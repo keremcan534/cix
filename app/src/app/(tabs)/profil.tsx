@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, VerifiedBadge } from '@/components/ui';
-import { ME } from '@/data/mock';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -21,22 +20,24 @@ const MENU: { icon: IconName; label: string; onPress?: () => void }[] = [
 ];
 
 export default function ProfileScreen() {
-  const { coins, following } = useApp();
+  const { coins, following, me, logout } = useApp();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={styles.top}>
-          <Avatar uri={ME.avatar} size={88} ring />
+          <Avatar uri={me.avatar} size={88} ring />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.name}>{ME.name}</Text>
-            <VerifiedBadge size={18} />
+            <Text style={styles.name}>
+              {me.name}, {me.age}
+            </Text>
+            {me.verified && <VerifiedBadge size={18} />}
             <View style={styles.level}>
               <Text style={styles.levelText}>Lv.7</Text>
             </View>
           </View>
-          <Text style={styles.bio}>{ME.bio}</Text>
-          <Text style={styles.id}>ID: 10284731 · {ME.city}</Text>
+          <Text style={styles.bio}>{me.bio}</Text>
+          <Text style={styles.id}>ID: 10284731 · {me.city}</Text>
         </View>
 
         <View style={styles.stats}>
@@ -68,6 +69,11 @@ export default function ProfileScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Pressable style={styles.logout} onPress={logout}>
+          <Ionicons name="log-out-outline" size={18} color={colors.red} />
+          <Text style={{ color: colors.red, fontWeight: '600' }}>Çıkış yap</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -99,4 +105,5 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   menuIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { color: '#fff', fontSize: 15, flex: 1 },
+  logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
 });

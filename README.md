@@ -19,6 +19,7 @@ Telefona **Expo Go** uygulamasını kur, terminaldeki QR kodu okut.
 
 | Ekran | Dosya | Neler var |
 | --- | --- | --- |
+| Giriş / Kayıt | `src/app/giris/` | Hoş geldin, telefon ile giriş (+90), 6 haneli SMS kodu (demo: herhangi bir kod), profil oluşturma (foto, ad, cinsiyet, doğum yılı, şehir, ilgi alanları, 18+ kontrolü), selfie ile gerçek kişi doğrulama, 100 jeton hoş geldin hediyesi |
 | Odalar | `src/app/(tabs)/index.tsx` | Çevrimiçi kişiler, kategori sekmeleri, canlı oda kartları, oda aç (+) |
 | Sesli oda | `src/app/oda/[id].tsx` | 9 koltuk (oda sahibi + 8), konuşan animasyonu, koltuğa geç/in, mikrofon, oda sohbeti, hediye paneli + animasyon |
 | Keşfet | `src/app/(tabs)/kesfet.tsx` | Yakındakiler / Tüm Türkiye / Yeni, doğrulandı ve VIP rozetleri, takip et, selam ver |
@@ -27,7 +28,7 @@ Telefona **Expo Go** uygulamasını kur, terminaldeki QR kodu okut.
 | Profil | `src/app/(tabs)/profil.tsx` | Seviye, istatistikler, VIP kartı, menü |
 | Cüzdan | `src/app/cuzdan.tsx` | Jeton bakiyesi ve paketler (ödeme simüle) |
 
-Ortak durum (jeton, takip, mesajlar) `src/store.tsx` içinde.
+Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 
 ## Sonraki adımlar
 

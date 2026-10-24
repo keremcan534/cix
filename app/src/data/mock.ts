@@ -9,7 +9,11 @@ export type User = {
   vip?: boolean;
   bio: string;
   online: boolean;
+  gender?: 'Kadın' | 'Erkek';
+  interests?: string[];
 };
+
+export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
 
 export type Room = {
   id: string;

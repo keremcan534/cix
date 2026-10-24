@@ -1,8 +1,15 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
-import { CONVERSATIONS, type Conversation } from '@/data/mock';
+import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
 
 type AppState = {
+  loggedIn: boolean;
+  me: User;
+  updateMe: (patch: Partial<User>) => void;
+  login: () => void;
+  logout: () => void;
+  phone: string;
+  setPhone: (phone: string) => void;
   coins: number;
   addCoins: (n: number) => void;
   spendCoins: (n: number) => boolean;
@@ -24,8 +31,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [coins, setCoins] = useState(250);
   const [following, setFollowing] = useState<Set<string>>(new Set(['u1']));
   const [conversations, setConversations] = useState(CONVERSATIONS);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [me, setMe] = useState<User>({ ...ME });
+  const [phone, setPhone] = useState('');
 
   const value: AppState = {
+    loggedIn,
+    me,
+    updateMe: (patch) => {
+      // Prototype shortcut: mock lookups (userById('me')) read the shared ME object.
+      Object.assign(ME, patch);
+      setMe({ ...ME });
+    },
+    login: () => setLoggedIn(true),
+    logout: () => setLoggedIn(false),
+    phone,
+    setPhone,
     coins,
     addCoins: (n) => setCoins((c) => c + n),
     spendCoins: (n) => {

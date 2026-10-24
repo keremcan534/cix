@@ -1,7 +1,7 @@
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { AppProvider } from '@/store';
+import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
 
 const theme = {
@@ -14,13 +14,25 @@ export default function RootLayout() {
     <AppProvider>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="oda/[id]" options={{ animation: 'slide_from_bottom' }} />
-          <Stack.Screen name="sohbet/[id]" />
-          <Stack.Screen name="cuzdan" options={{ presentation: 'modal' }} />
-        </Stack>
+        <RootStack />
       </ThemeProvider>
     </AppProvider>
+  );
+}
+
+function RootStack() {
+  const { loggedIn } = useApp();
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack.Protected guard={loggedIn}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="oda/[id]" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="sohbet/[id]" />
+        <Stack.Screen name="cuzdan" options={{ presentation: 'modal' }} />
+      </Stack.Protected>
+      <Stack.Protected guard={!loggedIn}>
+        <Stack.Screen name="giris" />
+      </Stack.Protected>
+    </Stack>
   );
 }
