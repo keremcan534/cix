@@ -29,6 +29,17 @@ function RootStack() {
         <Stack.Screen name="oda/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="sohbet/[id]" />
         <Stack.Screen name="cuzdan" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="kullanici/[id]" />
+        <Stack.Screen name="arama/[id]" options={{ animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="eslesme" />
+        <Stack.Screen name="yayinci/index" />
+        <Stack.Screen name="yayinci/cek" />
+        <Stack.Screen name="ajans" />
+        <Stack.Screen name="gorevler" />
+        <Stack.Screen name="siralama" />
+        <Stack.Screen name="vip" />
+        <Stack.Screen name="aile" />
+        <Stack.Screen name="cark" />
       </Stack.Protected>
       <Stack.Protected guard={!loggedIn}>
         <Stack.Screen name="giris" />

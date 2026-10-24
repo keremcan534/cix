@@ -78,6 +78,9 @@ export const USERS: User[] = [
   { id: 'u12', name: 'Onur', age: 26, city: 'Konya', distanceKm: 520, avatar: avatar(60), verified: false, bio: 'Kahve bağımlısı', online: true },
 ];
 
+const WOMEN = new Set(['u1', 'u3', 'u5', 'u7', 'u9', 'u11']);
+USERS.forEach((u) => (u.gender = WOMEN.has(u.id) ? 'Kadın' : 'Erkek'));
+
 export const userById = (id: string): User =>
   id === 'me' ? ME : (USERS.find((u) => u.id === id) ?? USERS[0]);
 

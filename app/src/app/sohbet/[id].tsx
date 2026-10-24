@@ -25,9 +25,12 @@ export default function ChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, messages.length]);
 
-  useEffect(() => () => {
-    if (replyTimer.current) clearTimeout(replyTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (replyTimer.current) clearTimeout(replyTimer.current);
+    },
+    [],
+  );
 
   const send = () => {
     const text = draft.trim();
@@ -48,16 +51,29 @@ export default function ChatScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Ionicons name="chevron-back" size={26} color="#fff" />
         </Pressable>
-        <Avatar uri={user.avatar} size={38} online={user.online} />
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={styles.name}>{user.name}</Text>
-            {user.verified && <VerifiedBadge />}
+        <Pressable
+          onPress={() => router.push(`/kullanici/${user.id}`)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
+        >
+          <Avatar uri={user.avatar} size={38} online={user.online} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.name}>{user.name}</Text>
+              {user.verified && <VerifiedBadge />}
+            </View>
+            <Text style={styles.status}>{typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : `${user.city}`}</Text>
           </View>
-          <Text style={styles.status}>{typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : `${user.city}`}</Text>
-        </View>
-        <Ionicons name="call-outline" size={22} color="#fff" />
-        <Ionicons name="videocam-outline" size={24} color="#fff" style={{ marginLeft: 14 }} />
+        </Pressable>
+        <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={8}>
+          <Ionicons name="call-outline" size={22} color="#fff" />
+        </Pressable>
+        <Pressable
+          onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'goruntulu' } })}
+          hitSlop={8}
+          style={{ marginLeft: 14 }}
+        >
+          <Ionicons name="videocam-outline" size={24} color="#fff" />
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -112,7 +128,15 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   name: { color: '#fff', fontWeight: '700', fontSize: 16 },
   status: { color: colors.textDim, fontSize: 12 },
   intro: { alignItems: 'center', gap: 6, paddingVertical: 24 },
@@ -123,6 +147,14 @@ const styles = StyleSheet.create({
   bubbleText: { color: '#fff', fontSize: 15 },
   time: { color: 'rgba(255,255,255,0.6)', fontSize: 10, alignSelf: 'flex-end', marginTop: 2 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  input: { flex: 1, backgroundColor: colors.card, color: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15 },
+  input: {
+    flex: 1,
+    backgroundColor: colors.card,
+    color: '#fff',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 });

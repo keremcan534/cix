@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { vipTier } from '@/data/economy';
 import { colors, gradient } from '@/theme';
 
 export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
@@ -111,4 +113,59 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   coinText: { color: colors.gold, fontWeight: '700' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10 },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
 });
+
+export function Header({ title, right }: { title: string; right?: ReactNode }) {
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={() => router.back()} hitSlop={10} style={{ width: 32 }} accessibilityLabel="Geri">
+        <Ionicons name="chevron-back" size={26} color="#fff" />
+      </Pressable>
+      <Text style={styles.headerTitle} numberOfLines={1}>
+        {title}
+      </Text>
+      <View style={{ minWidth: 32, alignItems: 'flex-end' }}>{right}</View>
+    </View>
+  );
+}
+
+/** Avatar with the nobility (VIP) frame color, if any. */
+export function FramedAvatar({ uri, size = 44, vipLevel = 0, online }: { uri: string; size?: number; vipLevel?: number; online?: boolean }) {
+  const tier = vipTier(vipLevel);
+  if (!tier) return <Avatar uri={uri} size={size} online={online} />;
+  return (
+    <View style={{ width: size, height: size }}>
+      <LinearGradient colors={tier.color} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
+        <Image source={{ uri }} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
+      </LinearGradient>
+      <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{tier.emoji}</Text>
+    </View>
+  );
+}
+
+export function VipTitle({ level }: { level: number }) {
+  const tier = vipTier(level);
+  if (!tier) return null;
+  return (
+    <LinearGradient colors={tier.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.vip}>
+      <Text style={[styles.vipText, { color: '#fff' }]}>
+        {tier.emoji} {tier.name}
+      </Text>
+    </LinearGradient>
+  );
+}
+
+export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[{ backgroundColor: colors.card, borderRadius: 18, padding: 16 }, style]}>{children}</View>;
+}
+
+export function DiamondPill({ diamonds }: { diamonds: number }) {
+  return (
+    <View style={[styles.coin, { backgroundColor: 'rgba(56,189,248,0.15)' }]}>
+      <Text style={{ fontSize: 13 }}>💎</Text>
+      <Text style={[styles.coinText, { color: '#7DD3FC' }]}>{diamonds.toLocaleString('tr-TR')}</Text>
+    </View>
+  );
+}

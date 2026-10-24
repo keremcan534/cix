@@ -2,11 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
+import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -41,7 +42,7 @@ export default function VerifyScreen() {
   const finish = () => {
     addCoins(100);
     login();
-    Alert.alert('Hoş geldin! 🎉', 'Hoş geldin hediyesi olarak 100 jeton hesabına eklendi.');
+    showAlert('Hoş geldin! 🎉', 'Hoş geldin hediyesi olarak 100 jeton hesabına eklendi.');
   };
 
   return (

@@ -2,11 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/components/ui';
 import { COIN_PACKS } from '@/data/mock';
+import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -19,7 +20,7 @@ export default function WalletScreen() {
     // Prototype: no real payment, just credit the coins.
     const bonus = pack.bonus ? Number(pack.bonus.replace('+', '')) : 0;
     addCoins(pack.coins + bonus);
-    Alert.alert('Başarılı 🎉', `${pack.coins + bonus} jeton hesabına eklendi. (Demo – gerçek ödeme alınmadı)`);
+    showAlert('Başarılı 🎉', `${pack.coins + bonus} jeton hesabına eklendi. (Demo – gerçek ödeme alınmadı)`);
   };
 
   return (

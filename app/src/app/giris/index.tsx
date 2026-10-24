@@ -5,6 +5,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/components/ui';
+import { useApp } from '@/store';
 import { USERS } from '@/data/mock';
 import { colors } from '@/theme';
 
@@ -19,6 +20,12 @@ const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
 ];
 
 export default function WelcomeScreen() {
+  const { updateMe, login } = useApp();
+  const demoLogin = () => {
+    updateMe({ name: 'Demo', age: 25, verified: true, bio: '🎧 Müzik 🎮 Oyun' });
+    login();
+  };
+
   return (
     <LinearGradient colors={['#2B1259', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -41,6 +48,9 @@ export default function WelcomeScreen() {
           <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
           <SocialButton icon="logo-google" title="Google ile devam et" />
           <SocialButton icon="logo-apple" title="Apple ile devam et" />
+          <Pressable onPress={demoLogin} style={{ alignItems: 'center', paddingVertical: 4 }}>
+            <Text style={styles.link}>⚡ Demo hesabıyla hızlı giriş</Text>
+          </Pressable>
           <Text style={styles.terms}>
             Devam ederek <Text style={styles.link}>Kullanım Koşulları</Text> ve{' '}
             <Text style={styles.link}>Gizlilik Politikası</Text>&apos;nı kabul etmiş olursun. 18 yaşından büyük olmalısın.

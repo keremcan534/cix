@@ -25,6 +25,9 @@ export default function DiscoverScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <View style={styles.header}>
+        <Pressable style={styles.matchBtn} onPress={() => router.push('/eslesme')}>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>⚡ Eşleş</Text>
+        </Pressable>
         {TABS.map((t) => (
           <Pressable key={t} onPress={() => setTab(t)}>
             <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
@@ -45,13 +48,13 @@ export default function DiscoverScreen() {
 }
 
 function PersonCard({ user }: { user: User }) {
-  const { sendMessage, following, toggleFollow } = useApp();
+  const { sendMessage, following, toggleFollow, bump } = useApp();
   const [greeted, setGreeted] = useState(false);
   const isFollowing = following.has(user.id);
 
   return (
     <View style={styles.card}>
-      <Pressable onPress={() => router.push(`/sohbet/${user.id}`)}>
+      <Pressable onPress={() => router.push(`/kullanici/${user.id}`)}>
         <Image source={{ uri: user.avatar }} style={styles.photo} />
         <LinearGradient colors={['transparent', 'rgba(18,11,36,0.9)']} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />
         <Pressable style={styles.follow} onPress={() => toggleFollow(user.id)} hitSlop={8}>
@@ -80,6 +83,7 @@ function PersonCard({ user }: { user: User }) {
         onPress={() => {
           if (greeted) return router.push(`/sohbet/${user.id}`);
           sendMessage(user.id, 'Selam! 👋');
+          bump('greetings');
           setGreeted(true);
         }}
       />
@@ -88,7 +92,8 @@ function PersonCard({ user }: { user: User }) {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', gap: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  header: { flexDirection: 'row', gap: 18, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'flex-start' },
+  matchBtn: { position: 'absolute', right: 16, top: 12, backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, zIndex: 1 },
   tab: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
   tabActive: { color: '#fff', fontSize: 18, fontWeight: '800' },
   underline: { height: 3, borderRadius: 2, backgroundColor: colors.pink, marginTop: 4, width: 20 },

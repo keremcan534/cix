@@ -6,18 +6,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, GradientButton, VerifiedBadge } from '@/components/ui';
 import { ME, MOMENTS, userById, type Moment } from '@/data/mock';
+import { useApp } from '@/store';
 import { colors } from '@/theme';
 
 export default function MomentsScreen() {
   const [moments, setMoments] = useState(MOMENTS);
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState('');
+  const { bump } = useApp();
 
   const post = () => {
     if (!draft.trim()) return;
     setMoments((m) => [{ id: String(Date.now()), userId: ME.id, text: draft.trim(), likes: 0, comments: 0, time: 'şimdi' }, ...m]);
     setDraft('');
     setComposing(false);
+    bump('moments');
   };
 
   return (
@@ -74,7 +77,7 @@ function MomentCard({ moment }: { moment: Moment }) {
 
   return (
     <View style={styles.card}>
-      <Pressable style={styles.row} onPress={() => user.id !== 'me' && router.push(`/sohbet/${user.id}`)}>
+      <Pressable style={styles.row} onPress={() => user.id !== 'me' && router.push(`/kullanici/${user.id}`)}>
         <Avatar uri={user.avatar} size={42} online={user.online} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
