@@ -19,10 +19,28 @@ import {
   SettingsModal,
   type MusicState,
 } from '@/components/room/panels';
+import {
+  EventsSheet,
+  GiftResults,
+  GoalCard,
+  GoalCreate,
+  InviteSheet,
+  ModerationSheet,
+  PollCard,
+  PollCreate,
+  QuestionsSheet,
+  SoundSheet,
+  type Goal,
+  type ModLog,
+  type Poll,
+  type Question,
+  type RoomEvent,
+} from '@/components/room/community';
 import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
-import { MUSIC_CATALOG, adminCapacity, cosmeticById, micCapacity, roomLevel, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { MUSIC_CATALOG, adminCapacity, cosmeticById, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { INCOMING_GIFT_POOL, VIP_ENTRY_LEVEL, VIP_INVISIBLE_LEVEL, vipTier } from '@/data/economy';
+import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
@@ -38,13 +56,14 @@ const BOT_TIPS = [
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 const rollDie = () => 1 + Math.floor(Math.random() * 6);
 const msgId = () => String(Date.now() + Math.random());
+const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
 
 export default function VoiceRoom() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isOwn = id === 'yeni';
   const app = useApp();
-  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket } = app;
+  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify } = app;
 
   const base = isOwn ? null : roomById(id);
   const hostId = isOwn ? 'me' : base!.hostId;
@@ -60,6 +79,11 @@ export default function VoiceRoom() {
   const roleOf = (uid: string): RoomRole => (uid === hostId ? 'owner' : adminIds.includes(uid) ? 'admin' : 'member');
   const botOn = isOwn ? settings.roomBot : true;
   const invisible = settings.invisibleEntry && vipLevel >= VIP_INVISIBLE_LEVEL;
+  const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
+  const typeInfo = roomTypeInfo(roomType);
+  const lockedSeats = isOwn ? myRoom.lockedSeats : [];
+  // Personal effect preferences never change the gift transaction itself.
+  const showFx = (price: number) => !settings.effectsOff && !settings.reduceMotion && (!isOwn || myRoom.giftEffects) && (!settings.bigGiftsOnly || price >= 100);
 
   // Entry effect from cosmetics (ride/entry) or VIP level.
   const entryInfo = useMemo(() => {
@@ -94,11 +118,24 @@ export default function VoiceRoom() {
   const [listeners, setListeners] = useState(isOwn ? 1 : base!.listeners);
   const [listOpen, setListOpen] = useState(false);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
-  const [panel, setPanel] = useState<null | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests'>(null);
+  const [panel, setPanel] = useState<null | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'sound' | 'mod' | 'invite' | 'results'>(null);
+  const [poll, setPoll] = useState<Poll | null>(null);
+  const [goal, setGoal] = useState<Goal | null>(null);
+  const [events, setEvents] = useState<RoomEvent[]>(() =>
+    roomType === 'event' ? [{ id: 'ev0', title: 'Doğruluk mu Cesaret mi', desc: 'Haftalık oyun gecesi', when: 'Bugün 22:00', type: 'Oyun', by: hostId, going: false, reminder: false, attendees: 37, cancelled: false }] : [],
+  );
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [modLog, setModLog] = useState<ModLog[]>([]);
+  const [slowMode, setSlowMode] = useState(false);
+  const [words, setWords] = useState<string[]>(['spam', 'reklam']);
+  const [bans, setBans] = useState<{ userId: string; until: string }[]>([]);
+  const [invited, setInvited] = useState<Record<string, 'Davet edildi' | 'Katıldı'>>({});
+  const [myQueuePos, setMyQueuePos] = useState<number | null>(null);
+  const [giftResults, setGiftResults] = useState<{ userId: string; ok: boolean }[]>([]);
+  const [musicRequests, setMusicRequests] = useState<{ track: Track; by: string }[]>([]);
   const [pk, setPk] = useState<Pk | null>(null);
   const [contrib, setContrib] = useState<Record<string, number>>({});
   const [requests, setRequests] = useState<string[]>([]);
-  const [myRequest, setMyRequest] = useState(false);
   const [envelope, setEnvelope] = useState<{ from: string; amount: number; count: number; seconds: number } | null>(null);
   const [dicePlays, setDicePlays] = useState(DAILY_DICE);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -116,7 +153,10 @@ export default function VoiceRoom() {
   const audience = USERS.filter((u) => !allSeats.includes(u.id) && !kicked.has(u.id) && !blocked.has(u.id));
   const canControlMusic = myRole !== 'member';
 
-  const addMsg = (msg: Omit<ChatMsg, 'id'>) => setMessages((m) => [...m.slice(-80), { ...msg, id: msgId() }]);
+  const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
+  const addMsg = (msg: Omit<ChatMsg, 'id'>) => setMessages((m) => [...m.slice(-80), { ...msg, text: msg.userId ? mask(msg.text) : msg.text, id: msgId() }]);
+  const logMod = (action: string, target: string, reason = '') =>
+    setModLog((l) => [{ id: msgId(), time: new Date().toTimeString().slice(0, 5), actor: myRole === 'owner' ? 'Sahip (sen)' : 'Yönetici (sen)', action, target, reason }, ...l]);
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
 
   // Room XP for the user's own room. Level-ups are announced once per level.
@@ -135,11 +175,22 @@ export default function VoiceRoom() {
     return () => clearTimeout(t);
   }, [entry]);
 
-  // Minutes in room: daily task + room XP.
+  // Recent rooms (personalized discovery) and fan-club points for joining.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      visitRoom(id);
+      if (!isOwn) addFanPoints(hostId, 5, 'Odaya katıldın');
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Minutes in room: daily task + room XP + fan points.
   useEffect(() => {
     const t = setInterval(() => {
       bump('roomMinutes');
       gainXp(10);
+      if (!isOwn) addFanPoints(hostId, 2, 'Odada 1 dk aktif kaldın');
     }, 60_000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,6 +201,7 @@ export default function VoiceRoom() {
     if (!botOn) return;
     const t = setInterval(() => addMsg({ bot: true, text: pick(BOT_TIPS) }), 45_000);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botOn]);
 
   // Fake "who is talking".
@@ -168,11 +220,16 @@ export default function VoiceRoom() {
     const t = setInterval(() => {
       const u = pick(USERS);
       if (kicked.has(u.id) || blocked.has(u.id)) return;
+      if (slowMode && Math.random() < 0.6) return;
       const r = Math.random();
       if (r < 0.25) {
         setListeners((n) => (isOwn ? Math.min(myRoom.limit, n + 1) : n + 1));
-        addMsg({ system: true, text: `${u.name} odaya katıldı` });
+        addMsg({ system: true, text: `${u.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         gainXp(5);
+        setGoal((g) => (g && g.kind === 'join' ? { ...g, progress: g.progress + 1 } : g));
+      } else if (r < 0.3) {
+        setGoal((g) => (g && g.kind === 'like' ? { ...g, progress: g.progress + 1 } : g));
+        addMsg({ system: true, text: `❤️ ${u.name} odayı beğendi` });
       } else if (r < 0.35 && !isOwn) {
         const g = pick(GIFTS.slice(0, 5));
         addContrib(u.id, g.price);
@@ -183,7 +240,7 @@ export default function VoiceRoom() {
     }, 3500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kicked, blocked]);
+  }, [kicked, blocked, slowMode, words]);
 
   // Own room: listeners send gifts (host earns diamonds, room earns XP) and ask to speak.
   useEffect(() => {
@@ -192,9 +249,12 @@ export default function VoiceRoom() {
       const from = pick(USERS);
       const gift = GIFTS.find((g) => g.price === pick(INCOMING_GIFT_POOL)) ?? GIFTS[0];
       receiveDiamonds(gift.price, 'Hediye', from.id);
+      // Owner bonus is calculated separately and never reduces the streamer's earnings.
+      const ownerBonus = Math.round(gift.price * RULES.roomOwnerBonus);
+      if (ownerBonus > 0) receiveDiamonds(ownerBonus, 'Oda sahibi bonusu', from.id);
       gainXp(gift.price);
       addContrib(from.id, gift.price);
-      if (gift.price >= 50 && !settings.effectsOff) setGiftFx(gift);
+      if (gift.price >= 50 && showFx(gift.price)) setGiftFx(gift);
       addMsg({ system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)` });
       setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + gift.price } : p));
     }, 6000);
@@ -205,12 +265,64 @@ export default function VoiceRoom() {
         return u ? [...r, u.id] : r;
       });
     }, 12_000);
+    const songs = setInterval(() => {
+      if (roomType !== 'music') return;
+      setMusicRequests((r) => (r.length >= 3 ? r : [...r, { track: pick(MUSIC_CATALOG), by: pick(USERS).id }]));
+    }, 15_000);
     return () => {
       clearInterval(gifts);
       clearInterval(reqs);
+      clearInterval(songs);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOwn]);
+
+  // Poll clock + simulated votes.
+  const pollOpen = !!poll && !poll.closed;
+  useEffect(() => {
+    if (!pollOpen) return;
+    const t = setInterval(
+      () =>
+        setPoll((p) => {
+          if (!p || p.closed) return p;
+          const options = p.options.map((o) => (Math.random() < 0.4 ? { ...o, votes: o.votes + 1 } : o));
+          return p.endsIn > 1 ? { ...p, options, endsIn: p.endsIn - 1 } : { ...p, options, endsIn: 0, closed: true };
+        }),
+      1000,
+    );
+    return () => clearInterval(t);
+  }, [pollOpen]);
+
+  // Goal clock.
+  const goalLive = !!goal && goal.endsIn > 0 && goal.progress < goal.target;
+  useEffect(() => {
+    if (!goalLive) return;
+    const t = setInterval(() => setGoal((g) => (g ? { ...g, endsIn: Math.max(0, g.endsIn - 1) } : g)), 1000);
+    return () => clearInterval(t);
+  }, [goalLive]);
+
+  // Q&A rooms: listeners send questions.
+  useEffect(() => {
+    if (roomType !== 'qa') return;
+    const t = setInterval(() => setQuestions((q) => (q.length > 8 ? q : [...q, { id: msgId(), userId: pick(USERS).id, text: pick(QUESTIONS), picked: false }])), 9000);
+    return () => clearInterval(t);
+  }, [roomType]);
+
+  // Speaker queue for me in someone else's room: position moves up, then I get a mic if one is free.
+  const inQueue = myQueuePos !== null;
+  useEffect(() => {
+    if (!inQueue) return;
+    const t = setInterval(() => setMyQueuePos((p) => (p === null ? p : Math.max(0, p - 1))), 3000);
+    return () => clearInterval(t);
+  }, [inQueue]);
+  const freeSeatIndex = allSeats.findIndex((x, i) => i > 0 && x === null && !lockedSeats.includes(i));
+  if (myQueuePos === 0 && freeSeatIndex > 0) {
+    // Derived transition: my turn came and a mic is free.
+    setMyQueuePos(null);
+    setSeats((st) => pad(st, capacity).map((x, i) => (i === freeSeatIndex ? 'me' : x)));
+    setMicOn(true);
+    setMessages((m) => [...m, { id: msgId(), system: true, text: `✅ Sıran geldi: ${freeSeatIndex + 1}. mikrofona geçtin` }]);
+  }
 
   // Other rooms: the host drops a red envelope after a while.
   useEffect(() => {
@@ -297,6 +409,7 @@ export default function VoiceRoom() {
     addMsg({ system: true, text: `${ME.name} ${index + 1}. koltuğa geçti` });
   };
 
+  const freeMic = roomType === 'free';
   const onSeatPress = (index: number) => {
     const uid = allSeats[index];
     if (uid === 'me') {
@@ -327,19 +440,22 @@ export default function VoiceRoom() {
           options.push(
             {
               label: muted ? '🔊 Sesini aç' : '🔇 Sustur',
-              onPress: () =>
+              onPress: () => {
                 setMutedUsers((m) => {
                   const n = new Set(m);
                   if (muted) n.delete(uid);
                   else n.add(uid);
                   return n;
-                }),
+                });
+                logMod(muted ? 'Sesini açtı' : 'Susturdu', u.name);
+              },
             },
             {
               label: '⬇️ Mikrofondan indir',
               onPress: () => {
                 removeFromSeat(uid);
                 addMsg({ system: true, text: `${u.name} mikrofondan indirildi` });
+                logMod('Mikrofondan indirdi', u.name);
               },
             },
           );
@@ -351,16 +467,19 @@ export default function VoiceRoom() {
                 onPress: () => {
                   if (!isAdmin && adminIds.length >= adminCapacity(level)) return showAlert('Yönetici kontenjanı dolu', `Lv.${level} odada en fazla ${adminCapacity(level)} yönetici olabilir.`);
                   updateMyRoom({ adminIds: isAdmin ? adminIds.filter((x) => x !== uid) : [...adminIds, uid] });
+                  logMod(isAdmin ? 'Yöneticilikten aldı' : 'Yönetici atadı', u.name);
                   addMsg({ system: true, text: isAdmin ? `${u.name} artık yönetici değil` : `🛡️ ${u.name} oda yöneticisi oldu` });
                 },
               },
               {
-                label: '🚫 Odadan çıkar',
+                label: '🚫 Odadan çıkar (10 dk giriş yasağı)',
                 destructive: true,
                 onPress: () => {
                   removeFromSeat(uid);
                   setKicked((k) => new Set(k).add(uid));
-                  addMsg({ system: true, text: `${u.name} odadan çıkarıldı (gerekçe ve süre denetim kaydına yazıldı)` });
+                  setBans((b) => [...b.filter((x) => x.userId !== uid), { userId: uid, until: '10 dk' }]);
+                  addMsg({ system: true, text: `${u.name} odadan çıkarıldı · 10 dk giriş yasağı (denetim kaydına yazıldı)` });
+                  logMod('Odadan çıkardı', u.name, '10 dk giriş yasağı');
                 },
               },
             );
@@ -368,7 +487,10 @@ export default function VoiceRoom() {
         } else {
           options.push({
             label: '🔒 Üst role müdahale edilemez',
-            onPress: () => showAlert('Yetki yok', `${targetRole === 'owner' ? 'Oda sahibini' : 'Aynı veya üst rolü'} susturamaz ya da mikrofondan indiremezsin. Bu deneme denetim kaydına yazıldı.`),
+            onPress: () => {
+              logMod('Reddedilen deneme: üst role müdahale', u.name);
+              showAlert('Yetki yok', `${targetRole === 'owner' ? 'Oda sahibini' : 'Aynı veya üst rolü'} susturamaz ya da mikrofondan indiremezsin. Bu deneme denetim kaydına yazıldı.`);
+            },
           });
         }
       }
@@ -376,16 +498,24 @@ export default function VoiceRoom() {
       return;
     }
     if (index === 0) return;
+    if (isOwn) {
+      const locked = lockedSeats.includes(index);
+      setSheet({
+        title: `${index + 1}. mikrofon`,
+        options: [
+          { label: locked ? '🔓 Kilidi aç' : '🔒 Mikrofonu kilitle', onPress: () => updateMyRoom({ lockedSeats: locked ? lockedSeats.filter((x) => x !== index) : [...lockedSeats, index] }) },
+          { label: '👥 Dinleyicilerden davet et', onPress: () => setListOpen(true) },
+        ],
+      });
+      return;
+    }
     if (amSeated || myRole !== 'member') return sitMe(index);
-    // Others' rooms require approval to speak.
-    if (myRequest) return showAlert('İsteğin bekliyor', 'Oda sahibinin onayını bekliyorsun.');
-    setMyRequest(true);
-    addMsg({ system: true, text: '🙋 Konuşma isteğin oda sahibine gönderildi' });
-    setTimeout(() => {
-      setMyRequest(false);
-      sitMe(index);
-      addMsg({ system: true, text: `✅ ${userById(hostId).name} konuşma isteğini kabul etti` });
-    }, 2000);
+    if (freeMic) return sitMe(index);
+    // Stage-style rooms: join the speaker queue and see my position.
+    if (myQueuePos !== null) return showAlert('Sıradasın', `Konumun: ${myQueuePos + 1}. Sıradan çıkmak için menüyü kullan.`);
+    const pos = rollDie() % 3 + 1;
+    setMyQueuePos(pos);
+    addMsg({ system: true, text: `🙋 Konuşmacı kuyruğuna katıldın · sıran: ${pos + 1}` });
   };
 
   // --- Chat, gifts, games ---------------------------------------------------------
@@ -397,21 +527,42 @@ export default function VoiceRoom() {
     gainXp(2);
   };
 
-  const sendGift = (gift: Gift, toId: string, count: number) => {
-    setGiftOpen(false);
-    const total = gift.price * count;
-    if (!spendCoins(total, `Hediye: ${gift.name} x${count}`)) {
+  const deliverGifts = (gift: Gift, toIds: string[], count: number) => {
+    const each = gift.price * count;
+    // Each recipient is a separate, individually recorded transaction; stop charging once the balance runs out.
+    const results = toIds.map((uid) => ({ userId: uid, ok: spendCoins(each, `Hediye: ${gift.name} x${count} → ${userById(uid).name}`) }));
+    const delivered = results.filter((r) => r.ok);
+    if (delivered.length === 0) {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
       ]);
       return;
     }
-    bump('giftsSent', count);
+    const total = each * delivered.length;
+    bump('giftsSent', count * delivered.length);
     addContrib('me', total);
-    if (!settings.effectsOff) setGiftFx(gift);
+    if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
+    if (showFx(gift.price)) setGiftFx(gift);
     setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + total } : p));
-    addMsg({ system: true, text: `🎁 ${ME.name}, ${userById(toId).name} kişisine ${gift.emoji} ${gift.name} x${count} gönderdi!` });
+    addMsg({ system: true, text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!` });
+    if (toIds.length > 1 || delivered.length < toIds.length) {
+      setGiftResults(results);
+      setPanel('results');
+    }
+  };
+
+  const sendGift = (gift: Gift, toIds: string[], count: number) => {
+    setGiftOpen(false);
+    const total = gift.price * count * toIds.length;
+    if (total >= settings.bigSpendConfirm) {
+      showAlert('Yüksek tutarlı gönderim', `${toIds.length} alıcıya toplam 🪙 ${total.toLocaleString('tr-TR')} gönderilecek. Onaylıyor musun?`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Onayla ve gönder', onPress: () => deliverGifts(gift, toIds, count) },
+      ]);
+      return;
+    }
+    deliverGifts(gift, toIds, count);
   };
 
   const sendEnvelope = (amount: number, count: number) => {
@@ -478,6 +629,13 @@ export default function VoiceRoom() {
       title,
       options: [
         { label: '🎵 Müzik', onPress: () => setPanel('music') },
+        ...(myRole !== 'member' ? [{ label: '📊 Anket başlat', onPress: () => setPanel('poll') }, { label: '🎯 Topluluk hedefi', onPress: () => setPanel('goal') }] : []),
+        { label: '📅 Etkinlikler', onPress: () => setPanel('events') },
+        ...(roomType === 'qa' ? [{ label: '❓ Sorular', onPress: () => setPanel('qa') }] : []),
+        { label: '🔊 Ses ve efekt ayarları', onPress: () => setPanel('sound') },
+        ...(myRole !== 'member' ? [{ label: '🛡️ Moderasyon', onPress: () => setPanel('mod') }] : []),
+        { label: '📨 Arkadaş davet et', onPress: () => setPanel('invite') },
+        ...(myQueuePos !== null ? [{ label: '🚶 Konuşmacı kuyruğundan çık', onPress: () => setMyQueuePos(null) }] : []),
         { label: '🎲 Zar Düellosu', onPress: () => setPanel('dice') },
         { label: '🧧 Zarf dağıt', onPress: () => setPanel('envelope') },
         { label: '🎰 Şans çarkı', onPress: () => router.push('/cark') },
@@ -520,7 +678,7 @@ export default function VoiceRoom() {
               </View>
               <Pressable onPress={() => setListOpen(true)}>
                 <Text style={styles.sub} numberOfLines={1}>
-                  👥 {listeners} · 🎙️ {capacity}
+                  {typeInfo.emoji} {typeInfo.name} · 👥 {listeners} · 🎙️ {capacity}
                   {agencyRoom ? ' · 🏢 Ajans odası' : ''}
                   {myRole === 'owner' ? ' · Sahibi' : myRole === 'admin' ? ' · 🛡️ Yönetici' : ''}
                   {invisible ? ' · 👻' : ''}
@@ -552,6 +710,29 @@ export default function VoiceRoom() {
 
           {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
           {pk && <PkBar pk={{ ...pk, mvp }} roomTitle={title} />}
+          {settings.roomMuted && <Text style={styles.mutedChip}>🔇 Oda sesi senin için kapalı · Ses ayarlarından açabilirsin</Text>}
+          {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
+          {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
+            <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
+              <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                📅 {events.filter((e) => !e.cancelled)[0].title} · {events.filter((e) => !e.cancelled)[0].when}
+              </Text>
+              <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{events.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
+            </Pressable>
+          )}
+          {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
+          {poll && (
+            <PollCard
+              poll={poll}
+              canManage={myRole !== 'member'}
+              onVote={(i) => setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p))}
+              onClose={() => {
+                setPoll((p) => (p ? { ...p, closed: true, endsIn: 0 } : p));
+                logMod('Anketi kapattı', poll.question);
+              }}
+            />
+          )}
+          {goal && <GoalCard goal={goal} />}
 
           <View style={styles.seatGrid}>
             {allSeats.map((uid, i) => (
@@ -566,7 +747,7 @@ export default function VoiceRoom() {
                 speaking={!!uid && speaking.has(uid)}
                 muted={uid === 'me' ? !micOn : !!uid && mutedUsers.has(uid)}
                 role={uid ? roleOf(uid) : undefined}
-                locked={!uid && i > 0 && myRole === 'member' && !amSeated}
+                locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
                 onPress={() => onSeatPress(i)}
               />
             ))}
@@ -596,6 +777,7 @@ export default function VoiceRoom() {
               returnKeyType="send"
             />
             {amSeated && <RoundBtn label="Mikrofon" icon={micOn ? 'mic' : 'mic-off'} active={micOn} onPress={() => setMicOn((m) => !m)} />}
+            {roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
             <RoundBtn label="Menü" icon="grid" onPress={moreMenu} />
             <RoundBtn
               label="Hediye"
@@ -655,6 +837,13 @@ export default function VoiceRoom() {
         onRemove={music$.remove}
         enabled={musicEnabled}
         setEnabled={setMusicEnabled}
+        requests={musicRequests}
+        onApprove={(i) => {
+          const r = musicRequests[i];
+          setMusicRequests((l) => l.filter((_, j) => j !== i));
+          if (r) music$.add(r.track);
+        }}
+        onReject={(i) => setMusicRequests((l) => l.filter((_, j) => j !== i))}
       />
       <EnvelopeSendModal visible={panel === 'envelope'} onClose={() => setPanel(null)} onSend={sendEnvelope} coins={coins} />
       <DiceModal visible={panel === 'dice'} onClose={() => setPanel(null)} onPlay={playDice} playsLeft={dicePlays} />
@@ -663,6 +852,7 @@ export default function VoiceRoom() {
         visible={panel === 'requests'}
         onClose={() => setPanel(null)}
         requests={requests}
+        freeSeats={allSeats.filter((x, i) => i > 0 && x === null && !lockedSeats.includes(i)).length}
         onAccept={(uid) => {
           setRequests((r) => r.filter((x) => x !== uid));
           placeOnSeat(uid);
@@ -672,6 +862,85 @@ export default function VoiceRoom() {
           addMsg({ system: true, text: `${userById(uid).name} adlı kullanıcının konuşma isteği reddedildi` });
         }}
       />
+      <PollCreate
+        visible={panel === 'poll'}
+        onClose={() => setPanel(null)}
+        onCreate={(question, opts, seconds, live) => {
+          setPoll({ id: msgId(), question, options: opts.map((text) => ({ text, votes: 0 })), myVote: null, endsIn: seconds, live, closed: false });
+          setPanel(null);
+          addMsg({ system: true, text: `📊 Anket başladı: ${question}` });
+        }}
+      />
+      <GoalCreate
+        visible={panel === 'goal'}
+        onClose={() => setPanel(null)}
+        onCreate={(g) => {
+          setGoal({ ...g, id: msgId(), progress: 0 });
+          setPanel(null);
+          addMsg({ system: true, text: `🎯 Topluluk hedefi: ${g.title} (10 dk)` });
+        }}
+      />
+      <EventsSheet
+        visible={panel === 'events'}
+        onClose={() => setPanel(null)}
+        events={events}
+        canManage={myRole !== 'member'}
+        onCreate={(e) => {
+          setEvents((l) => [...l, { ...e, id: msgId(), by: isOwn ? 'me' : hostId, going: true, reminder: true, attendees: 0, cancelled: false }]);
+          addMsg({ system: true, text: `📅 Yeni etkinlik: ${e.title} · ${e.when}` });
+        }}
+        onToggleGoing={(eid) => setEvents((l) => l.map((e) => (e.id === eid ? { ...e, going: !e.going } : e)))}
+        onToggleReminder={(eid) => {
+          const e = events.find((x) => x.id === eid);
+          setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
+          // One reminder per event (no duplicates); respects the user's notification choices.
+          if (e && !e.reminder) notify({ kind: 'social', icon: '⏰', title: `Hatırlatma kuruldu: ${e.title}`, body: `${e.when} · ${title}`, href: `/oda/${id}` });
+        }}
+        onCancel={(eid) => {
+          const e = events.find((x) => x.id === eid);
+          setEvents((l) => l.map((x) => (x.id === eid ? { ...x, cancelled: true } : x)));
+          if (e) {
+            addMsg({ system: true, text: `❌ Etkinlik iptal edildi: ${e.title} — katılımcılara bildirildi` });
+            logMod('Etkinliği iptal etti', e.title);
+          }
+        }}
+      />
+      <QuestionsSheet
+        visible={panel === 'qa'}
+        onClose={() => setPanel(null)}
+        questions={questions}
+        canManage={myRole !== 'member'}
+        onAsk={(text) => setQuestions((q) => [...q, { id: msgId(), userId: 'me', text, picked: false }])}
+        onPick={(qid) => {
+          const q = questions.find((x) => x.id === qid);
+          setQuestions((l) => l.map((x) => (x.id === qid ? { ...x, picked: true } : x)));
+          if (q) addMsg({ system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
+        }}
+      />
+      <SoundSheet
+        visible={panel === 'sound'}
+        onClose={() => setPanel(null)}
+        settings={settings}
+        set={setSetting}
+        isOwner={isOwn}
+        roomFx={{ giftEffects: myRoom.giftEffects, joinSounds: myRoom.joinSounds }}
+        setRoomFx={updateMyRoom}
+      />
+      <ModerationSheet visible={panel === 'mod'} onClose={() => setPanel(null)} log={modLog} slowMode={slowMode} setSlowMode={(v) => { setSlowMode(v); logMod(v ? 'Yavaş modu açtı' : 'Yavaş modu kapattı', 'Oda'); }} words={words} setWords={setWords} bans={bans} />
+      <InviteSheet
+        visible={panel === 'invite'}
+        onClose={() => setPanel(null)}
+        friends={USERS.filter((u) => following.has(u.id))}
+        invited={invited}
+        onInvite={(uid) => {
+          setInvited((m) => ({ ...m, [uid]: 'Davet edildi' }));
+          setTimeout(() => {
+            setInvited((m) => ({ ...m, [uid]: 'Katıldı' }));
+            addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya katıldı` });
+          }, 2500);
+        }}
+      />
+      <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
       {entry && <EntryBanner text={entry.text} color={entry.color} />}
     </View>
@@ -688,5 +957,8 @@ const styles = StyleSheet.create({
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  mutedChip: { color: colors.gold, fontSize: 11, textAlign: 'center', marginTop: 4 },
+  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(139,92,246,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
+  eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   input: { flex: 1, minWidth: 0, backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14 },
 });

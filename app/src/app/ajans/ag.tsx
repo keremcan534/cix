@@ -24,6 +24,18 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function NetworkScreen() {
   const [tab, setTab] = useState<'tree' | 'earnings'>('tree');
+  const { agencyId } = useApp();
+  // Network and commission data are only for active agency members (also enforced server-side).
+  if (!agencyId)
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <Header title="Üye ağım" />
+        <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 40 }}>🔒</Text>
+          <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>Üye ağı ve komisyonlar yalnızca aktif ajans üyeliği olan kullanıcılara açıktır.</Text>
+        </View>
+      </SafeAreaView>
+    );
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Üye ağım" />

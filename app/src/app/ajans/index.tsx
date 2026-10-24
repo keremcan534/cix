@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency';
-import { tl } from '@/data/economy';
 import { showAlert } from '@/lib/alert';
+import { RULES, pct, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -83,7 +83,7 @@ function JoinOrCreate() {
                     <Text style={styles.dim}>
                       Sahibi {preview.owner} · {preview.hosts} yayıncı · Kuruluş {preview.founded}
                     </Text>
-                    <Text style={[styles.dim, preview.status !== 'active' && { color: colors.red }]}>{preview.status === 'active' ? `Ajans payı %${preview.commission * 100}` : 'Bu ajans kapalı — yeni üye kabul etmiyor'}</Text>
+                    <Text style={[styles.dim, preview.status !== 'active' && { color: colors.red }]}>{preview.status === 'active' ? `Ajans komisyonu ${pct(RULES.agencyCommission)} · yayıncı kazancından kesilmez` : 'Bu ajans kapalı — yeni üye kabul etmiyor'}</Text>
                   </View>
                 </View>
               )}
@@ -111,7 +111,7 @@ function JoinOrCreate() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.title}>{a.name}</Text>
                     <Text style={styles.dim}>
-                      {a.status === 'active' ? `${a.hosts} yayıncı · %${a.commission * 100} · ${a.code}` : 'Kapalı'}
+                      {a.status === 'active' ? `${a.hosts} yayıncı · ${a.code}` : 'Kapalı'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
@@ -151,6 +151,7 @@ function OwnerEntry() {
           </Text>
         </Card>
         <GradientButton title="Ajans sahibi paneli" icon="speedometer" onPress={() => router.push('/ajans/panel')} />
+        <GradientButton title="Ajans sohbet grubu" icon="chatbubbles" onPress={() => router.push('/ajans/sohbet')} />
         <GradientButton title="Üye ağım ve komisyonlar" icon="git-network" onPress={() => router.push('/ajans/ag')} />
       </ScrollView>
     </SafeAreaView>
@@ -158,7 +159,7 @@ function OwnerEntry() {
 }
 
 function MemberView() {
-  const { agencyId, weekly, earnings, transfer, requestTransfer, leaveAgency, createTicket } = useApp();
+  const { agencyId, weekly, earnings, transfer, requestTransfer, createTicket } = useApp();
   const a = AGENCIES.find((x) => x.id === agencyId)!;
   const [showTransfer, setShowTransfer] = useState(false);
   const [toCode, setToCode] = useState('');
@@ -209,11 +210,11 @@ function MemberView() {
               <View key={s.label} style={styles.statusBox}>
                 <Text style={[styles.dim, { color: s.color }]}>{s.label}</Text>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>💎 {s.value.toLocaleString('tr-TR')}</Text>
-                <Text style={styles.dim}>{tl(s.value)}</Text>
+                <Text style={styles.dim}>{usd(s.value)}</Text>
               </View>
             ))}
           </View>
-          <Text style={styles.dim}>Ajans payı (%{a.commission * 100}) senin kazancından ayrı hesaplanır. Son hareket: {earnings[0] ? `${earnings[0].source} +${earnings[0].amount}` : '—'}</Text>
+          <Text style={styles.dim}>Kazancının tamamı senin. Ajansın {pct(RULES.agencyCommission)} komisyonu platform tarafından ayrıca ödenir, senden kesilmez. Son hareket: {earnings[0] ? `${earnings[0].source} +${earnings[0].amount}` : '—'}</Text>
           <Pressable
             onPress={() => {
               const no = createTicket('İtiraz', `Hak ediş itirazı · ${a.name}`);
@@ -244,20 +245,36 @@ function MemberView() {
               <Text style={styles.dim}>
                 Oluşturma {transfer.created} · Karar en geç {transfer.decisionIn} içinde · Gerekçe: {transfer.reason}
               </Text>
-              <Text style={styles.dim}>Geçmiş kazançların ve hak edişlerin korunur. Talep reddedilirse gerekçe ve itiraz yolu gösterilir.</Text>
-              {/* Demo shortcut to see the end state. */}
-              <Pressable
-                onPress={() => {
-                  leaveAgency();
-                  showAlert('Talep onaylandı', 'Ajans bağlantın kapatıldı. Geçmiş kayıtların saklanıyor.');
-                }}
-              >
-                <Text style={{ color: colors.textDim }}>(Demo) Talebi onaylanmış say</Text>
+              {transfer.steps.map((st, i) => (
+                <View key={i} style={styles.step}>
+                  <Text style={{ fontSize: 14 }}>{st.status === 'Bekliyor' ? '⏳' : st.status === 'Reddedildi' ? '❌' : '✅'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontWeight: '600' }}>{st.label}</Text>
+                    <Text style={styles.dim}>
+                      {st.status}
+                      {st.time ? ` · ${st.time}` : ''}
+                      {st.note ? ` · ${st.note}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {transfer.mode && (
+                <Text style={styles.dim}>
+                  Transfer türü: {transfer.mode}
+                  {transfer.fee ? ` · Ücret ${transfer.fee.toLocaleString('tr-TR')} 💎 (${usd(transfer.fee)}), hedef ajans öder` : ''} · Kural: {transfer.feeRule}
+                </Text>
+              )}
+              <Text style={styles.dim}>Geçmiş kazançların, eski ve yeni ajansın komisyon dönemleri ayrı korunur. Reddedilirse gerekçe gösterilir; itiraz edebilirsin.</Text>
+              <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'İtiraz' } })}>
+                <Text style={{ color: colors.pink, fontWeight: '700' }}>Transfer kararına itiraz et →</Text>
               </Pressable>
             </>
           ) : showTransfer ? (
             <>
-              <Text style={styles.dim}>Koşullar: bekleme süresi 7 gün; bu sürede yayın ve kazançların devam eder. Karar ve gerekçe sana bildirilir.</Text>
+              <Text style={styles.dim}>
+                Süreç: mevcut ajans sahibi onaylar (ücretli/ücretsiz) → hedef ajans kabul eder → bağlantı tek işlemde güncellenir. En geç 7 gün. Tahmini transfer ücreti:{' '}
+                {Math.round(weekly.reduce((x, y) => x + y, 0) * 4 * 0.1).toLocaleString('tr-TR')} 💎 (son 30 gün × %10, hedef ajans öder; senden kesilmez).
+              </Text>
               <TextInput value={toCode} onChangeText={(t) => setToCode(t.toUpperCase())} placeholder="Yeni ajans kodu (ayrılmak için boş bırak)" placeholderTextColor={colors.textDim} style={styles.input} autoCapitalize="characters" />
               <TextInput value={reason} onChangeText={setReason} placeholder="Gerekçe" placeholderTextColor={colors.textDim} style={[styles.input, { minHeight: 60 }]} multiline />
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -274,6 +291,7 @@ function MemberView() {
           )}
         </Card>
 
+        <GradientButton title="Ajans sohbet grubu" icon="chatbubbles" onPress={() => router.push('/ajans/sohbet')} />
         <GradientButton title="Üye ağım ve komisyonlar" icon="git-network" onPress={() => router.push('/ajans/ag')} />
         <Pressable style={{ alignItems: 'center', padding: 6 }} onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Ajans' } })}>
           <Text style={{ color: colors.textDim }}>🛟 Platform desteğine doğrudan yaz (ajansı aşarak)</Text>
@@ -307,5 +325,6 @@ const styles = StyleSheet.create({
   segActive: { backgroundColor: colors.primary },
   segText: { color: '#fff', fontWeight: '700' },
   statusBox: { flexBasis: '47%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10, gap: 2 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 8 },
   secondary: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.cardAlt, justifyContent: 'center' },
 });

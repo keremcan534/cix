@@ -1,27 +1,67 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type TicketCategory } from '@/data/catalog';
+import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   EXCHANGE_FEE,
-  MIN_WITHDRAW_DIAMONDS,
   TASKS,
   VIP_TIERS,
   type TaskKey,
 } from '@/data/economy';
+import { RULES, type Rules } from '@/data/rules';
+import { showAlert } from '@/lib/alert';
 import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
 
-export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu';
+export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu';
 export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
-export type LedgerRow = { id: string; currency: 'coin' | 'diamond'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
+export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
 export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: string; title: string; body: string; time: string; read: boolean; href?: string };
 export type Ticket = { id: string; number: string; category: TicketCategory; text: string; status: 'Açık' | 'Yanıtlandı' | 'Çözüldü' | 'Yeniden açıldı'; time: string; replies: { from: 'me' | 'support'; text: string; time: string }[] };
-export type Settings = { effectsOff: boolean; invisibleEntry: boolean; cityDiscovery: boolean; showOnline: boolean; profilePublic: boolean; notifySocial: boolean; notifyFinance: boolean; roomBot: boolean };
-export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members' };
+export type NotifyType = 'live' | 'invite' | 'event' | 'agency' | 'fanclub' | 'game' | 'payment' | 'system';
+export type Settings = {
+  effectsOff: boolean;
+  reduceMotion: boolean;
+  lowData: boolean;
+  invisibleEntry: boolean;
+  cityDiscovery: boolean;
+  showOnline: boolean;
+  profilePublic: boolean;
+  notifySocial: boolean;
+  notifyFinance: boolean;
+  notifyTypes: Record<NotifyType, boolean>;
+  snoozeUntil: number; // epoch ms; 0 = not snoozed
+  roomBot: boolean;
+  // personal room audio (affects only this user)
+  roomMuted: boolean;
+  musicVolume: number; // 0..1
+  voiceVolume: number;
+  giftSounds: boolean;
+  bigGiftsOnly: boolean;
+  invitesFrom: 'everyone' | 'following' | 'nobody';
+  dailySpendLimit: number; // coins; 0 = no limit
+  bigSpendConfirm: number; // coins; extra confirmation above this
+};
+export type RuleChange = { id: string; time: string; field: string; from: string; to: string; version: number };
+export type InviteReward = { id: string; inviteeId: string; ref: string; status: 'Beklemede' | 'Onaylandı' | 'İptal edildi'; time: string };
+export type Session = { id: string; device: string; place: string; last: string; current?: boolean };
+export type FanClub = { points: number; history: { text: string; pts: number; time: string }[] };
+export type GroupMsg = { id: string; userId: string; text: string; time: string };
+export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members'; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[] };
 export type OwnedAgency = { name: string; code: string; status: 'İnceleniyor' | 'Onaylandı' };
-export type TransferRequest = { toCode: string | null; reason: string; status: 'Beklemede' | 'Onaylandı'; created: string; decisionIn: string };
+export type TransferStep = { label: string; status: 'Bekliyor' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı'; time?: string; note?: string };
+export type TransferRequest = {
+  toCode: string | null;
+  reason: string;
+  status: 'Beklemede' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı';
+  created: string;
+  decisionIn: string;
+  mode?: 'Ücretli' | 'Ücretsiz';
+  fee?: number;
+  feeRule: string;
+  steps: TransferStep[];
+};
 
 type AppState = {
   // auth & profile
@@ -96,6 +136,27 @@ type AppState = {
   applyAgency: (name: string) => void;
   transfer: TransferRequest | null;
   requestTransfer: (toCode: string | null, reason: string) => string | null;
+  agencyChat: GroupMsg[];
+  sendAgencyMessage: (text: string) => void;
+  // rules (admin demo), invites, security, fan clubs, rooms, family
+  rules: Rules;
+  setRule: <K extends keyof Rules>(k: K, v: Rules[K]) => void;
+  ruleHistory: RuleChange[];
+  inviteRewards: InviteReward[];
+  simulateInviteePurchase: () => void;
+  spentToday: number;
+  sessions: Session[];
+  endSession: (id: string) => void;
+  fanClubs: Record<string, FanClub>;
+  addFanPoints: (hostId: string, pts: number, text: string) => void;
+  recentRooms: string[];
+  visitRoom: (id: string) => void;
+  familyRole: 'owner' | 'helper' | 'member' | null;
+  setFamilyRole: (r: 'owner' | 'helper' | 'member' | null) => void;
+  familyChat: GroupMsg[];
+  sendFamilyMessage: (text: string, userId?: string) => void;
+  familyMuted: boolean;
+  setFamilyMuted: (v: boolean) => void;
   referralCode: string;
   familyId: string | null;
   setFamily: (id: string | null) => void;
@@ -151,7 +212,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [spentTotal, setSpentTotal] = useState(0);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
   const log = (currency: LedgerRow['currency'], amount: number, reason: string, status: LedgerRow['status'] = 'Başarılı') =>
-    setLedger((l) => [{ id: uid(), currency, amount, reason, time: now(), status }, ...l].slice(0, 200));
+    setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), status }, ...l].slice(0, 200));
+  const spentTodayRef = useRef(0);
+  const [spentToday, setSpentToday] = useState(0);
+
+  const [rules, setRules] = useState<Rules>({ ...RULES });
+  const [ruleHistory, setRuleHistory] = useState<RuleChange[]>([]);
+  const [inviteRewards, setInviteRewards] = useState<InviteReward[]>([
+    { id: 'ir1', inviteeId: 'u3', ref: 'PUR-••41', status: 'Onaylandı', time: 'Pzt' },
+    { id: 'ir2', inviteeId: 'u3', ref: 'PUR-••58', status: 'Onaylandı', time: 'Sal' },
+    { id: 'ir3', inviteeId: 'u10', ref: 'PUR-••77', status: 'İptal edildi', time: 'Çar' },
+  ]);
+  const [sessions, setSessions] = useState<Session[]>([
+    { id: 's1', device: 'Bu cihaz', place: 'İstanbul', last: 'Şimdi', current: true },
+    { id: 's2', device: 'Android · Samsung', place: 'İstanbul', last: 'Dün 23:10' },
+    { id: 's3', device: 'Web · Chrome', place: 'Ankara', last: '3 gün önce' },
+  ]);
+  const [fanClubs, setFanClubs] = useState<Record<string, FanClub>>({});
+  const [recentRooms, setRecentRooms] = useState<string[]>([]);
+  const [familyRole, setFamilyRole] = useState<'owner' | 'helper' | 'member' | null>(null);
+  const [familyChat, setFamilyChat] = useState<GroupMsg[]>([
+    { id: 'f1', userId: 'u1', text: 'Bu hafta hedefimiz LV11! Herkes odaya 🎯', time: '20:10' },
+    { id: 'f2', userId: 'u9', text: 'Akşam aile odasında buluşalım mı?', time: '20:14' },
+  ]);
+  const [familyMuted, setFamilyMuted] = useState(false);
+  const [agencyChat, setAgencyChat] = useState<GroupMsg[]>([
+    { id: 'a1', userId: 'u1', text: '📢 Hafta sonu PK turnuvası Cumartesi 21:00, herkes hazır olsun!', time: '18:00' },
+    { id: 'a2', userId: 'u2', text: 'Ben varım 💪', time: '18:05' },
+    { id: 'a3', userId: 'u5', text: 'Yayın saatlerimi panelden güncelledim.', time: '18:20' },
+  ]);
 
   const [inventory, setInventory] = useState<Set<string>>(new Set());
   const [equipped, setEquipped] = useState<Partial<Record<CosmeticKind, string>>>({});
@@ -167,7 +256,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     notifySocial: true,
     notifyFinance: true,
     roomBot: true,
+    reduceMotion: false,
+    lowData: false,
+    notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
+    snoozeUntil: 0,
+    roomMuted: false,
+    musicVolume: 0.7,
+    voiceVolume: 1,
+    giftSounds: true,
+    bigGiftsOnly: false,
+    invitesFrom: 'everyone',
+    dailySpendLimit: 0,
+    bigSpendConfirm: 1_000,
   });
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
   const [notifications, setNotifications] = useState<Notice[]>([
     { id: 'n1', kind: 'social', icon: '👋', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
     { id: 'n2', kind: 'system', icon: '🎉', title: "Vibe Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
@@ -182,10 +287,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     cover: 'https://picsum.photos/seed/myroom/600/400',
     password: '',
     locked: false,
-    limit: 500,
+    limit: 50,
     xp: 0,
     adminIds: [],
     micMode: 'request',
+    roomType: 'stage',
+    giftEffects: true,
+    joinSounds: true,
+    lockedSeats: [],
   });
 
   const [vipLevel, setVipLevel] = useState(0);
@@ -209,13 +318,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const notify = (n: Omit<Notice, 'id' | 'time' | 'read'>) => {
-    const muted = (n.kind === 'social' && !settings.notifySocial) || (n.kind === 'finance' && !settings.notifyFinance);
+    const snoozed = settings.snoozeUntil > Date.now() && n.kind !== 'security' && n.kind !== 'finance';
+    const muted = snoozed || (n.kind === 'social' && !settings.notifySocial) || (n.kind === 'finance' && !settings.notifyFinance);
     if (muted) return;
     setNotifications((l) => [{ ...n, id: uid(), time: now(), read: false }, ...l].slice(0, 100));
   };
 
   const spend = (n: number, reason = 'Harcama') => {
     if (coinsRef.current < n) return false;
+    const limit = settingsRef.current.dailySpendLimit;
+    if (limit && spentTodayRef.current + n > limit) {
+      showAlert('Günlük harcama limiti', `Bugün en fazla ${limit.toLocaleString('tr-TR')} jeton harcayabilirsin (Ayarlar > Harcama kontrolü). Kalan: ${Math.max(0, limit - spentTodayRef.current)}`);
+      return false;
+    }
+    spentTodayRef.current += n;
+    setSpentToday(spentTodayRef.current);
     setCoins((c) => c - n);
     setSpentTotal((t) => t + n);
     log('coin', -n, reason);
@@ -316,7 +433,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     receiveDiamonds,
     withdrawals,
     requestWithdraw: (amount, iban) => {
-      if (amount < MIN_WITHDRAW_DIAMONDS) return `En az ${MIN_WITHDRAW_DIAMONDS.toLocaleString('tr-TR')} elmas çekebilirsin.`;
+      if (amount < RULES.minWithdrawDiamonds) return `En az ${RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas çekebilirsin.`;
       if (amount > diamonds) return 'Yetersiz elmas bakiyesi.';
       if (iban.replace(/\s/g, '').length !== 26) return 'Geçerli bir IBAN gir (TR + 24 hane).';
       setDiamonds((d) => d - amount);
@@ -407,15 +524,94 @@ export function AppProvider({ children }: { children: ReactNode }) {
     transfer,
     requestTransfer: (toCode, reason) => {
       if (!agencyId) return 'Bir ajansa üye değilsin.';
+      const to = toCode ? agencyByCode(toCode) : null;
       if (toCode) {
-        const to = agencyByCode(toCode);
         if (!to) return 'Hedef ajans kodu geçersiz.';
         if (to.status !== 'active') return 'Hedef ajans yeni üye kabul etmiyor.';
+        if (to.id === agencyId) return 'Zaten bu ajanstasın.';
       }
       if (reason.trim().length < 5) return 'Lütfen kısa bir gerekçe yaz.';
-      setTransfer({ toCode: toCode ? toCode.toUpperCase() : null, reason, status: 'Beklemede', created: now(), decisionIn: '7 gün' });
+      // Fee formula (versioned, shown before the request): last 30 days diamonds × 10%.
+      const last30 = weekly.reduce((x, y) => x + y, 0) * 4;
+      const fee = Math.round(last30 * 0.1);
+      const feeRule = 'Son 30 gün elmas × %10 (transfer kuralı v1)';
+      const base: TransferRequest = {
+        toCode: to ? to.code : null,
+        reason,
+        status: 'Beklemede',
+        created: now(),
+        decisionIn: '7 gün',
+        feeRule,
+        steps: [
+          { label: 'Talep oluşturuldu', status: 'Tamamlandı', time: now() },
+          { label: 'Mevcut ajans sahibi onayı', status: 'Bekliyor' },
+          ...(to ? [{ label: `${to.name} kabulü`, status: 'Bekliyor' as const }] : []),
+          { label: to ? 'Bağlantı güncellemesi (tek atomik işlem)' : 'Ajanstan ayrılma', status: 'Bekliyor' },
+        ],
+      };
+      setTransfer(base);
+      notify({ kind: 'system', icon: '📨', title: 'Transfer talebin mevcut ajansa iletildi', body: 'Ajans sahibine bildirim gitti.', href: '/ajans' });
+      // Demo timeline: owner approves (paid if moving to another agency), target accepts, link switches.
+      setTimeout(() => {
+        setTransfer((t) =>
+          t && {
+            ...t,
+            mode: to ? 'Ücretli' : 'Ücretsiz',
+            fee: to ? fee : 0,
+            steps: t.steps.map((st, i) => (i === 1 ? { ...st, status: 'Onaylandı', time: now(), note: to ? `Ücretli transfer · ${fee.toLocaleString('tr-TR')} 💎` : 'Ücretsiz ayrılma' } : st)),
+          },
+        );
+        notify({ kind: 'system', icon: '✅', title: 'Mevcut ajans transferi onayladı', body: to ? `Ücretli transfer · ${fee.toLocaleString('tr-TR')} elmas (hedef ajans öder)` : 'Ayrılma onaylandı', href: '/ajans' });
+      }, 2500);
+      setTimeout(() => {
+        setTransfer((t) => t && { ...t, status: 'Tamamlandı', steps: t.steps.map((st) => (st.status === 'Bekliyor' ? { ...st, status: 'Tamamlandı', time: now() } : st)) });
+        if (to) {
+          setAgencyId(to.id);
+          setAgencyRole('member');
+        } else {
+          setAgencyId(null);
+          setAgencyRole(null);
+        }
+        notify({ kind: 'system', icon: '🏢', title: to ? `${to.name} ajansına geçişin tamamlandı` : 'Ajanstan ayrıldın', body: 'Geçmiş kazançların ve komisyon dönemlerin ayrı ayrı korunuyor.', href: '/ajans' });
+      }, 6000);
       return null;
     },
+    agencyChat,
+    sendAgencyMessage: (text) => setAgencyChat((m) => [...m, { id: uid(), userId: 'me', text, time: now() }]),
+    rules,
+    setRule: (k, v) => {
+      const from = JSON.stringify(RULES[k]);
+      (RULES as Record<string, unknown>)[k] = v;
+      RULES.version += 1;
+      setRules({ ...RULES });
+      setRuleHistory((h) => [{ id: uid(), time: now(), field: String(k), from, to: JSON.stringify(v), version: RULES.version }, ...h]);
+    },
+    ruleHistory,
+    inviteRewards,
+    simulateInviteePurchase: () => {
+      const id = uid();
+      const invitee = ['u3', 'u10', 'u12'][Math.floor(Math.random() * 3)];
+      setInviteRewards((r) => [{ id, inviteeId: invitee, ref: `PUR-${Math.random().toString(36).slice(2, 6).toUpperCase()}`, status: 'Beklemede', time: now() }, ...r]);
+      // Confirmed after the store payment settles; each successful purchase = 1 unit.
+      setTimeout(() => setInviteRewards((r) => r.map((x) => (x.id === id ? { ...x, status: 'Onaylandı' } : x))), 3000);
+    },
+    spentToday,
+    sessions,
+    endSession: (id) => setSessions((l) => l.filter((x) => x.id !== id || x.current)),
+    fanClubs,
+    addFanPoints: (hostId, pts, text) =>
+      setFanClubs((f) => {
+        const club = f[hostId] ?? { points: 0, history: [] };
+        return { ...f, [hostId]: { points: club.points + pts, history: [{ text, pts, time: now() }, ...club.history].slice(0, 50) } };
+      }),
+    recentRooms,
+    visitRoom: (id) => setRecentRooms((r) => [id, ...r.filter((x) => x !== id)].slice(0, 10)),
+    familyRole,
+    setFamilyRole,
+    familyChat,
+    sendFamilyMessage: (text, userId = 'me') => setFamilyChat((m) => [...m, { id: uid(), userId, text, time: now() }]),
+    familyMuted,
+    setFamilyMuted,
     referralCode: 'NET-K7Q2',
     familyId,
     setFamily: setFamilyId,

@@ -12,7 +12,7 @@ import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
 export default function WalletScreen() {
-  const { coins, addCoins, ledger, diamonds } = useApp();
+  const { coins, addCoins, ledger, diamonds, spentToday, settings } = useApp();
   const [selected, setSelected] = useState(COIN_PACKS[1].id);
   const [tab, setTab] = useState<'buy' | 'history'>('buy');
   const [filter, setFilter] = useState<'coin' | 'diamond'>('coin');
@@ -32,6 +32,7 @@ export default function WalletScreen() {
     }, 1200);
   };
   const rows = ledger.filter((r) => r.currency === filter);
+  const loadedToday = ledger.filter((r) => r.currency === 'coin' && r.amount > 0).reduce((x, r) => x + r.amount, 0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -64,6 +65,10 @@ export default function WalletScreen() {
 
       {tab === 'history' ? (
         <>
+          <Text style={[styles.note, { marginBottom: 8 }]}>
+            Bugün: 🪙 {spentToday.toLocaleString('tr-TR')} harcandı · 🪙 {loadedToday.toLocaleString('tr-TR')} eklendi
+            {settings.dailySpendLimit ? ` · Limit ${settings.dailySpendLimit.toLocaleString('tr-TR')}` : ''}
+          </Text>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 }}>
             {(
               [
@@ -86,7 +91,7 @@ export default function WalletScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: '#fff' }}>{item.reason}</Text>
                   <Text style={{ color: colors.textDim, fontSize: 11 }}>
-                    {item.time} · {item.status}
+                    {item.time} · {item.status} · {item.ref}
                   </Text>
                 </View>
                 <Text style={{ color: item.amount < 0 ? colors.red : colors.green, fontWeight: '800' }}>

@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TextInput, View, Pressable } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, GradientButton, Header } from '@/components/ui';
-import { MIN_WITHDRAW_DIAMONDS, tl } from '@/data/economy';
+import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
@@ -16,7 +16,7 @@ const formatIban = (raw: string) => {
 
 export default function Withdraw() {
   const { diamonds, requestWithdraw, withdrawals } = useApp();
-  const [amount, setAmount] = useState(String(Math.max(MIN_WITHDRAW_DIAMONDS, Math.floor(diamonds / 1000) * 1000)));
+  const [amount, setAmount] = useState(String(Math.max(RULES.minWithdrawDiamonds, Math.floor(diamonds / 1000) * 1000)));
   const [iban, setIban] = useState('TR');
   const [name, setName] = useState('');
   const n = Number(amount) || 0;
@@ -26,7 +26,7 @@ export default function Withdraw() {
     if (name.trim().length < 3) return showAlert('Hata', 'Hesap sahibinin adını gir.');
     const err = requestWithdraw(n, iban);
     if (err) return showAlert('Hata', err);
-    showAlert('Talep alındı ✅', `${tl(n)} en geç 3 iş günü içinde hesabına yatırılacak. (Demo)`);
+    showAlert('Talep alındı ✅', `${usd(n)} en geç 3 iş günü içinde hesabına yatırılacak. (Demo)`);
   };
 
   return (
@@ -36,7 +36,7 @@ export default function Withdraw() {
         <Card style={{ alignItems: 'center', gap: 4 }}>
           <Text style={styles.dim}>Çekilebilir bakiye</Text>
           <Text style={styles.big}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
-          <Text style={styles.dim}>≈ {tl(diamonds)} · Minimum {MIN_WITHDRAW_DIAMONDS.toLocaleString('tr-TR')} elmas</Text>
+          <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas</Text>
         </Card>
 
         <Text style={styles.label}>Çekilecek elmas</Text>
@@ -47,13 +47,13 @@ export default function Withdraw() {
               <Text style={styles.chipText}>{p.toLocaleString('tr-TR')}</Text>
             </Pressable>
           ))}
-          {diamonds >= MIN_WITHDRAW_DIAMONDS && (
+          {diamonds >= RULES.minWithdrawDiamonds && (
             <Pressable style={styles.chip} onPress={() => setAmount(String(diamonds))}>
               <Text style={styles.chipText}>Tümü</Text>
             </Pressable>
           )}
         </View>
-        <Text style={styles.receive}>Hesabına geçecek: {tl(n)}</Text>
+        <Text style={styles.receive}>Hesabına geçecek: {usd(n)}</Text>
 
         <Text style={styles.label}>Hesap sahibi</Text>
         <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.textDim} style={styles.input} />
@@ -68,7 +68,7 @@ export default function Withdraw() {
             {withdrawals.map((w) => (
               <View key={w.id} style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#fff' }}>{tl(w.diamonds)}</Text>
+                  <Text style={{ color: '#fff' }}>{usd(w.diamonds)}</Text>
                   <Text style={styles.dim}>
                     {w.time} · {w.iban.slice(0, 7)}…
                   </Text>

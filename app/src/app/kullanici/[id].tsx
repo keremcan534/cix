@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
 import { GradientButton, VerifiedBadge, VipBadge } from '@/components/ui';
+import { FAN_LEVELS, fanLevel } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
 import { GIFTS, MOMENTS, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -18,7 +19,14 @@ const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', '
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = userById(id);
-  const { following, toggleFollow, blocked, toggleBlock, createTicket } = useApp();
+  const { following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints } = useApp();
+  const club = fanClubs[user.id];
+  const fan = fanLevel(club?.points ?? 0);
+  const [showHistory, setShowHistory] = useState(false);
+  const follow = () => {
+    if (!isFollowing && !club?.history.some((h) => h.text === 'Takip ettin')) addFanPoints(user.id, 10, 'Takip ettin');
+    toggleFollow(user.id);
+  };
   const isFollowing = following.has(user.id);
   const isBlocked = blocked.has(user.id);
   const photos = MOMENTS.filter((m) => m.userId === user.id && m.image).map((m) => m.image!);
@@ -64,6 +72,37 @@ export default function UserProfile() {
             <Stat n={giftWall.reduce((s, g) => s + g.count, 0)} label="Hediye" />
           </View>
 
+          <View style={styles.fanCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }}>💜 {user.name} hayran kulübü</Text>
+              <Text style={{ color: colors.gold, fontWeight: '800' }}>
+                Lv.{fan.index + 1} · {club?.points ?? 0} puan
+              </Text>
+            </View>
+            <Text style={styles.meta}>
+              {fan.current.name} · Ödül: {fan.current.reward}
+            </Text>
+            <View style={styles.track}>
+              <View style={{ height: 6, backgroundColor: colors.pink, width: fan.next ? `${(((club?.points ?? 0) - fan.current.min) / (fan.next.min - fan.current.min)) * 100}%` : '100%' }} />
+            </View>
+            <Text style={styles.meta}>{fan.next ? `Sonraki: ${fan.next.name} (${fan.next.min} puan) → ${fan.next.reward}` : 'En üst kulüp seviyesi'}</Text>
+            <Text style={styles.meta}>Puan kazan: takip et (+10), odasına katıl (+5), odada kal (+2/dk), görevler; hediye zorunlu değil.</Text>
+            <Pressable onPress={() => setShowHistory((v) => !v)}>
+              <Text style={{ color: colors.pink, fontWeight: '700', fontSize: 12 }}>{showHistory ? 'Puan geçmişini gizle' : 'Puan geçmişi'}</Text>
+            </Pressable>
+            {showHistory &&
+              (club?.history.length ? (
+                club.history.map((h, i) => (
+                  <Text key={i} style={styles.meta}>
+                    {h.time} · {h.text} · +{h.pts}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.meta}>Henüz puan yok.</Text>
+              ))}
+            <Text style={[styles.meta, { fontSize: 11 }]}>Seviyeler: {FAN_LEVELS.map((l) => l.name).join(' → ')}</Text>
+          </View>
+
           <Text style={styles.section}>Hediye duvarı</Text>
           <View style={styles.giftWall}>
             {giftWall.map((g) => (
@@ -88,7 +127,7 @@ export default function UserProfile() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.bottom}>
-        <Pressable style={[styles.roundBtn, isFollowing && { backgroundColor: colors.pink }]} onPress={() => toggleFollow(user.id)} accessibilityLabel="Takip et">
+        <Pressable style={[styles.roundBtn, isFollowing && { backgroundColor: colors.pink }]} onPress={follow} accessibilityLabel="Takip et">
           <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={22} color="#fff" />
         </Pressable>
         <Pressable style={styles.roundBtn} onPress={() => router.push(`/sohbet/${user.id}`)} accessibilityLabel="Mesaj">
@@ -147,6 +186,8 @@ const styles = StyleSheet.create({
   meta: { color: colors.textDim, fontSize: 13 },
   bio: { color: '#fff', fontSize: 15 },
   stats: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 16, paddingVertical: 14 },
+  fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: 'rgba(236,72,153,0.4)' },
+  track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   section: { color: '#fff', fontWeight: '700', fontSize: 16 },
   giftWall: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.card, borderRadius: 16, padding: 8 },
   giftCell: { width: '25%', alignItems: 'center', paddingVertical: 8 },

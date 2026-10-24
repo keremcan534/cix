@@ -6,16 +6,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
-import { tl } from '@/data/economy';
+import { RULES, pct, settlement, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
-type Tab = 'overview' | 'performance' | 'members' | 'invites' | 'earnings' | 'tasks' | 'events' | 'team' | 'support' | 'settings';
+type Tab = 'overview' | 'performance' | 'members' | 'transfers' | 'invites' | 'earnings' | 'tasks' | 'events' | 'team' | 'support' | 'settings';
 const TABS: { key: Tab; label: string; perm?: Permission }[] = [
   { key: 'overview', label: 'Genel bakış' },
   { key: 'performance', label: 'Performans', perm: 'agency.members.read' },
   { key: 'members', label: 'Üyeler', perm: 'agency.members.read' },
+  { key: 'transfers', label: 'Transferler', perm: 'agency.members.manage' },
   { key: 'invites', label: 'Davetler', perm: 'agency.members.manage' },
   { key: 'earnings', label: 'Kazançlar', perm: 'agency.earnings.read' },
   { key: 'tasks', label: 'Görevler', perm: 'room.events.manage' },
@@ -72,6 +73,8 @@ export default function OwnerPanel() {
           <Performance />
         ) : tab === 'members' ? (
           <Members canManage={can(role, 'agency.members.manage')} />
+        ) : tab === 'transfers' ? (
+          <Transfers />
         ) : tab === 'invites' ? (
           <Invites />
         ) : tab === 'earnings' ? (
@@ -216,6 +219,57 @@ function Members({ canManage }: { canManage: boolean }) {
   );
 }
 
+type IncomingTransfer = { id: string; member: AgencyMember; to: string; reason: string; status: 'Bekliyor' | 'Ücretli onaylandı' | 'Ücretsiz onaylandı' | 'Reddedildi' };
+
+function Transfers() {
+  const [items, setItems] = useState<IncomingTransfer[]>([
+    { id: 't1', member: AGENCY_MEMBERS[6], to: 'MOON22 · Moonlight Media', reason: 'Yayın saatlerim değişti', status: 'Bekliyor' },
+    { id: 't2', member: AGENCY_MEMBERS[8], to: 'Ajanstan ayrılma', reason: 'Bir süre ara vereceğim', status: 'Bekliyor' },
+  ]);
+  const decide = (id: string, status: IncomingTransfer['status']) => setItems((l) => l.map((x) => (x.id === id ? { ...x, status } : x)));
+  return (
+    <>
+      <Text style={styles.dim}>Onaylarken ücretli veya ücretsiz transfer seçersin. Ücret, yayımlanmış formülle hesaplanır (son 30 gün elmas × %10) ve hedef ajans tarafından ödenir. Tüm kararlar denetim kaydına yazılır; yayıncı itiraz edebilir.</Text>
+      {items.map((t) => {
+        const fee = Math.round(t.member.diamonds * 0.1);
+        return (
+          <Card key={t.id} style={{ gap: 8 }}>
+            <View style={styles.row}>
+              <Avatar uri={t.member.user.avatar} size={36} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>
+                  {t.member.user.name} → {t.to}
+                </Text>
+                <Text style={styles.dim}>Gerekçe: {t.reason}</Text>
+              </View>
+            </View>
+            <Text style={styles.dim}>
+              Hesaplanan ücret: 💎 {fee.toLocaleString('tr-TR')} ({usd(fee)}) · son 30 gün 💎 {t.member.diamonds.toLocaleString('tr-TR')}
+            </Text>
+            {t.status === 'Bekliyor' ? (
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                <Pressable style={[styles.small, { backgroundColor: colors.green }]} onPress={() => decide(t.id, 'Ücretli onaylandı')}>
+                  <Text style={styles.smallText}>Ücretli onayla</Text>
+                </Pressable>
+                <Pressable style={[styles.small, { backgroundColor: colors.primary }]} onPress={() => decide(t.id, 'Ücretsiz onaylandı')}>
+                  <Text style={styles.smallText}>Ücretsiz onayla</Text>
+                </Pressable>
+                <Pressable style={[styles.small, { backgroundColor: colors.cardAlt }]} onPress={() => decide(t.id, 'Reddedildi')}>
+                  <Text style={styles.smallText}>Reddet</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={{ color: t.status === 'Reddedildi' ? colors.red : colors.green, fontWeight: '800' }}>
+                {t.status} · {t.status === 'Reddedildi' ? 'gerekçe yayıncıya bildirildi' : 'hedef ajansın kabulü bekleniyor'}
+              </Text>
+            )}
+          </Card>
+        );
+      })}
+    </>
+  );
+}
+
 function Invites() {
   const { ownedAgency } = useApp();
   const code = ownedAgency?.code ?? '—';
@@ -232,24 +286,28 @@ function Invites() {
 }
 
 function Earnings() {
-  const rows = AGENCY_MEMBERS.map((m) => ({ m, share: Math.round(m.diamonds * 0.1) }));
+  const rows = AGENCY_MEMBERS.map((m) => ({ m, share: settlement(m.diamonds, true).commission }));
   const total = rows.reduce((s, r) => s + r.share, 0);
   return (
     <>
       <View style={styles.grid}>
-        <Kpi label="Ajans payı (dönem)" value={`💎 ${total.toLocaleString('tr-TR')}`} />
-        <Kpi label="Bekleyen" value={tl(Math.round(total * 0.4))} />
-        <Kpi label="Onaylanan" value={tl(Math.round(total * 0.4))} />
-        <Kpi label="Ödenen" value={tl(Math.round(total * 0.2))} />
+        <Kpi label={`Ajans komisyonu ${pct(RULES.agencyCommission)} (dönem)`} value={`💎 ${total.toLocaleString('tr-TR')}`} />
+        <Kpi label="Bekleyen" value={usd(Math.round(total * 0.4))} />
+        <Kpi label="Onaylanan" value={usd(Math.round(total * 0.4))} />
+        <Kpi label="Ödenen" value={usd(Math.round(total * 0.2))} />
       </View>
-      <Text style={styles.dim}>Yayıncı hak edişleri ile ajans payı ayrı muhasebeleştirilir; aynı tutar iki kez gelir sayılmaz.</Text>
+      <Text style={styles.dim}>
+        Komisyon, yayıncıların uygun kazancının {pct(RULES.agencyCommission)}&apos;ı olarak ayrıca hesaplanır; yayıncı ödemesinden kesilmez. {usd(total)} · {RULES.diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD
+      </Text>
       {rows.map(({ m, share }) => (
         <Card key={m.user.id} style={[styles.row, { padding: 12 }]}>
           <Avatar uri={m.user.avatar} size={32} />
           <Text style={{ color: '#fff', flex: 1 }}>{m.user.name}</Text>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ color: '#7DD3FC', fontWeight: '700' }}>💎 {m.diamonds.toLocaleString('tr-TR')}</Text>
-            <Text style={styles.dim}>Ajans payı {share.toLocaleString('tr-TR')}</Text>
+            <Text style={styles.dim}>
+              Komisyon 💎 {share.toLocaleString('tr-TR')} · {usd(share)}
+            </Text>
           </View>
         </Card>
       ))}

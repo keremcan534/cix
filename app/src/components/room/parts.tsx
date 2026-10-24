@@ -180,26 +180,38 @@ export function GiftSheet({
   recipients: string[];
   initialTo?: string | null;
   coins: number;
-  onSend: (g: Gift, to: string, count: number) => void;
+  onSend: (g: Gift, to: string[], count: number) => void;
 }) {
   const [selected, setSelected] = useState<Gift>(GIFTS[0]);
   const [count, setCount] = useState(1);
-  const [to, setTo] = useState<string | null>(initialTo ?? null);
-  const target = to && recipients.includes(to) ? to : recipients[0];
-  const total = selected.price * count;
+  const [picked, setPicked] = useState<string[]>(() => {
+    const first = initialTo && recipients.includes(initialTo) ? initialTo : recipients[0];
+    return first ? [first] : [];
+  });
+  const targets = picked.filter((id) => recipients.includes(id));
+  const allSelected = recipients.length > 0 && targets.length === recipients.length;
+  const total = selected.price * count * targets.length;
+  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1 }} onPress={onClose} />
       <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Kime?</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={[styles.sheetTitle, { flex: 1, marginBottom: 0 }]}>Kime? ({targets.length})</Text>
+          {recipients.length > 1 && (
+            <Pressable onPress={() => setPicked(allSelected ? recipients.slice(0, 1) : recipients)} hitSlop={8}>
+              <Text style={{ color: colors.pink, fontWeight: '800' }}>{allSelected ? 'Seçimi kaldır' : 'Hepsini seç'}</Text>
+            </Pressable>
+          )}
+        </View>
         {recipients.length === 0 ? (
           <Text style={{ color: colors.textDim, marginBottom: 12 }}>Koltukta kimse yok.</Text>
         ) : (
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             {recipients.map((id) => (
-              <Pressable key={id} onPress={() => setTo(id)} style={{ opacity: id === target ? 1 : 0.45 }}>
-                <Avatar uri={userById(id).avatar} size={40} ring={id === target} />
+              <Pressable key={id} onPress={() => togglePick(id)} style={{ opacity: targets.includes(id) ? 1 : 0.45 }}>
+                <Avatar uri={userById(id).avatar} size={40} ring={targets.includes(id)} />
               </Pressable>
             ))}
           </View>
@@ -230,9 +242,11 @@ export function GiftSheet({
                 router.push('/cuzdan');
               }}
             />
-            <Text style={{ color: total > coins ? colors.red : colors.textDim, fontSize: 12, marginTop: 4 }}>Toplam: 🪙 {total.toLocaleString('tr-TR')}</Text>
+            <Text style={{ color: total > coins ? colors.red : colors.textDim, fontSize: 12, marginTop: 4 }}>
+              {targets.length} alıcı × {count} × {selected.price} = 🪙 {total.toLocaleString('tr-TR')}
+            </Text>
           </View>
-          <GradientButton title="Gönder" icon="send" onPress={() => target && onSend(selected, target, count)} />
+          <GradientButton title="Gönder" icon="send" onPress={() => targets.length && onSend(selected, targets, count)} />
         </View>
       </View>
     </Modal>

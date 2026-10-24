@@ -11,7 +11,25 @@ import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
 export default function RoomsScreen() {
-  const { coins, checkedInToday, notifications } = useApp();
+  const { coins, checkedInToday, notifications, following, recentRooms, blocked, me } = useApp();
+  // Personalized suggestions with an explanation; blocked hosts and private rooms are excluded.
+  const suggestions = ROOMS.filter((r) => !r.password && !blocked.has(r.hostId))
+    .map((r) => {
+      const reason = following.has(r.hostId)
+        ? `Takip ettiğin ${userById(r.hostId).name} burada`
+        : recentRooms.includes(r.id)
+          ? 'Son ziyaret ettiğin oda'
+          : me.interests?.some((i) => i.includes(r.category) || r.tags.some((t) => i.includes(t)))
+            ? `İlgi alanın: ${r.category}`
+            : r.listeners > 300
+              ? 'Şu an çok hareketli'
+              : '';
+      const score = (following.has(r.hostId) ? 3 : 0) + (recentRooms.includes(r.id) ? 2 : 0) + (reason.startsWith('İlgi') ? 1 : 0) + r.listeners / 1000;
+      return { r, reason, score };
+    })
+    .filter((x) => x.reason)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
   const unreadNotices = notifications.filter((n) => !n.read).length;
   const [cat, setCat] = useState<Category>('Popüler');
   const rooms = cat === 'Popüler' ? [...ROOMS].sort((a, b) => b.listeners - a.listeners) : ROOMS.filter((r) => r.category === cat);
@@ -60,6 +78,29 @@ export default function RoomsScreen() {
                 </LinearGradient>
               </Pressable>
             </View>
+            {suggestions.length > 0 && (
+              <>
+                <Text style={styles.section}>✨ Senin için</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
+                  {suggestions.map(({ r, reason }) => (
+                    <Pressable key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
+                      <Image source={{ uri: r.cover }} style={styles.suggestImg} />
+                      <Text style={styles.suggestTitle} numberOfLines={1}>
+                        {r.title}
+                      </Text>
+                      <Text style={styles.suggestWhy} numberOfLines={1}>
+                        💡 {reason}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+            <Pressable style={styles.gamesRow} onPress={() => router.push('/oyunlar')}>
+              <Text style={{ fontSize: 22 }}>🎮</Text>
+              <Text style={{ color: '#fff', fontWeight: '700', flex: 1 }}>Oyun merkezi</Text>
+              <Text style={{ color: colors.textDim, fontSize: 12 }}>VIP 2 ile oyna →</Text>
+            </Pressable>
             <Text style={styles.section}>Şu an çevrimiçi</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingHorizontal: 16 }}>
               {USERS.filter((u) => u.online).map((u) => (
@@ -153,6 +194,11 @@ const styles = StyleSheet.create({
   liveText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   cardTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
   hostName: { color: colors.textDim, fontSize: 12, marginLeft: 6, flex: 1 },
+  suggest: { width: 150, gap: 4 },
+  suggestImg: { width: 150, height: 90, borderRadius: 12, backgroundColor: colors.card },
+  suggestTitle: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  suggestWhy: { color: colors.textDim, fontSize: 11 },
+  gamesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
   dot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
   promo: { borderRadius: 16, padding: 14, gap: 2, height: 96 },
   promoTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },

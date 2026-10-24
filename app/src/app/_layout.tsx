@@ -37,15 +37,18 @@ function RootStack() {
         <Stack.Screen name="ajans/index" />
         <Stack.Screen name="ajans/panel" />
         <Stack.Screen name="ajans/ag" />
+        <Stack.Screen name="ajans/sohbet" />
         <Stack.Screen name="magaza" />
         <Stack.Screen name="bildirimler" />
         <Stack.Screen name="destek" />
         <Stack.Screen name="ayarlar" />
+        <Stack.Screen name="oyunlar" />
         <Stack.Screen name="gorevler" />
         <Stack.Screen name="siralama" />
         <Stack.Screen name="vip" />
         <Stack.Screen name="aile" />
         <Stack.Screen name="cark" />
+        <Stack.Screen name="yonetim" />
       </Stack.Protected>
       <Stack.Protected guard={!loggedIn}>
         <Stack.Screen name="giris" />

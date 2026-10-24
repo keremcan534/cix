@@ -19,13 +19,17 @@ const SHORTCUTS: { emoji: string; label: string; onPress: () => void }[] = [
   { emoji: '🎰', label: 'Şans\nÇarkı', onPress: () => router.push('/cark') },
 ];
 
-const MENU: { icon: IconName; label: string; onPress?: () => void }[] = [
+const MENU: { icon: IconName; label: string; onPress?: () => void; agencyOnly?: boolean; noAgencyOnly?: boolean }[] = [
   { icon: 'wallet-outline', label: 'Cüzdan', onPress: () => router.push('/cuzdan') },
   { icon: 'diamond-outline', label: 'Soyluluk / VIP', onPress: () => router.push('/vip') },
   { icon: 'home-outline', label: 'Aile', onPress: () => router.push('/aile') },
   { icon: 'storefront-outline', label: 'Mağaza (çerçeve, efekt, emoji)', onPress: () => router.push('/magaza') },
-  { icon: 'business-outline', label: 'Ajans', onPress: () => router.push('/ajans') },
-  { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag') },
+  { icon: 'business-outline', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
+  { icon: 'chatbubbles-outline', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
+  { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
+  { icon: 'add-circle-outline', label: 'Ajansa katıl / ajans kur', onPress: () => router.push('/ajans'), noAgencyOnly: true },
+  { icon: 'game-controller-outline', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
+  { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'flash-outline', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
   { icon: 'people-outline', label: 'Arkadaşını Davet Et', onPress: () => router.push('/gorevler') },
@@ -34,7 +38,7 @@ const MENU: { icon: IconName; label: string; onPress?: () => void }[] = [
 ];
 
 export default function ProfileScreen() {
-  const { coins, diamonds, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds } = useApp();
+  const { coins, diamonds, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds, agencyId } = useApp();
   const specialId = cosmeticById(equipped.specialId);
   const tier = vipTier(vipLevel);
 
@@ -98,7 +102,7 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.menu}>
-          {MENU.map((m) => (
+          {MENU.filter((m) => (m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true)).map((m) => (
             <Pressable key={m.label} style={styles.menuRow} onPress={m.onPress}>
               <LinearGradient colors={gradient} style={styles.menuIcon}>
                 <Ionicons name={m.icon} size={18} color="#fff" />

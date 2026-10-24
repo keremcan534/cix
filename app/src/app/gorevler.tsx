@@ -4,13 +4,15 @@ import { ScrollView, Share, StyleSheet, Text, View, Pressable } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, CoinPill, GradientButton, Header } from '@/components/ui';
-import { CHECKIN_REWARDS, INVITE_REWARD, TASKS } from '@/data/economy';
+import { CHECKIN_REWARDS, TASKS } from '@/data/economy';
+import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
 export default function TasksScreen() {
-  const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask, inviteCode } = useApp();
+  const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask, inviteCode, inviteRewards, simulateInviteePurchase } = useApp();
+  const units = inviteRewards.filter((r) => r.status === 'Onaylandı').length;
   // Position inside the current 7-day cycle; once today is claimed the highlighted day is the one just taken.
   const todayIndex = (checkedInToday ? checkInDay - 1 : checkInDay) % 7;
 
@@ -89,13 +91,34 @@ export default function TasksScreen() {
           <Text style={{ fontSize: 36 }}>🤝</Text>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.inviteTitle}>Arkadaşını davet et</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Her kayıt olan arkadaşın için 🪙 {INVITE_REWARD} kazan</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Davet ettiğin kişi her başarılı jeton alımı yaptığında 1 davet ödül birimi kazanırsın.</Text>
             <Text style={styles.code}>Kodun: {inviteCode}</Text>
           </View>
           <Pressable style={styles.shareBtn} onPress={invite}>
             <Ionicons name="share-social" size={20} color="#EC4899" />
           </Pressable>
         </LinearGradient>
+
+        <Card style={{ gap: 8 }}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.title}>Davet ödüllerim</Text>
+            <Text style={{ color: colors.gold, fontWeight: '800' }}>🎟️ {units} birim</Text>
+          </View>
+          <Text style={styles.dim}>Ödül, alınan jeton miktarına değil başarılı alım sayısına bağlıdır. Başarısız/iade edilen alımlar ödül üretmez. Birimler elmas veya USD değildir.</Text>
+          {inviteRewards.map((r) => (
+            <View key={r.id} style={styles.rowBetween}>
+              <Text style={{ color: '#fff' }}>
+                {userById(r.inviteeId).name} · {r.ref}
+              </Text>
+              <Text style={{ color: r.status === 'Onaylandı' ? colors.green : r.status === 'Beklemede' ? colors.gold : colors.red, fontWeight: '700', fontSize: 12 }}>
+                {r.status} · {r.time}
+              </Text>
+            </View>
+          ))}
+          <Pressable onPress={simulateInviteePurchase}>
+            <Text style={{ color: colors.pink, fontWeight: '700' }}>(Demo) Davet ettiğim kişi jeton aldı</Text>
+          </Pressable>
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );

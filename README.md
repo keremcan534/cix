@@ -41,8 +41,6 @@ Telefona **Expo Go** uygulamasını kur, terminaldeki QR kodu okut.
 | Profil | `src/app/(tabs)/profil.tsx` | Seviye, istatistikler, VIP kartı, menü |
 | Cüzdan | `src/app/cuzdan.tsx` | Jeton bakiyesi ve paketler (ödeme simüle) |
 | Yayıncı Merkezi | `src/app/yayinci/` | Yayıncı başvurusu, elmas bakiyesi, haftalık grafik, yayıncı seviyesi, son kazançlar, para çekme (IBAN), elmas → jeton |
-| Ajans | `src/app/ajans.tsx` | Kodla katılma, komisyon, ajans yayıncı listesi |
-| Aile | `src/app/aile.tsx` | Aile sıralaması, katıl / kur (500 jeton), üye katkıları |
 | Görüntülü / sesli arama | `src/app/arama/[id].tsx` | Dakika başı jeton, süre sayacı, kamera/mikrofon, arama içi hediye |
 | Rastgele eşleş | `src/app/eslesme.tsx` | Görüntülü/sesli, cinsiyet filtresi, radar animasyonu |
 | Görevler | `src/app/gorevler.tsx` | 7 günlük giriş ödülü, günlük görevler (gerçek ilerleme), davet kodu |
@@ -65,9 +63,20 @@ Sesli odada ayrıca: oda sahibi yönetimi (sustur, koltuktan indir, odadan at), 
 | Destek | `src/app/destek.tsx` | SSS, kategorili talep, talep numarası, yanıt, yeniden açma/itiraz |
 | Ayarlar | `src/app/ayarlar.tsx` | Gizlilik, şehir keşfi (opt-in), efektleri kapatma, bildirim tercihleri, hesap silme |
 
+Ek ve yeni güncelleme belgeleriyle eklenenler:
+
+| Ekran | Dosya | Neler var |
+| --- | --- | --- |
+| Oda (topluluk) | `src/components/room/community.tsx` | Oda türleri, konuşmacı kuyruğu, anket, hedef, etkinlik takvimi, soru-cevap, kişisel ses ayarları, moderasyon (yasak, yavaş mod, filtre, kayıt), arkadaş daveti, toplu hediye "Hepsini seç", oda sahibi bonusu %20 |
+| Aile | `src/app/aile.tsx` | Sahip/yardımcı/üye rolleri, başvuru onayı, aile sohbeti, LV1–15, aktif üye, haftalık bonus %1–5 |
+| Ajans sohbeti | `src/app/ajans/sohbet.tsx` | Yalnız üyeler; çevrimiçi/çevrimdışı listesi; ajanslar arası transfer akışı (panelde onay) |
+| Oyun merkezi | `src/app/oyunlar.tsx` | VIP2'de açılır, sağlayıcı doğrulamalı sonuç |
+| Yönetim (demo) | `src/app/yonetim.tsx` | USD kuru, ajans %40, oda sahibi %20, aile oranları, arama bonusları, sınırlar, örnek hesaplayıcı, değişiklik geçmişi |
+| Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
+
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `VIBE77` (kapalı: `OLD999`).
 
-Ekonomi kuralları `src/data/economy.ts` içinde: 1 jetonluk hediye = 1 elmas, 100 elmas = ₺1, en az 10.000 elmas çekilebilir, elmas → jeton %10 kesinti.
+Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Değerler Profil > Kazanç & bonus yönetimi ekranından (demo) değiştirilebilir.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 

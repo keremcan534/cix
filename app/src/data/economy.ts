@@ -1,12 +1,9 @@
 import { USERS, type User } from '@/data/mock';
 
 // --- Rates -----------------------------------------------------------------
-// A gift worth N coins earns the receiver N diamonds.
-// 100 diamonds = ₺1 when withdrawing; 1 diamond = 1 coin when exchanging (minus 10%).
-export const DIAMONDS_PER_TL = 100;
-export const MIN_WITHDRAW_DIAMONDS = 10_000;
+// A gift worth N coins earns the receiver N diamonds. Diamond→USD and bonus rates live in rules.ts.
+// 1 diamond = 1 coin when exchanging (minus 10%).
 export const EXCHANGE_FEE = 0.1;
-export const tl = (diamonds: number) => `₺${(diamonds / DIAMONDS_PER_TL).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const callPrice = (u: User) => (u.vip ? 120 : 60); // coins per minute
 
@@ -72,7 +69,6 @@ export const TASKS: { id: string; key: TaskKey; title: string; goal: number; rew
   { id: 't4', key: 'moments', title: '1 an paylaş', goal: 1, reward: 10, icon: '📸' },
   { id: 't5', key: 'calls', title: '1 görüntülü arama yap', goal: 1, reward: 25, icon: '📹' },
 ];
-export const INVITE_REWARD = 200;
 
 // --- Lucky wheel -------------------------------------------------------------
 export const WHEEL_COST = 20;
@@ -95,10 +91,10 @@ export const spinWheel = () => {
 
 // --- Families -----------------------------------------------------------------
 export const FAMILIES = [
-  { id: 'f1', name: 'Gece Kuşları', emoji: '🦉', level: 12, members: 86, points: 1_284_000, leaderId: 'u1', memberIds: ['u1', 'u2', 'u9', 'u7', 'u4'] },
-  { id: 'f2', name: 'Karaoke Ailesi', emoji: '🎤', level: 9, members: 54, points: 842_500, leaderId: 'u11', memberIds: ['u11', 'u4', 'u8', 'u5'] },
-  { id: 'f3', name: 'Oyun Kurtları', emoji: '🐺', level: 7, members: 40, points: 515_200, leaderId: 'u2', memberIds: ['u2', 'u6', 'u10', 'u12'] },
-  { id: 'f4', name: 'İstanbul Sohbet', emoji: '🌉', level: 5, members: 27, points: 230_900, leaderId: 'u5', memberIds: ['u5', 'u7', 'u3'] },
+  { id: 'f1', name: 'Gece Kuşları', emoji: '🦉', level: 12, xp: 142_000, weekly: 100_000, members: 86, points: 1_284_000, leaderId: 'u1', memberIds: ['u1', 'u2', 'u9', 'u7', 'u4'] },
+  { id: 'f2', name: 'Karaoke Ailesi', emoji: '🎤', level: 9, xp: 58_000, weekly: 64_000, members: 54, points: 842_500, leaderId: 'u11', memberIds: ['u11', 'u4', 'u8', 'u5'] },
+  { id: 'f3', name: 'Oyun Kurtları', emoji: '🐺', level: 7, xp: 27_500, weekly: 38_000, members: 40, points: 515_200, leaderId: 'u2', memberIds: ['u2', 'u6', 'u10', 'u12'] },
+  { id: 'f4', name: 'İstanbul Sohbet', emoji: '🌉', level: 5, xp: 12_400, weekly: 17_500, members: 27, points: 230_900, leaderId: 'u5', memberIds: ['u5', 'u7', 'u3'] },
 ];
 
 // --- Leaderboards (mock) -----------------------------------------------------

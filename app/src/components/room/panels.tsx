@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
-import { MUSIC_CATALOG, ROOM_BACKGROUNDS, ROOM_LEVEL_REWARDS, ROOM_XP_THRESHOLDS, adminCapacity, roomLevel, type Track } from '@/data/catalog';
+import { MUSIC_CATALOG, ROOM_BACKGROUNDS, ROOM_LEVEL_ICONS, ROOM_LEVEL_REWARDS, ROOM_LIMITS, ROOM_TYPES, ROOM_XP_THRESHOLDS, adminCapacity, memberLimit, roomLevel, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import type { MyRoom } from '@/store';
@@ -159,11 +159,23 @@ export function SettingsModal({
 
         <Text style={styles.label}>Gizlilik</Text>
         <TextInput value={password} onChangeText={setPassword} placeholder="Şifre (boş = herkese açık)" placeholderTextColor={colors.textDim} style={styles.input} maxLength={8} />
-        <Text style={styles.label}>Katılımcı limiti</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {[50, 200, 500].map((n) => (
+        <Text style={styles.label}>Oda türü</Text>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {ROOM_TYPES.map((t) => (
+            <Pressable key={t.id} onPress={() => update({ roomType: t.id, micMode: t.id === 'free' ? 'free' : 'request' })} style={[styles.chip, room.roomType === t.id && { borderColor: colors.pink }]}>
+              <Text style={styles.chipText}>
+                {t.emoji} {t.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.dim}>{ROOM_TYPES.find((t) => t.id === room.roomType)?.desc}. Tür değişince mikrofon ve erişim izinleri yeniden değerlendirilir.</Text>
+
+        <Text style={styles.label}>Katılımcı limiti (Lv.{level} sınırı: {memberLimit(level).toLocaleString('tr-TR')})</Text>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {[50, 100, 200, 300, 500, 1_200, 2_000, 5_000].filter((n) => n <= memberLimit(level)).map((n) => (
             <Pressable key={n} onPress={() => update({ limit: n })} style={[styles.chip, room.limit === n && { borderColor: colors.pink }]}>
-              <Text style={styles.chipText}>{n} kişi</Text>
+              <Text style={styles.chipText}>{n.toLocaleString('tr-TR')} kişi</Text>
             </Pressable>
           ))}
         </View>
@@ -208,12 +220,16 @@ export function SettingsModal({
           <Switch value={botOn} onValueChange={setBot} />
         </View>
 
-        <Text style={styles.label}>Seviye ödülleri</Text>
+        <Text style={styles.label}>Seviye tablosu (oda limiti · üye · yönetici)</Text>
         {ROOM_LEVEL_REWARDS.map((r, i) => (
-          <Text key={r} style={[styles.dim, i < level && { color: '#fff' }]}>
-            {i < level ? '✅' : '🔒'} Lv.{i + 1} · {r}
-          </Text>
+          <View key={r} style={[styles.levelRow, i + 1 === level && { borderColor: colors.pink }]}>
+            <Text style={[styles.dim, i < level && { color: '#fff' }, { fontWeight: '800' }]}>
+              {i < level ? '✅' : '🔒'} {ROOM_LEVEL_ICONS[i]} LV{i + 1} · {ROOM_LIMITS[i].rooms.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].members.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].admins}
+            </Text>
+            <Text style={[styles.dim, i < level && { color: '#fff' }]}>{r}</Text>
+          </View>
         ))}
+        <Text style={styles.dim}>Limitler ve XP eşikleri yönetim panelinden değiştirilebilir; haklar sunucu tarafında uygulanır.</Text>
         <GradientButton title="Kaydet" icon="checkmark" onPress={save} />
       </ScrollView>
     </Sheet>
@@ -266,7 +282,13 @@ export function MusicSheet({
   onRemove,
   enabled,
   setEnabled,
+  requests = [],
+  onApprove,
+  onReject,
 }: {
+  requests?: { track: Track; by: string }[];
+  onApprove?: (i: number) => void;
+  onReject?: (i: number) => void;
   visible: boolean;
   onClose: () => void;
   music: MusicState;
@@ -294,6 +316,24 @@ export function MusicSheet({
             <Text style={{ color: '#fff', flex: 1 }}>Ortak müzik</Text>
             <Switch value={enabled} onValueChange={setEnabled} />
           </View>
+        )}
+        {canControl && requests.length > 0 && (
+          <>
+            <Text style={styles.label}>İstek kuyruğu ({requests.length}) · onay bekliyor</Text>
+            {requests.map((r, i) => (
+              <View key={`${r.track.id}-${i}`} style={styles.row}>
+                <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
+                  🙋 {userById(r.by).name}: {r.track.title}
+                </Text>
+                <Pressable style={[styles.smallBtn, { backgroundColor: colors.green }]} onPress={() => onApprove?.(i)}>
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Onayla</Text>
+                </Pressable>
+                <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject?.(i)}>
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Reddet</Text>
+                </Pressable>
+              </View>
+            ))}
+          </>
         )}
         <Text style={styles.label}>Sıra ({music.queue.length})</Text>
         {music.queue.length === 0 && <Text style={styles.dim}>Sıra boş.</Text>}
@@ -440,19 +480,21 @@ export function ContributionModal({ visible, onClose, data, locked }: { visible:
 }
 
 // --- Speak requests -----------------------------------------------------------------
-export function RequestsModal({ visible, onClose, requests, onAccept, onReject }: { visible: boolean; onClose: () => void; requests: string[]; onAccept: (id: string) => void; onReject: (id: string) => void }) {
+export function RequestsModal({ visible, onClose, requests, onAccept, onReject, freeSeats }: { visible: boolean; onClose: () => void; requests: string[]; onAccept: (id: string) => void; onReject: (id: string) => void; freeSeats: number }) {
   return (
-    <Sheet visible={visible} onClose={onClose} title={`🙋 Konuşma istekleri (${requests.length})`}>
+    <Sheet visible={visible} onClose={onClose} title={`🙋 Konuşmacı kuyruğu (${requests.length})`}>
+      <Text style={styles.dim}>Sıra geliş sırasına göre. Boş mikrofon: {freeSeats}. Mikrofon doluysa kabul edilen kişi bekleme listesinde kalır.</Text>
       {requests.length === 0 && <Text style={styles.dim}>Bekleyen istek yok.</Text>}
-      {requests.map((id) => (
+      {requests.map((id, i) => (
         <View key={id} style={styles.row}>
+          <Text style={{ color: colors.gold, fontWeight: '800', width: 18 }}>{i + 1}</Text>
           <Avatar uri={userById(id).avatar} size={38} />
           <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
           <Pressable style={[styles.smallBtn, { backgroundColor: colors.green }]} onPress={() => onAccept(id)}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Kabul</Text>
           </Pressable>
           <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Reddet</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Sıradan çıkar</Text>
           </Pressable>
         </View>
       ))}
@@ -467,6 +509,7 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
   chipText: { color: '#fff', fontWeight: '600', fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  levelRow: { borderWidth: 1, borderColor: 'transparent', borderRadius: 10, padding: 6, gap: 2 },
   levelCard: { backgroundColor: colors.cardAlt, borderRadius: 14, padding: 12, gap: 6 },
   levelTitle: { color: '#fff', fontWeight: '800' },
   track: { height: 8, borderRadius: 4, backgroundColor: colors.bg, overflow: 'hidden' },

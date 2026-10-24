@@ -67,6 +67,33 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Davet ağı: sınırsız derinlik, kademeli yükleme, filtreler, gizlilik | ✅ |
 | Komisyon defteri: iki kaynak türü, yaşam döngüsü durumları, ters kayıt, kural sürümü, itiraz | 🟡 (örnek veri, simülasyon oranları) |
 
+## Ek güncelleme + yeni güncelleme belgeleri
+
+| Madde | Durum |
+| --- | --- |
+| Oda LV1–15 tablosu (oda / üye / yönetici sınırları + seviye ödülleri), katılımcı sınırı seviyeye göre | ✅ Oda ayarları > seviye tablosu |
+| Oda türleri: serbest, sahne, soru-cevap, müzik, etkinlik, özel | ✅ |
+| Konuşmacı kuyruğu (sıra numarası, sıradan çıkma, boş koltuğa otomatik geçiş), koltuk kilitleme | ✅ |
+| Anket, topluluk hedefi, etkinlik takvimi, soru-cevap, şarkı isteği kuyruğu | ✅ |
+| Kişisel ses ayarları (oda sesi, müzik/ses seviyesi, hediye sesleri, büyük hediyeler) | ✅ |
+| Moderasyon: geçici yasak, yavaş mod, kelime filtresi, şikayetler, moderasyon kaydı | ✅ |
+| Toplu hediye "Hepsini seç", alıcı bazlı sonuç, büyük harcama onayı, günlük harcama limiti | ✅ |
+| Arkadaş daveti; davet ödülü = davet edilenin her başarılı jeton alımında 1 birim | ✅ Görevler > Davet ödüllerim |
+| Kişisel oda önerileri ("Senin için", gerekçeli) | ✅ |
+| Hayran kulübü (seviye, puan geçmişi, ücretsiz kazanım yolları) | ✅ |
+| Oyun merkezi VIP2'de açılır; katalog önceden görünür; sonuç sağlayıcı doğrulamalı | ✅ (sağlayıcı simülasyon ⛔) |
+| Günlük / haftalık / aylık sıralamalar + ölçüt açıklaması, ajans ve oda XP sıralaması | ✅ |
+| Yayıncı analizi; 5.000 💎 = 1 USD; ajans %40 komisyonu ayrıca ödenir, yayıncıdan kesilmez | ✅ |
+| Oda sahibi bonusu %20 (kendi odasındaki uygun hediyeler) | ✅ |
+| Ajans menüleri yalnızca ajans üyelerine görünür; ajans sohbet grubu (çevrimiçi/çevrimdışı, sabit duyuru) | ✅ |
+| Tek ajans kuralı; ajanslar arası transfer: talep → ajans sahibi onayı (ücretli/ücretsiz) → tamamlanma, adım zaman çizelgesi, itiraz | ✅ Ajans > Transfer / Panel > Transferler |
+| Aile sistemi: sahip/yardımcı/üye rolleri, başvuru onayı, aile sohbeti + sessize alma, LV1–15, kapasite, aktif üye tanımı, haftalık bonus %1–5 katkıya göre dağıtım | ✅ |
+| Bildirim türleri ayrı ayrı + erteleme (1/8/24 sa), düşük veri modu, hareketi azalt, davet izinleri | ✅ Ayarlar |
+| Oturumlar ve oturum sonlandırma, şüpheli giriş / yeniden doğrulama, çoklu hesap/IBAN risk notları | ✅ (gerçek kontrol sunucuda ⛔) |
+| İtiraz kategorileri: moderasyon kararı, hesap kısıtlaması, ajans transferi, oyun sonucu | ✅ Destek |
+| İşlem geçmişi referans numarası, günlük özet | ✅ Cüzdan |
+| Merkezi kazanç & bonus yönetim paneli (USD kuru, ajans %, oda sahibi %, aile oranları, arama bonusları, üst sınır, min. çekim, davet birimi, örnek hesaplayıcı, sürüm geçmişi) | ✅ Profil > Kazanç & bonus yönetimi (demo, kaydedilmez) |
+
 ## Prototip dışı (backend / yönetim paneli gerektirir) ⛔
 
 - Gerçek ses/görüntü altyapısı (LiveKit/Agora), yayın telemetrisi, tekrar oynatma ve zaman eşlemeli sohbet

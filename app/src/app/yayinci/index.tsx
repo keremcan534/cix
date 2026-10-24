@@ -6,9 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { EXCHANGE_FEE, hostLevel, tl } from '@/data/economy';
+import { EXCHANGE_FEE, hostLevel } from '@/data/economy';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -84,7 +85,7 @@ function Dashboard() {
         <LinearGradient colors={['#0EA5E9', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Text style={styles.balanceLabel}>Elmas bakiyesi</Text>
           <Text style={styles.balanceN}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
-          <Text style={styles.balanceLabel}>≈ {tl(diamonds)}</Text>
+          <Text style={styles.balanceLabel}>≈ {usd(diamonds)}</Text>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
             <Pressable style={styles.balanceBtn} onPress={() => router.push('/yayinci/cek')}>
               <Ionicons name="cash-outline" size={18} color="#fff" />
@@ -138,11 +139,13 @@ function Dashboard() {
             <Text style={{ fontSize: 28 }}>{agency?.logo ?? '🏢'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.perkTitle}>{agency ? agency.name : 'Bir ajansa katıl'}</Text>
-              <Text style={styles.dim}>{agency ? `Ajans komisyonu %${agency.commission * 100}` : 'Ajansa bağlı yayıncılar ekstra bonus kazanır'}</Text>
+              <Text style={styles.dim}>{agency ? `Ajansa ${pct(RULES.agencyCommission)} komisyon ayrıca ödenir — senden kesilmez` : 'Ajansa bağlı yayıncılar ekstra bonus kazanır'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Card>
         </Pressable>
+
+        <Analytics />
 
         <Card style={{ gap: 4 }}>
           <Text style={[styles.cardTitle, { marginBottom: 6 }]}>Son kazançlar</Text>
@@ -166,6 +169,58 @@ function Dashboard() {
         <GradientButton title="Yayın aç" icon="radio" onPress={() => router.push('/oda/yeni')} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function Analytics() {
+  const { earnings, agencyId, weekly } = useApp();
+  const sum = (src: string) => earnings.filter((e) => e.source === src).reduce((x, e) => x + e.amount, 0);
+  const gifts = sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0);
+  const ownerBonus = sum('Oda sahibi bonusu');
+  const familyBonus = sum('Aile bonusu');
+  const callBonus = sum('Arama bonusu') + sum('Arama');
+  const net = gifts + ownerBonus + familyBonus + callBonus;
+  const { commission } = settlement(gifts, !!agencyId);
+  const seed = Math.max(1, Math.round(gifts / 500));
+  const metrics = [
+    ['Toplam yayın süresi', `${12 + (seed % 30)} sa`],
+    ['Tekil katılımcı', String(140 + seed * 3)],
+    ['Yeni takipçi', String(18 + (seed % 40))],
+    ['Tekrar gelen', `%${35 + (seed % 30)}`],
+    ['Ort. katılım süresi', `${6 + (seed % 9)} dk`],
+    ['Etkinlik katılımı', String(22 + (seed % 15))],
+  ];
+  return (
+    <Card style={{ gap: 8 }}>
+      <Text style={styles.cardTitle}>📈 Yayıncı analizi (bu hafta)</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {metrics.map(([l, v]) => (
+          <View key={l} style={styles.metric}>
+            <Text style={styles.dim}>{l}</Text>
+            <Text style={{ color: '#fff', fontWeight: '800' }}>{v}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={[styles.cardTitle, { fontSize: 14, marginTop: 4 }]}>Kazanç dökümü</Text>
+      <Line label="Brüt hediye değeri" value={`💎 ${gifts.toLocaleString('tr-TR')}`} />
+      <Line label={`Oda sahibi bonusu (${pct(RULES.roomOwnerBonus)})`} value={`+ ${ownerBonus.toLocaleString('tr-TR')}`} />
+      <Line label="Aile bonusu" value={`+ ${familyBonus.toLocaleString('tr-TR')}`} />
+      <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />
+      <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />
+      {agencyId && <Line label={`Ajans komisyonu (${pct(RULES.agencyCommission)}, ayrıca ödenir)`} value={`${commission.toLocaleString('tr-TR')} · ${usd(commission)}`} dim />}
+      <Text style={styles.dim}>
+        {RULES.diamondsPerUsd.toLocaleString('tr-TR')} elmas = 1 USD. Komisyon ve bonuslar senin kazancından kesilmez; iade edilen işlemler dökümden çıkarılır.
+      </Text>
+    </Card>
+  );
+}
+
+function Line({ label, value, bold, dim }: { label: string; value: string; bold?: boolean; dim?: boolean }) {
+  return (
+    <View style={styles.rowBetween}>
+      <Text style={[styles.dim, bold && { color: '#fff', fontWeight: '800' }]}>{label}</Text>
+      <Text style={{ color: dim ? colors.textDim : bold ? colors.green : '#fff', fontWeight: bold ? '800' : '600' }}>{value}</Text>
+    </View>
   );
 }
 
@@ -200,5 +255,6 @@ const styles = StyleSheet.create({
   bar: { width: 18, borderRadius: 6, backgroundColor: colors.primary },
   barValue: { color: colors.textDim, fontSize: 9 },
   barLabel: { color: colors.textDim, fontSize: 10 },
+  metric: { flexBasis: '30%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 8, gap: 2 },
   earning: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
 });

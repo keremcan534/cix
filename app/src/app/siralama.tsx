@@ -6,31 +6,43 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, Header } from '@/components/ui';
 import { LEADERBOARDS } from '@/data/economy';
-import { ROOMS, type User } from '@/data/mock';
+import { AGENCIES } from '@/data/agency';
+import { ROOMS, USERS, type User } from '@/data/mock';
 import { colors } from '@/theme';
 
-type Board = 'zengin' | 'yayinci' | 'oda';
-const BOARDS: { key: Board; label: string; unit: string }[] = [
-  { key: 'zengin', label: '💰 Zenginler', unit: '🪙' },
-  { key: 'yayinci', label: '🎙️ Yayıncılar', unit: '💎' },
-  { key: 'oda', label: '🔥 Odalar', unit: '👥' },
+type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
+const BOARDS: { key: Board; label: string; unit: string; how: string }[] = [
+  { key: 'zengin', label: '💰 Zenginler', unit: '🪙', how: 'Geçerli hediye harcaması' },
+  { key: 'yayinci', label: '🎙️ Yayıncılar', unit: '💎', how: 'Alınan geçerli hediyeler (elmas)' },
+  { key: 'oda', label: '🔥 Odalar', unit: '👥', how: 'Tekil katılımcı' },
+  { key: 'ajans', label: '🏢 Ajanslar', unit: '💎', how: 'Ajans yayıncılarının toplam geçerli kazancı' },
+  { key: 'odaxp', label: '⭐ Oda XP', unit: 'XP', how: 'Doğrulanmış oda deneyim puanı' },
 ];
+const PERIOD_RANGE = { daily: '24 Ekim 2026', weekly: '19–25 Ekim 2026', monthly: '1–31 Ekim 2026' } as const;
 
 type Row = { id: string; name: string; avatar: string; score: number; user?: User; roomId?: string };
 
 export default function Leaderboard() {
   const [board, setBoard] = useState<Board>('zengin');
-  const [period, setPeriod] = useState<'daily' | 'weekly'>('daily');
-  const unit = BOARDS.find((b) => b.key === board)!.unit;
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const info = BOARDS.find((b) => b.key === board)!;
+  const unit = info.unit;
+  const mult = period === 'monthly' ? 4 : 1;
 
   const rows: Row[] =
     board === 'oda'
       ? [...ROOMS]
           .sort((a, b) => b.listeners - a.listeners)
-          .map((r) => ({ id: r.id, name: r.title, avatar: r.cover, score: r.listeners * (period === 'weekly' ? 23 : 1), roomId: r.id }))
-      : LEADERBOARDS[board][period].map((r) => ({ id: r.user.id, name: r.user.name, avatar: r.user.avatar, score: r.score, user: r.user }));
+          .map((r) => ({ id: r.id, name: r.title, avatar: r.cover, score: r.listeners * (period === 'daily' ? 1 : 23) * mult, roomId: r.id }))
+      : board === 'odaxp'
+        ? [...ROOMS]
+            .sort((a, b) => (b.level ?? 1) - (a.level ?? 1))
+            .map((r) => ({ id: r.id, name: `${r.title} · LV${r.level ?? 1}`, avatar: r.cover, score: (r.level ?? 1) * 1_750 * mult, roomId: r.id }))
+        : board === 'ajans'
+          ? AGENCIES.filter((a) => a.status === 'active').map((a, i) => ({ id: a.id, name: `${a.logo} ${a.name}`, avatar: USERS[i].avatar, score: (a.hosts * 9_100 + i * 311) * mult * (period === 'daily' ? 1 : 6) }))
+          : LEADERBOARDS[board][period === 'monthly' ? 'weekly' : period].map((r) => ({ id: r.user.id, name: r.user.name, avatar: r.user.avatar, score: r.score * mult, user: r.user }));
 
-  const open = (r: Row) => (r.roomId ? router.push(`/oda/${r.roomId}`) : router.push(`/kullanici/${r.id}`));
+  const open = (r: Row) => (r.roomId ? router.push(`/oda/${r.roomId}`) : r.user ? router.push(`/kullanici/${r.id}`) : undefined);
   const [first, second, third] = rows;
 
   return (
@@ -44,12 +56,15 @@ export default function Leaderboard() {
         ))}
       </View>
       <View style={styles.periods}>
-        {(['daily', 'weekly'] as const).map((p) => (
+        {(['daily', 'weekly', 'monthly'] as const).map((p) => (
           <Pressable key={p} onPress={() => setPeriod(p)}>
-            <Text style={[styles.period, period === p && styles.periodActive]}>{p === 'daily' ? 'Günlük' : 'Haftalık'}</Text>
+            <Text style={[styles.period, period === p && styles.periodActive]}>{p === 'daily' ? 'Günlük' : p === 'weekly' ? 'Haftalık' : 'Aylık'}</Text>
           </Pressable>
         ))}
       </View>
+      <Text style={styles.how}>
+        {PERIOD_RANGE[period]} · Ölçüt: {info.how} · İade edilen hediyeler ve sahte etkileşimler hariç
+      </Text>
 
       <FlatList
         data={rows.slice(3)}
@@ -98,8 +113,9 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
-  tab: { flex: 1, paddingVertical: 9, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
+  how: { color: colors.textDim, fontSize: 11, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
+  tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, flexWrap: 'wrap' },
+  tab: { flexGrow: 1, paddingVertical: 9, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   periods: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingVertical: 12 },
