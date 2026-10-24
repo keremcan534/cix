@@ -34,7 +34,13 @@ function RootStack() {
         <Stack.Screen name="eslesme" />
         <Stack.Screen name="yayinci/index" />
         <Stack.Screen name="yayinci/cek" />
-        <Stack.Screen name="ajans" />
+        <Stack.Screen name="ajans/index" />
+        <Stack.Screen name="ajans/panel" />
+        <Stack.Screen name="ajans/ag" />
+        <Stack.Screen name="magaza" />
+        <Stack.Screen name="bildirimler" />
+        <Stack.Screen name="destek" />
+        <Stack.Screen name="ayarlar" />
         <Stack.Screen name="gorevler" />
         <Stack.Screen name="siralama" />
         <Stack.Screen name="vip" />

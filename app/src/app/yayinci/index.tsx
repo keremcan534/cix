@@ -5,7 +5,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, GradientButton, Header } from '@/components/ui';
-import { AGENCIES, EXCHANGE_FEE, hostLevel, tl } from '@/data/economy';
+import { AGENCIES } from '@/data/agency';
+import { EXCHANGE_FEE, hostLevel, tl } from '@/data/economy';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';

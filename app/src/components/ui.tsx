@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
 import { colors, gradient } from '@/theme';
 
@@ -114,6 +115,8 @@ const styles = StyleSheet.create({
   },
   coinText: { color: colors.gold, fontWeight: '700' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10 },
+  levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  levelChipText: { fontSize: 11, fontWeight: '800' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
 });
 
@@ -132,15 +135,34 @@ export function Header({ title, right }: { title: string; right?: ReactNode }) {
 }
 
 /** Avatar with the nobility (VIP) frame color, if any. */
-export function FramedAvatar({ uri, size = 44, vipLevel = 0, online }: { uri: string; size?: number; vipLevel?: number; online?: boolean }) {
+export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean }) {
   const tier = vipTier(vipLevel);
-  if (!tier) return <Avatar uri={uri} size={size} online={online} />;
+  const frame = cosmeticById(frameId);
+  // A purchased frame overrides the VIP frame color; the VIP badge emoji stays.
+  const frameColors = frame?.color ?? tier?.color;
+  if (!frameColors) return <Avatar uri={uri} size={size} online={online} />;
   return (
     <View style={{ width: size, height: size }}>
-      <LinearGradient colors={tier.color} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
+      <LinearGradient colors={frameColors} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
         <Image source={{ uri }} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
       </LinearGradient>
-      <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{tier.emoji}</Text>
+      {(tier || frame) && (
+        <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{tier?.emoji ?? frame?.emoji}</Text>
+      )}
+    </View>
+  );
+}
+
+/** Wealth / charm level chips (separate from VIP). */
+export function LevelChips({ wealth, charm }: { wealth: number; charm: number }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      <View style={[styles.levelChip, { backgroundColor: 'rgba(251,191,36,0.18)' }]}>
+        <Text style={[styles.levelChipText, { color: colors.gold }]}>💰 Lv.{wealth}</Text>
+      </View>
+      <View style={[styles.levelChip, { backgroundColor: 'rgba(236,72,153,0.18)' }]}>
+        <Text style={[styles.levelChipText, { color: '#F9A8D4' }]}>✨ Lv.{charm}</Text>
+      </View>
     </View>
   );
 }
@@ -151,7 +173,7 @@ export function VipTitle({ level }: { level: number }) {
   return (
     <LinearGradient colors={tier.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.vip}>
       <Text style={[styles.vipText, { color: '#fff' }]}>
-        {tier.emoji} {tier.name}
+        {tier.emoji} VIP {tier.level}
       </Text>
     </LinearGradient>
   );

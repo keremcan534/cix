@@ -24,16 +24,42 @@ export const hostLevel = (totalDiamonds: number) => {
   return { current: HOST_LEVELS[idx], next: HOST_LEVELS[idx + 1] };
 };
 
-// --- VIP / nobility ----------------------------------------------------------
-export type VipTier = { level: number; name: string; emoji: string; price: number; color: readonly [string, string]; perks: string[] };
-export const VIP_TIERS: VipTier[] = [
-  { level: 1, name: 'Şövalye', emoji: '🛡️', price: 300, color: ['#64748B', '#94A3B8'], perks: ['Şövalye rozeti', 'Avatar çerçevesi'] },
-  { level: 2, name: 'Baron', emoji: '🎖️', price: 1_000, color: ['#0EA5E9', '#38BDF8'], perks: ['Baron rozeti', 'Mavi çerçeve', 'Odaya giriş efekti'] },
-  { level: 3, name: 'Kont', emoji: '💠', price: 3_000, color: ['#8B5CF6', '#C084FC'], perks: ['Kont rozeti', 'Mor çerçeve', 'Giriş efekti', 'Günlük 30 jeton'] },
-  { level: 4, name: 'Dük', emoji: '👑', price: 8_000, color: ['#F59E0B', '#FBBF24'], perks: ['Dük rozeti', 'Altın çerçeve', 'Özel giriş efekti', 'Günlük 100 jeton', 'Odadan atılamaz'] },
-  { level: 5, name: 'Kral', emoji: '🦁', price: 20_000, color: ['#EF4444', '#F97316'], perks: ['Kral rozeti', 'Ateş çerçeve', 'Efsane giriş efekti', 'Günlük 300 jeton', 'Odadan atılamaz', 'Sıralamada gizlenme'] },
+// --- VIP 1–15 ---------------------------------------------------------------
+// Titles/perks follow the product spec (our design, not a competitor's official table).
+// Perks are cumulative: each level includes everything below it.
+export type VipTier = { level: number; name: string; emoji: string; price: number; color: readonly [string, string]; perk: string };
+const VIP_DEFS: [string, string, number, string, string, string][] = [
+  ['Üye', '🔰', 100, '#64748B', '#94A3B8', 'VIP rozeti'],
+  ['Bronz', '🥉', 300, '#B45309', '#D97706', 'İsim rengi'],
+  ['Gümüş', '🥈', 600, '#94A3B8', '#E2E8F0', 'Profil çerçevesi'],
+  ['Altın', '🥇', 1_000, '#F59E0B', '#FBBF24', 'Odaya giriş efekti'],
+  ['Platin', '💿', 1_800, '#0EA5E9', '#67E8F9', 'Sohbet balonu'],
+  ['Safir', '🔷', 3_000, '#2563EB', '#60A5FA', 'Profil kişiselleştirmesi'],
+  ['Yakut', '♦️', 4_500, '#BE123C', '#F43F5E', 'Oda içi görsel efekt'],
+  ['Zümrüt', '💚', 6_500, '#047857', '#34D399', 'Ek kozmetik paketi'],
+  ['Elmas', '💎', 9_000, '#06B6D4', '#A5F3FC', 'Gelişmiş giriş animasyonu + gizli giriş'],
+  ['Usta', '🎖️', 12_000, '#7C3AED', '#A78BFA', 'Özel VIP teması'],
+  ['Asil', '⚜️', 16_000, '#9333EA', '#E879F9', 'Genişletilmiş kozmetik koleksiyonu'],
+  ['Lord', '🗡️', 21_000, '#4338CA', '#818CF8', 'Özel isim efekti'],
+  ['Kont', '💠', 27_000, '#8B5CF6', '#C084FC', 'Üst düzey profil/giriş efekti'],
+  ['Dük', '👑', 35_000, '#D97706', '#FDE047', 'Nadir kozmetik seçenekleri'],
+  ['İmparator', '🦁', 50_000, '#DC2626', '#F97316', 'En üst VIP rozeti ve özel tema'],
 ];
+export const VIP_TIERS: VipTier[] = VIP_DEFS.map(([name, emoji, price, c1, c2, perk], i) => ({ level: i + 1, name, emoji, price, color: [c1, c2] as const, perk }));
 export const vipTier = (level: number) => VIP_TIERS.find((t) => t.level === level);
+export const vipPerks = (level: number) => VIP_TIERS.filter((t) => t.level <= level).map((t) => t.perk);
+export const VIP_ENTRY_LEVEL = 4; // entry banner unlocks at Altın
+export const VIP_INVISIBLE_LEVEL = 9; // invisible entry unlocks at Elmas
+
+// --- Wealth & Charm (separate from VIP and room level) ----------------------
+// Wealth: qualifying coins spent. Charm: diamonds received.
+const levelFrom = (value: number, base: number) => {
+  let lvl = 0;
+  while (value >= base * (2 ** lvl - 1) && lvl < 50) lvl++;
+  return Math.max(1, lvl);
+};
+export const wealthLevel = (spent: number) => levelFrom(spent, 100);
+export const charmLevel = (diamonds: number) => levelFrom(diamonds, 200);
 
 // --- Daily check-in & tasks --------------------------------------------------
 export const CHECKIN_REWARDS = [10, 15, 20, 30, 40, 50, 100];
@@ -67,13 +93,7 @@ export const spinWheel = () => {
   return WHEEL_PRIZES.findIndex((p) => (r -= p.weight) < 0);
 };
 
-// --- Agencies & families -----------------------------------------------------
-export const AGENCIES = [
-  { id: 'a1', code: 'STAR01', name: 'Star Ajans', commission: 0.1, hosts: 48, logo: '⭐' },
-  { id: 'a2', code: 'MOON22', name: 'Moonlight Media', commission: 0.12, hosts: 31, logo: '🌙' },
-  { id: 'a3', code: 'VIBE77', name: 'Vibe Talent', commission: 0.08, hosts: 19, logo: '💜' },
-];
-
+// --- Families -----------------------------------------------------------------
 export const FAMILIES = [
   { id: 'f1', name: 'Gece Kuşları', emoji: '🦉', level: 12, members: 86, points: 1_284_000, leaderId: 'u1', memberIds: ['u1', 'u2', 'u9', 'u7', 'u4'] },
   { id: 'f2', name: 'Karaoke Ailesi', emoji: '🎤', level: 9, members: 54, points: 842_500, leaderId: 'u11', memberIds: ['u11', 'u4', 'u8', 'u5'] },

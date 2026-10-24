@@ -53,6 +53,20 @@ Telefona **Expo Go** uygulamasını kur, terminaldeki QR kodu okut.
 
 Sesli odada ayrıca: oda sahibi yönetimi (sustur, koltuktan indir, odadan at), dinleyici listesi ve koltuğa davet, PK yarışı, gelen hediyelerden elmas kazanma (kendi odanda), VIP giriş efekti.
 
+Şartname v1.2 ile eklenenler (ayrıntı: [`docs/SARTNAME_KAPSAM.md`](docs/SARTNAME_KAPSAM.md)):
+
+| Ekran | Dosya | Neler var |
+| --- | --- | --- |
+| Oda (genişletildi) | `src/app/oda/[id].tsx`, `src/components/room/` | 10/15 mikrofon, oda XP ve 1–15 seviye, konuşma isteği, oda yöneticisi + rol hiyerarşisi, oda ayarları, şifreli oda, gizli giriş, etiketli bot, katkı sıralaması, oda zarfı, ortak müzik, zar oyunu, PK daveti/geri sayım/MVP, emoji paneli |
+| VIP 1–15 | `src/app/vip.tsx` | 15 seviye (Üye → İmparator), birikimli ayrıcalıklar, Wealth ve Charm ayrı seviyeler |
+| Mağaza | `src/app/magaza.tsx` | Çerçeve, giriş efekti, binek, sohbet balonu, özel ID, emoji paketleri; satın al / kullan |
+| Ajans | `src/app/ajans/` | Kodla katılım (şartlar + onay), ajans kurma başvurusu, yayıncı ajans ekranı, geçiş/ayrılma talebi, sahip paneli (10 bölüm), baş asistan izin kısıtı, davet ağı ağacı, komisyon defteri |
+| Bildirimler | `src/app/bildirimler.tsx` | Sosyal ve finans/güvenlik ayrımı |
+| Destek | `src/app/destek.tsx` | SSS, kategorili talep, talep numarası, yanıt, yeniden açma/itiraz |
+| Ayarlar | `src/app/ayarlar.tsx` | Gizlilik, şehir keşfi (opt-in), efektleri kapatma, bildirim tercihleri, hesap silme |
+
+Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `VIBE77` (kapalı: `OLD999`).
+
 Ekonomi kuralları `src/data/economy.ts` içinde: 1 jetonluk hediye = 1 elmas, 100 elmas = ₺1, en az 10.000 elmas çekilebilir, elmas → jeton %10 kesinti.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.

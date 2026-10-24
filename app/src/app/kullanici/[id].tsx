@@ -18,7 +18,7 @@ const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', '
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = userById(id);
-  const { following, toggleFollow, blocked, toggleBlock } = useApp();
+  const { following, toggleFollow, blocked, toggleBlock, createTicket } = useApp();
   const isFollowing = following.has(user.id);
   const isBlocked = blocked.has(user.id);
   const photos = MOMENTS.filter((m) => m.userId === user.id && m.image).map((m) => m.image!);
@@ -88,10 +88,10 @@ export default function UserProfile() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.bottom}>
-        <Pressable style={[styles.roundBtn, isFollowing && { backgroundColor: colors.pink }]} onPress={() => toggleFollow(user.id)}>
+        <Pressable style={[styles.roundBtn, isFollowing && { backgroundColor: colors.pink }]} onPress={() => toggleFollow(user.id)} accessibilityLabel="Takip et">
           <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={22} color="#fff" />
         </Pressable>
-        <Pressable style={styles.roundBtn} onPress={() => router.push(`/sohbet/${user.id}`)}>
+        <Pressable style={styles.roundBtn} onPress={() => router.push(`/sohbet/${user.id}`)} accessibilityLabel="Mesaj">
           <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
         </Pressable>
         <Pressable style={styles.roundBtn} onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })}>
@@ -120,7 +120,10 @@ export default function UserProfile() {
         onClose={() => setSheet('none')}
         options={REPORT_REASONS.map((r) => ({
           label: r,
-          onPress: () => showAlert('Teşekkürler', `"${r}" şikayetin moderasyon ekibimize iletildi. 24 saat içinde incelenecek.`),
+          onPress: () => {
+            const no = createTicket('Şikâyet', `${user.name} (${user.id}) · ${r}`);
+            showAlert('Şikâyet alındı', `Talep #${no} · "${r}". İnceleme sonucu bildirim olarak gelir; durumu Destek ekranından izleyebilirsin.`);
+          },
         }))}
       />
     </View>

@@ -5,15 +5,20 @@ import { useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmojiPanel } from '@/components/EmojiPanel';
 import { Avatar, VerifiedBadge } from '@/components/ui';
-import { BOT_LINES, userById } from '@/data/mock';
+import { BOT_LINES, DM_PRICE, FOLLOWS_ME, userById } from '@/data/mock';
+import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = userById(id);
-  const { conversations, sendMessage, markRead } = useApp();
+  const { conversations, sendMessage, markRead, following, toggleFollow, blocked, spendCoins } = useApp();
+  const mutual = following.has(user.id) && FOLLOWS_ME.has(user.id);
+  const isBlocked = blocked.has(user.id);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const convo = conversations.find((c) => c.userId === user.id);
   const messages = convo?.messages ?? [];
   const [draft, setDraft] = useState('');
@@ -32,10 +37,22 @@ export default function ChatScreen() {
     [],
   );
 
+  // Index of the other person's latest message: everything I sent before it counts as read.
+  const lastTheirs = messages.map((m) => m.fromMe).lastIndexOf(false);
+
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || isBlocked) return;
+    // Mutual follow chats are free; otherwise each message costs coins (price shown before sending).
+    if (!mutual && !spendCoins(DM_PRICE, `Mesaj: ${user.name}`)) {
+      showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${DM_PRICE} jeton.`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+      ]);
+      return;
+    }
     sendMessage(user.id, text);
+    setEmojiOpen(false);
     setDraft('');
     // Fake reply so the prototype feels real.
     setTyping(true);
@@ -95,7 +112,10 @@ export default function ChatScreen() {
             item.fromMe ? (
               <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mine]}>
                 <Text style={styles.bubbleText}>{item.text}</Text>
-                <Text style={styles.time}>{item.time}</Text>
+                <Text style={styles.time}>
+                  {item.time}{' '}
+                  <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
+                </Text>
               </LinearGradient>
             ) : (
               <View style={[styles.bubble, styles.theirs]}>
@@ -105,8 +125,22 @@ export default function ChatScreen() {
             )
           }
         />
+        {isBlocked ? (
+          <Text style={styles.notice}>Bu kullanıcıyı engelledin; mesaj gönderemezsin.</Text>
+        ) : (
+          !mutual && (
+            <Pressable style={styles.notice} onPress={() => toggleFollow(user.id)}>
+              <Text style={{ color: colors.gold, fontSize: 12, textAlign: 'center' }}>
+                Karşılıklı takip değilsiniz · mesaj başı 🪙 {DM_PRICE}. {following.has(user.id) ? `${user.name} seni takip etmiyor.` : 'Takip et → karşılıklıysa ücretsiz.'}
+              </Text>
+            </Pressable>
+          )
+        )}
+        {emojiOpen && <EmojiPanel onPick={(e) => setDraft((d) => d + e)} />}
         <View style={styles.inputRow}>
-          <Ionicons name="happy-outline" size={26} color={colors.textDim} />
+          <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
+            <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
+          </Pressable>
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -146,6 +180,7 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: colors.cardAlt, borderBottomLeftRadius: 4 },
   bubbleText: { color: '#fff', fontSize: 15 },
   time: { color: 'rgba(255,255,255,0.6)', fontSize: 10, alignSelf: 'flex-end', marginTop: 2 },
+  notice: { paddingHorizontal: 16, paddingVertical: 6, color: colors.textDim, textAlign: 'center', fontSize: 12 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   input: {
     flex: 1,

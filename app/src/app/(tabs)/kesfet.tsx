@@ -14,13 +14,17 @@ const TABS = ['Yakındakiler', 'Tüm Türkiye', 'Yeni'] as const;
 
 export default function DiscoverScreen() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Yakındakiler');
+  const { blocked, settings, setSetting } = useApp();
+  // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
+  const needsOptIn = tab === 'Yakındakiler' && !settings.cityDiscovery;
 
-  const list =
+  const list = (
     tab === 'Yakındakiler'
       ? USERS.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
       : tab === 'Yeni'
         ? [...USERS].reverse()
-        : USERS;
+        : USERS
+  ).filter((u) => !blocked.has(u.id));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -35,7 +39,21 @@ export default function DiscoverScreen() {
           </Pressable>
         ))}
       </View>
+      {needsOptIn && (
+        <View style={styles.optIn}>
+          <Text style={{ fontSize: 40 }}>📍</Text>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Yakındakileri görmek için şehir bazlı keşfi aç</Text>
+          <Text style={{ color: colors.textDim, textAlign: 'center', fontSize: 13 }}>Kesin konumun paylaşılmaz; sadece şehrin kullanılır. Ayarlardan istediğin zaman kapatabilirsin.</Text>
+          <Pressable style={styles.optInBtn} onPress={() => setSetting('cityDiscovery', true)}>
+            <Text style={{ color: '#fff', fontWeight: '800' }}>Şehir bazlı keşfi aç</Text>
+          </Pressable>
+          <Pressable onPress={() => setTab('Tüm Türkiye')}>
+            <Text style={{ color: colors.textDim }}>Şimdilik tüm Türkiye&apos;yi göster</Text>
+          </Pressable>
+        </View>
+      )}
       <FlatList
+        style={needsOptIn ? { display: 'none' } : undefined}
         data={list}
         keyExtractor={(u) => u.id}
         numColumns={2}
@@ -93,6 +111,8 @@ function PersonCard({ user }: { user: User }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', gap: 18, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'flex-start' },
+  optIn: { alignItems: 'center', gap: 10, padding: 24, marginTop: 30 },
+  optInBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12 },
   matchBtn: { position: 'absolute', right: 16, top: 12, backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, zIndex: 1 },
   tab: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
   tabActive: { color: '#fff', fontSize: 18, fontWeight: '800' },

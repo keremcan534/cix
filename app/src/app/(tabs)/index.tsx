@@ -11,7 +11,8 @@ import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
 export default function RoomsScreen() {
-  const { coins, checkedInToday } = useApp();
+  const { coins, checkedInToday, notifications } = useApp();
+  const unreadNotices = notifications.filter((n) => !n.read).length;
   const [cat, setCat] = useState<Category>('Popüler');
   const rooms = cat === 'Popüler' ? [...ROOMS].sort((a, b) => b.listeners - a.listeners) : ROOMS.filter((r) => r.category === cat);
 
@@ -23,6 +24,10 @@ export default function RoomsScreen() {
           <CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />
           <Pressable onPress={() => router.push('/siralama')} hitSlop={6}>
             <Ionicons name="trophy" size={22} color={colors.gold} />
+          </Pressable>
+          <Pressable onPress={() => router.push('/bildirimler')} hitSlop={6} accessibilityLabel="Bildirimler">
+            <Ionicons name="notifications" size={22} color={colors.text} />
+            {unreadNotices > 0 && <View style={styles.dot} />}
           </Pressable>
           <Pressable onPress={() => router.push('/gorevler')} hitSlop={6}>
             <Ionicons name="gift" size={22} color={colors.pink} />

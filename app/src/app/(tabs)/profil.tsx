@@ -4,8 +4,9 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FramedAvatar, VerifiedBadge, VipTitle } from '@/components/ui';
-import { vipTier } from '@/data/economy';
+import { FramedAvatar, LevelChips, VerifiedBadge, VipTitle } from '@/components/ui';
+import { cosmeticById } from '@/data/catalog';
+import { charmLevel, vipTier, wealthLevel } from '@/data/economy';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -22,22 +23,26 @@ const MENU: { icon: IconName; label: string; onPress?: () => void }[] = [
   { icon: 'wallet-outline', label: 'Cüzdan', onPress: () => router.push('/cuzdan') },
   { icon: 'diamond-outline', label: 'Soyluluk / VIP', onPress: () => router.push('/vip') },
   { icon: 'home-outline', label: 'Aile', onPress: () => router.push('/aile') },
+  { icon: 'storefront-outline', label: 'Mağaza (çerçeve, efekt, emoji)', onPress: () => router.push('/magaza') },
   { icon: 'business-outline', label: 'Ajans', onPress: () => router.push('/ajans') },
+  { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag') },
+  { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'flash-outline', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
   { icon: 'people-outline', label: 'Arkadaşını Davet Et', onPress: () => router.push('/gorevler') },
-  { icon: 'settings-outline', label: 'Ayarlar' },
-  { icon: 'help-circle-outline', label: 'Yardım & Destek' },
+  { icon: 'settings-outline', label: 'Ayarlar ve gizlilik', onPress: () => router.push('/ayarlar') },
+  { icon: 'help-circle-outline', label: 'Yardım & Destek', onPress: () => router.push('/destek') },
 ];
 
 export default function ProfileScreen() {
-  const { coins, diamonds, isHost, following, me, logout, vipLevel } = useApp();
+  const { coins, diamonds, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds } = useApp();
+  const specialId = cosmeticById(equipped.specialId);
   const tier = vipTier(vipLevel);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={styles.top}>
-          <FramedAvatar uri={me.avatar} size={88} vipLevel={vipLevel} />
+          <FramedAvatar uri={me.avatar} size={88} vipLevel={vipLevel} frameId={equipped.frame} />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.name}>
               {me.name}, {me.age}
@@ -47,9 +52,14 @@ export default function ProfileScreen() {
               <Text style={styles.levelText}>Lv.7</Text>
             </View>
           </View>
-          <VipTitle level={vipLevel} />
+          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            <VipTitle level={vipLevel} />
+            <LevelChips wealth={wealthLevel(spentTotal)} charm={charmLevel(totalDiamonds)} />
+          </View>
           <Text style={styles.bio}>{me.bio}</Text>
-          <Text style={styles.id}>ID: 10284731 · {me.city}</Text>
+          <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>
+            ID: {specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'} · {me.city}
+          </Text>
         </View>
 
         <View style={styles.stats}>
