@@ -1,0 +1,88 @@
+name: Preview builds
+
+# Every push builds a phone-testable preview:
+#  - web:     https://<owner>.github.io/<repo>/   (GitHub Pages)
+#  - android: APK attached to the latest GitHub Release
+on:
+  push:
+    branches: [ccr-0c79d9d5-0hfb46, main]
+    paths: ['app/**', '.github/workflows/preview.yml']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Configure base URL for Pages
+        run: |
+          node -e '
+            const fs = require("fs");
+            const a = JSON.parse(fs.readFileSync("app.json"));
+            a.expo.experiments.baseUrl = "/${{ github.event.repository.name }}";
+            a.expo.web = { ...a.expo.web, output: "single" };
+            fs.writeFileSync("app.json", JSON.stringify(a, null, 2));
+          '
+      - run: npx expo export --platform web --output-dir dist
+      # SPA fallback so deep links (e.g. /oda/r1) work on Pages.
+      - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      # Release build signed with the debug keystore (fine for side-loading a preview).
+      - name: Build APK
+        working-directory: app/android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
+      - run: cp android/app/build/outputs/apk/release/app-release.apk vibe-club.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-${{ github.run_number }}
+          name: Android önizleme #${{ github.run_number }}
+          body: |
+            Telefona kurmak için aşağıdaki **vibe-club.apk** dosyasını indir ve aç.
+            İlk kurulumda "Bilinmeyen kaynaklardan yüklemeye izin ver" demen gerekebilir.
+            Commit: ${{ github.sha }}
+          files: app/vibe-club.apk
+          make_latest: true

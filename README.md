@@ -5,6 +5,19 @@ Expo (React Native) + Expo Router ile yazıldı; iOS ve Android'de çalışır.
 
 > Prototip: Backend yok, tüm veriler sahte (`app/src/data/mock.ts`). Ses, ödeme ve doğrulama simüle edilir.
 
+## Telefonda deneme
+
+| Yol | Nasıl | Not |
+| --- | --- | --- |
+| **Web (iPhone + Android)** | Telefonda aç: https://keremcan534.github.io/cix/ | Kurulum yok. Tarayıcıda "Ana ekrana ekle" ile uygulama gibi açılır. |
+| **Android APK** | https://github.com/keremcan534/cix/releases/latest → `vibe-club.apk` indir, aç, kur | "Bilinmeyen kaynaklara izin ver" gerekebilir. |
+| **Expo Go (geliştirici)** | Aşağıdaki "Çalıştırma" adımları + QR kodu okut | Kod değişince anında yenilenir. |
+
+Web ve APK her push'ta `.github/workflows/preview.yml` ile otomatik güncellenir.
+İlk sefer için bir kere: GitHub → **Settings → Pages → Source: GitHub Actions** seçilmeli.
+
+Kayıt adımlarını atlamak için hoş geldin ekranında **⚡ Demo hesabıyla hızlı giriş** var.
+
 ## Çalıştırma
 
 ```bash
@@ -27,6 +40,20 @@ Telefona **Expo Go** uygulamasını kur, terminaldeki QR kodu okut.
 | Mesajlar | `src/app/(tabs)/mesajlar.tsx`, `src/app/sohbet/[id].tsx` | Sohbet listesi, okunmamış rozetleri, birebir sohbet (otomatik sahte cevap) |
 | Profil | `src/app/(tabs)/profil.tsx` | Seviye, istatistikler, VIP kartı, menü |
 | Cüzdan | `src/app/cuzdan.tsx` | Jeton bakiyesi ve paketler (ödeme simüle) |
+| Yayıncı Merkezi | `src/app/yayinci/` | Yayıncı başvurusu, elmas bakiyesi, haftalık grafik, yayıncı seviyesi, son kazançlar, para çekme (IBAN), elmas → jeton |
+| Ajans | `src/app/ajans.tsx` | Kodla katılma, komisyon, ajans yayıncı listesi |
+| Aile | `src/app/aile.tsx` | Aile sıralaması, katıl / kur (500 jeton), üye katkıları |
+| Görüntülü / sesli arama | `src/app/arama/[id].tsx` | Dakika başı jeton, süre sayacı, kamera/mikrofon, arama içi hediye |
+| Rastgele eşleş | `src/app/eslesme.tsx` | Görüntülü/sesli, cinsiyet filtresi, radar animasyonu |
+| Görevler | `src/app/gorevler.tsx` | 7 günlük giriş ödülü, günlük görevler (gerçek ilerleme), davet kodu |
+| Sıralama | `src/app/siralama.tsx` | Zenginler / Yayıncılar / Odalar, günlük-haftalık, podyum |
+| Soyluluk / VIP | `src/app/vip.tsx` | 5 seviye; rozet, çerçeve, odaya giriş efekti |
+| Şans çarkı | `src/app/cark.tsx` | 20 jetonla çevir, ağırlıklı ödüller |
+| Kullanıcı profili | `src/app/kullanici/[id].tsx` | Hediye duvarı, takip, mesaj, arama, şikayet, engelle |
+
+Sesli odada ayrıca: oda sahibi yönetimi (sustur, koltuktan indir, odadan at), dinleyici listesi ve koltuğa davet, PK yarışı, gelen hediyelerden elmas kazanma (kendi odanda), VIP giriş efekti.
+
+Ekonomi kuralları `src/data/economy.ts` içinde: 1 jetonluk hediye = 1 elmas, 100 elmas = ₺1, en az 10.000 elmas çekilebilir, elmas → jeton %10 kesinti.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 
