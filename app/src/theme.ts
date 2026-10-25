@@ -37,3 +37,10 @@ export const semantic = {
 
 /** The hero gradient: reserved for the one primary button on a screen. White text stays above 4.5:1 on both ends. */
 export const gradient = ['#7C3AED', '#DB2777'] as const;
+
+/** 4-pt spacing scale: every gap and padding in new screens comes from here. */
+export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+/** Corner radii by role: chips and pills are round, cards medium, sheets large. */
+export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 } as const;
+/** Type scale (sp). Captions never go below 12; amounts use tabular figures. */
+export const type = { caption: 12, body: 14, bodyL: 16, title: 18, h2: 22, amount: 24 } as const;

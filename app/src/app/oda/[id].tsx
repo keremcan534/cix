@@ -37,7 +37,8 @@ import {
 } from '@/components/room/community';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
-import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, MicBtn, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
+import { GiftSheet } from '@/components/room/gift-sheet';
+import { ChatLine, EntryBanner, GiftAnimation, ListenersModal, MicBtn, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -672,10 +673,11 @@ export default function VoiceRoom() {
     }
   };
 
-  const sendGift = (gift: Gift, toIds: string[], count: number) => {
+  const sendGift = (gift: Gift, toIds: string[], count: number, confirmed = false) => {
     setGiftOpen(false);
     const total = gift.price * count * toIds.length;
-    if (total >= settings.bigSpendConfirm) {
+    // The gift sheet asks for high-value confirmation itself; other callers still get the dialog.
+    if (!confirmed && total >= settings.bigSpendConfirm) {
       showAlert('Yüksek tutarlı gönderim', `${toIds.length} alıcıya toplam 🪙 ${total.toLocaleString('tr-TR')} gönderilecek. Onaylıyor musun?`, [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Onayla ve gönder', onPress: () => deliverGifts(gift, toIds, count) },

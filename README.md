@@ -86,6 +86,10 @@ Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Gi
 
 Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sözleşme, komisyon, Coins Bank, ödeme yetkisi) ve denetim kaydı: [`docs/AJANS_BASVURU.md`](docs/AJANS_BASVURU.md). Uygulamada **Ben > Ajans başvuru yönetimi**.
 
+## Tasarım yönü
+
+SimilarClub'ın özgün tasarım dili, tokenlar, her ekranda uygulanan UX kuralları ve yeniden tasarlanan ekranlar: [`docs/TASARIM_YONU.md`](docs/TASARIM_YONU.md). İlk ekran: hediye gönder paneli (`src/components/room/gift-sheet.tsx`).
+
 ## Arayüz önerileri
 
 Göz ve beyin dostu buton sistemi, renk anlamları ve oda alt çubuğu önerisi: [`docs/ARAYUZ_ONERILERI.md`](docs/ARAYUZ_ONERILERI.md).
