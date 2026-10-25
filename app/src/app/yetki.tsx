@@ -446,7 +446,7 @@ function Commissions({ rbac, update, actor }: Props) {
       audit: [entry, ...s.audit],
     }));
     if (!d.allowed) return showAlert('Reddedildi', d.reason);
-    if (rule.party === 'agency') setRule('agencyCommission', next);
+    setRule(rule.party === 'agency' ? 'agencyCommission' : 'bdCommission', next);
   };
   const agency = rbac.commissions.find((c) => c.party === 'agency')!;
   const bd = rbac.commissions.find((c) => c.party === 'bd')!;

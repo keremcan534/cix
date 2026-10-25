@@ -54,6 +54,12 @@ function RootStack() {
         <Stack.Screen name="davet" />
         <Stack.Screen name="seviye" />
         <Stack.Screen name="yetki" />
+        <Stack.Screen name="kabile/index" />
+        <Stack.Screen name="kabile/sohbet" />
+        <Stack.Screen name="kabile/merkez" />
+        <Stack.Screen name="kabile/iliski" />
+        <Stack.Screen name="kabile/kasa" />
+        <Stack.Screen name="coins-bank" />
       </Stack.Protected>
       <Stack.Protected guard={!loggedIn}>
         <Stack.Screen name="giris" />

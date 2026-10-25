@@ -49,7 +49,7 @@ export type RuleChange = { id: string; time: string; field: string; from: string
 export type InviteReward = { id: string; inviteeId: string; ref: string; status: 'Beklemede' | 'Onaylandı' | 'İptal edildi'; time: string };
 export type Session = { id: string; device: string; place: string; last: string; current?: boolean };
 export type FanClub = { points: number; history: { text: string; pts: number; time: string }[] };
-export type GroupMsg = { id: string; userId: string; text: string; time: string };
+export type GroupMsg = { id: string; userId: string; text: string; time: string; system?: boolean; actionLabel?: string; actionHref?: string };
 export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members'; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
   theme: RoomTheme; micCount: number; micPermission: 'everyone' | 'members'; bossSeat: boolean;
   joinMode: 'open' | 'apply' | 'closed'; manageMembers: 'owner' | 'admins'; manageFunctions: 'owner' | 'admins';

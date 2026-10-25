@@ -27,6 +27,7 @@ import {
   wealthCharmOf,
   type Relation,
 } from '@/data/profile';
+import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { useApp, type FanClub } from '@/store';
 import { colors, gradient } from '@/theme';
@@ -164,6 +165,7 @@ export default function UserProfile() {
       : null;
   const family = isMe ? (FAMILIES.find((f) => f.id === familyId) ?? null) : familyOf(user.id);
 
+  const presence = presenceOf(user.id);
   const pickerUsers = USERS.filter((u) => following.has(u.id) && !blocked.has(u.id));
 
   return (
@@ -247,6 +249,22 @@ export default function UserProfile() {
             <Stat n={giftTotal} label="Hediye" onPress={() => setTab('onur')} />
           </View>
           {isBlocked && <Text style={{ color: colors.red, marginTop: 8 }}>Bu kullanıcıyı engelledin.</Text>}
+          {!isMe && !isBlocked && presence && (
+            <Pressable
+              style={[styles.presence, presence.kind === 'call' && { borderColor: colors.gold }]}
+              disabled={presence.kind !== 'room'}
+              onPress={() => presence.kind === 'room' && router.push(followRoute(presence.roomId, user.id))}
+              accessibilityLabel="Bulunduğu yere git">
+              <Text style={{ fontSize: 20 }}>{presence.kind === 'room' ? '🎙️' : '📞'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#fff', fontWeight: '800' }} numberOfLines={1}>
+                  {presence.kind === 'room' ? `Şu an odada: ${presence.locked ? '🔒 ' : ''}${presence.title}` : `Şu an ${presence.mode} görüşmede`}
+                </Text>
+                <Text style={styles.meta}>{presence.kind === 'room' ? (presence.locked ? 'Şifreli oda · girişte şifre sorulur' : 'Dokun, yanına git') : 'Özel görüşmeye katılınamaz'}</Text>
+              </View>
+              {presence.kind === 'room' && <Text style={styles.presenceGo}>Git</Text>}
+            </Pressable>
+          )}
         </View>
 
         <View onLayout={(e) => setTabY(e.nativeEvent.layout.y)}>
@@ -1226,4 +1244,6 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.cardAlt, alignItems: 'center' },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14 },
+  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: 'rgba(168,85,247,0.15)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#A855F7' },
+  presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#A855F7', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
 });

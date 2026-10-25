@@ -64,7 +64,7 @@ const clock = () => new Date().toTimeString().slice(0, 5);
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
 
 export default function VoiceRoom() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
   const isOwn = id === 'yeni';
   const app = useApp();
   const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency } = app;
@@ -120,6 +120,8 @@ export default function VoiceRoom() {
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
     ...(botOn ? [{ id: 'bot0', bot: true, text: `Merhaba ${ME.name}! ${BOT_TIPS[0]}` }] : []),
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
+    // Arrived by following someone from a profile / agency / tribe chat.
+    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek odaya katıldı` }] : []),
     ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girişle girdin. Diğer kullanıcılar katıldığını görmez; moderasyon kayıtlarında görünürsün.' }] : []),
   ]);
   const [draft, setDraft] = useState('');

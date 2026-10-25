@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
-import { RULES, pct, settlement, usd } from '@/data/rules';
+import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
@@ -93,10 +93,48 @@ export default function OwnerPanel() {
   );
 }
 
+function Bar({ label, value, target }: { label: string; value: number; target: number }) {
+  const done = value >= target;
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row' }}>
+        <Text style={[styles.dim, { flex: 1, color: '#fff' }]}>{label}</Text>
+        <Text style={{ color: done ? colors.green : colors.gold, fontWeight: '800' }}>
+          {value}/{target} {done ? '✓' : ''}
+        </Text>
+      </View>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' }}>
+        <View style={{ height: 6, width: `${Math.min(100, (value / Math.max(1, target)) * 100)}%`, backgroundColor: done ? colors.green : colors.gold }} />
+      </View>
+    </View>
+  );
+}
+
 function Overview() {
   const active = AGENCY_MEMBERS.filter((m) => m.status === 'active').length;
+  const earners = AGENCY_MEMBERS.filter((m) => m.diamonds / RULES.diamondsPerUsd >= RULES.agencyActivationEarnUsd).length;
+  const newThisMonth = AGENCY_MEMBERS.filter((m) => m.status === 'new').length;
+  const st = agencyStatus({ hosts: AGENCY_MEMBERS.length, earners, newThisMonth });
   return (
     <>
+      <Card style={{ gap: 10, borderWidth: 1, borderColor: st.status === 'Aktif ajans' ? colors.green : colors.gold }}>
+        <Text style={styles.title}>
+          {st.status === 'Aktif ajans' ? '✅' : '⏳'} Statü: {st.status}
+        </Text>
+        <Bar label={`Getirilen yayıncı`} value={AGENCY_MEMBERS.length} target={RULES.agencyActivationHosts} />
+        <Bar label={`${RULES.agencyActivationEarnUsd} USD kazanan yayıncı`} value={earners} target={RULES.agencyActivationEarners} />
+        <Bar label="Bu ay eklenen yayıncı" value={newThisMonth} target={RULES.agencyMonthlyNewHosts} />
+        <Text style={styles.dim}>
+          Aktif olmak için {RULES.agencyActivationHosts} yayıncı getirmeli ve en az {RULES.agencyActivationEarners} tanesi {RULES.agencyActivationEarnUsd} USD kazanmalı; o zamana kadar aday ajans statüsünde kalırsın. Her ay en az {RULES.agencyMonthlyNewHosts} yeni yayıncı eklenmezse komisyon {pct(RULES.agencyCommissionPenalty)} düşer; yayıncı sayısı {RULES.agencyDemoteBelowHosts}&apos;in altına inerse tekrar aday olursun.
+        </Text>
+        <Text style={{ color: '#fff', fontWeight: '700' }}>
+          Geçerli komisyon: {pct(st.rate)}
+          {st.missedMonthly && st.status === 'Aktif ajans' ? ` (aylık hedef tutmadı, −${pct(RULES.agencyCommissionPenalty)})` : ''}
+        </Text>
+        <Text style={styles.dim}>
+          {RULES.agencyHostInactiveDays} gün çevrimiçi olmayan ve çekim yapmayan yayıncı ajanstan düşer ve yönetim hesabına aktarılır. Süreler yönetim panelinden değiştirilir.
+        </Text>
+      </Card>
       <View style={styles.grid}>
         <Kpi label="Toplam yayıncı" value={String(AGENCY_MEMBERS.length)} />
         <Kpi label="Aktif yayıncı" value={String(active)} />

@@ -25,6 +25,21 @@ const FIELDS: Field[] = [
   { k: 'inviteUnitsPerPurchase', label: 'Davet ödülü (birim / başarılı alım)', step: 1, min: 0, max: 10 },
   { k: 'inviteIncomeShare', label: 'Davet: arkadaş gelirinden pay', step: 0.01, min: 0, max: 0.3, percent: true },
   { k: 'inviteRechargeShare', label: 'Davet: arkadaş yüklemesinden pay', step: 0.01, min: 0, max: 0.3, percent: true },
+  { k: 'creatorDiamondsPerCoin', label: 'Coins Bank: hediye jetonu başına yayıncı elması', step: 0.1, min: 0.1, max: 2 },
+  { k: 'bdCommission', label: 'BD komisyonu (ajans tabanı üzerinden, ayrıca ödenir)', step: 0.01, min: 0, max: 0.3, percent: true },
+  { k: 'maxWithdrawDiamonds', label: 'Maksimum çekim / talep (💎)', step: 500_000, min: 100_000, max: 50_000_000 },
+  { k: 'weeklyWithdrawLimitDiamonds', label: 'Haftalık çekim limiti (💎)', step: 1_000_000, min: 500_000, max: 100_000_000 },
+  { k: 'autoApproveUnderDiamonds', label: 'Otomatik onay sınırı (💎, üstü manuel)', step: 50_000, min: 0, max: 5_000_000 },
+  { k: 'pendingDays', label: 'Kazanç kesinleşme süresi (gün)', step: 1, min: 0, max: 60 },
+  { k: 'bonusCashable', label: 'Bonus kredisi çekilebilir mi (0 hayır / 1 evet)', step: 1, min: 0, max: 1 },
+  { k: 'hostAgencyJoinDays', label: 'Ajanssız yayıncı → yönetim hesabı (gün)', step: 1, min: 1, max: 60 },
+  { k: 'agencyHostInactiveDays', label: 'Pasif yayıncı ajanstan düşer (gün, çevrimiçi + çekim yok)', step: 10, min: 10, max: 365 },
+  { k: 'agencyActivationHosts', label: 'Ajans aktivasyonu: yayıncı sayısı', step: 1, min: 1, max: 200 },
+  { k: 'agencyActivationEarners', label: 'Ajans aktivasyonu: kazanç hedefini tutan yayıncı', step: 1, min: 1, max: 200 },
+  { k: 'agencyActivationEarnUsd', label: 'Ajans aktivasyonu: yayıncı başı kazanç (USD)', step: 1, min: 1, max: 1000 },
+  { k: 'agencyMonthlyNewHosts', label: 'Ajans aylık yeni yayıncı hedefi', step: 1, min: 0, max: 100 },
+  { k: 'agencyCommissionPenalty', label: 'Aylık hedef tutmazsa komisyon düşüşü', step: 0.01, min: 0, max: 0.4, percent: true },
+  { k: 'agencyDemoteBelowHosts', label: 'Aktif ajans bu sayının altına düşerse aday olur', step: 1, min: 1, max: 200 },
 ];
 const round = (v: number) => Math.round(v * 10_000) / 10_000;
 const fmt = (f: Field, v: number) => (f.percent ? pct(v) : v.toLocaleString('tr-TR'));

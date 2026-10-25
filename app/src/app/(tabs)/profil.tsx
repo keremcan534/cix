@@ -46,6 +46,7 @@ export default function ProfileScreen() {
 
   const main: Item[] = [
     { icon: 'diamond-outline', label: 'Gelir', onPress: () => router.push('/gelir') },
+    { icon: 'business-outline', label: 'Coins Bank', tag: 'Yeni!', onPress: () => router.push('/coins-bank') },
     { icon: 'storefront-outline', label: 'Alışveriş Merkezi', tag: 'Yeni!', onPress: () => router.push('/magaza') },
     {
       icon: 'checkmark-circle-outline',

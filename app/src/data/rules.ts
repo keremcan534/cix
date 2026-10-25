@@ -17,6 +17,23 @@ export type Rules = {
   inviteUnitsPerPurchase: number;
   inviteIncomeShare: number; // share of an invited friend's income, paid by the platform
   inviteRechargeShare: number; // share of an invited friend's recharges, paid by the platform
+  // Coins Bank (finance)
+  creatorDiamondsPerCoin: number; // diamonds a creator earns per coin of a received gift
+  bdCommission: number; // share of the agency's eligible base, paid by the platform
+  maxWithdrawDiamonds: number; // per request
+  weeklyWithdrawLimitDiamonds: number;
+  autoApproveUnderDiamonds: number; // smaller payouts are auto-approved, larger ones need manual review
+  pendingDays: number; // days before earned diamonds become final (refund/chargeback window)
+  bonusCashable: number; // 0 = bonus credits can never be withdrawn
+  // Host & agency lifecycle
+  hostAgencyJoinDays: number; // unaffiliated host moves to the management account after N days
+  agencyHostInactiveDays: number; // inactive + no withdrawal for N days → host leaves the agency
+  agencyActivationHosts: number; // hosts needed to become an active agency
+  agencyActivationEarners: number; // of which at least N must earn ≥ agencyActivationEarnUsd
+  agencyActivationEarnUsd: number;
+  agencyMonthlyNewHosts: number; // new hosts required each month
+  agencyCommissionPenalty: number; // commission reduction (points) when the monthly target is missed
+  agencyDemoteBelowHosts: number; // active agency falls back to candidate below this many hosts
   period: 'Haftalık';
 };
 
@@ -35,6 +52,21 @@ export const DEFAULT_RULES: Rules = {
   inviteUnitsPerPurchase: 1,
   inviteIncomeShare: 0.08,
   inviteRechargeShare: 0.04,
+  creatorDiamondsPerCoin: 1,
+  bdCommission: 0.05,
+  maxWithdrawDiamonds: 5_000_000,
+  weeklyWithdrawLimitDiamonds: 10_000_000,
+  autoApproveUnderDiamonds: 250_000,
+  pendingDays: 7,
+  bonusCashable: 0,
+  hostAgencyJoinDays: 3,
+  agencyHostInactiveDays: 90,
+  agencyActivationHosts: 20,
+  agencyActivationEarners: 10,
+  agencyActivationEarnUsd: 10,
+  agencyMonthlyNewHosts: 5,
+  agencyCommissionPenalty: 0.05,
+  agencyDemoteBelowHosts: 15,
   period: 'Haftalık',
 };
 
@@ -69,3 +101,12 @@ export const FAMILY_PERKS = [
 export const familyCapacity = (level: number) => 50 + (level - 1) * 25;
 /** Weekly family bonus = eligible family earnings × level rate; distributed by contribution. */
 export const familyBonus = (eligible: number, level: number) => Math.round(eligible * RULES.familyRates[level - 1]);
+
+/** Agency lifecycle: candidate until activation targets are met; monthly target misses reduce commission. */
+export const agencyStatus = (s: { hosts: number; earners: number; newThisMonth: number; wasActive?: boolean }) => {
+  const activated = s.hosts >= RULES.agencyActivationHosts && s.earners >= RULES.agencyActivationEarners;
+  const active = s.wasActive ? s.hosts >= RULES.agencyDemoteBelowHosts : activated;
+  const missedMonthly = s.newThisMonth < RULES.agencyMonthlyNewHosts;
+  const rate = Math.max(0, RULES.agencyCommission - (active && missedMonthly ? RULES.agencyCommissionPenalty : 0));
+  return { status: active ? ('Aktif ajans' as const) : ('Aday ajans' as const), activated, missedMonthly, rate };
+};

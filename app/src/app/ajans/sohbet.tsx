@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 
@@ -24,6 +25,12 @@ export default function AgencyChat() {
           onSend={sendAgencyMessage}
           pinned="📢 Bu hafta: PK turnuvası Cumartesi 21:00 · Aylık 100 saat hedefi"
           lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length]}
+          roomId="r2"
+          quickActions={[
+            { key: 'panel', label: 'Ajans paneli', emoji: '📊', onPress: () => router.push('/ajans') },
+            { key: 'bank', label: 'Coins Bank', emoji: '🏦', onPress: () => router.push('/coins-bank') },
+            { key: 'net', label: 'Üye ağı', emoji: '🌐', onPress: () => router.push('/ajans/ag') },
+          ]}
         />
       ) : (
         // Access is checked here and (in the real product) on the server for every message read.

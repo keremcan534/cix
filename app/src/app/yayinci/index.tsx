@@ -98,6 +98,20 @@ function Dashboard() {
           </View>
         </LinearGradient>
 
+        <View style={[styles.affil, { borderColor: agency ? colors.green : colors.gold }]}>
+          <Text style={{ color: '#fff', fontWeight: '800' }}>{agency ? `🏢 Ajans: ${agency.name}` : '🏛️ Ajanssız yayıncı'}</Text>
+          <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
+            {agency
+              ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmaz ve çekim yapmazsan ajanstan düşer, yönetim hesabına aktarılırsın. Kazancın etkilenmez.`
+              : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. Kalan süre: ${Math.max(0, RULES.hostAgencyJoinDays - 1)} gün.`}
+          </Text>
+          {!agency && (
+            <Pressable onPress={() => router.push('/ajans')}>
+              <Text style={{ color: colors.gold, fontWeight: '800' }}>Ajansa katıl →</Text>
+            </Pressable>
+          )}
+        </View>
+
         <Card style={{ gap: 10 }}>
           <View style={styles.rowBetween}>
             <Text style={styles.cardTitle}>
@@ -257,4 +271,5 @@ const styles = StyleSheet.create({
   barLabel: { color: colors.textDim, fontSize: 10 },
   metric: { flexBasis: '30%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 8, gap: 2 },
   earning: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  affil: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1 },
 });
