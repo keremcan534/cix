@@ -105,6 +105,10 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Timo tarzı kullanıcı profili (Profil / dinamik / Onur / İlişki, koruma, CP) ve hediye paneli (Hot / Gameplay / Çift / Ayrıcalık, SVIP kilitli hediyeler, çanta, favoriler) | ✅ |
 | Timo sekme düzeni: Senin İçin · Anlar · Odalar (ortada büyük düğme) · Mesajlar · Ben; Odalar (Benim/Önerilen, sıralama kartları, kategori sekmeleri, TOP odalar), Senin İçin (kısayol kartları, Hi, Gerçek rozeti), Anlar (konu kartları, yorum), Mesajlar (Arkadaşlarım, Aramalar, ziyaretçiler) | ✅ |
 | Merkezi Rol ve Yetki Merkezi: roller, izinler (yasak dahil), kapsamlar (platform/bölge/ajans/oda), çoklu rol ataması, etkin yetki kontrolü, moderasyon kayıtları, BD/ajans komisyon kuralları, denetim kaydı, teknik şartname çıktısı | ✅ `docs/YETKI_MODELI.md` (gerçek koruma sunucuda ⛔) |
+| Kabile (Timo): profil (seviye kartı, duyuru, etiket, haftalık sıralama, Oda/Görev/Çift/Durum/Tema), kabile sohbeti, Görev Merkezi (sabit ödüllü sandıklar), Kabile Kasası, İlişki Meydanı | ✅ |
+| Hangi odada olduğu: profil, ajans sohbeti ve kabile sohbetinde görünür, dokununca o odaya gidilir (kilitliyse şifre), odada "A, B kişisini takip ederek odaya katıldı" mesajı | ✅ |
+| Coins Bank: cüzdan, yayıncı/ajans/BD defterleri, blokajlı para çekme, otomatik/manuel onay, ters kayıt, kurallar & denetim, mutabakat | ✅ `docs/COINS_BANK.md` (ödeme simüle) |
+| Yayıncı/ajans yaşam döngüsü: ajanssız yayıncı 3 gün → yönetim hesabı, 90 gün pasif → ajanstan düşer, ajans aktivasyonu 20 yayıncı / 10×10 USD, aylık 5 yeni yayıncı, komisyon düşüşü, aday statüsüne düşme; süreler panelden | ✅ |
 | Jackpot / şans çarpanlı hediye ve rastgele ödüllü kutular | ⛔ bilinçli olarak eklenmedi (kumar niteliği; lisans/hukuk gerekir) |
 
 ## Prototip dışı (backend / yönetim paneli gerektirir) ⛔
