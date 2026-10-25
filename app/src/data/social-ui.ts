@@ -65,7 +65,7 @@ export const countryOf = (u: User) => USER_COUNTRY[u.id] ?? 'TR';
 export const DISCOVER_PROMO = {
   roomId: 'r2',
   waiting: 19,
-  avatarIds: ['u11', 'u1', 'u5', 'u7', 'u9'],
+  avatarIds: ['u11', 'u1', 'u5', 'u7', 'u9', 'u3'],
   /** Insert after this many users. */
   afterIndex: 3,
 };

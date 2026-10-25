@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   emptyBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },
   card: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  svipTag: { position: 'absolute', bottom: -6, alignSelf: 'center', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 },
+  svipTag: { position: 'absolute', bottom: -6, left: 5, right: 5, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
   svipText: { color: '#fff', fontSize: 8, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { color: '#fff', fontWeight: '800', fontSize: 15, maxWidth: 150 },

@@ -66,7 +66,7 @@ export default function RoleCenter() {
           ))}
         </ScrollView>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingVertical: 8 }} style={{ flexGrow: 0 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' }} style={{ flexGrow: 0, flexShrink: 0, minHeight: 52 }}>
         {TABS.map(([k, l]) => (
           <Chip key={k} on={tab === k} label={l} onPress={() => setTab(k)} strong />
         ))}
@@ -555,7 +555,7 @@ function Chip({ on, label, onPress, strong }: { on: boolean; label: string; onPr
 }
 
 const styles = StyleSheet.create({
-  actorBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16 },
+  actorBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 44 },
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 10 },
   h1: { color: '#fff', fontSize: 20, fontWeight: '900' },
   h2: { color: '#fff', fontSize: 17, fontWeight: '800' },

@@ -103,6 +103,8 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Görev Merkezi: 7 günlük check-in, yarının ödülleri, gece yarısına geri sayım, Git/Al | ✅ |
 | Gelir / Kazanç detayları, Ödüllü Davet (kayıt ödülü cinsiyetten bağımsız, gelir görevi, %8 gelir / %4 şarj payı, süreli ek bonus), Müşteri hizmetleri | ✅ |
 | Timo tarzı kullanıcı profili (Profil / dinamik / Onur / İlişki, koruma, CP) ve hediye paneli (Hot / Gameplay / Çift / Ayrıcalık, SVIP kilitli hediyeler, çanta, favoriler) | ✅ |
+| Timo sekme düzeni: Senin İçin · Anlar · Odalar (ortada büyük düğme) · Mesajlar · Ben; Odalar (Benim/Önerilen, sıralama kartları, kategori sekmeleri, TOP odalar), Senin İçin (kısayol kartları, Hi, Gerçek rozeti), Anlar (konu kartları, yorum), Mesajlar (Arkadaşlarım, Aramalar, ziyaretçiler) | ✅ |
+| Merkezi Rol ve Yetki Merkezi: roller, izinler (yasak dahil), kapsamlar (platform/bölge/ajans/oda), çoklu rol ataması, etkin yetki kontrolü, moderasyon kayıtları, BD/ajans komisyon kuralları, denetim kaydı, teknik şartname çıktısı | ✅ `docs/YETKI_MODELI.md` (gerçek koruma sunucuda ⛔) |
 | Jackpot / şans çarpanlı hediye ve rastgele ödüllü kutular | ⛔ bilinçli olarak eklenmedi (kumar niteliği; lisans/hukuk gerekir) |
 
 ## Prototip dışı (backend / yönetim paneli gerektirir) ⛔
