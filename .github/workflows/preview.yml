@@ -57,6 +57,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # Only the newest push publishes; parallel runs raced on creating the "latest" release.
+    concurrency:
+      group: android-release
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
