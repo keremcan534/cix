@@ -19,10 +19,15 @@ const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
   [8, 52, '70%', '18%'],
 ];
 
+/** Coins given to the demo account on quick login (no real payment). */
+const DEMO_TEST_COINS = 1_000_000;
+
 export default function WelcomeScreen() {
-  const { updateMe, login } = useApp();
+  const { updateMe, login, addCoins } = useApp();
   const demoLogin = () => {
     updateMe({ name: 'Demo', age: 25, verified: true, bio: '🎧 Müzik 🎮 Oyun' });
+    // Test balance so every paid flow (gifts, store, VIP) can be tried without the payment step.
+    addCoins(DEMO_TEST_COINS, 'Demo test bakiyesi');
     login();
   };
 
