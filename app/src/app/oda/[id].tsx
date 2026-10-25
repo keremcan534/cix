@@ -38,7 +38,7 @@ import {
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
-import { ChatLine, EntryBanner, GiftAnimation, ListenersModal, MicBtn, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
+import { ChatLine, EntryBanner, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -47,7 +47,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
-import { errorHaptic, successHaptic } from '@/lib/haptics';
+import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -64,6 +64,8 @@ const msgId = () => String(Date.now() + Math.random());
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
 const clock = () => new Date().toTimeString().slice(0, 5);
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
+
+const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
 
 export default function VoiceRoom() {
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
@@ -128,6 +130,8 @@ export default function VoiceRoom() {
   ]);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // Seat emoji reactions currently playing, by user id.
+  const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
@@ -250,6 +254,24 @@ export default function VoiceRoom() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botOn]);
+
+  // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
+  const react = (uid: string, emoji: string) => {
+    const key = Date.now() + Math.random();
+    setReactions((r) => ({ ...r, [uid]: { emoji, key } }));
+    setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), REACTION_MS);
+  };
+  // Other people on mic send seat emoji now and then (quiet when effects are off).
+  const botReactions = !settings.effectsOff;
+  useEffect(() => {
+    if (!botReactions) return;
+    const t = setInterval(() => {
+      const seated = seatedKey.split(',').filter(Boolean);
+      if (!seated.length || Math.random() > 0.35) return;
+      react(pick(seated), pick(BOT_REACTIONS));
+    }, 3500);
+    return () => clearInterval(t);
+  }, [seatedKey, botReactions]);
 
   // Fake "who is talking".
   useEffect(() => {
@@ -932,6 +954,8 @@ export default function VoiceRoom() {
                   muted={allSeats[0] === 'me' ? !micOn : !!allSeats[0] && mutedUsers.has(allSeats[0])}
                   role="owner"
                   compact
+                  reaction={allSeats[0] ? reactions[allSeats[0]] : undefined}
+                  still={settings.reduceMotion}
                   onPress={() => onSeatPress(0)}
                 />
                 <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
@@ -950,6 +974,8 @@ export default function VoiceRoom() {
                 muted={uid === 'me' ? !micOn : !!uid && mutedUsers.has(uid)}
                 role={uid ? roleOf(uid) : undefined}
                 locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
+                reaction={uid ? reactions[uid] : undefined}
+                still={settings.reduceMotion}
                 onPress={() => onSeatPress(i)}
               />
             ))}
@@ -966,11 +992,22 @@ export default function VoiceRoom() {
             contentContainerStyle={{ gap: 6, paddingVertical: 8 }}
           />
 
-          {emojiOpen && <EmojiPanel onPick={(e) => setDraft((d) => d + e)} />}
+          {emojiOpen && (
+            <EmojiPanel
+              hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
+              onPick={(e) => {
+                if (amSeated) {
+                  tapHaptic();
+                  react('me', e);
+                  setEmojiOpen(false);
+                } else setDraft((d) => d + e);
+              }}
+            />
+          )}
           <View style={styles.bottom}>
             <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />
             <View style={styles.inputWrap}>
-              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={8}>
+              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
               </Pressable>
               <TextInput

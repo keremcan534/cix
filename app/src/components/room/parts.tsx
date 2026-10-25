@@ -27,6 +27,8 @@ export function Seat({
   role,
   locked,
   compact,
+  reaction,
+  still,
   onPress,
 }: {
   index: number;
@@ -41,6 +43,10 @@ export function Seat({
   locked?: boolean;
   /** Host seat sharing the top row (e.g. with the boss seat). */
   compact?: boolean;
+  /** Emoji reaction playing over the avatar; a new `key` restarts the animation. */
+  reaction?: SeatReactionData;
+  /** Reduce motion: show the reaction without bouncing. */
+  still?: boolean;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -89,6 +95,7 @@ export function Seat({
             <Text style={{ fontSize: 9 }}>🛡️</Text>
           </View>
         )}
+        {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
         {host && <Text style={{ fontSize: 12 }}>👑</Text>}
@@ -98,6 +105,53 @@ export function Seat({
         {user?.verified && !small && <VerifiedBadge size={11} />}
       </View>
     </Pressable>
+  );
+}
+
+export type SeatReactionData = { emoji: string; key: number };
+export const REACTION_MS = 2600;
+
+/** An emoji that pops over a seated person's avatar, wiggles, then fades (Timo-style seat emoji). */
+function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
+  const [v] = useState(() => new Animated.Value(still ? 1 : 0));
+  useEffect(() => {
+    if (still) {
+      Animated.sequence([Animated.delay(REACTION_MS - 400), Animated.timing(v, { toValue: 2, duration: 300, useNativeDriver: true })]).start();
+      return;
+    }
+    Animated.sequence([
+      Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, { toValue: 1.15, duration: 220, useNativeDriver: true }),
+          Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: true }),
+        ]),
+        { iterations: 3 },
+      ),
+      Animated.delay(250),
+      Animated.timing(v, { toValue: 2, duration: 320, useNativeDriver: true }),
+    ]).start();
+  }, [v, still]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityLabel={`Emoji: ${emoji}`}
+      style={{
+        position: 'absolute',
+        width: size * 1.2,
+        height: size * 1.2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: v.interpolate({ inputRange: [0, 0.2, 1, 1.15, 1.7, 2], outputRange: [0, 1, 1, 1, 1, 0] }),
+        transform: [
+          { scale: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [0.2, 1, 1.12, 1.3] }) },
+          { rotate: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: ['-20deg', '0deg', '8deg', '0deg'] }) },
+          { translateY: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [size * 0.3, 0, -2, -size * 0.35] }) },
+        ],
+      }}
+    >
+      <Text style={{ fontSize: size * 0.82, lineHeight: size * 1.05 }}>{emoji}</Text>
+    </Animated.View>
   );
 }
 
