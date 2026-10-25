@@ -21,7 +21,7 @@ const GROWTH: Item[] = [
   { icon: 'business-outline', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
   { icon: 'chatbubbles-outline', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
-  { icon: 'add-circle-outline', label: 'Ajansa katıl / ajans kur', onPress: () => router.push('/ajans'), noAgencyOnly: true },
+  { icon: 'add-circle-outline', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   { icon: 'game-controller-outline', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
   { icon: 'trophy-outline', label: 'Sıralama', onPress: () => router.push('/siralama') },
   { icon: 'aperture-outline', label: 'Şans çarkı', onPress: () => router.push('/cark') },
@@ -29,6 +29,7 @@ const GROWTH: Item[] = [
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
+  { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim') },
 ];
 const SUPPORT: Item[] = [
   { icon: 'headset-outline', label: 'Müşteri hizmetleri', onPress: () => router.push('/destek') },

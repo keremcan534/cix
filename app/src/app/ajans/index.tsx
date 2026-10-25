@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Card, GradientButton, Header } from '@/components/ui';
+import { Button, Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency';
+import { agenciesOwnedBy, myApplications, useAgencyApps } from '@/lib/agency-apps';
 import { showAlert } from '@/lib/alert';
 import { RULES, pct, usd } from '@/data/rules';
 import { useApp } from '@/store';
@@ -35,13 +36,10 @@ function Pending() {
 }
 
 function JoinOrCreate() {
-  const { joinAgency, applyAgency, isHost } = useApp();
+  const { joinAgency, isHost } = useApp();
   const [mode, setMode] = useState<'join' | 'create'>('join');
   const [code, setCode] = useState('');
   const [accepted, setAccepted] = useState(false);
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [idNo, setIdNo] = useState('');
   const preview = agencyByCode(code);
 
   const join = () => {
@@ -50,12 +48,6 @@ function JoinOrCreate() {
     if (!accepted) return showAlert('Şartları onayla', 'Katılmadan önce üyelik şartlarını okuyup onaylaman gerekiyor.');
     const err = joinAgency(code);
     if (err) showAlert('Katılım başarısız', err);
-  };
-
-  const create = () => {
-    if (name.trim().length < 3) return showAlert('Ajans adı en az 3 karakter olmalı');
-    if (idNo.replace(/\D/g, '').length !== 11) return showAlert('Kimlik/vergi numarası 11 hane olmalı');
-    applyAgency(name.trim());
   };
 
   return (
@@ -120,25 +112,42 @@ function JoinOrCreate() {
             ))}
           </>
         ) : (
-          <Card style={{ gap: 10 }}>
-            <Text style={styles.title}>Yeni ajans başvurusu</Text>
-            <Text style={styles.dim}>Başvurun platform tarafından incelenir. Onaylanınca benzersiz bir davet kodu üretilir ve ajans sahibi paneli açılır.</Text>
-            <Text style={styles.label}>Ajans adı</Text>
-            <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="Örn. Yıldız Ajans" placeholderTextColor={colors.textDim} maxLength={24} />
-            <Text style={styles.label}>Açıklama</Text>
-            <TextInput value={desc} onChangeText={setDesc} style={[styles.input, { minHeight: 70 }]} multiline placeholder="Ajansını kısaca anlat" placeholderTextColor={colors.textDim} />
-            <Text style={styles.label}>Kimlik / vergi no (11 hane)</Text>
-            <TextInput value={idNo} onChangeText={(t) => setIdNo(t.replace(/\D/g, '').slice(0, 11))} keyboardType="number-pad" style={styles.input} placeholder="•••••••••••" placeholderTextColor={colors.textDim} />
-            <GradientButton title="Başvuruyu gönder" icon="send" onPress={create} />
-          </Card>
+          <ApplyCard />
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+/** Entry to the agency application flow (form, then status tracking). */
+function ApplyCard() {
+  useAgencyApps();
+  const mine = myApplications('me').find((a) => a.status !== 'Taslak') ?? myApplications('me')[0];
+  return (
+    <Card style={{ gap: 10 }}>
+      <Text style={styles.title}>Ajans kur</Text>
+      <Text style={styles.dim}>Başvurun SimilarClub ekibi ve BD tarafından değerlendirilir. Onaylanınca ajans kimliğin oluşur; sözleşme, komisyon ve Coins Bank adımlarından sonra ödeme yetkin açılır. Vergi numarası gerekmez.</Text>
+      {mine && (
+        <View style={styles.preview}>
+          <Ionicons name="document-text" size={26} color={colors.primaryText} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{mine.form.agencyName || 'Taslak başvuru'}</Text>
+            <Text style={styles.dim}>
+              {mine.number !== '—' ? `${mine.number} · ` : ''}
+              {mine.status}
+            </Text>
+          </View>
+        </View>
+      )}
+      <Button title={mine ? (mine.status === 'Taslak' ? 'Taslağa devam et' : 'Başvurumu takip et') : 'Ajans başvurusu yap'} icon={mine ? 'eye' : 'create'} onPress={() => router.push('/ajans/basvuru')} />
+    </Card>
+  );
+}
+
 function OwnerEntry() {
   const { ownedAgency, agencyRole } = useApp();
+  useAgencyApps();
+  const account = agenciesOwnedBy('me')[0];
   return (
     <SafeAreaView style={styles.safe}>
       <Header title="Ajans" />
@@ -150,9 +159,10 @@ function OwnerEntry() {
             {ROLE_LABEL[agencyRole!]} · Davet kodu: {ownedAgency?.code}
           </Text>
         </Card>
-        <GradientButton title="Ajans sahibi paneli" icon="speedometer" onPress={() => router.push('/ajans/panel')} />
-        <GradientButton title="Ajans sohbet grubu" icon="chatbubbles" onPress={() => router.push('/ajans/sohbet')} />
-        <GradientButton title="Üye ağım ve komisyonlar" icon="git-network" onPress={() => router.push('/ajans/ag')} />
+        {account && <GradientButton title="Ajans hesabı ve Coins Bank" icon="wallet" onPress={() => router.push(`/ajans/hesap/${account.id}`)} />}
+        <Button title="Ajans sahibi paneli" icon="speedometer" variant="tonal" onPress={() => router.push('/ajans/panel')} />
+        <Button title="Ajans sohbet grubu" icon="chatbubbles" variant="tonal" onPress={() => router.push('/ajans/sohbet')} />
+        <Button title="Üye ağım ve komisyonlar" icon="git-network" variant="tonal" onPress={() => router.push('/ajans/ag')} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -291,8 +301,8 @@ function MemberView() {
           )}
         </Card>
 
-        <GradientButton title="Ajans sohbet grubu" icon="chatbubbles" onPress={() => router.push('/ajans/sohbet')} />
-        <GradientButton title="Üye ağım ve komisyonlar" icon="git-network" onPress={() => router.push('/ajans/ag')} />
+        <Button title="Ajans sohbet grubu" icon="chatbubbles" variant="tonal" onPress={() => router.push('/ajans/sohbet')} />
+        <Button title="Üye ağım ve komisyonlar" icon="git-network" variant="tonal" onPress={() => router.push('/ajans/ag')} />
         <Pressable style={{ alignItems: 'center', padding: 6 }} onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Ajans' } })}>
           <Text style={{ color: colors.textDim }}>🛟 Platform desteğine doğrudan yaz (ajansı aşarak)</Text>
         </Pressable>

@@ -152,7 +152,8 @@ type AppState = {
   joinAgency: (code: string) => string | null;
   leaveAgency: () => void;
   ownedAgency: OwnedAgency | null;
-  applyAgency: (name: string) => void;
+  /** Called when an admin approves the demo user's own agency application (lib/agency-apps). */
+  activateOwnedAgency: (name: string, code: string) => void;
   transfer: TransferRequest | null;
   requestTransfer: (toCode: string | null, reason: string) => string | null;
   agencyChat: GroupMsg[];
@@ -578,15 +579,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAgencyRole(null);
     },
     ownedAgency,
-    applyAgency: (name) => {
-      const code = name.replace(/[^A-Za-z]/g, '').slice(0, 4).toUpperCase().padEnd(4, 'X') + String(Math.floor(Math.random() * 90) + 10);
-      setOwnedAgency({ name, code, status: 'İnceleniyor' });
-      setTimeout(() => {
-        setOwnedAgency({ name, code, status: 'Onaylandı' });
-        setAgencyId('own');
-        setAgencyRole('owner');
-        notify({ kind: 'system', icon: '✅', title: 'Ajans başvurun onaylandı', body: `${name} · Davet kodun: ${code}`, href: '/ajans/panel' });
-      }, 4000);
+    activateOwnedAgency: (name, code) => {
+      setPendingAgency(null);
+      setOwnedAgency({ name, code, status: 'Onaylandı' });
+      setAgencyId('own');
+      setAgencyRole('owner');
     },
     transfer,
     requestTransfer: (toCode, reason) => {

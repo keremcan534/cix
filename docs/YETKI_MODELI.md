@@ -19,6 +19,8 @@ Tüm yetkiler tek bir merkezi panelden (uygulamada: **Ben > Rol ve Yetki Merkezi
 
 Kullanıcıları görüntüle, Kullanıcı susturma, Kullanıcı banlama (kritik), Oda yönetimi, Ajansları görüntüle, Ajans oluşturma başvurusu, Ajans atama, BD komisyon raporunu görüntüle, Komisyon oranı değiştirme (kritik, yalnız platform kapsamı), Finansal raporları görüntüle (kritik), Rol oluşturma (kritik, platform), Rol ve yetki değiştirme (kritik, platform).
 
+Ajans başvurusu grubu (atanmış/tüm başvurular, değerlendirme, belgeler, BD atama, kesin karar, ajans yönetimi, ajans komisyonu, Coins Bank, ödeme yetkisi, performans): ayrıntı [`AJANS_BASVURU.md`](AJANS_BASVURU.md).
+
 ## Kapsam
 
 `platform ⊃ bölge ⊃ ajans ⊃ oda`. Bir atama yalnızca kendi kapsamını ve altını etkiler (ör. Marmara bölgesi moderatörü, Marmara'daki ajansların odalarında işlem yapabilir; Ege'de yapamaz).

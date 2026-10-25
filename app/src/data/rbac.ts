@@ -19,7 +19,18 @@ export type PermissionKey =
   | 'commission.rate.edit'
   | 'finance.reports.view'
   | 'roles.create'
-  | 'roles.edit';
+  | 'roles.edit'
+  | 'agency_apps.view_assigned'
+  | 'agency_apps.view_all'
+  | 'agency_apps.review'
+  | 'agency_apps.documents'
+  | 'agency_apps.assign'
+  | 'agency_apps.decide'
+  | 'agencies.manage'
+  | 'agencies.commission'
+  | 'agencies.coinsbank'
+  | 'agencies.payout'
+  | 'agencies.performance';
 
 export const PERMISSIONS: { key: PermissionKey; label: string; group: string; critical?: boolean; minScope?: ScopeType }[] = [
   { key: 'users.view', label: 'Kullanıcıları görüntüle', group: 'Kullanıcı' },
@@ -34,6 +45,17 @@ export const PERMISSIONS: { key: PermissionKey; label: string; group: string; cr
   { key: 'finance.reports.view', label: 'Finansal raporları görüntüle', group: 'Finans', critical: true },
   { key: 'roles.create', label: 'Rol oluşturma', group: 'Yetki', critical: true, minScope: 'platform' },
   { key: 'roles.edit', label: 'Rol ve yetki değiştirme', group: 'Yetki', critical: true, minScope: 'platform' },
+  { key: 'agency_apps.view_assigned', label: 'Atanmış ajans başvurularını görüntüle', group: 'Ajans başvurusu' },
+  { key: 'agency_apps.view_all', label: 'Tüm ajans başvurularını görüntüle', group: 'Ajans başvurusu' },
+  { key: 'agency_apps.review', label: 'Başvuru değerlendirme (not, ek bilgi, Admin onayına gönderme)', group: 'Ajans başvurusu' },
+  { key: 'agency_apps.documents', label: 'Başvuru belgelerini görüntüle', group: 'Ajans başvurusu' },
+  { key: 'agency_apps.assign', label: 'Başvuruyu BD’ye atama / devretme', group: 'Ajans başvurusu' },
+  { key: 'agency_apps.decide', label: 'Başvuruyu kesin onaylama / reddetme / askıya alma', group: 'Ajans başvurusu', critical: true },
+  { key: 'agencies.manage', label: 'Ajans hesabı yönetimi (sahip, yöneticiler, sözleşme)', group: 'Ajans başvurusu' },
+  { key: 'agencies.commission', label: 'Ajans komisyon kuralı tanımlama', group: 'Ajans başvurusu', critical: true, minScope: 'platform' },
+  { key: 'agencies.coinsbank', label: 'Ajans Coins Bank erişimini etkinleştirme', group: 'Ajans başvurusu', critical: true },
+  { key: 'agencies.payout', label: 'Ajans ödeme yetkisi, finansal doğrulama ve ödeme onayı', group: 'Ajans başvurusu', critical: true, minScope: 'platform' },
+  { key: 'agencies.performance', label: 'Atanmış ajansların performansını görüntüle', group: 'Ajans başvurusu' },
 ];
 export const permLabel = (k: PermissionKey) => PERMISSIONS.find((p) => p.key === k)?.label ?? k;
 export const SCOPE_LABEL: Record<ScopeType, string> = { platform: 'Platform', region: 'Bölge', agency: 'Ajans', room: 'Oda' };
@@ -88,7 +110,16 @@ export const INITIAL_RBAC: RbacState = {
     { id: 'super', name: 'Super Admin', permissions: ALL, denies: [], scopeTypes: ['platform'], priority: 100, protected: true, system: true },
     { id: 'admin', name: 'Admin', permissions: ALL.filter((k) => k !== 'roles.edit' && k !== 'commission.rate.edit'), denies: [], scopeTypes: ['platform', 'region'], priority: 80, system: true },
     { id: 'mod', name: 'Moderatör', permissions: ['users.view', 'users.mute', 'users.ban', 'rooms.manage'], denies: ['finance.reports.view'], scopeTypes: ['region', 'agency', 'room'], priority: 50, system: true },
-    { id: 'bd', name: 'BD', permissions: ['agencies.view', 'agencies.apply', 'agencies.assign', 'bd.commission.view'], denies: [], scopeTypes: ['region', 'platform'], priority: 40, system: true },
+    // BD: final approval, commission rates, payouts and bans stay off by default (spec: agency applications §4).
+    {
+      id: 'bd',
+      name: 'BD',
+      permissions: ['agencies.view', 'agencies.apply', 'agencies.assign', 'bd.commission.view', 'agency_apps.view_assigned', 'agency_apps.review', 'agency_apps.documents', 'agencies.performance'],
+      denies: [],
+      scopeTypes: ['region', 'platform'],
+      priority: 40,
+      system: true,
+    },
   ],
   userRoles: [
     { id: 'ur1', userId: 'me', roleId: 'super', scope: { type: 'platform' }, grantedBy: 'Sistem', at: '01.10.2026' },
@@ -96,6 +127,7 @@ export const INITIAL_RBAC: RbacState = {
     { id: 'ur3', userId: 'u2', roleId: 'bd', scope: { type: 'region', id: 'ege' }, grantedBy: 'Demo', at: '15.10.2026' },
     { id: 'ur4', userId: 'u5', roleId: 'bd', scope: { type: 'region', id: 'marmara' }, grantedBy: 'Demo', at: '18.10.2026' },
     { id: 'ur5', userId: 'u9', roleId: 'mod', scope: { type: 'room', id: 'r1' }, grantedBy: 'Demo', at: '20.10.2026' },
+    { id: 'ur6', userId: 'u3', roleId: 'admin', scope: { type: 'platform' }, grantedBy: 'Demo', at: '01.10.2026' },
   ],
   audit: [],
   moderation: [],

@@ -82,6 +82,10 @@ Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.0
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 
+## Ajans başvuru sistemi
+
+Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sözleşme, komisyon, Coins Bank, ödeme yetkisi) ve denetim kaydı: [`docs/AJANS_BASVURU.md`](docs/AJANS_BASVURU.md). Uygulamada **Ben > Ajans başvuru yönetimi**.
+
 ## Arayüz önerileri
 
 Göz ve beyin dostu buton sistemi, renk anlamları ve oda alt çubuğu önerisi: [`docs/ARAYUZ_ONERILERI.md`](docs/ARAYUZ_ONERILERI.md).
