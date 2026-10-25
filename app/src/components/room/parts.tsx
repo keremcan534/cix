@@ -2,14 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { cosmeticById } from '@/data/catalog';
-import { GIFTS, userById, type Gift, type GiftCat, type Room, type User } from '@/data/mock';
-import { showAlert } from '@/lib/alert';
+import { userById, type Gift, type Room, type User } from '@/data/mock';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
-import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
 export type ChatMsg = { id: string; userId?: string; text: string; system?: boolean; bot?: boolean };
@@ -29,6 +27,8 @@ export function Seat({
   role,
   locked,
   compact,
+  reaction,
+  still,
   onPress,
 }: {
   index: number;
@@ -43,6 +43,10 @@ export function Seat({
   locked?: boolean;
   /** Host seat sharing the top row (e.g. with the boss seat). */
   compact?: boolean;
+  /** Emoji reaction playing over the avatar; a new `key` restarts the animation. */
+  reaction?: SeatReactionData;
+  /** Reduce motion: show the reaction without bouncing. */
+  still?: boolean;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -91,6 +95,7 @@ export function Seat({
             <Text style={{ fontSize: 9 }}>🛡️</Text>
           </View>
         )}
+        {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
         {host && <Text style={{ fontSize: 12 }}>👑</Text>}
@@ -100,6 +105,53 @@ export function Seat({
         {user?.verified && !small && <VerifiedBadge size={11} />}
       </View>
     </Pressable>
+  );
+}
+
+export type SeatReactionData = { emoji: string; key: number };
+export const REACTION_MS = 2600;
+
+/** An emoji that pops over a seated person's avatar, wiggles, then fades (Timo-style seat emoji). */
+function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
+  const [v] = useState(() => new Animated.Value(still ? 1 : 0));
+  useEffect(() => {
+    if (still) {
+      Animated.sequence([Animated.delay(REACTION_MS - 400), Animated.timing(v, { toValue: 2, duration: 300, useNativeDriver: true })]).start();
+      return;
+    }
+    Animated.sequence([
+      Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, { toValue: 1.15, duration: 220, useNativeDriver: true }),
+          Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: true }),
+        ]),
+        { iterations: 3 },
+      ),
+      Animated.delay(250),
+      Animated.timing(v, { toValue: 2, duration: 320, useNativeDriver: true }),
+    ]).start();
+  }, [v, still]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityLabel={`Emoji: ${emoji}`}
+      style={{
+        position: 'absolute',
+        width: size * 1.2,
+        height: size * 1.2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: v.interpolate({ inputRange: [0, 0.2, 1, 1.15, 1.7, 2], outputRange: [0, 1, 1, 1, 1, 0] }),
+        transform: [
+          { scale: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [0.2, 1, 1.12, 1.3] }) },
+          { rotate: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: ['-20deg', '0deg', '8deg', '0deg'] }) },
+          { translateY: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [size * 0.3, 0, -2, -size * 0.35] }) },
+        ],
+      }}
+    >
+      <Text style={{ fontSize: size * 0.82, lineHeight: size * 1.05 }}>{emoji}</Text>
+    </Animated.View>
   );
 }
 
@@ -214,427 +266,6 @@ export function MicBtn({ state, queuePos, onPress }: { state: MicState; queuePos
         </>
       )}
     </Pressable>
-  );
-}
-
-// --- Gift panel (Timo-style) --------------------------------------------------------
-
-type GiftTab = GiftCat;
-type GiftView = 'tab' | 'fav' | 'bag';
-type HotSort = 'default' | 'asc' | 'desc';
-
-const GIFT_TABS: { key: GiftTab; label: string }[] = [
-  { key: 'hot', label: 'Hot' },
-  { key: 'gameplay', label: 'Gameplay' },
-  { key: 'couple', label: 'Çift' },
-  { key: 'privilege', label: 'Ayrıcalık' },
-];
-const GIFT_COUNTS = [1, 10, 66, 99, 188, 520, 1314];
-const COUNT_LABELS: Record<number, string> = { 1: '', 10: 'Mükemmel', 66: 'Her şey yolunda', 99: 'Sonsuza dek', 188: 'Seni seviyorum', 520: 'Aşkım', 1314: 'Ömür boyu' };
-/** Sender gift level: Lv(n+1) needs GIFT_LEVEL_XP[n] coins spent in total. */
-const GIFT_LEVEL_XP = [0, 870, 5_000, 20_000, 60_000, 150_000, 400_000, 1_000_000, 2_500_000, 6_000_000];
-// Turkish dative suffix after the spoken number ("Lv2'ye", "Lv3'e", "Lv6'ya", "Lv10'a").
-const LV_SUFFIX: Record<number, string> = { 2: 'ye', 3: 'e', 4: 'e', 5: 'e', 6: 'ya', 7: 'ye', 8: 'e', 9: 'a', 10: 'a' };
-
-// Prototype persistence: the sheet remounts on every open, so favorites and the free-gift
-// backpack live at module level (reset on app reload).
-const favoriteGifts = new Set<string>(['g5', 'h1']);
-const BACKPACK_SOURCES: Record<string, string> = { g1: 'Günlük giriş', g3: 'Günlük giriş', p3: 'Etkinlik ödülü', g2: 'Görev ödülü' };
-const backpackStock: Record<string, number> = { g1: 7, g3: 2, p3: 3, g2: 1 };
-
-const fmt = (n: number) => n.toLocaleString('tr-TR');
-const giftLevelOf = (spent: number) => GIFT_LEVEL_XP.filter((x) => spent >= x).length;
-const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
-
-function giftsFor(view: GiftView, tab: GiftTab, sort: HotSort, favs: Set<string>, bag: Record<string, number>) {
-  if (view === 'fav') return GIFTS.filter((g) => favs.has(g.id));
-  if (view === 'bag') return GIFTS.filter((g) => (bag[g.id] ?? 0) > 0);
-  const list = GIFTS.filter((g) => (g.cat ?? 'hot') === tab);
-  if (tab === 'hot' && sort !== 'default') list.sort((a, b) => (sort === 'asc' ? a.price - b.price : b.price - a.price));
-  return list;
-}
-
-function GiftCell({
-  gift,
-  selected,
-  favorite,
-  locked,
-  stock,
-  onPress,
-  onLongPress,
-  onToggleFav,
-}: {
-  gift: Gift;
-  selected: boolean;
-  favorite: boolean;
-  locked: boolean;
-  stock?: number;
-  onPress: () => void;
-  onLongPress: () => void;
-  onToggleFav: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={styles.giftCellWrap}>
-      <View style={[styles.giftCell, selected && styles.giftSelected]}>
-        <View style={[styles.giftArt, locked && { opacity: 0.45 }]}>
-          <Text style={{ fontSize: 36 }}>{gift.emoji}</Text>
-        </View>
-        <Text style={styles.giftName} numberOfLines={1}>
-          {gift.name}
-        </Text>
-        {stock !== undefined ? (
-          <Text style={[styles.giftPrice, { color: colors.green }]}>Ücretsiz</Text>
-        ) : (
-          <Text style={styles.giftPrice}>🪙 {fmt(gift.price)}</Text>
-        )}
-        <View style={styles.cornerBadges}>
-          {!!gift.minSvip && (
-            <View style={[styles.cBadge, styles.cBadgeSvip]}>
-              <Text style={styles.cBadgeSvipText}>S{gift.minSvip}</Text>
-            </View>
-          )}
-          {gift.cat === 'couple' && (
-            <View style={[styles.cBadge, styles.cBadgeCouple]}>
-              <Ionicons name="heart" size={9} color="#fff" />
-            </View>
-          )}
-          {gift.cat === 'gameplay' && (
-            <View style={[styles.cBadge, styles.cBadgeGame]}>
-              <Text style={{ fontSize: 8 }}>🎯</Text>
-            </View>
-          )}
-          {gift.badge === '3D' && (
-            <View style={[styles.cBadge, styles.cBadge3d]}>
-              <Text style={styles.cBadge3dText}>3D</Text>
-            </View>
-          )}
-          {gift.badge === 'music' && (
-            <View style={[styles.cBadge, styles.cBadgeMusic]}>
-              <Ionicons name="musical-notes" size={9} color="#fff" />
-            </View>
-          )}
-        </View>
-        {locked && (
-          <View style={styles.lockIcon}>
-            <Ionicons name="lock-closed" size={11} color={colors.gold} />
-          </View>
-        )}
-        {stock !== undefined && (
-          <View style={styles.stockBadge}>
-            <Text style={styles.stockText}>x{stock}</Text>
-          </View>
-        )}
-        {(selected || favorite) && (
-          <Pressable onPress={onToggleFav} hitSlop={8} style={styles.favBtn} accessibilityLabel={favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}>
-            <Ionicons name={favorite ? 'star' : 'star-outline'} size={13} color={favorite ? colors.gold : colors.textDim} />
-          </Pressable>
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-function GiftBanner({ tab, onVip }: { tab: GiftTab; onVip: () => void }) {
-  if (tab === 'couple')
-    return (
-      <LinearGradient colors={['#EC4899', '#FB7185', '#FDBA74']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.banner}>
-        <Text style={{ fontSize: 22 }}>💗</Text>
-        <Text style={styles.bannerText} numberOfLines={2}>
-          Çift hediyesi verdikten sonra yakınlık değeri ekstra %2
-        </Text>
-      </LinearGradient>
-    );
-  if (tab === 'privilege')
-    return (
-      <Pressable onPress={onVip}>
-        <LinearGradient colors={['#B45309', '#F59E0B', '#FDE68A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.banner}>
-          <Text style={{ fontSize: 22 }}>💎</Text>
-          <Text style={[styles.bannerText, { color: '#3B2300', fontSize: 17, fontWeight: '900' }]}>SVIP Sistemi</Text>
-          <View style={styles.bannerArrow}>
-            <Ionicons name="chevron-forward" size={16} color="#B45309" />
-          </View>
-        </LinearGradient>
-      </Pressable>
-    );
-  if (tab === 'gameplay')
-    return (
-      <LinearGradient colors={['#4C1D95', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.banner}>
-        <Text style={{ fontSize: 22 }}>🎯</Text>
-        <Text style={[styles.bannerText, { fontSize: 12 }]} numberOfLines={2}>
-          Atış hediyeleri alıcının koltuğuna eğlenceli bir animasyonla fırlatılır. Fiyat sabittir, sürpriz ödül yoktur.
-        </Text>
-      </LinearGradient>
-    );
-  return null;
-}
-
-export function GiftSheet({
-  visible,
-  onClose,
-  recipients,
-  initialTo,
-  coins,
-  onSend,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  recipients: string[];
-  initialTo?: string | null;
-  coins: number;
-  onSend: (g: Gift, to: string[], count: number) => void;
-}) {
-  const { svipLevel, spentTotal } = useApp();
-  const [tab, setTab] = useState<GiftTab>('hot');
-  const [view, setView] = useState<GiftView>('tab');
-  const [sort, setSort] = useState<HotSort>('default');
-  const [favs, setFavs] = useState(() => new Set(favoriteGifts));
-  const [bag, setBag] = useState(() => ({ ...backpackStock }));
-  const [sel, setSel] = useState<{ id: string; bag: boolean }>({ id: GIFTS[0].id, bag: false });
-  const [count, setCount] = useState(1);
-  const [countOpen, setCountOpen] = useState(false);
-  const [picked, setPicked] = useState<string[]>(() => {
-    const first = initialTo && recipients.includes(initialTo) ? initialTo : recipients[0];
-    return first ? [first] : [];
-  });
-  const targets = picked.filter((id) => recipients.includes(id));
-  const allSelected = recipients.length > 0 && targets.length === recipients.length;
-  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-
-  const list = giftsFor(view, tab, sort, favs, bag);
-  const selected = GIFTS.find((g) => g.id === sel.id) ?? GIFTS[0];
-  const fromBag = sel.bag;
-  const unitPrice = fromBag ? 0 : selected.price;
-  const total = unitPrice * count * targets.length;
-
-  const level = giftLevelOf(spentTotal);
-  const nextXp = GIFT_LEVEL_XP[level];
-  const prevXp = GIFT_LEVEL_XP[level - 1] ?? 0;
-  const progress = nextXp === undefined ? 1 : Math.min(1, (spentTotal - prevXp) / (nextXp - prevXp));
-
-  const selectFirst = (nextView: GiftView, nextTab: GiftTab, nextSort: HotSort) => {
-    const l = giftsFor(nextView, nextTab, nextSort, favs, bag);
-    const keep = l.some((g) => g.id === sel.id) && sel.bag === (nextView === 'bag');
-    if (!keep && l[0]) setSel({ id: l[0].id, bag: nextView === 'bag' });
-  };
-  const pickTab = (t: GiftTab) => {
-    let nextSort = sort;
-    if (t === 'hot' && view === 'tab' && tab === 'hot') {
-      nextSort = sort === 'default' ? 'desc' : sort === 'desc' ? 'asc' : 'default';
-      setSort(nextSort);
-    }
-    setTab(t);
-    setView('tab');
-    selectFirst('tab', t, nextSort);
-  };
-  const pickView = (v: GiftView) => {
-    const next = view === v ? 'tab' : v;
-    setView(next);
-    selectFirst(next, tab, sort);
-  };
-  const toggleFav = (id: string) => {
-    const next = new Set(favs);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    favoriteGifts.clear();
-    next.forEach((x) => favoriteGifts.add(x));
-    setFavs(next);
-  };
-  const openVip = () => {
-    onClose();
-    router.push('/vip');
-  };
-  const lockedAlert = (g: Gift) =>
-    showAlert(`SVIP ${g.minSvip} gerekli`, `${g.emoji} ${g.name} yalnızca SVIP ${g.minSvip} ve üzeri kullanıcılar tarafından gönderilebilir. Şu anki seviyen: SVIP ${svipLevel}.`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'SVIP Sistemi', onPress: openVip },
-    ]);
-  const tapGift = (g: Gift) => {
-    if (view !== 'bag' && isLocked(g, svipLevel)) return lockedAlert(g);
-    setSel({ id: g.id, bag: view === 'bag' });
-  };
-
-  const send = () => {
-    if (targets.length === 0) return showAlert('Alıcı seç', 'Hediye göndermek için en az bir kişi seç.');
-    if (fromBag) {
-      const need = count * targets.length;
-      const have = bag[selected.id] ?? 0;
-      if (need > have) return showAlert('Çantada yeterli hediye yok', `${selected.emoji} ${selected.name}: ${have} adet var, ${need} adet gerekiyor.`);
-      const next = { ...bag, [selected.id]: have - need };
-      Object.assign(backpackStock, next);
-      setBag(next);
-      onSend({ ...selected, price: 0 }, targets, count);
-      return;
-    }
-    if (isLocked(selected, svipLevel)) return lockedAlert(selected);
-    onSend(selected, targets, count);
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      {view === 'tab' && (
-        <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
-          <GiftBanner tab={tab} onVip={openVip} />
-        </View>
-      )}
-      <View style={styles.giftSheet}>
-        {/* Recipients (multi-select) */}
-        <View style={styles.recipRow}>
-          <Text style={styles.recipLabel}>Kime? ({targets.length})</Text>
-          {recipients.length === 0 ? (
-            <Text style={{ color: colors.textDim, flex: 1, fontSize: 12 }}>Koltukta kimse yok.</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
-              {recipients.map((id) => (
-                <Pressable key={id} onPress={() => togglePick(id)} style={{ opacity: targets.includes(id) ? 1 : 0.45 }} accessibilityLabel={userById(id).name}>
-                  <Avatar uri={userById(id).avatar} size={34} ring={targets.includes(id)} />
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
-          {recipients.length > 1 && (
-            <Pressable onPress={() => setPicked(allSelected ? recipients.slice(0, 1) : recipients)} hitSlop={8} style={styles.allBtn}>
-              <Text style={{ color: colors.pink, fontWeight: '800', fontSize: 12 }}>{allSelected ? 'Seçimi kaldır' : 'Hepsini seç'}</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Sender gift level */}
-        <View style={styles.levelRow}>
-          <LinearGradient colors={['#FDE68A', '#F59E0B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.levelPill}>
-            <Text style={styles.levelPillText}>Lv.{level}</Text>
-          </LinearGradient>
-          <View style={styles.levelDivider} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.levelText} numberOfLines={1}>
-              {nextXp === undefined ? (
-                'Maksimum hediye seviyesine ulaştın 🎉'
-              ) : (
-                <>
-                  <Text style={{ color: colors.gold, fontWeight: '800' }}>{fmt(nextXp - spentTotal)}</Text> Jeton hediye göndererek Lv{level + 1}&apos;{LV_SUFFIX[level + 1]} yüksel
-                </>
-              )}
-            </Text>
-            <View style={styles.levelTrack}>
-              <LinearGradient colors={['#FDE68A', '#F59E0B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: `${Math.round(progress * 100)}%`, height: '100%', borderRadius: 3 }} />
-            </View>
-          </View>
-          <Text style={styles.levelPlus}>+{fmt(total)}</Text>
-        </View>
-
-        {/* Tabs + favorites / backpack */}
-        <View style={styles.tabRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 16, alignItems: 'flex-end' }}>
-            {GIFT_TABS.map((t) => {
-              const active = view === 'tab' && tab === t.key;
-              return (
-                <Pressable key={t.key} onPress={() => pickTab(t.key)} style={{ alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-                    {t.key === 'hot' && (
-                      <Ionicons name={sort === 'asc' ? 'arrow-up' : sort === 'desc' ? 'arrow-down' : 'swap-vertical'} size={13} color={active ? '#fff' : colors.textDim} />
-                    )}
-                    {t.key === 'couple' && <Ionicons name="heart" size={15} color={colors.red} />}
-                  </View>
-                  <View style={[styles.tabLine, !active && { backgroundColor: 'transparent' }]} />
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <Pressable onPress={() => pickView('fav')} hitSlop={6} style={[styles.tabIcon, view === 'fav' && styles.tabIconActive]} accessibilityLabel="Favoriler">
-            <Ionicons name={view === 'fav' ? 'star' : 'star-outline'} size={20} color={view === 'fav' ? colors.gold : colors.textDim} />
-          </Pressable>
-          <Pressable onPress={() => pickView('bag')} hitSlop={6} style={[styles.tabIcon, view === 'bag' && styles.tabIconActive]} accessibilityLabel="Çanta">
-            <Ionicons name={view === 'bag' ? 'bag-handle' : 'bag-handle-outline'} size={20} color={view === 'bag' ? colors.primaryText : colors.textDim} />
-          </Pressable>
-        </View>
-        {view === 'bag' && <Text style={styles.viewNote}>🎒 Çanta · Günlük giriş ve görev ödülü hediyeler. Gönderirken jeton harcanmaz.</Text>}
-        {view === 'fav' && <Text style={styles.viewNote}>⭐ Favoriler · Bir hediyeye uzun basarak ekle ya da çıkar.</Text>}
-
-        {/* Gift grid */}
-        <ScrollView style={styles.gridScroll} contentContainerStyle={styles.giftGrid}>
-          {list.length === 0 ? (
-            <Text style={styles.emptyText}>
-              {view === 'fav' ? 'Henüz favori hediyen yok. Bir hediyeye uzun basarak favorilere ekle.' : 'Çantan boş. Günlük girişten ücretsiz hediye kazanabilirsin.'}
-            </Text>
-          ) : (
-            list.map((g) => (
-              <GiftCell
-                key={g.id}
-                gift={g}
-                selected={sel.id === g.id && sel.bag === (view === 'bag')}
-                favorite={favs.has(g.id)}
-                locked={view !== 'bag' && isLocked(g, svipLevel)}
-                stock={view === 'bag' ? bag[g.id] : undefined}
-                onPress={() => tapGift(g)}
-                onLongPress={() => toggleFav(g.id)}
-                onToggleFav={() => toggleFav(g.id)}
-              />
-            ))
-          )}
-        </ScrollView>
-
-        {/* Price confirmation before spending (spec §7.2). */}
-        <View style={styles.summaryRow}>
-          <Text style={[styles.summaryText, total > coins && { color: colors.red }]} numberOfLines={1}>
-            {selected.emoji} {selected.name} · {targets.length} alıcı × {count} × {fromBag ? 'Ücretsiz' : fmt(selected.price)} = 🪙 {fmt(total)}
-          </Text>
-          {fromBag ? (
-            <Text style={[styles.summaryExtra, { color: colors.green }]}>{BACKPACK_SOURCES[selected.id] ?? 'Çanta'}</Text>
-          ) : selected.intimacy ? (
-            <Text style={[styles.summaryExtra, { color: colors.pink }]}>💗 +{fmt(selected.intimacy * count)} yakınlık</Text>
-          ) : null}
-        </View>
-
-        {/* Bottom bar */}
-        <View style={styles.bottomBar}>
-          <Pressable
-            onPress={() => {
-              onClose();
-              router.push('/cuzdan');
-            }}
-            style={styles.balance}
-            accessibilityLabel="Cüzdan"
-          >
-            <Text style={{ fontSize: 16 }}>🪙</Text>
-            <Text style={styles.balanceText}>{fmt(coins)}</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.gold} />
-          </Pressable>
-          <View style={styles.sendPill}>
-            <Pressable onPress={() => setCountOpen((o) => !o)} style={styles.countBtn} accessibilityLabel="Adet seç">
-              <Text style={styles.countText}>{count}</Text>
-              <Ionicons name={countOpen ? 'chevron-down' : 'chevron-up'} size={14} color="#fff" />
-            </Pressable>
-            <Pressable onPress={send} accessibilityLabel="Gönder">
-              <LinearGradient colors={[colors.primary, '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.sendBtn, targets.length === 0 && { opacity: 0.5 }]}>
-                <Text style={styles.sendText}>Gönder</Text>
-              </LinearGradient>
-            </Pressable>
-          </View>
-        </View>
-
-        {countOpen && (
-          <>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setCountOpen(false)} />
-            <View style={styles.countPopup}>
-              {GIFT_COUNTS.map((n) => (
-                <Pressable
-                  key={n}
-                  onPress={() => {
-                    setCount(n);
-                    setCountOpen(false);
-                  }}
-                  style={[styles.countOption, count === n && { backgroundColor: 'rgba(139,92,246,0.25)' }]}
-                >
-                  <Text style={styles.countOptionN}>{n}</Text>
-                  {!!COUNT_LABELS[n] && <Text style={styles.countOptionLabel}>{COUNT_LABELS[n]}</Text>}
-                </Pressable>
-              ))}
-            </View>
-          </>
-        )}
-      </View>
-    </Modal>
   );
 }
 
@@ -760,24 +391,6 @@ export function ListenersModal({
   );
 }
 
-export function EntryBanner({ text, color }: { text: string; color: readonly [string, string] }) {
-  const [x] = useState(() => new Animated.Value(-400));
-  useEffect(() => {
-    Animated.sequence([
-      Animated.spring(x, { toValue: 0, useNativeDriver: true }),
-      Animated.delay(2200),
-      Animated.timing(x, { toValue: 500, duration: 400, useNativeDriver: true }),
-    ]).start();
-  }, [x]);
-  return (
-    <Animated.View pointerEvents="none" style={[styles.entry, { transform: [{ translateX: x }] }]}>
-      <LinearGradient colors={color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.entryInner}>
-        <Text style={styles.entryText}>{text}</Text>
-      </LinearGradient>
-    </Animated.View>
-  );
-}
-
 export const roomStyles = StyleSheet.create({
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34 },
   sheetTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 10 },
@@ -813,67 +426,6 @@ const styles = StyleSheet.create({
   pkMvp: { color: colors.gold, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   listenerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   inviteBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  entry: { position: 'absolute', top: 110, left: 12, right: 12 },
-  entryInner: { borderRadius: 999, paddingVertical: 10, paddingHorizontal: 16 },
-  entryText: { color: '#fff', fontWeight: '800', textAlign: 'center' },
   sheet: roomStyles.sheet,
   sheetTitle: roomStyles.sheetTitle,
-  giftSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 28 },
-  recipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  recipLabel: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  allBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(236,72,153,0.12)' },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  levelPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 3 },
-  levelPillText: { color: '#7C2D12', fontWeight: '900', fontStyle: 'italic', fontSize: 12 },
-  levelDivider: { width: 1, height: 18, backgroundColor: colors.border },
-  levelText: { color: '#E9E3FF', fontSize: 12 },
-  levelTrack: { height: 5, borderRadius: 3, backgroundColor: colors.cardAlt, marginTop: 5, overflow: 'hidden' },
-  levelPlus: { color: colors.gold, fontWeight: '800', fontSize: 13, minWidth: 28, textAlign: 'right' },
-  tabRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
-  tabText: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
-  tabTextActive: { color: '#fff', fontWeight: '900' },
-  tabLine: { width: 18, height: 3, borderRadius: 2, backgroundColor: '#fff', marginTop: 4 },
-  tabIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  tabIconActive: { backgroundColor: colors.cardAlt },
-  viewNote: { color: colors.textDim, fontSize: 12, marginTop: 6 },
-  gridScroll: { height: 236, marginTop: 8 },
-  giftGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 4 },
-  giftCellWrap: { width: '25%', padding: 2 },
-  giftCell: { alignItems: 'center', paddingTop: 8, paddingBottom: 6, borderRadius: 12, borderWidth: 1.5, borderColor: 'transparent' },
-  giftSelected: { borderColor: colors.primary, backgroundColor: 'rgba(139,92,246,0.14)' },
-  giftArt: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
-  giftName: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: '94%' },
-  giftPrice: { color: colors.gold, fontSize: 11, marginTop: 2 },
-  cornerBadges: { position: 'absolute', top: 4, right: 4, gap: 2, alignItems: 'flex-end' },
-  cBadge: { minWidth: 16, height: 14, borderRadius: 4, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
-  cBadge3d: { borderWidth: 1, borderColor: '#34D399', backgroundColor: 'rgba(6,78,59,0.85)' },
-  cBadge3dText: { color: '#6EE7B7', fontSize: 8, fontWeight: '900' },
-  cBadgeMusic: { backgroundColor: '#16A34A' },
-  cBadgeSvip: { borderWidth: 1, borderColor: colors.gold, backgroundColor: 'rgba(120,53,15,0.9)' },
-  cBadgeSvipText: { color: colors.gold, fontSize: 8, fontWeight: '900' },
-  cBadgeCouple: { backgroundColor: colors.pink },
-  cBadgeGame: { backgroundColor: 'rgba(139,92,246,0.6)' },
-  lockIcon: { position: 'absolute', top: 30, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 3 },
-  stockBadge: { position: 'absolute', top: 4, left: 4, backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 },
-  stockText: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  favBtn: { position: 'absolute', top: 3, left: 3 },
-  emptyText: { color: colors.textDim, fontSize: 13, textAlign: 'center', width: '100%', paddingVertical: 40, paddingHorizontal: 20 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 },
-  bannerText: { flex: 1, color: '#fff', fontWeight: '800', fontSize: 14 },
-  bannerArrow: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFFBEB', alignItems: 'center', justifyContent: 'center' },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  summaryText: { flex: 1, color: colors.textDim, fontSize: 12 },
-  summaryExtra: { fontSize: 12, fontWeight: '700' },
-  bottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 10 },
-  balance: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
-  balanceText: { color: '#fff', fontWeight: '900', fontSize: 17 },
-  sendPill: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary, borderRadius: 999, overflow: 'hidden' },
-  countBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
-  countText: { color: '#fff', fontWeight: '800', fontSize: 16, minWidth: 18, textAlign: 'center' },
-  sendBtn: { paddingHorizontal: 22, paddingVertical: 11, borderRadius: 999 },
-  sendText: { color: '#fff', fontWeight: '900', fontSize: 15 },
-  countPopup: { position: 'absolute', right: 110, bottom: 76, backgroundColor: colors.cardAlt, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingVertical: 4, minWidth: 150 },
-  countOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  countOptionN: { color: '#fff', fontWeight: '900', fontSize: 14, minWidth: 38 },
-  countOptionLabel: { color: colors.textDim, fontSize: 12 },
 });

@@ -8,10 +8,10 @@ import { ROOMS, userById, type Room } from '@/data/mock';
 export type RankCard = { key: string; title: string; board: string; colors: readonly [string, string]; avatars: string[] };
 const topRoomCovers = [...ROOMS].sort((a, b) => b.listeners - a.listeners).slice(0, 3).map((r) => r.cover);
 export const RANK_CARDS: RankCard[] = [
-  { key: 'cazibe', title: 'Cazibe Listesi', board: 'yayinci', colors: ['#EC4899', '#A855F7'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
-  { key: 'zengin', title: 'Zenginlik Sıralaması', board: 'zengin', colors: ['#F59E0B', '#EA580C'], avatars: LEADERBOARDS.zengin.daily.slice(0, 3).map((r) => r.user.avatar) },
-  { key: 'oda', title: 'Oda Sıralaması', board: 'oda', colors: ['#6366F1', '#3B82F6'], avatars: topRoomCovers },
-  { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#F43F5E', '#DB2777'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
+  { key: 'cazibe', title: 'Cazibe Listesi', board: 'yayinci', colors: ['#5A1F4B', '#2A1838'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
+  { key: 'zengin', title: 'Zenginlik Sıralaması', board: 'zengin', colors: ['#5C4012', '#2E2414'], avatars: LEADERBOARDS.zengin.daily.slice(0, 3).map((r) => r.user.avatar) },
+  { key: 'oda', title: 'Oda Sıralaması', board: 'oda', colors: ['#24346E', '#1A2140'], avatars: topRoomCovers },
+  { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#4B2266', '#221A3D'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
 ];
 
 // --- Category tabs --------------------------------------------------------------------------

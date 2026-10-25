@@ -2,9 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
@@ -14,8 +16,11 @@ import { colors } from '@/theme';
 type Tab = CosmeticKind | 'emoji';
 
 export default function StoreScreen() {
-  const { coins, inventory, equipped, buyCosmetic, equip, emojiPacks, buyEmojiPack, vipLevel, settings } = useApp();
+  const { coins, inventory, equipped, buyCosmetic, equip, emojiPacks, buyEmojiPack, vipLevel, settings, me } = useApp();
   const [tab, setTab] = useState<Tab>('frame');
+  const [preview, setPreview] = useState<EntryShow | null>(null);
+  const playPreview = (c: Cosmetic) =>
+    setPreview({ name: me.name, avatar: me.avatar, fx: c.kind === 'entry' ? ((c.fx as EntryFx | undefined) ?? 'vip') : 'vip', ride: c.kind === 'ride' ? c.emoji : undefined });
   const items = COSMETICS.filter((c) => c.kind === tab);
 
   const buy = (c: Cosmetic) => {
@@ -77,8 +82,14 @@ export default function StoreScreen() {
               const owned = inventory.has(c.id);
               const isEquipped = equipped[c.kind] === c.id;
               return (
-                <View key={c.id} style={[styles.item, isEquipped && { borderColor: colors.pink }]}>
-                  <Preview item={c} />
+                <View key={c.id} style={[styles.item, isEquipped && { borderColor: colors.primaryText }]}>
+                  <Preview item={c} avatar={me.avatar} still={settings.reduceMotion} />
+                  {(c.kind === 'entry' || c.kind === 'ride') && (
+                    <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
+                      <Ionicons name="play" size={12} color={colors.primaryText} />
+                      <Text style={styles.previewText}>Önizle</Text>
+                    </Pressable>
+                  )}
                   <Text style={styles.name}>{c.name}</Text>
                   <Text style={styles.meta}>
                     {c.days ? `${c.days} gün` : 'Kalıcı'}
@@ -102,11 +113,33 @@ export default function StoreScreen() {
             })}
       </ScrollView>
       <Text style={styles.footer}>Kozmetik satın alımları komisyon programına dahil değildir.</Text>
+      {preview && <EntryEffect key={`${preview.fx}-${preview.ride}`} show={preview} still={settings.reduceMotion} top={140} onDone={() => setPreview(null)} />}
     </SafeAreaView>
   );
 }
 
-function Preview({ item }: { item: Cosmetic }) {
+function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; still?: boolean }) {
+  if (item.kind === 'frame' && item.fx) {
+    return (
+      <View style={{ height: 76, justifyContent: 'center' }}>
+        <AnimatedFrame fx={item.fx as FrameFx} size={64} still={still}>
+          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
+        </AnimatedFrame>
+      </View>
+    );
+  }
+  if (item.kind === 'entry') {
+    const look = ENTRY_LOOKS[(item.fx as EntryFx | undefined) ?? 'vip'];
+    return (
+      <LinearGradient colors={look.colors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.entryPreview}>
+        {look.creature && <Text style={{ fontSize: 16 }}>{look.creature}</Text>}
+        <Text style={styles.entryPreviewText} numberOfLines={1}>
+          Hoş geldin
+        </Text>
+        <Text style={{ fontSize: 14 }}>{look.mark}</Text>
+      </LinearGradient>
+    );
+  }
   if (item.kind === 'frame' && item.color) {
     return (
       <LinearGradient colors={item.color} style={styles.framePreview}>
@@ -128,6 +161,10 @@ function Preview({ item }: { item: Cosmetic }) {
 }
 
 const styles = StyleSheet.create({
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: 'rgba(139,92,246,0.18)' },
+  previewText: { color: colors.primaryText, fontWeight: '700', fontSize: 12 },
+  entryPreview: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, borderRadius: 20, paddingHorizontal: 10, marginVertical: 12, maxWidth: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  entryPreviewText: { color: '#fff', fontWeight: '800', fontSize: 12, flexShrink: 1 },
   tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
@@ -139,7 +176,7 @@ const styles = StyleSheet.create({
   meta: { color: colors.textDim, fontSize: 12 },
   owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },
   locked: { color: colors.textDim, fontWeight: '700', paddingVertical: 7 },
-  buy: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
+  buy: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   buyText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   framePreview: { width: 64, height: 64, borderRadius: 32, padding: 4 },
   frameInner: { flex: 1, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },

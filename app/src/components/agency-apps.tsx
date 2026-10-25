@@ -65,7 +65,7 @@ export function Field({
     <View style={{ gap: 6 }}>
       <Text style={s.label}>
         {label}
-        {required ? <Text style={{ color: colors.pink }}> *</Text> : <Text style={s.optional}> · isteğe bağlı</Text>}
+        {required ? <Text style={{ color: colors.primaryText }}> *</Text> : <Text style={s.optional}> · isteğe bağlı</Text>}
       </Text>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <TextInput
@@ -179,7 +179,7 @@ export function Note({ text, tone = 'info' }: { text: string; tone?: 'info' | 'w
 export function Check({ done, label }: { done: boolean; label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 }}>
-      <Ionicons name={done ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={done ? semantic.live : colors.textDim} />
+      <Ionicons name={done ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={done ? semantic.success : colors.textDim} />
       <Text style={[s.body, !done && { color: colors.textDim }]}>{label}</Text>
     </View>
   );

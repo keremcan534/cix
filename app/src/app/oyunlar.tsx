@@ -78,7 +78,7 @@ function GameSession({ session, setSession }: { session: Session; setSession: (s
           <Text style={styles.title}>{game.name}</Text>
           {phase !== 'done' ? (
             <>
-              <ActivityIndicator color={colors.pink} />
+              <ActivityIndicator color={colors.primaryText} />
               <Text style={styles.dim}>{phase === 'starting' ? `${game.provider} oturumu başlatılıyor…` : phase === 'playing' ? 'Oyun oynanıyor (demo)…' : 'Sonuç sağlayıcıdan doğrulanıyor…'}</Text>
             </>
           ) : (
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   section: { color: colors.textDim, fontWeight: '800', fontSize: 13, textTransform: 'uppercase' },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'left' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  play: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  play: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   sessionCard: { backgroundColor: colors.card, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10, alignSelf: 'stretch' },
 });

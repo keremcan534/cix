@@ -62,7 +62,7 @@ export default function VerifyScreen() {
 
         {status === 'checking' && (
           <View style={styles.statusRow}>
-            <ActivityIndicator color={colors.pink} />
+            <ActivityIndicator color={colors.primaryText} />
             <Text style={styles.statusText}>Doğrulanıyor...</Text>
           </View>
         )}

@@ -78,10 +78,10 @@ const STATUS_COLOR: Record<string, string> = {
   Reddedildi: colors.red,
   Bekliyor: colors.gold,
   Kesinleşti: '#38BDF8',
-  Düzeltme: colors.pink,
+  Düzeltme: colors.primaryText,
   Başarılı: colors.green,
   Beklemede: colors.gold,
-  İade: colors.pink,
+  İade: colors.primaryText,
   Aktif: colors.green,
   Kullanıldı: colors.textDim,
   'Süresi doldu': colors.textDim,
@@ -160,7 +160,7 @@ function WalletTab() {
   const cashable = rules.bonusCashable > 0;
   return (
     <>
-      <LinearGradient colors={['#A855F7', '#6366F1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={['#262C4D', '#181C33']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <Text style={styles.heroLabel}>Jeton bakiyesi</Text>
         <Text style={styles.heroN}>🪙 {fmt(coins)}</Text>
         <Text style={styles.heroSub}>Jetonlar satın alınır ve hediyelerde harcanır. Nakde çevrilmez.</Text>
@@ -171,7 +171,7 @@ function WalletTab() {
       </LinearGradient>
 
       <View style={styles.grid}>
-        <Stat label="Bonus Kredi" value={`🎟️ ${fmt(BONUS_BALANCE)}`} sub={cashable ? `${pct(rules.bonusCashable)} çekilebilir` : 'Çekilemez · yalnız uygulama içi'} color={colors.pink} />
+        <Stat label="Bonus Kredi" value={`🎟️ ${fmt(BONUS_BALANCE)}`} sub={cashable ? `${pct(rules.bonusCashable)} çekilebilir` : 'Çekilemez · yalnız uygulama içi'} color={colors.primaryText} />
         <Stat label="Elmas (ayrı birim)" value={dia(diamonds)} sub={`≈ ${usd(diamonds)} · Yayıncı sekmesi`} color="#7DD3FC" />
       </View>
 
@@ -470,7 +470,7 @@ function BdTab() {
         <SectionTitle icon="shield" title={`Çift komisyon engellendi (${b.dupes.length})`} />
         {b.dupes.map((d) => (
           <View key={`${d.earningId}-${d.agencyId}-${d.period}`} style={styles.row}>
-            <Ionicons name="ban" size={18} color={colors.pink} />
+            <Ionicons name="ban" size={18} color={colors.primaryText} />
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle}>
                 {d.earningId} · {d.host}
@@ -1041,7 +1041,7 @@ const styles = StyleSheet.create({
   body: { padding: 16, gap: 12, paddingBottom: 48 },
   banner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', backgroundColor: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.35)', borderWidth: 1, borderRadius: 14, padding: 10 },
   bannerText: { color: colors.gold, fontSize: 12, flex: 1, lineHeight: 17 },
-  hero: { borderRadius: 24, padding: 20, gap: 4 },
+  hero: { borderRadius: 24, padding: 20, gap: 4, borderWidth: 1, borderColor: colors.border },
   heroLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
   heroN: { color: '#fff', fontSize: 36, fontWeight: '900' },
   heroSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },

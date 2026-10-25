@@ -11,6 +11,8 @@ export type Cosmetic = {
   days: number | null; // null = permanent
   color?: readonly [string, string];
   minVip?: number;
+  /** Code-drawn animation (components/fx): frame styles and entry styles. */
+  fx?: 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown' | 'sparkle' | 'thunder' | 'dragon' | 'comet';
 };
 
 export const COSMETIC_KINDS: { kind: CosmeticKind; label: string }[] = [
@@ -22,13 +24,15 @@ export const COSMETIC_KINDS: { kind: CosmeticKind; label: string }[] = [
 ];
 
 export const COSMETICS: Cosmetic[] = [
-  { id: 'fr-neon', kind: 'frame', name: 'Neon', emoji: '💜', price: 150, days: 7, color: ['#A855F7', '#EC4899'] },
-  { id: 'fr-ocean', kind: 'frame', name: 'Okyanus', emoji: '🌊', price: 300, days: 30, color: ['#0EA5E9', '#22D3EE'] },
-  { id: 'fr-fire', kind: 'frame', name: 'Ateş', emoji: '🔥', price: 900, days: 30, color: ['#EF4444', '#F59E0B'] },
-  { id: 'fr-gold', kind: 'frame', name: 'Altın Taç', emoji: '👑', price: 2_500, days: null, color: ['#F59E0B', '#FDE047'], minVip: 4 },
-  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#8B5CF6', '#EC4899'] },
-  { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#2563EB', '#FBBF24'] },
-  { id: 'en-dragon', kind: 'entry', name: 'Ejderha', emoji: '🐉', price: 3_000, days: 30, color: ['#DC2626', '#16A34A'], minVip: 7 },
+  { id: 'fr-neon', kind: 'frame', name: 'Ses Dalgası', emoji: '🔊', price: 150, days: 7, color: ['#2DD4BF', '#7C3AED'], fx: 'pulse' },
+  { id: 'fr-ocean', kind: 'frame', name: 'Yörünge', emoji: '🪐', price: 300, days: 30, color: ['#38BDF8', '#A78BFA'], fx: 'orbit' },
+  { id: 'fr-aurora', kind: 'frame', name: 'Aurora', emoji: '🌌', price: 600, days: 30, color: ['#2DD4BF', '#F472B6'], fx: 'aurora' },
+  { id: 'fr-fire', kind: 'frame', name: 'Ateş', emoji: '🔥', price: 900, days: 30, color: ['#EF4444', '#F59E0B'], fx: 'flame' },
+  { id: 'fr-gold', kind: 'frame', name: 'Platin Taç', emoji: '👑', price: 2_500, days: null, color: ['#E2E8F0', '#818CF8'], minVip: 4, fx: 'crown' },
+  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#4C1D95', '#7C3AED'], fx: 'sparkle' },
+  { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder' },
+  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#0B1022', '#312E81'], fx: 'comet' },
+  { id: 'en-dragon', kind: 'entry', name: 'Ejderha', emoji: '🐉', price: 3_000, days: 30, color: ['#450A0A', '#B91C1C'], minVip: 7, fx: 'dragon' },
   { id: 'rd-scooter', kind: 'ride', name: 'Scooter', emoji: '🛵', price: 250, days: 7 },
   { id: 'rd-sport', kind: 'ride', name: 'Spor Araba', emoji: '🏎️', price: 1_200, days: 30 },
   { id: 'rd-jet', kind: 'ride', name: 'Özel Jet', emoji: '🛩️', price: 5_000, days: 30, minVip: 9 },

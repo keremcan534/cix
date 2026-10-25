@@ -11,7 +11,7 @@ import { showAlert } from '@/lib/alert';
 import { useApp, type Ticket } from '@/store';
 import { colors, gradient } from '@/theme';
 
-const STATUS_COLOR: Record<Ticket['status'], string> = { Açık: colors.gold, Yanıtlandı: '#7DD3FC', Çözüldü: colors.green, 'Yeniden açıldı': colors.pink };
+const STATUS_COLOR: Record<Ticket['status'], string> = { Açık: colors.gold, Yanıtlandı: '#7DD3FC', Çözüldü: colors.green, 'Yeniden açıldı': colors.primaryText };
 
 // Quick-help chips → the matching ticket category.
 const TOPICS: { label: string; category: TicketCategory }[] = [
@@ -144,7 +144,7 @@ export default function SupportScreen() {
             <Text style={styles.label}>Kategori</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {TICKET_CATEGORIES.map((c) => (
-                <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { borderColor: colors.pink }]}>
+                <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { borderColor: colors.primaryText }]}>
                   <Text style={styles.chipText}>{c}</Text>
                 </Pressable>
               ))}

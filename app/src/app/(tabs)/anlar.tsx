@@ -124,7 +124,7 @@ export default function MomentsScreen() {
               <View style={styles.topicFilter}>
                 <Text style={{ color: '#fff', fontWeight: '700', flex: 1 }}># {MOMENT_TOPICS.find((t) => t.id === topic)?.title}</Text>
                 <Pressable onPress={() => setTopic(null)} hitSlop={8}>
-                  <Text style={{ color: colors.pink, fontWeight: '700', fontSize: 12 }}>Tümünü göster</Text>
+                  <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Tümünü göster</Text>
                 </Pressable>
               </View>
             )}
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
   tab: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
   tabActive: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  underline: { height: 3, borderRadius: 2, backgroundColor: colors.pink, marginTop: 4, width: 20 },
+  underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
   badge: { position: 'absolute', top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   topics: { gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   topicEmoji: { position: 'absolute', right: 8, bottom: 4, fontSize: 28, opacity: 0.85 },
   topicFilter: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   empty: { alignItems: 'center', gap: 10, padding: 32 },
-  emptyBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },
+  emptyBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },
   card: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   svipTag: { position: 'absolute', bottom: -6, left: 5, right: 5, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
@@ -482,11 +482,11 @@ const styles = StyleSheet.create({
   preview: { width: 110, height: 110, borderRadius: 12, backgroundColor: colors.cardAlt },
   removeImage: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, padding: 3 },
   topicChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'transparent' },
-  topicChipActive: { borderColor: colors.pink, backgroundColor: 'rgba(236,72,153,0.2)' },
+  topicChipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(139,92,246,0.18)' },
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 999, paddingLeft: 14, paddingRight: 4, paddingVertical: 4 },
   commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
-  sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.pink, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 });

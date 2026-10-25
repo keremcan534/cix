@@ -6,7 +6,9 @@ import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyl
 
 import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
+import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
+import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 
 export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
@@ -28,7 +30,7 @@ export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: n
             width: size * 0.28,
             height: size * 0.28,
             borderRadius: size,
-            backgroundColor: colors.green,
+            backgroundColor: semantic.live,
             borderWidth: 2,
             borderColor: colors.bg,
           }}
@@ -44,8 +46,8 @@ export function VerifiedBadge({ size = 14 }: { size?: number }) {
 
 export function VipBadge() {
   return (
-    <LinearGradient colors={['#F59E0B', '#FBBF24']} style={styles.vip}>
-      <Text style={styles.vipText}>VIP</Text>
+    <LinearGradient colors={semantic.status} style={styles.vip}>
+      <Text style={[styles.vipText, { color: semantic.statusInk }]}>VIP</Text>
     </LinearGradient>
   );
 }
@@ -184,8 +186,19 @@ export function Header({ title, right }: { title: string; right?: ReactNode }) {
 
 /** Avatar with the nobility (VIP) frame color, if any. */
 export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean }) {
+  const { settings } = useApp();
   const tier = vipTier(vipLevel);
   const frame = cosmeticById(frameId);
+  if (frame?.fx && frame.fx in FRAME_LOOKS) {
+    return (
+      <View style={{ width: size, height: size }}>
+        <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion}>
+          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+        </AnimatedFrame>
+        {tier && <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{tier.emoji}</Text>}
+      </View>
+    );
+  }
   // A purchased frame overrides the VIP frame color; the VIP badge emoji stays.
   const frameColors = frame?.color ?? tier?.color;
   if (!frameColors) return <Avatar uri={uri} size={size} online={online} />;

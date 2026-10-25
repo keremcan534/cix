@@ -111,9 +111,9 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#A78BFA', '#6D28D9']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
-            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün` : 'VIP değil'} colors={['#FCD34D', '#B45309']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
-            <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz Alınmadı'} colors={['#FB923C', '#C2410C']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
+            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#5B3FA8', '#2E2266']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün` : 'VIP değil'} colors={['#5B6478', '#2C3245']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
+            <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz Alınmadı'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
         </View>
 

@@ -27,7 +27,7 @@ function Pending() {
     <SafeAreaView style={styles.safe}>
       <Header title="Ajans" />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
-        <ActivityIndicator color={colors.pink} size="large" />
+        <ActivityIndicator color={colors.primaryText} size="large" />
         <Text style={styles.title}>{a ? `${a.name} başvurunu inceliyor` : `${ownedAgency?.name} ajans başvurun inceleniyor`}</Text>
         <Text style={[styles.dim, { textAlign: 'center' }]}>Sonuç bildirim olarak gelecek. Ret durumunda gerekçe gösterilir ve itiraz edebilirsin. (Demo: birkaç saniye)</Text>
       </View>
@@ -88,7 +88,7 @@ function JoinOrCreate() {
                     </Text>
                   ))}
                   <Pressable style={styles.check} onPress={() => setAccepted((v) => !v)}>
-                    <Ionicons name={accepted ? 'checkbox' : 'square-outline'} size={22} color={accepted ? colors.pink : colors.textDim} />
+                    <Ionicons name={accepted ? 'checkbox' : 'square-outline'} size={22} color={accepted ? colors.primaryText : colors.textDim} />
                     <Text style={{ color: '#fff', flex: 1 }}>Şartları okudum ve kabul ediyorum</Text>
                   </Pressable>
                 </View>
@@ -231,7 +231,7 @@ function MemberView() {
               showAlert('İtiraz oluşturuldu', `Talep #${no}`);
             }}
           >
-            <Text style={{ color: colors.pink, fontWeight: '700' }}>Hak edişe itiraz et</Text>
+            <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Hak edişe itiraz et</Text>
           </Pressable>
         </Card>
 
@@ -276,7 +276,7 @@ function MemberView() {
               )}
               <Text style={styles.dim}>Geçmiş kazançların, eski ve yeni ajansın komisyon dönemleri ayrı korunur. Reddedilirse gerekçe gösterilir; itiraz edebilirsin.</Text>
               <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'İtiraz' } })}>
-                <Text style={{ color: colors.pink, fontWeight: '700' }}>Transfer kararına itiraz et →</Text>
+                <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Transfer kararına itiraz et →</Text>
               </Pressable>
             </>
           ) : showTransfer ? (
@@ -296,7 +296,7 @@ function MemberView() {
             </>
           ) : (
             <Pressable onPress={() => setShowTransfer(true)}>
-              <Text style={{ color: colors.pink, fontWeight: '700' }}>Talep oluştur →</Text>
+              <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Talep oluştur →</Text>
             </Pressable>
           )}
         </Card>

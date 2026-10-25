@@ -185,11 +185,11 @@ export const KABILE_FRIENDS: Pair[] = [
 
 // --- Themes (Tema tab) --------------------------------------------------------
 export const KABILE_THEMES: { id: string; name: string; colors: readonly [string, string]; minLevel: number }[] = [
-  { id: 'gece', name: 'Gece Moru', colors: ['#3B1D6E', '#120B24'], minLevel: 1 },
-  { id: 'ates', name: 'Kızıl Ay', colors: ['#7F1D1D', '#120B24'], minLevel: 1 },
-  { id: 'orman', name: 'Zümrüt Orman', colors: ['#14532D', '#120B24'], minLevel: 4 },
-  { id: 'okyanus', name: 'Derin Okyanus', colors: ['#0C4A6E', '#120B24'], minLevel: 7 },
-  { id: 'altin', name: 'Altın Saray', colors: ['#78350F', '#120B24'], minLevel: 10 },
+  { id: 'gece', name: 'Gece Moru', colors: ['#3B1D6E', '#0D1020'], minLevel: 1 },
+  { id: 'ates', name: 'Kızıl Ay', colors: ['#7F1D1D', '#0D1020'], minLevel: 1 },
+  { id: 'orman', name: 'Zümrüt Orman', colors: ['#14532D', '#0D1020'], minLevel: 4 },
+  { id: 'okyanus', name: 'Derin Okyanus', colors: ['#0C4A6E', '#0D1020'], minLevel: 7 },
+  { id: 'altin', name: 'Altın Saray', colors: ['#78350F', '#0D1020'], minLevel: 10 },
   { id: 'galaksi', name: 'Galaksi', colors: ['#581C87', '#0B1026'], minLevel: 13 },
 ];
 

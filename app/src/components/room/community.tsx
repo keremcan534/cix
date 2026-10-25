@@ -38,7 +38,7 @@ function Chips<T extends string | number>({ items, value, onChange }: { items: {
   return (
     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
       {items.map((i) => (
-        <Pressable key={String(i.v)} onPress={() => onChange(i.v)} style={[styles.chip, value === i.v && { borderColor: colors.pink }]}>
+        <Pressable key={String(i.v)} onPress={() => onChange(i.v)} style={[styles.chip, value === i.v && { borderColor: colors.primaryText }]}>
           <Text style={styles.chipText}>{i.label}</Text>
         </Pressable>
       ))}
@@ -96,7 +96,7 @@ export function PollCreate({ visible, onClose, onCreate }: { visible: boolean; o
       ))}
       {opts.length < 4 && (
         <Pressable onPress={() => setOpts((l) => [...l, ''])}>
-          <Text style={{ color: colors.pink, fontWeight: '700' }}>+ Seçenek ekle</Text>
+          <Text style={{ color: colors.primaryText, fontWeight: '700' }}>+ Seçenek ekle</Text>
         </Pressable>
       )}
       <Text style={styles.label}>Süre</Text>
@@ -130,7 +130,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
         <Text style={styles.dim}>{done ? '✅ Tamamlandı' : `${Math.ceil(goal.endsIn / 60)} dk kaldı`}</Text>
       </View>
       <View style={styles.track}>
-        <View style={{ height: 6, backgroundColor: done ? colors.green : colors.pink, width: `${Math.min(100, (goal.progress / goal.target) * 100)}%` }} />
+        <View style={{ height: 6, backgroundColor: done ? colors.green : colors.primary, width: `${Math.min(100, (goal.progress / goal.target) * 100)}%` }} />
       </View>
       <Text style={styles.dim}>
         {goal.progress}/{goal.target}
@@ -208,8 +208,8 @@ export function EventsSheet({
           {!!e.desc && <Text style={{ color: '#fff', fontSize: 13 }}>{e.desc}</Text>}
           {!e.cancelled && (
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              <Pressable onPress={() => onToggleGoing(e.id)} style={[styles.small, e.going && { backgroundColor: colors.green }]}>
-                <Text style={[styles.smallText, e.going && { color: semantic.liveInk }]}>{e.going ? '✓ Katılıyorum' : 'Katıl'}</Text>
+              <Pressable onPress={() => onToggleGoing(e.id)} style={[styles.small, e.going && { backgroundColor: semantic.successFill }]}>
+                <Text style={[styles.smallText, e.going && { color: '#fff' }]}>{e.going ? '✓ Katılıyorum' : 'Katıl'}</Text>
               </Pressable>
               <Pressable onPress={() => onToggleReminder(e.id)} style={[styles.small, e.reminder && { backgroundColor: colors.primary }]}>
                 <Text style={styles.smallText}>{e.reminder ? '🔔 Hatırlatılacak' : '🔕 Hatırlat'}</Text>

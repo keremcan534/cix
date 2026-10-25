@@ -121,7 +121,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
       <SafeAreaView style={s.safe}>
         <Header title="Ajans Başvurusu" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
-          <Ionicons name="checkmark-circle" size={72} color={semantic.live} />
+          <Ionicons name="checkmark-circle" size={72} color={semantic.success} />
           <Text style={[s.title, { textAlign: 'center' }]}>Başvurun alındı</Text>
           <Text style={[s.dim, { textAlign: 'center' }]}>Başvuru numaran</Text>
           <Text selectable style={{ color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: 1 }}>
@@ -198,7 +198,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
               right={<VerifyButton ok={phoneOk} enabled={validPhone(f.phone)} target={f.phone} onVerified={() => setPhoneOk(true)} />}
             />
             <Text style={s.label}>
-              Faaliyet gösterilecek ülke<Text style={{ color: colors.pink }}> *</Text>
+              Faaliyet gösterilecek ülke<Text style={{ color: colors.primaryText }}> *</Text>
             </Text>
             <Chips options={COUNTRIES.map((c) => ({ key: c, label: c }))} value={f.country} onChange={(v) => up('country', v)} />
             <Field label="Şehir veya faaliyet bölgesi" required value={f.city} onChange={(v) => up('city', v)} placeholder="Örn. İstanbul" />
@@ -206,7 +206,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
 
           <Section title="2. Deneyim" icon="ribbon">
             <Text style={s.label}>
-              Ajans deneyimin<Text style={{ color: colors.pink }}> *</Text>
+              Ajans deneyimin<Text style={{ color: colors.primaryText }}> *</Text>
             </Text>
             <View style={{ gap: 8 }}>
               {(Object.keys(EXPERIENCE_LABEL) as Experience[]).map((k) => (
@@ -256,7 +256,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
             <Pressable onPress={() => up('consent', !f.consent)} style={s.row} accessibilityRole="checkbox" accessibilityState={{ checked: f.consent }}>
               <Ionicons name={f.consent ? 'checkbox' : 'square-outline'} size={24} color={f.consent ? colors.primaryText : colors.textDim} />
               <Text style={[s.body, { flex: 1 }]}>
-                Gizlilik bildirimini okudum, verilerimin işlenmesini onaylıyorum<Text style={{ color: colors.pink }}> *</Text>
+                Gizlilik bildirimini okudum, verilerimin işlenmesini onaylıyorum<Text style={{ color: colors.primaryText }}> *</Text>
               </Text>
             </Pressable>
           </Section>
@@ -284,8 +284,8 @@ function VerifyButton({ ok, enabled, target, onVerified }: { ok: boolean; enable
   if (ok)
     return (
       <View style={[s.row, { gap: 4 }]} accessibilityLabel="Doğrulandı">
-        <Ionicons name="checkmark-circle" size={20} color={semantic.live} />
-        <Text style={{ color: semantic.live, fontWeight: '800', fontSize: 13 }}>Doğrulandı</Text>
+        <Ionicons name="checkmark-circle" size={20} color={semantic.success} />
+        <Text style={{ color: semantic.success, fontWeight: '800', fontSize: 13 }}>Doğrulandı</Text>
       </View>
     );
   if (code !== null)
@@ -376,7 +376,7 @@ function Tracking({ app, onNew }: { app: Application; onNew?: () => void }) {
           {/* Progress along the main path */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
             {MAIN_PATH.map((p, i) => (
-              <View key={p} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: app.status === 'Reddedildi' || app.status === 'Başvuru İptal Edildi' ? colors.border : i <= stepIndex ? semantic.live : colors.border }} />
+              <View key={p} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: app.status === 'Reddedildi' || app.status === 'Başvuru İptal Edildi' ? colors.border : i <= stepIndex ? semantic.success : colors.border }} />
             ))}
           </View>
           <Text style={s.dim}>{MAIN_PATH.map((p, i) => (i <= stepIndex ? `✓ ${p}` : p)).join('  ›  ')}</Text>

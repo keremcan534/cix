@@ -30,7 +30,7 @@ import {
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { useApp, type FanClub } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -219,8 +219,8 @@ export default function UserProfile() {
                 {user.verified && <VerifiedBadge size={18} />}
               </View>
               <View style={styles.row}>
-                <View style={[styles.dot, { backgroundColor: user.online ? colors.green : colors.textDim }]} />
-                <Text style={{ color: user.online ? colors.green : colors.textDim, fontSize: 13 }}>{user.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
+                <View style={[styles.dot, { backgroundColor: user.online ? semantic.live : colors.textDim }]} />
+                <Text style={{ color: user.online ? semantic.live : colors.textDim, fontSize: 13 }}>{user.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
                 <View style={styles.vSep} />
                 <Ionicons name="location-outline" size={14} color={colors.textDim} />
                 <Text style={styles.meta}>

@@ -8,7 +8,7 @@ import { useApp } from '@/store';
 import { colors } from '@/theme';
 
 /** Inline emoji picker: free basics, paid packs, VIP-only set, recents. Locked packs show a preview. */
-export function EmojiPanel({ onPick }: { onPick: (e: string) => void }) {
+export function EmojiPanel({ onPick, hint }: { onPick: (e: string) => void; hint?: string }) {
   const { emojiPacks, vipLevel, recentEmojis, rememberEmoji, buyEmojiPack } = useApp();
   const [tab, setTab] = useState<string>(recentEmojis.length ? 'recent' : 'basic');
   const pack = EMOJI_PACKS.find((p) => p.id === tab);
@@ -27,6 +27,7 @@ export function EmojiPanel({ onPick }: { onPick: (e: string) => void }) {
 
   return (
     <View style={styles.wrap}>
+      {hint && <Text style={styles.hint}>{hint}</Text>}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
         {[{ id: 'recent', name: '🕘' }, ...EMOJI_PACKS].map((p) => (
           <Pressable key={p.id} onPress={() => setTab(p.id)} style={[styles.tab, tab === p.id && styles.tabActive]}>
@@ -62,6 +63,7 @@ export function EmojiPanel({ onPick }: { onPick: (e: string) => void }) {
 }
 
 const styles = StyleSheet.create({
+  hint: { color: colors.textDim, fontSize: 12, paddingHorizontal: 12, paddingBottom: 6 },
   wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6 },
   tab: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   tabActive: { backgroundColor: colors.cardAlt },
@@ -69,5 +71,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 6, minHeight: 60 },
   cell: { width: '12.5%', alignItems: 'center', paddingVertical: 6 },
   empty: { color: colors.textDim, padding: 12 },
-  unlock: { alignSelf: 'center', backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 6 },
+  unlock: { alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 6 },
 });

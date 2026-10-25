@@ -97,7 +97,7 @@ export function MusicBar({ music, canControl, onOpen, onToggle, onNext }: { musi
           {track.title} · {track.artist}
         </Text>
         <View style={styles.musicTrack}>
-          <View style={{ height: 3, backgroundColor: colors.pink, width: `${(music.position / track.seconds) * 100}%` }} />
+          <View style={{ height: 3, backgroundColor: colors.primary, width: `${(music.position / track.seconds) * 100}%` }} />
         </View>
       </View>
       <Text style={styles.dim}>
@@ -172,8 +172,8 @@ export function MusicSheet({
                 <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
                   🙋 {userById(r.by).name}: {r.track.title}
                 </Text>
-                <Pressable style={[styles.smallBtn, { backgroundColor: colors.green }]} onPress={() => onApprove?.(i)}>
-                  <Text style={{ color: semantic.liveInk, fontWeight: '700', fontSize: 12 }}>Onayla</Text>
+                <Pressable style={[styles.smallBtn, { backgroundColor: semantic.successFill }]} onPress={() => onApprove?.(i)}>
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Onayla</Text>
                 </Pressable>
                 <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject?.(i)}>
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Reddet</Text>
@@ -186,7 +186,7 @@ export function MusicSheet({
         {music.queue.length === 0 && <Text style={styles.dim}>Sıra boş.</Text>}
         {music.queue.map((t, i) => (
           <View key={`${t.id}-${i}`} style={styles.row}>
-            <Text style={{ color: i === 0 ? colors.pink : colors.textDim, width: 18 }}>{i === 0 ? '▶' : i + 1}</Text>
+            <Text style={{ color: i === 0 ? colors.primaryText : colors.textDim, width: 18 }}>{i === 0 ? '▶' : i + 1}</Text>
             <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
               {t.title}
             </Text>
@@ -240,7 +240,7 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
       <Text style={styles.label}>Toplam</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[100, 500, 1000].map((n) => (
-          <Pressable key={n} onPress={() => setAmount(n)} style={[styles.chip, amount === n && { borderColor: colors.pink }]}>
+          <Pressable key={n} onPress={() => setAmount(n)} style={[styles.chip, amount === n && { borderColor: colors.primaryText }]}>
             <Text style={styles.chipText}>🪙 {n}</Text>
           </Pressable>
         ))}
@@ -248,7 +248,7 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
       <Text style={styles.label}>Kişi sayısı</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         {[5, 10, 20].map((n) => (
-          <Pressable key={n} onPress={() => setCount(n)} style={[styles.chip, count === n && { borderColor: colors.pink }]}>
+          <Pressable key={n} onPress={() => setCount(n)} style={[styles.chip, count === n && { borderColor: colors.primaryText }]}>
             <Text style={styles.chipText}>{n} kişi</Text>
           </Pressable>
         ))}
@@ -278,7 +278,7 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
       <Text style={styles.dim}>Odadaki rastgele biriyle zar at; yüksek atan bahsi 2 katı alır, eşitlikte iade. 18+ · Günlük {playsLeft} hak kaldı. Sonuç sunucuda belirlenir (demo).</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
         {[10, 50, 100].map((n) => (
-          <Pressable key={n} onPress={() => setBet(n)} style={[styles.chip, bet === n && { borderColor: colors.pink }]}>
+          <Pressable key={n} onPress={() => setBet(n)} style={[styles.chip, bet === n && { borderColor: colors.primaryText }]}>
             <Text style={styles.chipText}>🪙 {n}</Text>
           </Pressable>
         ))}
@@ -337,8 +337,8 @@ export function RequestsModal({ visible, onClose, requests, onAccept, onReject, 
           <Text style={{ color: colors.gold, fontWeight: '800', width: 18 }}>{i + 1}</Text>
           <Avatar uri={userById(id).avatar} size={38} />
           <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
-          <Pressable style={[styles.smallBtn, { backgroundColor: colors.green }]} onPress={() => onAccept(id)}>
-            <Text style={{ color: semantic.liveInk, fontWeight: '700', fontSize: 12 }}>Kabul</Text>
+          <Pressable style={[styles.smallBtn, { backgroundColor: semantic.successFill }]} onPress={() => onAccept(id)}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Kabul</Text>
           </Pressable>
           <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Sıradan çıkar</Text>

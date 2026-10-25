@@ -136,7 +136,7 @@ function Dashboard() {
             {weekly.map((v, i) => (
               <View key={i} style={styles.barCol}>
                 <Text style={styles.barValue}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</Text>
-                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: colors.pink }]} />
+                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: colors.primaryText }]} />
                 <Text style={styles.barLabel}>{DAYS[i]}</Text>
               </View>
             ))}

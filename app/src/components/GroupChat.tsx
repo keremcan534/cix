@@ -244,6 +244,6 @@ const styles = StyleSheet.create({
   quickTag: { position: 'absolute', top: -9, right: 8, color: colors.gold, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   input: { flex: 1, minWidth: 0, backgroundColor: colors.card, color: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
-  send: { backgroundColor: colors.pink, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  send: { backgroundColor: colors.primary, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   goBtn: { backgroundColor: '#A855F7', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
 });

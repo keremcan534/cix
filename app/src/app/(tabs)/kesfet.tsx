@@ -9,7 +9,7 @@ import { VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 const TABS = ['Senin için', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
@@ -104,7 +104,7 @@ export default function DiscoverScreen() {
                   {filters.newest ? ' · Yeni üyeler' : ''}
                 </Text>
                 <Pressable onPress={() => setFilters(DEFAULT_FILTERS)} hitSlop={8}>
-                  <Text style={{ color: colors.pink, fontWeight: '700', fontSize: 12 }}>Temizle</Text>
+                  <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Temizle</Text>
                 </Pressable>
               </View>
             )}
@@ -191,7 +191,7 @@ function ShortcutArt({ id, emoji }: { id: string; emoji: string }) {
     return (
       <View style={styles.artCenter}>
         <View style={styles.starCircle}>
-          <Ionicons name="star" size={20} color={colors.pink} />
+          <Ionicons name="star" size={20} color={colors.primaryText} />
         </View>
       </View>
     );
@@ -343,18 +343,18 @@ function FilterSheet({
 
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Sadece çevrimiçi</Text>
-          <Switch value={filters.onlineOnly} onValueChange={(v) => set('onlineOnly', v)} trackColor={{ true: colors.pink, false: colors.cardAlt }} />
+          <Switch value={filters.onlineOnly} onValueChange={(v) => set('onlineOnly', v)} trackColor={{ true: colors.primary, false: colors.cardAlt }} />
         </View>
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Yeni üyeler önce</Text>
-          <Switch value={filters.newest} onValueChange={(v) => set('newest', v)} trackColor={{ true: colors.pink, false: colors.cardAlt }} />
+          <Switch value={filters.newest} onValueChange={(v) => set('newest', v)} trackColor={{ true: colors.primary, false: colors.cardAlt }} />
         </View>
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
           <Pressable style={[styles.sheetBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onChange(DEFAULT_FILTERS)}>
             <Text style={{ color: '#fff', fontWeight: '700' }}>Sıfırla</Text>
           </Pressable>
-          <Pressable style={[styles.sheetBtn, { backgroundColor: colors.pink }]} onPress={onClose}>
+          <Pressable style={[styles.sheetBtn, { backgroundColor: colors.primary }]} onPress={onClose}>
             <Text style={{ color: '#fff', fontWeight: '800' }}>Tamam</Text>
           </Pressable>
         </View>
@@ -377,18 +377,18 @@ const styles = StyleSheet.create({
   tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
   tab: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
   tabActive: { color: '#fff', fontSize: 19, fontWeight: '800' },
-  underline: { height: 3, borderRadius: 2, backgroundColor: colors.pink, marginTop: 4, width: 20 },
+  underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
   iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.pink },
+  filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   activeText: { flex: 1, color: '#fff', fontSize: 12 },
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginTop: 4 },
   cityText: { flex: 1, color: colors.textDim, fontSize: 12 },
   optIn: { alignItems: 'center', gap: 10, padding: 24, marginTop: 20 },
-  optInBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12 },
+  optInBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   photo: { width: 92, height: 92, borderRadius: 16, backgroundColor: colors.cardAlt },
-  onlineDot: { position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.bg },
+  onlineDot: { position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: semantic.live, borderWidth: 2, borderColor: colors.bg },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   name: { color: '#fff', fontWeight: '800', fontSize: 17, maxWidth: 140 },
   realBadge: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(34,197,94,0.14)', borderRadius: 6, paddingLeft: 2, paddingRight: 6, paddingVertical: 1 },
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   promoSub: { color: colors.pink, fontSize: 15, fontWeight: '600' },
   promoAvatars: { flexDirection: 'row', justifyContent: 'space-between' },
   promoAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: colors.pink, backgroundColor: colors.cardAlt },
-  goBtn: { alignSelf: 'flex-start', backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7 },
+  goBtn: { alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7 },
   goText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10 },
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   sheetLabel: { color: colors.textDim, fontWeight: '700', fontSize: 12, marginTop: 4 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  optionActive: { borderColor: colors.pink, backgroundColor: 'rgba(236,72,153,0.2)' },
+  optionActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(139,92,246,0.18)' },
   optionText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchText: { color: '#fff', fontSize: 14 },

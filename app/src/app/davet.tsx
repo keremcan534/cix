@@ -322,7 +322,7 @@ export default function InviteScreen() {
             </View>
           ))}
           <Pressable onPress={simulateInviteePurchase}>
-            <Text style={{ color: colors.pink, fontWeight: '700' }}>(Demo) Davet ettiğim kişi jeton aldı</Text>
+            <Text style={{ color: colors.primaryText, fontWeight: '700' }}>(Demo) Davet ettiğim kişi jeton aldı</Text>
           </Pressable>
         </Card>
       </ScrollView>

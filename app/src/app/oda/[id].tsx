@@ -37,7 +37,9 @@ import {
 } from '@/components/room/community';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
-import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, MicBtn, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
+import { GiftSheet } from '@/components/room/gift-sheet';
+import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { ChatLine, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -46,7 +48,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
-import { errorHaptic, successHaptic } from '@/lib/haptics';
+import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -63,6 +65,9 @@ const msgId = () => String(Date.now() + Math.random());
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
 const clock = () => new Date().toTimeString().slice(0, 5);
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
+
+const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
+const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 
 export default function VoiceRoom() {
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
@@ -106,8 +111,11 @@ export default function VoiceRoom() {
     if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
     const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `SVIP${svipLevel} ` : ''}${ME.name}`;
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya katıldı!`;
-    return { text, color: entryItem?.color ?? tier?.color ?? gradient };
-  }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride]);
+    const badge = [noble?.emoji, svipLevel ? `SVIP${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
+    const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
+    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
+    return { text, show };
+  }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride, app.me.avatar]);
 
   const [unlocked, setUnlocked] = useState(!password);
   const [seats, setSeats] = useState<(string | null)[]>(() => pad(isOwn ? ['me'] : base!.seatUserIds, capacity));
@@ -115,7 +123,8 @@ export default function VoiceRoom() {
   const [mutedUsers, setMutedUsers] = useState<Set<string>>(new Set());
   const [kicked, setKicked] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
-  const [entry, setEntry] = useState<typeof entryInfo>(() => (invisible || settings.effectsOff ? null : entryInfo));
+  // Entry effects on screen: mine when I join, then other people's (one at a time).
+  const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || settings.effectsOff || !entryInfo ? null : entryInfo.show));
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     { id: 'w', system: true, text: 'Odaya hoş geldin! Saygılı ol, iyi eğlenceler 💜' },
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
@@ -127,6 +136,8 @@ export default function VoiceRoom() {
   ]);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // Seat emoji reactions currently playing, by user id.
+  const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
@@ -200,11 +211,6 @@ export default function VoiceRoom() {
     if (after > before) addMsg({ system: true, text: `🎉 Oda seviyesi Lv.${after} oldu! Açılan: ${ROOM_LEVEL_REWARDS[after - 1]}` });
   };
 
-  useEffect(() => {
-    if (!entry) return;
-    const t = setTimeout(() => setEntry(null), 3500);
-    return () => clearTimeout(t);
-  }, [entry]);
 
   // Announce a new boss once per change (deferred so it isn't a synchronous effect update).
   const lastBoss = useRef<string | null>(null);
@@ -250,6 +256,24 @@ export default function VoiceRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botOn]);
 
+  // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
+  const react = (uid: string, emoji: string) => {
+    const key = Date.now() + Math.random();
+    setReactions((r) => ({ ...r, [uid]: { emoji, key } }));
+    setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), REACTION_MS);
+  };
+  // Other people on mic send seat emoji now and then (quiet when effects are off).
+  const botReactions = !settings.effectsOff;
+  useEffect(() => {
+    if (!botReactions) return;
+    const t = setInterval(() => {
+      const seated = seatedKey.split(',').filter(Boolean);
+      if (!seated.length || Math.random() > 0.35) return;
+      react(pick(seated), pick(BOT_REACTIONS));
+    }, 3500);
+    return () => clearInterval(t);
+  }, [seatedKey, botReactions]);
+
   // Fake "who is talking".
   useEffect(() => {
     const t = setInterval(() => {
@@ -271,6 +295,8 @@ export default function VoiceRoom() {
       if (r < 0.25) {
         setListeners((n) => (isOwn ? Math.min(myRoom.limit, n + 1) : n + 1));
         addMsg({ system: true, text: `${u.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
+        // Some joiners own an entry effect; show it if nothing else is playing.
+        if (!settings.effectsOff && Math.random() < 0.4) setEntry((cur) => cur ?? { name: u.name, avatar: u.avatar, fx: pick(BOT_ENTRY_FX), ride: Math.random() < 0.3 ? pick(['🏎️', '🛵', '🛩️']) : undefined, badge: u.vip ? 'VIP' : undefined });
         gainXp(5);
         setGoal((g) => (g && g.kind === 'join' ? { ...g, progress: g.progress + 1 } : g));
       } else if (r < 0.3) {
@@ -672,10 +698,11 @@ export default function VoiceRoom() {
     }
   };
 
-  const sendGift = (gift: Gift, toIds: string[], count: number) => {
+  const sendGift = (gift: Gift, toIds: string[], count: number, confirmed = false) => {
     setGiftOpen(false);
     const total = gift.price * count * toIds.length;
-    if (total >= settings.bigSpendConfirm) {
+    // The gift sheet asks for high-value confirmation itself; other callers still get the dialog.
+    if (!confirmed && total >= settings.bigSpendConfirm) {
       showAlert('Yüksek tutarlı gönderim', `${toIds.length} alıcıya toplam 🪙 ${total.toLocaleString('tr-TR')} gönderilecek. Onaylıyor musun?`, [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Onayla ve gönder', onPress: () => deliverGifts(gift, toIds, count) },
@@ -930,6 +957,8 @@ export default function VoiceRoom() {
                   muted={allSeats[0] === 'me' ? !micOn : !!allSeats[0] && mutedUsers.has(allSeats[0])}
                   role="owner"
                   compact
+                  reaction={allSeats[0] ? reactions[allSeats[0]] : undefined}
+                  still={settings.reduceMotion}
                   onPress={() => onSeatPress(0)}
                 />
                 <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
@@ -948,6 +977,8 @@ export default function VoiceRoom() {
                 muted={uid === 'me' ? !micOn : !!uid && mutedUsers.has(uid)}
                 role={uid ? roleOf(uid) : undefined}
                 locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
+                reaction={uid ? reactions[uid] : undefined}
+                still={settings.reduceMotion}
                 onPress={() => onSeatPress(i)}
               />
             ))}
@@ -964,11 +995,22 @@ export default function VoiceRoom() {
             contentContainerStyle={{ gap: 6, paddingVertical: 8 }}
           />
 
-          {emojiOpen && <EmojiPanel onPick={(e) => setDraft((d) => d + e)} />}
+          {emojiOpen && (
+            <EmojiPanel
+              hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
+              onPick={(e) => {
+                if (amSeated) {
+                  tapHaptic();
+                  react('me', e);
+                  setEmojiOpen(false);
+                } else setDraft((d) => d + e);
+              }}
+            />
+          )}
           <View style={styles.bottom}>
             <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />
             <View style={styles.inputWrap}>
-              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={8}>
+              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
               </Pressable>
               <TextInput
@@ -1206,7 +1248,7 @@ export default function VoiceRoom() {
       />
       <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
-      {entry && <EntryBanner text={entry.text} color={entry.color} />}
+      {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>
   );
 }
