@@ -100,7 +100,8 @@ export function GiftSheet({
   // The confirmation is tied to exactly what was shown; changing gift, count or people disarms it.
   const armKey = `${sel.id}|${sel.bag}|${count}|${targets.join(',')}`;
   const armed = armedFor === armKey;
-  const needsConfirm = !fromBag && total >= settings.bigSpendConfirm;
+  // No confirmation by default (product decision: the sender is responsible); users can opt in from Ayarlar.
+  const needsConfirm = !fromBag && settings.bigSpendConfirm > 0 && total >= settings.bigSpendConfirm;
 
   const level = levelOf(spentTotal);
   const nextXp = LEVEL_XP[level];

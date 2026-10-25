@@ -100,7 +100,7 @@ export default function UserProfile() {
   };
   const sendGift = (g: Gift) => {
     if (isBlocked) return showAlert('Engelli kullanıcı');
-    if (g.price >= settings.bigSpendConfirm) {
+    if (settings.bigSpendConfirm > 0 && g.price >= settings.bigSpendConfirm) {
       showAlert('Yüksek tutarlı gönderim', `${user.name} kişisine 🪙 ${g.price.toLocaleString('tr-TR')} değerinde ${g.name} gönderilecek. Onaylıyor musun?`, [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Onayla ve gönder', onPress: () => deliverGift(g) },
