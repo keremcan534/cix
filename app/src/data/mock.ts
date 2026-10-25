@@ -48,7 +48,21 @@ export type Moment = {
   time: string;
 };
 
-export type Gift = { id: string; name: string; emoji: string; price: number };
+export type GiftCat = 'hot' | 'gameplay' | 'couple' | 'privilege';
+export type Gift = {
+  id: string;
+  name: string;
+  emoji: string;
+  price: number;
+  /** Gift panel tab (defaults to 'hot'). */
+  cat?: GiftCat;
+  /** Corner badge on the gift cell. */
+  badge?: '3D' | 'music';
+  /** Ayrıcalık gifts: minimum SVIP level required to send. */
+  minSvip?: number;
+  /** Couple gifts: intimacy points gained per gift (already includes the +2% couple bonus). */
+  intimacy?: number;
+};
 
 export type Conversation = {
   id: string;
@@ -120,15 +134,77 @@ export const MOMENTS: Moment[] = [
   { id: 'm5', userId: 'u9', text: 'Bugün kim ders çalışıyor? Lo-fi odasındayım, gelin 📚', likes: 54, comments: 7, time: '8 sa' },
 ];
 
+const couple = (id: string, name: string, emoji: string, price: number, badge?: Gift['badge']): Gift => ({
+  id,
+  name,
+  emoji,
+  price,
+  badge,
+  cat: 'couple',
+  intimacy: Math.round((price / 10) * 1.02),
+});
+
+// Timo-scale gift catalog. Keep g1…g8 (other screens reference them) and the first five cheap (≤ 500):
+// bot gifts use GIFTS.slice(0, 5) and INCOMING_GIFT_POOL prices.
 export const GIFTS: Gift[] = [
-  { id: 'g1', name: 'Gül', emoji: '🌹', price: 1 },
-  { id: 'g2', name: 'Kalp', emoji: '💖', price: 5 },
-  { id: 'g3', name: 'Kahve', emoji: '☕', price: 10 },
-  { id: 'g4', name: 'Pasta', emoji: '🎂', price: 50 },
-  { id: 'g5', name: 'Taç', emoji: '👑', price: 100 },
-  { id: 'g6', name: 'Roket', emoji: '🚀', price: 300 },
-  { id: 'g7', name: 'Elmas', emoji: '💎', price: 500 },
-  { id: 'g8', name: 'Şato', emoji: '🏰', price: 1000 },
+  // --- Hot ---
+  { id: 'g1', name: 'Gül', emoji: '🌹', price: 10, cat: 'hot' },
+  { id: 'g2', name: 'Kalp', emoji: '💖', price: 50, cat: 'hot' },
+  { id: 'g3', name: 'Kahve', emoji: '☕', price: 99, cat: 'hot' },
+  { id: 'g4', name: 'Pasta', emoji: '🎂', price: 200, cat: 'hot', badge: '3D' },
+  { id: 'g5', name: 'Taç', emoji: '👑', price: 500, cat: 'hot' },
+  { id: 'g6', name: 'Roket', emoji: '🚀', price: 1_999, cat: 'hot', badge: '3D' },
+  { id: 'g7', name: 'Elmas', emoji: '💎', price: 4_950, cat: 'hot' },
+  { id: 'g8', name: 'Şato', emoji: '🏰', price: 19_999, cat: 'hot', badge: 'music' },
+  { id: 'h1', name: 'Oyun Zamanı', emoji: '🎮', price: 7_777, cat: 'hot', badge: '3D' },
+  { id: 'h2', name: 'Dünya Turu', emoji: '🌍', price: 249_999, cat: 'hot', badge: 'music' },
+  { id: 'h3', name: 'Seni Seviyorum', emoji: '🥰', price: 500, cat: 'hot', badge: '3D' },
+  { id: 'h4', name: 'Fok Sarılması', emoji: '🦭', price: 3_999, cat: 'hot', badge: '3D' },
+  { id: 'h5', name: 'Tatil Keyfi', emoji: '🏖️', price: 7_999, cat: 'hot' },
+  { id: 'h6', name: 'Fok Öpücüğü', emoji: '😘', price: 1_999, cat: 'hot' },
+  { id: 'h7', name: 'Fok Kralı', emoji: '🤴', price: 39_999, cat: 'hot' },
+  { id: 'h8', name: 'Birlikte Bisiklet', emoji: '🚲', price: 777, cat: 'hot', badge: '3D' },
+  { id: 'h9', name: 'Parti Zamanı', emoji: '🎉', price: 9_999, cat: 'hot', badge: '3D' },
+  { id: 'h10', name: 'Anı Fotoğrafı', emoji: '📸', price: 1_299, cat: 'hot', badge: '3D' },
+  { id: 'h11', name: 'Altın Çan', emoji: '🔔', price: 4_950, cat: 'hot' },
+  { id: 'h12', name: 'Altın Kuğu', emoji: '🦢', price: 99_950, cat: 'hot', badge: 'music' },
+  // --- Gameplay: interactive "throw" gifts (fixed price, no random rewards) ---
+  { id: 'p1', name: 'Kar Topu', emoji: '❄️', price: 50, cat: 'gameplay' },
+  { id: 'p2', name: 'Sulu Balon', emoji: '🎈', price: 99, cat: 'gameplay' },
+  { id: 'p3', name: 'Domates At', emoji: '🍅', price: 200, cat: 'gameplay' },
+  { id: 'p4', name: 'Kâğıt Uçak', emoji: '✈️', price: 200, cat: 'gameplay' },
+  { id: 'p5', name: 'Su Kovası', emoji: '🪣', price: 500, cat: 'gameplay' },
+  { id: 'p6', name: 'Pasta At', emoji: '🥧', price: 777, cat: 'gameplay' },
+  { id: 'p7', name: 'Yumurta At', emoji: '🥚', price: 1_299, cat: 'gameplay' },
+  { id: 'p8', name: 'Terlik At', emoji: '🩴', price: 1_299, cat: 'gameplay' },
+  { id: 'p9', name: 'Konfeti Topu', emoji: '🎊', price: 1_999, cat: 'gameplay', badge: '3D' },
+  { id: 'p10', name: 'Aşk Oku', emoji: '💘', price: 2_399, cat: 'gameplay', badge: '3D' },
+  // --- Çift ❤ (intimacy +2%) ---
+  couple('c1', 'Yakın Dostun', '💞', 5_000),
+  couple('c2', 'Aşk Dilek Şişesi', '🫙', 8_999),
+  couple('c3', 'Kale Aşkı', '🏯', 99_999),
+  couple('c4', 'Aşk Mektubu', '💌', 7_999),
+  couple('c5', 'Sevgi Tatlısı', '🍰', 39_999),
+  couple('c6', 'Aşk Faytonu', '🐎', 699_999, 'music'),
+  couple('c7', 'Evlilik Teklifi', '💍', 19_999),
+  couple('c8', 'Biz Evliyiz', '👰', 399_999, '3D'),
+  couple('c9', 'Sonsuz Öpücük', '💋', 777),
+  couple('c10', 'Kristal Kolye', '📿', 9_999),
+  couple('c11', 'Lunapark Randevusu', '🎡', 49_950, '3D'),
+  couple('c12', 'Aşk Ateşi', '❤️‍🔥', 1_999),
+  // --- Ayrıcalık (SVIP-gated) ---
+  { id: 'v1', name: 'Yeşil Altın Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
+  { id: 'v2', name: 'Gizemli Gül', emoji: '🥀', price: 350, cat: 'privilege', minSvip: 2 },
+  { id: 'v3', name: 'Sihirli Şapka', emoji: '🎩', price: 19_950, cat: 'privilege', minSvip: 3 },
+  { id: 'v4', name: 'Kristal Ayakkabı', emoji: '👠', price: 49_950, cat: 'privilege', minSvip: 4 },
+  { id: 'v5', name: 'Altın Kılıç', emoji: '🗡️', price: 777, cat: 'privilege', minSvip: 4 },
+  { id: 'v6', name: 'Kartal', emoji: '🦅', price: 99_950, cat: 'privilege', minSvip: 5 },
+  { id: 'v7', name: 'Derin Uzay Aşkı', emoji: '👨‍🚀', price: 277_750, cat: 'privilege', minSvip: 6, badge: 'music' },
+  { id: 'v8', name: 'Havalı Giriş', emoji: '🚁', price: 549_950, cat: 'privilege', minSvip: 7, badge: 'music' },
+  { id: 'v9', name: 'Altın Kanatlar', emoji: '🪽', price: 199_999, cat: 'privilege', minSvip: 7 },
+  { id: 'v10', name: 'Lüks Yat', emoji: '🛥️', price: 399_999, cat: 'privilege', minSvip: 8, badge: 'music' },
+  { id: 'v11', name: 'Altın Tavus', emoji: '🦚', price: 299_999, cat: 'privilege', minSvip: 8 },
+  { id: 'v12', name: 'Masal Diyarı', emoji: '🎠', price: 699_999, cat: 'privilege', minSvip: 9, badge: 'music' },
 ];
 
 export const COIN_PACKS = [

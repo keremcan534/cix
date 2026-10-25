@@ -108,4 +108,5 @@ export const LEADERBOARDS = {
 };
 
 // Bot gifts while the user hosts a room / is in a call.
-export const INCOMING_GIFT_POOL = [1, 1, 1, 5, 5, 10, 10, 50, 100];
+// Every price here must exist in GIFTS (oda/[id] looks the gift up by price); keep them modest (≤ 500).
+export const INCOMING_GIFT_POOL = [10, 10, 10, 50, 50, 99, 99, 200, 500];
