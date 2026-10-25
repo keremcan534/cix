@@ -188,3 +188,35 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 6. **Yayıncı, ajans, BD ve Admin panelleri:** aynı sistemle sadeleştirilir.
 
 Her ekran bu belgedeki 10 başlıkla (amaç → bağlantılar) ve kabul kriterleriyle teslim edilir.
+
+## 7. Kodla çizilen efektler (çerçeve, giriş, koltuk emojisi)
+
+Görsel dosya satın almadan, lisans riski olmadan ve uygulama boyutunu büyütmeden, tamamen SimilarClub'a özgü efektler. Hepsi telefonun yerel animasyon motorunda (yalnız transform ve opacity) çalışıyor. "Hareketi azalt" açıkken hareketsiz gösteriliyor, "Efektleri kapat" açıkken başkalarının efektleri gelmiyor.
+
+**Avatar çerçeveleri** (`components/fx/frames.tsx`). Katmanlar: nefes alan ışık halesi, efekt katmanı, dönen renk halkası, avatar ve en önde süsler.
+
+| Çerçeve | Efekt |
+| --- | --- |
+| Ses Dalgası | Turkuaz-mor halka, avatardan yayılan ses dalgaları (imza) |
+| Yörünge | Mavi-mor halka, etrafında dönen üç ışık |
+| Aurora | Çok renkli dönen halka, köşelerde yanıp sönen kıvılcımlar |
+| Ateş | Sıcak renkli hızlı halka, yükselen korlar |
+| Platin Taç (VIP 4) | Metalik halka, kıvılcımlar, sallanan taç |
+
+**Giriş efektleri** (`components/fx/entry.tsx`). Tek zaman çizelgesi (~3,2 sn):
+1. Bant kayarak gelir ve avatardan parçacıklar saçılır.
+2. Bant üzerinden ışık süpürmesi geçer.
+3. Binek veya yaratık bandın arkasından geçer.
+4. Bant sağa çıkar.
+
+| Efekt | Özellik |
+| --- | --- |
+| Işıltı | Mor-turkuaz bant |
+| Şimşek | Mavi bant, çift şimşek parlaması |
+| Kuyruklu Yıldız | Gece bandı, geçen kuyruklu yıldız |
+| Ejderha (VIP 7) | Kızıl bant, geçen ejderha |
+| VIP | Seviye renklerinde bant |
+
+Binek (scooter, araba, jet) varsa ekrandan geçer. Mağazada her giriş efekti ve binek "Önizle" ile tam boyutta oynatılabilir. Odaya katılan diğer kişilerin de zaman zaman giriş efekti olur.
+
+**Koltuk emojisi.** Koltuktaki kişinin seçtiği emoji avatarının üzerinde yaklaşık 2,6 saniye oynar.

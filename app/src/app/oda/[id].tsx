@@ -38,7 +38,8 @@ import {
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
-import { ChatLine, EntryBanner, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { ChatLine, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -66,6 +67,7 @@ const clock = () => new Date().toTimeString().slice(0, 5);
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
 
 const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
+const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 
 export default function VoiceRoom() {
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
@@ -109,8 +111,11 @@ export default function VoiceRoom() {
     if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
     const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `SVIP${svipLevel} ` : ''}${ME.name}`;
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya katıldı!`;
-    return { text, color: entryItem?.color ?? tier?.color ?? gradient };
-  }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride]);
+    const badge = [noble?.emoji, svipLevel ? `SVIP${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
+    const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
+    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
+    return { text, show };
+  }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride, app.me.avatar]);
 
   const [unlocked, setUnlocked] = useState(!password);
   const [seats, setSeats] = useState<(string | null)[]>(() => pad(isOwn ? ['me'] : base!.seatUserIds, capacity));
@@ -118,7 +123,8 @@ export default function VoiceRoom() {
   const [mutedUsers, setMutedUsers] = useState<Set<string>>(new Set());
   const [kicked, setKicked] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
-  const [entry, setEntry] = useState<typeof entryInfo>(() => (invisible || settings.effectsOff ? null : entryInfo));
+  // Entry effects on screen: mine when I join, then other people's (one at a time).
+  const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || settings.effectsOff || !entryInfo ? null : entryInfo.show));
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     { id: 'w', system: true, text: 'Odaya hoş geldin! Saygılı ol, iyi eğlenceler 💜' },
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
@@ -205,11 +211,6 @@ export default function VoiceRoom() {
     if (after > before) addMsg({ system: true, text: `🎉 Oda seviyesi Lv.${after} oldu! Açılan: ${ROOM_LEVEL_REWARDS[after - 1]}` });
   };
 
-  useEffect(() => {
-    if (!entry) return;
-    const t = setTimeout(() => setEntry(null), 3500);
-    return () => clearTimeout(t);
-  }, [entry]);
 
   // Announce a new boss once per change (deferred so it isn't a synchronous effect update).
   const lastBoss = useRef<string | null>(null);
@@ -294,6 +295,8 @@ export default function VoiceRoom() {
       if (r < 0.25) {
         setListeners((n) => (isOwn ? Math.min(myRoom.limit, n + 1) : n + 1));
         addMsg({ system: true, text: `${u.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
+        // Some joiners own an entry effect; show it if nothing else is playing.
+        if (!settings.effectsOff && Math.random() < 0.4) setEntry((cur) => cur ?? { name: u.name, avatar: u.avatar, fx: pick(BOT_ENTRY_FX), ride: Math.random() < 0.3 ? pick(['🏎️', '🛵', '🛩️']) : undefined, badge: u.vip ? 'VIP' : undefined });
         gainXp(5);
         setGoal((g) => (g && g.kind === 'join' ? { ...g, progress: g.progress + 1 } : g));
       } else if (r < 0.3) {
@@ -1245,7 +1248,7 @@ export default function VoiceRoom() {
       />
       <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
-      {entry && <EntryBanner text={entry.text} color={entry.color} />}
+      {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>
   );
 }

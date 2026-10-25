@@ -391,24 +391,6 @@ export function ListenersModal({
   );
 }
 
-export function EntryBanner({ text, color }: { text: string; color: readonly [string, string] }) {
-  const [x] = useState(() => new Animated.Value(-400));
-  useEffect(() => {
-    Animated.sequence([
-      Animated.spring(x, { toValue: 0, useNativeDriver: true }),
-      Animated.delay(2200),
-      Animated.timing(x, { toValue: 500, duration: 400, useNativeDriver: true }),
-    ]).start();
-  }, [x]);
-  return (
-    <Animated.View pointerEvents="none" style={[styles.entry, { transform: [{ translateX: x }] }]}>
-      <LinearGradient colors={color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.entryInner}>
-        <Text style={styles.entryText}>{text}</Text>
-      </LinearGradient>
-    </Animated.View>
-  );
-}
-
 export const roomStyles = StyleSheet.create({
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34 },
   sheetTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 10 },
@@ -444,9 +426,6 @@ const styles = StyleSheet.create({
   pkMvp: { color: colors.gold, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   listenerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   inviteBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  entry: { position: 'absolute', top: 110, left: 12, right: 12 },
-  entryInner: { borderRadius: 999, paddingVertical: 10, paddingHorizontal: 16 },
-  entryText: { color: '#fff', fontWeight: '800', textAlign: 'center' },
   sheet: roomStyles.sheet,
   sheetTitle: roomStyles.sheetTitle,
 });
