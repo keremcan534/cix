@@ -11,7 +11,7 @@ import { useApp } from '@/store';
 import { colors } from '@/theme';
 
 export default function WalletScreen() {
-  const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp } = useApp();
+  const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp, addCoins } = useApp();
   const [tab, setTab] = useState<'buy' | 'history'>('buy');
   const [filter, setFilter] = useState<'coin' | 'diamond'>('coin');
   const [processing, setProcessing] = useState<string | null>(null);
@@ -89,6 +89,18 @@ export default function WalletScreen() {
           <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
             <Text style={{ color: colors.textDim, fontSize: 16 }}>Coinsim ⓘ</Text>
             <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
+            <Pressable
+              onPress={() => {
+                addCoins(1_000_000, 'Demo test bakiyesi');
+                showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, SVIP puanı vermez)');
+              }}
+              style={styles.testBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Demo: 1.000.000 test jetonu ekle"
+            >
+              <Ionicons name="flask-outline" size={14} color={colors.primaryText} />
+              <Text style={styles.testText}>Demo: +1.000.000 test jetonu</Text>
+            </Pressable>
           </View>
           <Pressable onPress={() => router.push('/vip')} accessibilityLabel="SVIP Sistemi">
             <LinearGradient colors={['#78350F', '#4C1D95', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
@@ -125,6 +137,8 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
+  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(139,92,246,0.18)' },
+  testText: { color: colors.primaryText, fontWeight: '700', fontSize: 13 },
   segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, marginBottom: 12 },
   segBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },
   segActive: { backgroundColor: colors.primary },
