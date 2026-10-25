@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -7,10 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
-import { MUSIC_CATALOG, ROOM_BACKGROUNDS, ROOM_LEVEL_ICONS, ROOM_LEVEL_REWARDS, ROOM_LIMITS, ROOM_TYPES, ROOM_XP_THRESHOLDS, adminCapacity, memberLimit, roomLevel, type Track } from '@/data/catalog';
+import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
-import type { MyRoom } from '@/store';
 import { colors } from '@/theme';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -82,157 +80,6 @@ export function PasswordGate({ title, password, onPass }: { title: string; passw
         <Text style={{ color: colors.textDim }}>Geri dön</Text>
       </Pressable>
     </SafeAreaView>
-  );
-}
-
-// --- Owner settings ------------------------------------------------------------
-export function SettingsModal({
-  visible,
-  onClose,
-  room,
-  update,
-  agencyRoom,
-  botOn,
-  setBot,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  room: MyRoom;
-  update: (p: Partial<MyRoom>) => void;
-  agencyRoom: boolean;
-  botOn: boolean;
-  setBot: (v: boolean) => void;
-}) {
-  const [title, setTitle] = useState(room.title);
-  const [announcement, setAnnouncement] = useState(room.announcement);
-  const [password, setPassword] = useState(room.password);
-  const level = roomLevel(room.xp);
-  const next = ROOM_XP_THRESHOLDS[level];
-  const prev = ROOM_XP_THRESHOLDS[level - 1];
-
-  const save = () => {
-    if (title.trim().length < 3) return showAlert('Oda adı en az 3 karakter olmalı');
-    update({ title: title.trim(), announcement: announcement.trim(), password: password.trim(), locked: !!password.trim() });
-    onClose();
-  };
-
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Oda ayarları" tall>
-      <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.levelCard}>
-          <Text style={styles.levelTitle}>
-            Oda seviyesi Lv.{level} {agencyRoom ? '· Ajans odası' : ''}
-          </Text>
-          <View style={styles.track}>
-            <LinearGradient
-              colors={['#8B5CF6', '#EC4899']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ height: 8, width: next ? `${((room.xp - prev) / (next - prev)) * 100}%` : '100%' }}
-            />
-          </View>
-          <Text style={styles.dim}>{next ? `${room.xp} / ${next} XP · sonraki ödül: ${ROOM_LEVEL_REWARDS[level]}` : `${room.xp} XP · maksimum seviye`}</Text>
-          <Text style={styles.dim}>XP kaynakları: hediye, katılım, mikrofonda konuşma, etkinlik, sohbet. Spam ve sahte işlemler XP üretmez.</Text>
-        </View>
-
-        <Text style={styles.label}>Oda adı</Text>
-        <TextInput value={title} onChangeText={setTitle} style={styles.input} maxLength={30} />
-        <Text style={styles.label}>Duyuru</Text>
-        <TextInput value={announcement} onChangeText={setAnnouncement} style={[styles.input, { minHeight: 60 }]} multiline maxLength={120} />
-
-        <Text style={styles.label}>Arka plan</Text>
-        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-          {ROOM_BACKGROUNDS.map((b) => {
-            const open = level >= b.minLevel;
-            const uri = `https://picsum.photos/seed/${b.seed}/600/400`;
-            return (
-              <Pressable key={b.id} disabled={!open} onPress={() => update({ cover: uri })} style={[styles.chip, room.cover === uri && { borderColor: colors.pink }, !open && { opacity: 0.4 }]}>
-                <Text style={styles.chipText}>
-                  {open ? '' : '🔒 '}
-                  {b.name}
-                  {open ? '' : ` Lv.${b.minLevel}`}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Text style={styles.label}>Gizlilik</Text>
-        <TextInput value={password} onChangeText={setPassword} placeholder="Şifre (boş = herkese açık)" placeholderTextColor={colors.textDim} style={styles.input} maxLength={8} />
-        <Text style={styles.label}>Oda türü</Text>
-        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-          {ROOM_TYPES.map((t) => (
-            <Pressable key={t.id} onPress={() => update({ roomType: t.id, micMode: t.id === 'free' ? 'free' : 'request' })} style={[styles.chip, room.roomType === t.id && { borderColor: colors.pink }]}>
-              <Text style={styles.chipText}>
-                {t.emoji} {t.name}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.dim}>{ROOM_TYPES.find((t) => t.id === room.roomType)?.desc}. Tür değişince mikrofon ve erişim izinleri yeniden değerlendirilir.</Text>
-
-        <Text style={styles.label}>Katılımcı limiti (Lv.{level} sınırı: {memberLimit(level).toLocaleString('tr-TR')})</Text>
-        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-          {[50, 100, 200, 300, 500, 1_200, 2_000, 5_000].filter((n) => n <= memberLimit(level)).map((n) => (
-            <Pressable key={n} onPress={() => update({ limit: n })} style={[styles.chip, room.limit === n && { borderColor: colors.pink }]}>
-              <Text style={styles.chipText}>{n.toLocaleString('tr-TR')} kişi</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Mikrofon kuralı</Text>
-        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-          {(
-            [
-              ['free', 'Herkes oturabilir', 1],
-              ['request', 'İstekle', 1],
-              ['members', 'Sadece takipçiler', 5],
-            ] as const
-          ).map(([mode, label, min]) => (
-            <Pressable key={mode} disabled={level < min} onPress={() => update({ micMode: mode })} style={[styles.chip, room.micMode === mode && { borderColor: colors.pink }, level < min && { opacity: 0.4 }]}>
-              <Text style={styles.chipText}>
-                {level < min ? `🔒 ${label} Lv.${min}` : label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>
-          Oda yöneticileri ({room.adminIds.length}/{adminCapacity(level)})
-        </Text>
-        {room.adminIds.length === 0 ? (
-          <Text style={styles.dim}>Koltuktaki birine dokunup &quot;Yönetici yap&quot; diyebilirsin.</Text>
-        ) : (
-          room.adminIds.map((id) => (
-            <View key={id} style={styles.row}>
-              <Avatar uri={userById(id).avatar} size={32} />
-              <Text style={{ color: '#fff', flex: 1 }}>🛡️ {userById(id).name}</Text>
-              <Pressable onPress={() => update({ adminIds: room.adminIds.filter((x) => x !== id) })}>
-                <Text style={{ color: colors.red, fontWeight: '600' }}>Kaldır</Text>
-              </Pressable>
-            </View>
-          ))
-        )}
-        <Text style={styles.dim}>Yöneticiler susturabilir ve mikrofondan indirebilir; ama oda sahibine müdahale edemez, ajans gelirlerini göremez.</Text>
-
-        <View style={styles.row}>
-          <Text style={{ color: '#fff', flex: 1 }}>🤖 Oda botu (karşılama ve kurallar)</Text>
-          <Switch value={botOn} onValueChange={setBot} />
-        </View>
-
-        <Text style={styles.label}>Seviye tablosu (oda limiti · üye · yönetici)</Text>
-        {ROOM_LEVEL_REWARDS.map((r, i) => (
-          <View key={r} style={[styles.levelRow, i + 1 === level && { borderColor: colors.pink }]}>
-            <Text style={[styles.dim, i < level && { color: '#fff' }, { fontWeight: '800' }]}>
-              {i < level ? '✅' : '🔒'} {ROOM_LEVEL_ICONS[i]} LV{i + 1} · {ROOM_LIMITS[i].rooms.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].members.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].admins}
-            </Text>
-            <Text style={[styles.dim, i < level && { color: '#fff' }]}>{r}</Text>
-          </View>
-        ))}
-        <Text style={styles.dim}>Limitler ve XP eşikleri yönetim panelinden değiştirilebilir; haklar sunucu tarafında uygulanır.</Text>
-        <GradientButton title="Kaydet" icon="checkmark" onPress={save} />
-      </ScrollView>
-    </Sheet>
   );
 }
 
@@ -509,10 +356,6 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
   chipText: { color: '#fff', fontWeight: '600', fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
-  levelRow: { borderWidth: 1, borderColor: 'transparent', borderRadius: 10, padding: 6, gap: 2 },
-  levelCard: { backgroundColor: colors.cardAlt, borderRadius: 14, padding: 12, gap: 6 },
-  levelTitle: { color: '#fff', fontWeight: '800' },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.bg, overflow: 'hidden' },
   musicBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 4, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
   musicTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, marginTop: 4, overflow: 'hidden' },
   smallBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },

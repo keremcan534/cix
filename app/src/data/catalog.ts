@@ -92,7 +92,7 @@ export const ROOM_LEVEL_REWARDS = [
   '5.000 kişilik üye sınırı, 30 yöneticiye kadar, en üst simge, özel tema, hediye ve yönetici alanı',
 ];
 export const memberLimit = (level: number) => ROOM_LIMITS[level - 1].members;
-export const ROOM_LEVEL_ICONS = ['🟫', '🟫', '⬜', '⬜', '🟨', '🟨', '🟧', '🟧', '🟥', '🟪', '🟪', '🔷', '🔷', '💎', '👑'];
+export const ROOM_LEVEL_ICONS = ['🥉', '🥉', '🥈', '🥈', '🥇', '🥇', '🏅', '🏅', '🎖️', '💜', '💜', '💎', '💎', '👑', '🔱'];
 
 export type RoomType = 'free' | 'stage' | 'qa' | 'music' | 'event' | 'private';
 export const ROOM_TYPES: { id: RoomType; name: string; emoji: string; desc: string }[] = [
@@ -114,6 +114,26 @@ export const roomLevel = (xp: number) => {
 export const micCapacity = (agencyRoom: boolean, level: number) =>
   agencyRoom ? AGENCY_MICS : Math.min(15, STANDARD_MICS + (level >= 8 ? 2 : 0) + (level >= 15 ? 3 : 0));
 export const adminCapacity = (level: number) => ROOM_LIMITS[level - 1].admins;
+// Room settings gates (Timo-style "Oda Ayarları").
+export const ROOM_THEMES = [
+  { id: 'chat', name: 'Sohbet', emoji: '💬' },
+  { id: 'pk', name: 'PK', emoji: '🥊' },
+  { id: 'music', name: 'Müzik', emoji: '🎵' },
+  { id: 'game', name: 'Oyun', emoji: '🎮' },
+  { id: 'party', name: 'Parti', emoji: '🎉' },
+  { id: 'friends', name: 'Arkadaşlık', emoji: '💜' },
+] as const;
+export type RoomTheme = (typeof ROOM_THEMES)[number]['id'];
+export const roomThemeInfo = (t: RoomTheme) => ROOM_THEMES.find((x) => x.id === t) ?? ROOM_THEMES[0];
+export const LOCK_MIN_LEVEL = 4; // or any VIP (soyluluk) level
+export const MIC_PERMISSION_MIN_LEVEL = 4;
+export const BOSS_SEAT_MIN_LEVEL = 3;
+/** Boss seat goes to the session's top gifter once they pass this many coins. */
+export const BOSS_SEAT_MIN_COINS = 1_000;
+export const MIC_COUNT_OPTIONS = [5, 8, 10, 12, 15];
+/** Stable public room number shown as "ID". */
+export const roomCode = (id: string) => String(10_000_000 + ([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7)));
+
 export const ROOM_BACKGROUNDS = [
   { id: 'bg1', name: 'Gece', seed: 'night', minLevel: 1 },
   { id: 'bg2', name: 'Neon', seed: 'neon', minLevel: 2 },
@@ -163,6 +183,18 @@ export const fanLevel = (points: number) => {
 export const GAME_MIN_VIP = 2; // admin-configurable
 export const GAME_CATALOG_VISIBLE_BEFORE_VIP = true; // admin setting: show catalog (locked) before VIP 2
 export type Game = { id: string; name: string; emoji: string; provider: string; kind: string; players: string; free: boolean };
+/** Coin game tiles shown in the room menu; all run through the provider flow in /oyunlar (VIP2+). */
+export const COIN_GAME_TILES: { id: string; name: string; emoji: string; colors: [string, string]; badge?: 'HOT' | 'NEW' }[] = [
+  { id: 'g3', name: 'Ludo', emoji: '🎲', colors: ['#F59E0B', '#B45309'], badge: 'HOT' },
+  { id: 'g4', name: 'Çizim Tahmin', emoji: '🎨', colors: ['#06B6D4', '#0E7490'] },
+  { id: 'g6', name: 'Bilgi Turnuvası', emoji: '🏆', colors: ['#8B5CF6', '#5B21B6'], badge: 'NEW' },
+  { id: 'c1', name: 'Roket', emoji: '🚀', colors: ['#1D4ED8', '#7C3AED'] },
+  { id: 'c2', name: 'Meyve Partisi', emoji: '🍓', colors: ['#16A34A', '#DB2777'] },
+  { id: 'c3', name: 'Hazine Sandığı', emoji: '💰', colors: ['#CA8A04', '#7C2D12'] },
+  { id: 'c4', name: 'Penaltı', emoji: '⚽', colors: ['#0EA5E9', '#1E3A8A'] },
+  { id: 'c5', name: 'Balık Avı', emoji: '🦈', colors: ['#0891B2', '#164E63'] },
+];
+
 export const GAMES: Game[] = [
   { id: 'g1', name: 'Kelime Avı', emoji: '🔤', provider: 'Sağlayıcı A', kind: 'Kelime', players: '2–6', free: true },
   { id: 'g2', name: 'Bilgi Yarışması', emoji: '🧠', provider: 'Sağlayıcı A', kind: 'Bilgi', players: '2–10', free: true },

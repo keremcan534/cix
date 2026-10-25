@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FramedAvatar, LevelChips, VerifiedBadge, VipTitle } from '@/components/ui';
-import { cosmeticById } from '@/data/catalog';
+import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
 import { charmLevel, vipTier, wealthLevel } from '@/data/economy';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
@@ -38,7 +38,7 @@ const MENU: { icon: IconName; label: string; onPress?: () => void; agencyOnly?: 
 ];
 
 export default function ProfileScreen() {
-  const { coins, diamonds, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds, agencyId } = useApp();
+  const { coins, diamonds, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds, agencyId, myRoom } = useApp();
   const specialId = cosmeticById(equipped.specialId);
   const tier = vipTier(vipLevel);
 
@@ -92,6 +92,19 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#fff" />
           </LinearGradient>
         </Pressable>
+
+        {myRoom.profileVisible && (
+          <Pressable onPress={() => router.push('/oda/yeni')} style={styles.hostCta} accessibilityLabel="Odam">
+            <Text style={{ fontSize: 22 }}>🎙️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{myRoom.title}</Text>
+              <Text style={{ color: colors.textDim, fontSize: 12 }}>
+                Odam · Lv.{roomLevel(myRoom.xp)} · ID {roomCode('yeni')} · {myRoom.memberIds.length + 1} üye
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+        )}
 
         {!isHost && (
           <Pressable onPress={() => router.push('/yayinci')} style={[styles.hostCta]}>

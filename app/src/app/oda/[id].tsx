@@ -16,7 +16,6 @@ import {
   MusicSheet,
   PasswordGate,
   RequestsModal,
-  SettingsModal,
   type MusicState,
 } from '@/components/room/panels';
 import {
@@ -36,10 +35,13 @@ import {
   type Question,
   type RoomEvent,
 } from '@/components/room/community';
+import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
+import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
-import { MUSIC_CATALOG, adminCapacity, cosmeticById, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
-import { INCOMING_GIFT_POOL, VIP_ENTRY_LEVEL, VIP_INVISIBLE_LEVEL, vipTier } from '@/data/economy';
+import { AGENCIES } from '@/data/agency';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, GAME_MIN_VIP, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { FAMILIES, INCOMING_GIFT_POOL, VIP_ENTRY_LEVEL, VIP_INVISIBLE_LEVEL, vipTier } from '@/data/economy';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -57,13 +59,14 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 const rollDie = () => 1 + Math.floor(Math.random() * 6);
 const msgId = () => String(Date.now() + Math.random());
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
+const clock = () => new Date().toTimeString().slice(0, 5);
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
 
 export default function VoiceRoom() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isOwn = id === 'yeni';
   const app = useApp();
-  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify } = app;
+  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency } = app;
 
   const base = isOwn ? null : roomById(id);
   const hostId = isOwn ? 'me' : base!.hostId;
@@ -73,10 +76,17 @@ export default function VoiceRoom() {
   const password = isOwn ? '' : (base!.password ?? '');
   const level = isOwn ? roomLevel(myRoom.xp) : (base!.level ?? 1);
   const agencyRoom = isOwn ? !!agencyId : !!base!.agency;
-  const capacity = micCapacity(agencyRoom, level);
+  const maxMics = micCapacity(agencyRoom, level);
+  const capacity = isOwn ? Math.min(myRoom.micCount, maxMics) : maxMics;
+  const theme = isOwn ? myRoom.theme : (base!.theme ?? 'chat');
+  const bossOn = isOwn ? myRoom.bossSeat && level >= BOSS_SEAT_MIN_LEVEL : !!base!.bossSeat;
+  const micPermission = isOwn ? myRoom.micPermission : (base!.micPermission ?? 'everyone');
+  const functionsBy = isOwn ? myRoom.manageFunctions : 'admins';
   const adminIds = isOwn ? myRoom.adminIds : (base!.adminIds ?? []);
   const myRole: RoomRole = isOwn ? 'owner' : adminIds.includes('me') ? 'admin' : 'member';
   const roleOf = (uid: string): RoomRole => (uid === hostId ? 'owner' : adminIds.includes(uid) ? 'admin' : 'member');
+  // "Oda işlevlerini yönet": music, polls, goals, events can be limited to the owner.
+  const canFunctions = myRole === 'owner' || (myRole === 'admin' && functionsBy === 'admins');
   const botOn = isOwn ? settings.roomBot : true;
   const invisible = settings.invisibleEntry && vipLevel >= VIP_INVISIBLE_LEVEL;
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
@@ -118,7 +128,8 @@ export default function VoiceRoom() {
   const [listeners, setListeners] = useState(isOwn ? 1 : base!.listeners);
   const [listOpen, setListOpen] = useState(false);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
-  const [panel, setPanel] = useState<null | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'sound' | 'mod' | 'invite' | 'results'>(null);
+  const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'sound' | 'mod' | 'invite' | 'results'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -134,7 +145,17 @@ export default function VoiceRoom() {
   const [giftResults, setGiftResults] = useState<{ userId: string; ok: boolean }[]>([]);
   const [musicRequests, setMusicRequests] = useState<{ track: Track; by: string }[]>([]);
   const [pk, setPk] = useState<Pk | null>(null);
-  const [contrib, setContrib] = useState<Record<string, number>>({});
+  // Boss-seat rooms start with an existing top gifter so the seat can be competed for.
+  const [contrib, setContrib] = useState<Record<string, number>>(() => {
+    if (isOwn || !base!.bossSeat) return {};
+    const rival = USERS.find((u) => u.id !== hostId && !base!.seatUserIds.includes(u.id));
+    return rival ? { [rival.id]: 1_250 } : {};
+  });
+  const [bossRemoved, setBossRemoved] = useState<Set<string>>(new Set());
+  const [membership, setMembership] = useState<'owner' | 'none' | 'pending' | 'member'>(isOwn ? 'owner' : 'none');
+  const [memberApps, setMemberApps] = useState<string[]>(() => (isOwn ? ['u2', 'u9', 'u11'] : []));
+  const [minutes, setMinutes] = useState(0);
+  const [giftLog, setGiftLog] = useState<GiftLogRow[]>([]);
   const [requests, setRequests] = useState<string[]>([]);
   const [envelope, setEnvelope] = useState<{ from: string; amount: number; count: number; seconds: number } | null>(null);
   const [dicePlays, setDicePlays] = useState(DAILY_DICE);
@@ -146,18 +167,23 @@ export default function VoiceRoom() {
   const xpRef = useRef(myRoom.xp);
 
   const allSeats = pad(seats, capacity);
+  const ranking = Object.entries(contrib).sort((a, b) => b[1] - a[1]);
+  const topGifter = ranking.find(([uid]) => !bossRemoved.has(uid) && !kicked.has(uid));
+  const bossId = bossOn && topGifter && topGifter[1] >= BOSS_SEAT_MIN_COINS ? topGifter[0] : null;
   const mySeat = allSeats.indexOf('me');
-  const amSeated = mySeat >= 0;
+  const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
-  const seatedKey = seatedOthers.join(',');
+  const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   const audience = USERS.filter((u) => !allSeats.includes(u.id) && !kicked.has(u.id) && !blocked.has(u.id));
-  const canControlMusic = myRole !== 'member';
+  const canControlMusic = canFunctions;
 
   const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
   const addMsg = (msg: Omit<ChatMsg, 'id'>) => setMessages((m) => [...m.slice(-80), { ...msg, text: msg.userId ? mask(msg.text) : msg.text, id: msgId() }]);
   const logMod = (action: string, target: string, reason = '') =>
     setModLog((l) => [{ id: msgId(), time: new Date().toTimeString().slice(0, 5), actor: myRole === 'owner' ? 'Sahip (sen)' : 'Yönetici (sen)', action, target, reason }, ...l]);
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
+  const logGift = (from: string, to: string, gift: Gift, count: number) =>
+    setGiftLog((l) => [{ id: msgId(), from, to, emoji: gift.emoji, name: gift.name, count, coins: gift.price * count, time: clock() }, ...l].slice(0, 100));
 
   // Room XP for the user's own room. Level-ups are announced once per level.
   const gainXp = (n: number) => {
@@ -175,6 +201,20 @@ export default function VoiceRoom() {
     return () => clearTimeout(t);
   }, [entry]);
 
+  // Announce a new boss once per change (deferred so it isn't a synchronous effect update).
+  const lastBoss = useRef<string | null>(null);
+  useEffect(() => {
+    if (bossId === lastBoss.current) return;
+    lastBoss.current = bossId;
+    if (!bossId) return;
+    const t = setTimeout(() => {
+      addMsg({ system: true, text: `👑 ${bossId === 'me' ? ME.name : userById(bossId).name} patron koltuğuna oturdu!` });
+      if (bossId === 'me') setMicOn(true);
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bossId]);
+
   // Recent rooms (personalized discovery) and fan-club points for joining.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -189,6 +229,7 @@ export default function VoiceRoom() {
   useEffect(() => {
     const t = setInterval(() => {
       bump('roomMinutes');
+      setMinutes((m) => m + 1);
       gainXp(10);
       if (!isOwn) addFanPoints(hostId, 2, 'Odada 1 dk aktif kaldın');
     }, 60_000);
@@ -233,6 +274,7 @@ export default function VoiceRoom() {
       } else if (r < 0.35 && !isOwn) {
         const g = pick(GIFTS.slice(0, 5));
         addContrib(u.id, g.price);
+        logGift(u.id, hostId, g, 1);
         addMsg({ system: true, text: `🎁 ${u.name}, ${userById(hostId).name} kişisine ${g.emoji} ${g.name} gönderdi` });
       } else {
         addMsg({ userId: u.id, text: pick(BOT_LINES) });
@@ -254,6 +296,7 @@ export default function VoiceRoom() {
       if (ownerBonus > 0) receiveDiamonds(ownerBonus, 'Oda sahibi bonusu', from.id);
       gainXp(gift.price);
       addContrib(from.id, gift.price);
+      logGift(from.id, 'me', gift, 1);
       if (gift.price >= 50 && showFx(gift.price)) setGiftFx(gift);
       addMsg({ system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)` });
       setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + gift.price } : p));
@@ -409,6 +452,46 @@ export default function VoiceRoom() {
     addMsg({ system: true, text: `${ME.name} ${index + 1}. koltuğa geçti` });
   };
 
+  const joinRoom = () => {
+    if (membership !== 'none') return;
+    setMembership('pending');
+    addMsg({ system: true, text: '📝 Oda üyeliği başvurun gönderildi' });
+    setTimeout(() => {
+      setMembership('member');
+      addMsg({ system: true, text: `✅ ${title} odasının üyesi oldun` });
+      notify({ kind: 'social', icon: '🏠', title: 'Oda üyeliğin onaylandı', body: title, href: `/oda/${id}` });
+    }, 2000);
+  };
+
+  const onBossPress = () => {
+    const mine = contrib.me ?? 0;
+    const top = topGifter?.[1] ?? 0;
+    if (bossId && bossId !== 'me') {
+      const u = userById(bossId);
+      const options: SheetOption[] = [
+        { label: '👤 Profili gör', onPress: () => router.push(`/kullanici/${bossId}`) },
+        { label: '🎁 Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
+        { label: `ℹ️ Patron ol: 🪙 ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} daha gönder`, onPress: () => showAlert('👑 Patron Koltuğu', bossSeatInfo(bossId, mine, top)) },
+      ];
+      if (myRole === 'owner')
+        options.push({
+          label: '⬇️ Patron koltuğundan indir',
+          destructive: true,
+          onPress: () => {
+            setBossRemoved((s) => new Set(s).add(bossId));
+            addMsg({ system: true, text: `${u.name} patron koltuğundan indirildi` });
+            logMod('Patron koltuğundan indirdi', u.name);
+          },
+        });
+      setSheet({ title: `👑 Patron · ${u.name} · 🪙 ${top.toLocaleString('tr-TR')}`, options });
+      return;
+    }
+    showAlert('👑 Patron Koltuğu', bossSeatInfo(bossId, mine, top), bossId === 'me' ? undefined : [
+      { text: 'Kapat', style: 'cancel' },
+      { text: 'Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
+    ]);
+  };
+
   const freeMic = roomType === 'free';
   const onSeatPress = (index: number) => {
     const uid = allSeats[index];
@@ -472,6 +555,17 @@ export default function VoiceRoom() {
                 },
               },
               {
+                label: '⛔ Kara listeye ekle (kalıcı)',
+                destructive: true,
+                onPress: () => {
+                  removeFromSeat(uid);
+                  setKicked((k) => new Set(k).add(uid));
+                  updateMyRoom({ blacklist: [...new Set([...myRoom.blacklist, uid])], memberIds: myRoom.memberIds.filter((x) => x !== uid) });
+                  addMsg({ system: true, text: `${u.name} oda kara listesine eklendi` });
+                  logMod('Kara listeye ekledi', u.name, 'kalıcı');
+                },
+              },
+              {
                 label: '🚫 Odadan çıkar (10 dk giriş yasağı)',
                 destructive: true,
                 onPress: () => {
@@ -509,6 +603,13 @@ export default function VoiceRoom() {
       });
       return;
     }
+    if (myRole === 'member' && micPermission === 'members' && membership !== 'member') {
+      showAlert('Mikrofon yalnızca oda üyelerine açık', 'Bu odada mikrofon almak için önce oda üyesi olmalısın.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Oda üyesi ol', onPress: joinRoom },
+      ]);
+      return;
+    }
     if (amSeated || myRole !== 'member') return sitMe(index);
     if (freeMic) return sitMe(index);
     // Stage-style rooms: join the speaker queue and see my position.
@@ -540,6 +641,7 @@ export default function VoiceRoom() {
       return;
     }
     const total = each * delivered.length;
+    delivered.forEach((r) => logGift('me', r.userId, gift, count));
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
@@ -624,35 +726,86 @@ export default function VoiceRoom() {
     },
   };
 
-  const moreMenu = () =>
-    setSheet({
-      title,
-      options: [
-        { label: '🎵 Müzik', onPress: () => setPanel('music') },
-        ...(myRole !== 'member' ? [{ label: '📊 Anket başlat', onPress: () => setPanel('poll') }, { label: '🎯 Topluluk hedefi', onPress: () => setPanel('goal') }] : []),
-        { label: '📅 Etkinlikler', onPress: () => setPanel('events') },
-        ...(roomType === 'qa' ? [{ label: '❓ Sorular', onPress: () => setPanel('qa') }] : []),
-        { label: '🔊 Ses ve efekt ayarları', onPress: () => setPanel('sound') },
-        ...(myRole !== 'member' ? [{ label: '🛡️ Moderasyon', onPress: () => setPanel('mod') }] : []),
-        { label: '📨 Arkadaş davet et', onPress: () => setPanel('invite') },
-        ...(myQueuePos !== null ? [{ label: '🚶 Konuşmacı kuyruğundan çık', onPress: () => setMyQueuePos(null) }] : []),
-        { label: '🎲 Zar Düellosu', onPress: () => setPanel('dice') },
-        { label: '🧧 Zarf dağıt', onPress: () => setPanel('envelope') },
-        { label: '🎰 Şans çarkı', onPress: () => router.push('/cark') },
-        ...(isOwn && !pk ? [{ label: '⚔️ PK daveti gönder', onPress: startPk }] : []),
-        ...(isOwn ? [{ label: '⚙️ Oda ayarları', onPress: () => setPanel('settings') }] : []),
-        { label: '👥 Dinleyiciler', onPress: () => setListOpen(true) },
-        { label: '🏆 Katkı sıralaması', onPress: () => setPanel('contrib') },
-        { label: '🔗 Odayı paylaş', onPress: () => Share.share({ message: `Vibe Club'da "${title}" odasına gel! 🎙️ vibeclub://oda/${id}` }).catch(() => {}) },
-        {
-          label: '🚩 Odayı şikâyet et',
-          onPress: () => {
-            const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);
-            showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
-          },
-        },
+  const shareRoom = () => Share.share({ message: `Vibe Club'da "${title}" odasına gel! 🎙️ vibeclub://oda/${id}` }).catch(() => {});
+
+  const report = () => {
+    const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);
+    showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
+  };
+  const toGames = () => router.push('/oyunlar');
+  const menuSections: MenuSection[] = [
+    {
+      title: 'Etkileşimli Oyunlar',
+      variant: 'round',
+      items: [
+        ...(isOwn && !pk ? [{ key: 'pk', label: 'PK Modu', emoji: '⚔️', colors: ['#EC4899', '#7C3AED'] as [string, string], onPress: startPk }] : []),
+        { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
+        { key: 'dice', label: 'Zar Düellosu', emoji: '🎲', colors: ['#2563EB', '#7C3AED'], onPress: () => setPanel('dice') },
+        { key: 'wheel', label: 'Şans çarkı', emoji: '🎡', colors: ['#F59E0B', '#DB2777'], onPress: () => router.push('/cark') },
+        { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#6366F1', '#A78BFA'], onPress: () => router.push('/gorevler') },
+        { key: 'events', label: 'Aktivite', emoji: '🎉', colors: ['#8B5CF6', '#EC4899'], onPress: () => setPanel('events') },
+        ...(canFunctions
+          ? [
+              { key: 'poll', label: 'Anket', emoji: '📊', colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
+              { key: 'goal', label: 'Topluluk hedefi', emoji: '🎯', colors: ['#16A34A', '#0D9488'] as [string, string], onPress: () => setPanel('goal') },
+            ]
+          : []),
+        ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
+        { key: 'music', label: 'Müzik', emoji: '🎵', colors: ['#DB2777', '#9333EA'], onPress: () => setPanel('music') },
       ],
-    });
+    },
+    {
+      title: 'Jetonlu Oyunlar',
+      variant: 'tile',
+      note: vipLevel >= GAME_MIN_VIP ? 'Sonuçlar oyun sağlayıcısı tarafından doğrulanır · jeton harcaması günlük limitine dahildir' : `VIP ${GAME_MIN_VIP} ile açılır · katalog önizleme`,
+      items: COIN_GAME_TILES.map((g) => ({ key: g.id, label: g.name, emoji: g.emoji, colors: g.colors, badge: g.badge, onPress: toGames })),
+    },
+    {
+      title: 'Oda Araçları',
+      variant: 'tool',
+      items: [
+        { key: 'card', label: 'Oda kartı', icon: 'home-outline', onPress: () => setPanel('info') },
+        ...(isOwn ? [{ key: 'settings', label: 'Oda ayarları', icon: 'settings-outline' as const, onPress: () => setPanel('settings') }] : []),
+        ...(myRole !== 'member' ? [{ key: 'mod', label: 'Moderasyon', icon: 'shield-checkmark-outline' as const, onPress: () => setPanel('mod') }] : []),
+        { key: 'invite', label: 'Arkadaş davet et', icon: 'person-add-outline', onPress: () => setPanel('invite') },
+        { key: 'listeners', label: 'Dinleyiciler', icon: 'people-outline', onPress: () => setListOpen(true) },
+        { key: 'contrib', label: 'Katkı sıralaması', icon: 'trophy-outline', onPress: () => setPanel('contrib') },
+        ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: () => setMyQueuePos(null) }] : []),
+        { key: 'report', label: 'Odayı şikâyet et', icon: 'flag-outline', onPress: report },
+      ],
+    },
+    {
+      title: 'Oda Ayarları',
+      variant: 'tool',
+      items: [
+        { key: 'share', label: 'Paylaş', icon: 'arrow-redo-outline', onPress: shareRoom },
+        { key: 'fx', label: 'Efektler', icon: 'sparkles-outline', badge: settings.effectsOff ? 'off' : 'on', onPress: () => setSetting('effectsOff', !settings.effectsOff) },
+        { key: 'decor', label: 'Süsler', icon: 'shirt-outline', onPress: () => router.push('/magaza') },
+        { key: 'sound', label: 'Ses', icon: 'volume-high-outline', badge: settings.roomMuted ? 'off' : undefined, onPress: () => setPanel('sound') },
+        { key: 'denoise', label: 'Mikrofon denoise', icon: 'mic-circle-outline', badge: settings.micDenoise ? 'on' : 'off', onPress: () => setSetting('micDenoise', !settings.micDenoise) },
+        { key: 'msg', label: 'Mesaj Ayarları', icon: 'chatbox-ellipses-outline', onPress: () => setPanel('msgSettings') },
+      ],
+    },
+  ];
+
+  // Room card data (members, clan).
+  const roomMembers = isOwn ? ['me', ...myRoom.memberIds] : [...(membership === 'member' ? ['me'] : []), ...USERS.filter((u) => !kicked.has(u.id) && !blocked.has(u.id)).slice(0, 10).map((u) => u.id)];
+  const memberTotal = isOwn ? roomMembers.length : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+  const ownFamily = FAMILIES.find((f) => f.id === familyId);
+  const ownAgencyName = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
+  const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
+  const clan = isOwn
+    ? familyId
+      ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : '🏰 Ailem', href: '/aile' as const }
+      : ownAgencyName
+        ? { label: `🏢 ${ownAgencyName}`, href: '/ajans' as const }
+        : null
+    : base!.agency
+      ? { label: '🏢 Ajans odası', href: '/ajans' as const }
+      : level >= 5
+        ? { label: `${otherFamily.emoji} ${otherFamily.name}`, href: '/aile' as const }
+        : null;
+  const top3 = ranking.slice(0, 3).map(([uid]) => uid);
 
   if (!unlocked) return <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} />;
 
@@ -665,9 +818,11 @@ export default function VoiceRoom() {
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
-            <Avatar uri={userById(hostId).avatar} size={36} />
+            <Pressable onPress={() => setPanel('info')} accessibilityLabel="Oda kartı" hitSlop={4}>
+              <Avatar uri={userById(hostId).avatar} size={36} />
+            </Pressable>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Pressable onPress={() => setPanel('info')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Text style={styles.title} numberOfLines={1}>
                   {password ? '🔒 ' : ''}
                   {title}
@@ -675,7 +830,7 @@ export default function VoiceRoom() {
                 <View style={styles.levelBadge}>
                   <Text style={styles.levelText}>Lv.{level}</Text>
                 </View>
-              </View>
+              </Pressable>
               <Pressable onPress={() => setListOpen(true)}>
                 <Text style={styles.sub} numberOfLines={1}>
                   {typeInfo.emoji} {typeInfo.name} · 👥 {listeners} · 🎙️ {capacity}
@@ -693,6 +848,15 @@ export default function VoiceRoom() {
                     <Text style={styles.reqBadgeText}>{requests.length}</Text>
                   </View>
                 )}
+              </Pressable>
+            )}
+            {top3.length > 0 && (
+              <Pressable onPress={() => setPanel('contrib')} style={{ flexDirection: 'row' }} accessibilityLabel="İlk 3 katkı">
+                {top3.map((uid, i) => (
+                  <View key={uid} style={[styles.topAvatar, { marginLeft: i ? -8 : 0, borderColor: ['#FBBF24', '#CBD5E1', '#F59E0B'][i] }]}>
+                    <Avatar uri={userById(uid).avatar} size={24} />
+                  </View>
+                ))}
               </Pressable>
             )}
             <Pressable onPress={() => setPanel('contrib')} accessibilityLabel="Katkı sıralaması" hitSlop={6}>
@@ -735,7 +899,25 @@ export default function VoiceRoom() {
           {goal && <GoalCard goal={goal} />}
 
           <View style={styles.seatGrid}>
-            {allSeats.map((uid, i) => (
+            {bossOn && (
+              <View style={styles.topRow}>
+                <Seat
+                  index={0}
+                  userId={allSeats[0]}
+                  host
+                  small={small}
+                  vipLevel={allSeats[0] === 'me' ? vipLevel : 0}
+                  frameId={allSeats[0] === 'me' ? equipped.frame : undefined}
+                  speaking={!!allSeats[0] && speaking.has(allSeats[0])}
+                  muted={allSeats[0] === 'me' ? !micOn : !!allSeats[0] && mutedUsers.has(allSeats[0])}
+                  role="owner"
+                  compact
+                  onPress={() => onSeatPress(0)}
+                />
+                <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+              </View>
+            )}
+            {allSeats.map((uid, i) => bossOn && i === 0 ? null : (
               <Seat
                 key={i}
                 index={i}
@@ -755,7 +937,9 @@ export default function VoiceRoom() {
 
           <FlatList
             style={{ flex: 1, marginHorizontal: 12 }}
-            data={[...messages].reverse()}
+            data={[...messages]
+              .filter((m) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('odaya katıldı'))) && (msgFilter.gifts || !(m.system && m.text.startsWith('🎁'))))
+              .reverse()}
             inverted
             keyExtractor={(m) => m.id}
             renderItem={({ item }) => <ChatLine msg={item} bubbleId={equipped.bubble} />}
@@ -778,7 +962,7 @@ export default function VoiceRoom() {
             />
             {amSeated && <RoundBtn label="Mikrofon" icon={micOn ? 'mic' : 'mic-off'} active={micOn} onPress={() => setMicOn((m) => !m)} />}
             {roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
-            <RoundBtn label="Menü" icon="grid" onPress={moreMenu} />
+            <RoundBtn label="Menü" icon="grid" onPress={() => setPanel('menu')} />
             <RoundBtn
               label="Hediye"
               icon="gift"
@@ -813,14 +997,59 @@ export default function VoiceRoom() {
         total={listeners}
         invisibleMe={invisible}
       />
+      <RoomInfoSheet
+        key={panel === 'info' ? 'info-open' : 'info-closed'}
+        visible={panel === 'info'}
+        onClose={() => setPanel(null)}
+        roomId={id}
+        title={title}
+        cover={cover}
+        theme={theme}
+        level={level}
+        xp={isOwn ? myRoom.xp : null}
+        owner={isOwn}
+        clan={clan}
+        members={roomMembers}
+        memberTotal={memberTotal}
+        applications={memberApps}
+        canManageMembers={isOwn}
+        autoRemoveDays={isOwn ? myRoom.autoRemoveDays : 0}
+        membership={membership}
+        onJoin={joinRoom}
+        onApprove={(uid) => {
+          if (roomMembers.length >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
+          setMemberApps((l) => l.filter((x) => x !== uid));
+          updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
+          addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });
+        }}
+        onReject={(uid) => setMemberApps((l) => l.filter((x) => x !== uid))}
+        onRemoveMember={(uid) => {
+          updateMyRoom({ memberIds: myRoom.memberIds.filter((x) => x !== uid) });
+          logMod('Oda üyeliğinden çıkardı', userById(uid).name);
+        }}
+        stats={{ coins: Object.entries(contrib).reduce((sum, [uid, v]) => (uid === 'me' && isOwn ? sum : sum + v), 0), peak: listeners, minutes }}
+        giftLog={giftLog}
+        announcement={announcement ?? ''}
+        onSave={(p) => updateMyRoom(p)}
+        onSettings={() => setPanel('settings')}
+        onShare={shareRoom}
+        onInvite={() => setPanel('invite')}
+      />
       {isOwn && (
-        <SettingsModal
-          key={panel === 'settings' ? 'settings-open' : 'settings-closed'}
+        <RoomSettingsScreen
           visible={panel === 'settings'}
           onClose={() => setPanel(null)}
           room={myRoom}
-          update={updateMyRoom}
-          agencyRoom={agencyRoom}
+          update={(p) => {
+            updateMyRoom(p);
+            const keys = Object.keys(p).filter((k) => k !== 'password');
+            if (keys.length) logMod('Oda ayarını değiştirdi', keys.join(', '));
+          }}
+          level={level}
+          vipLevel={vipLevel}
+          maxMics={maxMics}
+          modLog={modLog}
+          bans={bans}
           botOn={settings.roomBot}
           setBot={(v) => setSetting('roomBot', v)}
         />
@@ -940,6 +1169,17 @@ export default function VoiceRoom() {
           }, 2500);
         }}
       />
+      <RoomMenuSheet visible={panel === 'menu'} onClose={() => setPanel(null)} sections={menuSections} />
+      <ActionSheet
+        visible={panel === 'msgSettings'}
+        title="Mesaj ayarları (sadece senin ekranın)"
+        onClose={() => setPanel(null)}
+        options={[
+          { label: `${msgFilter.joins ? '✅' : '⬜'} Giriş mesajlarını göster`, onPress: () => setMsgFilter((f) => ({ ...f, joins: !f.joins })) },
+          { label: `${msgFilter.gifts ? '✅' : '⬜'} Hediye mesajlarını göster`, onPress: () => setMsgFilter((f) => ({ ...f, gifts: !f.gifts })) },
+          { label: `${msgFilter.bot ? '✅' : '⬜'} Bot mesajlarını göster`, onPress: () => setMsgFilter((f) => ({ ...f, bot: !f.bot })) },
+        ]}
+      />
       <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
       {entry && <EntryBanner text={entry.text} color={entry.color} />}
@@ -955,6 +1195,8 @@ const styles = StyleSheet.create({
   levelText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
+  topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   mutedChip: { color: colors.gold, fontSize: 11, textAlign: 'center', marginTop: 4 },

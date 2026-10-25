@@ -1,4 +1,4 @@
-import type { RoomType } from '@/data/catalog';
+import type { RoomTheme, RoomType } from '@/data/catalog';
 
 export type User = {
   id: string;
@@ -33,6 +33,9 @@ export type Room = {
   announcement?: string;
   track?: string; // music track id currently playing
   roomType?: RoomType;
+  theme?: RoomTheme;
+  bossSeat?: boolean;
+  micPermission?: 'everyone' | 'members';
 };
 
 export type Moment = {
@@ -99,12 +102,12 @@ export const userById = (id: string): User =>
 
 export const ROOMS: Room[] = [
   { id: 'r1', title: 'Gece Sohbeti 🌙', category: 'Sohbet', cover: photo('night'), hostId: 'u1', listeners: 248, seatUserIds: ['u1', 'u2', 'u5', null, 'u7', null, 'u9', null, null], tags: ['Sohbet', 'Gece'], level: 6, roomType: 'free', announcement: 'Gece sohbetine hoş geldin, saygı her şeyden önce 🌙' },
-  { id: 'r2', title: 'Karaoke Akşamı 🎤', category: 'Müzik', cover: photo('karaoke'), hostId: 'u11', listeners: 512, seatUserIds: ['u11', 'u4', null, 'u1', null, null, 'u8', null, null], tags: ['Karaoke', 'Pop'], level: 11, agency: true, track: 'm4', roomType: 'music', announcement: 'Star Ajans karaoke gecesi · sıraya girmek için koltuk iste 🎤' },
+  { id: 'r2', title: 'Karaoke Akşamı 🎤', category: 'Müzik', cover: photo('karaoke'), hostId: 'u11', listeners: 512, seatUserIds: ['u11', 'u4', null, 'u1', null, null, 'u8', null, null], tags: ['Karaoke', 'Pop'], level: 11, agency: true, track: 'm4', roomType: 'music', theme: 'music', bossSeat: true, announcement: 'Star Ajans karaoke gecesi · sıraya girmek için koltuk iste 🎤' },
   { id: 'r3', title: 'Kim Milyoner? Quiz', category: 'Oyun', cover: photo('quiz'), hostId: 'u2', listeners: 133, seatUserIds: ['u2', 'u6', 'u10', 'u12', null, null, null, null, null], tags: ['Oyun', 'Bilgi'], level: 4, roomType: 'qa', announcement: 'Bilgi yarışması · soruları ❓ ile gönder' },
-  { id: 'r4', title: 'Yeni Arkadaşlar 💜', category: 'Arkadaşlık', cover: photo('friends'), hostId: 'u7', listeners: 389, seatUserIds: ['u7', 'u5', 'u9', null, null, 'u3', null, null, null], tags: ['Tanışma'], level: 8, adminIds: ['me'], roomType: 'stage', announcement: 'Sen bu odanın yöneticisisin 🛡️' },
+  { id: 'r4', title: 'Yeni Arkadaşlar 💜', category: 'Arkadaşlık', cover: photo('friends'), hostId: 'u7', listeners: 389, seatUserIds: ['u7', 'u5', 'u9', null, null, 'u3', null, null, null], tags: ['Tanışma'], level: 8, adminIds: ['me'], roomType: 'stage', theme: 'friends', bossSeat: true, announcement: 'Sen bu odanın yöneticisisin 🛡️' },
   { id: 'r5', title: 'Lo-fi & Ders Çalışma', category: 'Müzik', cover: photo('lofi'), hostId: 'u9', listeners: 76, seatUserIds: ['u9', null, null, null, null, null, null, null, null], tags: ['Lo-fi', 'Sessiz'], level: 3, track: 'm3', roomType: 'music' },
   { id: 'r6', title: 'Futbol Muhabbeti ⚽', category: 'Sohbet', cover: photo('football'), hostId: 'u6', listeners: 201, seatUserIds: ['u6', 'u2', 'u10', null, 'u12', null, null, null, null], tags: ['Spor'], level: 5, password: '1234', roomType: 'private', announcement: 'Özel oda · şifre: 1234 (demo)' },
-  { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
+  { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', theme: 'pk', bossSeat: true, micPermission: 'members', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
 ];
 
 export const roomById = (id: string) => ROOMS.find((r) => r.id === id) ?? ROOMS[0];

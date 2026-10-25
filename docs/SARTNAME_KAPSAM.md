@@ -93,6 +93,10 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | İtiraz kategorileri: moderasyon kararı, hesap kısıtlaması, ajans transferi, oyun sonucu | ✅ Destek |
 | İşlem geçmişi referans numarası, günlük özet | ✅ Cüzdan |
 | Merkezi kazanç & bonus yönetim paneli (USD kuru, ajans %, oda sahibi %, aile oranları, arama bonusları, üst sınır, min. çekim, davet birimi, örnek hesaplayıcı, sürüm geçmişi) | ✅ Profil > Kazanç & bonus yönetimi (demo, kaydedilmez) |
+| Oda kartı (başlığa dokun): kapak seç, ad düzenle, tema, oda ID, seviye kartı, kabile (aile/ajans), oda üyeleri (sayı/limit, başvuru rozeti), Oda Sahibi Merkezi (%20 pay, trafik paneli, bu oturumun hediye/zirve/süre istatistikleri), oda süslemesi, hediye kaydı, bülten, Paylaş / Davet et | ✅ Timo ekran görüntülerine göre |
+| Tam ekran "Oda Ayarları": oda tipi, tema, kilit (Lv4 veya VIP), oda günlüğü, yayına katılma modu (mikrofon sayısı), mikrofon kontrolü, mikrofon izni (Lv4, oda üyeleri), patron koltuğu (Lv3), üyelik başvurusu (gerekmiyor/başvuru/kapalı), üyeleri/işlevleri kim yönetir, otomatik eleme (7/14/30 gün, her gün 00:00 UTC+3), kara liste, profilde oda görünürlüğü, video gizlilik koruması | ✅ |
+| Patron koltuğu: oturumun en çok hediye gönderen kişisi (en az 1.000 jeton) oturur, geçilince el değiştirir, sahip indirebilir | ✅ (`Yeni Arkadaşlar`, `Karaoke Akşamı` odalarında açık) |
+| Oda menüsü ızgara panel: Etkileşimli Oyunlar, Jetonlu Oyunlar (VIP2, sağlayıcı akışı), Oda Araçları, Oda Ayarları (Paylaş, Efektler, Süsler, Ses, mikrofon gürültü giderme, Mesaj ayarları) | ✅ |
 
 ## Prototip dışı (backend / yönetim paneli gerektirir) ⛔
 

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   EXCHANGE_FEE,
@@ -39,6 +39,7 @@ export type Settings = {
   voiceVolume: number;
   giftSounds: boolean;
   bigGiftsOnly: boolean;
+  micDenoise: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
   bigSpendConfirm: number; // coins; extra confirmation above this
@@ -48,7 +49,10 @@ export type InviteReward = { id: string; inviteeId: string; ref: string; status:
 export type Session = { id: string; device: string; place: string; last: string; current?: boolean };
 export type FanClub = { points: number; history: { text: string; pts: number; time: string }[] };
 export type GroupMsg = { id: string; userId: string; text: string; time: string };
-export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members'; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[] };
+export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members'; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
+  theme: RoomTheme; micCount: number; micPermission: 'everyone' | 'members'; bossSeat: boolean;
+  joinMode: 'open' | 'apply' | 'closed'; manageMembers: 'owner' | 'admins'; manageFunctions: 'owner' | 'admins';
+  autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[] };
 export type OwnedAgency = { name: string; code: string; status: 'İnceleniyor' | 'Onaylandı' };
 export type TransferStep = { label: string; status: 'Bekliyor' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı'; time?: string; note?: string };
 export type TransferRequest = {
@@ -264,7 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     musicVolume: 0.7,
     voiceVolume: 1,
     giftSounds: true,
-    bigGiftsOnly: false,
+    bigGiftsOnly: false, micDenoise: true,
     invitesFrom: 'everyone',
     dailySpendLimit: 0,
     bigSpendConfirm: 1_000,
@@ -288,13 +292,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     password: '',
     locked: false,
     limit: 50,
-    xp: 0,
+    xp: 600, // starts at Lv.4 so lock / mic permission / boss seat can be tried in the demo
     adminIds: [],
     micMode: 'request',
     roomType: 'stage',
     giftEffects: true,
     joinSounds: true,
     lockedSeats: [],
+    theme: 'chat',
+    micCount: 10,
+    micPermission: 'everyone',
+    bossSeat: true,
+    joinMode: 'apply',
+    manageMembers: 'admins',
+    manageFunctions: 'admins',
+    autoRemoveDays: 14,
+    profileVisible: true,
+    videoPrivacy: true,
+    memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
+    blacklist: ['u6'],
   });
 
   const [vipLevel, setVipLevel] = useState(0);

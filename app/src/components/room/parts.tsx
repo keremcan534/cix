@@ -25,6 +25,7 @@ export function Seat({
   muted,
   role,
   locked,
+  compact,
   onPress,
 }: {
   index: number;
@@ -37,6 +38,8 @@ export function Seat({
   muted: boolean;
   role?: RoomRole;
   locked?: boolean;
+  /** Host seat sharing the top row (e.g. with the boss seat). */
+  compact?: boolean;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -55,7 +58,7 @@ export function Seat({
   const size = host ? 70 : small ? 48 : 56;
 
   return (
-    <Pressable onPress={onPress} style={[styles.seat, host ? styles.hostSeat : { width: '20%' }]}>
+    <Pressable onPress={onPress} style={[styles.seat, host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}>
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
         {speaking && (
           <Animated.View
