@@ -87,7 +87,7 @@ export default function IncomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
-        <LinearGradient colors={['#A855F7', '#6366F1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
+        <LinearGradient colors={['#262C4D', '#181C33']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Pressable onPress={info} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={styles.balanceLabel}>Mevcut Elmaslar {usd(diamonds)}</Text>
             <Ionicons name="help-circle-outline" size={18} color="rgba(255,255,255,0.9)" />
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', flex: 1 },
   headIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  balance: { borderRadius: 24, padding: 20 },
+  balance: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.border },
   balanceLabel: { color: 'rgba(255,255,255,0.92)', fontSize: 15 },
   balanceN: { color: '#fff', fontSize: 40, fontWeight: '900', marginTop: 4 },
   outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', borderRadius: 999, paddingVertical: 11, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },

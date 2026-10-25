@@ -32,7 +32,7 @@ import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 const CREATE_COST = 500;
 type Role = 'owner' | 'helper' | 'member';
@@ -483,7 +483,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                         <Avatar uri={u.avatar} size={34} />
                         <Text style={{ color: '#fff', flex: 1 }}>{u.name}</Text>
                         <Pressable
-                          style={[styles.small, { backgroundColor: colors.green }]}
+                          style={[styles.small, { backgroundColor: semantic.successFill }]}
                           onPress={() => {
                             if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `LV${lvl} kabile en fazla ${familyCapacity(lvl)} üye alabilir.`);
                             setPending((p) => p.filter((x) => x !== id));
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   rank: { color: colors.textDim, fontWeight: '800', width: 18 },
-  join: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  join: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
   input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: '#fff', fontSize: 16, paddingHorizontal: 16, paddingVertical: 12 },
   bar: { width: '100%', height: 8, backgroundColor: colors.cardAlt, borderRadius: 4, overflow: 'hidden', marginTop: 6 },
   barFill: { height: 8, backgroundColor: colors.gold },
@@ -888,7 +888,7 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBtn: { alignItems: 'center', paddingBottom: 8, minWidth: 50 },
   tabText: { color: colors.textDim, fontSize: 16, fontWeight: '700' },
-  tabLine: { width: 22, height: 4, borderRadius: 2, backgroundColor: colors.pink, marginTop: 4 },
+  tabLine: { width: 22, height: 4, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4 },
   chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 66 },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10 },
   roleBadge: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: '#EA580C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },

@@ -319,7 +319,7 @@ function CoinsBankCard({ ag, ctx, isOwner, can, r }: { ag: AgencyAccount; ctx: C
           <Stat label="Toplam hak ediş" value={dia(n.total)} sub={usd(n.total)} />
           <Stat label="Bekleyen" value={dia(n.pending)} sub={`${RULES.pendingDays} gün iade süresi`} />
           <Stat label="Kesinleşmiş" value={dia(n.settled)} />
-          <Stat label="Çekilebilir" value={ag.payoutEnabled ? dia(n.withdrawable) : '🔒 Kapalı'} sub={ag.payoutEnabled ? usd(n.withdrawable) : 'Ödeme yetkisi kapalı'} color={ag.payoutEnabled ? semantic.live : colors.textDim} />
+          <Stat label="Çekilebilir" value={ag.payoutEnabled ? dia(n.withdrawable) : '🔒 Kapalı'} sub={ag.payoutEnabled ? usd(n.withdrawable) : 'Ödeme yetkisi kapalı'} color={ag.payoutEnabled ? semantic.success : colors.textDim} />
           <Stat label="Ödeme sürecinde" value={dia(n.inPayout)} />
           <Stat label="Tamamlanan" value={dia(n.paid)} />
           <Stat label="Reddedilen / başarısız" value={dia(n.rejected)} />

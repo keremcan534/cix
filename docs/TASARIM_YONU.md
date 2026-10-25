@@ -2,7 +2,7 @@
 
 Bu belge SimilarClub'ın özgün tasarım dilini, her ekranda uygulanacak UX kurallarını ve ilk yeniden tasarlanan ekranı (Hediye gönder paneli) tanımlar. Referans ekranlar (Timo, BIGO, Clubhouse, Discord, TikTok LIVE, Twitch) yalnız **analiz girdisidir**; yerleşimleri, renkleri ve bileşenleri kopyalanmaz.
 
-Durum: **Onay bekliyor.** Onaylandıktan sonra sıradaki ekranlar aynı sistemle tasarlanır (bkz. "Sonraki ekranlar").
+Durum: **Palet v1.1 uygulandı** (mürekkep zemin, turkuaz imza rengi). Sonraki ekranlar onay bekliyor. Onaylandıktan sonra sıradaki ekranlar aynı sistemle tasarlanır (bkz. "Sonraki ekranlar").
 
 ---
 
@@ -12,10 +12,10 @@ SimilarClub'ın vaadi: *benzer insanlarla aynı anda, sesle buluşmak.* Görsel 
 
 | Karar | Gerekçe |
 | --- | --- |
-| **Sakin koyu zemin, tek canlı eylem rengi.** Mürdüm-lacivert yüzeyler (`bg`, `card`, `cardAlt`), eylemler mor. | Uygulama çoğunlukla akşam ve gece, uzun oturumlarda kullanılıyor. Koyu zemin gözü yormuyor; tek eylem rengi, gözün ilk bakışta doğru butonu bulmasını sağlıyor (Von Restorff). |
-| **Renk = anlam.** Mor eylem, pembe sosyal, altın **yalnız para**, yeşil **canlı / ses açık**, kırmızı yalnız tehlike ve okunmamış sayısı. | Kullanıcı rengi bir kez öğrenir: altın gördüğü yerde jeton harcanır veya kazanılır. Referans uygulamalarda altın; rozet, başlık ve reklamda da kullanıldığı için anlamını yitiriyor. |
-| **Gradyan nadir.** Mor→pembe gradyan yalnız ekranın tek birincil butonunda. | Bugün 97 yerde gradyan vardı; her şey özel görününce hiçbir şey öne çıkmıyor. |
-| **Sesin görünür hali yeşil halka.** Konuşan kişi kalın, nabız atan yeşil halkayla; mikrofon durumu renk + ikon + yazıyla. | Sesli odanın en önemli bilgisi "kim konuşuyor, ben açık mıyım". Renk körlüğü için tek başına renk kullanılmıyor. |
+| **Sakin mürekkep zemin, tek canlı eylem rengi.** Mavimsi koyu yüzeyler (`bg`, `card`, `cardAlt`), eylemler mor. Mürdüm zemin + mor→pembe gradyan kategorinin (Timo, Yalla) ortak paleti olduğu için bırakıldı. | Uygulama çoğunlukla akşam ve gece, uzun oturumlarda kullanılıyor. Koyu zemin gözü yormuyor; tek eylem rengi, gözün ilk bakışta doğru butonu bulmasını sağlıyor (Von Restorff). |
+| **Renk = anlam.** Mor eylem, pembe **yalnız sosyal** (beğeni, takip, kalp, yakınlık), altın **yalnız para**, **turkuaz ses ve varlık** (çevrimiçi, konuşuyor, mikrofon açık), yeşil başarılı/onaylandı, kırmızı yalnız tehlike ve okunmamış sayısı. Statü (VIP, SVIP, Asil) metalik ve koyu tonlarda, asla para altını değil. | Kullanıcı rengi bir kez öğrenir: altın gördüğü yerde jeton harcanır veya kazanılır. Referans uygulamalarda altın; rozet, başlık ve reklamda da kullanıldığı için anlamını yitiriyor. |
+| **Gradyan nadir ve tek tonlu.** Birincil butonda morun iki tonu (`#7C3AED → #5B21B6`); pembe marka gradyanından çıkarıldı. | Bugün 97 yerde gradyan vardı; her şey özel görününce hiçbir şey öne çıkmıyor. |
+| **İmza rengi turkuaz: sesin görünür hali.** Konuşan kişi kalın, nabız atan turkuaz halkayla; açık mikrofon turkuaz; durum her zaman renk + ikon + yazıyla. Sesli odalarda neredeyse kimse turkuaz kullanmıyor; SimilarClub'ı ilk bakışta tanınır kılar ve "ortak frekans" fikrini taşır. | Sesli odanın en önemli bilgisi "kim konuşuyor, ben açık mıyım". Renk körlüğü için tek başına renk kullanılmıyor. |
 | **Finans ekranları daha sade.** Animasyon, parıltı, gradyan yok; düz kartlar, tabular rakamlar, durum etiketleri. | Para ekranında güven, eğlenceden önce gelir. |
 | **Sosyal ekranlar sıcak.** Avatar halkaları, hediye animasyonları, yumuşak köşeler. | Eğlence ve bağ kurma hissi sosyal alanlarda kalır. |
 
@@ -23,10 +23,10 @@ SimilarClub'ın vaadi: *benzer insanlarla aynı anda, sesle buluşmak.* Görsel 
 
 | Grup | Değerler |
 | --- | --- |
-| Yüzeyler | `bg #120B24` · `card #1E1538` · `cardAlt #2A1F4A` · `border #33285A` |
-| Yazı | `text #FFFFFF` · `textDim #A79CC9` (bg üzerinde 7,5:1) · `primaryText #A78BFA` (koyu zeminde mor yazı, 7:1) |
-| Anlamlı renkler (`semantic`) | `action #7C3AED` (beyaz yazı 5,7:1) · `social #DB2777` · `money #FBBF24` + `moneyInk #3B2300` · `live #22C55E` + `liveInk #052E16` · `danger #F87171` · `tonal` (%18 mor) |
-| Birincil gradyan | `#7C3AED → #DB2777` (beyaz yazı iki uçta da ≥ 4,5:1) |
+| Yüzeyler | `bg #0D1020` · `card #161A2E` · `cardAlt #20253D` · `border #2C3252` |
+| Yazı | `text #FFFFFF` · `textDim #A3A8C9` (bg üzerinde 8,1:1, cardAlt üzerinde 6,5:1) · `primaryText #A78BFA` (koyu zeminde mor yazı, 6,9:1) |
+| Anlamlı renkler (`semantic`) | `action #7C3AED` (beyaz yazı 5,7:1) · `social #DB2777` · `money #FBBF24` + `moneyInk #3B2300` · `live #2DD4BF` turkuaz + `liveInk #042F2E` (bg üzerinde 10:1) · `success #22C55E` + `successFill #15803D` (beyaz yazılı onay butonu, 5:1) · `danger #F87171` · `status` metalik (`#E2E8F0 → #A5B4FC`) · `tonal` (%18 mor) |
+| Birincil dolgu | `#7C3AED → #5B21B6` (beyaz yazı iki uçta da ≥ 5,7:1) |
 | Boşluk (`space`, 4 pt) | 4 · 8 · 12 · 16 · 24 · 32 |
 | Köşe (`radius`) | 8 küçük · 12 kart içi · 16 kart · 24 alt panel · 999 hap/çip |
 | Yazı ölçeği (`type`) | 12 açıklama (en küçük) · 14 gövde · 16 büyük gövde · 18 başlık · 22 ekran başlığı · 24 tutar. Tutarlar `tabular-nums` |

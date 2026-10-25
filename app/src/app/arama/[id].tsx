@@ -167,7 +167,7 @@ export default function CallScreen() {
 
 function Ctrl({ icon, onPress, active, gift }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void; active?: boolean; gift?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={[styles.ctrl, active && { backgroundColor: '#fff' }, gift && { backgroundColor: colors.pink }]}>
+    <Pressable onPress={onPress} style={[styles.ctrl, active && { backgroundColor: '#fff' }, gift && { backgroundColor: colors.primary }]}>
       <Ionicons name={icon} size={24} color={active ? '#000' : '#fff'} />
     </Pressable>
   );

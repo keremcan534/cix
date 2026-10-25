@@ -140,11 +140,11 @@ const styles = StyleSheet.create({
   photoRing: { width: 116, height: 116, borderRadius: 58, padding: 3 },
   photo: { flex: 1, borderRadius: 56, borderWidth: 3, borderColor: colors.bg },
   photoEmpty: { backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
-  photoPlus: { position: 'absolute', right: 4, bottom: 4, backgroundColor: colors.pink, borderRadius: 14, padding: 4, borderWidth: 2, borderColor: colors.bg },
+  photoPlus: { position: 'absolute', right: 4, bottom: 4, backgroundColor: colors.primary, borderRadius: 14, padding: 4, borderWidth: 2, borderColor: colors.bg },
   label: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   input: { backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 16, paddingHorizontal: 16, paddingVertical: 13 },
   error: { color: colors.red, fontSize: 13, marginTop: -12 },
   chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: 'transparent' },
-  chipActive: { borderColor: colors.pink, backgroundColor: 'rgba(236,72,153,0.15)' },
+  chipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(139,92,246,0.18)' },
   chipText: { color: colors.textDim, fontWeight: '600' },
 });

@@ -398,7 +398,7 @@ function GiftTile({
             <Text style={g.lockText}>SVIP {gift.minSvip}</Text>
           </View>
         ) : stock !== undefined ? (
-          <Text style={[g.tilePrice, { color: semantic.live }]}>Ücretsiz · {stock}</Text>
+          <Text style={[g.tilePrice, { color: semantic.success }]}>Ücretsiz · {stock}</Text>
         ) : (
           <Text style={g.tilePrice}>🪙 {fmt(gift.price)}</Text>
         )}

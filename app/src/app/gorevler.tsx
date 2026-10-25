@@ -9,7 +9,7 @@ import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
   roomMinutes: { desc: 'Sohbet odasında belirtilen süre kadar kal', go: () => router.push('/(tabs)') },
@@ -83,7 +83,7 @@ export default function TaskCenter() {
                   <Text style={styles.dim} numberOfLines={1}>
                     {x.name}
                   </Text>
-                  <Text style={{ color: colors.pink, fontWeight: '800', fontSize: 16 }}>{x.n}</Text>
+                  <Text style={{ color: colors.primaryText, fontWeight: '800', fontSize: 16 }}>{x.n}</Text>
                 </View>
               ))}
             </View>
@@ -114,7 +114,7 @@ export default function TaskCenter() {
                       <Ionicons name="checkmark" size={20} color="#fff" />
                     </View>
                   ) : complete ? (
-                    <Pressable style={[styles.goBtn, { backgroundColor: colors.green }]} onPress={() => claimTask(t.id)} accessibilityLabel={`${t.title} ödülünü al`}>
+                    <Pressable style={[styles.goBtn, { backgroundColor: semantic.successFill }]} onPress={() => claimTask(t.id)} accessibilityLabel={`${t.title} ödülünü al`}>
                       <Text style={styles.goText}>Al</Text>
                     </Pressable>
                   ) : (
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   taskTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
-  goBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
+  goBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
   goText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   invite: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 16 },
 });

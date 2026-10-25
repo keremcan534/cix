@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   small: { color: '#fff', fontSize: 12, lineHeight: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pill: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  pill: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   treasury: { borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   treasureBadge: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.gold },
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   reward: { color: '#C4B5FD', fontWeight: '700', fontSize: 13 },
   rateText: { color: '#C4B5FD', fontSize: 12, lineHeight: 17 },
   hint: { color: colors.textDim, fontSize: 12, fontStyle: 'italic' },
-  taskBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minWidth: 74, alignItems: 'center' },
+  taskBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minWidth: 74, alignItems: 'center' },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
   doneCount: { color: colors.textDim, fontWeight: '800', fontSize: 12, marginLeft: 4 },
 });

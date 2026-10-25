@@ -63,7 +63,7 @@ export default function CodeScreen() {
 
       <View style={{ alignItems: 'center', gap: 14, marginTop: 28 }}>
         {checking ? (
-          <ActivityIndicator color={colors.pink} />
+          <ActivityIndicator color={colors.primaryText} />
         ) : seconds > 0 ? (
           <Text style={styles.dim}>Kodu tekrar gönder ({seconds} sn)</Text>
         ) : (
@@ -80,11 +80,11 @@ export default function CodeScreen() {
 const styles = StyleSheet.create({
   boxes: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 32 },
   box: { width: 48, height: 58, borderRadius: 14, backgroundColor: colors.card, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  boxActive: { borderColor: colors.pink },
+  boxActive: { borderColor: colors.primaryText },
   boxFilled: { borderColor: colors.primary },
   digit: { color: '#fff', fontSize: 24, fontWeight: '800' },
   hidden: { position: 'absolute', opacity: 0, width: 1, height: 1 },
   dim: { color: colors.textDim },
-  link: { color: colors.pink, fontWeight: '700' },
+  link: { color: colors.primaryText, fontWeight: '700' },
   hint: { color: colors.textDim, fontSize: 12, opacity: 0.7 },
 });

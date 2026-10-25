@@ -52,7 +52,7 @@ export default function MatchScreen() {
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 10 }}>
         {FILTERS.map((f) => (
-          <Pressable key={f} onPress={() => setFilter(f)} style={[styles.chip, filter === f && { borderColor: colors.pink }]}>
+          <Pressable key={f} onPress={() => setFilter(f)} style={[styles.chip, filter === f && { borderColor: colors.primaryText }]}>
             <Text style={[styles.chipText, filter === f && { color: '#fff' }]}>{f}</Text>
           </Pressable>
         ))}

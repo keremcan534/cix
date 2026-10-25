@@ -28,7 +28,7 @@ export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: n
             width: size * 0.28,
             height: size * 0.28,
             borderRadius: size,
-            backgroundColor: colors.green,
+            backgroundColor: semantic.live,
             borderWidth: 2,
             borderColor: colors.bg,
           }}
@@ -44,8 +44,8 @@ export function VerifiedBadge({ size = 14 }: { size?: number }) {
 
 export function VipBadge() {
   return (
-    <LinearGradient colors={['#F59E0B', '#FBBF24']} style={styles.vip}>
-      <Text style={styles.vipText}>VIP</Text>
+    <LinearGradient colors={semantic.status} style={styles.vip}>
+      <Text style={[styles.vipText, { color: semantic.statusInk }]}>VIP</Text>
     </LinearGradient>
   );
 }

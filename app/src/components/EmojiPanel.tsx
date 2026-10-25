@@ -69,5 +69,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 6, minHeight: 60 },
   cell: { width: '12.5%', alignItems: 'center', paddingVertical: 6 },
   empty: { color: colors.textDim, padding: 12 },
-  unlock: { alignSelf: 'center', backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 6 },
+  unlock: { alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 6 },
 });

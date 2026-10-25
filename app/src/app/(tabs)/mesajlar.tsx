@@ -11,7 +11,7 @@ import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimac
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
@@ -242,7 +242,7 @@ function TabButton({ label, active, badge, onPress }: { label: string; active: b
           </View>
         )}
       </View>
-      <View style={[styles.tabLine, active && { backgroundColor: colors.pink }]} />
+      <View style={[styles.tabLine, active && { backgroundColor: colors.primary }]} />
     </Pressable>
   );
 }
@@ -353,7 +353,7 @@ function FriendRow({ friend }: { friend: Friend }) {
           {u.vip && <VipBadge />}
         </View>
         <Text style={styles.last} numberOfLines={1}>
-          <Text style={{ color: u.online ? colors.green : colors.textDim }}>{u.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
+          <Text style={{ color: u.online ? semantic.live : colors.textDim }}>{u.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
           {` · ${relation}`}
         </Text>
       </View>
@@ -538,9 +538,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: colors.pink,
+    borderColor: colors.primaryText,
   },
-  viewBtnText: { color: colors.pink, fontSize: 12, fontWeight: '700' },
+  viewBtnText: { color: colors.primaryText, fontSize: 12, fontWeight: '700' },
   empty: {
     color: colors.textDim,
     textAlign: 'center',
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: 'rgba(236,72,153,0.15)',
+    backgroundColor: 'rgba(139,92,246,0.18)',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 1,

@@ -27,7 +27,7 @@ export default function NotificationsScreen() {
         title="Bildirimler"
         right={
           <Pressable onPress={markNotificationsRead} hitSlop={8}>
-            <Text style={{ color: colors.pink, fontWeight: '700', fontSize: 12 }}>Tümünü okundu say</Text>
+            <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Tümünü okundu say</Text>
           </Pressable>
         }
       />

@@ -167,7 +167,7 @@ export function LevelTable({ xp, level }: { xp: number; level: number }) {
       <Text style={styles.dim}>XP kaynakları: hediye, katılım, mikrofonda konuşma, etkinlik, sohbet. Spam ve sahte işlemler XP üretmez.</Text>
       <Text style={[styles.dim, { fontWeight: '800', marginTop: 4 }]}>Seviye · oda limiti · üye · yönetici</Text>
       {ROOM_LEVEL_REWARDS.map((r, i) => (
-        <View key={r} style={[styles.levelRow, i + 1 === level && { borderColor: colors.pink }]}>
+        <View key={r} style={[styles.levelRow, i + 1 === level && { borderColor: colors.primaryText }]}>
           <Text style={[styles.dim, i < level && { color: '#fff' }, { fontWeight: '800' }]}>
             {i < level ? '✅' : '🔒'} {ROOM_LEVEL_ICONS[i]} LV{i + 1} · {ROOM_LIMITS[i].rooms.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].members.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].admins}
           </Text>
@@ -386,8 +386,8 @@ export function RoomInfoSheet({
               <View key={id} style={styles.listRow}>
                 <Avatar uri={userById(id).avatar} size={36} />
                 <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
-                <Pressable style={[styles.pill, { backgroundColor: colors.green }]} onPress={() => onApprove(id)}>
-                  <Text style={[styles.pillText, { color: semantic.liveInk }]}>Onayla</Text>
+                <Pressable style={[styles.pill, { backgroundColor: semantic.successFill }]} onPress={() => onApprove(id)}>
+                  <Text style={styles.pillText}>Onayla</Text>
                 </Pressable>
                 <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
                   <Text style={styles.pillText}>Reddet</Text>
@@ -449,7 +449,7 @@ export function RoomInfoSheet({
             const open = level >= b.minLevel;
             const uri = `https://picsum.photos/seed/${b.seed}/600/400`;
             return (
-              <Pressable key={b.id} disabled={!open} onPress={() => onSave({ cover: uri })} style={[styles.decor, cover === uri && { borderColor: colors.pink }, !open && { opacity: 0.4 }]}>
+              <Pressable key={b.id} disabled={!open} onPress={() => onSave({ cover: uri })} style={[styles.decor, cover === uri && { borderColor: colors.primaryText }, !open && { opacity: 0.4 }]}>
                 <Image source={{ uri }} style={{ width: '100%', height: 70, borderRadius: 8 }} />
                 <Text style={styles.tiny}>
                   {open ? '' : '🔒 '}
@@ -531,7 +531,7 @@ function Traffic({ peak, minutes }: { peak: number; minutes: number }) {
       <Text style={styles.h3}>Saatlik dinleyici (son 10 saat)</Text>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 90 }}>
         {HOURS.map((h, i) => (
-          <View key={`h${i}`} style={{ flex: 1, height: `${(h / max) * 100}%`, backgroundColor: i === HOURS.length - 1 ? colors.pink : colors.primary, borderRadius: 4 }} />
+          <View key={`h${i}`} style={{ flex: 1, height: `${(h / max) * 100}%`, backgroundColor: i === HOURS.length - 1 ? colors.primaryText : colors.primary, borderRadius: 4 }} />
         ))}
       </View>
       <Text style={styles.dim}>Trafik verileri yalnızca oda sahibine görünür; kişisel veri içermez (toplu istatistik).</Text>

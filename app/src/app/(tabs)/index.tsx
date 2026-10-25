@@ -29,7 +29,7 @@ import {
   type RoomTab,
 } from '@/data/rooms-ui';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -113,7 +113,7 @@ export default function RoomsScreen() {
         </View>
         <View style={styles.headerIcons}>
           <Pressable onPress={() => setSheet('events')} hitSlop={6} accessibilityLabel="Etkinlikler">
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={styles.calendarBtn}>
+            <LinearGradient colors={gradient} style={styles.calendarBtn}>
               <Ionicons name="calendar" size={17} color="#fff" />
             </LinearGradient>
           </Pressable>
@@ -238,7 +238,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
         ))}
       </ScrollView>
       <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
-        <LinearGradient colors={['#A855F7', '#6366F1']} style={styles.catIcon}>
+        <LinearGradient colors={gradient} style={styles.catIcon}>
           <Ionicons name="people" size={18} color="#fff" />
           <View style={styles.plusBadge}>
             <Ionicons name="add" size={10} color={colors.primaryText} />
@@ -322,7 +322,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: str
             </Text>
           </View>
           <View style={[styles.listeners, { alignSelf: 'flex-end', marginTop: 8 }]}>
-            <Ionicons name="stats-chart" size={13} color={colors.green} />
+            <Ionicons name="stats-chart" size={13} color={semantic.live} />
             <Text style={styles.listenerText}>0</Text>
           </View>
         </View>
@@ -397,7 +397,7 @@ function RoomRow({ room }: { room: Room }) {
           )}
           <View style={{ flex: 1 }} />
           <View style={styles.listeners}>
-            <Ionicons name="stats-chart" size={12} color={colors.green} />
+            <Ionicons name="stats-chart" size={12} color={semantic.live} />
             <Text style={styles.listenerText}>{room.listeners}</Text>
           </View>
         </View>
@@ -474,7 +474,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
                 <Text style={styles.announce}>ID: {roomCode(r.id)}</Text>
               </View>
               <View style={styles.listeners}>
-                <Ionicons name="stats-chart" size={12} color={colors.green} />
+                <Ionicons name="stats-chart" size={12} color={semantic.live} />
                 <Text style={styles.listenerText}>{r.listeners}</Text>
               </View>
             </Pressable>
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   // Benim tab
   myRoom: { flexDirection: 'row', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border },
   myCover: { width: 92, height: 92, borderRadius: 12, backgroundColor: colors.cardAlt },
-  odamChip: { backgroundColor: colors.green, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1 },
+  odamChip: { backgroundColor: semantic.successFill, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1 },
   odamText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   subTabs: { flexDirection: 'row', gap: 22, paddingHorizontal: 16 },
   subTab: { color: colors.textDim, fontSize: 15, fontWeight: '600' },

@@ -9,7 +9,7 @@ import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, t
 import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 type Tab = 'overview' | 'performance' | 'members' | 'transfers' | 'invites' | 'earnings' | 'tasks' | 'events' | 'team' | 'support' | 'settings';
 const TABS: { key: Tab; label: string; perm?: Permission }[] = [
@@ -200,7 +200,7 @@ function Members({ canManage }: { canManage: boolean }) {
               <Text style={{ color: '#fff', flex: 1 }}>{u.name}</Text>
               {canManage ? (
                 <>
-                  <Pressable style={[styles.small, { backgroundColor: colors.green }]} onPress={() => setPending((p) => p.filter((x) => x.id !== u.id))}>
+                  <Pressable style={[styles.small, { backgroundColor: semantic.successFill }]} onPress={() => setPending((p) => p.filter((x) => x.id !== u.id))}>
                     <Text style={styles.smallText}>Kabul</Text>
                   </Pressable>
                   <Pressable
@@ -286,7 +286,7 @@ function Transfers() {
             </Text>
             {t.status === 'Bekliyor' ? (
               <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                <Pressable style={[styles.small, { backgroundColor: colors.green }]} onPress={() => decide(t.id, 'Ücretli onaylandı')}>
+                <Pressable style={[styles.small, { backgroundColor: semantic.successFill }]} onPress={() => decide(t.id, 'Ücretli onaylandı')}>
                   <Text style={styles.smallText}>Ücretli onayla</Text>
                 </Pressable>
                 <Pressable style={[styles.small, { backgroundColor: colors.primary }]} onPress={() => decide(t.id, 'Ücretsiz onaylandı')}>
@@ -350,7 +350,7 @@ function Earnings() {
         </Card>
       ))}
       <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })}>
-        <Text style={{ color: colors.pink, fontWeight: '700' }}>Finans itirazı / mutabakat talebi →</Text>
+        <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Finans itirazı / mutabakat talebi →</Text>
       </Pressable>
     </>
   );

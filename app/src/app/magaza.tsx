@@ -77,7 +77,7 @@ export default function StoreScreen() {
               const owned = inventory.has(c.id);
               const isEquipped = equipped[c.kind] === c.id;
               return (
-                <View key={c.id} style={[styles.item, isEquipped && { borderColor: colors.pink }]}>
+                <View key={c.id} style={[styles.item, isEquipped && { borderColor: colors.primaryText }]}>
                   <Preview item={c} />
                   <Text style={styles.name}>{c.name}</Text>
                   <Text style={styles.meta}>
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   meta: { color: colors.textDim, fontSize: 12 },
   owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },
   locked: { color: colors.textDim, fontWeight: '700', paddingVertical: 7 },
-  buy: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
+  buy: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   buyText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   framePreview: { width: 64, height: 64, borderRadius: 32, padding: 4 },
   frameInner: { flex: 1, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },

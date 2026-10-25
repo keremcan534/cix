@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   kpi: { flexBasis: '47%', flexGrow: 1, backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 4 },
   chip: { backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   chipText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  shareBtn: { flexDirection: 'row', gap: 6, alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  shareBtn: { flexDirection: 'row', gap: 6, alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   node: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, paddingRight: 8 },
   statusChip: { backgroundColor: colors.cardAlt, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: 10 },

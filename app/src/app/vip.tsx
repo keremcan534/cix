@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   mid: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
   vipCol: { flex: 1, backgroundColor: 'rgba(245,215,161,0.06)' },
   plan: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#17151D' },
-  planTag: { position: 'absolute', top: -10, backgroundColor: colors.pink, color: '#fff', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
+  planTag: { position: 'absolute', top: -10, backgroundColor: colors.primary, color: '#fff', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
   buyBtn: { backgroundColor: GOLD, borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
   nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
   nobleTab: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700', paddingVertical: 6 },
