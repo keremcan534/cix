@@ -50,7 +50,7 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
 
 1. **Tek birincil eylem.** Ekranda yalnız bir `hero` veya `money` buton.
 2. **Önce maliyet, sonra eylem.** Jeton harcatan her ekranda toplam (adet × fiyat × kişi) ve kalan bakiye butondan önce görünür.
-3. **Yüksek tutar için ikinci dokunuş.** `bigSpendConfirm` eşiği (varsayılan 1.000 jeton) üstünde buton "Onayla ve gönder" olur. Yanında "Vazgeç" çıkar. Seçim değişirse onay düşer.
+3. **Hediye tek dokunuşla gider (ürün kararı).** Gönderen dikkat etmekten sorumlu; varsayılan olarak ek onay yok. Toplam tutar butonun üstünde ve butonun içinde zaten yazıyor. İsteyen kullanıcı Ayarlar'dan "Büyük harcamada ek onay" eşiği (500 / 1.000 / 5.000) açabilir; o zaman buton "Onayla ve gönder" olur.
 4. **Yetersiz bakiye işlemi bozmaz.** Eksik miktar yazılır, buton "Jeton yükle" olur, kullanıcı satın almadan odaya dönebilir.
 5. **Yetkisiz işlem eylem gibi görünmez.** Kilitli öğe soluk + kilit + gereken seviye; seçilince ne gerektiği ve nasıl açılacağı yazılır.
 6. **Durum görünür.** Yükleniyor / bekliyor / başarılı / başarısız / izin yok durumlarının her biri ayrı metin ve ikonla gösterilir.
@@ -105,7 +105,7 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
    - Karoya dokun: seç.
    - Uzun bas: favoriye ekle/çıkar.
    - Kilitli karo: seçilir, ama eylem "SVIP ayrıcalıklarını gör" olur.
-   - Yüksek tutar: ilk dokunuş onay durumuna geçer; seçim değişince onay düşer.
+   - Gönder tek dokunuşla gönderir. Kullanıcı Ayarlar'dan ek onay açtıysa eşik üstünde ilk dokunuş onay durumuna geçer; seçim değişince onay düşer.
    - Gönderimden sonra panel kapanır, odada animasyon ve sistem mesajı çıkar.
    - Bakiye çipi ve "Jeton yükle" cüzdana gider; geri tuşu odaya döner.
 7. **Durumlar.**
@@ -143,8 +143,8 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 
 **Kabul kriterleri.**
 - [ ] Gönder düğmesine basmadan önce toplam ve kalan bakiye görünür.
-- [ ] Toplam ≥ eşik ise tek dokunuşla gönderim olmaz; onay ekranında tutar yazar.
-- [ ] Onaylı gönderimde ikinci bir sistem penceresi açılmaz.
+- [ ] Varsayılan ayarda hediye tek dokunuşla gönderilir, onay penceresi açılmaz.
+- [ ] Kullanıcı ek onayı açtıysa eşik üstünde tutar yazan tek bir onay adımı olur, ikinci pencere açılmaz.
 - [ ] Bakiye yetmiyorsa eksik tutar yazar ve eylem "Jeton yükle" olur.
 - [ ] Kilitli hediye gönderilemez; neden ve çözüm yazar.
 - [ ] Çantadan gönderimde jeton düşmez, stok düşer.
@@ -160,7 +160,7 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 | Açık tema | Lansmanda yalnız koyu tema; tokenlar hazır |
 | Marka yazı tipi | Sistem yazı tipi (performans, Türkçe karakter). Özel yazı tipi ayrı karar |
 | Hediye animasyon formatı | Küçükler Lottie, büyükler şeffaf video; ayrı iş |
-| Yüksek tutar eşiği | 1.000 jeton (Ayarlar'dan değişir); kullanıcı testiyle doğrulanacak |
+| Yüksek tutar onayı | Varsayılan kapalı (ürün kararı); kullanıcı Ayarlar'dan açabilir |
 | Şans / jackpot hediyeleri | Yok. Hukuki görüş olmadan eklenmeyecek |
 | Kulüp logosu, dini ve milli sembollü hediyeler | Lisans ve hassasiyet incelemesi olmadan yok |
 

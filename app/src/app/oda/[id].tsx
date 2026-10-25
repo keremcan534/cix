@@ -702,7 +702,7 @@ export default function VoiceRoom() {
     setGiftOpen(false);
     const total = gift.price * count * toIds.length;
     // The gift sheet asks for high-value confirmation itself; other callers still get the dialog.
-    if (!confirmed && total >= settings.bigSpendConfirm) {
+    if (!confirmed && settings.bigSpendConfirm > 0 && total >= settings.bigSpendConfirm) {
       showAlert('Yüksek tutarlı gönderim', `${toIds.length} alıcıya toplam 🪙 ${total.toLocaleString('tr-TR')} gönderilecek. Onaylıyor musun?`, [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Onayla ve gönder', onPress: () => deliverGifts(gift, toIds, count) },

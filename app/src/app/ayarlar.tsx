@@ -117,10 +117,11 @@ export default function SettingsScreen() {
             ]}
             onChange={(v) => setSetting('dailySpendLimit', v)}
           />
-          <Text style={{ color: '#fff', marginTop: 4 }}>Büyük harcamada ek onay</Text>
+          <Text style={{ color: '#fff', marginTop: 4 }}>Büyük harcamada ek onay (isteğe bağlı)</Text>
           <Chips
             value={settings.bigSpendConfirm}
             options={[
+              [0, 'Kapalı'],
               [500, '🪙 500 üstü'],
               [1000, '🪙 1.000 üstü'],
               [5000, '🪙 5.000 üstü'],

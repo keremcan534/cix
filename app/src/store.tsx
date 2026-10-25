@@ -45,7 +45,7 @@ export type Settings = {
   micDenoise: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
-  bigSpendConfirm: number; // coins; extra confirmation above this
+  bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
 };
 export type RuleChange = { id: string; time: string; field: string; from: string; to: string; version: number };
 export type InviteReward = { id: string; inviteeId: string; ref: string; status: 'Beklemede' | 'Onaylandı' | 'İptal edildi'; time: string };
@@ -288,7 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bigGiftsOnly: false, micDenoise: true,
     invitesFrom: 'everyone',
     dailySpendLimit: 0,
-    bigSpendConfirm: 1_000,
+    bigSpendConfirm: 0,
   });
   const settingsRef = useRef(settings);
   useEffect(() => {
