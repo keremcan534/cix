@@ -8,6 +8,7 @@ import {
   TASKS,
   type TaskKey,
 } from '@/data/economy';
+import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
 import { NOBLE_DAYS, RECHARGE_PACKS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
@@ -139,6 +140,9 @@ type AppState = {
   buyNoble: (tier: number) => boolean;
   vipDays: number;
   buyVipPlan: (days: number) => boolean;
+  // central role & permission center (demo state)
+  rbac: RbacState;
+  updateRbac: (fn: (s: RbacState) => RbacState) => void;
   agencyId: string | null;
   agencyRole: AgencyRole | null;
   setAgencyRole: (r: AgencyRole) => void;
@@ -327,6 +331,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [nobleTier, setNobleTier] = useState(0);
   const [nobleDays, setNobleDays] = useState(0);
   const [vipDays, setVipDays] = useState(0);
+  const [rbac, setRbac] = useState<RbacState>(INITIAL_RBAC);
   const svipLevel = svipLevelOf(svipXp);
   const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDays > 0 ? 1 : 0));
   const [agencyId, setAgencyId] = useState<string | null>(null);
@@ -535,6 +540,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setNobleDays(NOBLE_DAYS);
       return true;
     },
+    rbac,
+    updateRbac: (fn) => setRbac((s) => fn(s)),
     vipDays,
     buyVipPlan: (days) => {
       const plan = VIP_PLANS.find((p) => p.days === days);

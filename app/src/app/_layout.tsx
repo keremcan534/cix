@@ -53,6 +53,7 @@ function RootStack() {
         <Stack.Screen name="gelir/detay" />
         <Stack.Screen name="davet" />
         <Stack.Screen name="seviye" />
+        <Stack.Screen name="yetki" />
       </Stack.Protected>
       <Stack.Protected guard={!loggedIn}>
         <Stack.Screen name="giris" />

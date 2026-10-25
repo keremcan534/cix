@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -115,6 +116,10 @@ export default function AdminScreen() {
             ))
           )}
         </Card>
+        <Pressable onPress={() => router.push('/yetki')} style={styles.warn} accessibilityLabel="Rol ve Yetki Merkezi">
+          <Ionicons name="key" size={16} color={colors.gold} />
+          <Text style={{ color: '#fff', fontWeight: '700', flex: 1 }}>Rol ve Yetki Merkezi → roller, kapsamlar, atamalar, BD/ajans komisyon kuralları</Text>
+        </Pressable>
         <Pressable onPress={reset} style={{ alignItems: 'center', padding: 8 }}>
           <Text style={{ color: colors.red, fontWeight: '700' }}>Varsayılanlara dön</Text>
         </Pressable>

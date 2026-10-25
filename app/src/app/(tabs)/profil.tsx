@@ -28,6 +28,7 @@ const GROWTH: Item[] = [
   { icon: 'flash-outline', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
+  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
 ];
 const SUPPORT: Item[] = [
   { icon: 'headset-outline', label: 'Müşteri hizmetleri', onPress: () => router.push('/destek') },
