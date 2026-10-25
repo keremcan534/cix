@@ -40,8 +40,9 @@ import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLog
 import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, GAME_MIN_VIP, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
-import { FAMILIES, INCOMING_GIFT_POOL, VIP_ENTRY_LEVEL, VIP_INVISIBLE_LEVEL, vipTier } from '@/data/economy';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
+import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -66,7 +67,7 @@ export default function VoiceRoom() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isOwn = id === 'yeni';
   const app = useApp();
-  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency } = app;
+  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency } = app;
 
   const base = isOwn ? null : roomById(id);
   const hostId = isOwn ? 'me' : base!.hostId;
@@ -88,7 +89,7 @@ export default function VoiceRoom() {
   // "Oda işlevlerini yönet": music, polls, goals, events can be limited to the owner.
   const canFunctions = myRole === 'owner' || (myRole === 'admin' && functionsBy === 'admins');
   const botOn = isOwn ? settings.roomBot : true;
-  const invisible = settings.invisibleEntry && vipLevel >= VIP_INVISIBLE_LEVEL;
+  const invisible = settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
   const typeInfo = roomTypeInfo(roomType);
   const lockedSeats = isOwn ? myRoom.lockedSeats : [];
@@ -100,11 +101,12 @@ export default function VoiceRoom() {
     const tier = vipTier(vipLevel);
     const entryItem = cosmeticById(equipped.entry);
     const ride = cosmeticById(equipped.ride);
-    if (!entryItem && !ride && (!tier || tier.level < VIP_ENTRY_LEVEL)) return null;
-    const who = `${tier ? `${tier.emoji} VIP${tier.level} ` : ''}${ME.name}`;
+    const noble = nobleInfo(nobleTier);
+    if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
+    const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `SVIP${svipLevel} ` : ''}${ME.name}`;
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya katıldı!`;
     return { text, color: entryItem?.color ?? tier?.color ?? gradient };
-  }, [vipLevel, equipped.entry, equipped.ride]);
+  }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride]);
 
   const [unlocked, setUnlocked] = useState(!password);
   const [seats, setSeats] = useState<(string | null)[]>(() => pad(isOwn ? ['me'] : base!.seatUserIds, capacity));
@@ -757,7 +759,7 @@ export default function VoiceRoom() {
     {
       title: 'Jetonlu Oyunlar',
       variant: 'tile',
-      note: vipLevel >= GAME_MIN_VIP ? 'Sonuçlar oyun sağlayıcısı tarafından doğrulanır · jeton harcaması günlük limitine dahildir' : `VIP ${GAME_MIN_VIP} ile açılır · katalog önizleme`,
+      note: GATES.games(svipLevel, nobleTier) ? 'Sonuçlar oyun sağlayıcısı tarafından doğrulanır · jeton harcaması günlük limitine dahildir' : 'SVIP 2 veya Asil Vikont ile açılır · katalog önizleme',
       items: COIN_GAME_TILES.map((g) => ({ key: g.id, label: g.name, emoji: g.emoji, colors: g.colors, badge: g.badge, onPress: toGames })),
     },
     {
@@ -1046,7 +1048,7 @@ export default function VoiceRoom() {
             if (keys.length) logMod('Oda ayarını değiştirdi', keys.join(', '));
           }}
           level={level}
-          vipLevel={vipLevel}
+          vipLevel={GATES.roomLock(nobleTier) ? 1 : 0}
           maxMics={maxMics}
           modLog={modLog}
           bans={bans}

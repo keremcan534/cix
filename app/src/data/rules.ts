@@ -15,6 +15,8 @@ export type Rules = {
   bonusCapPerWeek: number; // diamonds, per user
   minWithdrawDiamonds: number;
   inviteUnitsPerPurchase: number;
+  inviteIncomeShare: number; // share of an invited friend's income, paid by the platform
+  inviteRechargeShare: number; // share of an invited friend's recharges, paid by the platform
   period: 'Haftalık';
 };
 
@@ -31,6 +33,8 @@ export const DEFAULT_RULES: Rules = {
   bonusCapPerWeek: 500_000,
   minWithdrawDiamonds: 50_000,
   inviteUnitsPerPurchase: 1,
+  inviteIncomeShare: 0.08,
+  inviteRechargeShare: 0.04,
   period: 'Haftalık',
 };
 

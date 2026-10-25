@@ -2,33 +2,29 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GradientButton } from '@/components/ui';
-import { COIN_PACKS } from '@/data/mock';
+import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors } from '@/theme';
 
 export default function WalletScreen() {
-  const { coins, addCoins, ledger, diamonds, spentToday, settings } = useApp();
-  const [selected, setSelected] = useState(COIN_PACKS[1].id);
+  const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp } = useApp();
   const [tab, setTab] = useState<'buy' | 'history'>('buy');
   const [filter, setFilter] = useState<'coin' | 'diamond'>('coin');
-  const [processing, setProcessing] = useState(false);
-  const pack = COIN_PACKS.find((p) => p.id === selected)!;
+  const [processing, setProcessing] = useState<string | null>(null);
 
-  const buy = () => {
+  const buy = (pack: RechargePack) => {
     // A second tap while the store payment is pending must not charge twice.
     if (processing) return;
-    setProcessing(true);
+    setProcessing(pack.id);
     // Prototype: no real payment; simulate the store confirmation delay, then credit.
     setTimeout(() => {
-      const bonus = pack.bonus ? Number(pack.bonus.replace('+', '')) : 0;
-      addCoins(pack.coins + bonus, `Satın alma: ${pack.coins} paket`);
-      setProcessing(false);
-      showAlert('Başarılı 🎉', `${pack.coins + bonus} jeton hesabına eklendi. (Demo – gerçek ödeme alınmadı)`);
+      const total = buyPack(pack.id);
+      setProcessing(null);
+      showAlert('Başarılı 🎉', `${total.toLocaleString('tr-TR')} jeton hesabına eklendi. +${pack.coins.toLocaleString('tr-TR')} SVIP deneyim puanı. (Demo – gerçek ödeme alınmadı)`);
     }, 1200);
   };
   const rows = ledger.filter((r) => r.currency === filter);
@@ -37,30 +33,16 @@ export default function WalletScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="close" size={26} color="#fff" />
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+          <Ionicons name="arrow-back" size={26} color="#fff" />
         </Pressable>
-        <Text style={styles.title}>Cüzdan</Text>
-        <View style={{ width: 26 }} />
-      </View>
-
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
-        <Text style={styles.balanceLabel}>Jeton bakiyen</Text>
-        <Text style={styles.balanceN}>🪙 {coins.toLocaleString('tr-TR')}</Text>
-        <Text style={styles.balanceLabel}>💎 {diamonds.toLocaleString('tr-TR')} elmas (ayrı bakiye)</Text>
-      </LinearGradient>
-
-      <View style={styles.segment}>
-        {(
-          [
-            ['buy', 'Jeton yükle'],
-            ['history', 'Hareketler'],
-          ] as const
-        ).map(([k, l]) => (
-          <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
-            <Text style={styles.segText}>{l}</Text>
-          </Pressable>
-        ))}
+        <Text style={[styles.title, { flex: 1, marginLeft: 12 }]}>{tab === 'buy' ? 'Yüklemek' : 'Hareketler'}</Text>
+        <Pressable onPress={() => setTab(tab === 'buy' ? 'history' : 'buy')} hitSlop={8} accessibilityLabel="Hareketler" style={{ marginRight: 16 }}>
+          <Ionicons name={tab === 'buy' ? 'document-text-outline' : 'wallet-outline'} size={24} color="#fff" />
+        </Pressable>
+        <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Ödeme' } })} hitSlop={8} accessibilityLabel="Destek">
+          <Ionicons name="headset-outline" size={24} color="#fff" />
+        </Pressable>
       </View>
 
       {tab === 'history' ? (
@@ -103,33 +85,40 @@ export default function WalletScreen() {
           />
         </>
       ) : (
-        <>
-          <Text style={styles.section}>Jeton yükle</Text>
+        <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
+            <Text style={{ color: colors.textDim, fontSize: 16 }}>Coinsim ⓘ</Text>
+            <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
+          </View>
+          <Pressable onPress={() => router.push('/vip')} accessibilityLabel="SVIP Sistemi">
+            <LinearGradient colors={['#78350F', '#4C1D95', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+              <Text style={styles.bannerTitle}>SVIP Sistemi</Text>
+              <Text style={{ color: '#FDE7C7', fontSize: 12 }}>{svipLevel ? `SVIP${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Her yüklenen jeton = 1 deneyim puanı'}</Text>
+              <Text style={{ position: 'absolute', right: 16, top: 14, fontSize: 40 }}>👑💎</Text>
+            </LinearGradient>
+          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
+            <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Coins Yükle</Text>
+            <Text style={styles.flag}>🇹🇷 ▾</Text>
+          </View>
           <View style={styles.grid}>
-            {COIN_PACKS.map((p) => (
-              <Pressable key={p.id} onPress={() => setSelected(p.id)} style={[styles.pack, selected === p.id && styles.packSelected]}>
-                {p.bonus && (
-                  <View style={styles.bonus}>
-                    <Text style={styles.bonusText}>{p.bonus}</Text>
-                  </View>
-                )}
-                <Text style={{ fontSize: 30 }}>🪙</Text>
-                <Text style={styles.packCoins}>{p.coins.toLocaleString('tr-TR')}</Text>
-                <Text style={styles.packPrice}>{p.price}</Text>
-              </Pressable>
-            ))}
+            {RECHARGE_PACKS.map((p: RechargePack) => {
+              const first = !!p.firstBonus && !firstBuys.has(p.id);
+              const bonus = first ? p.firstBonus : p.bonus;
+              return (
+                <Pressable key={p.id} onPress={() => buy(p)} accessibilityLabel={`${p.coins} jeton paketi`} style={{ width: '31.3%', margin: '1%' }}>
+                  <LinearGradient colors={first ? ['#FB923C', '#F97316'] : ['#2A2433', '#1E1A26']} style={[styles.pack, processing === p.id && { opacity: 0.5 }]}>
+                    {first && <Text style={styles.firstTag}>🔥 Sadece İlk Defa</Text>}
+                    <Text style={styles.packCoins}>🪙 {p.coins.toLocaleString('tr-TR')}</Text>
+                    {bonus ? <Text style={[styles.packBonus, first && { color: '#FFF7ED' }]}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
+                    <Text style={[styles.packPrice, first && { color: '#FFF7ED' }]}>{processing === p.id ? 'Bekleniyor…' : p.price}</Text>
+                  </LinearGradient>
+                </Pressable>
+              );
+            })}
           </View>
-
-          <View style={{ padding: 16, marginTop: 'auto' }}>
-            <GradientButton
-              title={processing ? 'Ödeme bekleniyor...' : `${pack.price} öde`}
-              icon={processing ? 'time' : 'card'}
-              onPress={buy}
-              style={{ opacity: processing ? 0.6 : 1 }}
-            />
-            <Text style={styles.note}>Prototip: Ödeme simüle edilir. İade/itiraz için Destek merkezi.</Text>
-          </View>
-        </>
+          <Text style={styles.note}>Şarj etmeye devam etmek, Kullanım Koşulları ve Ödeme Sözleşmesi&apos;ni okuduğunuz ve kabul ettiğiniz anlamına gelir. Prototip: ödeme simüle edilir; iade/itiraz için Destek.</Text>
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -149,17 +138,12 @@ const styles = StyleSheet.create({
   balanceN: { color: '#fff', fontSize: 32, fontWeight: '800' },
   section: { color: '#fff', fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
-  pack: {
-    width: '46%',
-    margin: '2%',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 18,
-    borderRadius: 16,
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
+  pack: { alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130 },
+  banner: { marginHorizontal: 16, borderRadius: 14, padding: 16, gap: 4, overflow: 'hidden' },
+  bannerTitle: { color: '#FDE68A', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
+  flag: { color: '#fff', backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, overflow: 'hidden' },
+  firstTag: { position: 'absolute', top: -8, left: 4, backgroundColor: '#DC2626', color: '#FDE68A', fontSize: 10, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
   packSelected: { borderColor: colors.pink },
   bonus: {
     position: 'absolute',

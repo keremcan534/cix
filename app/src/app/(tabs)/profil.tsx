@@ -4,97 +4,124 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FramedAvatar, LevelChips, VerifiedBadge, VipTitle } from '@/components/ui';
+import { Avatar, FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
-import { charmLevel, vipTier, wealthLevel } from '@/data/economy';
+import { charmLevel, wealthLevel } from '@/data/economy';
+import { USERS } from '@/data/mock';
+import { nobleInfo } from '@/data/status';
+import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
+type Item = { icon: IconName; label: string; onPress: () => void; tag?: string; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean };
 
-const SHORTCUTS: { emoji: string; label: string; onPress: () => void }[] = [
-  { emoji: '🎙️', label: 'Yayıncı\nMerkezi', onPress: () => router.push('/yayinci') },
-  { emoji: '📋', label: 'Görevler', onPress: () => router.push('/gorevler') },
-  { emoji: '🏆', label: 'Sıralama', onPress: () => router.push('/siralama') },
-  { emoji: '🎰', label: 'Şans\nÇarkı', onPress: () => router.push('/cark') },
-];
-
-const MENU: { icon: IconName; label: string; onPress?: () => void; agencyOnly?: boolean; noAgencyOnly?: boolean }[] = [
-  { icon: 'wallet-outline', label: 'Cüzdan', onPress: () => router.push('/cuzdan') },
-  { icon: 'diamond-outline', label: 'Soyluluk / VIP', onPress: () => router.push('/vip') },
-  { icon: 'home-outline', label: 'Aile', onPress: () => router.push('/aile') },
-  { icon: 'storefront-outline', label: 'Mağaza (çerçeve, efekt, emoji)', onPress: () => router.push('/magaza') },
+const GROWTH: Item[] = [
+  { icon: 'mic-outline', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
   { icon: 'business-outline', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
   { icon: 'chatbubbles-outline', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
   { icon: 'add-circle-outline', label: 'Ajansa katıl / ajans kur', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   { icon: 'game-controller-outline', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
-  { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
-  { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
+  { icon: 'trophy-outline', label: 'Sıralama', onPress: () => router.push('/siralama') },
+  { icon: 'aperture-outline', label: 'Şans çarkı', onPress: () => router.push('/cark') },
   { icon: 'flash-outline', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
-  { icon: 'people-outline', label: 'Arkadaşını Davet Et', onPress: () => router.push('/gorevler') },
-  { icon: 'settings-outline', label: 'Ayarlar ve gizlilik', onPress: () => router.push('/ayarlar') },
-  { icon: 'help-circle-outline', label: 'Yardım & Destek', onPress: () => router.push('/destek') },
+  { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
+  { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
 ];
+const SUPPORT: Item[] = [
+  { icon: 'headset-outline', label: 'Müşteri hizmetleri', onPress: () => router.push('/destek') },
+  { icon: 'shield-checkmark-outline', label: 'Güvenlik Merkezi', onPress: () => router.push('/ayarlar') },
+  { icon: 'settings-outline', label: 'Ayarlar', onPress: () => router.push('/ayarlar') },
+];
+const VISITORS = 53;
+const COMPLETION = 46;
 
 export default function ProfileScreen() {
-  const { coins, diamonds, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds, agencyId, myRoom } = useApp();
+  const { coins, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
   const specialId = cosmeticById(equipped.specialId);
-  const tier = vipTier(vipLevel);
+  const noble = nobleInfo(nobleTier);
+  const friends = USERS.filter((u) => following.has(u.id)).slice(0, 1);
+
+  const main: Item[] = [
+    { icon: 'diamond-outline', label: 'Gelir', onPress: () => router.push('/gelir') },
+    { icon: 'storefront-outline', label: 'Alışveriş Merkezi', tag: 'Yeni!', onPress: () => router.push('/magaza') },
+    {
+      icon: 'checkmark-circle-outline',
+      label: 'Kimlik Doğrulamam',
+      dot: !me.verified,
+      onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı ✅' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
+    },
+    { icon: 'bag-handle-outline', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
+    { icon: 'ribbon-outline', label: 'Kullanıcı Seviyesi', onPress: () => router.push('/seviye') },
+  ];
+  const visible = (m: Item) => (m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32, gap: 12 }}>
         <View style={styles.top}>
-          <FramedAvatar uri={me.avatar} size={88} vipLevel={vipLevel} frameId={equipped.frame} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.name}>
-              {me.name}, {me.age}
-            </Text>
-            {me.verified && <VerifiedBadge size={18} />}
-            <View style={styles.level}>
-              <Text style={styles.levelText}>Lv.7</Text>
+          <Pressable onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profilim">
+            <FramedAvatar uri={me.avatar} size={78} vipLevel={vipLevel} frameId={equipped.frame} />
+          </Pressable>
+          <View style={{ flex: 1, gap: 5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.name} numberOfLines={1}>
+                {me.name}
+              </Text>
+              {me.verified && <VerifiedBadge size={16} />}
             </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-            <VipTitle level={vipLevel} />
             <LevelChips wealth={wealthLevel(spentTotal)} charm={charmLevel(totalDiamonds)} />
+            <Pressable onPress={() => showAlert('ID kopyalandı', specialId ? specialId.name : '10284731')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'}</Text>
+              <Ionicons name="copy-outline" size={13} color={colors.textDim} />
+            </Pressable>
           </View>
-          <Text style={styles.bio}>{me.bio}</Text>
-          <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>
-            ID: {specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'} · {me.city}
-          </Text>
+          <Pressable style={styles.completion} onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profil tamamlama">
+            <Ionicons name="person-outline" size={14} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>%{COMPLETION}</Text>
+            <View style={styles.redDot} />
+            <Ionicons name="chevron-forward" size={14} color="#fff" />
+          </Pressable>
         </View>
 
         <View style={styles.stats}>
-          <Stat n={following.size} label="Takip" />
-          <Stat n={128} label="Takipçi" />
-          <Stat n={coins} label="🪙 Jeton" onPress={() => router.push('/cuzdan')} />
-          <Stat n={diamonds} label="💎 Elmas" onPress={() => router.push('/yayinci')} />
+          <Stat n={128} label="Takipçiler" />
+          <Stat n={following.size} label="Takip etmek" />
+          <Pressable style={{ flex: 1, alignItems: 'center', gap: 4 }} onPress={() => router.push('/(tabs)/mesajlar')}>
+            {friends[0] ? <Avatar uri={friends[0].avatar} size={30} /> : <Text style={styles.statN}>0</Text>}
+            <Text style={styles.statL}>Arkadaşlarım</Text>
+          </Pressable>
+          <Stat
+            n={VISITORS}
+            label="Ziyaretçiler"
+            dot
+            onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? 'Son 7 günde profilini 53 kişi ziyaret etti. (VIP ayrıcalığı)' : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
+          />
         </View>
 
-        <View style={styles.shortcuts}>
-          {SHORTCUTS.map((s) => (
-            <Pressable key={s.label} style={styles.shortcut} onPress={s.onPress}>
-              <Text style={{ fontSize: 28 }}>{s.emoji}</Text>
-              <Text style={styles.shortcutText}>{s.label}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.card}>
+          <Pressable style={styles.rechargeRow} onPress={() => router.push('/cuzdan')} accessibilityLabel="Yükleme">
+            <Text style={styles.h2}>Yükleme</Text>
+            <Text style={styles.rewardTag}>🎁 Ödül</Text>
+            <Text style={styles.coinN}>🪙 {coins.toLocaleString('tr-TR')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#A78BFA', '#6D28D9']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün` : 'VIP değil'} colors={['#FCD34D', '#B45309']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
+            <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz Alınmadı'} colors={['#FB923C', '#C2410C']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
+          </View>
         </View>
 
-        <Pressable onPress={() => router.push('/vip')} style={{ marginHorizontal: 16 }}>
-          <LinearGradient colors={tier?.color ?? ['#F59E0B', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.vip}>
-            <Text style={{ fontSize: 28 }}>{tier?.emoji ?? '👑'}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.vipTitle}>{tier ? `${tier.name} soyluluğun aktif` : 'Soylu ol'}</Text>
-              <Text style={styles.vipSub}>{tier ? 'Seviyeni yükselt, daha fazla ayrıcalık kazan' : 'Rozet, çerçeve ve odaya giriş efekti'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#fff" />
-          </LinearGradient>
-        </Pressable>
+        <View style={[styles.card, { flexDirection: 'row' }]}>
+          <Shortcut emoji="🎁" label="Bedava Para" onPress={() => router.push('/gorevler')} />
+          <Shortcut emoji="⛺" label="Kabile" onPress={() => router.push('/aile')} />
+          <Shortcut emoji="✉️" label="Davet" tag="Para Kazan" onPress={() => router.push('/davet')} />
+        </View>
 
         {myRoom.profileVisible && (
-          <Pressable onPress={() => router.push('/oda/yeni')} style={styles.hostCta} accessibilityLabel="Odam">
+          <Pressable onPress={() => router.push('/oda/yeni')} style={styles.roomCta} accessibilityLabel="Odam">
             <Text style={{ fontSize: 22 }}>🎙️</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>{myRoom.title}</Text>
@@ -105,26 +132,17 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
         )}
-
         {!isHost && (
-          <Pressable onPress={() => router.push('/yayinci')} style={[styles.hostCta]}>
+          <Pressable onPress={() => router.push('/yayinci')} style={styles.roomCta}>
             <Text style={{ fontSize: 22 }}>💎</Text>
             <Text style={{ color: '#fff', flex: 1, fontWeight: '600' }}>Yayıncı ol, hediyelerden para kazan</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
         )}
 
-        <View style={styles.menu}>
-          {MENU.filter((m) => (m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true)).map((m) => (
-            <Pressable key={m.label} style={styles.menuRow} onPress={m.onPress}>
-              <LinearGradient colors={gradient} style={styles.menuIcon}>
-                <Ionicons name={m.icon} size={18} color="#fff" />
-              </LinearGradient>
-              <Text style={styles.menuLabel}>{m.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-            </Pressable>
-          ))}
-        </View>
+        <Group items={main} />
+        <Group items={GROWTH.filter(visible)} />
+        <Group items={SUPPORT} />
 
         <Pressable style={styles.logout} onPress={logout}>
           <Ionicons name="log-out-outline" size={18} color={colors.red} />
@@ -135,35 +153,84 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ n, label, onPress }: { n: number; label: string; onPress?: () => void }) {
+function Group({ items }: { items: Item[] }) {
   return (
-    <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1 }}>
-      <Text style={styles.statN}>{n.toLocaleString('tr-TR')}</Text>
+    <View style={[styles.card, { paddingVertical: 4 }]}>
+      {items.map((m, i) => (
+        <Pressable key={m.label} style={[styles.menuRow, i > 0 && styles.sep]} onPress={m.onPress} accessibilityLabel={m.label}>
+          <Ionicons name={m.icon} size={24} color="#fff" />
+          <Text style={styles.menuLabel}>{m.label}</Text>
+          {m.tag && <Text style={{ color: '#F59E0B', fontWeight: '800', fontSize: 12 }}>{m.tag}</Text>}
+          {m.dot && <View style={styles.redDot} />}
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function StatusCard({ title, sub, colors: c, tag, dot, onPress }: { title: string; sub: string; colors: [string, string]; tag?: string; dot?: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={title}>
+      <LinearGradient colors={c} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.status}>
+        {tag && <Text style={styles.newTag}>{tag}</Text>}
+        {dot && <View style={[styles.redDot, { position: 'absolute', top: 8, right: 8 }]} />}
+        <Text style={styles.statusTitle}>{title}</Text>
+        <Text style={styles.statusSub} numberOfLines={1}>
+          {sub}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+function Shortcut({ emoji, label, tag, onPress }: { emoji: string; label: string; tag?: string; onPress: () => void }) {
+  return (
+    <Pressable style={{ flex: 1, alignItems: 'center', gap: 6 }} onPress={onPress} accessibilityLabel={label}>
+      {tag && <Text style={styles.earnTag}>{tag}</Text>}
+      <View style={styles.shortIcon}>
+        <Text style={{ fontSize: 30 }}>{emoji}</Text>
+      </View>
+      <Text style={{ color: '#fff', fontSize: 14 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Stat({ n, label, onPress, dot }: { n: number; label: string; onPress?: () => void; dot?: boolean }) {
+  return (
+    <Pressable style={{ flex: 1, alignItems: 'center', gap: 4 }} onPress={onPress} disabled={!onPress}>
+      <View style={{ flexDirection: 'row' }}>
+        <Text style={styles.statN}>{n.toLocaleString('tr-TR')}</Text>
+        {dot && <View style={[styles.redDot, { marginLeft: 2 }]} />}
+      </View>
       <Text style={styles.statL}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  top: { alignItems: 'center', gap: 6, paddingVertical: 20 },
-  name: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  level: { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
-  levelText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  bio: { color: colors.textDim, fontSize: 14 },
-  id: { color: colors.textDim, fontSize: 12 },
-  stats: { flexDirection: 'row', marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, paddingVertical: 14, marginBottom: 16 },
-  statN: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  statL: { color: colors.textDim, fontSize: 12 },
-  shortcuts: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 16, gap: 10 },
-  shortcut: { flex: 1, alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 16, paddingVertical: 14 },
-  shortcutText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  hostCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)' },
-  vip: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16 },
-  vipTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  vipSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
-  menu: { margin: 16, backgroundColor: colors.card, borderRadius: 16, paddingVertical: 4 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  menuIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { color: '#fff', fontSize: 15, flex: 1 },
-  logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 16 },
+  name: { color: '#fff', fontSize: 22, fontWeight: '800', flexShrink: 1 },
+  id: { color: colors.textDim, fontSize: 13 },
+  completion: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  redDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.red },
+  stats: { flexDirection: 'row', paddingHorizontal: 8 },
+  statN: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  statL: { color: colors.textDim, fontSize: 13 },
+  card: { backgroundColor: colors.card, borderRadius: 18, marginHorizontal: 16, padding: 14, gap: 12 },
+  rechargeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  h2: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  rewardTag: { color: '#F472B6', backgroundColor: 'rgba(244,114,182,0.15)', fontWeight: '800', fontSize: 12, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto' },
+  status: { borderRadius: 14, padding: 12, minHeight: 74, justifyContent: 'center', gap: 4 },
+  statusTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
+  newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: '#F97316', color: '#fff', fontSize: 10, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
+  shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  earnTag: { position: 'absolute', top: -10, right: 4, color: '#FDE047', fontWeight: '900', fontStyle: 'italic', fontSize: 12, zIndex: 1 },
+  roomCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)' },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15 },
+  sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  menuLabel: { flex: 1, color: '#fff', fontSize: 16 },
+  logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14 },
 });

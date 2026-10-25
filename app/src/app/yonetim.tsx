@@ -22,6 +22,8 @@ const FIELDS: Field[] = [
   { k: 'bonusCapPerWeek', label: 'Haftalık bonus üst sınırı (💎)', step: 50_000, min: 0, max: 5_000_000 },
   { k: 'minWithdrawDiamonds', label: 'Minimum çekim (💎)', step: 10_000, min: 5_000, max: 500_000 },
   { k: 'inviteUnitsPerPurchase', label: 'Davet ödülü (birim / başarılı alım)', step: 1, min: 0, max: 10 },
+  { k: 'inviteIncomeShare', label: 'Davet: arkadaş gelirinden pay', step: 0.01, min: 0, max: 0.3, percent: true },
+  { k: 'inviteRechargeShare', label: 'Davet: arkadaş yüklemesinden pay', step: 0.01, min: 0, max: 0.3, percent: true },
 ];
 const round = (v: number) => Math.round(v * 10_000) / 10_000;
 const fmt = (f: Field, v: number) => (f.percent ? pct(v) : v.toLocaleString('tr-TR'));

@@ -97,6 +97,13 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Tam ekran "Oda Ayarları": oda tipi, tema, kilit (Lv4 veya VIP), oda günlüğü, yayına katılma modu (mikrofon sayısı), mikrofon kontrolü, mikrofon izni (Lv4, oda üyeleri), patron koltuğu (Lv3), üyelik başvurusu (gerekmiyor/başvuru/kapalı), üyeleri/işlevleri kim yönetir, otomatik eleme (7/14/30 gün, her gün 00:00 UTC+3), kara liste, profilde oda görünürlüğü, video gizlilik koruması | ✅ |
 | Patron koltuğu: oturumun en çok hediye gönderen kişisi (en az 1.000 jeton) oturur, geçilince el değiştirir, sahip indirebilir | ✅ (`Yeni Arkadaşlar`, `Karaoke Akşamı` odalarında açık) |
 | Oda menüsü ızgara panel: Etkileşimli Oyunlar, Jetonlu Oyunlar (VIP2, sağlayıcı akışı), Oda Araçları, Oda Ayarları (Paylaş, Efektler, Süsler, Ses, mikrofon gürültü giderme, Mesaj ayarları) | ✅ |
+| "Ben" sayfası (Timo düzeni): profil tamamlama, takipçi/takip/arkadaş/ziyaretçi, Yükleme kartı + SVIP/VIP/Asil kartları, Bedava Para / Kabile / Davet, Gelir, Alışveriş Merkezi, Kimlik doğrulama, Çanta, Kullanıcı Seviyesi, Müşteri hizmetleri, Güvenlik, Ayarlar | ✅ |
+| SVIP 1–10 (yüklenen 1 jeton = 1 deneyim puanı, 500k → 400M), 31 hak; VIP abonelik (1/3/6 ay) ve ayrıcalık karşılaştırması; Asil (Şövalye, Vikont, Kont, Markiz, Dük · 30 gün) 27 hak | ✅ `src/data/status.ts` |
+| Yükleme ekranı: TRY paketleri, "Sadece İlk Defa" bonusu, SVIP banner | ✅ (ödeme simüle) |
+| Görev Merkezi: 7 günlük check-in, yarının ödülleri, gece yarısına geri sayım, Git/Al | ✅ |
+| Gelir / Kazanç detayları, Ödüllü Davet (kayıt ödülü cinsiyetten bağımsız, gelir görevi, %8 gelir / %4 şarj payı, süreli ek bonus), Müşteri hizmetleri | ✅ |
+| Timo tarzı kullanıcı profili (Profil / dinamik / Onur / İlişki, koruma, CP) ve hediye paneli (Hot / Gameplay / Çift / Ayrıcalık, SVIP kilitli hediyeler, çanta, favoriler) | ✅ |
+| Jackpot / şans çarpanlı hediye ve rastgele ödüllü kutular | ⛔ bilinçli olarak eklenmedi (kumar niteliği; lisans/hukuk gerekir) |
 
 ## Prototip dışı (backend / yönetim paneli gerektirir) ⛔
 

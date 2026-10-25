@@ -4,15 +4,16 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Share, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, GradientButton, Header } from '@/components/ui';
-import { GAMES, GAME_CATALOG_VISIBLE_BEFORE_VIP, GAME_MIN_VIP, type Game } from '@/data/catalog';
+import { GAMES, GAME_CATALOG_VISIBLE_BEFORE_VIP, type Game } from '@/data/catalog';
+import { GATES } from '@/data/status';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
 type Session = { game: Game; phase: 'starting' | 'playing' | 'verifying' | 'done'; score: number };
 
 export default function GamesScreen() {
-  const { vipLevel } = useApp();
-  const unlocked = vipLevel >= GAME_MIN_VIP;
+  const { svipLevel, nobleTier } = useApp();
+  const unlocked = GATES.games(svipLevel, nobleTier);
   const [session, setSession] = useState<Session | null>(null);
   const kinds = [...new Set(GAMES.map((g) => g.provider))];
 
@@ -22,9 +23,9 @@ export default function GamesScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
         {!unlocked && (
           <Card style={{ gap: 8, borderWidth: 1, borderColor: colors.gold }}>
-            <Text style={styles.title}>🔒 Oyun başlatma VIP {GAME_MIN_VIP}&apos;de açılır</Text>
-            <Text style={styles.dim}>Kataloğu inceleyebilirsin; oyun başlatmak için VIP {GAME_MIN_VIP} gerekir. (Kural yönetim panelinden değiştirilebilir.)</Text>
-            <GradientButton small title={`VIP ${GAME_MIN_VIP} ol`} icon="diamond" onPress={() => router.push('/vip')} />
+            <Text style={styles.title}>🔒 Oyun başlatma SVIP 2 veya Asil Vikont ile açılır</Text>
+            <Text style={styles.dim}>Kataloğu inceleyebilirsin; oyun başlatmak için SVIP 2 veya Asil Vikont gerekir. (Kural yönetim panelinden değiştirilebilir.)</Text>
+            <GradientButton small title="Ayrıcalıkları gör" icon="diamond" onPress={() => router.push('/vip')} />
           </Card>
         )}
         {(unlocked || GAME_CATALOG_VISIBLE_BEFORE_VIP) &&

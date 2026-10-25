@@ -6,9 +6,9 @@ import {
   CHECKIN_REWARDS,
   EXCHANGE_FEE,
   TASKS,
-  VIP_TIERS,
   type TaskKey,
 } from '@/data/economy';
+import { NOBLE_DAYS, RECHARGE_PACKS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
@@ -128,8 +128,17 @@ type AppState = {
   checkIn: () => number;
   inviteCode: string;
   // vip, agency, family
+  /** Visual status level (frames/badges), derived from SVIP, Asil and VIP subscription. */
   vipLevel: number;
-  buyVip: (level: number) => boolean;
+  svipXp: number;
+  svipLevel: number;
+  firstBuys: Set<string>;
+  buyPack: (packId: string) => number;
+  nobleTier: number;
+  nobleDays: number;
+  buyNoble: (tier: number) => boolean;
+  vipDays: number;
+  buyVipPlan: (days: number) => boolean;
   agencyId: string | null;
   agencyRole: AgencyRole | null;
   setAgencyRole: (r: AgencyRole) => void;
@@ -313,7 +322,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     blacklist: ['u6'],
   });
 
-  const [vipLevel, setVipLevel] = useState(0);
+  const [svipXp, setSvipXp] = useState(0);
+  const [firstBuys, setFirstBuys] = useState<Set<string>>(new Set());
+  const [nobleTier, setNobleTier] = useState(0);
+  const [nobleDays, setNobleDays] = useState(0);
+  const [vipDays, setVipDays] = useState(0);
+  const svipLevel = svipLevelOf(svipXp);
+  const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDays > 0 ? 1 : 0));
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(null);
   const [pendingAgency, setPendingAgency] = useState<string | null>(null);
@@ -495,11 +510,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     inviteCode: 'VIBE-7K2Q',
 
     vipLevel,
-    buyVip: (level) => {
-      const tier = VIP_TIERS.find((t) => t.level === level);
-      const ownedPrice = VIP_TIERS.find((t) => t.level === vipLevel)?.price ?? 0;
-      if (!tier || level <= vipLevel || !spend(Math.max(0, tier.price - ownedPrice), `VIP ${tier.level} ${tier.name}`)) return false;
-      setVipLevel(level);
+    svipXp,
+    svipLevel,
+    firstBuys,
+    buyPack: (packId) => {
+      const pack = RECHARGE_PACKS.find((p) => p.id === packId);
+      if (!pack) return 0;
+      // First-purchase bonus applies once per pack; SVIP experience counts the purchased coins only.
+      const first = 'firstBonus' in pack && pack.firstBonus && !firstBuys.has(pack.id) ? pack.firstBonus : 0;
+      const extra = 'bonus' in pack && pack.bonus ? pack.bonus : 0;
+      const total = pack.coins + first + extra;
+      setCoins((c) => c + total);
+      setSvipXp((x) => x + pack.coins);
+      setFirstBuys((f) => new Set(f).add(pack.id));
+      log('coin', total, `Yükleme: ${pack.coins.toLocaleString('tr-TR')} paket (${pack.price})${first ? ' · ilk alım bonusu' : ''}`);
+      return total;
+    },
+    nobleTier,
+    nobleDays,
+    buyNoble: (tier) => {
+      const t = nobleInfo(tier);
+      if (!t || !spend(t.price, `Asil: ${t.name} (${NOBLE_DAYS} gün)`)) return false;
+      setNobleTier(tier);
+      setNobleDays(NOBLE_DAYS);
+      return true;
+    },
+    vipDays,
+    buyVipPlan: (days) => {
+      const plan = VIP_PLANS.find((p) => p.days === days);
+      if (!plan || !spend(plan.price, `VIP ${plan.label}`)) return false;
+      setVipDays((d) => d + days);
       return true;
     },
     agencyId,

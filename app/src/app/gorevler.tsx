@@ -1,146 +1,168 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollView, Share, StyleSheet, Text, View, Pressable } from 'react-native';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Card, CoinPill, GradientButton, Header } from '@/components/ui';
-import { CHECKIN_REWARDS, TASKS } from '@/data/economy';
-import { userById } from '@/data/mock';
+import { CoinPill, Header } from '@/components/ui';
+import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors } from '@/theme';
 
-export default function TasksScreen() {
-  const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask, inviteCode, inviteRewards, simulateInviteePurchase } = useApp();
-  const units = inviteRewards.filter((r) => r.status === 'Onaylandı').length;
-  // Position inside the current 7-day cycle; once today is claimed the highlighted day is the one just taken.
+const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
+  roomMinutes: { desc: 'Sohbet odasında belirtilen süre kadar kal', go: () => router.push('/(tabs)') },
+  giftsSent: { desc: 'Ödül almak için sohbet odasında hediyeler gönderin', go: () => router.push('/(tabs)') },
+  greetings: { desc: 'Keşfet ekranında yeni kişilere selam ver', go: () => router.push('/(tabs)/kesfet') },
+  moments: { desc: 'Günlük an paylaş; incelemeyi geçince sayılır', go: () => router.push('/(tabs)/anlar') },
+  calls: { desc: 'Bir arkadaşınla görüntülü sohbet et', go: () => router.push('/(tabs)/mesajlar') },
+};
+// Tomorrow's check-in reward bundle (cards + coins), mirrors the 7-day cycle.
+const TOMORROW = (coins: number) => [
+  { emoji: '💬', name: 'PM kartı', n: '+2' },
+  { emoji: '❤️', name: 'Merhaba kartı', n: '+2' },
+  { emoji: '🪙', name: 'Jeton', n: `+${coins}` },
+];
+const secsToMidnight = () => {
+  const d = new Date();
+  return Math.max(0, Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - d.getTime()) / 1000));
+};
+const hms = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ${s % 60}s`;
+
+export default function TaskCenter() {
+  const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask } = useApp();
   const todayIndex = (checkedInToday ? checkInDay - 1 : checkInDay) % 7;
+  const [selected, setSelected] = useState((todayIndex + (checkedInToday ? 1 : 0)) % 7);
+  const [left, setLeft] = useState(secsToMidnight);
 
-  const invite = async () => {
-    try {
-      await Share.share({ message: `Vibe Club'a katıl, sesli odalarda tanışalım! Davet kodum: ${inviteCode} 🎙️` });
-    } catch {
-      showAlert('Davet kodun', inviteCode);
+  useEffect(() => {
+    const t = setInterval(() => setLeft(secsToMidnight()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const doCheckIn = () => {
+    const r = checkIn();
+    if (r) {
+      showAlert('Check-in tamam 🎉', `${r} jeton hesabına eklendi.`);
+      setSelected((todayIndex + 1) % 7);
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title="Görevler & Ödüller" right={<CoinPill coins={coins} />} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-        <Card style={{ gap: 12 }}>
+      <Header title="Görev Merkezi" right={<CoinPill coins={coins} />} />
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: 40 }}>
+        <View style={styles.card}>
           <View style={styles.rowBetween}>
-            <Text style={styles.title}>Günlük giriş ödülü</Text>
-            <Text style={styles.dim}>{checkInDay} gün seri 🔥</Text>
+            <Text style={styles.checkTitle}>Günlük Check-in</Text>
+            <Pressable onPress={doCheckIn} disabled={checkedInToday} style={[styles.checkBtn, checkedInToday && { backgroundColor: '#52525B' }]} accessibilityLabel="Check-in">
+              <Text style={{ color: '#fff', fontWeight: '800' }}>{checkedInToday ? 'Bugün tamamlandı' : `Check-in yap +${CHECKIN_REWARDS[todayIndex]}`}</Text>
+            </Pressable>
           </View>
-          <View style={styles.days}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {CHECKIN_REWARDS.map((r, i) => {
               const done = i < todayIndex || (i === todayIndex && checkedInToday);
-              const isToday = i === todayIndex;
+              const big = i === 1 || i === 6;
               return (
-                <View key={i} style={[styles.day, isToday && !checkedInToday && styles.dayToday, done && styles.dayDone, i === 6 && { flexBasis: '100%' }]}>
-                  <Text style={styles.dayLabel}>{i === 6 ? '7. gün · Büyük ödül' : `${i + 1}. gün`}</Text>
-                  <Text style={{ fontSize: i === 6 ? 26 : 20 }}>{done ? '✅' : i === 6 ? '🎁' : '🪙'}</Text>
-                  <Text style={styles.dayReward}>+{r}</Text>
-                </View>
+                <Pressable key={`d${i}`} onPress={() => setSelected(i)} style={[styles.day, selected === i && styles.daySel]} accessibilityLabel={`Gün ${i + 1}`}>
+                  {big && <Text style={styles.large}>Large</Text>}
+                  <Text style={{ fontSize: 26 }}>{big ? '🎁' : i === 3 ? '🪙' : '💌'}</Text>
+                  {done ? <Ionicons name="checkmark" size={22} color={colors.textDim} /> : <Text style={[styles.dayLabel, selected === i && { color: '#3B2A12' }]}>Gün {i + 1}</Text>}
+                  <Text style={[styles.dayCoins, selected === i && { color: '#92400E' }]}>+{r}</Text>
+                </Pressable>
               );
             })}
+          </ScrollView>
+          <View style={styles.tomorrow}>
+            <Text style={styles.tomorrowTitle}>{selected === (todayIndex + (checkedInToday ? 1 : 0)) % 7 ? (checkedInToday ? 'Yarının giriş ödülleri' : 'Bugünün giriş ödülleri') : `Gün ${selected + 1} giriş ödülleri`}</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {TOMORROW(CHECKIN_REWARDS[selected]).map((x) => (
+                <View key={x.name} style={styles.rewardBox}>
+                  <Text style={{ fontSize: 30 }}>{x.emoji}</Text>
+                  <Text style={styles.dim} numberOfLines={1}>
+                    {x.name}
+                  </Text>
+                  <Text style={{ color: colors.pink, fontWeight: '800', fontSize: 16 }}>{x.n}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-          <GradientButton
-            title={checkedInToday ? 'Bugünkü ödül alındı' : `Ödülü al (+${CHECKIN_REWARDS[todayIndex]})`}
-            icon={checkedInToday ? 'checkmark' : 'gift'}
-            style={{ opacity: checkedInToday ? 0.5 : 1 }}
-            onPress={() => {
-              const r = checkIn();
-              if (r) showAlert('Tebrikler! 🎉', `${r} jeton hesabına eklendi.`);
-            }}
-          />
-        </Card>
+        </View>
 
-        <Card style={{ gap: 4 }}>
-          <Text style={[styles.title, { marginBottom: 8 }]}>Günlük görevler</Text>
-          {TASKS.map((t) => {
+        <View style={{ gap: 6 }}>
+          <Text style={styles.h1}>Günlük Görevler</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>⏰ {hms(left)}</Text>
+        </View>
+        <View style={[styles.card, { paddingVertical: 4 }]}>
+          {TASKS.map((t, i) => {
             const progress = Math.min(stats[t.key], t.goal);
             const complete = progress >= t.goal;
             const claimed = claimedTasks.has(t.id);
             return (
-              <View key={t.id} style={styles.task}>
-                <Text style={{ fontSize: 26 }}>{t.icon}</Text>
-                <View style={{ flex: 1, gap: 6 }}>
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>{t.title}</Text>
-                  <View style={styles.track}>
-                    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${(progress / t.goal) * 100}%` }]} />
-                  </View>
-                  <Text style={styles.dim}>
-                    {progress}/{t.goal} · 🪙 +{t.reward}
+              <View key={t.id} style={[styles.task, i > 0 && styles.sep]}>
+                <Text style={styles.taskTitle}>
+                  {t.icon} {t.title}
+                </Text>
+                <Text style={styles.dim}>{TASK_INFO[t.key].desc}</Text>
+                <View style={styles.rowBetween}>
+                  <Text style={{ color: '#C4B5FD', fontSize: 15 }}>
+                    🪙 x{t.reward} <Text style={styles.dim}>({progress}/{t.goal})</Text>
                   </Text>
+                  {claimed ? (
+                    <View style={[styles.goBtn, { opacity: 0.45 }]}>
+                      <Ionicons name="checkmark" size={20} color="#fff" />
+                    </View>
+                  ) : complete ? (
+                    <Pressable style={[styles.goBtn, { backgroundColor: colors.green }]} onPress={() => claimTask(t.id)} accessibilityLabel={`${t.title} ödülünü al`}>
+                      <Text style={styles.goText}>Al</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable style={styles.goBtn} onPress={TASK_INFO[t.key].go} accessibilityLabel={`${t.title} git`}>
+                      <Text style={styles.goText}>Git</Text>
+                    </Pressable>
+                  )}
                 </View>
-                {claimed ? (
-                  <Ionicons name="checkmark-circle" size={28} color={colors.green} />
-                ) : (
-                  <Pressable disabled={!complete} onPress={() => claimTask(t.id)} style={[styles.claim, !complete && { opacity: 0.35 }]}>
-                    <Text style={styles.claimText}>Al</Text>
-                  </Pressable>
-                )}
               </View>
             );
           })}
-        </Card>
+        </View>
 
-        <LinearGradient colors={['#F59E0B', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
-          <Text style={{ fontSize: 36 }}>🤝</Text>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.inviteTitle}>Arkadaşını davet et</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Davet ettiğin kişi her başarılı jeton alımı yaptığında 1 davet ödül birimi kazanırsın.</Text>
-            <Text style={styles.code}>Kodun: {inviteCode}</Text>
-          </View>
-          <Pressable style={styles.shareBtn} onPress={invite}>
-            <Ionicons name="share-social" size={20} color="#EC4899" />
-          </Pressable>
-        </LinearGradient>
-
-        <Card style={{ gap: 8 }}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.title}>Davet ödüllerim</Text>
-            <Text style={{ color: colors.gold, fontWeight: '800' }}>🎟️ {units} birim</Text>
-          </View>
-          <Text style={styles.dim}>Ödül, alınan jeton miktarına değil başarılı alım sayısına bağlıdır. Başarısız/iade edilen alımlar ödül üretmez. Birimler elmas veya USD değildir.</Text>
-          {inviteRewards.map((r) => (
-            <View key={r.id} style={styles.rowBetween}>
-              <Text style={{ color: '#fff' }}>
-                {userById(r.inviteeId).name} · {r.ref}
-              </Text>
-              <Text style={{ color: r.status === 'Onaylandı' ? colors.green : r.status === 'Beklemede' ? colors.gold : colors.red, fontWeight: '700', fontSize: 12 }}>
-                {r.status} · {r.time}
-              </Text>
+        <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
+          <LinearGradient colors={['#F97316', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
+            <Text style={{ fontSize: 34 }}>🤝</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }}>Ödüllü Davet</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Arkadaşlarını davet et, kayıt ve gelir görevlerinden ödül kazan</Text>
             </View>
-          ))}
-          <Pressable onPress={simulateInviteePurchase}>
-            <Text style={{ color: colors.pink, fontWeight: '700' }}>(Demo) Davet ettiğim kişi jeton aldı</Text>
-          </Pressable>
-        </Card>
+            <Ionicons name="chevron-forward" size={22} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+        <Text style={styles.dim}>Görevler her gün 00:00&apos;da sıfırlanır. Ödüller sunucuda doğrulanan etkinliklerden verilir; sahte etkileşim ödül üretmez.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  dim: { color: colors.textDim, fontSize: 12 },
-  days: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  day: { flexBasis: '22%', flexGrow: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.cardAlt, borderWidth: 2, borderColor: 'transparent' },
-  dayToday: { borderColor: colors.pink },
-  dayDone: { opacity: 0.55 },
-  dayLabel: { color: colors.textDim, fontSize: 11 },
-  dayReward: { color: colors.gold, fontWeight: '800' },
-  task: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
-  fill: { height: 6 },
-  claim: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
-  claimText: { color: '#fff', fontWeight: '700' },
+  card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, gap: 14 },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  checkTitle: { color: '#C4B5FD', fontSize: 22, fontWeight: '900' },
+  checkBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  day: { width: 64, alignItems: 'center', gap: 4, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.cardAlt },
+  daySel: { backgroundColor: '#FDE68A' },
+  large: { position: 'absolute', top: 2, color: '#F59E0B', fontSize: 9, fontWeight: '900' },
+  dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
+  dayCoins: { color: colors.gold, fontSize: 11, fontWeight: '700' },
+  tomorrow: { backgroundColor: 'rgba(139,92,246,0.12)', borderRadius: 16, padding: 14, gap: 12 },
+  tomorrowTitle: { color: '#C4B5FD', fontWeight: '800', fontSize: 16 },
+  rewardBox: { width: 88, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
+  h1: { color: '#fff', fontWeight: '900', fontSize: 22 },
+  task: { gap: 6, paddingVertical: 14 },
+  sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  taskTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
+  goBtn: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
+  goText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   invite: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 16 },
-  inviteTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  code: { color: '#fff', fontWeight: '800', marginTop: 4, letterSpacing: 1 },
-  shareBtn: { backgroundColor: '#fff', borderRadius: 999, padding: 10 },
 });

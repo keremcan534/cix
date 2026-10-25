@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, Header } from '@/components/ui';
-import { VIP_INVISIBLE_LEVEL } from '@/data/economy';
+import { GATES } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
 import { colors } from '@/theme';
@@ -49,7 +49,7 @@ function Chips<T extends string | number>({ value, options, onChange }: { value:
 }
 
 export default function SettingsScreen() {
-  const { vipLevel, me, phone, deletionRequested, requestDeletion, logout, blocked, settings, setSetting, sessions, endSession, notify } = useApp();
+  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, blocked, settings, setSetting, sessions, endSession, notify } = useApp();
   const snoozed = settings.snoozeUntil > nowMs();
   const snooze = (h: number) => {
     setSetting('snoozeUntil', h ? nowMs() + h * 3_600_000 : 0);
@@ -135,7 +135,7 @@ export default function SettingsScreen() {
           <Toggle k="profilePublic" label="Profilim herkese açık" />
           <Toggle k="showOnline" label="Çevrimiçi durumumu göster" />
           <Toggle k="cityDiscovery" label="Aynı şehirde keşfedilebilir ol" hint="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
-          <Toggle k="invisibleEntry" label="👻 Odalara gizli giriş" hint={`VIP ${VIP_INVISIBLE_LEVEL}+ · Moderasyon kayıtlarından gizlenmez.`} disabled={vipLevel < VIP_INVISIBLE_LEVEL} />
+          <Toggle k="invisibleEntry" label="👻 Odalara gizli giriş" hint="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez." disabled={!GATES.invisibleEntry(nobleTier)} />
           <Text style={{ color: '#fff' }}>Beni odalara kimler davet edebilir?</Text>
           <Chips
             value={settings.invitesFrom}
