@@ -203,7 +203,7 @@ function Roles({ rbac, update, actor }: Props) {
               </Pressable>
               <Text style={{ color: '#fff', fontWeight: '800', width: 34, textAlign: 'center' }}>{draft.priority}</Text>
               <Pressable onPress={() => !draft.protected && setDraft({ ...draft, priority: Math.min(99, draft.priority + 10) })}>
-                <Ionicons name="add-circle" size={26} color={colors.primary} />
+                <Ionicons name="add-circle" size={26} color={colors.primaryText} />
               </Pressable>
             </View>
           </View>
@@ -471,7 +471,7 @@ function Commissions({ rbac, update, actor }: Props) {
               <Ionicons name="remove-circle" size={26} color={colors.textDim} />
             </Pressable>
             <Pressable onPress={() => change(c.id, 0.01)} accessibilityLabel={`${c.name} artır`}>
-              <Ionicons name="add-circle" size={26} color={colors.primary} />
+              <Ionicons name="add-circle" size={26} color={colors.primaryText} />
             </Pressable>
           </View>
         ))}
@@ -561,10 +561,10 @@ const styles = StyleSheet.create({
   h2: { color: '#fff', fontSize: 17, fontWeight: '800' },
   label: { color: colors.textDim, fontWeight: '700', marginTop: 4 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
-  note: { color: colors.textDim, fontSize: 11, textAlign: 'center' },
+  note: { color: colors.textDim, fontSize: 12, textAlign: 'center' },
   optRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   optText: { color: '#fff', fontSize: 16, flexShrink: 1 },
-  critical: { color: colors.gold, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.gold, borderRadius: 6, paddingHorizontal: 4 },
+  critical: { color: colors.gold, fontSize: 11, fontWeight: '800', borderWidth: 1, borderColor: colors.gold, borderRadius: 6, paddingHorizontal: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipText: { color: '#fff', fontWeight: '700', fontSize: 12 },

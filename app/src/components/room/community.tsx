@@ -7,7 +7,7 @@ import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import type { Settings } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 export type Poll = { id: string; question: string; options: { text: string; votes: number }[]; myVote: number | null; endsIn: number; live: boolean; closed: boolean };
 export type Goal = { id: string; title: string; kind: 'join' | 'like' | 'event'; target: number; progress: number; endsIn: number; paid: boolean };
@@ -209,7 +209,7 @@ export function EventsSheet({
           {!e.cancelled && (
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
               <Pressable onPress={() => onToggleGoing(e.id)} style={[styles.small, e.going && { backgroundColor: colors.green }]}>
-                <Text style={styles.smallText}>{e.going ? '✓ Katılıyorum' : 'Katıl'}</Text>
+                <Text style={[styles.smallText, e.going && { color: semantic.liveInk }]}>{e.going ? '✓ Katılıyorum' : 'Katıl'}</Text>
               </Pressable>
               <Pressable onPress={() => onToggleReminder(e.id)} style={[styles.small, e.reminder && { backgroundColor: colors.primary }]}>
                 <Text style={styles.smallText}>{e.reminder ? '🔔 Hatırlatılacak' : '🔕 Hatırlat'}</Text>

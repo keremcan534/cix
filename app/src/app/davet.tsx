@@ -240,7 +240,7 @@ export default function InviteScreen() {
                   </LinearGradient>
                   <View style={[styles.dot, (done || current) && { borderColor: '#F97316', backgroundColor: done ? '#F97316' : colors.card }]} />
                   <Text style={styles.mileN}>{m.invites}</Text>
-                  <Text style={[styles.dim, { textAlign: 'center', fontSize: 11 }]}>Kümülatif{'\n'}davetiyeler</Text>
+                  <Text style={[styles.dim, { textAlign: 'center', fontSize: 12 }]}>Kümülatif{'\n'}davetiyeler</Text>
                   <View style={[styles.mileChip, done ? { backgroundColor: 'rgba(34,197,94,0.18)' } : current ? { backgroundColor: 'rgba(251,191,36,0.18)' } : null]}>
                     <Text style={[styles.mileChipText, { color: done ? colors.green : current ? colors.gold : colors.textDim }]}>
                       {done ? '✓ Kazanıldı' : current ? 'Devam Ediyor' : '🔒 Kilidi Açılacak'}
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   taskCard: { flex: 1, backgroundColor: colors.cardAlt, borderRadius: 16, overflow: 'hidden' },
   taskTop: { alignItems: 'center', paddingVertical: 12, gap: 4, borderTopLeftRadius: 60, borderTopRightRadius: 60 },
   taskAmount: { color: '#fff', fontWeight: '900', fontSize: 16 },
-  taskGoal: { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center', padding: 8, lineHeight: 16 },
+  taskGoal: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', padding: 8, lineHeight: 16 },
   link: { color: colors.gold, fontWeight: '800', textDecorationLine: 'underline' },
   shareCard: { flex: 1, alignItems: 'center', gap: 4, borderTopWidth: 4 },
   shareLabel: { fontWeight: '800' },
@@ -419,19 +419,19 @@ const styles = StyleSheet.create({
   countTitle: { color: colors.gold, fontWeight: '900', fontSize: 13 },
   timeBox: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, minWidth: 44, alignItems: 'center', borderWidth: 2, borderColor: '#B91C1C' },
   timeText: { color: '#B91C1C', fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
-  timeLabel: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  timeLabel: { color: '#fff', fontSize: 12, fontWeight: '600' },
   colon: { color: '#fff', fontWeight: '900', fontSize: 22, marginTop: 6 },
   milestones: { flexDirection: 'row', backgroundColor: colors.cardAlt, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 4 },
   milestone: { flex: 1, alignItems: 'center', gap: 4, zIndex: 1 },
   here: { backgroundColor: '#F97316', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  hereText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  hereText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   medal: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
   medalText: { color: '#3B2300', fontWeight: '900', fontSize: 13 },
   dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3, borderColor: colors.border, backgroundColor: colors.card, marginTop: 4 },
   mileTrack: { position: 'absolute', left: 16, right: 16, top: 10 + 22 + 4 + 62 + 4 + 4 + 6, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mileN: { color: '#fff', fontWeight: '900', fontSize: 16 },
   mileChip: { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: colors.card, marginTop: 2 },
-  mileChipText: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  mileChipText: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
   ringRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   ring: { position: 'absolute', left: 4, top: 4, right: 4, bottom: 4, borderRadius: RING, borderWidth: 6, borderColor: 'rgba(249,115,22,0.22)' },
   ringDot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#F97316' },

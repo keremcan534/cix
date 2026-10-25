@@ -249,7 +249,7 @@ function MomentCard({
             </Text>
             {author.gender && (
               <View style={[styles.genderChip, { backgroundColor: female ? 'rgba(236,72,153,0.18)' : 'rgba(56,189,248,0.18)' }]}>
-                <Text style={{ color: female ? colors.pink : '#38BDF8', fontSize: 11, fontWeight: '700' }}>
+                <Text style={{ color: female ? colors.pink : '#38BDF8', fontSize: 12, fontWeight: '700' }}>
                   {female ? '♀' : '♂'}
                   {author.age}
                 </Text>

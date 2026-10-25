@@ -234,7 +234,7 @@ function WalletTab() {
         )}
         <Pressable onPress={() => router.push('/cuzdan')} style={styles.linkRow}>
           <Text style={styles.link}>Tüm hareketler ve jeton paketleri</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          <Ionicons name="chevron-forward" size={16} color={colors.primaryText} />
         </Pressable>
       </Card>
     </>
@@ -581,7 +581,7 @@ function RulesTab() {
         <Text style={styles.dim}>Salt okunur. Kurallar yönetim panelinde düzenlenir; her değişiklik yeni sürüm oluşturur ve yalnız ileriye dönük uygulanır.</Text>
         <Pressable onPress={() => router.push('/yonetim')} style={styles.linkRow}>
           <Text style={styles.link}>Yönetim paneline git</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          <Ionicons name="chevron-forward" size={16} color={colors.primaryText} />
         </Pressable>
         {ruleHistory.slice(0, 5).map((h) => (
           <Text key={h.id} style={styles.mono}>
@@ -712,7 +712,7 @@ function PayoutAccountCard({ scope }: { scope: Scope }) {
       {!editing ? (
         <Pressable onPress={() => setEditing(true)} style={styles.linkRow}>
           <Text style={styles.link}>{acc ? 'Hesabı değiştir' : 'Hesap ekle'}</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          <Ionicons name="chevron-forward" size={16} color={colors.primaryText} />
         </Pressable>
       ) : (
         <View style={{ gap: 8 }}>
@@ -967,7 +967,7 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
 function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
   return (
     <View style={styles.sectionTitle}>
-      <Ionicons name={icon} size={16} color={colors.primary} />
+      <Ionicons name={icon} size={16} color={colors.primaryText} />
       <Text style={styles.sectionText}>{title}</Text>
     </View>
   );
@@ -1033,7 +1033,7 @@ function LockedCard({ icon, title, text, action, onPress }: { icon: keyof typeof
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   protoPill: { backgroundColor: 'rgba(251,191,36,0.18)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  protoPillText: { color: colors.gold, fontSize: 10, fontWeight: '800' },
+  protoPillText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
   tabs: { paddingHorizontal: 12, gap: 8, paddingBottom: 8 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   tabOn: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -1051,7 +1051,7 @@ const styles = StyleSheet.create({
   stat: { flexGrow: 1, flexBasis: '45%', backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 2, borderWidth: 1, borderColor: colors.border },
   statLabel: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   statValue: { fontSize: 17, fontWeight: '900' },
-  statSub: { color: colors.textDim, fontSize: 11 },
+  statSub: { color: colors.textDim, fontSize: 12 },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   sectionText: { color: '#fff', fontSize: 15, fontWeight: '800', flexShrink: 1 },
   cardTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
@@ -1059,17 +1059,17 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
   amount: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  mono: { color: colors.textDim, fontSize: 11, fontFamily: MONO },
+  mono: { color: colors.textDim, fontSize: 12, fontFamily: MONO },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { fontSize: 10, fontWeight: '800' },
+  badgeText: { fontSize: 11, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 12 },
   input: { backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#fff', fontSize: 14, borderWidth: 1, borderColor: colors.border },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 6 },
-  link: { color: colors.primary, fontWeight: '700' },
+  link: { color: colors.primaryText, fontWeight: '700' },
   ghostBtn: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingVertical: 7 },
   ghostText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   kv: { flexDirection: 'row', gap: 10, paddingVertical: 3 },
@@ -1080,7 +1080,7 @@ const styles = StyleSheet.create({
   versionPill: { backgroundColor: colors.cardAlt, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
   versionText: { color: colors.gold, fontWeight: '800', fontSize: 12 },
   auditRow: { flexDirection: 'row', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  auditTime: { color: colors.textDim, fontSize: 11, fontFamily: MONO, width: 58 },
+  auditTime: { color: colors.textDim, fontSize: 12, fontFamily: MONO, width: 58 },
   tableName: { color: '#C4B5FD', fontFamily: MONO, fontSize: 13, fontWeight: '700' },
   payout: { backgroundColor: colors.cardAlt, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   step: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },

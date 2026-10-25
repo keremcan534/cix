@@ -69,7 +69,7 @@ export default function EarningsDetail() {
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primaryText} />}
       >
         {main === 'diamonds' ? (
           <>
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   sumRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   sumLabel: { color: '#fff', fontSize: 16 },
   sumValue: { color: '#fff', fontWeight: '700' },
-  hint: { color: colors.textDim, fontSize: 11 },
+  hint: { color: colors.textDim, fontSize: 12 },
   subTabs: { flexDirection: 'row', paddingHorizontal: 16, gap: 22, paddingTop: 12 },
   subTab: { alignItems: 'center', gap: 6 },
   subText: { color: colors.textDim, fontSize: 16, fontWeight: '600' },

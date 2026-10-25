@@ -281,8 +281,8 @@ export default function UserProfile() {
                       <Text style={styles.rewardTitle}>Ödül Kazan</Text>
                       <View style={{ flex: 1 }} />
                       <View style={styles.editPill}>
-                        <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>Profili Düzenle</Text>
-                        <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+                        <Text style={{ color: colors.primaryText, fontWeight: '800', fontSize: 13 }}>Profili Düzenle</Text>
+                        <Ionicons name="chevron-forward" size={14} color={colors.primaryText} />
                       </View>
                     </View>
                     <View style={[styles.row, { marginTop: 10 }]}>
@@ -404,7 +404,7 @@ export default function UserProfile() {
                       {room.desc}
                     </Text>
                     <View style={styles.lvChip}>
-                      <Text style={{ fontSize: 11 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
+                      <Text style={{ fontSize: 12 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
                       <Text style={styles.lvText}>Lv.{room.level}</Text>
                     </View>
                   </View>
@@ -600,7 +600,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
         <Text style={styles.guardianText}>👑 KORUMA</Text>
       </LinearGradient>
       {g && guardian && (
-        <Text style={[styles.meta, { fontSize: 11, marginTop: 4 }]} numberOfLines={1}>
+        <Text style={[styles.meta, { fontSize: 12, marginTop: 4 }]} numberOfLines={1}>
           {g.name} · {(guardian.points / 1000).toFixed(1)}K
         </Text>
       )}
@@ -645,7 +645,7 @@ function BarButton({ icon, label, onPress, highlight }: { icon: keyof typeof Ion
           <Ionicons name={icon} size={21} color="#fff" />
         </View>
       )}
-      <Text style={{ color: colors.textDim, fontSize: 10 }}>{label}</Text>
+      <Text style={{ color: colors.textDim, fontSize: 11 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -739,7 +739,7 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
         ) : (
           <Text style={styles.meta}>Henüz puan yok.</Text>
         ))}
-      <Text style={[styles.meta, { fontSize: 11 }]}>Seviyeler: {FAN_LEVELS.map((l) => l.name).join(' → ')}</Text>
+      <Text style={[styles.meta, { fontSize: 12 }]}>Seviyeler: {FAN_LEVELS.map((l) => l.name).join(' → ')}</Text>
     </View>
   );
 }
@@ -751,7 +751,7 @@ function MomentItem({ moment, user }: { moment: Moment; user: User }) {
         <Avatar uri={user.avatar} size={36} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>{user.name}</Text>
-          <Text style={[styles.meta, { fontSize: 11 }]}>{moment.time}</Text>
+          <Text style={[styles.meta, { fontSize: 12 }]}>{moment.time}</Text>
         </View>
       </View>
       <Text style={{ color: '#fff', fontSize: 15 }}>{moment.text}</Text>
@@ -887,7 +887,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
         {giftWall.map((g) => (
           <View key={g.id} style={styles.giftCell}>
             <Text style={{ fontSize: 26, opacity: g.count > 0 ? 1 : 0.25 }}>{g.emoji}</Text>
-            <Text style={[styles.meta, { fontSize: 11 }]} numberOfLines={1}>
+            <Text style={[styles.meta, { fontSize: 12 }]} numberOfLines={1}>
               {g.name}
             </Text>
             <Text style={{ color: g.count > 0 ? colors.gold : colors.textDim, fontSize: 12, fontWeight: '700' }}>x{g.count}</Text>
@@ -911,7 +911,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
                 {c.name}
               </Text>
               <View style={styles.collectionBar}>
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
                   {c.done}/{c.total}
                 </Text>
               </View>
@@ -950,7 +950,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
           </View>
           {isMe ? (
             <Pressable style={styles.relIcon} onPress={() => setHidden((v) => !v)} accessibilityLabel="Görünürlük">
-              <Ionicons name={hidden ? 'eye-off' : 'eye'} size={18} color={colors.primary} />
+              <Ionicons name={hidden ? 'eye-off' : 'eye'} size={18} color={colors.primaryText} />
             </Pressable>
           ) : (
             <View style={{ width: 34 }} />
@@ -967,12 +967,12 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
             }
             accessibilityLabel="Yardım"
           >
-            <Ionicons name="help" size={18} color={colors.primary} />
+            <Ionicons name="help" size={18} color={colors.primaryText} />
           </Pressable>
         </View>
         {isMe && (
           <Pressable style={[styles.row, { alignSelf: 'flex-end', marginTop: 10 }]} onPress={() => setTop1Only((v) => !v)}>
-            <Ionicons name={top1Only ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={colors.primary} />
+            <Ionicons name={top1Only ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={colors.primaryText} />
             <Text style={{ color: '#C4B5FD', fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
           </Pressable>
         )}
@@ -1026,7 +1026,7 @@ function RelationRow({ user, relation, kind, canWed }: { user: User; relation: R
           <LinearGradient colors={['#F472B6', '#A855F7']} style={styles.daysPill}>
             <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{relation.days} gün</Text>
           </LinearGradient>
-          {relation.label && <Text style={[styles.meta, { fontSize: 11, marginTop: 2 }]}>{relation.label}</Text>}
+          {relation.label && <Text style={[styles.meta, { fontSize: 12, marginTop: 2 }]}>{relation.label}</Text>}
         </View>
         <Pressable style={{ alignItems: 'center', gap: 4, flex: 1 }} onPress={() => router.push(`/kullanici/${partner.id}`)}>
           <Avatar uri={partner.avatar} size={58} />
@@ -1082,7 +1082,7 @@ function EditSheet({ user, onSave, onClose }: { user: User; onSave: (patch: Part
         <TextInput value={name} onChangeText={setName} maxLength={20} style={styles.input} placeholder="İsmin" placeholderTextColor={colors.textDim} />
         <Text style={styles.inputLabel}>Hakkımda</Text>
         <TextInput value={bio} onChangeText={setBio} maxLength={80} multiline style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]} placeholder="Kendini anlat" placeholderTextColor={colors.textDim} />
-        <Text style={[styles.meta, { alignSelf: 'flex-end', fontSize: 11 }]}>{bio.length}/80</Text>
+        <Text style={[styles.meta, { alignSelf: 'flex-end', fontSize: 12 }]}>{bio.length}/80</Text>
         <Text style={styles.inputLabel}>Şehir</Text>
         <TextInput value={city} onChangeText={setCity} maxLength={30} style={styles.input} placeholder="Şehir" placeholderTextColor={colors.textDim} />
         <View style={[styles.row, { gap: 10, marginTop: 16 }]}>
@@ -1154,7 +1154,7 @@ const styles = StyleSheet.create({
   guardianRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: colors.gold, overflow: 'hidden' },
   guardianImg: { width: '100%', height: '100%' },
   guardianLabel: { marginTop: -12, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FEF3C7' },
-  guardianText: { color: '#5B2A00', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  guardianText: { color: '#5B2A00', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
   tabBar: { flexDirection: 'row', justifyContent: 'center', gap: 26, height: TAB_H, backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabItem: { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4, gap: 5 },
   tabText: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
@@ -1205,10 +1205,10 @@ const styles = StyleSheet.create({
   wallCount: { color: '#fff', fontWeight: '700', fontSize: 13 },
   pedestals: { flexDirection: 'row', gap: 8, marginTop: 14 },
   pedestal: { width: '90%', height: 14, borderRadius: 4 },
-  pedestalName: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  pedestalName: { color: '#fff', fontSize: 11, fontWeight: '600' },
   titleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, justifyContent: 'space-between' },
   titleSlot: { width: '31%', height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  titleText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  titleText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   giftWall: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.card, borderRadius: 16, padding: 8 },
   giftCell: { width: '25%', alignItems: 'center', paddingVertical: 8, gap: 1 },
   catalog: { backgroundColor: colors.card, borderRadius: 18, padding: 14, gap: 12 },
@@ -1223,7 +1223,7 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.textDim, fontWeight: '800', fontSize: 15 },
   relRow: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: 12, paddingTop: 22 },
   relLv: { position: 'absolute', top: 6, left: 8, backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
-  relLvText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  relLvText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   relPair: { flexDirection: 'row', alignItems: 'center' },
   relName: { color: '#fff', fontSize: 13, fontWeight: '600', maxWidth: 90 },
   daysPill: { marginTop: -8, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },

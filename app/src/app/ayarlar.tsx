@@ -152,6 +152,7 @@ export default function SettingsScreen() {
         <Text style={styles.section}>Görünüm ve erişilebilirlik</Text>
         <Card style={{ gap: 12 }}>
           <Toggle k="effectsOff" label="Animasyon ve giriş efektlerini kapat" hint="Hediye animasyonları ve giriş efektleri gösterilmez; oda işlevleri devam eder." />
+          <Toggle k="haptics" label="Dokunuş titreşimi" hint="Butona basınca, mikrofonu açınca ve hediye gönderince telefon hafifçe titrer." />
           <Toggle k="reduceMotion" label="Hareketi azalt" hint="Geçişler ve titreşimli efektler sadeleştirilir." />
           <Toggle k="lowData" label="📶 Düşük veri modu" hint="Kapak görselleri düşük çözünürlükte, otomatik oynatma kapalı, ses kalitesi bağlantıya göre düşürülür." />
         </Card>

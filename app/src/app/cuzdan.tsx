@@ -72,7 +72,7 @@ export default function WalletScreen() {
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: '#fff' }}>{item.reason}</Text>
-                  <Text style={{ color: colors.textDim, fontSize: 11 }}>
+                  <Text style={{ color: colors.textDim, fontSize: 12 }}>
                     {item.time} · {item.status} · {item.ref}
                   </Text>
                 </View>
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   banner: { marginHorizontal: 16, borderRadius: 14, padding: 16, gap: 4, overflow: 'hidden' },
   bannerTitle: { color: '#FDE68A', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   flag: { color: '#fff', backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, overflow: 'hidden' },
-  firstTag: { position: 'absolute', top: -8, left: 4, backgroundColor: '#DC2626', color: '#FDE68A', fontSize: 10, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  firstTag: { position: 'absolute', top: -8, left: 4, backgroundColor: '#DC2626', color: '#FDE68A', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
   packSelected: { borderColor: colors.pink },
   bonus: {
@@ -155,8 +155,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  bonusText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  bonusText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   packCoins: { color: '#fff', fontSize: 18, fontWeight: '800' },
   packPrice: { color: colors.textDim },
-  note: { color: colors.textDim, fontSize: 11, textAlign: 'center', marginTop: 8 },
+  note: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: 8 },
 });

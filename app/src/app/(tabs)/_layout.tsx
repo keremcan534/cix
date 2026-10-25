@@ -27,7 +27,7 @@ function RoomsIcon({ color, focused }: { color: ColorValue; focused: boolean }) 
   );
 }
 function RoomsLabel({ focused, color }: { focused: boolean; color: ColorValue }) {
-  return focused ? <View /> : <Text style={{ color: color as string, fontSize: 11, fontWeight: '600' }}>Odalar</Text>;
+  return focused ? <View /> : <Text style={{ color: color as string, fontSize: 12, fontWeight: '600' }}>Odalar</Text>;
 }
 
 export default function TabLayout() {
@@ -41,24 +41,24 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#fff',
         tabBarInactiveTintColor: colors.textDim,
         tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border, height: 64, paddingTop: 6 },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         tabBarIconStyle: { overflow: 'visible' },
       }}
     >
-      <Tabs.Screen name="kesfet" options={{ title: 'Senin İçin', tabBarIcon: icon('heart-outline', 'heart'), tabBarActiveTintColor: colors.primary }} />
-      <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture'), tabBarActiveTintColor: colors.primary }} />
+      <Tabs.Screen name="kesfet" options={{ title: 'Senin İçin', tabBarIcon: icon('heart-outline', 'heart'), tabBarActiveTintColor: colors.primaryText }} />
+      <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture'), tabBarActiveTintColor: colors.primaryText }} />
       <Tabs.Screen name="index" options={{ title: 'Odalar', tabBarIcon: RoomsIcon, tabBarLabel: RoomsLabel, tabBarAccessibilityLabel: 'Odalar' }} />
       <Tabs.Screen
         name="mesajlar"
         options={{
           title: 'Mesajlar',
           tabBarIcon: icon('chatbox-ellipses-outline', 'chatbox-ellipses'),
-          tabBarActiveTintColor: colors.primary,
+          tabBarActiveTintColor: colors.primaryText,
           tabBarBadge: unread || undefined,
           tabBarBadgeStyle: { backgroundColor: colors.red },
         }}
       />
-      <Tabs.Screen name="profil" options={{ title: 'Ben', tabBarIcon: icon('happy-outline', 'happy'), tabBarActiveTintColor: colors.primary }} />
+      <Tabs.Screen name="profil" options={{ title: 'Ben', tabBarIcon: icon('happy-outline', 'happy'), tabBarActiveTintColor: colors.primaryText }} />
     </Tabs>
   );
 }

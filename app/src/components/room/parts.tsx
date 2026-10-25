@@ -8,8 +8,9 @@ import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { cosmeticById } from '@/data/catalog';
 import { GIFTS, userById, type Gift, type GiftCat, type Room, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 export type ChatMsg = { id: string; userId?: string; text: string; system?: boolean; bot?: boolean };
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -74,7 +75,7 @@ export function Seat({
         {user && (vipLevel > 0 || frameId) ? (
           <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
         ) : user ? (
-          <Image source={{ uri: user.avatar }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? colors.pink : 'transparent' }} />
+          <Image source={{ uri: user.avatar }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
         ) : (
           <View style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }]}>
             <Ionicons name={locked ? 'lock-closed' : 'add'} size={small ? 18 : 22} color={colors.textDim} />
@@ -92,8 +93,8 @@ export function Seat({
         )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-        {host && <Text style={{ fontSize: 11 }}>👑</Text>}
-        <Text style={[styles.seatName, small && { fontSize: 11 }]} numberOfLines={1}>
+        {host && <Text style={{ fontSize: 12 }}>👑</Text>}
+        <Text style={[styles.seatName, small && { fontSize: 12 }]} numberOfLines={1}>
           {user ? user.name : `${index + 1}`}
         </Text>
         {user?.verified && !small && <VerifiedBadge size={11} />}
@@ -139,34 +140,78 @@ export function ChatLine({ msg, bubbleId }: { msg: ChatMsg; bubbleId?: string })
 export function RoundBtn({
   icon,
   onPress,
-  active,
   gift,
   label,
   badge,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
-  active?: boolean;
+  /** Gold "money" button: gold is reserved for spending coins. */
   gift?: boolean;
   label: string;
   badge?: number;
 }) {
-  const inner = gift ? (
-    <LinearGradient colors={['#F59E0B', '#EC4899']} style={styles.round}>
-      <Ionicons name={icon} size={20} color="#fff" />
-    </LinearGradient>
-  ) : (
-    <View style={[styles.round, { backgroundColor: active ? colors.primary : colors.cardAlt }]}>
-      <Ionicons name={icon} size={20} color="#fff" />
-    </View>
-  );
   return (
-    <Pressable onPress={onPress} accessibilityLabel={label}>
-      {inner}
+    <Pressable
+      onPress={() => {
+        if (gift) pressHaptic();
+        else tapHaptic();
+        onPress();
+      }}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.92 : 1 }] })}
+    >
+      {gift ? (
+        <View style={[styles.round, styles.giftRound]}>
+          <Ionicons name={icon} size={22} color={semantic.moneyInk} />
+        </View>
+      ) : (
+        <View style={[styles.round, { backgroundColor: colors.cardAlt }]}>
+          <Ionicons name={icon} size={22} color="#fff" />
+        </View>
+      )}
       {!!badge && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
+      )}
+    </Pressable>
+  );
+}
+
+export type MicState = 'on' | 'off' | 'hand' | 'queued';
+const MIC_LOOK: Record<MicState, { icon: keyof typeof Ionicons.glyphMap; caption: string; bg: string; edge: string; fg: string; a11y: string }> = {
+  on: { icon: 'mic', caption: 'AÇIK', bg: semantic.live, edge: semantic.liveEdge, fg: semantic.liveInk, a11y: 'Mikrofon açık, kapatmak için dokun' },
+  off: { icon: 'mic-off', caption: 'KAPALI', bg: colors.cardAlt, edge: '#18112E', fg: '#FCA5A5', a11y: 'Mikrofon kapalı, açmak için dokun' },
+  hand: { icon: 'hand-left', caption: 'EL KALDIR', bg: colors.primary, edge: semantic.actionEdge, fg: '#fff', a11y: 'El kaldır, konuşmak iste' },
+  queued: { icon: 'hourglass', caption: 'SIRADA', bg: semantic.tonal, edge: 'transparent', fg: semantic.tonalText, a11y: 'Konuşmacı sırasındasın' },
+};
+
+/** The biggest control in the room: state is shown by color, icon and caption together, never by color alone. */
+export function MicBtn({ state, queuePos, onPress }: { state: MicState; queuePos?: number; onPress: () => void }) {
+  const look = MIC_LOOK[state];
+  const caption = state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : look.caption;
+  return (
+    <Pressable
+      onPress={() => {
+        micHaptic();
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={look.a11y}
+      accessibilityState={{ checked: state === 'on' }}
+      style={{ alignItems: 'center', gap: 2 }}
+    >
+      {({ pressed }) => (
+        <>
+          <View style={{ borderRadius: 28, backgroundColor: look.edge, paddingBottom: pressed ? 0 : 4, marginTop: pressed ? 4 : 0 }}>
+            <View style={[styles.micRound, { backgroundColor: look.bg }]}>
+              <Ionicons name={look.icon} size={26} color={look.fg} />
+            </View>
+          </View>
+          <Text style={[styles.micCaption, state === 'on' && { color: semantic.live }]}>{caption}</Text>
+        </>
       )}
     </Pressable>
   );
@@ -500,7 +545,7 @@ export function GiftSheet({
             <Ionicons name={view === 'fav' ? 'star' : 'star-outline'} size={20} color={view === 'fav' ? colors.gold : colors.textDim} />
           </Pressable>
           <Pressable onPress={() => pickView('bag')} hitSlop={6} style={[styles.tabIcon, view === 'bag' && styles.tabIconActive]} accessibilityLabel="Çanta">
-            <Ionicons name={view === 'bag' ? 'bag-handle' : 'bag-handle-outline'} size={20} color={view === 'bag' ? colors.primary : colors.textDim} />
+            <Ionicons name={view === 'bag' ? 'bag-handle' : 'bag-handle-outline'} size={20} color={view === 'bag' ? colors.primaryText : colors.textDim} />
           </Pressable>
         </View>
         {view === 'bag' && <Text style={styles.viewNote}>🎒 Çanta · Günlük giriş ve görev ödülü hediyeler. Gönderirken jeton harcanmaz.</Text>}
@@ -741,7 +786,7 @@ export const roomStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
-  ring: { position: 'absolute', borderWidth: 3, borderColor: colors.pink },
+  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live },
   emptySeat: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: colors.bg, borderRadius: 10, padding: 2 },
@@ -749,16 +794,19 @@ const styles = StyleSheet.create({
   systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(139,92,246,0.25)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
   systemText: { color: '#DDD6FE', fontSize: 12 },
   botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
-  botTag: { color: colors.green, fontSize: 10, fontWeight: '900' },
+  botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },
   chatLine: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, maxWidth: '85%' },
   chatText: { color: '#fff', fontSize: 14 },
-  round: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  giftRound: { backgroundColor: semantic.money, borderBottomWidth: 4, borderBottomColor: semantic.moneyEdge },
+  micRound: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  micCaption: { color: colors.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   pk: { marginHorizontal: 12, marginTop: 4, gap: 6 },
   pkTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pkName: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '600' },
+  pkName: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '600' },
   pkTimer: { color: colors.gold, fontWeight: '900', fontSize: 13 },
   pkTrack: { flexDirection: 'row', height: 22, borderRadius: 11, overflow: 'hidden' },
   pkScore: { color: '#fff', fontWeight: '800', fontSize: 12 },
@@ -787,7 +835,7 @@ const styles = StyleSheet.create({
   tabLine: { width: 18, height: 3, borderRadius: 2, backgroundColor: '#fff', marginTop: 4 },
   tabIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   tabIconActive: { backgroundColor: colors.cardAlt },
-  viewNote: { color: colors.textDim, fontSize: 11, marginTop: 6 },
+  viewNote: { color: colors.textDim, fontSize: 12, marginTop: 6 },
   gridScroll: { height: 236, marginTop: 8 },
   giftGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 4 },
   giftCellWrap: { width: '25%', padding: 2 },
@@ -795,7 +843,7 @@ const styles = StyleSheet.create({
   giftSelected: { borderColor: colors.primary, backgroundColor: 'rgba(139,92,246,0.14)' },
   giftArt: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   giftName: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: '94%' },
-  giftPrice: { color: colors.gold, fontSize: 10, marginTop: 2 },
+  giftPrice: { color: colors.gold, fontSize: 11, marginTop: 2 },
   cornerBadges: { position: 'absolute', top: 4, right: 4, gap: 2, alignItems: 'flex-end' },
   cBadge: { minWidth: 16, height: 14, borderRadius: 4, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   cBadge3d: { borderWidth: 1, borderColor: '#34D399', backgroundColor: 'rgba(6,78,59,0.85)' },
@@ -814,8 +862,8 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, color: '#fff', fontWeight: '800', fontSize: 14 },
   bannerArrow: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFFBEB', alignItems: 'center', justifyContent: 'center' },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  summaryText: { flex: 1, color: colors.textDim, fontSize: 11 },
-  summaryExtra: { fontSize: 11, fontWeight: '700' },
+  summaryText: { flex: 1, color: colors.textDim, fontSize: 12 },
+  summaryExtra: { fontSize: 12, fontWeight: '700' },
   bottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 10 },
   balance: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
   balanceText: { color: '#fff', fontWeight: '900', fontSize: 17 },

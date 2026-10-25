@@ -241,7 +241,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
         <LinearGradient colors={['#A855F7', '#6366F1']} style={styles.catIcon}>
           <Ionicons name="people" size={18} color="#fff" />
           <View style={styles.plusBadge}>
-            <Ionicons name="add" size={10} color={colors.primary} />
+            <Ionicons name="add" size={10} color={colors.primaryText} />
           </View>
         </LinearGradient>
       </Pressable>
@@ -378,7 +378,7 @@ function RoomRow({ room }: { room: Room }) {
         <View style={styles.chipRow}>
           {badge && (
             <LinearGradient colors={badge.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.badgeChip}>
-              <Text style={{ fontSize: 10 }}>{badge.emoji}</Text>
+              <Text style={{ fontSize: 11 }}>{badge.emoji}</Text>
               <Text style={styles.badgeText} numberOfLines={1}>
                 {badge.label}
               </Text>
@@ -525,13 +525,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.bg,
   },
-  hostLevelText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  hostLevelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   hostName: { color: colors.text, fontSize: 12, marginTop: 4 },
   // suggestions
   suggest: { width: 150, gap: 4 },
   suggestImg: { width: 150, height: 90, borderRadius: 12, backgroundColor: colors.card },
   suggestTitle: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  suggestWhy: { color: colors.textDim, fontSize: 11 },
+  suggestWhy: { color: colors.textDim, fontSize: 12 },
   // room rows
   roomCard: { flexDirection: 'row', gap: 12, padding: 10, borderRadius: 16, backgroundColor: colors.card, overflow: 'hidden' },
   roomCardTop: { borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)' },
@@ -542,13 +542,13 @@ const styles = StyleSheet.create({
   announce: { color: colors.textDim, fontSize: 12 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 92 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800', flexShrink: 1 },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
   lvChip: { backgroundColor: 'rgba(251,191,36,0.18)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  lvText: { color: colors.gold, fontSize: 10, fontWeight: '800' },
+  lvText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
   tagChip: { backgroundColor: 'rgba(139,92,246,0.2)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  tagText: { color: '#C4B5FD', fontSize: 10, fontWeight: '600' },
+  tagText: { color: '#C4B5FD', fontSize: 11, fontWeight: '600' },
   pkPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  pkText: { color: '#fff', fontSize: 10, fontWeight: '900', fontStyle: 'italic' },
+  pkText: { color: '#fff', fontSize: 11, fontWeight: '900', fontStyle: 'italic' },
   listeners: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   listenerText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   watermark: { position: 'absolute', right: 14, top: 4, alignItems: 'flex-end' },
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   myRoom: { flexDirection: 'row', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border },
   myCover: { width: 92, height: 92, borderRadius: 12, backgroundColor: colors.cardAlt },
   odamChip: { backgroundColor: colors.green, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1 },
-  odamText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  odamText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   subTabs: { flexDirection: 'row', gap: 22, paddingHorizontal: 16 },
   subTab: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
   subTabActive: { color: colors.text, fontSize: 16, fontWeight: '800' },

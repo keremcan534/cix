@@ -31,7 +31,7 @@ import { userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import type { MyRoom } from '@/store';
-import { colors } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string };
 type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean };
@@ -161,7 +161,7 @@ export function LevelTable({ xp, level }: { xp: number; level: number }) {
   return (
     <View style={{ gap: 6 }}>
       <View style={styles.track}>
-        <LinearGradient colors={['#8B5CF6', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 8, width: next ? `${((xp - prev) / (next - prev)) * 100}%` : '100%' }} />
+        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 8, width: next ? `${((xp - prev) / (next - prev)) * 100}%` : '100%' }} />
       </View>
       <Text style={styles.dim}>{next ? `${xp.toLocaleString('tr-TR')} / ${next.toLocaleString('tr-TR')} XP · sonraki ödül: ${ROOM_LEVEL_REWARDS[level]}` : `${xp} XP · maksimum seviye`}</Text>
       <Text style={styles.dim}>XP kaynakları: hediye, katılım, mikrofonda konuşma, etkinlik, sohbet. Spam ve sahte işlemler XP üretmez.</Text>
@@ -364,8 +364,8 @@ export function RoomInfoSheet({
         </ScrollView>
         <View style={{ flexDirection: 'row', gap: 12, paddingTop: 10 }}>
           <Pressable style={[styles.bigBtn, { backgroundColor: '#fff' }]} onPress={onShare}>
-            <Ionicons name="arrow-redo" size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 16 }}>Paylaş</Text>
+            <Ionicons name="arrow-redo" size={18} color={colors.primaryText} />
+            <Text style={{ color: colors.primaryText, fontWeight: '800', fontSize: 16 }}>Paylaş</Text>
           </Pressable>
           <Pressable style={[styles.bigBtn, { backgroundColor: colors.primary }]} onPress={onInvite}>
             <Ionicons name="add" size={20} color="#fff" />
@@ -387,7 +387,7 @@ export function RoomInfoSheet({
                 <Avatar uri={userById(id).avatar} size={36} />
                 <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
                 <Pressable style={[styles.pill, { backgroundColor: colors.green }]} onPress={() => onApprove(id)}>
-                  <Text style={styles.pillText}>Onayla</Text>
+                  <Text style={[styles.pillText, { color: semantic.liveInk }]}>Onayla</Text>
                 </Pressable>
                 <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
                   <Text style={styles.pillText}>Reddet</Text>
@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%' },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17, marginBottom: 4 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
-  tiny: { color: '#fff', fontSize: 11, marginTop: 4, maxWidth: 70 },
+  tiny: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: 70 },
   h2: { color: '#fff', fontWeight: '800', fontSize: 17 },
   h3: { color: '#fff', fontWeight: '700', fontSize: 14, marginTop: 4 },
   choice: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)' },
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
   track: { height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' },
   levelRow: { borderWidth: 1, borderColor: 'transparent', borderRadius: 10, padding: 6, gap: 2 },
   cover: { width: 76, height: 76, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  coverLabel: { position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: 11, backgroundColor: 'rgba(0,0,0,0.5)', borderBottomLeftRadius: 10, borderBottomRightRadius: 10, paddingVertical: 2, overflow: 'hidden' },
+  coverLabel: { position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderBottomLeftRadius: 10, borderBottomRightRadius: 10, paddingVertical: 2, overflow: 'hidden' },
   bigTitle: { color: '#fff', fontWeight: '900', fontSize: 20, flexShrink: 1 },
   card: { borderRadius: 12, padding: 12, gap: 6, minHeight: 64 },
   cardLabel: { color: '#fff', fontSize: 13, fontWeight: '600' },
@@ -879,7 +879,7 @@ const styles = StyleSheet.create({
   bell: { backgroundColor: colors.red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6 },
   joinBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
   stat: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: 10, gap: 8, justifyContent: 'space-between' },
-  statLabel: { color: colors.textDim, fontSize: 11 },
+  statLabel: { color: colors.textDim, fontSize: 12 },
   statValue: { color: '#fff', fontWeight: '900', fontSize: 18 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
   bigBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 13 },

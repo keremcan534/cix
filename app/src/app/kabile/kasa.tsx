@@ -156,6 +156,6 @@ const styles = StyleSheet.create({
   heroText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   bar: { height: 18, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 9, overflow: 'hidden', justifyContent: 'center' },
   barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.primary, borderRadius: 9 },
-  barText: { color: '#fff', fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  barText: { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   mine: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
 });
