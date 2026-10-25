@@ -11,6 +11,7 @@ import { EXCHANGE_FEE } from '@/data/economy';
 import { GIFTS, userById } from '@/data/mock';
 import { RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { blockedFor, useBank } from '@/lib/bank';
 import { useApp, type Earning, type EarningSource } from '@/store';
 import { colors } from '@/theme';
 
@@ -42,6 +43,8 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function IncomeScreen() {
   const { diamonds, earnings, exchangeDiamonds } = useApp();
+  // Diamonds blocked by open payout requests can't be converted (same balance can't be used twice).
+  const convertible = Math.max(0, diamonds - blockedFor(useBank(), 'creator'));
   const [sheet, setSheet] = useState(false);
 
   const convert = (amount: number) => {
@@ -50,7 +53,7 @@ export default function IncomeScreen() {
     setTimeout(() => showAlert('Dönüştürüldü ✅', `${fmt(amount)} 💎 → ${fmt(gained)} 🪙\nDönüşüm ücreti: ${fmt(amount - gained)} 💎 (%${EXCHANGE_FEE * 100})`), 350);
   };
 
-  const options: SheetOption[] = [...EXCHANGE_STEPS.filter((s) => s < diamonds), diamonds]
+  const options: SheetOption[] = [...EXCHANGE_STEPS.filter((s) => s < convertible), convertible]
     .filter((s) => s > 0)
     .map((s, i, all) => ({
       label: `${i === all.length - 1 ? 'Tümü · ' : ''}${fmt(s)} 💎 → ${fmt(Math.floor(s * (1 - EXCHANGE_FEE)))} 🪙`,
@@ -58,7 +61,7 @@ export default function IncomeScreen() {
     }));
 
   const openConvert = () => {
-    if (diamonds <= 0) return showAlert('Dönüştürülecek elmas yok', 'Hediye ve aramalardan elmas kazandıkça jetona dönüştürebilirsin.');
+    if (convertible <= 0) return showAlert('Dönüştürülecek elmas yok', diamonds > 0 ? 'Elmasların bekleyen para çekme talebinde bloke. Talep sonuçlanınca dönüştürebilirsin.' : 'Hediye ve aramalardan elmas kazandıkça jetona dönüştürebilirsin.');
     setSheet(true);
   };
 
@@ -99,6 +102,15 @@ export default function IncomeScreen() {
             </Pressable>
           </View>
         </LinearGradient>
+
+        <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Coins Bank">
+          <Text style={{ fontSize: 20 }}>🏦</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>Coins Bank</Text>
+            <Text style={styles.dim}>Cüzdan, kazançlar, ödemeler ve kurallar</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </Pressable>
 
         <View style={styles.sectionHead}>
           <Text style={{ fontSize: 22 }}>💎</Text>
@@ -156,6 +168,7 @@ const styles = StyleSheet.create({
   balanceN: { color: '#fff', fontSize: 40, fontWeight: '900', marginTop: 4 },
   outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', borderRadius: 999, paddingVertical: 11, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
   outlineText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  bankLink: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.border },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
