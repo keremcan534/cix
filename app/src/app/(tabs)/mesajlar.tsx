@@ -366,7 +366,7 @@ function FriendRow({ friend }: { friend: Friend }) {
 
 const CALL_DIR: Record<CallLog['direction'], { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
   in: { label: 'Gelen', icon: 'arrow-down', color: colors.green },
-  out: { label: 'Giden', icon: 'arrow-up', color: colors.primary },
+  out: { label: 'Giden', icon: 'arrow-up', color: colors.primaryText },
   missed: { label: 'Cevapsız', icon: 'close', color: colors.red },
 };
 
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   name: { color: '#fff', fontWeight: '700', fontSize: 15, flexShrink: 1 },
   last: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
-  time: { color: colors.textDim, fontSize: 11 },
+  time: { color: colors.textDim, fontSize: 12 },
   badge: {
     backgroundColor: colors.red,
     borderRadius: 10,
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
   },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   intimacy: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     marginLeft: 2,
   },
-  intimacyText: { color: colors.pink, fontSize: 11, fontWeight: '700' },
+  intimacyText: { color: colors.pink, fontSize: 12, fontWeight: '700' },
   roundBtn: {
     width: 36,
     height: 36,

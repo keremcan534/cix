@@ -159,6 +159,6 @@ const styles = StyleSheet.create({
   pair: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(236,72,153,0.35)' },
   pairBig: { backgroundColor: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.3)' },
   pairName: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  chip: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(236,72,153,0.6)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  chip: { color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: 'rgba(236,72,153,0.6)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   score: { color: '#F9A8D4', fontWeight: '900', fontSize: 15 },
 });

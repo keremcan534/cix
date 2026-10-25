@@ -151,7 +151,7 @@ function Stepper({ label, value, onMinus, onPlus }: { label: string; value: stri
       </Pressable>
       <Text style={styles.value}>{value}</Text>
       <Pressable onPress={onPlus} hitSlop={6} accessibilityLabel={`${label} artır`}>
-        <Ionicons name="add-circle" size={24} color={colors.primary} />
+        <Ionicons name="add-circle" size={24} color={colors.primaryText} />
       </Pressable>
     </View>
   );

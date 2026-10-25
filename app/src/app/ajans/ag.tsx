@@ -141,7 +141,7 @@ function Earnings() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {byStatus.map((b) => (
             <View key={b.st} style={styles.statusChip}>
-              <Text style={{ color: STATUS_COLOR[b.st], fontSize: 11, fontWeight: '700' }}>{b.st}</Text>
+              <Text style={{ color: STATUS_COLOR[b.st], fontSize: 12, fontWeight: '700' }}>{b.st}</Text>
               <Text style={{ color: '#fff', fontWeight: '800' }}>{b.v}</Text>
             </View>
           ))}
@@ -164,7 +164,7 @@ function Earnings() {
                 {c.amount > 0 ? '+' : ''}
                 {c.amount} 💎
               </Text>
-              <Text style={{ color: STATUS_COLOR[c.status], fontSize: 11, fontWeight: '700' }}>{c.status}</Text>
+              <Text style={{ color: STATUS_COLOR[c.status], fontSize: 12, fontWeight: '700' }}>{c.status}</Text>
             </View>
           </Card>
         </Pressable>

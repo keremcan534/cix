@@ -82,7 +82,7 @@ export default function IncomeScreen() {
           <Text style={{ fontSize: 26 }}>🎁</Text>
         </Pressable>
         <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
-          <Ionicons name="headset" size={20} color={colors.primary} />
+          <Ionicons name="headset" size={20} color={colors.primaryText} />
         </Pressable>
       </View>
 
@@ -132,7 +132,7 @@ export default function IncomeScreen() {
         )}
         {earnings.length > PREVIEW && (
           <Pressable onPress={() => router.push('/gelir/detay')} style={{ alignItems: 'center', paddingVertical: 6 }}>
-            <Text style={{ color: colors.primary, fontWeight: '700' }}>Tümünü gör ({earnings.length})</Text>
+            <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Tümünü gör ({earnings.length})</Text>
           </Pressable>
         )}
       </ScrollView>

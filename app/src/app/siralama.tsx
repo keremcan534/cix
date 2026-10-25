@@ -113,7 +113,7 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
 }
 
 const styles = StyleSheet.create({
-  how: { color: colors.textDim, fontSize: 11, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
+  how: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
   tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, flexWrap: 'wrap' },
   tab: { flexGrow: 1, paddingVertical: 9, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
   tabActive: { backgroundColor: colors.primary },

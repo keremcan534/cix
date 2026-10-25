@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   status: { borderRadius: 14, padding: 12, minHeight: 74, justifyContent: 'center', gap: 4 },
   statusTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
   statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
-  newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: '#F97316', color: '#fff', fontSize: 10, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
+  newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: '#F97316', color: '#fff', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   earnTag: { position: 'absolute', top: -10, right: 4, color: '#FDE047', fontWeight: '900', fontStyle: 'italic', fontSize: 12, zIndex: 1 },
   roomCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)' },

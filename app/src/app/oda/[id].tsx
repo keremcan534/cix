@@ -37,7 +37,7 @@ import {
 } from '@/components/room/community';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
-import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
+import { ChatLine, EntryBanner, GiftAnimation, GiftSheet, ListenersModal, MicBtn, PkBar, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -46,6 +46,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { errorHaptic, successHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -616,11 +617,22 @@ export default function VoiceRoom() {
     }
     if (amSeated || myRole !== 'member') return sitMe(index);
     if (freeMic) return sitMe(index);
-    // Stage-style rooms: join the speaker queue and see my position.
+    joinQueue();
+  };
+
+  // Stage-style rooms: join the speaker queue and see my position.
+  const joinQueue = () => {
     if (myQueuePos !== null) return showAlert('Sıradasın', `Konumun: ${myQueuePos + 1}. Sıradan çıkmak için menüyü kullan.`);
     const pos = rollDie() % 3 + 1;
     setMyQueuePos(pos);
     addMsg({ system: true, text: `🙋 Konuşmacı kuyruğuna katıldın · sıran: ${pos + 1}` });
+  };
+
+  // The big mic button for a listener (Discord Stage style): take a free mic, or raise a hand when all are taken.
+  const raiseHand = () => {
+    if (freeSeatIndex > 0) return isOwn ? sitMe(freeSeatIndex) : onSeatPress(freeSeatIndex);
+    if (myRole === 'member' && micPermission === 'members' && membership !== 'member') return onSeatPress(1);
+    joinQueue();
   };
 
   // --- Chat, gifts, games ---------------------------------------------------------
@@ -638,12 +650,14 @@ export default function VoiceRoom() {
     const results = toIds.map((uid) => ({ userId: uid, ok: spendCoins(each, `Hediye: ${gift.name} x${count} → ${userById(uid).name}`) }));
     const delivered = results.filter((r) => r.ok);
     if (delivered.length === 0) {
+      errorHaptic();
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
       ]);
       return;
     }
+    successHaptic();
     const total = each * delivered.length;
     delivered.forEach((r) => logGift('me', r.userId, gift, count));
     bump('giftsSent', count * delivered.length);
@@ -952,21 +966,27 @@ export default function VoiceRoom() {
 
           {emojiOpen && <EmojiPanel onPick={(e) => setDraft((d) => d + e)} />}
           <View style={styles.bottom}>
-            <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
-              <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={28} color={colors.textDim} />
-            </Pressable>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              onSubmitEditing={send}
-              placeholder="Bir şey söyle..."
-              placeholderTextColor={colors.textDim}
-              style={styles.input}
-              returnKeyType="send"
-            />
-            {amSeated && <RoundBtn label="Mikrofon" icon={micOn ? 'mic' : 'mic-off'} active={micOn} onPress={() => setMicOn((m) => !m)} />}
+            <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />
+            <View style={styles.inputWrap}>
+              <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={8}>
+                <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
+              </Pressable>
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                onSubmitEditing={send}
+                placeholder="Bir şey söyle..."
+                placeholderTextColor={colors.textDim}
+                style={styles.input}
+                returnKeyType="send"
+              />
+            </View>
             {roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
-            <RoundBtn label="Menü" icon="grid" onPress={() => setPanel('menu')} />
+            {amSeated ? (
+              <MicBtn state={micOn ? 'on' : 'off'} onPress={() => setMicOn((m) => !m)} />
+            ) : (
+              <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
+            )}
             <RoundBtn
               label="Hediye"
               icon="gift"
@@ -1194,17 +1214,18 @@ export default function VoiceRoom() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  sub: { color: colors.textDim, fontSize: 11 },
+  sub: { color: colors.textDim, fontSize: 12 },
   levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
-  levelText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  mutedChip: { color: colors.gold, fontSize: 11, textAlign: 'center', marginTop: 4 },
+  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center', marginTop: 4 },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(139,92,246,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  input: { flex: 1, minWidth: 0, backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14 },
+  inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, paddingLeft: 10, height: 48 },
+  input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },
 });

@@ -9,7 +9,7 @@ import { Avatar, GradientButton } from '@/components/ui';
 import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -173,7 +173,7 @@ export function MusicSheet({
                   🙋 {userById(r.by).name}: {r.track.title}
                 </Text>
                 <Pressable style={[styles.smallBtn, { backgroundColor: colors.green }]} onPress={() => onApprove?.(i)}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Onayla</Text>
+                  <Text style={{ color: semantic.liveInk, fontWeight: '700', fontSize: 12 }}>Onayla</Text>
                 </Pressable>
                 <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject?.(i)}>
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Reddet</Text>
@@ -338,7 +338,7 @@ export function RequestsModal({ visible, onClose, requests, onAccept, onReject, 
           <Avatar uri={userById(id).avatar} size={38} />
           <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
           <Pressable style={[styles.smallBtn, { backgroundColor: colors.green }]} onPress={() => onAccept(id)}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Kabul</Text>
+            <Text style={{ color: semantic.liveInk, fontWeight: '700', fontSize: 12 }}>Kabul</Text>
           </Pressable>
           <Pressable style={[styles.smallBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Sıradan çıkar</Text>
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   musicTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, marginTop: 4, overflow: 'hidden' },
   smallBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   envelope: { position: 'absolute', right: 12, top: 180, backgroundColor: '#B91C1C', borderRadius: 16, padding: 10, alignItems: 'center', borderWidth: 2, borderColor: colors.gold },
-  envelopeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  envelopeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   envelopeTimer: { color: colors.gold, fontSize: 12, fontWeight: '900' },
   diceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 12 },
   die: { fontSize: 64, color: '#fff' },

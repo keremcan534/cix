@@ -11,7 +11,7 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, gradient } from '@/theme';
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
 
@@ -29,7 +29,7 @@ export default function HostCenter() {
       <SafeAreaView style={styles.safe}>
         <Header title="Yayıncı Merkezi" />
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
-          <LinearGradient colors={['#8B5CF6', '#EC4899']} style={styles.hero}>
+          <LinearGradient colors={gradient} style={styles.hero}>
             <Text style={{ fontSize: 48 }}>🎙️</Text>
             <Text style={styles.heroTitle}>Yayıncı ol, kazanmaya başla</Text>
             <Text style={styles.heroText}>Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.</Text>
@@ -120,7 +120,7 @@ function Dashboard() {
             <Text style={styles.dim}>{totalDiamonds.toLocaleString('tr-TR')} 💎</Text>
           </View>
           <View style={styles.track}>
-            <LinearGradient colors={['#8B5CF6', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${progress * 100}%` }]} />
+            <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${progress * 100}%` }]} />
           </View>
           <Text style={styles.dim}>
             {next ? `Lv.${next.level} ${next.name} için ${(next.min - totalDiamonds).toLocaleString('tr-TR')} elmas kaldı` : 'En yüksek seviyedesin 🎉'}
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   barCol: { alignItems: 'center', gap: 4, flex: 1 },
   bar: { width: 18, borderRadius: 6, backgroundColor: colors.primary },
   barValue: { color: colors.textDim, fontSize: 9 },
-  barLabel: { color: colors.textDim, fontSize: 10 },
+  barLabel: { color: colors.textDim, fontSize: 11 },
   metric: { flexBasis: '30%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 8, gap: 2 },
   earning: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   affil: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1 },

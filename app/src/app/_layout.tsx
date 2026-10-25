@@ -6,7 +6,7 @@ import { colors } from '@/theme';
 
 const theme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg, primary: colors.primary, border: colors.border },
+  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg, primary: colors.primaryText, border: colors.border },
 };
 
 export default function RootLayout() {

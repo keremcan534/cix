@@ -9,7 +9,7 @@ import { Card, GradientButton, Header } from '@/components/ui';
 import { FAQ, TICKET_CATEGORIES, type TicketCategory } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useApp, type Ticket } from '@/store';
-import { colors } from '@/theme';
+import { colors, gradient } from '@/theme';
 
 const STATUS_COLOR: Record<Ticket['status'], string> = { Açık: colors.gold, Yanıtlandı: '#7DD3FC', Çözüldü: colors.green, 'Yeniden açıldı': colors.pink };
 
@@ -95,7 +95,7 @@ export default function SupportScreen() {
                 <Text style={styles.heroTitle}>Müşteri hizmetleri</Text>
                 <Text style={styles.heroSub}>Merhaba, size nasıl yardımcı olabilirim?</Text>
               </View>
-              <LinearGradient colors={['#8B5CF6', '#EC4899']} style={styles.bot}>
+              <LinearGradient colors={gradient} style={styles.bot}>
                 <Text style={{ fontSize: 30 }}>😉</Text>
               </LinearGradient>
             </View>
@@ -116,7 +116,7 @@ export default function SupportScreen() {
                 <View style={{ flex: 1 }} />
                 {FAQ.length > FAQ_PREVIEW && (
                   <Pressable onPress={() => setTab('faq')} hitSlop={8}>
-                    <Text style={[styles.dim, { color: colors.primary, fontWeight: '700' }]}>Tümü</Text>
+                    <Text style={[styles.dim, { color: colors.primaryText, fontWeight: '700' }]}>Tümü</Text>
                   </Pressable>
                 )}
               </View>
@@ -212,7 +212,7 @@ function TicketCard({ t }: { t: Ticket }) {
           {t.replies.map((r, i) => (
             <View key={i} style={[styles.reply, r.from === 'me' && { alignSelf: 'flex-end', backgroundColor: colors.primary }]}>
               <Text style={{ color: '#fff', fontSize: 13 }}>{r.text}</Text>
-              <Text style={[styles.dim, { fontSize: 10 }]}>
+              <Text style={[styles.dim, { fontSize: 11 }]}>
                 {r.from === 'support' ? 'Destek' : 'Sen'} · {r.time}
               </Text>
             </View>

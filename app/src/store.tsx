@@ -12,6 +12,7 @@ import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
 import { NOBLE_DAYS, RECHARGE_PACKS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu';
@@ -23,6 +24,7 @@ export type Ticket = { id: string; number: string; category: TicketCategory; tex
 export type NotifyType = 'live' | 'invite' | 'event' | 'agency' | 'fanclub' | 'game' | 'payment' | 'system';
 export type Settings = {
   effectsOff: boolean;
+  haptics: boolean;
   reduceMotion: boolean;
   lowData: boolean;
   invisibleEntry: boolean;
@@ -266,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [settings, setSettings] = useState<Settings>({
     effectsOff: false,
+    haptics: true,
     invisibleEntry: false,
     cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
     showOnline: true,
@@ -289,6 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
+    setHapticsEnabled(settings.haptics);
   }, [settings]);
   const [notifications, setNotifications] = useState<Notice[]>([
     { id: 'n1', kind: 'social', icon: '👋', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },

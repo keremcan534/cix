@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   daySel: { backgroundColor: '#FDE68A' },
   large: { position: 'absolute', top: 2, color: '#F59E0B', fontSize: 9, fontWeight: '900' },
   dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
-  dayCoins: { color: colors.gold, fontSize: 11, fontWeight: '700' },
+  dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
   tomorrow: { backgroundColor: 'rgba(139,92,246,0.12)', borderRadius: 16, padding: 14, gap: 12 },
   tomorrowTitle: { color: '#C4B5FD', fontWeight: '800', fontSize: 16 },
   rewardBox: { width: 88, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },

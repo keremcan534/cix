@@ -6,7 +6,8 @@ import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyl
 
 import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
-import { colors, gradient } from '@/theme';
+import { pressHaptic, tapHaptic } from '@/lib/haptics';
+import { colors, gradient, semantic } from '@/theme';
 
 export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
   return (
@@ -49,32 +50,77 @@ export function VipBadge() {
   );
 }
 
-export function GradientButton({
+export type ButtonVariant = 'hero' | 'money' | 'tonal' | 'ghost' | 'danger';
+
+/**
+ * One button, five jobs. Only `hero` (one per screen) and `money` (coins/gifts) get the raised,
+ * press-down "key" look, so the eye finds them first; the rest stay flat.
+ */
+export function Button({
   title,
   onPress,
   icon,
   style,
   small,
+  variant = 'hero',
+  disabled,
 }: {
   title: string;
   onPress?: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
   small?: boolean;
+  variant?: ButtonVariant;
+  disabled?: boolean;
 }) {
+  const raised = variant === 'hero' || variant === 'money';
+  const edge = small ? 3 : 4;
+  const fg = variant === 'money' ? semantic.moneyInk : variant === 'tonal' ? semantic.tonalText : variant === 'ghost' ? colors.primaryText : variant === 'danger' ? semantic.danger : '#fff';
+  const body = [styles.btn, small && styles.btnSmall, !raised && { backgroundColor: variant === 'tonal' ? semantic.tonal : 'transparent' }, variant === 'danger' && styles.btnDanger];
+  const label = (
+    <>
+      {icon && <Ionicons name={icon} size={small ? 15 : 19} color={fg} />}
+      <Text style={[styles.btnText, small && { fontSize: 13 }, { color: fg }]}>{title}</Text>
+    </>
+  );
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }, style]}>
-      <LinearGradient
-        colors={gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.btn, small && { paddingVertical: 7, paddingHorizontal: 14 }]}
-      >
-        {icon && <Ionicons name={icon} size={small ? 14 : 18} color="#fff" />}
-        <Text style={[styles.btnText, small && { fontSize: 13 }]}>{title}</Text>
-      </LinearGradient>
+    <Pressable
+      onPress={
+        onPress &&
+        (() => {
+          if (raised) pressHaptic();
+          else tapHaptic();
+          onPress();
+        })
+      }
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => [{ opacity: disabled ? 0.5 : 1 }, !raised && pressed && { transform: [{ scale: 0.96 }] }, style]}
+    >
+      {({ pressed }) =>
+        raised ? (
+          // The darker edge below the face is the "key"; pressing moves the face down onto it.
+          <View style={{ borderRadius: 999, backgroundColor: variant === 'money' ? semantic.moneyEdge : semantic.actionEdge, paddingBottom: pressed ? 0 : edge, marginTop: pressed ? edge : 0 }}>
+            {variant === 'money' ? (
+              <View style={[...body, { backgroundColor: semantic.money }]}>{label}</View>
+            ) : (
+              <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={body}>
+                {label}
+              </LinearGradient>
+            )}
+          </View>
+        ) : (
+          <View style={body}>{label}</View>
+        )
+      }
     </Pressable>
   );
+}
+
+/** The screen's primary action. Kept for existing call sites; same as `<Button variant="hero" />`. */
+export function GradientButton(props: { title: string; onPress?: () => void; icon?: keyof typeof Ionicons.glyphMap; style?: StyleProp<ViewStyle>; small?: boolean }) {
+  return <Button {...props} variant="hero" />;
 }
 
 export function Screen({ children }: { children: ReactNode }) {
@@ -93,17 +139,19 @@ export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => vo
 
 const styles = StyleSheet.create({
   vip: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
-  vipText: { color: '#3B2300', fontSize: 10, fontWeight: '800' },
+  vipText: { color: '#3B2300', fontSize: 11, fontWeight: '800' },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 22,
     borderRadius: 999,
   },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  btnSmall: { paddingVertical: 7, paddingHorizontal: 14 },
+  btnDanger: { borderWidth: 1.5, borderColor: semantic.danger },
+  btnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   coin: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -116,7 +164,7 @@ const styles = StyleSheet.create({
   coinText: { color: colors.gold, fontWeight: '700' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10 },
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  levelChipText: { fontSize: 11, fontWeight: '800' },
+  levelChipText: { fontSize: 12, fontWeight: '800' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
 });
 

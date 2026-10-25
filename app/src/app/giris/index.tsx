@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
 import { USERS } from '@/data/mock';
-import { colors } from '@/theme';
+import { colors, gradient } from '@/theme';
 
 // Avatars floating around the logo: [user index, size, top %, left %]
 const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
@@ -36,7 +36,7 @@ export default function WelcomeScreen() {
             </View>
           ))}
           <View style={styles.center}>
-            <LinearGradient colors={['#8B5CF6', '#EC4899']} style={styles.logoMark}>
+            <LinearGradient colors={gradient} style={styles.logoMark}>
               <Ionicons name="mic" size={44} color="#fff" />
             </LinearGradient>
             <Text style={styles.logo}>Similar Club</Text>
@@ -91,6 +91,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   socialText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  terms: { color: colors.textDim, fontSize: 11, textAlign: 'center', lineHeight: 16, marginTop: 4 },
+  terms: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 16, marginTop: 4 },
   link: { color: '#C4B5FD', fontWeight: '600' },
 });

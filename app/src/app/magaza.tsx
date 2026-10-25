@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   item: { width: '46%', margin: '2%', backgroundColor: colors.card, borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 2, borderColor: 'transparent' },
   emojiPreview: { fontSize: 26, height: 64, textAlignVertical: 'center', paddingTop: 14 },
   name: { color: '#fff', fontWeight: '700' },
-  meta: { color: colors.textDim, fontSize: 11 },
+  meta: { color: colors.textDim, fontSize: 12 },
   owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },
   locked: { color: colors.textDim, fontWeight: '700', paddingVertical: 7 },
   buy: { backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
@@ -145,5 +145,5 @@ const styles = StyleSheet.create({
   frameInner: { flex: 1, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   bubblePreview: { height: 64, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 16, marginVertical: 0 },
   idPreview: { color: colors.gold, fontSize: 30, fontWeight: '900', height: 64, textAlignVertical: 'center', letterSpacing: 2, paddingTop: 12 },
-  footer: { color: colors.textDim, fontSize: 11, textAlign: 'center', paddingBottom: 12 },
+  footer: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },
 });

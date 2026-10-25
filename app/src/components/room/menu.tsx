@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 export type MenuItem = {
   key: string;
@@ -69,7 +69,7 @@ function Icon({ item, variant }: { item: MenuItem; variant: MenuSection['variant
       )}
       {badge === 'on' && (
         <View style={[styles.state, { backgroundColor: colors.green }]}>
-          <Ionicons name="checkmark" size={12} color="#fff" />
+          <Ionicons name="checkmark" size={12} color={semantic.liveInk} />
         </View>
       )}
       {badge === 'off' && (
@@ -89,11 +89,11 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 12, paddingTop: 18, maxHeight: '78%' },
   title: { color: '#fff', fontWeight: '800', fontSize: 18, marginLeft: 8, marginBottom: 6 },
-  note: { color: colors.textDim, fontSize: 11, marginLeft: 8, marginBottom: 6 },
+  note: { color: colors.textDim, fontSize: 12, marginLeft: 8, marginBottom: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: '25%', alignItems: 'center', gap: 6, paddingVertical: 10 },
   label: { color: '#fff', fontSize: 12, textAlign: 'center', maxWidth: 84 },
   tool: { backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   state: { position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#24232B' },
-  ribbon: { position: 'absolute', top: -6, left: -4, color: '#fff', fontSize: 10, fontWeight: '900', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  ribbon: { position: 'absolute', top: -6, left: -4, color: '#fff', fontSize: 11, fontWeight: '900', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
 });

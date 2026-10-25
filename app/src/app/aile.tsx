@@ -32,7 +32,7 @@ import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, gradient } from '@/theme';
 
 const CREATE_COST = 500;
 type Role = 'owner' | 'helper' | 'member';
@@ -568,7 +568,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           </LinearGradient>
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.sohbet)} accessibilityLabel="Sohbet">
-          <LinearGradient colors={['#8B5CF6', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bottomBtn}>
+          <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bottomBtn}>
             <Ionicons name="chatbubbles" size={20} color="#fff" />
             <Text style={styles.bottomText}>Sohbet</Text>
           </LinearGradient>
@@ -690,7 +690,7 @@ function PlayingChip({ u, onPress }: { u: User; onPress: () => void }) {
       <Text style={[styles.chip, p?.kind === 'room' ? { backgroundColor: '#A855F7' } : p?.kind === 'call' ? { backgroundColor: '#F59E0B' } : null]} numberOfLines={1}>
         {p?.kind === 'room' ? '🎉 Partide' : p?.kind === 'call' ? '📞 Görüşmede' : '💬 Çevrimiçi'}
       </Text>
-      <Text style={[styles.dim, { fontSize: 11 }]} numberOfLines={1}>
+      <Text style={[styles.dim, { fontSize: 12 }]} numberOfLines={1}>
         {u.name}
       </Text>
     </Pressable>
@@ -866,32 +866,32 @@ const styles = StyleSheet.create({
   small: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   smallText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4 },
-  th: { color: colors.textDim, fontWeight: '800', fontSize: 11 },
+  th: { color: colors.textDim, fontWeight: '800', fontSize: 12 },
   td: { color: '#fff', fontSize: 12 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   topBtn: { height: 36, minWidth: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   logo: { width: 86, height: 86, borderRadius: 16, borderWidth: 2, borderColor: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  badgeChip: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
-  powerChip: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: '#DC2626', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  badgeChip: { color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  powerChip: { color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: '#DC2626', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   more: { width: 36, height: 36, borderRadius: 18, marginLeft: -6, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   levelCard: { marginTop: 16, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
   tier: { color: '#fff', fontSize: 24, fontWeight: '900', fontStyle: 'italic' },
-  lvChip: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  lvChip: { color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   body: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -8, padding: 16, gap: 6 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   tag: { color: '#E9D5FF', fontSize: 13, fontWeight: '600', backgroundColor: 'rgba(139,92,246,0.22)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, overflow: 'hidden' },
   cards: { flexDirection: 'row', gap: 8, marginTop: 14 },
   miniCard: { flex: 1, borderRadius: 14, padding: 10, gap: 6, minHeight: 96 },
-  miniTitle: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' },
-  miniChip: { color: colors.gold, fontSize: 11, fontWeight: '800' },
+  miniTitle: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
+  miniChip: { color: colors.gold, fontSize: 12, fontWeight: '800' },
   tabs: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabBtn: { alignItems: 'center', paddingBottom: 8, minWidth: 50 },
   tabText: { color: colors.textDim, fontSize: 16, fontWeight: '700' },
   tabLine: { width: 22, height: 4, borderRadius: 2, backgroundColor: colors.pink, marginTop: 4 },
-  chip: { marginTop: -8, fontSize: 10, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 66 },
+  chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 66 },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10 },
-  roleBadge: { color: '#fff', fontSize: 10, fontWeight: '800', backgroundColor: '#EA580C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  roleBadge: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: '#EA580C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   goBtn: { backgroundColor: '#A855F7', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: 'rgba(18,11,36,0.92)' },
   bottomBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },
