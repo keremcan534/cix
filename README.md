@@ -82,6 +82,10 @@ Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.0
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 
+## Arayüz önerileri
+
+Göz ve beyin dostu buton sistemi, renk anlamları ve oda alt çubuğu önerisi: [`docs/ARAYUZ_ONERILERI.md`](docs/ARAYUZ_ONERILERI.md).
+
 ## Sonraki adımlar
 
 - Gerçek sesli oda: LiveKit veya Agora (development build gerekir)
