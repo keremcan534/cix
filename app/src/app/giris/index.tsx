@@ -39,7 +39,7 @@ export default function WelcomeScreen() {
             <LinearGradient colors={['#8B5CF6', '#EC4899']} style={styles.logoMark}>
               <Ionicons name="mic" size={44} color="#fff" />
             </LinearGradient>
-            <Text style={styles.logo}>Vibe Club</Text>
+            <Text style={styles.logo}>Similar Club</Text>
             <Text style={styles.tagline}>Sesli odalarda yeni insanlarla tanış,{'\n'}sohbet et, eğlen.</Text>
           </View>
         </View>

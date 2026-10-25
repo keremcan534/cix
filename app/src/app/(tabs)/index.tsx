@@ -37,7 +37,7 @@ export default function RoomsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.logo}>Vibe Club</Text>
+        <Text style={styles.logo}>Similar Club</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />
           <Pressable onPress={() => router.push('/siralama')} hitSlop={6}>

@@ -728,7 +728,7 @@ export default function VoiceRoom() {
     },
   };
 
-  const shareRoom = () => Share.share({ message: `Vibe Club'da "${title}" odasına gel! 🎙️ vibeclub://oda/${id}` }).catch(() => {});
+  const shareRoom = () => Share.share({ message: `Similar Club'da "${title}" odasına gel! 🎙️ similarclub://oda/${id}` }).catch(() => {});
 
   const report = () => {
     const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);

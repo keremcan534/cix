@@ -288,7 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [settings]);
   const [notifications, setNotifications] = useState<Notice[]>([
     { id: 'n1', kind: 'social', icon: '👋', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
-    { id: 'n2', kind: 'system', icon: '🎉', title: "Vibe Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
+    { id: 'n2', kind: 'system', icon: '🎉', title: "Similar Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
     { id: 'n3', kind: 'social', icon: '🎤', title: 'Karaoke Akşamı başladı', body: 'Melis seni odaya davet ediyor.', time: '18:30', read: true, href: '/oda/r2' },
   ]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -507,7 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCheckInDay((d) => d + 1);
       return reward;
     },
-    inviteCode: 'VIBE-7K2Q',
+    inviteCode: 'SIMI-7K2Q',
 
     vipLevel,
     svipXp,

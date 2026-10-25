@@ -277,8 +277,8 @@ function Invites() {
     <Card style={{ gap: 10 }}>
       <Text style={styles.title}>Davet kodu</Text>
       <Text style={styles.code}>{code}</Text>
-      <Text style={styles.dim}>Bağlantı: vibeclub://ajans/katil?kod={code}</Text>
-      <GradientButton title="Davet bağlantısını paylaş" icon="share-social" onPress={() => Share.share({ message: `Ajansıma katıl! Kod: ${code} · vibeclub://ajans/katil?kod=${code}` }).catch(() => {})} />
+      <Text style={styles.dim}>Bağlantı: similarclub://ajans/katil?kod={code}</Text>
+      <GradientButton title="Davet bağlantısını paylaş" icon="share-social" onPress={() => Share.share({ message: `Ajansıma katıl! Kod: ${code} · similarclub://ajans/katil?kod=${code}` }).catch(() => {})} />
       <Text style={styles.label}>Davet durumu</Text>
       <Text style={styles.dim}>• 12 bağlantı görüntülendi · 5 kayıt · 2 başvuru bekliyor · 3 üye oldu</Text>
     </Card>

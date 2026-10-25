@@ -81,7 +81,7 @@ export default function InviteScreen() {
 
   const shareInvite = async () => {
     try {
-      await Share.share({ message: `Vibe Club'a katıl, sesli odalarda tanışalım! Kayıt olurken davet kodumu kullan: ${inviteCode} 🎙️` });
+      await Share.share({ message: `Similar Club'a katıl, sesli odalarda tanışalım! Kayıt olurken davet kodumu kullan: ${inviteCode} 🎙️` });
     } catch {
       showAlert('Davet kodun', inviteCode);
     }

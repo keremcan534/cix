@@ -75,14 +75,14 @@ jobs:
       - name: Build APK
         working-directory: app/android
         run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
-      - run: cp android/app/build/outputs/apk/release/app-release.apk vibe-club.apk
+      - run: cp android/app/build/outputs/apk/release/app-release.apk similar-club.apk
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: preview-${{ github.run_number }}
           name: Android önizleme #${{ github.run_number }}
           body: |
-            Telefona kurmak için aşağıdaki **vibe-club.apk** dosyasını indir ve aç.
+            Telefona kurmak için aşağıdaki **similar-club.apk** dosyasını indir ve aç.
             İlk kurulumda "Bilinmeyen kaynaklardan yüklemeye izin ver" demen gerekebilir.
             Commit: ${{ github.sha }}
-          files: app/vibe-club.apk
+          files: app/similar-club.apk
           make_latest: true

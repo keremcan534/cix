@@ -1,4 +1,4 @@
-# Vibe Club (prototip)
+# Similar Club (prototip)
 
 Timo Club benzeri sesli sohbet / sosyal tanışma uygulamasının tıklanabilir mobil prototipi.
 Expo (React Native) + Expo Router ile yazıldı; iOS ve Android'de çalışır.
@@ -10,7 +10,7 @@ Expo (React Native) + Expo Router ile yazıldı; iOS ve Android'de çalışır.
 | Yol | Nasıl | Not |
 | --- | --- | --- |
 | **Web (iPhone + Android)** | Telefonda aç: https://keremcan534.github.io/cix/ | Kurulum yok. Tarayıcıda "Ana ekrana ekle" ile uygulama gibi açılır. |
-| **Android APK** | https://github.com/keremcan534/cix/releases/latest → `vibe-club.apk` indir, aç, kur | "Bilinmeyen kaynaklara izin ver" gerekebilir. |
+| **Android APK** | https://github.com/keremcan534/cix/releases/latest → `similar-club.apk` indir, aç, kur | "Bilinmeyen kaynaklara izin ver" gerekebilir. |
 | **Expo Go (geliştirici)** | Aşağıdaki "Çalıştırma" adımları + QR kodu okut | Kod değişince anında yenilenir. |
 
 Web ve APK her push'ta `.github/workflows/preview.yml` ile otomatik güncellenir.
@@ -74,7 +74,7 @@ Ek ve yeni güncelleme belgeleriyle eklenenler:
 | Yönetim (demo) | `src/app/yonetim.tsx` | USD kuru, ajans %40, oda sahibi %20, aile oranları, arama bonusları, sınırlar, örnek hesaplayıcı, değişiklik geçmişi |
 | Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
 
-Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `VIBE77` (kapalı: `OLD999`).
+Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 
 Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Değerler Profil > Kazanç & bonus yönetimi ekranından (demo) değiştirilebilir.
 

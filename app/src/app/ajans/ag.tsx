@@ -66,7 +66,7 @@ function Tree() {
       <Card style={{ gap: 8 }}>
         <Text style={styles.title}>Davet kodun: {referralCode}</Text>
         <Text style={styles.dim}>Davet ettiğin kişiler senin alt ağına bağlanır; onların davet ettikleri bir alt seviyeye. Ağ derinliği sınırsızdır, alt seviyeler dokundukça yüklenir.</Text>
-        <Pressable onPress={() => Share.share({ message: `Vibe Club'a katıl! Davet kodum: ${referralCode}` }).catch(() => {})} style={styles.shareBtn}>
+        <Pressable onPress={() => Share.share({ message: `Similar Club'a katıl! Davet kodum: ${referralCode}` }).catch(() => {})} style={styles.shareBtn}>
           <Ionicons name="share-social" size={16} color="#fff" />
           <Text style={{ color: '#fff', fontWeight: '700' }}>Davet linkini paylaş</Text>
         </Pressable>

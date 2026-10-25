@@ -23,7 +23,7 @@ const TOPICS: { label: string; category: TicketCategory }[] = [
   { label: 'Doğrulama', category: 'Üyelik' },
   { label: 'Diğer', category: 'Teknik' },
 ];
-const SUPPORT_EMAIL = 'destek@vibeclub.app';
+const SUPPORT_EMAIL = 'destek@similarclub.app';
 const FAQ_PREVIEW = 3;
 
 type View_ = 'home' | 'faq' | 'new' | 'list';

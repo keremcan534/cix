@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Vibe Club",
-    "slug": "vibe-club",
+    "name": "Similar Club",
+    "slug": "similar-club",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vibeclub.app"
+      "bundleIdentifier": "com.similarclub.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.vibeclub.app"
+      "package": "com.similarclub.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,7 +34,7 @@
         }
       ]
     ],
-    "scheme": "vibeclub",
+    "scheme": "similarclub",
     "experiments": {
       "typedRoutes": true
     }

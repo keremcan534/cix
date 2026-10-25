@@ -43,7 +43,7 @@ const TERMS = ['Haftalık en az 10 saat yayın hedefi (zorunlu değil, bonus ko�
 export const AGENCIES: Agency[] = [
   { id: 'a1', code: 'STAR01', name: 'Star Ajans', logo: '⭐', hosts: 48, status: 'active', owner: 'Elif', founded: '03.2025', terms: TERMS },
   { id: 'a2', code: 'MOON22', name: 'Moonlight Media', logo: '🌙', hosts: 31, status: 'active', owner: 'Mert', founded: '11.2025', terms: TERMS },
-  { id: 'a3', code: 'VIBE77', name: 'Vibe Talent', logo: '💜', hosts: 19, status: 'active', owner: 'Selin', founded: '06.2026', terms: TERMS },
+  { id: 'a3', code: 'SIMI77', name: 'Similar Talent', logo: '💜', hosts: 19, status: 'active', owner: 'Selin', founded: '06.2026', terms: TERMS },
   { id: 'a4', code: 'OLD999', name: 'Eski Ajans', logo: '📦', hosts: 0, status: 'closed', owner: 'Kaan', founded: '01.2024', terms: TERMS },
 ];
 export const agencyByCode = (code: string) => AGENCIES.find((a) => a.code === code.trim().toUpperCase());

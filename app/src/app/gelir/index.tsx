@@ -135,7 +135,7 @@ export function EarningRow({ e }: { e: Earning }) {
     <Card style={styles.row}>
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={styles.rowTitle}>{INCOME_LABEL[e.source]}</Text>
-        {e.fromId ? <Text style={styles.sender}>{userById(e.fromId).name}</Text> : <Text style={styles.sender}>Vibe Club</Text>}
+        {e.fromId ? <Text style={styles.sender}>{userById(e.fromId).name}</Text> : <Text style={styles.sender}>Similar Club</Text>}
         <Text style={styles.dim}>Bugün {e.time}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 6 }}>
