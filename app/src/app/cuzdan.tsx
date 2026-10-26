@@ -9,6 +9,7 @@ import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 export default function WalletScreen() {
   const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp, addCoins } = useApp();
@@ -121,7 +122,8 @@ export default function WalletScreen() {
                 <Pressable key={p.id} onPress={() => buy(p)} accessibilityLabel={`${p.coins} jeton paketi`} style={{ width: '31.3%', margin: '1%' }}>
                   <LinearGradient colors={first ? ['#FB923C', '#F97316'] : ['#2A2433', '#1E1A26']} style={[styles.pack, processing === p.id && { opacity: 0.5 }]}>
                     {first && <Text style={styles.firstTag}>🔥 Sadece İlk Defa</Text>}
-                    <Text style={styles.packCoins}>🪙 {p.coins.toLocaleString('tr-TR')}</Text>
+                    <Icon3D name="coin" size={40} />
+                    <Text style={styles.packCoins}>{p.coins.toLocaleString('tr-TR')}</Text>
                     {bonus ? <Text style={[styles.packBonus, first && { color: '#FFF7ED' }]}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
                     <Text style={[styles.packPrice, first && { color: '#FFF7ED' }]}>{processing === p.id ? 'Bekleniyor…' : p.price}</Text>
                   </LinearGradient>

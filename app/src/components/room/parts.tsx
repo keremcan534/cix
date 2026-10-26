@@ -9,6 +9,7 @@ import { cosmeticById } from '@/data/catalog';
 import { userById, type Gift, type Room, type User } from '@/data/mock';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { colors, semantic } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 export type ChatMsg = { id: string; userId?: string; text: string; system?: boolean; bot?: boolean };
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -216,7 +217,7 @@ export function RoundBtn({
     >
       {gift ? (
         <View style={[styles.round, styles.giftRound]}>
-          <Ionicons name={icon} size={22} color={semantic.moneyInk} />
+          <Icon3D name="gift" size={34} />
         </View>
       ) : (
         <View style={[styles.round, { backgroundColor: colors.cardAlt }]}>
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
   chatLine: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, maxWidth: '85%' },
   chatText: { color: '#fff', fontSize: 14 },
   round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  giftRound: { backgroundColor: semantic.money, borderBottomWidth: 4, borderBottomColor: semantic.moneyEdge },
+  giftRound: { backgroundColor: colors.cardAlt, borderWidth: 2, borderColor: semantic.money },
   micRound: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   micCaption: { color: colors.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },

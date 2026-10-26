@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, gradientDeep, semantic } from '@/theme';
+import { Icon3D, icon3dFor } from '@/components/Icon3D';
 
 export type MenuItem = {
   key: string;
@@ -61,6 +62,10 @@ function Icon({ item, variant }: { item: MenuItem; variant: MenuSection['variant
       {variant === 'tool' ? (
         <View style={[styles.tool, { width: size, height: size, borderRadius: radius }]}>
           {item.icon ? <Ionicons name={item.icon} size={28} color="#fff" /> : <Text style={{ fontSize: 26 }}>{item.emoji}</Text>}
+        </View>
+      ) : icon3dFor(item.emoji) ? (
+        <View style={{ width: size, height: size, borderRadius: radius, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border }}>
+          <Icon3D name={icon3dFor(item.emoji)!} size={variant === 'tile' ? 50 : 40} />
         </View>
       ) : (
         <LinearGradient colors={item.colors ?? gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, borderRadius: radius, alignItems: 'center', justifyContent: 'center' }}>

@@ -30,6 +30,7 @@ import {
 } from '@/data/rooms-ui';
 import { useApp } from '@/store';
 import { colors, gradient, gradientDeep, semantic } from '@/theme';
+import { EmojiIcon } from '@/components/Icon3D';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -217,7 +218,7 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
       <CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />
       {items.map((it) => (
         <Pressable key={it.key} style={styles.quick} onPress={it.onPress}>
-          <Text style={{ fontSize: 14 }}>{it.emoji}</Text>
+          <EmojiIcon emoji={it.emoji} size={15} />
           <Text style={styles.quickText}>{it.label}</Text>
           {it.dot && <View style={styles.dot} />}
         </Pressable>

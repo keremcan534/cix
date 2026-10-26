@@ -10,6 +10,7 @@ import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
   roomMinutes: { desc: 'Sohbet odasında belirtilen süre kadar kal', go: () => router.push('/(tabs)') },
@@ -67,7 +68,7 @@ export default function TaskCenter() {
               return (
                 <Pressable key={`d${i}`} onPress={() => setSelected(i)} style={[styles.day, selected === i && styles.daySel]} accessibilityLabel={`Gün ${i + 1}`}>
                   {big && <Text style={styles.large}>Large</Text>}
-                  <Text style={{ fontSize: 26 }}>{big ? '🎁' : i === 3 ? '🪙' : '💌'}</Text>
+                  <Icon3D name={big ? 'gift' : i === 3 ? 'coin' : 'envelope'} size={32} />
                   {done ? <Ionicons name="checkmark" size={22} color={colors.textDim} /> : <Text style={[styles.dayLabel, selected === i && { color: '#3B2A12' }]}>Gün {i + 1}</Text>}
                   <Text style={[styles.dayCoins, selected === i && { color: '#92400E' }]}>+{r}</Text>
                 </Pressable>

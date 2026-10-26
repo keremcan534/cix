@@ -21,7 +21,7 @@ export const DISCOVER_SHORTCUTS: DiscoverShortcut[] = [
   { id: 'call', title: 'Arama Merkezi', subtitle: 'Görüntülü&Sesli', emoji: '📞', colors: ['#0E7C9A', '#0A8F95'], href: '/eslesme', wide: true },
   { id: 'party', title: 'Parti', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#14B8A6', '#0E7C9A'], href: '/(tabs)' },
   { id: 'tribe', title: 'Kabile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#0A8F95', '#0FB8BE'], href: '/aile' },
-  { id: 'free', title: 'Bedava', subtitle: 'Jeton kazan', emoji: '⭐', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
+  { id: 'free', title: 'Bedava', subtitle: 'Jeton kazan', emoji: '🪙', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
 ];
 
 /** Avatars shown on the "Parti" shortcut card. */

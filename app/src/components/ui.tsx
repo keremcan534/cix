@@ -10,6 +10,7 @@ import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
   return (
@@ -132,7 +133,7 @@ export function Screen({ children }: { children: ReactNode }) {
 export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => void }) {
   return (
     <Pressable onPress={onPress} style={styles.coin}>
-      <Text style={{ fontSize: 14 }}>🪙</Text>
+      <Icon3D name="coin" size={18} />
       <Text style={styles.coinText}>{coins.toLocaleString('tr-TR')}</Text>
       {onPress && <Ionicons name="add-circle" size={16} color={colors.gold} />}
     </Pressable>
@@ -247,7 +248,7 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
 export function DiamondPill({ diamonds }: { diamonds: number }) {
   return (
     <View style={[styles.coin, { backgroundColor: 'rgba(56,189,248,0.15)' }]}>
-      <Text style={{ fontSize: 13 }}>💎</Text>
+      <Icon3D name="diamond" size={17} />
       <Text style={[styles.coinText, { color: '#7DD3FC' }]}>{diamonds.toLocaleString('tr-TR')}</Text>
     </View>
   );
