@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
@@ -9,7 +10,10 @@ import { ActionSheet } from '@/components/ActionSheet';
 import { Avatar, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice, FAMILIES } from '@/data/economy';
-import { GIFTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type User } from '@/data/mock';
+import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type User } from '@/data/mock';
+import { privacyOf } from '@/data/privacy';
+import { staffBadgeOf } from '@/data/rbac';
+import { COUNTRIES } from '@/data/social-ui';
 import {
   GIFT_CATALOG_TOTAL,
   GIFT_COLLECTIONS,
@@ -29,9 +33,12 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
+import { checkInteraction, type Action } from '@/lib/interaction';
 import { shareLink } from '@/lib/links';
+import { LIMITS, ageFrom, formatTrDate, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
 import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
+import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
 
@@ -51,7 +58,10 @@ const TAB_H = 48;
 
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, familyId, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory } = useApp();
+  const {
+    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, familyId, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory,
+    rbac, coins, diamonds, spentTotal, totalDiamonds, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
+  } = useApp();
   const isMe = id === 'me';
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
@@ -66,6 +76,36 @@ export default function UserProfile() {
   const levels = wealthCharmOf(user.id);
   const guardian = guardianOf(user.id);
   const relations = relationsOf(user.id);
+
+  // What this viewer may see and do (profile spec §3, §5). Others' choices come with their profile; mine from Settings.
+  const priv = isMe ? { ...privacyOf('me'), showOnline: settings.showOnline, showLastSeen: settings.showLastSeen, showCurrentRoom: settings.showCurrentRoom } : privacyOf(user.id);
+  // Like most messengers: hiding your own last seen also hides everyone else's from you.
+  const lastSeen = !isMe && !user.online && priv.showLastSeen && settings.showLastSeen ? user.lastSeen : undefined;
+  const staff = staffBadgeOf(rbac, user.id);
+  const country = COUNTRIES.find((c) => c.code === (user.country ?? 'TR'));
+  const friends = isMe ? USERS.filter((u) => following.has(u.id) && FOLLOWS_ME.has(u.id)).length : (user.age * 7) % 60;
+  const can = (a: Action) => checkInteraction(a, user, { blocked, following, myAge: me.age });
+  const guard = (a: Action, run: () => void) => {
+    const c = can(a);
+    if (!c.ok) return showAlert('Şu an yapılamıyor', c.reason);
+    run();
+  };
+  const album = [...(user.photos ?? []), ...MOMENTS.filter((m) => m.userId === user.id && m.image).map((m) => m.image!)];
+  const [openedAt] = useState(() => Date.now());
+  const vipUntil = vipDays > 0 ? new Date(openedAt + vipDays * 86_400_000).toLocaleDateString('tr-TR') : null;
+
+  const pickPhoto = async (forAlbum: boolean) => {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: !forAlbum, aspect: [1, 1], quality: 0.7 });
+    if (res.canceled || !res.assets[0]) return;
+    const uri = res.assets[0].uri;
+    if (forAlbum) {
+      updateMe({ photos: [uri, ...(me.photos ?? [])].slice(0, LIMITS.photos) });
+      showAlert('Fotoğraf eklendi', 'Albüm fotoğrafları da topluluk kurallarına göre denetlenir.');
+    } else {
+      submitAvatar(uri);
+      showAlert('Fotoğraf incelemede', 'Yeni profil fotoğrafın kısa bir kontrolden sonra herkese görünecek. Bu sırada eski fotoğrafın görünür.');
+    }
+  };
 
   const [tab, setTab] = useState<Tab>('profil');
   const [sheet, setSheet] = useState<Sheet>('none');
@@ -85,8 +125,14 @@ export default function UserProfile() {
     toggleFollow(user.id);
   };
 
-  const call = (mode: 'sesli' | 'goruntulu') =>
-    isBlocked ? showAlert('Engelli kullanıcı') : router.push({ pathname: '/arama/[id]', params: { id: user.id, mode } });
+  const call = (mode: 'sesli' | 'goruntulu') => guard(mode === 'sesli' ? 'voice' : 'video', () => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode } }));
+  const inviteToRoom = () =>
+    guard('invite', () => {
+      if (sentInvites.includes(`room:${user.id}`)) return showAlert('Davet zaten gönderildi', `${user.name} henüz yanıt vermedi.`);
+      setSentInvites((l) => [...l, `room:${user.id}`]);
+      notify({ kind: 'social', icon: '🎙️', title: 'Oda daveti gönderildi', body: `${user.name} kişisini "${myRoom.title}" odana davet ettin.`, href: '/oda/yeni' });
+      showAlert('Davet gönderildi', `${user.name} kabul ederse odana katılır.`);
+    });
 
   const deliverGift = (g: Gift) => {
     if (!spendCoins(g.price, `Hediye: ${g.name} → ${user.name}`)) {
@@ -102,7 +148,8 @@ export default function UserProfile() {
     showAlert('Hediye gönderildi 🎁', `${g.emoji} ${g.name} → ${user.name}`);
   };
   const sendGift = (g: Gift) => {
-    if (isBlocked) return showAlert('Engelli kullanıcı');
+    const c = can('gift');
+    if (!c.ok) return showAlert('Şu an yapılamıyor', c.reason);
     if (settings.bigSpendConfirm > 0 && g.price >= settings.bigSpendConfirm) {
       showAlert('Yüksek tutarlı gönderim', `${user.name} kişisine 🪙 ${g.price.toLocaleString('tr-TR')} değerinde ${g.name} gönderilecek. Onaylıyor musun?`, [
         { text: 'Vazgeç', style: 'cancel' },
@@ -140,18 +187,19 @@ export default function UserProfile() {
     ]);
   };
 
-  const copyId = () => {
-    const value = displayId(user.id);
+  const copyText = (value: string, what: string) => {
     const clip = Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
     if (clip) {
       clip.writeText(value).then(
-        () => showAlert('ID kopyalandı', value),
-        () => showAlert(`ID: ${value}`),
+        () => showAlert(`${what} kopyalandı`, value),
+        () => showAlert(`${what}: ${value}`),
       );
       return;
     }
-    showAlert(`ID: ${value}`, 'Kopyalamak için numaranın üzerine uzun bas.');
+    showAlert(`${what}: ${value}`, 'Kopyalamak için metnin üzerine uzun bas.');
   };
+  const copyId = () => copyText(displayId(user.id), 'ID');
+  const copyUsername = () => copyText(`@${user.username ?? ''}`, 'Kullanıcı adı');
 
   const barHeight = insets.top + BAR_H;
   const onScroll = (y: number) => {
@@ -168,7 +216,7 @@ export default function UserProfile() {
       : null;
   const family = isMe ? (FAMILIES.find((f) => f.id === familyId) ?? null) : familyOf(user.id);
 
-  const presence = presenceOf(user.id);
+  const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
   const pickerUsers = USERS.filter((u) => following.has(u.id) && !blocked.has(u.id));
 
   return (
@@ -197,39 +245,77 @@ export default function UserProfile() {
             <View style={{ flex: 1, gap: 8 }}>
               <View style={styles.avatarWrap}>
                 {isMe ? (
-                  <FramedAvatar uri={user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} />
+                  <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
+                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} />
+                    <View style={styles.cameraBadge}>
+                      <Ionicons name="camera" size={14} color="#fff" />
+                    </View>
+                  </Pressable>
                 ) : (
                   <Avatar uri={user.avatar} size={96} ring={user.vip} />
                 )}
               </View>
+              {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
               <View style={styles.row}>
                 <Text style={styles.name} numberOfLines={1}>
                   {user.name}
                 </Text>
-                <View style={styles.flag}>
-                  <Text style={{ fontSize: 13 }}>🇹🇷</Text>
-                  <Text style={styles.flagText}>TR</Text>
-                </View>
+                {country && (
+                  <View style={styles.flag} accessibilityLabel={country.name}>
+                    <Text style={{ fontSize: 13 }}>{country.flag}</Text>
+                    <Text style={styles.flagText}>{country.code}</Text>
+                  </View>
+                )}
               </View>
+              {!!user.username && (
+                <Pressable style={styles.row} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
+                  <Text style={styles.handle}>@{user.username}</Text>
+                  <Ionicons name="copy-outline" size={13} color={colors.textDim} />
+                </Pressable>
+              )}
               <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                <View style={[styles.genderChip, { backgroundColor: user.gender === 'Kadın' ? semantic.socialFill : '#0369A1' }]}>
-                  <Text style={styles.genderText}>
-                    {user.gender === 'Kadın' ? '♀' : '♂'} {user.age}
-                  </Text>
-                </View>
+                {user.showGender === false || !user.gender ? (
+                  <View style={[styles.genderChip, { backgroundColor: colors.cardAlt }]}>
+                    <Text style={styles.genderText}>{user.age}</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.genderChip, { backgroundColor: user.gender === 'Kadın' ? semantic.socialFill : '#0369A1' }]}>
+                    <Text style={styles.genderText}>
+                      {user.gender === 'Kadın' ? '♀' : '♂'} {user.age}
+                    </Text>
+                  </View>
+                )}
                 <LevelChips wealth={levels.wealth} charm={levels.charm} />
                 {isMe ? <VipTitle level={vipLevel} /> : user.vip && <VipBadge />}
+                {staff && (
+                  <View style={[styles.staffChip, staff === 'Moderatör' && { backgroundColor: '#1D4ED8' }]} accessibilityLabel={`Resmi ${staff}`}>
+                    <Ionicons name="shield-checkmark" size={12} color="#fff" />
+                    <Text style={styles.genderText}>{staff}</Text>
+                  </View>
+                )}
                 {user.verified && <VerifiedBadge size={18} />}
               </View>
               <View style={styles.row}>
-                <View style={[styles.dot, { backgroundColor: user.online ? semantic.live : colors.textDim }]} />
-                <Text style={{ color: user.online ? semantic.live : colors.textDim, fontSize: 13 }}>{user.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
-                <View style={styles.vSep} />
-                <Ionicons name="location-outline" size={14} color={colors.textDim} />
-                <Text style={styles.meta}>
-                  {user.city}
-                  {!isMe && ` · ${user.distanceKm} km`}
-                </Text>
+                {priv.showOnline ? (
+                  <>
+                    <View style={[styles.dot, { backgroundColor: user.online ? semantic.live : colors.textDim }]} />
+                    <Text style={{ color: user.online ? semantic.live : colors.textDim, fontSize: 13 }}>
+                      {user.online ? 'Çevrimiçi' : lastSeen ? `Son görülme ${lastSeen}` : 'Çevrimdışı'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.meta}>{isMe ? 'Durumun gizli' : 'Durum gizli'}</Text>
+                )}
+                {!!user.city && (
+                  <>
+                    <View style={styles.vSep} />
+                    <Ionicons name="location-outline" size={14} color={colors.textDim} />
+                    <Text style={styles.meta}>
+                      {user.city}
+                      {!isMe && settings.cityDiscovery && ` · ${user.distanceKm} km`}
+                    </Text>
+                  </>
+                )}
               </View>
             </View>
             <Guardian guardian={guardian} />
@@ -249,9 +335,14 @@ export default function UserProfile() {
             <View style={styles.vSep} />
             <Stat n={isMe ? following.size : (user.age * 13) % 200} label="Takip" />
             <View style={styles.vSep} />
+            <Stat n={friends} label="Arkadaş" />
+            <View style={styles.vSep} />
             <Stat n={giftTotal} label="Hediye" onPress={() => setTab('onur')} />
           </View>
           {isBlocked && <Text style={{ color: colors.red, marginTop: 8 }}>Bu kullanıcıyı engelledin.</Text>}
+          {!isMe && priv.status !== 'active' && (
+            <Text style={styles.statusNote}>{priv.status === 'restricted' ? '⚠️ Bu hesap geçici olarak kısıtlı: arama, hediye ve oda daveti alamıyor.' : '⛔ Bu hesap askıya alındı.'}</Text>
+          )}
           {!isMe && !isBlocked && presence && (
             <Pressable
               style={[styles.presence, presence.kind === 'call' && { borderColor: colors.gold }]}
@@ -297,6 +388,15 @@ export default function UserProfile() {
                     </View>
                   </LinearGradient>
                 </Pressable>
+                <PrivateStats
+                  coins={coins}
+                  diamonds={diamonds}
+                  vipUntil={vipUntil}
+                  wealthXp={spentTotal}
+                  charmXp={totalDiamonds}
+                  giftsSent={stats.giftsSent}
+                  giftsReceived={giftTotal}
+                />
               </View>
             ) : (
               <View style={styles.section}>
@@ -306,11 +406,29 @@ export default function UserProfile() {
             <Band />
 
             <View style={styles.section}>
-              <SectionTitle title="Özel albüm" onPress={() => setTab('dinamik')} />
-              {photos.length > 0 ? (
+              <SectionTitle title={`Albüm${isMe ? ` · ${me.photos?.length ?? 0}/${LIMITS.photos}` : ''}`} onPress={() => setTab('dinamik')} />
+              {album.length > 0 || isMe ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {photos.map((p) => (
-                    <Image key={p} source={{ uri: p }} style={styles.photo} />
+                  {isMe && (me.photos?.length ?? 0) < LIMITS.photos && (
+                    <Pressable style={[styles.photo, styles.addPhoto]} onPress={() => pickPhoto(true)} accessibilityLabel="Albüme fotoğraf ekle">
+                      <Ionicons name="add" size={30} color={colors.textDim} />
+                      <Text style={styles.meta}>Fotoğraf ekle</Text>
+                    </Pressable>
+                  )}
+                  {album.map((p) => (
+                    <View key={p}>
+                      <Image source={{ uri: p }} style={styles.photo} />
+                      {isMe && me.photos?.includes(p) && (
+                        <Pressable
+                          style={styles.removePhoto}
+                          hitSlop={6}
+                          onPress={() => updateMe({ photos: (me.photos ?? []).filter((x) => x !== p) })}
+                          accessibilityLabel="Fotoğrafı kaldır"
+                        >
+                          <Ionicons name="close" size={14} color="#fff" />
+                        </Pressable>
+                      )}
+                    </View>
                   ))}
                 </ScrollView>
               ) : (
@@ -388,9 +506,31 @@ export default function UserProfile() {
                     <Ionicons name="copy-outline" size={16} color={colors.textDim} />
                   </Pressable>
                 </InfoRow>
+                {!!user.username && (
+                  <InfoRow icon="at-outline" label="Kullanıcı adı">
+                    <Pressable style={styles.row} onPress={copyUsername} hitSlop={6} accessibilityLabel="Kullanıcı adını kopyala">
+                      <Text selectable style={styles.infoValue}>
+                        @{user.username}
+                      </Text>
+                      <Ionicons name="copy-outline" size={16} color={colors.textDim} />
+                    </Pressable>
+                  </InfoRow>
+                )}
+                {country && (
+                  <InfoRow icon="flag-outline" label="Ülke">
+                    <Text style={styles.infoValue}>
+                      {country.flag} {country.name}
+                    </Text>
+                  </InfoRow>
+                )}
                 {isMe && (
-                  <InfoRow icon="gift-outline" label="Doğum Günü" hint="Yalnızca Sen Görebilirsin">
-                    <Text style={styles.infoValue}>{extras.birthday}</Text>
+                  <InfoRow icon="gift-outline" label="Doğum Günü" hint="Yalnızca Sen Görebilirsin · diğerleri sadece yaşını görür">
+                    <Text style={styles.infoValue}>{user.birthDate ? formatTrDate(user.birthDate) : extras.birthday}</Text>
+                  </InfoRow>
+                )}
+                {!!user.joinedAt && (
+                  <InfoRow icon="calendar-outline" label="Üyelik">
+                    <Text style={styles.infoValue}>{new Date(user.joinedAt).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}</Text>
                   </InfoRow>
                 )}
                 <InfoRow icon="heart-outline" label="İlişki Durumu">
@@ -515,9 +655,9 @@ export default function UserProfile() {
             <Ionicons name={isFollowing ? 'checkmark' : 'add'} size={20} color="#fff" />
             <Text style={styles.followText}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
           </Pressable>
-          <BarButton icon="chatbubble-ellipses" label="Mesaj" onPress={() => router.push(`/sohbet/${user.id}`)} />
-          <BarButton icon="call" label="Ara" onPress={() => (isBlocked ? showAlert('Engelli kullanıcı') : setSheet('call'))} />
-          <BarButton icon="gift" label="Hediye" highlight onPress={() => (isBlocked ? showAlert('Engelli kullanıcı') : setSheet('gift'))} />
+          <BarButton icon="chatbubble-ellipses" label="Mesaj" off={!can('message').ok} onPress={() => guard('message', () => router.push(`/sohbet/${user.id}`))} />
+          <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />
+          <BarButton icon="gift" label="Hediye" highlight off={!can('gift').ok} onPress={() => guard('gift', () => setSheet('gift'))} />
         </SafeAreaView>
       )}
 
@@ -526,7 +666,9 @@ export default function UserProfile() {
         title={user.name}
         onClose={() => setSheet('none')}
         options={[
+          { label: '🎙️ Odama davet et', onPress: inviteToRoom },
           { label: '🔗 Profili paylaş', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
+          { label: '📋 Kullanıcı adını kopyala', onPress: copyUsername },
           { label: '🚩 Şikayet et', onPress: () => setTimeout(() => setSheet('report'), 300) },
           { label: isBlocked ? 'Engeli kaldır' : '⛔ Engelle', destructive: true, onPress: () => toggleBlock(user.id) },
         ]}
@@ -539,6 +681,7 @@ export default function UserProfile() {
           label: r,
           onPress: () => {
             const no = createTicket('Şikâyet', `${user.name} (${user.id}) · ${r}`);
+            logSafety('Şikâyet etti', user.id, `${r} · #${no}`);
             showAlert('Şikâyet alındı', `Talep #${no} · "${r}". İnceleme sonucu bildirim olarak gelir; durumu Destek ekranından izleyebilirsin.`);
           },
         }))}
@@ -548,8 +691,8 @@ export default function UserProfile() {
         title={`${user.name} ile arama`}
         onClose={() => setSheet('none')}
         options={[
-          { label: '📞 Sesli arama', onPress: () => call('sesli') },
-          { label: `🎥 Görüntülü arama · 🪙 ${callPrice(user)}/dk`, onPress: () => call('goruntulu') },
+          { label: `📞 Sesli arama · 🪙 ${Math.round(callPrice(user) / 2)}/dk${can('voice').ok ? '' : ' · kapalı'}`, onPress: () => call('sesli') },
+          { label: `🎥 Görüntülü arama · 🪙 ${callPrice(user)}/dk${can('video').ok ? '' : ' · kapalı'}`, onPress: () => call('goruntulu') },
         ]}
       />
       <ActionSheet
@@ -562,6 +705,7 @@ export default function UserProfile() {
       {editOpen && (
         <EditSheet
           user={me}
+          onPhoto={() => pickPhoto(false)}
           onClose={() => setEditOpen(false)}
           onSave={(patch) => {
             updateMe(patch);
@@ -646,9 +790,10 @@ function Stat({ n, label, onPress }: { n: number; label: string; onPress?: () =>
   );
 }
 
-function BarButton({ icon, label, onPress, highlight }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; highlight?: boolean }) {
+function BarButton({ icon, label, onPress, highlight, off }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; highlight?: boolean; off?: boolean }) {
+  // "off" stays tappable so the reason can be shown, but looks disabled.
   return (
-    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 2 }} accessibilityLabel={label}>
+    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 2, opacity: off ? 0.4 : 1 }} accessibilityLabel={label} accessibilityState={{ disabled: off }}>
       {highlight ? (
         <LinearGradient colors={gradientDeep} style={styles.roundBtn}>
           <Ionicons name={icon} size={21} color="#fff" />
@@ -1078,27 +1223,91 @@ function InviteButton({ icon, title, onPress }: { icon: keyof typeof Ionicons.gl
 
 // --- Sheets ----------------------------------------------------------------------------
 
-function EditSheet({ user, onSave, onClose }: { user: User; onSave: (patch: Partial<User>) => void; onClose: () => void }) {
+const GENDERS: [User['gender'] | 'hidden', string][] = [
+  ['Kadın', 'Kadın'],
+  ['Erkek', 'Erkek'],
+  ['hidden', 'Belirtmek istemiyorum'],
+];
+
+function EditSheet({ user, onSave, onClose, onPhoto }: { user: User; onSave: (patch: Partial<User>) => void; onClose: () => void; onPhoto: () => void }) {
   const [name, setName] = useState(user.name);
+  const [username, setUsername] = useState(user.username ?? '');
   const [bio, setBio] = useState(user.bio);
   const [city, setCity] = useState(user.city);
+  const [birth, setBirth] = useState(formatTrDate(user.birthDate));
+  const [gender, setGender] = useState<User['gender'] | 'hidden'>(user.showGender === false ? 'hidden' : user.gender);
+  const [country, setCountry] = useState(user.country ?? 'TR');
+  const [interests, setInterests] = useState<string[]>(user.interests ?? []);
+  const [errors, setErrors] = useState<ProfileErrors>({});
+
   const save = () => {
-    if (!name.trim()) return showAlert('İsim boş olamaz');
-    onSave({ name: name.trim(), bio: bio.trim(), city: city.trim() });
+    // Same rules the server applies; nothing is saved while any field is invalid.
+    const e = validateProfile({ name, username, bio, city, birth });
+    setErrors(e);
+    if (Object.keys(e).length) return showAlert('Profil kaydedilemedi', Object.values(e).join('\n'));
+    const birthDate = parseTrDate(birth)!;
+    onSave({
+      name: name.trim(),
+      username: username.trim().toLowerCase(),
+      bio: bio.trim(),
+      city: city.trim(),
+      birthDate,
+      age: ageFrom(birthDate),
+      country,
+      interests,
+      showGender: gender !== 'hidden',
+      ...(gender !== 'hidden' ? { gender } : {}),
+    });
+    showAlert('Profil güncellendi', 'Değişikliklerin kaydedildi.');
   };
+  const toggleInterest = (i: string) =>
+    setInterests((l) => (l.includes(i) ? l.filter((x) => x !== i) : l.length >= LIMITS.interests ? l : [...l, i]));
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.modalSheet}>
+      <View style={[styles.modalSheet, { maxHeight: '88%' }]}>
         <Text style={styles.modalTitle}>Profili düzenle</Text>
-        <Text style={styles.inputLabel}>İsim</Text>
-        <TextInput value={name} onChangeText={setName} maxLength={20} style={styles.input} placeholder="İsmin" placeholderTextColor={colors.textDim} />
-        <Text style={styles.inputLabel}>Hakkımda</Text>
-        <TextInput value={bio} onChangeText={setBio} maxLength={80} multiline style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]} placeholder="Kendini anlat" placeholderTextColor={colors.textDim} />
-        <Text style={[styles.meta, { alignSelf: 'flex-end', fontSize: 12 }]}>{bio.length}/80</Text>
-        <Text style={styles.inputLabel}>Şehir</Text>
-        <TextInput value={city} onChangeText={setCity} maxLength={30} style={styles.input} placeholder="Şehir" placeholderTextColor={colors.textDim} />
-        <View style={[styles.row, { gap: 10, marginTop: 16 }]}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+          <Pressable style={[styles.row, { gap: 12, marginTop: 4 }]} onPress={onPhoto} accessibilityLabel="Profil fotoğrafını değiştir">
+            <Avatar uri={user.avatar} size={56} />
+            <Text style={{ color: semantic.tonalText, fontWeight: '800' }}>Fotoğrafı değiştir</Text>
+          </Pressable>
+          <Field label="Görünen ad" error={errors.name}>
+            <TextInput value={name} onChangeText={setName} maxLength={LIMITS.name} style={styles.input} placeholder="Adın veya takma adın" placeholderTextColor={colors.textDim} />
+          </Field>
+          <Field label="Kullanıcı adı" error={errors.username} hint="Benzersiz olmalı. ID numaran değişmez.">
+            <View style={[styles.row, styles.input, { paddingVertical: 0 }]}>
+              <Text style={{ color: colors.textDim, fontSize: 15 }}>@</Text>
+              <TextInput value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" autoCorrect={false} maxLength={20} style={{ flex: 1, color: '#fff', fontSize: 15, paddingVertical: 10 }} placeholder="kullanici.adi" placeholderTextColor={colors.textDim} />
+            </View>
+          </Field>
+          <Field label={`Hakkımda · ${bio.length}/${LIMITS.bio}`} error={errors.bio}>
+            <TextInput value={bio} onChangeText={setBio} maxLength={LIMITS.bio} multiline style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]} placeholder="Kendini anlat" placeholderTextColor={colors.textDim} />
+          </Field>
+          <Field label="Doğum tarihi" error={errors.birth} hint="Yalnızca sen görürsün; diğerleri sadece yaşını görür.">
+            <TextInput value={birth} onChangeText={setBirth} keyboardType="numbers-and-punctuation" maxLength={10} style={styles.input} placeholder="GG.AA.YYYY" placeholderTextColor={colors.textDim} />
+          </Field>
+          <Field label="Cinsiyet (isteğe bağlı)">
+            <ChipRow value={gender} options={GENDERS} onChange={setGender} />
+          </Field>
+          <Field label="Ülke">
+            <ChipRow value={country} options={COUNTRIES.filter((c) => c.code !== 'ALL').map((c) => [c.code, `${c.flag} ${c.name}`] as [string, string])} onChange={setCountry} />
+          </Field>
+          <Field label="Şehir (isteğe bağlı)" error={errors.city} hint="Boş bırakırsan profilinde şehir görünmez.">
+            <TextInput value={city} onChangeText={setCity} maxLength={LIMITS.city} style={styles.input} placeholder="Şehir" placeholderTextColor={colors.textDim} />
+          </Field>
+          <Field label={`İlgi alanları · ${interests.length}/${LIMITS.interests}`}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {INTERESTS.map((i) => (
+                <Pressable key={i} onPress={() => toggleInterest(i)} style={[styles.editChip, interests.includes(i) && styles.editChipOn]}>
+                  <Text style={{ color: '#fff', fontSize: 13 }}>{i}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Field>
+        </ScrollView>
+        <View style={[styles.row, { gap: 10, marginTop: 12 }]}>
           <Pressable style={styles.cancelBtn} onPress={onClose}>
             <Text style={{ color: colors.textDim, fontWeight: '700' }}>Vazgeç</Text>
           </Pressable>
@@ -1106,6 +1315,65 @@ function EditSheet({ user, onSave, onClose }: { user: User; onSave: (patch: Part
         </View>
       </View>
     </Modal>
+  );
+}
+
+function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: ReactNode }) {
+  return (
+    <View>
+      <Text style={styles.inputLabel}>{label}</Text>
+      {children}
+      {error ? <Text style={styles.fieldError}>{error}</Text> : hint ? <Text style={[styles.meta, { fontSize: 12, marginTop: 4 }]}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+function ChipRow<T extends string | undefined>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+      {options.map(([v, l]) => (
+        <Pressable key={String(v)} onPress={() => onChange(v)} style={[styles.editChip, value === v && styles.editChipOn]}>
+          <Text style={{ color: '#fff', fontSize: 13 }}>{l}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+/** Owner-only numbers: balances, VIP end date and XP never appear on profiles others open. */
+function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | null; wealthXp: number; charmXp: number; giftsSent: number; giftsReceived: number }) {
+  const n = (x: number) => x.toLocaleString('tr-TR');
+  return (
+    <View style={styles.privateCard}>
+      <View style={styles.row}>
+        <Ionicons name="lock-closed" size={14} color={colors.textDim} />
+        <Text style={[styles.meta, { fontSize: 12 }]}>Yalnızca sen görürsün</Text>
+      </View>
+      <View style={styles.privateRow}>
+        <Pressable style={styles.privateCell} onPress={() => router.push('/cuzdan')} accessibilityLabel="Jeton bakiyesi">
+          <Icon3D name="coin" size={26} />
+          <Text style={styles.privateValue}>{n(p.coins)}</Text>
+          <Text style={styles.meta}>Jeton</Text>
+        </Pressable>
+        <Pressable style={styles.privateCell} onPress={() => router.push('/gelir')} accessibilityLabel="Elmas bakiyesi">
+          <Icon3D name="diamond" size={26} />
+          <Text style={styles.privateValue}>{n(p.diamonds)}</Text>
+          <Text style={styles.meta}>Elmas</Text>
+        </Pressable>
+        <Pressable style={styles.privateCell} onPress={() => router.push('/vip')} accessibilityLabel="VIP durumu">
+          <Icon3D name="crown" size={26} />
+          <Text style={styles.privateValue} numberOfLines={1}>
+            {p.vipUntil ?? 'Yok'}
+          </Text>
+          <Text style={styles.meta}>{p.vipUntil ? 'VIP bitişi' : 'VIP'}</Text>
+        </Pressable>
+      </View>
+      <Pressable onPress={() => router.push('/seviye')} accessibilityLabel="Seviye ve deneyim puanı">
+        <Text style={styles.meta}>
+          Servet XP {n(p.wealthXp)} · Çekicilik XP {n(p.charmXp)} · Hediye: {n(p.giftsSent)} gönderdin, {n(p.giftsReceived)} aldın ›
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1206,6 +1474,20 @@ const styles = StyleSheet.create({
   fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: 'rgba(255,101,118,0.4)' },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   photo: { width: 110, height: 110, borderRadius: 12 },
+  addPhoto: { backgroundColor: colors.card, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  removePhoto: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(8,15,30,0.75)', alignItems: 'center', justifyContent: 'center' },
+  cameraBadge: { position: 'absolute', right: 2, bottom: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  reviewNote: { color: colors.gold, fontSize: 12, fontWeight: '700' },
+  handle: { color: colors.textDim, fontSize: 14, fontWeight: '600' },
+  staffChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#B91C1C', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  statusNote: { color: colors.gold, fontSize: 13, marginTop: 8 },
+  privateCard: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: colors.border },
+  privateRow: { flexDirection: 'row', gap: 8 },
+  privateCell: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
+  privateValue: { color: colors.text, fontWeight: '900', fontSize: 15 },
+  fieldError: { color: '#FF7A82', fontSize: 12, marginTop: 4, fontWeight: '600' },
+  editChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
+  editChipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.18)' },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 4 },
   zzz: { color: colors.textDim, fontSize: 16, fontWeight: '900', marginTop: -6 },
   moment: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10 },

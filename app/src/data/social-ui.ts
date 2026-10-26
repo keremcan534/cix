@@ -59,7 +59,7 @@ export const COUNTRIES: Country[] = [
 ];
 /** Demo users default to Türkiye (their `city` field); other countries show an empty state. */
 export const USER_COUNTRY: Record<string, string> = {};
-export const countryOf = (u: User) => USER_COUNTRY[u.id] ?? 'TR';
+export const countryOf = (u: User) => u.country ?? USER_COUNTRY[u.id] ?? 'TR';
 
 /** Agency room promo card shown inside the discovery list. */
 export const DISCOVER_PROMO = {

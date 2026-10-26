@@ -13,6 +13,20 @@ export type User = {
   online: boolean;
   gender?: 'Kadın' | 'Erkek';
   interests?: string[];
+  /** Unique @handle (lowercase, changeable with limits); `id` never changes. */
+  username?: string;
+  /** ISO country code; shown as flag + name. */
+  country?: string;
+  /** YYYY-MM-DD; only the owner sees it, everyone else sees the age. */
+  birthDate?: string;
+  /** Account creation (YYYY-MM-DD); shown as month and year. */
+  joinedAt?: string;
+  /** Last activity for offline users, e.g. "2 sa önce" (hidden if they turned it off). */
+  lastSeen?: string;
+  /** Album photos (max 6). */
+  photos?: string[];
+  /** false = gender kept private. */
+  showGender?: boolean;
 };
 
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -88,6 +102,12 @@ export const ME: User = {
   bio: 'Müzik, kahve ve gece sohbetleri ☕🎧',
   online: true,
   interests: ['🎧 Müzik', '☕ Kahve', '💬 Sohbet'],
+  username: 'sen',
+  country: 'TR',
+  birthDate: '2002-03-14',
+  joinedAt: '2026-09-02',
+  photos: [],
+  showGender: true,
 };
 
 export const USERS: User[] = [
@@ -106,7 +126,17 @@ export const USERS: User[] = [
 ];
 
 const WOMEN = new Set(['u1', 'u3', 'u5', 'u7', 'u9', 'u11']);
-USERS.forEach((u) => (u.gender = WOMEN.has(u.id) ? 'Kadın' : 'Erkek'));
+const COUNTRY_OF: Record<string, string> = { u4: 'DE', u8: 'AZ', u12: 'NL' };
+const LAST_SEEN = ['5 dk önce', '1 sa önce', 'Dün 23:40', '3 gün önce'];
+const ASCII: Record<string, string> = { ı: 'i', ğ: 'g', ü: 'u', ş: 's', ö: 'o', ç: 'c' };
+USERS.forEach((u, i) => {
+  u.gender = WOMEN.has(u.id) ? 'Kadın' : 'Erkek';
+  u.username = `${u.name.toLocaleLowerCase('tr-TR').replace(/[ığüşöç]/g, (c) => ASCII[c])}.${10 + i * 7}`;
+  u.country = COUNTRY_OF[u.id] ?? 'TR';
+  u.joinedAt = `202${5 + (i % 2)}-${String(1 + ((i * 5) % 12)).padStart(2, '0')}-1${i % 9}`;
+  u.lastSeen = u.online ? undefined : LAST_SEEN[i % LAST_SEEN.length];
+  u.showGender = u.id !== 'u10';
+});
 
 // Users who follow the current user back (mutual follow => free messages).
 export const FOLLOWS_ME = new Set(['u1', 'u2', 'u5', 'u7', 'u9']);

@@ -9,6 +9,7 @@ import { CoinPill, VerifiedBadge } from '@/components/ui';
 import { callPrice } from '@/data/economy';
 import { GIFTS, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { checkInteraction } from '@/lib/interaction';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -21,7 +22,7 @@ export default function CallScreen() {
   const user = userById(id);
   const video = mode !== 'sesli';
   const price = video ? callPrice(user) : Math.round(callPrice(user) / 2);
-  const { coins, spendCoins, bump, me } = useApp();
+  const { coins, spendCoins, bump, me, blocked, following } = useApp();
 
   const [phase, setPhase] = useState<Phase>('ringing');
   const [seconds, setSeconds] = useState(0);
@@ -38,6 +39,14 @@ export default function CallScreen() {
     const loop = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }));
     loop.start();
     const t = setTimeout(() => {
+      // Every entry point (profile, chat, call history) lands here, so block and privacy are checked once,
+      // before anything is charged. The server repeats this check when the call is set up.
+      const allowed = checkInteraction(video ? 'video' : 'voice', user, { blocked, following, myAge: me.age });
+      if (!allowed.ok) {
+        setPhase('ended');
+        showAlert('Arama yapılamıyor', allowed.reason, [{ text: 'Tamam', onPress: () => router.back() }]);
+        return;
+      }
       if (!spendCoins(price)) {
         setPhase('ended');
         showAlert('Yetersiz jeton', `Bu arama dakikada ${price} jeton. Jeton yükleyip tekrar dene.`, [{ text: 'Tamam', onPress: () => router.back() }]);

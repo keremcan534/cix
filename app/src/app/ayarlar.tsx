@@ -2,7 +2,9 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Card, Header } from '@/components/ui';
+import { Avatar, Card, Header } from '@/components/ui';
+import { userById } from '@/data/mock';
+import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
 import { GATES } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
@@ -49,7 +51,7 @@ function Chips<T extends string | number>({ value, options, onChange }: { value:
 }
 
 export default function SettingsScreen() {
-  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, settings, setSetting, sessions, endSession, notify } = useApp();
+  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
   const snoozed = settings.snoozeUntil > nowMs();
   const snooze = (h: number) => {
     setSetting('snoozeUntil', h ? nowMs() + h * 3_600_000 : 0);
@@ -135,6 +137,12 @@ export default function SettingsScreen() {
         <Card style={{ gap: 12 }}>
           <Toggle k="profilePublic" label="Profilim herkese açık" />
           <Toggle k="showOnline" label="Çevrimiçi durumumu göster" />
+          <Toggle k="showLastSeen" label="Son görülme bilgimi göster" hint="Kapatırsan başkalarının son görülmesini de göremezsin." />
+          <Toggle k="showCurrentRoom" label="Bulunduğum odayı profilimde göster" hint="Kapalıyken profilinden odana 'Git' ile gelinemez." />
+          <Text style={{ color: '#fff' }}>Bana kimler mesaj gönderebilir?</Text>
+          <Chips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
+          <Text style={{ color: '#fff' }}>Beni kimler arayabilir? (ücretli sesli/görüntülü)</Text>
+          <Chips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
           <Toggle k="cityDiscovery" label="Aynı şehirde keşfedilebilir ol" hint="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
           <Toggle k="invisibleEntry" label="👻 Odalara gizli giriş" hint="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez." disabled={!GATES.invisibleEntry(nobleTier)} />
           <Text style={{ color: '#fff' }}>Beni odalara kimler davet edebilir?</Text>
@@ -147,7 +155,44 @@ export default function SettingsScreen() {
             ]}
             onChange={(v) => setSetting('invitesFrom', v)}
           />
-          <Text style={styles.dim}>Engellenen kullanıcılar: {blocked.size}</Text>
+        </Card>
+
+        <Text style={styles.section}>Engellenenler · {blocked.size}</Text>
+        <Card style={{ gap: 10 }}>
+          {blocked.size === 0 ? (
+            <Text style={styles.dim}>Kimseyi engellemedin. Engellediğin kişiler sana mesaj atamaz, seni arayamaz, hediye veya oda daveti gönderemez.</Text>
+          ) : (
+            [...blocked].map((id) => {
+              const u = userById(id);
+              return (
+                <View key={id} style={styles.row}>
+                  <Avatar uri={u.avatar} size={36} />
+                  <Pressable style={{ flex: 1 }} onPress={() => router.push(`/kullanici/${id}`)}>
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>{u.name}</Text>
+                    <Text style={styles.dim}>@{u.username}</Text>
+                  </Pressable>
+                  <Pressable style={styles.chip} onPress={() => toggleBlock(id)} accessibilityLabel={`${u.name} engelini kaldır`}>
+                    <Text style={styles.chipText}>Engeli kaldır</Text>
+                  </Pressable>
+                </View>
+              );
+            })
+          )}
+        </Card>
+
+        <Text style={styles.section}>Güvenlik kayıtları</Text>
+        <Card style={{ gap: 6 }}>
+          {safetyLog.length === 0 ? (
+            <Text style={styles.dim}>Engelleme, şikâyet ve veri talepleri burada tarihleriyle listelenir.</Text>
+          ) : (
+            safetyLog.slice(0, 12).map((l) => (
+              <Text key={l.id} style={styles.dim}>
+                {l.time} · {l.action}
+                {l.targetId ? ` · ${userById(l.targetId).name}` : ''}
+                {l.detail ? ` · ${l.detail}` : ''}
+              </Text>
+            ))
+          )}
         </Card>
 
         <Text style={styles.section}>Görünüm ve erişilebilirlik</Text>
@@ -201,6 +246,9 @@ export default function SettingsScreen() {
         </Card>
 
         <Card style={{ gap: 10 }}>
+          <Pressable onPress={requestDataExport}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>📦 Verilerimin kopyasını iste (KVKK)</Text>
+          </Pressable>
           <Pressable onPress={logout}>
             <Text style={{ color: '#fff', fontWeight: '700' }}>Çıkış yap</Text>
           </Pressable>
