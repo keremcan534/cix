@@ -29,6 +29,7 @@ const GROWTH: Item[] = [
   { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi') },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi') },
+  { icon: 'flash-outline', label: 'Takım PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi') },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim') },
 ];
