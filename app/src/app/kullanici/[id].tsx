@@ -33,6 +33,7 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
+import { successHaptic } from '@/lib/haptics';
 import { checkInteraction, type Action } from '@/lib/interaction';
 import { shareLink } from '@/lib/links';
 import { LIMITS, ageFrom, formatTrDate, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
@@ -146,18 +147,11 @@ export default function UserProfile() {
     setSentGifts((m) => ({ ...m, [g.id]: (m[g.id] ?? 0) + 1 }));
     bump('giftsSent', 1);
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
-    showAlert('Hediye gönderildi 🎁', `${g.emoji} ${g.name} → ${user.name}`);
+    successHaptic();
   };
   const sendGift = (g: Gift) => {
     const c = can('gift');
     if (!c.ok) return showAlert('Şu an yapılamıyor', c.reason);
-    if (settings.bigSpendConfirm > 0 && g.price >= settings.bigSpendConfirm) {
-      showAlert('Yüksek tutarlı gönderim', `${user.name} kişisine 🪙 ${g.price.toLocaleString('tr-TR')} değerinde ${g.name} gönderilecek. Onaylıyor musun?`, [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Onayla ve gönder', onPress: () => deliverGift(g) },
-      ]);
-      return;
-    }
     deliverGift(g);
   };
 

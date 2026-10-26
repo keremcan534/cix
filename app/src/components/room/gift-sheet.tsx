@@ -5,8 +5,8 @@
 // Lucky shelf: price, every multiplier with its exact odds and reward are shown before sending; the draw
 // happens on the server (lib/lucky) and is shown afterwards in the room.
 // Spending rules: the total (price × count × recipients) is always visible before sending, gold is
-// used only for the money action, high totals need a second, explicit tap, and a short balance turns
-// the action into "top up" instead of failing after the tap.
+// used only for the money action, and a short balance turns the action into "top up" instead of
+// failing after the tap. Product rule: no gift ever asks for a confirmation; one tap sends.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -56,8 +56,6 @@ const backpackStock: Record<string, number> = { g1: 7, g3: 2, p3: 3, g2: 1 };
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
-/** Lucky odds were shown and acknowledged once this session; later sends skip the extra tap. */
-const luckyAck = new Set<string>();
 
 function shelfGifts(shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>) {
   if (shelf === 'lucky') return [];
@@ -86,15 +84,13 @@ export function GiftSheet({
   listeners: string[];
   initialTo?: string | null;
   coins: number;
-  /** `confirmed` is true when the sheet already asked for the high-value confirmation. */
-  onSend: (g: Gift, to: string[], count: number, confirmed: boolean) => void;
+  onSend: (g: Gift, to: string[], count: number) => void;
   onSendLucky: (giftId: string, toId: string) => void;
 }) {
-  const { svipLevel, spentTotal, settings, me } = useApp();
+  const { svipLevel, spentTotal, me } = useApp();
   const lucky = useLucky();
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
-  const [luckyArmed, setLuckyArmed] = useState(false);
   const [shelf, setShelf] = useState<Shelf>('hot');
   const [sort, setSort] = useState<PriceSort>('default');
   const [favs, setFavs] = useState(() => new Set(favoriteGifts));
@@ -102,7 +98,6 @@ export function GiftSheet({
   const [sel, setSel] = useState<{ id: string; bag: boolean }>({ id: GIFTS[0].id, bag: false });
   const [count, setCount] = useState(1);
   const [countOpen, setCountOpen] = useState(false);
-  const [armedFor, setArmedFor] = useState<string | null>(null);
   const micIds = seated.map((x) => x.id);
   const roomIds = [...micIds, ...listeners.filter((id) => !micIds.includes(id))];
   const [picked, setPicked] = useState<string[]>(() => {
@@ -126,11 +121,6 @@ export function GiftSheet({
   const short = fromBag ? 0 : total - coins;
   const bagNeed = count * targets.length;
   const bagShort = fromBag && bagNeed > (bag[gift.id] ?? 0);
-  // The confirmation is tied to exactly what was shown; changing gift, count or people disarms it.
-  const armKey = `${sel.id}|${sel.bag}|${count}|${targets.join(',')}`;
-  const armed = armedFor === armKey;
-  // No confirmation by default (product decision: the sender is responsible); users can opt in from Ayarlar.
-  const needsConfirm = !fromBag && settings.bigSpendConfirm > 0 && total >= settings.bigSpendConfirm;
 
   const level = levelOf(spentTotal);
   const nextXp = LEVEL_XP[level];
@@ -155,12 +145,10 @@ export function GiftSheet({
   };
   const togglePerson = (id: string) => {
     tapHaptic();
-    setLuckyArmed(false);
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   };
   const pickGroup = (ids: string[], on: boolean) => {
     tapHaptic();
-    setLuckyArmed(false);
     setPicked(on ? micIds.slice(0, 1) : ids);
   };
   const goWallet = () => {
@@ -176,13 +164,7 @@ export function GiftSheet({
   const sendLucky = () => {
     if (targets.length !== 1 || luckyBlock) return;
     if (lg.price > coins) return goWallet();
-    if (!luckyAck.has('me') && !luckyArmed) {
-      pressHaptic();
-      setLuckyArmed(true);
-      return;
-    }
-    luckyAck.add('me');
-    setLuckyArmed(false);
+    pressHaptic();
     onSendLucky(lg.id, targets[0]);
   };
 
@@ -193,16 +175,12 @@ export function GiftSheet({
       const next = { ...bag, [gift.id]: (bag[gift.id] ?? 0) - bagNeed };
       Object.assign(backpackStock, next);
       setBag(next);
-      onSend({ ...gift, price: 0 }, targets, count, true);
+      onSend({ ...gift, price: 0 }, targets, count);
       return;
     }
     if (short > 0) return goWallet();
-    if (needsConfirm && !armed) {
-      pressHaptic();
-      setArmedFor(armKey);
-      return;
-    }
-    onSend(gift, targets, count, needsConfirm);
+    pressHaptic();
+    onSend(gift, targets, count);
   };
 
   const top = isLucky ? maxMult(lg) : 0;
@@ -217,9 +195,7 @@ export function GiftSheet({
           ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
           : lg.price > coins
             ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(lg.price - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
-            : luckyArmed
-              ? { tone: 'warn' as const, text: `${fmt(lg.price)} jeton harcanacak. Ödül garanti değildir; çoğu gönderimde ödül çıkmaz. Sonucu sunucu belirler.`, cta: 'Anladım, gönder', variant: 'money' as const }
-              : { tone: 'info' as const, text: `En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Kazanırsan ödül bakiyene eklenir.`, cta: `Gönder · ${fmt(lg.price)}`, variant: 'money' as const }
+            : { tone: 'info' as const, text: `En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Gönderdikten sonra sağ alttaki çarka basarak aynı hediyeyi tekrar gönderebilirsin.`, cta: `Gönder · ${fmt(lg.price)}`, variant: 'money' as const }
     : locked
       ? { tone: 'lock' as const, text: `${gift.name}, SVIP ${gift.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`, cta: 'SVIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -228,9 +204,7 @@ export function GiftSheet({
           ? { tone: 'info' as const, text: `${BACKPACK_SOURCES[gift.id] ?? 'Çanta'} · jeton harcanmaz.`, cta: 'Ücretsiz gönder', variant: 'hero' as const }
           : short > 0
             ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
-            : armed
-              ? { tone: 'warn' as const, text: `${fmt(total)} jeton harcanacak. Gönderilen hediye geri alınamaz.`, cta: `Onayla ve gönder`, variant: 'money' as const }
-              : { tone: 'info' as const, text: `Gönderimden sonra kalan bakiye: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
+            : { tone: 'info' as const, text: `Gönderimden sonra kalan bakiye: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -332,7 +306,6 @@ export function GiftSheet({
               version={lucky.config.version}
               onPick={(id) => {
                 tapHaptic();
-                setLuckyArmed(false);
                 setLuckyId(id);
               }}
             />
@@ -392,9 +365,6 @@ export function GiftSheet({
               <Text style={g.countText}>×{count}</Text>
               <Ionicons name={countOpen ? 'chevron-down' : 'chevron-up'} size={14} color={colors.text} />
             </Pressable>
-            )}
-            {(isLucky ? luckyArmed : armed) && (
-              <Button title="Vazgeç" variant="ghost" onPress={() => (isLucky ? setLuckyArmed(false) : setArmedFor(null))} />
             )}
             <Button
               title={footer.cta}

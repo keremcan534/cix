@@ -9,7 +9,8 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 | Dosya | Görevi |
 |---|---|
 | `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, limitler, kayıtlar, denetim. |
-| `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Lucky** rafı: paketler, tam olasılık tablosu, Geçmişim, onay. |
+| `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Lucky** rafı: paketler, tam olasılık tablosu, Geçmişim. |
+| `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişiye tekrar gönderir (×1, ×2, ×3 …). |
 | `src/components/room/lucky-result.tsx` | Odadaki sonuç kartı (çarpan + ödül veya "ödül çıkmadı"). Dokunmaları engellemez, mikrofona dokunmaz. |
 | `src/app/oda/[id].tsx` | `sendLuckyGift`: alıcının hediye kaydı, PK puanı, sohbet bildirimi. |
 | `src/app/lucky-yonetimi.tsx` | Yönetim paneli (`lucky.manage`). |
@@ -23,8 +24,9 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
   - Belgedeki test tablosu (her gönderim en az 2x kazanır) yönetim panelinde **Belgedeki test tablosu** düğmesiyle uygulanabilir.
 - **Gönderim akışı:**
   1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir.
-  2. Oturumdaki ilk gönderimde "ödül garanti değildir" onayı istenir.
-  3. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi ve limitleri kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
+  2. **Onay yok:** Hiçbir hediye onay sormaz; tek dokunuşla gönderilir.
+  3. Gönderimden sonra sağ altta o hediyeye ait çark çıkar. Çevresindeki çizgi 5 saniyede tamamlanır; bu sürede çarka basmak aynı hediyeyi aynı kişiye tekrar gönderir ve sayaç ×1, ×2, ×3 diye ilerler. Her basış çizgiyi baştan başlatır, çizgi kapanınca çark kaybolur.
+  4. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi ve limitleri kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
 - **Kapsam:** İlk sürümde tek kişiye, tek adet gönderilir. Çoklu gönderim kapsam dışıdır.
 - **Tekrar eden istek:** Aynı işlem kimliği gelirse ilk sonuç döner. İkinci kez jeton düşülmez, ödül verilmez.
 - **Bütçe:**
@@ -33,7 +35,7 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 - **Ayar sürümü:** Her değişiklik sürümü artırır. Her kayıt, çekildiği olasılık tablosunu ve sürümü saklar.
 - **Limitler:**
   - Kullanıcı başına günlük gönderim sınırı.
-  - Dakikalık sınır; aşılırsa istek reddedilir ve şüpheli kaydına düşer.
+  - Dakikalık sınır (varsayılan 60; çarkla hızlı tekrar için yükseltildi); aşılırsa istek reddedilir ve şüpheli kaydına düşer.
   - Yaş sınırı 18; kişi kendine Lucky gönderemez.
 - **PK:** Varsayılan olarak yalnızca hediye bedeli PK puanı getirir. Ödülün eklenmesi yönetim panelinden ayrı bir ayarla açılır.
 - **Servet puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
@@ -46,7 +48,7 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 | Test | Sonuç |
 |---|---|
 | Fiyat ve olasılık tablosu gönderimden önce görünür | ✅ |
-| İlk gönderimde onay istenir | ✅ |
+| Onay penceresi çıkmaz; çarka 3 kez basınca ×4, 4 ayrı kayıt; 5 sn sonra çark kaybolur | ✅ |
 | Çarpan ve ödülü sunucu belirler; bakiye doğru güncellenir | ✅ ×100: −100 +10.000 |
 | Tekrar gönderilen istek ikinci kez ücretlendirilmez ve ödül verilmez | ✅ |
 | Olasılık toplamı %100 olmayan paket kaydedilmez | ✅ "%136; %100 olmalı" |
