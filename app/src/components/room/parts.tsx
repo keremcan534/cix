@@ -6,7 +6,7 @@ import { Animated, FlatList, Image, Modal, Pressable, StyleSheet, Text, View, ty
 
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { cosmeticById } from '@/data/catalog';
-import { userById, type Gift, type Room, type User } from '@/data/mock';
+import { userById, type Gift, type User } from '@/data/mock';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -14,7 +14,6 @@ import { Icon3D } from '@/components/Icon3D';
 export type ChatMsg = { id: string; userId?: string; text: string; system?: boolean; bot?: boolean };
 export type RoomRole = 'owner' | 'admin' | 'member';
 export const ROLE_RANK: Record<RoomRole, number> = { owner: 3, admin: 2, member: 1 };
-export type Pk = { opponent: Room; ours: number; theirs: number; left: number; phase: 'inviting' | 'countdown' | 'live' | 'done'; result?: 'win' | 'lose' | 'draw'; mvp?: string };
 
 export function Seat({
   index,
@@ -32,6 +31,7 @@ export function Seat({
   still,
   anchorRef,
   camera,
+  teamColor,
   onPress,
 }: {
   index: number;
@@ -54,6 +54,8 @@ export function Seat({
   anchorRef?: (v: HostInstance | null) => void;
   /** Sharing camera in the room (live badge on the seat). */
   camera?: boolean;
+  /** Team PK: ring in the team colour around the avatar. */
+  teamColor?: string;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -92,6 +94,7 @@ export function Seat({
             <Ionicons name={locked ? 'lock-closed' : 'add'} size={small ? 18 : 22} color={colors.textDim} />
           </View>
         )}
+        {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
         {camera && user && (
           <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
             <Ionicons name="videocam" size={10} color={semantic.liveInk} />
@@ -313,48 +316,6 @@ export function GiftAnimation({ gift, onDone }: { gift: Gift; onDone: () => void
   );
 }
 
-export function PkBar({ pk, roomTitle }: { pk: Pk; roomTitle: string }) {
-  const ratio = pk.ours + pk.theirs === 0 ? 0.5 : pk.ours / (pk.ours + pk.theirs);
-  const status =
-    pk.phase === 'inviting'
-      ? '📨 Davet gönderildi...'
-      : pk.phase === 'countdown'
-        ? `⏳ ${pk.left}`
-        : pk.phase === 'live'
-          ? `${pk.left}s`
-          : pk.result === 'win'
-            ? 'KAZANDIN'
-            : pk.result === 'lose'
-              ? 'KAYBETTİN'
-              : 'BERABERE';
-  const badge = pk.phase === 'live' ? 'swords' : pk.phase === 'done' && pk.result === 'win' ? 'trophy' : null;
-  return (
-    <View style={styles.pk}>
-      <View style={styles.pkTop}>
-        <Text style={styles.pkName} numberOfLines={1}>
-          {roomTitle}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {badge && <Icon3D name={badge} size={22} />}
-          <Text style={styles.pkTimer}>{status}</Text>
-        </View>
-        <Text style={[styles.pkName, { textAlign: 'right' }]} numberOfLines={1}>
-          {pk.opponent.title}
-        </Text>
-      </View>
-      <View style={styles.pkTrack}>
-        <LinearGradient colors={['#FF6576', '#F43F5E']} style={{ flex: Math.max(ratio, 0.04), justifyContent: 'center', paddingLeft: 8 }}>
-          <Text style={styles.pkScore}>{pk.ours}</Text>
-        </LinearGradient>
-        <LinearGradient colors={['#3B82F6', '#0E7C9A']} style={{ flex: Math.max(1 - ratio, 0.04), justifyContent: 'center', alignItems: 'flex-end', paddingRight: 8 }}>
-          <Text style={styles.pkScore}>{pk.theirs}</Text>
-        </LinearGradient>
-      </View>
-      {pk.phase === 'done' && pk.mvp && <Text style={styles.pkMvp}>⭐ MVP destekçi: {userById(pk.mvp).name}</Text>}
-    </View>
-  );
-}
-
 export function ListenersModal({
   visible,
   onClose,
@@ -417,6 +378,7 @@ const styles = StyleSheet.create({
   hostSeat: { width: '100%' },
   ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live },
   emptySeat: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  teamRing: { position: 'absolute', borderWidth: 3 },
   camBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.live, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, borderWidth: 1.5, borderColor: colors.bg },
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: colors.bg, borderRadius: 10, padding: 2 },

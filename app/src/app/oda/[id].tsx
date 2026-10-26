@@ -45,24 +45,25 @@ import { AnimLayer } from '@/components/fx/anim-layer';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
-import { ChatLine, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { ChatLine, GiftAnimation, ListenersModal, MicBtn, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { PkBoard, PkResult, PkSetupSheet } from '@/components/room/pk';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
-import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
+import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, useGames } from '@/lib/games';
+import { getPk, markPkSeen, recordGift, reportMismatch, usePk } from '@/lib/pk';
 import { shareLink } from '@/lib/links';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 
-const PK_SECONDS = 60;
 const DAILY_DICE = 20;
 const BOT_TIPS = [
   'Oda kuralları: saygılı ol, spam ve hakaret yok. Şikâyet için ⋯ menüsünü kullan.',
@@ -196,7 +197,18 @@ export default function VoiceRoom() {
   const [myQueuePos, setMyQueuePos] = useState<number | null>(null);
   const [giftResults, setGiftResults] = useState<{ userId: string; ok: boolean }[]>([]);
   const [musicRequests, setMusicRequests] = useState<{ track: Track; by: string }[]>([]);
-  const [pk, setPk] = useState<Pk | null>(null);
+  // Team PK (lib/pk is the PK server: clock, score and result live there).
+  const pkStore = usePk();
+  const pk = pkStore.sessions.find((x) => ['invite', 'prep', 'active'].includes(x.status) && (x.roomId === id || x.opponentRoomId === id)) ?? null;
+  const lastPk = pkStore.sessions.find((x) => x.roomId === id || x.opponentRoomId === id);
+  const [pkSetup, setPkSetup] = useState(false);
+  const teamColorOf = (uid: string | null) => (uid && pk?.kind === 'room' && pk.status !== 'invite' ? pk.teams.find((t) => t.members.includes(uid))?.color : undefined);
+  // Gifts score in a PK only through the PK server, once per transaction id.
+  const scorePk = (txId: string, senderId: string, recipientId: string, giftId: string, coins: number) => {
+    const r = recordGift(id, txId, senderId, recipientId, giftId, coins);
+    if (!r.ok && !r.duplicate && pk?.status === 'active' && r.reason.includes('aktif değil')) reportMismatch(txId, 'Hediye alındı ama PK puanı yazılamadı');
+    return r;
+  };
   // Boss-seat rooms start with an existing top gifter so the seat can be competed for.
   const [contrib, setContrib] = useState<Record<string, number>>(() => {
     if (isOwn || !base!.bossSeat) return {};
@@ -396,6 +408,25 @@ export default function VoiceRoom() {
     }, 3500);
     return () => clearInterval(t);
   }, [seatedKey, botReactions]);
+  // Room PK: listeners back both teams with gifts (prototype stand-in for other people's sends).
+  const roomPkActive = pk?.kind === 'room' && pk.status === 'active' ? pk.id : null;
+  useEffect(() => {
+    if (!roomPkActive) return;
+    const t = setInterval(() => {
+      const cur = getPk().sessions.find((x) => x.id === roomPkActive); // live read, not the render-time copy
+      if (!cur || cur.status !== 'active') return;
+      const members = cur.teams.flatMap((x) => x.members).filter((m) => m !== 'me');
+      if (!members.length || Math.random() > 0.6) return;
+      const to = pick(members);
+      const from = pick(USERS.filter((u) => !members.includes(u.id)));
+      const g = pick(GIFTS.slice(0, 6));
+      const r = scorePk(`BOT-${msgId()}`, from.id, to, g.id, g.price);
+      if (r.ok) addMsg({ system: true, text: `🎁 ${from.name}, ${userById(to).name} kişisine ${g.emoji} ${g.name} gönderdi · PK +${r.points}` });
+    }, 3000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomPkActive]);
+
   // Others also send animated reactions from their seats; they arrive over the same room bus.
   useEffect(() => {
     if (!botReactions) return;
@@ -441,6 +472,7 @@ export default function VoiceRoom() {
         addContrib(u.id, g.price);
         logGift(u.id, hostId, g, 1);
         addMsg({ system: true, text: `🎁 ${u.name}, ${userById(hostId).name} kişisine ${g.emoji} ${g.name} gönderdi` });
+        scorePk(`BOT-${msgId()}`, u.id, hostId, g.id, g.price);
         flyGift(g.emoji, 1, [hostId], { x: 36, y: win.height * 0.72 });
       } else {
         addMsg({ userId: u.id, text: pick(BOT_LINES) });
@@ -466,7 +498,7 @@ export default function VoiceRoom() {
       flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 });
       if (gift.price >= 50 && showFx(gift.price)) setGiftFx(gift);
       addMsg({ system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)` });
-      setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + gift.price } : p));
+      scorePk(`BOT-${msgId()}`, from.id, 'me', gift.id, gift.price);
     }, 6000);
     const reqs = setInterval(() => {
       setRequests((r) => {
@@ -565,44 +597,22 @@ export default function VoiceRoom() {
     return () => clearInterval(t);
   }, [musicPlaying]);
 
-  // PK: invite -> countdown -> live -> done.
-  const pkPhase = pk?.phase;
-  useEffect(() => {
-    if (pkPhase !== 'countdown' && pkPhase !== 'live') return;
-    const t = setInterval(() => {
-      setPk((p) => {
-        if (!p) return p;
-        if (p.phase === 'countdown') return p.left > 1 ? { ...p, left: p.left - 1 } : { ...p, phase: 'live', left: PK_SECONDS };
-        if (p.phase !== 'live') return p;
-        const theirs = p.theirs + (Math.random() < 0.5 ? pick(INCOMING_GIFT_POOL) : 0);
-        const ours = p.ours + (Math.random() < 0.3 ? pick(INCOMING_GIFT_POOL) : 0);
-        if (p.left > 1) return { ...p, left: p.left - 1, theirs, ours };
-        return { ...p, left: 0, theirs, ours, phase: 'done', result: ours > theirs ? 'win' : ours < theirs ? 'lose' : 'draw' };
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [pkPhase]);
-  const pkResult = pk?.result;
-  useEffect(() => {
-    if (pkPhase !== 'done') return;
-    const t = setTimeout(() => {
-      if (pkResult === 'win') gainXp(300);
-      setPk(null);
-    }, 6000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pkPhase, pkResult]);
-
-  const startPk = () => {
-    const opponent = pick(ROOMS.filter((r) => r.id !== id));
-    setPk({ opponent, ours: 0, theirs: 0, left: 0, phase: 'inviting' });
-    addMsg({ system: true, text: `📨 PK daveti gönderildi: ${opponent.title}` });
-    setTimeout(() => {
-      setPk((p) => (p ? { ...p, phase: 'countdown', left: 3 } : p));
-      addMsg({ system: true, text: `⚔️ ${opponent.title} daveti kabul etti! Tur süresi ${PK_SECONDS} sn · hediye puanı x1` });
-    }, 2000);
-  };
-  const mvp = pk?.phase === 'done' ? Object.entries(contrib).sort((a, b) => b[1] - a[1])[0]?.[0] : undefined;
+  // PK status changes announced in the room chat (derived transition, not an effect).
+  const [pkSeenState, setPkSeenState] = useState('');
+  const pkKey = lastPk ? `${lastPk.id}:${lastPk.status}` : '';
+  if (pkKey !== pkSeenState) {
+    setPkSeenState(pkKey);
+    if (lastPk) {
+      const text: Partial<Record<typeof lastPk.status, string>> = {
+        invite: `📨 Takım PK daveti gönderildi · ${lastPk.durationMin} dk`,
+        prep: `⏳ Takım PK hazırlanıyor · ${lastPk.durationMin} dk`,
+        active: `⚔️ Takım PK başladı! Hediyeler takımına puan kazandırır.`,
+        done: `🏁 Takım PK bitti`,
+        cancelled: `✖️ Takım PK başlamadı/iptal edildi`,
+      };
+      if (text[lastPk.status]) setMessages((m) => [...m, { id: msgId(), system: true, text: text[lastPk.status]! }]);
+    }
+  }
 
   // --- Seat actions ------------------------------------------------------------
   const placeOnSeat = (userId: string, target?: number) => {
@@ -884,7 +894,7 @@ export default function VoiceRoom() {
     if (showFx(gift.price)) setGiftFx(gift);
     // From the gift button (bottom right) to each recipient's seat.
     flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 });
-    setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + total } : p));
+    delivered.forEach((r) => scorePk(`GT-${msgId()}`, 'me', r.userId, gift.id, each));
     addMsg({ system: true, text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!` });
     if (toIds.length > 1 || delivered.length < toIds.length) {
       setGiftResults(results);
@@ -997,7 +1007,7 @@ export default function VoiceRoom() {
       title: 'Etkileşimli Oyunlar',
       variant: 'round',
       items: [
-        ...(isOwn && !pk ? [{ key: 'pk', label: 'PK Modu', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: startPk }] : []),
+        ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'Takım PK', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
@@ -1141,7 +1151,7 @@ export default function VoiceRoom() {
           </View>
 
           {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
-          {pk && <PkBar pk={{ ...pk, mvp }} roomTitle={title} />}
+          {pk && <PkBoard pk={pk} viewerRoomId={id} canManage={myRole !== 'member'} />}
           {callActive && (
             <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
               <Ionicons name="call" size={16} color={semantic.successInk} />
@@ -1193,6 +1203,7 @@ export default function VoiceRoom() {
                   still={settings.reduceMotion}
                   anchorRef={seatAnchor(allSeats[0], 0)}
                   camera={allSeats[0] === 'me' && camOn}
+                  teamColor={teamColorOf(allSeats[0])}
                   onPress={() => onSeatPress(0)}
                 />
                 <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
@@ -1215,6 +1226,7 @@ export default function VoiceRoom() {
                 still={settings.reduceMotion}
                 anchorRef={seatAnchor(uid, i)}
                 camera={uid === 'me' && camOn}
+                teamColor={teamColorOf(uid)}
                 onPress={() => onSeatPress(i)}
               />
             ))}
@@ -1500,6 +1512,22 @@ export default function VoiceRoom() {
         off={settings.effectsOff}
         micEffect={{ animationId: app.micFx, active: amSeated && micOn && !callActive, isSpeaking: () => speakingMe.current }}
       />
+      <PkSetupSheet visible={pkSetup} roomId={id} starterId="me" participants={[app.me, ...seatedOthers.map(userById)]} onClose={() => setPkSetup(false)} />
+      {lastPk && (lastPk.status === 'done' || lastPk.status === 'cancelled') && !pkStore.seen.includes(lastPk.id) && (
+        <PkResult
+          pk={lastPk}
+          viewerRoomId={id}
+          onClose={() => markPkSeen(lastPk.id)}
+          onNew={
+            myRole !== 'member'
+              ? () => {
+                  markPkSeen(lastPk.id);
+                  setPkSetup(true);
+                }
+              : undefined
+          }
+        />
+      )}
       <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
       {moving && (
         <Pressable style={styles.moveBanner} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">
