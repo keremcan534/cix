@@ -9,13 +9,14 @@ import { EmojiPanel } from '@/components/EmojiPanel';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
 import { useApp } from '@/store';
 import { colors, gradientDeep } from '@/theme';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = userById(id);
-  const { conversations, sendMessage, markRead, following, toggleFollow, blocked, spendCoins } = useApp();
+  const { conversations, sendMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket } = useApp();
   const mutual = following.has(user.id) && FOLLOWS_ME.has(user.id);
   const isBlocked = blocked.has(user.id);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -40,9 +41,17 @@ export default function ChatScreen() {
   // Index of the other person's latest message: everything I sent before it counts as read.
   const lastTheirs = messages.map((m) => m.fromMe).lastIndexOf(false);
 
-  const send = () => {
+  const send = (checked = false) => {
     const text = draft.trim();
     if (!text || isBlocked) return;
+    const warning = checked ? null : outgoingWarning(scanMessage(text));
+    if (warning) {
+      showAlert('Kişisel bilgi paylaşıyorsun', warning, [
+        { text: 'Düzenle', style: 'cancel' },
+        { text: 'Yine de gönder', onPress: () => send(true) },
+      ]);
+      return;
+    }
     // Mutual follow chats are free; otherwise each message costs coins (price shown before sending).
     if (!mutual && !spendCoins(DM_PRICE, `Mesaj: ${user.name}`)) {
       showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${DM_PRICE} jeton.`, [
@@ -118,9 +127,21 @@ export default function ChatScreen() {
                 </Text>
               </LinearGradient>
             ) : (
-              <View style={[styles.bubble, styles.theirs]}>
-                <Text style={styles.bubbleText}>{item.text}</Text>
-                <Text style={styles.time}>{item.time}</Text>
+              <View style={{ gap: 6 }}>
+                <View style={[styles.bubble, styles.theirs]}>
+                  <Text style={styles.bubbleText}>{item.text}</Text>
+                  <Text style={styles.time}>{item.time}</Text>
+                </View>
+                <SafetyNote
+                  text={item.text}
+                  onReport={() => {
+                    const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Şüpheli mesaj: "${item.text}"`);
+                    showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`, [
+                      { text: 'Tamam', style: 'cancel' },
+                      { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => !isBlocked && toggleBlock(user.id) },
+                    ]);
+                  }}
+                />
               </View>
             )
           }
@@ -144,13 +165,13 @@ export default function ChatScreen() {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            onSubmitEditing={send}
+            onSubmitEditing={() => send()}
             placeholder="Mesaj yaz..."
             placeholderTextColor={colors.textDim}
             style={styles.input}
             returnKeyType="send"
           />
-          <Pressable onPress={send}>
+          <Pressable onPress={() => send()}>
             <LinearGradient colors={gradientDeep} style={styles.sendBtn}>
               <Ionicons name="send" size={18} color="#fff" />
             </LinearGradient>
@@ -161,7 +182,24 @@ export default function ChatScreen() {
   );
 }
 
+function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) {
+  const warning = incomingWarning(scanMessage(text));
+  if (!warning) return null;
+  return (
+    <View style={styles.safety} accessibilityRole="alert">
+      <Ionicons name="shield-half" size={18} color={colors.gold} />
+      <Text style={styles.safetyText}>{warning}</Text>
+      <Pressable onPress={onReport} hitSlop={6} accessibilityLabel="Şüpheli mesajı bildir">
+        <Text style={styles.safetyLink}>Bildir</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  safety: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '88%', backgroundColor: 'rgba(246,189,96,0.12)', borderColor: 'rgba(246,189,96,0.4)', borderWidth: 1, borderRadius: 12, padding: 10 },
+  safetyText: { color: colors.text, fontSize: 12, lineHeight: 17, flex: 1 },
+  safetyLink: { color: colors.gold, fontWeight: '800', fontSize: 13 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

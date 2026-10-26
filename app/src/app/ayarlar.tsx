@@ -49,7 +49,7 @@ function Chips<T extends string | number>({ value, options, onChange }: { value:
 }
 
 export default function SettingsScreen() {
-  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, blocked, settings, setSetting, sessions, endSession, notify } = useApp();
+  const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, settings, setSetting, sessions, endSession, notify } = useApp();
   const snoozed = settings.snoozeUntil > nowMs();
   const snooze = (h: number) => {
     setSetting('snoozeUntil', h ? nowMs() + h * 3_600_000 : 0);
@@ -203,6 +203,16 @@ export default function SettingsScreen() {
         <Card style={{ gap: 10 }}>
           <Pressable onPress={logout}>
             <Text style={{ color: '#fff', fontWeight: '700' }}>Çıkış yap</Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              showAlert('Demo verilerini sıfırla', 'Bakiye, satın alımlar, ayarlar ve sohbetler bu cihazda ilk günkü haline döner. Test için kullanılır.', [
+                { text: 'Vazgeç', style: 'cancel' },
+                { text: 'Sıfırla', style: 'destructive', onPress: resetAll },
+              ])
+            }
+          >
+            <Text style={{ color: colors.textDim, fontWeight: '700' }}>Demo verilerini sıfırla</Text>
           </Pressable>
           {deletionRequested ? (
             <Text style={{ color: colors.gold }}>Hesap silme talebin alındı. 30 gün içinde tamamlanacak; bu sürede giriş yaparak iptal edebilirsin. Yasal olarak saklanması gereken kayıtlar saklama süresi kadar tutulur.</Text>

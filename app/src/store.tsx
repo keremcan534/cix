@@ -12,6 +12,7 @@ import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
 import { NOBLE_DAYS, RECHARGE_PACKS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
 
@@ -188,6 +189,55 @@ type AppState = {
   conversations: Conversation[];
   sendMessage: (userId: string, text: string, fromMe?: boolean) => void;
   markRead: (userId: string) => void;
+  /** "İlk adımlar" card on the home tab: reward claimed once, or hidden by the user. */
+  starter: { claimed: boolean; hidden: boolean };
+  claimStarter: (reward: number) => void;
+  hideStarter: () => void;
+  /** Wipes the saved demo state and starts over with the defaults. */
+  resetAll: () => void;
+};
+
+/** What survives an app restart (lib/persist). Sets are stored as arrays. */
+type Snapshot = {
+  loggedIn: boolean;
+  me: User;
+  coins: number;
+  spentTotal: number;
+  ledger: LedgerRow[];
+  spentDay: { date: string; amount: number };
+  inventory: string[];
+  equipped: Partial<Record<CosmeticKind, string>>;
+  emojiPacks: string[];
+  recentEmojis: string[];
+  settings: Partial<Settings>;
+  notifications: Notice[];
+  myRoom: Partial<MyRoom>;
+  isHost: boolean;
+  diamonds: number;
+  totalDiamonds: number;
+  weekly: number[];
+  earnings: Earning[];
+  withdrawals: Withdrawal[];
+  stats: Record<TaskKey, number>;
+  claimedTasks: string[];
+  checkInDay: number;
+  checkInDate: string;
+  svipXp: number;
+  firstBuys: string[];
+  nobleTier: number;
+  nobleDays: number;
+  vipDays: number;
+  agencyId: string | null;
+  agencyRole: AgencyRole | null;
+  ownedAgency: OwnedAgency | null;
+  familyRole: 'owner' | 'helper' | 'member' | null;
+  familyId: string | null;
+  fanClubs: Record<string, FanClub>;
+  recentRooms: string[];
+  following: string[];
+  blocked: string[];
+  conversations: Conversation[];
+  starter: { claimed: boolean; hidden: boolean };
 };
 
 const Ctx = createContext<AppState | null>(null);
@@ -204,37 +254,68 @@ const toggle = (set: Set<string>, id: string) => {
   return next;
 };
 
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [loggedIn, setLoggedIn] = useState(false);
+const ME_DEFAULT = { ...ME };
+
+/** Loads the saved state first (the splash screen stays up meanwhile), then mounts the store. */
+export function AppProvider({ children, onReady }: { children: ReactNode; onReady?: () => void }) {
+  const [boot, setBoot] = useState<{ gen: number; initial: Partial<Snapshot> | null } | null>(null);
+  useEffect(() => {
+    loadState<Partial<Snapshot>>().then((initial) => {
+      // Prototype shortcut: mock lookups (userById('me')) read the shared ME object.
+      if (initial?.me) Object.assign(ME, initial.me);
+      setBoot({ gen: 0, initial });
+    });
+  }, []);
+  const ready = !!boot;
+  useEffect(() => {
+    if (ready) onReady?.();
+  }, [ready, onReady]);
+  if (!boot) return null;
+  const reset = () => {
+    clearState();
+    Object.assign(ME, ME_DEFAULT);
+    setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: null }));
+  };
+  return (
+    <StateProvider key={boot.gen} initial={boot.initial ?? {}} onReset={reset}>
+      {children}
+    </StateProvider>
+  );
+}
+
+function StateProvider({ children, initial: s, onReset }: { children: ReactNode; initial: Partial<Snapshot>; onReset: () => void }) {
+  const [loggedIn, setLoggedIn] = useState(s.loggedIn ?? false);
   const [me, setMe] = useState<User>({ ...ME });
   const [phone, setPhone] = useState('');
 
   // Coins are read synchronously by spendCoins (e.g. from call timers), so mirror them in a ref.
-  const [coins, setCoinsState] = useState(250);
-  const coinsRef = useRef(250);
+  const [coins, setCoinsState] = useState(s.coins ?? 250);
+  const coinsRef = useRef(s.coins ?? 250);
   const setCoins = (fn: (c: number) => number) => {
     coinsRef.current = fn(coinsRef.current);
     setCoinsState(coinsRef.current);
   };
 
-  const [isHost, setIsHost] = useState(false);
-  const [diamonds, setDiamonds] = useState(0);
-  const [totalDiamonds, setTotalDiamonds] = useState(0);
-  const [weekly, setWeekly] = useState([0, 0, 0, 0, 0, 0, 0]);
-  const [earnings, setEarnings] = useState<Earning[]>([]);
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [isHost, setIsHost] = useState(s.isHost ?? false);
+  const [diamonds, setDiamonds] = useState(s.diamonds ?? 0);
+  const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
+  const [weekly, setWeekly] = useState(s.weekly ?? [0, 0, 0, 0, 0, 0, 0]);
+  const [earnings, setEarnings] = useState<Earning[]>(s.earnings ?? []);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
 
-  const [stats, setStats] = useState<Record<TaskKey, number>>({ roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 });
-  const [claimedTasks, setClaimedTasks] = useState<Set<string>>(new Set());
-  const [checkInDay, setCheckInDay] = useState(2); // demo: user already has a 2-day streak
-  const [checkedInToday, setCheckedInToday] = useState(false);
+  const [stats, setStats] = useState<Record<TaskKey, number>>(s.stats ?? { roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 });
+  const [claimedTasks, setClaimedTasks] = useState<Set<string>>(new Set(s.claimedTasks));
+  const [checkInDay, setCheckInDay] = useState(s.checkInDay ?? 2); // demo: user already has a 2-day streak
+  const [checkInDate, setCheckInDate] = useState(s.checkInDate ?? '');
+  const [checkedInToday, setCheckedInToday] = useState(() => s.checkInDate === today());
 
-  const [spentTotal, setSpentTotal] = useState(0);
-  const [ledger, setLedger] = useState<LedgerRow[]>([]);
+  const [spentTotal, setSpentTotal] = useState(s.spentTotal ?? 0);
+  const [ledger, setLedger] = useState<LedgerRow[]>(s.ledger ?? []);
   const log = (currency: LedgerRow['currency'], amount: number, reason: string, status: LedgerRow['status'] = 'Başarılı') =>
     setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), status }, ...l].slice(0, 200));
-  const spentTodayRef = useRef(0);
-  const [spentToday, setSpentToday] = useState(0);
+  const spentStart = s.spentDay?.date === today() ? s.spentDay.amount : 0;
+  const spentTodayRef = useRef(spentStart);
+  const [spentToday, setSpentToday] = useState(spentStart);
 
   const [rules, setRules] = useState<Rules>({ ...RULES });
   const [ruleHistory, setRuleHistory] = useState<RuleChange[]>([]);
@@ -248,9 +329,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     { id: 's2', device: 'Android · Samsung', place: 'İstanbul', last: 'Dün 23:10' },
     { id: 's3', device: 'Web · Chrome', place: 'Ankara', last: '3 gün önce' },
   ]);
-  const [fanClubs, setFanClubs] = useState<Record<string, FanClub>>({});
-  const [recentRooms, setRecentRooms] = useState<string[]>([]);
-  const [familyRole, setFamilyRole] = useState<'owner' | 'helper' | 'member' | null>(null);
+  const [fanClubs, setFanClubs] = useState<Record<string, FanClub>>(s.fanClubs ?? {});
+  const [recentRooms, setRecentRooms] = useState<string[]>(s.recentRooms ?? []);
+  const [familyRole, setFamilyRole] = useState<'owner' | 'helper' | 'member' | null>(s.familyRole ?? null);
   const [familyChat, setFamilyChat] = useState<GroupMsg[]>([
     { id: 'f1', userId: 'u1', text: 'Bu hafta hedefimiz LV11! Herkes odaya 🎯', time: '20:10' },
     { id: 'f2', userId: 'u9', text: 'Akşam aile odasında buluşalım mı?', time: '20:14' },
@@ -262,12 +343,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     { id: 'a3', userId: 'u5', text: 'Yayın saatlerimi panelden güncelledim.', time: '18:20' },
   ]);
 
-  const [inventory, setInventory] = useState<Set<string>>(new Set());
-  const [equipped, setEquipped] = useState<Partial<Record<CosmeticKind, string>>>({});
-  const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set(['basic']));
-  const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
+  const [inventory, setInventory] = useState<Set<string>>(new Set(s.inventory));
+  const [equipped, setEquipped] = useState<Partial<Record<CosmeticKind, string>>>(s.equipped ?? {});
+  const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set(s.emojiPacks ?? ['basic']));
+  const [recentEmojis, setRecentEmojis] = useState<string[]>(s.recentEmojis ?? []);
 
-  const [settings, setSettings] = useState<Settings>({
+  const [settings, setSettings] = useState<Settings>(() => ({
     effectsOff: false,
     haptics: true,
     invisibleEntry: false,
@@ -289,13 +370,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     invitesFrom: 'everyone',
     dailySpendLimit: 0,
     bigSpendConfirm: 0,
-  });
+    ...s.settings,
+  }));
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
     setHapticsEnabled(settings.haptics);
   }, [settings]);
-  const [notifications, setNotifications] = useState<Notice[]>([
+  const [notifications, setNotifications] = useState<Notice[]>(s.notifications ?? [
     { id: 'n1', kind: 'social', icon: '👋', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
     { id: 'n2', kind: 'system', icon: '🎉', title: "Similar Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
     { id: 'n3', kind: 'social', icon: '🎤', title: 'Karaoke Akşamı başladı', body: 'Melis seni odaya davet ediyor.', time: '18:30', read: true, href: '/oda/r2' },
@@ -303,7 +385,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [deletionRequested, setDeletionRequested] = useState(false);
 
-  const [myRoom, setMyRoom] = useState<MyRoom>({
+  const [myRoom, setMyRoom] = useState<MyRoom>(() => ({
     title: 'Benim Odam 🎙️',
     announcement: 'Hoş geldiniz! Saygılı olalım 💜',
     cover: 'https://picsum.photos/seed/myroom/600/400',
@@ -329,26 +411,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     videoPrivacy: true,
     memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
     blacklist: ['u6'],
-  });
+    ...s.myRoom,
+  }));
 
-  const [svipXp, setSvipXp] = useState(0);
-  const [firstBuys, setFirstBuys] = useState<Set<string>>(new Set());
-  const [nobleTier, setNobleTier] = useState(0);
-  const [nobleDays, setNobleDays] = useState(0);
-  const [vipDays, setVipDays] = useState(0);
+  const [svipXp, setSvipXp] = useState(s.svipXp ?? 0);
+  const [firstBuys, setFirstBuys] = useState<Set<string>>(new Set(s.firstBuys));
+  const [nobleTier, setNobleTier] = useState(s.nobleTier ?? 0);
+  const [nobleDays, setNobleDays] = useState(s.nobleDays ?? 0);
+  const [vipDays, setVipDays] = useState(s.vipDays ?? 0);
   const [rbac, setRbac] = useState<RbacState>(INITIAL_RBAC);
   const svipLevel = svipLevelOf(svipXp);
   const vipLevel = Math.min(15, Math.max(svipLevel, nobleTier * 3, vipDays > 0 ? 1 : 0));
-  const [agencyId, setAgencyId] = useState<string | null>(null);
-  const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(null);
+  const [agencyId, setAgencyId] = useState<string | null>(s.agencyId ?? null);
+  const [agencyRole, setAgencyRole] = useState<AgencyRole | null>(s.agencyRole ?? null);
   const [pendingAgency, setPendingAgency] = useState<string | null>(null);
-  const [ownedAgency, setOwnedAgency] = useState<OwnedAgency | null>(null);
+  const [ownedAgency, setOwnedAgency] = useState<OwnedAgency | null>(s.ownedAgency ?? null);
   const [transfer, setTransfer] = useState<TransferRequest | null>(null);
-  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [familyId, setFamilyId] = useState<string | null>(s.familyId ?? null);
 
-  const [following, setFollowing] = useState<Set<string>>(new Set(['u1']));
-  const [blocked, setBlocked] = useState<Set<string>>(new Set());
-  const [conversations, setConversations] = useState(CONVERSATIONS);
+  const [following, setFollowing] = useState<Set<string>>(new Set(s.following ?? ['u1']));
+  const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
+  const [conversations, setConversations] = useState(s.conversations ?? CONVERSATIONS);
+  const [starter, setStarter] = useState(s.starter ?? { claimed: false, hidden: false });
+
+  // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
+  // are not resumed after a restart; their records keep the last saved status.
+  const snapshot: Snapshot = {
+    loggedIn, me, coins, spentTotal, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
+    inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
+    myRoom, isHost, diamonds, totalDiamonds, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
+    claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
+    agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
+    following: [...following], blocked: [...blocked], conversations, starter,
+  };
+  useEffect(() => {
+    // Each render reschedules the write with the newest snapshot.
+    saveState(() => snapshot);
+  });
 
   const receiveDiamonds = (n: number, source: EarningSource, fromId?: string) => {
     setDiamonds((d) => d + n);
@@ -514,6 +613,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const reward = CHECKIN_REWARDS[checkInDay % CHECKIN_REWARDS.length];
       setCoins((c) => c + reward);
       setCheckedInToday(true);
+      setCheckInDate(today());
       setCheckInDay((d) => d + 1);
       return reward;
     },
@@ -697,6 +797,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }),
     markRead: (userId) =>
       setConversations((prev) => prev.map((c) => (c.userId === userId ? { ...c, unread: 0 } : c))),
+    starter,
+    claimStarter: (reward) => {
+      if (starter.claimed) return;
+      setStarter((st) => ({ ...st, claimed: true }));
+      setCoins((c) => c + reward);
+      log('coin', reward, 'İlk adımlar ödülü');
+    },
+    hideStarter: () => setStarter((st) => ({ ...st, hidden: true })),
+    resetAll: onReset,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

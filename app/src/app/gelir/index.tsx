@@ -15,7 +15,7 @@ import { blockedFor, useBank } from '@/lib/bank';
 import { useApp, type Earning, type EarningSource } from '@/store';
 import { colors } from '@/theme';
 
-// Timo-style income labels for each store earning source.
+// Income labels for each store earning source.
 export const INCOME_LABEL: Record<EarningSource, string> = {
   Hediye: 'Parti Hediyeleri Geliri',
   Arama: 'Arama Geliri',

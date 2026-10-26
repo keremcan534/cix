@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { CoinPill, GradientButton, Header } from '@/components/ui';
 import { WHEEL_COST, WHEEL_PRIZES, spinWheel } from '@/data/economy';
 import { showAlert } from '@/lib/alert';
@@ -14,7 +15,8 @@ const SLICE = 360 / WHEEL_PRIZES.length;
 const SLICE_COLORS = ['#0A8F95', '#FF6576', '#0E7C9A', '#F59E0B', '#0EA5E9', '#22C55E', '#0FB8BE', '#EF4444'];
 
 export default function LuckyWheel() {
-  const { coins, spendCoins, addCoins } = useApp();
+  const { coins, spendCoins, addCoins, settings } = useApp();
+  const [reward, setReward] = useState<Reward | null>(null);
   const [rotation] = useState(() => new Animated.Value(0));
   const [angle, setAngle] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -36,8 +38,10 @@ export default function LuckyWheel() {
       setAngle(target);
       setSpinning(false);
       const prize = WHEEL_PRIZES[idx];
-      if (prize.coins) addCoins(prize.coins);
+      if (prize.coins) addCoins(prize.coins, 'Şans çarkı ödülü');
       setLast(`${prize.emoji} ${prize.label}`);
+      // No celebration for "try again"; the result line under the wheel says it.
+      if (prize.coins) setReward({ icon: prize.coins >= 2_000 ? 'trophy' : 'coin', title: prize.coins >= 2_000 ? 'BÜYÜK ÖDÜL!' : 'Çarktan jeton kazandın!', amount: prize.coins });
     });
   };
 
@@ -73,6 +77,7 @@ export default function LuckyWheel() {
       <View style={{ padding: 20 }}>
         <GradientButton title={`Çevir · 🪙 ${WHEEL_COST}`} icon="sync" onPress={spin} style={{ opacity: spinning ? 0.5 : 1 }} />
       </View>
+      {reward && <RewardBurst reward={reward} still={settings.reduceMotion} onDone={() => setReward(null)} />}
     </SafeAreaView>
   );
 }

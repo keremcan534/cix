@@ -87,21 +87,22 @@ export const ME: User = {
   verified: true,
   bio: 'Müzik, kahve ve gece sohbetleri ☕🎧',
   online: true,
+  interests: ['🎧 Müzik', '☕ Kahve', '💬 Sohbet'],
 };
 
 export const USERS: User[] = [
-  { id: 'u1', name: 'Elif', age: 23, city: 'İstanbul', distanceKm: 2, avatar: avatar(5), verified: true, vip: true, bio: 'Karaoke kraliçesi 🎤', online: true },
-  { id: 'u2', name: 'Mert', age: 26, city: 'İstanbul', distanceKm: 4, avatar: avatar(11), verified: true, bio: 'Oyun ve gece sohbetleri', online: true },
-  { id: 'u3', name: 'Zeynep', age: 22, city: 'Ankara', distanceKm: 350, avatar: avatar(9), verified: true, bio: 'Kitap kurdu 📚', online: false },
-  { id: 'u4', name: 'Can', age: 28, city: 'İzmir', distanceKm: 480, avatar: avatar(13), verified: false, bio: 'Gitar çalarım, istek alırım', online: true },
-  { id: 'u5', name: 'Selin', age: 25, city: 'İstanbul', distanceKm: 6, avatar: avatar(16), verified: true, vip: true, bio: 'Seyahat ✈️ fotoğraf 📷', online: true },
-  { id: 'u6', name: 'Burak', age: 27, city: 'Bursa', distanceKm: 150, avatar: avatar(14), verified: true, bio: 'Futbol muhabbeti ⚽', online: false },
-  { id: 'u7', name: 'Ayşe', age: 21, city: 'İstanbul', distanceKm: 1, avatar: avatar(20), verified: true, bio: 'Yeni insanlar tanımayı seviyorum', online: true },
-  { id: 'u8', name: 'Emre', age: 29, city: 'Antalya', distanceKm: 700, avatar: avatar(33), verified: false, bio: 'Deniz, kum, müzik 🌊', online: true },
-  { id: 'u9', name: 'Deniz', age: 24, city: 'İstanbul', distanceKm: 8, avatar: avatar(25), verified: true, bio: 'Lo-fi dinlerken sohbet', online: true },
-  { id: 'u10', name: 'Kaan', age: 30, city: 'Eskişehir', distanceKm: 230, avatar: avatar(51), verified: true, bio: 'Stand-up hayranı 😂', online: false },
-  { id: 'u11', name: 'Melis', age: 23, city: 'İstanbul', distanceKm: 3, avatar: avatar(44), verified: true, vip: true, bio: 'Dans ve pop müzik 💃', online: true },
-  { id: 'u12', name: 'Onur', age: 26, city: 'Konya', distanceKm: 520, avatar: avatar(60), verified: false, bio: 'Kahve bağımlısı', online: true },
+  { id: 'u1', name: 'Elif', age: 23, city: 'İstanbul', distanceKm: 2, avatar: avatar(5), verified: true, vip: true, bio: 'Karaoke kraliçesi 🎤', online: true, interests: ['🎤 Karaoke', '🎧 Müzik', '💃 Dans'] },
+  { id: 'u2', name: 'Mert', age: 26, city: 'İstanbul', distanceKm: 4, avatar: avatar(11), verified: true, bio: 'Oyun ve gece sohbetleri', online: true, interests: ['🎮 Oyun', '💬 Sohbet', '🎬 Film'] },
+  { id: 'u3', name: 'Zeynep', age: 22, city: 'Ankara', distanceKm: 350, avatar: avatar(9), verified: true, bio: 'Kitap kurdu 📚', online: false, interests: ['📚 Kitap', '☕ Kahve', '🎬 Film'] },
+  { id: 'u4', name: 'Can', age: 28, city: 'İzmir', distanceKm: 480, avatar: avatar(13), verified: false, bio: 'Gitar çalarım, istek alırım', online: true, interests: ['🎧 Müzik', '🎤 Karaoke', '✈️ Seyahat'] },
+  { id: 'u5', name: 'Selin', age: 25, city: 'İstanbul', distanceKm: 6, avatar: avatar(16), verified: true, vip: true, bio: 'Seyahat ✈️ fotoğraf 📷', online: true, interests: ['✈️ Seyahat', '🎬 Film', '☕ Kahve'] },
+  { id: 'u6', name: 'Burak', age: 27, city: 'Bursa', distanceKm: 150, avatar: avatar(14), verified: true, bio: 'Futbol muhabbeti ⚽', online: false, interests: ['⚽ Spor', '🎮 Oyun', '💬 Sohbet'] },
+  { id: 'u7', name: 'Ayşe', age: 21, city: 'İstanbul', distanceKm: 1, avatar: avatar(20), verified: true, bio: 'Yeni insanlar tanımayı seviyorum', online: true, interests: ['💬 Sohbet', '💃 Dans', '🎧 Müzik'] },
+  { id: 'u8', name: 'Emre', age: 29, city: 'Antalya', distanceKm: 700, avatar: avatar(33), verified: false, bio: 'Deniz, kum, müzik 🌊', online: true, interests: ['✈️ Seyahat', '🎧 Müzik', '⚽ Spor'] },
+  { id: 'u9', name: 'Deniz', age: 24, city: 'İstanbul', distanceKm: 8, avatar: avatar(25), verified: true, bio: 'Lo-fi dinlerken sohbet', online: true, interests: ['🎧 Müzik', '📚 Kitap', '💬 Sohbet'] },
+  { id: 'u10', name: 'Kaan', age: 30, city: 'Eskişehir', distanceKm: 230, avatar: avatar(51), verified: true, bio: 'Stand-up hayranı 😂', online: false, interests: ['🎬 Film', '💬 Sohbet', '🎮 Oyun'] },
+  { id: 'u11', name: 'Melis', age: 23, city: 'İstanbul', distanceKm: 3, avatar: avatar(44), verified: true, vip: true, bio: 'Dans ve pop müzik 💃', online: true, interests: ['💃 Dans', '🎧 Müzik', '🎤 Karaoke'] },
+  { id: 'u12', name: 'Onur', age: 26, city: 'Konya', distanceKm: 520, avatar: avatar(60), verified: false, bio: 'Kahve bağımlısı', online: true, interests: ['☕ Kahve', '📚 Kitap', '💬 Sohbet'] },
 ];
 
 const WOMEN = new Set(['u1', 'u3', 'u5', 'u7', 'u9', 'u11']);
@@ -144,7 +145,7 @@ const couple = (id: string, name: string, emoji: string, price: number, badge?: 
   intimacy: Math.round((price / 10) * 1.02),
 });
 
-// Timo-scale gift catalog. Keep g1…g8 (other screens reference them) and the first five cheap (≤ 500):
+// Full-size gift catalog (own names, no names copied from other apps). Keep g1…g8 (other screens reference them) and the first five cheap (≤ 500):
 // bot gifts use GIFTS.slice(0, 5) and INCOMING_GIFT_POOL prices.
 export const GIFTS: Gift[] = [
   // --- Hot ---
@@ -159,10 +160,10 @@ export const GIFTS: Gift[] = [
   { id: 'h1', name: 'Oyun Zamanı', emoji: '🎮', price: 7_777, cat: 'hot', badge: '3D' },
   { id: 'h2', name: 'Dünya Turu', emoji: '🌍', price: 249_999, cat: 'hot', badge: 'music' },
   { id: 'h3', name: 'Seni Seviyorum', emoji: '🥰', price: 500, cat: 'hot', badge: '3D' },
-  { id: 'h4', name: 'Fok Sarılması', emoji: '🦭', price: 3_999, cat: 'hot', badge: '3D' },
+  { id: 'h4', name: 'Panda Sarılması', emoji: '🐼', price: 3_999, cat: 'hot', badge: '3D' },
   { id: 'h5', name: 'Tatil Keyfi', emoji: '🏖️', price: 7_999, cat: 'hot' },
-  { id: 'h6', name: 'Fok Öpücüğü', emoji: '😘', price: 1_999, cat: 'hot' },
-  { id: 'h7', name: 'Fok Kralı', emoji: '🤴', price: 39_999, cat: 'hot' },
+  { id: 'h6', name: 'Uçan Öpücük', emoji: '😘', price: 1_999, cat: 'hot' },
+  { id: 'h7', name: 'Gece Kralı', emoji: '🤴', price: 39_999, cat: 'hot' },
   { id: 'h8', name: 'Birlikte Bisiklet', emoji: '🚲', price: 777, cat: 'hot', badge: '3D' },
   { id: 'h9', name: 'Parti Zamanı', emoji: '🎉', price: 9_999, cat: 'hot', badge: '3D' },
   { id: 'h10', name: 'Anı Fotoğrafı', emoji: '📸', price: 1_299, cat: 'hot', badge: '3D' },
@@ -180,31 +181,31 @@ export const GIFTS: Gift[] = [
   { id: 'p9', name: 'Konfeti Topu', emoji: '🎊', price: 1_999, cat: 'gameplay', badge: '3D' },
   { id: 'p10', name: 'Aşk Oku', emoji: '💘', price: 2_399, cat: 'gameplay', badge: '3D' },
   // --- Çift ❤ (intimacy +2%) ---
-  couple('c1', 'Yakın Dostun', '💞', 5_000),
-  couple('c2', 'Aşk Dilek Şişesi', '🫙', 8_999),
-  couple('c3', 'Kale Aşkı', '🏯', 99_999),
+  couple('c1', 'Can Dostum', '💞', 5_000),
+  couple('c2', 'Dilek Kavanozu', '🫙', 8_999),
+  couple('c3', 'Masal Kalesi', '🏯', 99_999),
   couple('c4', 'Aşk Mektubu', '💌', 7_999),
   couple('c5', 'Sevgi Tatlısı', '🍰', 39_999),
-  couple('c6', 'Aşk Faytonu', '🐎', 699_999, 'music'),
+  couple('c6', 'Yıldız Faytonu', '🐎', 699_999, 'music'),
   couple('c7', 'Evlilik Teklifi', '💍', 19_999),
-  couple('c8', 'Biz Evliyiz', '👰', 399_999, '3D'),
+  couple('c8', 'Düğün Günü', '👰', 399_999, '3D'),
   couple('c9', 'Sonsuz Öpücük', '💋', 777),
   couple('c10', 'Kristal Kolye', '📿', 9_999),
   couple('c11', 'Lunapark Randevusu', '🎡', 49_950, '3D'),
   couple('c12', 'Aşk Ateşi', '❤️‍🔥', 1_999),
   // --- Ayrıcalık (SVIP-gated) ---
-  { id: 'v1', name: 'Yeşil Altın Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
+  { id: 'v1', name: 'Zümrüt Saat', emoji: '⌚', price: 4_950, cat: 'privilege', minSvip: 2 },
   { id: 'v2', name: 'Gizemli Gül', emoji: '🥀', price: 350, cat: 'privilege', minSvip: 2 },
   { id: 'v3', name: 'Sihirli Şapka', emoji: '🎩', price: 19_950, cat: 'privilege', minSvip: 3 },
   { id: 'v4', name: 'Kristal Ayakkabı', emoji: '👠', price: 49_950, cat: 'privilege', minSvip: 4 },
   { id: 'v5', name: 'Altın Kılıç', emoji: '🗡️', price: 777, cat: 'privilege', minSvip: 4 },
   { id: 'v6', name: 'Kartal', emoji: '🦅', price: 99_950, cat: 'privilege', minSvip: 5 },
-  { id: 'v7', name: 'Derin Uzay Aşkı', emoji: '👨‍🚀', price: 277_750, cat: 'privilege', minSvip: 6, badge: 'music' },
-  { id: 'v8', name: 'Havalı Giriş', emoji: '🚁', price: 549_950, cat: 'privilege', minSvip: 7, badge: 'music' },
+  { id: 'v7', name: 'Uzay Yolculuğu', emoji: '👨‍🚀', price: 277_750, cat: 'privilege', minSvip: 6, badge: 'music' },
+  { id: 'v8', name: 'Gökyüzü Turu', emoji: '🚁', price: 549_950, cat: 'privilege', minSvip: 7, badge: 'music' },
   { id: 'v9', name: 'Altın Kanatlar', emoji: '🪽', price: 199_999, cat: 'privilege', minSvip: 7 },
   { id: 'v10', name: 'Lüks Yat', emoji: '🛥️', price: 399_999, cat: 'privilege', minSvip: 8, badge: 'music' },
   { id: 'v11', name: 'Altın Tavus', emoji: '🦚', price: 299_999, cat: 'privilege', minSvip: 8 },
-  { id: 'v12', name: 'Masal Diyarı', emoji: '🎠', price: 699_999, cat: 'privilege', minSvip: 9, badge: 'music' },
+  { id: 'v12', name: 'Atlıkarınca Gecesi', emoji: '🎠', price: 699_999, cat: 'privilege', minSvip: 9, badge: 'music' },
 ];
 
 export const COIN_PACKS = [
@@ -229,6 +230,10 @@ export const CONVERSATIONS: Conversation[] = [
   ] },
   { id: 'c-u5', userId: 'u5', unread: 0, messages: [
     { id: '1', fromMe: false, text: 'Fotoğrafını beğendim 📷', time: 'Pzt' },
+  ] },
+  // Demo for the DM safety warning (lib/safety): an off-platform "cheap coins" offer.
+  { id: 'c-u12', userId: 'u12', unread: 1, messages: [
+    { id: '1', fromMe: false, text: 'Selam! Ucuz jeton satıyorum, 10.000 jeton 50 TL. WhatsApp\'tan yaz: 0532 111 22 33', time: 'Pzt' },
   ] },
 ];
 

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
-import { showAlert } from '@/lib/alert';
+import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -32,7 +32,8 @@ const secsToMidnight = () => {
 const hms = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ${s % 60}s`;
 
 export default function TaskCenter() {
-  const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask } = useApp();
+  const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask, settings } = useApp();
+  const [reward, setReward] = useState<Reward | null>(null);
   const todayIndex = (checkedInToday ? checkInDay - 1 : checkInDay) % 7;
   const [selected, setSelected] = useState((todayIndex + (checkedInToday ? 1 : 0)) % 7);
   const [left, setLeft] = useState(secsToMidnight);
@@ -45,7 +46,7 @@ export default function TaskCenter() {
   const doCheckIn = () => {
     const r = checkIn();
     if (r) {
-      showAlert('Check-in tamam 🎉', `${r} jeton hesabına eklendi.`);
+      setReward({ icon: 'gift', title: `Check-in tamam · ${checkInDay + 1}. gün`, amount: r });
       setSelected((todayIndex + 1) % 7);
     }
   };
@@ -115,7 +116,10 @@ export default function TaskCenter() {
                       <Ionicons name="checkmark" size={20} color="#fff" />
                     </View>
                   ) : complete ? (
-                    <Pressable style={[styles.goBtn, { backgroundColor: semantic.successFill }]} onPress={() => claimTask(t.id)} accessibilityLabel={`${t.title} ödülünü al`}>
+                    <Pressable style={[styles.goBtn, { backgroundColor: semantic.successFill }]} onPress={() => {
+                        claimTask(t.id);
+                        setReward({ icon: 'tasks', title: `${t.title} tamamlandı`, amount: t.reward });
+                      }} accessibilityLabel={`${t.title} ödülünü al`}>
                       <Text style={styles.goText}>Al</Text>
                     </Pressable>
                   ) : (
@@ -141,6 +145,7 @@ export default function TaskCenter() {
         </Pressable>
         <Text style={styles.dim}>Görevler her gün 00:00&apos;da sıfırlanır. Ödüller sunucuda doğrulanan etkinliklerden verilir; sahte etkileşim ödül üretmez.</Text>
       </ScrollView>
+      {reward && <RewardBurst reward={reward} still={settings.reduceMotion} onDone={() => setReward(null)} />}
     </SafeAreaView>
   );
 }

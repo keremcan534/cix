@@ -8,7 +8,7 @@ import { colors } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-// Rooms stay the landing tab even though "Senin İçin" is first in the bar (Timo order).
+// Rooms stay the landing tab even though "Senin İçin" is first in the bar.
 export const unstable_settings = { initialRouteName: 'index' };
 
 function icon(name: IconName, active: IconName) {

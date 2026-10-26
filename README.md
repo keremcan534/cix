@@ -1,6 +1,6 @@
 # Similar Club (prototip)
 
-Timo Club benzeri sesli sohbet / sosyal tanışma uygulamasının tıklanabilir mobil prototipi.
+Sesli sohbet / sosyal tanışma uygulamasının tıklanabilir mobil prototipi.
 Expo (React Native) + Expo Router ile yazıldı; iOS ve Android'de çalışır.
 
 > Prototip: Backend yok, tüm veriler sahte (`app/src/data/mock.ts`). Ses, ödeme ve doğrulama simüle edilir.
@@ -74,7 +74,7 @@ Ek ve yeni güncelleme belgeleriyle eklenenler:
 | Yönetim (demo) | `src/app/yonetim.tsx` | USD kuru, ajans %40, oda sahibi %20, aile oranları, arama bonusları, sınırlar, örnek hesaplayıcı, değişiklik geçmişi |
 | Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
 
-Timo ekran görüntüleriyle eklenenler: Ben sayfası, SVIP 1–10 / VIP abonelik / Asil (Şövalye–Dük) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, Timo tarzı kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
+Sonradan eklenenler: Ben sayfası, SVIP 1–10 / VIP abonelik / Asil (Şövalye–Dük) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
 
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 
