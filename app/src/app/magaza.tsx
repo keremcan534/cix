@@ -6,6 +6,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
@@ -120,6 +121,18 @@ export default function StoreScreen() {
 }
 
 function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; still?: boolean }) {
+  const art = item.kind === 'frame' ? frameArtOf(item.id) : undefined;
+  if (art) {
+    // Size the avatar so the whole illustrated frame (wings, crown) fits the card.
+    const size = Math.round(100 * 2 * art.hole * 1.04);
+    return (
+      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }}>
+        <ArtFrame art={art} size={size} still={still} maxScale={3}>
+          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
+        </ArtFrame>
+      </View>
+    );
+  }
   if (item.kind === 'frame' && item.fx) {
     return (
       <View style={{ height: 76, justifyContent: 'center' }}>

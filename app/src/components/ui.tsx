@@ -8,6 +8,7 @@ import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
 import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
+import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -186,10 +187,18 @@ export function Header({ title, right }: { title: string; right?: ReactNode }) {
 }
 
 /** Avatar with the nobility (VIP) frame color, if any. */
-export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean }) {
+export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online, artScale }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number }) {
   const { settings } = useApp();
   const tier = vipTier(vipLevel);
   const frame = cosmeticById(frameId);
+  const art = frameArtOf(frame?.id);
+  if (art) {
+    return (
+      <ArtFrame art={art} size={size} still={settings.reduceMotion} maxScale={artScale}>
+        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+      </ArtFrame>
+    );
+  }
   if (frame?.fx && frame.fx in FRAME_LOOKS) {
     return (
       <View style={{ width: size, height: size }}>

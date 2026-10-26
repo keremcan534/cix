@@ -65,7 +65,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 32, gap: 12 }}>
         <View style={styles.top}>
           <Pressable onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profilim">
-            <FramedAvatar uri={me.avatar} size={78} vipLevel={vipLevel} frameId={equipped.frame} />
+            <FramedAvatar uri={me.avatar} size={78} vipLevel={vipLevel} frameId={equipped.frame} artScale={1.4} />
           </Pressable>
           <View style={{ flex: 1, gap: 5 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

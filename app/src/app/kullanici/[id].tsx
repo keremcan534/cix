@@ -246,7 +246,7 @@ export default function UserProfile() {
               <View style={styles.avatarWrap}>
                 {isMe ? (
                   <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
-                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} />
+                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
                     <View style={styles.cameraBadge}>
                       <Ionicons name="camera" size={14} color="#fff" />
                     </View>
