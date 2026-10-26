@@ -1,0 +1,75 @@
+# Lucky Hediye Modülü
+
+Kaynak: *LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ*.
+
+Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişi normal hediye gelirini alır; gönderenin ödülü bundan ayrı hesaplanır.
+
+## Dosyalar
+
+| Dosya | Görevi |
+|---|---|
+| `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, limitler, kayıtlar, denetim. |
+| `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Lucky** rafı: paketler, tam olasılık tablosu, Geçmişim, onay. |
+| `src/components/room/lucky-result.tsx` | Odadaki sonuç kartı (çarpan + ödül veya "ödül çıkmadı"). Dokunmaları engellemez, mikrofona dokunmaz. |
+| `src/app/oda/[id].tsx` | `sendLuckyGift`: alıcının hediye kaydı, PK puanı, sohbet bildirimi. |
+| `src/app/lucky-yonetimi.tsx` | Yönetim paneli (`lucky.manage`). |
+
+## Kurallar
+
+- **Çarpanlar:** 2x, 5x, 10x, 20x, 50x, 100x, 200x, 500x ve 1.000x. Her pakette hepsinin bulunması gerekmez.
+  - Olasılıklar 100.000 üzerinden tam sayı tutulur (en küçük adım %0,001).
+  - "Ödül yok" da tabloda bir satırdır; tablo her zaman %100'e tamamlanır.
+- **Varsayılan oranlar:** Beklenen geri dönüş yaklaşık ×0,65. Bunlar örnek değerlerdir; gerçek oranlar ekonomi ve hukuk incelemesinden sonra belirlenmeli.
+  - Belgedeki test tablosu (her gönderim en az 2x kazanır) yönetim panelinde **Belgedeki test tablosu** düğmesiyle uygulanabilir.
+- **Gönderim akışı:**
+  1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir.
+  2. Oturumdaki ilk gönderimde "ödül garanti değildir" onayı istenir.
+  3. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi ve limitleri kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
+- **Kapsam:** İlk sürümde tek kişiye, tek adet gönderilir. Çoklu gönderim kapsam dışıdır.
+- **Tekrar eden istek:** Aynı işlem kimliği gelirse ilk sonuç döner. İkinci kez jeton düşülmez, ödül verilmez.
+- **Bütçe:**
+  - Her gönderimin bir payı (varsayılan %70) ödül rezervine aktarılır.
+  - Rezerv bir paketin en yüksek ödülünü karşılayamazsa ya da günlük ödül limiti dolarsa paket **jeton düşülmeden önce** kapanır.
+- **Ayar sürümü:** Her değişiklik sürümü artırır. Her kayıt, çekildiği olasılık tablosunu ve sürümü saklar.
+- **Limitler:**
+  - Kullanıcı başına günlük gönderim sınırı.
+  - Dakikalık sınır; aşılırsa istek reddedilir ve şüpheli kaydına düşer.
+  - Yaş sınırı 18; kişi kendine Lucky gönderemez.
+- **PK:** Varsayılan olarak yalnızca hediye bedeli PK puanı getirir. Ödülün eklenmesi yönetim panelinden ayrı bir ayarla açılır.
+- **Servet puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
+- **Duyuru:** ×50 ve üzeri kazanç odada duyurulur.
+  - Kullanıcı Ayarlar › Gizlilik'ten adının gizlenmesini seçebilir; o zaman "Bir kullanıcı kazandı" yazar.
+- **Mikrofon ve oda:** Sonuç kartı yalnızca görseldir. Koltuk, mikrofon ve ses bağlantısı değişmez.
+
+## Kabul testleri (web prototipi, Playwright)
+
+| Test | Sonuç |
+|---|---|
+| Fiyat ve olasılık tablosu gönderimden önce görünür | ✅ |
+| İlk gönderimde onay istenir | ✅ |
+| Çarpan ve ödülü sunucu belirler; bakiye doğru güncellenir | ✅ ×100: −100 +10.000 |
+| Tekrar gönderilen istek ikinci kez ücretlendirilmez ve ödül verilmez | ✅ |
+| Olasılık toplamı %100 olmayan paket kaydedilmez | ✅ "%136; %100 olmalı" |
+| Gösterilen oranlar gerçek yapılandırmayla aynı (sürüm numarası) | ✅ |
+| Geçmiş: harcanan, çarpan, ödül, ayar sürümü | ✅ Kullanıcı (Geçmişim) ve yönetim panelinde |
+| Rezerv yetersizse paket gönderime kapanır | ✅ ("Rezervi 1.000’e düşür (test)") |
+| Lucky gönderiminde koltuk ve mikrofon korunur | ✅ |
+
+## Sunucuya taşınacaklar
+
+- **Tablolar:**
+  - `lucky_packages (id, name, price, enabled, version)`
+  - `lucky_odds (package_id, version, mult, weight)`
+  - `lucky_sends (tx_id unique, user_id, room_id, package_id, to_id, price, mult, reward, config_version, created_at)`
+  - `lucky_pool_ledger`
+- **Tek işlem:** Jeton düşümü, çekiliş, ödül ve kayıt tek bir veritabanı işleminde yapılmalı.
+- **Rastgele sayı:** Çekiliş için kriptografik bir rastgele sayı üreteci kullanılmalı.
+- **Test aracı:** "Sonraki sonucu zorla" yalnızca bu demoda vardır; üretimde olmamalı.
+
+## Karar bekleyenler
+
+- **Ödül kaynağı:** Rezerv payı (%70) ve günlük limit.
+- **Alıcının geliri:** Hediyeyi alan kişinin normal gelir oranı Lucky hediyelerde de aynı mı kalacak?
+- **Hukuk:** Mevzuat, mağaza kuralları ve yaş sınırı incelemesi.
+  - Jetonlar nakde çevrilemez.
+  - Gerçek para karşılığı ödül, hukuki onay olmadan eklenmeyecek.

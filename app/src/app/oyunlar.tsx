@@ -20,7 +20,7 @@ const PROFILE = { from: 'profile' } as const;
 
 export default function GameCenter() {
   const { oyun } = useLocalSearchParams<{ oyun?: CasinoGame['id'] }>();
-  const { vipLevel, me } = useApp();
+  const { wealthLevel, me } = useApp();
   const { casino, roomGames, history } = useGames();
   const [tab, setTab] = useState<Tab>('casino');
   const [open, setOpen] = useState<OpenGame | null>(oyun ? { kind: 'casino', id: oyun } : null);
@@ -33,7 +33,7 @@ export default function GameCenter() {
       <View style={s.tabs}>
         {(
           [
-            ['casino', 'Casino · VIP2'],
+            ['casino', 'Casino · Servet Lv.2'],
             ['room', 'Oda oyunları'],
             ['history', 'Geçmiş'],
           ] as [Tab, string][]
@@ -47,13 +47,13 @@ export default function GameCenter() {
         {tab === 'casino' && (
           <>
             <Card style={{ gap: 4 }}>
-              <Text style={s.title}>Senin seviyen: VIP{vipLevel}</Text>
-              <Text style={s.dim}>Casino oyunları VIP2 ve üzeri aktif üyelere açıktır; erişim her turda sunucuda yeniden kontrol edilir. Bir odaya girmen gerekmez.</Text>
+              <Text style={s.title}>Senin Servet Seviyen: Lv.{wealthLevel}</Text>
+              <Text style={s.dim}>Casino oyunları Servet Seviyesi 2 ve üzeri üyelere açıktır; erişim her turda sunucuda yeniden kontrol edilir. Bir odaya girmen gerekmez.</Text>
             </Card>
             {casino
               .filter((g) => g.active)
               .map((g) => {
-                const access = casinoAccess(g, PROFILE, vipLevel);
+                const access = casinoAccess(g, PROFILE, wealthLevel);
                 return (
                   <Card key={g.id} style={s.row}>
                     <Text style={{ fontSize: 34 }}>{g.emoji}</Text>
@@ -65,7 +65,7 @@ export default function GameCenter() {
                       </Text>
                     </View>
                     <Pressable style={[s.play, !access.ok && s.locked]} onPress={() => setOpen({ kind: 'casino', id: g.id })} accessibilityLabel={`${g.name} aç`}>
-                      <Text style={[s.playText, !access.ok && { color: colors.text }]}>{access.ok ? 'Oyna' : `🔒 VIP${g.minVip}`}</Text>
+                      <Text style={[s.playText, !access.ok && { color: colors.text }]}>{access.ok ? 'Oyna' : `🔒 Servet Lv.${g.minWealth}`}</Text>
                     </Pressable>
                   </Card>
                 );

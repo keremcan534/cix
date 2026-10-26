@@ -139,6 +139,7 @@ export default function SettingsScreen() {
           <Toggle k="showOnline" label="Çevrimiçi durumumu göster" />
           <Toggle k="showLastSeen" label="Son görülme bilgimi göster" hint="Kapatırsan başkalarının son görülmesini de göremezsin." />
           <Toggle k="showCurrentRoom" label="Bulunduğum odayı profilimde göster" hint="Kapalıyken profilinden odana 'Git' ile gelinemez." />
+          <Toggle k="luckyAnnounce" label="Büyük Lucky kazançlarımda adım odada görünsün" hint="Kapalıyken odada “Bir kullanıcı kazandı” yazar." />
           <Text style={{ color: '#fff' }}>Bana kimler mesaj gönderebilir?</Text>
           <Chips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
           <Text style={{ color: '#fff' }}>Beni kimler arayabilir? (ücretli sesli/görüntülü)</Text>

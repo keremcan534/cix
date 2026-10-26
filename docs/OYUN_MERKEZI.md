@@ -6,7 +6,7 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 
 | Dosya | Görevi |
 |---|---|
-| `src/data/games.ts` | İki bağımsız katalog: **Oda oyunları** (ücretsiz, VIP yok) ve **Casino** (oyun başına minimum VIP, varsayılan VIP2). |
+| `src/data/games.ts` | İki bağımsız katalog: **Oda oyunları** (ücretsiz, VIP yok) ve **Casino** (oyun başına minimum Servet Seviyesi, varsayılan Servet Lv.2). |
 | `src/lib/games.ts` | Ortak oyun platformu. Tek cüzdan (uygulamanın jeton bakiyesi), tek geçmiş. Casino turları sunucu mantığıyla işlenir. |
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
 | `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları (UNO benzeri, özgün ad), XOX. |
@@ -16,7 +16,7 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 
 Erişim noktaları:
 - **Profil:** Ben sekmesindeki Oyun Merkezi kartı ve `/oyunlar`. Eski `/cark` bağlantısı da casino Şans Çarkı'na gider.
-- **Oda:** Menü › *Oda Oyunları · ücretsiz* ve *Casino · VIP2*.
+- **Oda:** Menü › *Oda Oyunları · ücretsiz* ve *Casino · Servet Lv.2*.
 
 İki giriş noktası aynı platformu, aynı bakiyeyi ve aynı geçmişi kullanır.
 
@@ -31,7 +31,7 @@ Erişim noktaları:
 
 İsteğin işlenme sırası:
 1. **Tekrar kontrolü:** Aynı istek kimliğiyle tekrar gelen istek aynı sonucu döndürür; ikinci kez jeton düşülmez.
-2. **Erişim:** Oyun aktif mi, sağlayıcı ayakta mı, bu giriş noktası (profil/oda) izinli mi, VIP seviyesi yeterli mi? VIP her turda yeniden okunur, ekrandaki bilgiye güvenilmez.
+2. **Erişim:** Oyun aktif mi, sağlayıcı ayakta mı, bu giriş noktası (profil/oda) izinli mi, Servet Seviyesi yeterli mi? Seviye her turda yeniden okunur, ekrandaki bilgiye güvenilmez.
 3. **Limit:** Bahis tutarı ve günlük limit kontrolü.
 4. **Tahsilat:** Bahis tek bir hareketle düşülür.
 5. **Sağlayıcı:** Sağlayıcı hata verirse bahis aynı işlem numarasıyla iade edilir.
@@ -39,11 +39,11 @@ Erişim noktaları:
 
 Her tur `GM-…` işlem numarasıyla Oyun Merkezi › Geçmiş'te ve cüzdan hareketlerinde görünür; reddedilen istekler de kayda geçer.
 
-**VIP oyun sırasında biterse:** Başlamış tur tamamlanır, yeni tur VIP kontrolünde reddedilir.
+**Servet Seviyesi kalıcıdır** (düşmez); bu yüzden oyun sırasında erişim kaybı olmaz.
 
-## VIP2 eşlemesi (ürün kararı gerekli)
+## Erişim kuralı: Servet Seviyesi 2
 
-Uygulamadaki "VIP seviyesi" üç kaynaktan gelir: SVIP (yükleme deneyimi, kalıcı), Asil (30 günlük unvan) ve VIP aboneliği. Şu an kullanılan kural: **VIP2 = gösterilen VIP seviyesi 2 ve üzeri.** Bu, SVIP2+ veya herhangi bir Asil unvanı (Şövalye = VIP3) anlamına gelir; VIP aboneliği tek başına VIP1 sayılıyor. Belgedeki "aktif üye" ifadesi süreli üyeliği kastediyorsa bu eşleme değişmeli.
+Ürün kararıyla (26.10) casino erişimi **VIP2 yerine Servet Seviyesi 2 ve üzeri** oldu. Servet seviyesi geçerli jeton harcamasından gelir ve kalıcıdır (bkz. `docs/SEVIYELER.md`). Casino ve zar düellosu bahisleri servet puanı kazandırmaz; yani oyun oynayarak seviye yükseltilemez. Yönetim panelinde oyun başına eşik Servet Lv.1 / 2 / 3 / 5 / 10 olarak seçilebilir.
 
 ## Kabul testleri (§5.4)
 
@@ -63,7 +63,7 @@ Web prototipinde Playwright ile çalıştırıldı:
 | 10 | Odada değilken profilden casino açılır | ✅ Kullanıcı Oyun Merkezi'nde kalır, odaya sokulmaz |
 
 Ek kontroller:
-- VIP0 kullanıcıda casino kilitli görünüyor.
+- Servet Lv.0–1 kullanıcıda casino kilitli görünüyor; 30 servet puanına (Lv.2) ulaşınca açılıyor.
 - Aynı istek tekrar gönderildiğinde jeton değişimi 0.
 - Yönetim panelinden "Hata" seçilince tur iade ediliyor.
 

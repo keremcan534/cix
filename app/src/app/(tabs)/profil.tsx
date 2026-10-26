@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
-import { charmLevel, wealthLevel } from '@/data/economy';
 import { USERS } from '@/data/mock';
 import { nobleInfo } from '@/data/status';
 import { showAlert } from '@/lib/alert';
@@ -30,6 +29,7 @@ const GROWTH: Item[] = [
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi') },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi') },
   { icon: 'flash-outline', label: 'Takım PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi') },
+  { icon: 'leaf-outline', label: 'Lucky hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi') },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim') },
 ];
@@ -42,7 +42,7 @@ const VISITORS = 53;
 const COMPLETION = 46;
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, me, logout, vipLevel, equipped, spentTotal, totalDiamonds, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
+  const { coins, isHost, following, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
   const friends = USERS.filter((u) => following.has(u.id)).slice(0, 1);
@@ -58,7 +58,7 @@ export default function ProfileScreen() {
       onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı ✅' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
     },
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
-    { icon: 'ribbon-outline', img: 'crown', label: 'Kullanıcı Seviyesi', onPress: () => router.push('/seviye') },
+    { icon: 'ribbon-outline', img: 'crown', label: 'Servet ve Cazibe Seviyesi', onPress: () => router.push('/seviye') },
   ];
   const visible = (m: Item) => (m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
 
@@ -76,7 +76,7 @@ export default function ProfileScreen() {
               </Text>
               {me.verified && <VerifiedBadge size={16} />}
             </View>
-            <LevelChips wealth={wealthLevel(spentTotal)} charm={charmLevel(totalDiamonds)} />
+            <LevelChips wealth={wealthLevel} charm={charmLevel} />
             <Pressable onPress={() => showAlert('ID kopyalandı', specialId ? specialId.name : '10284731')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'}</Text>
               <Ionicons name="copy-outline" size={13} color={colors.textDim} />
@@ -115,7 +115,7 @@ export default function ProfileScreen() {
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#0A8F95', '#0B3B4A']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
-            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün` : 'VIP değil'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
+            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün · VIP${vipLevel}` : vipLevel ? `Seviye VIP${vipLevel}` : 'VIP değil'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
             <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz Alınmadı'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
         </View>
@@ -152,7 +152,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Oyun Merkezi</Text>
               <Text style={{ color: colors.textDim, fontSize: 12 }}>
-                Casino oyunları VIP2+ · {vipLevel >= 2 ? 'erişimin açık' : `şu an VIP${vipLevel}`} · odaya girmeden oyna
+                Casino oyunları Servet Lv.2+ · {wealthLevel >= 2 ? 'erişimin açık' : `şu an Lv.${wealthLevel}`} · odaya girmeden oyna
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />

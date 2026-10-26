@@ -1,4 +1,4 @@
-// VIP2 casino games UI. Every round goes through playCasino (lib/games), the same path for profile and
+// Casino games UI (Servet Seviyesi 2+). Every round goes through playCasino (lib/games), the same path for profile and
 // room entry; this component only shows the result. It never touches the room or the microphone.
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -24,7 +24,7 @@ const PICKS: Partial<Record<CasinoGame['id'], [string, string][]>> = {
 const WHEEL_LABELS = ['0x', '0.5x', '1x', '1.5x', '2x', '3x', '5x', '10x'];
 
 export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entry: Entry }) {
-  const { vipLevel, coins } = useApp();
+  const { wealthLevel, coins } = useApp();
   const { casino } = useGames();
   const game = casino.find((x) => x.id === gameId)!;
   const [bet, setBet] = useState(game.bets[0]);
@@ -33,7 +33,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
   const [result, setResult] = useState<PlayResult | null>(null);
   const [lastReq, setLastReq] = useState<string | null>(null);
   const [spin] = useState(() => new Animated.Value(0));
-  const access = casinoAccess(game, entry, vipLevel);
+  const access = casinoAccess(game, entry, wealthLevel);
 
   const play = (requestId = newRequestId()) => {
     setBusy(true);
@@ -56,9 +56,9 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
       <View style={c.lock}>
         <Text style={{ fontSize: 44 }}>🔒</Text>
         <Text style={c.lockText}>{access.reason}</Text>
-        {access.needVip && (
-          <Pressable style={c.btn} onPress={() => router.push('/vip')}>
-            <Text style={c.btnText}>VIP ayrıcalıklarını gör</Text>
+        {access.needWealth && (
+          <Pressable style={c.btn} onPress={() => router.push('/seviye')}>
+            <Text style={c.btnText}>Servet Seviyemi gör</Text>
           </Pressable>
         )}
       </View>

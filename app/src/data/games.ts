@@ -32,7 +32,8 @@ export type CasinoGame = {
   emoji: string;
   provider: string;
   active: boolean;
-  minVip: number;
+  /** Minimum Servet Seviyesi (wealth level) to play. */
+  minWealth: number;
   fromProfile: boolean;
   fromRoom: boolean;
   bets: number[]; // allowed stakes in coins
@@ -81,7 +82,7 @@ export const CASINO_GAMES: CasinoGame[] = [
     emoji: '🎡',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
-    minVip: 2,
+    minWealth: 2,
     fromProfile: true,
     fromRoom: true,
     bets: [10, 50, 100],
@@ -90,7 +91,7 @@ export const CASINO_GAMES: CasinoGame[] = [
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
-  { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: true, minVip: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 8–12 "Büyük", 2–6 "Küçük" kazandırır (1.9x); 7 gelirse kasa kazanır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
-  { id: 'slot', name: 'Lucky 77', emoji: '🎰', provider: 'Sağlayıcı (araştırılıyor)', active: true, minVip: 2, fromProfile: true, fromRoom: false, bets: [10, 50, 100], dailyLimit: 3000, rules: '3 makara. Üç 7 = 20x, üç aynı meyve = 5x, iki 7 = 2x.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
-  { id: 'dragon', name: 'Dragon Tiger', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: true, minVip: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar; yüksek kart kazanır (1.95x). Beraberlik seçimi 8x; beraberlikte diğer seçimlerin yarısı iade edilir.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
+  { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: true, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 8–12 "Büyük", 2–6 "Küçük" kazandırır (1.9x); 7 gelirse kasa kazanır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
+  { id: 'slot', name: 'Lucky 77', emoji: '🎰', provider: 'Sağlayıcı (araştırılıyor)', active: true, minWealth: 2, fromProfile: true, fromRoom: false, bets: [10, 50, 100], dailyLimit: 3000, rules: '3 makara. Üç 7 = 20x, üç aynı meyve = 5x, iki 7 = 2x.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
+  { id: 'dragon', name: 'Dragon Tiger', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: true, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar; yüksek kart kazanır (1.95x). Beraberlik seçimi 8x; beraberlikte diğer seçimlerin yarısı iade edilir.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
 ];
