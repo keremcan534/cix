@@ -29,7 +29,7 @@ export type PlayResult = { ok: true; row: HistoryRow; outcome: Outcome; replay: 
 
 /** What the platform needs from the app store; set by <GamesBridge> on every render. */
 export type GameDeps = {
-  vipLevel: () => number;
+  wealthLevel: () => number;
   coins: () => number;
   spend: (n: number, reason: string) => boolean;
   credit: (n: number, reason: string) => void;
@@ -63,14 +63,14 @@ export const updateRoomGame = (id: string, patch: Partial<RoomGame>) => emit({ r
 export const updateCasino = (id: string, patch: Partial<CasinoGame>) => emit({ casino: state.casino.map((g) => (g.id === id ? { ...g, ...patch } : g)) });
 
 // --- Access ----------------------------------------------------------------------------------
-export type Access = { ok: true } | { ok: false; reason: string; needVip?: number };
+export type Access = { ok: true } | { ok: false; reason: string; needWealth?: number };
 /** Same check the server runs on every launch and every round; the UI only uses it to explain. */
-export function casinoAccess(game: CasinoGame, entry: Entry, vipLevel: number): Access {
+export function casinoAccess(game: CasinoGame, entry: Entry, wealthLevel: number): Access {
   if (!game.active) return { ok: false, reason: `${game.name} şu an kapalı.` };
   if (game.providerStatus === 'down') return { ok: false, reason: `${game.name} sağlayıcısı bakımda. Bakiyen etkilenmez; oda ve sesli sohbetin devam eder.` };
   if (entry.from === 'profile' && !game.fromProfile) return { ok: false, reason: `${game.name} yalnızca oda içinden açılabilir.` };
   if (entry.from === 'room' && !game.fromRoom) return { ok: false, reason: `${game.name} oda içinden açılamaz; profilindeki Oyun Merkezi'nden oynayabilirsin.` };
-  if (vipLevel < game.minVip) return { ok: false, reason: `${game.name} VIP${game.minVip} ve üzeri aktif üyeler içindir. Şu an VIP${vipLevel}.`, needVip: game.minVip };
+  if (wealthLevel < game.minWealth) return { ok: false, reason: `${game.name}, Servet Seviyesi ${game.minWealth} ve üzeri üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`, needWealth: game.minWealth };
   return { ok: true };
 }
 
@@ -129,7 +129,7 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
   if (!game || !deps) return { ok: false, reason: 'Oyun bulunamadı.' };
   const where = entry.from === 'profile' ? 'Profil · Oyun Merkezi' : `Oda · ${entry.roomTitle}`;
   const base = { requestId, gameId, gameName: game.name, entry: where, bet, time: clock() };
-  const access = casinoAccess(game, entry, deps.vipLevel());
+  const access = casinoAccess(game, entry, deps.wealthLevel());
   if (!access.ok) return finish({ ok: false, reason: access.reason, row: { ...base, txId: txId(), payout: 0, status: 'Reddedildi', detail: access.reason } });
   if (!game.bets.includes(bet)) return { ok: false, reason: 'Geçersiz bahis tutarı.' };
   const day = today();

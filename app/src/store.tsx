@@ -10,15 +10,19 @@ import {
 } from '@/data/economy';
 import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
 import { animById, isLive } from '@/lib/animations';
-import { NOBLE_DAYS, RECHARGE_PACKS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
+import { NOBLE_DAYS, RECHARGE_PACKS, SVIP_LEVELS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
+import { countsForWealth, wealthLevelOf } from '@/data/wealth';
+import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 
-export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu';
+const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
+
+export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
 export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
 export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
@@ -57,6 +61,8 @@ export type Settings = {
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
   bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
+  /** Big Lucky wins are announced in the room with my name (off: "Bir kullanıcı"). */
+  luckyAnnounce: boolean;
 };
 /** Block, unblock, report and data requests are kept as a record (spec: profile §5). */
 export type SafetyLog = { id: string; action: 'Engelledi' | 'Engeli kaldırdı' | 'Şikâyet etti' | 'Veri dökümü istedi' | 'Fotoğraf incelemeye gönderildi' | 'Fotoğraf onaylandı'; targetId?: string; detail?: string; time: string };
@@ -97,6 +103,9 @@ type AppState = {
   addCoins: (n: number, reason?: string) => void;
   spendCoins: (n: number, reason?: string) => boolean;
   spentTotal: number;
+  /** Servet puanı: qualifying spending only (data/wealth). */
+  wealthXp: number;
+  wealthLevel: number;
   ledger: LedgerRow[];
   // cosmetics & emoji
   inventory: Set<string>;
@@ -128,6 +137,9 @@ type AppState = {
   becomeHost: () => void;
   diamonds: number;
   totalDiamonds: number;
+  /** Cazibe puanı and level (data/charm): drives the earnings bonus and Keşfet ranking. */
+  charmXp: number;
+  charmLevel: number;
   weekly: number[];
   earnings: Earning[];
   receiveDiamonds: (n: number, source: EarningSource, fromId?: string) => void;
@@ -227,6 +239,7 @@ type Snapshot = {
   me: User;
   coins: number;
   spentTotal: number;
+  wealthXp?: number;
   ledger: LedgerRow[];
   spentDay: { date: string; amount: number };
   inventory: string[];
@@ -239,6 +252,7 @@ type Snapshot = {
   isHost: boolean;
   diamonds: number;
   totalDiamonds: number;
+  charmXp?: number;
   weekly: number[];
   earnings: Earning[];
   withdrawals: Withdrawal[];
@@ -326,6 +340,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [isHost, setIsHost] = useState(s.isHost ?? false);
   const [diamonds, setDiamonds] = useState(s.diamonds ?? 0);
   const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
+  const [charmXp, setCharmXp] = useState(s.charmXp ?? s.totalDiamonds ?? 0);
+  const charmRef = useRef(charmXp);
   const [weekly, setWeekly] = useState(s.weekly ?? [0, 0, 0, 0, 0, 0, 0]);
   const [earnings, setEarnings] = useState<Earning[]>(s.earnings ?? []);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
@@ -337,6 +353,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [checkedInToday, setCheckedInToday] = useState(() => s.checkInDate === today());
 
   const [spentTotal, setSpentTotal] = useState(s.spentTotal ?? 0);
+  // Older saves have no wealth points yet; start them from total spending.
+  const [wealthXp, setWealthXp] = useState(s.wealthXp ?? s.spentTotal ?? 0);
+  const wealthRef = useRef(wealthXp);
   const [ledger, setLedger] = useState<LedgerRow[]>(s.ledger ?? []);
   const log = (currency: LedgerRow['currency'], amount: number, reason: string, status: LedgerRow['status'] = 'Başarılı') =>
     setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), status }, ...l].slice(0, 200));
@@ -402,6 +421,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     invitesFrom: 'everyone',
     dailySpendLimit: 0,
     bigSpendConfirm: 0,
+    luckyAnnounce: true,
     ...s.settings,
   }));
   const settingsRef = useRef(settings);
@@ -446,7 +466,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     ...s.myRoom,
   }));
 
-  const [svipXp, setSvipXp] = useState(s.svipXp ?? 0);
+  // Demo account starts at VIP 3 (SVIP 3 threshold) so VIP-gated features and their limits can be tested;
+  // older saves below it are raised once, higher saves are kept.
+  const [svipXp, setSvipXp] = useState(Math.max(s.svipXp ?? 0, DEMO_SVIP_XP));
   const [firstBuys, setFirstBuys] = useState<Set<string>>(new Set(s.firstBuys));
   const [nobleTier, setNobleTier] = useState(s.nobleTier ?? 0);
   const [nobleDays, setNobleDays] = useState(s.nobleDays ?? 0);
@@ -475,9 +497,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
   // are not resumed after a restart; their records keep the last saved status.
   const snapshot: Snapshot = {
-    loggedIn, me, coins, spentTotal, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
+    loggedIn, me, coins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
-    myRoom, isHost, diamonds, totalDiamonds, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
+    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     following: [...following], blocked: [...blocked], conversations, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
@@ -487,12 +509,24 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     saveState(() => snapshot);
   });
 
-  const receiveDiamonds = (n: number, source: EarningSource, fromId?: string) => {
+  const creditDiamonds = (n: number, source: EarningSource, fromId?: string) => {
     setDiamonds((d) => d + n);
     setTotalDiamonds((d) => d + n);
     setWeekly((w) => [...w.slice(0, 6), w[6] + n]);
     setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now() }, ...e].slice(0, 100));
     log('diamond', n, source);
+  };
+  const receiveDiamonds = (n: number, source: EarningSource, fromId?: string) => {
+    creditDiamonds(n, source, fromId);
+    if (source !== 'Hediye' && source !== 'Arama') return;
+    // Cazibe: gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
+    const before = charmLevelOf(charmRef.current);
+    const bonus = source === 'Hediye' ? Math.floor((n * charmBonusPct(before)) / 100) : 0;
+    if (bonus > 0) creditDiamonds(bonus, 'Cazibe bonusu', fromId);
+    charmRef.current += n;
+    setCharmXp(charmRef.current);
+    const after = charmLevelOf(charmRef.current);
+    if (after > before) notify({ kind: 'system', icon: '🌹', title: `Cazibe seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
   };
 
   const notify = (n: Omit<Notice, 'id' | 'time' | 'read'>) => {
@@ -514,6 +548,13 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setCoins((c) => c - n);
     setSpentTotal((t) => t + n);
     log('coin', -n, reason);
+    if (countsForWealth(reason)) {
+      const before = wealthLevelOf(wealthRef.current);
+      wealthRef.current += n;
+      setWealthXp(wealthRef.current);
+      const after = wealthLevelOf(wealthRef.current);
+      if (after > before) notify({ kind: 'system', icon: '💰', title: `Servet seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Servet Seviyesi sayfasında gör.', href: '/seviye' });
+    }
     return true;
   };
 
@@ -537,6 +578,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     spendCoins: spend,
     spentTotal,
+    wealthXp,
+    wealthLevel: wealthLevelOf(wealthXp),
     ledger,
 
     inventory,
@@ -606,6 +649,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     diamonds,
     totalDiamonds,
+    charmXp,
+    charmLevel: charmLevelOf(charmXp),
     weekly,
     earnings,
     receiveDiamonds,

@@ -60,7 +60,7 @@ export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, familyId, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory,
-    rbac, coins, diamonds, spentTotal, totalDiamonds, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
+    rbac, coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   const isMe = id === 'me';
   const user = isMe ? me : userById(id);
@@ -73,7 +73,8 @@ export default function UserProfile() {
   const moments = MOMENTS.filter((m) => m.userId === user.id);
   const photos = moments.filter((m) => m.image).map((m) => m.image!);
   const completion = profileCompletion(user, extras, photos.length);
-  const levels = wealthCharmOf(user.id);
+  // Others: demo values; me: my real Servet and Cazibe levels.
+  const levels = user.id === 'me' ? { wealth: wealthLevel, charm: charmLevel } : wealthCharmOf(user.id);
   const guardian = guardianOf(user.id);
   const relations = relationsOf(user.id);
 
@@ -392,8 +393,8 @@ export default function UserProfile() {
                   coins={coins}
                   diamonds={diamonds}
                   vipUntil={vipUntil}
-                  wealthXp={spentTotal}
-                  charmXp={totalDiamonds}
+                  wealthXp={wealthXp}
+                  charmXp={charmXp}
                   giftsSent={stats.giftsSent}
                   giftsReceived={giftTotal}
                 />
@@ -1370,7 +1371,7 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
       </View>
       <Pressable onPress={() => router.push('/seviye')} accessibilityLabel="Seviye ve deneyim puanı">
         <Text style={styles.meta}>
-          Servet XP {n(p.wealthXp)} · Çekicilik XP {n(p.charmXp)} · Hediye: {n(p.giftsSent)} gönderdin, {n(p.giftsReceived)} aldın ›
+          Servet puanı {n(p.wealthXp)} · Cazibe puanı {n(p.charmXp)} · Hediye: {n(p.giftsSent)} gönderdin, {n(p.giftsReceived)} aldın ›
         </Text>
       </Pressable>
     </View>

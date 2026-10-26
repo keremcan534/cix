@@ -19,6 +19,7 @@ import { colors } from '@/theme';
 export const INCOME_LABEL: Record<EarningSource, string> = {
   Hediye: 'Parti Hediyeleri Geliri',
   Arama: 'Arama Geliri',
+  'Cazibe bonusu': 'Cazibe Seviyesi Bonusu',
   Görev: 'Görev Ödülü',
   'Ajans bonusu': 'Ajans bonusu',
   'Oda sahibi bonusu': 'Oda sahibi bonusu',

@@ -75,6 +75,7 @@ function RootStack() {
           <Stack.Screen name="oyun-yonetimi" />
           <Stack.Screen name="animasyon-yonetimi" />
           <Stack.Screen name="pk-yonetimi" />
+          <Stack.Screen name="lucky-yonetimi" />
         </Stack.Protected>
         <Stack.Protected guard={!loggedIn}>
           <Stack.Screen name="giris" />

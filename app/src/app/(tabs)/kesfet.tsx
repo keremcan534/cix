@@ -5,9 +5,11 @@ import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { VerifiedBadge, VipBadge } from '@/components/ui';
+import { CharmBadge, VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
+import { charmRankBoost } from '@/data/charm';
+import { wealthCharmOf } from '@/data/profile';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
@@ -36,7 +38,8 @@ export default function DiscoverScreen() {
   let users =
     tab === 'Yakındaki'
       ? USERS.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
-      : [...USERS].sort((a, b) => Number(b.online) - Number(a.online));
+      : // Online first, then Cazibe Seviyesi: charm is what lifts a profile in discovery.
+        [...USERS].sort((a, b) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm));
   if (filters.newest) users = [...users].reverse();
   users = users.filter(
     (u) =>
@@ -243,6 +246,7 @@ function UserRow({
             user.verified && <VerifiedBadge size={16} />
           )}
           {user.vip && <VipBadge />}
+          <CharmBadge level={wealthCharmOf(user.id).charm} />
         </View>
         <View style={styles.chips}>
           {showDistance && (

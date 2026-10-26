@@ -39,6 +39,7 @@ import {
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
+import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { AnimLayer } from '@/components/fx/anim-layer';
@@ -57,6 +58,7 @@ import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/da
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, useGames } from '@/lib/games';
+import { getLucky, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, recordGift, reportMismatch, usePk } from '@/lib/pk';
 import { shareLink } from '@/lib/links';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
@@ -159,6 +161,7 @@ export default function VoiceRoom() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
+  const [luckyFx, setLuckyFx] = useState<LuckyRecord | null>(null);
   const gameCatalog = useGames();
   const [game, setGame] = useState<OpenGame | null>(null);
   const [gameMin, setGameMin] = useState(false);
@@ -916,6 +919,35 @@ export default function VoiceRoom() {
     deliverGifts(gift, toIds, count);
   };
 
+  // Lucky: one gift, one recipient. The server (lib/lucky) charges, draws and credits; the room only
+  // records the normal gift for the recipient and shows the stored result.
+  const sendLuckyGift = (giftId: string, toId: string) => {
+    setGiftOpen(false);
+    const to = userById(toId);
+    const r = sendLucky({ txId: newLuckyTxId(), userId: 'me', userAge: app.me.age, roomId: id, giftId, toId, toName: to.name }, { spend: spendCoins, credit: addCoins });
+    if (!r.ok) {
+      errorHaptic();
+      return showAlert('Lucky gönderilemedi', r.reason);
+    }
+    const { record } = r;
+    const cfg = getLucky().config;
+    successHaptic();
+    logGift('me', toId, { id: record.giftId, name: record.giftName, emoji: record.emoji, price: record.price }, 1);
+    bump('giftsSent', 1);
+    addContrib('me', record.price);
+    if (!isOwn) addFanPoints(hostId, Math.ceil(record.price / 10), `Hediye gönderdin (${record.price} jeton)`);
+    flyGift(record.emoji, 1, [toId], { x: win.width - 60, y: win.height - 48 });
+    // PK counts the gift value; the reward only when the admin setting says so.
+    scorePk(record.txId, 'me', toId, record.giftId, record.price + (cfg.pkCountsReward ? record.reward : 0));
+    addMsg({ system: true, text: `🍀 ${ME.name}, ${to.name} kişisine ${record.emoji} ${record.giftName} (Lucky) gönderdi` });
+    if (record.mult >= cfg.announceFrom)
+      addMsg({
+        system: true,
+        text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı! +${record.reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı!`,
+      });
+    setLuckyFx(record);
+  };
+
   const sendEnvelope = (amount: number, count: number) => {
     setPanel(null);
     if (!spendCoins(amount, 'Oda zarfı dağıtıldı')) return showAlert('Yetersiz jeton');
@@ -996,9 +1028,9 @@ export default function VoiceRoom() {
     const g = gameCatalog.casino.find((x) => x.id === gid);
     if (!g) return;
     setPanel(null);
-    const access = casinoAccess(g, gameEntry, vipLevel);
+    const access = casinoAccess(g, gameEntry, app.wealthLevel);
     if (!access.ok)
-      return showAlert(g.name, access.reason, access.needVip ? [{ text: 'Kapat', style: 'cancel' }, { text: 'VIP ayrıcalıkları', onPress: () => router.push('/vip') }] : undefined);
+      return showAlert(g.name, access.reason, access.needWealth ? [{ text: 'Kapat', style: 'cancel' }, { text: 'Servet Seviyem', onPress: () => router.push('/seviye') }] : undefined);
     setGame({ kind: 'casino', id: g.id });
     setGameMin(false);
   };
@@ -1031,9 +1063,9 @@ export default function VoiceRoom() {
         .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#0A8F95', '#13D9DF'] as [string, string], badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
     },
     {
-      title: 'Casino · VIP2',
+      title: 'Casino · Servet Lv.2',
       variant: 'tile',
-      note: vipLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `VIP2 ve üzeri aktif üyelere açık · şu an VIP${vipLevel}`,
+      note: app.wealthLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `Servet Seviyesi 2 ve üzeri üyelere açık · şu an Lv.${app.wealthLevel}`,
       items: gameCatalog.casino
         .filter((g) => g.active && g.fromRoom)
         .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#B7832E', '#F6BD60'] as [string, string], onPress: () => openCasino(g.id) })),
@@ -1298,10 +1330,12 @@ export default function VoiceRoom() {
         key={giftOpen ? `gift-open-${giftTo}` : 'gift-closed'}
         visible={giftOpen}
         onClose={() => setGiftOpen(false)}
-        recipients={allSeats.filter((s): s is string => !!s && s !== 'me')}
+        seated={allSeats.flatMap((s, i) => (s && s !== 'me' ? [{ id: s, seat: i + 1 }] : []))}
+        listeners={audience.map((u) => u.id)}
         initialTo={giftTo}
         coins={coins}
         onSend={sendGift}
+        onSendLucky={sendLuckyGift}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
       <ListenersModal
@@ -1554,6 +1588,7 @@ export default function VoiceRoom() {
         </Pressable>
       )}
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
+      {luckyFx && <LuckyResult key={luckyFx.txId} record={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>
   );

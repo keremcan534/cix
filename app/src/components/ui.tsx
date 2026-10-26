@@ -6,6 +6,8 @@ import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyl
 
 import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
+import { charmTier } from '@/data/charm';
+import { wealthTier, type LevelTier } from '@/data/wealth';
 import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
@@ -167,6 +169,9 @@ const styles = StyleSheet.create({
   },
   coinText: { color: colors.gold, fontWeight: '700' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10 },
+  wealthBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 20, paddingLeft: 2, paddingRight: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  wealthDot: { width: 15, height: 15, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
+  wealthNum: { fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
@@ -224,16 +229,38 @@ export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online, ar
   );
 }
 
+/** Servet Seviyesi badge: the level group's colors and symbol plus the level number. */
+export function WealthBadge({ level, size = 'sm' }: { level: number; size?: 'sm' | 'lg' }) {
+  return <TierBadge tier={wealthTier(level)} level={level} size={size} label={`Servet seviyesi ${level}`} />;
+}
+/** Cazibe Seviyesi badge (same shape, its own colors and symbols). */
+export function CharmBadge({ level, size = 'sm' }: { level: number; size?: 'sm' | 'lg' }) {
+  return <TierBadge tier={charmTier(level)} level={level} size={size} label={`Cazibe seviyesi ${level}`} />;
+}
+function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: 'sm' | 'lg'; label: string }) {
+  const lg = size === 'lg';
+  return (
+    <LinearGradient
+      colors={t.colors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.wealthBadge, lg && { height: 30, paddingLeft: 4, paddingRight: 12, borderRadius: 15 }]}
+      accessibilityLabel={`${label}, ${t.name}`}
+    >
+      <View style={[styles.wealthDot, lg && { width: 22, height: 22, borderRadius: 11 }]}>
+        <Ionicons name={t.icon} size={lg ? 13 : 10} color={t.colors[1]} />
+      </View>
+      <Text style={[styles.wealthNum, { color: t.ink }, lg && { fontSize: 15 }]}>{level}</Text>
+    </LinearGradient>
+  );
+}
+
 /** Wealth / charm level chips (separate from VIP). */
 export function LevelChips({ wealth, charm }: { wealth: number; charm: number }) {
   return (
     <View style={{ flexDirection: 'row', gap: 6 }}>
-      <View style={[styles.levelChip, { backgroundColor: 'rgba(251,191,36,0.18)' }]}>
-        <Text style={[styles.levelChipText, { color: colors.gold }]}>💰 Lv.{wealth}</Text>
-      </View>
-      <View style={[styles.levelChip, { backgroundColor: 'rgba(255,101,118,0.18)' }]}>
-        <Text style={[styles.levelChipText, { color: '#F9A8D4' }]}>✨ Lv.{charm}</Text>
-      </View>
+      <WealthBadge level={wealth} />
+      <CharmBadge level={charm} />
     </View>
   );
 }
