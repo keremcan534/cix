@@ -10,6 +10,7 @@ import { callPrice } from '@/data/economy';
 import { GIFTS, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
+import { beginCall, endCall } from '@/lib/media';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -33,6 +34,12 @@ export default function CallScreen() {
   const [floating, setFloating] = useState<string | null>(null);
   const pulse = useState(() => new Animated.Value(0))[0];
   const spentRef = useRef(0);
+  // Release only what this screen claimed (a busy attempt must not end someone else's call).
+  const claimedRef = useRef(false);
+  const release = () => {
+    if (claimedRef.current) endCall(user.id);
+    claimedRef.current = false;
+  };
 
   // Ringing -> connected after 2.5s.
   useEffect(() => {
@@ -47,7 +54,17 @@ export default function CallScreen() {
         showAlert('Arama yapılamıyor', allowed.reason, [{ text: 'Tamam', onPress: () => router.back() }]);
         return;
       }
+      // One one-to-one call at a time (also blocks while a Hemen Tanış match is live); a room underneath
+      // gives up the mic seat and camera when this succeeds (lib/media).
+      const claim = beginCall({ kind: 'direct', mode: video ? 'video' : 'voice', peerId: user.id });
+      if (!claim.ok) {
+        setPhase('ended');
+        showAlert('Meşgulsün', claim.reason, [{ text: 'Tamam', onPress: () => router.back() }]);
+        return;
+      }
+      claimedRef.current = true;
       if (!spendCoins(price)) {
+        release();
         setPhase('ended');
         showAlert('Yetersiz jeton', `Bu arama dakikada ${price} jeton. Jeton yükleyip tekrar dene.`, [{ text: 'Tamam', onPress: () => router.back() }]);
         return;
@@ -60,9 +77,16 @@ export default function CallScreen() {
     return () => {
       loop.stop();
       clearTimeout(t);
+      release(); // leaving the screen always releases the devices
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Any end (hang up, balance out) releases mic and camera; the room does not take them back by itself.
+  useEffect(() => {
+    if (phase === 'ended') release();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // Call timer.
   useEffect(() => {

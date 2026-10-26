@@ -31,6 +31,7 @@ export function Seat({
   reaction,
   still,
   anchorRef,
+  camera,
   onPress,
 }: {
   index: number;
@@ -51,6 +52,8 @@ export function Seat({
   still?: boolean;
   /** Receives the avatar view so the room can measure where gifts should land. */
   anchorRef?: (v: HostInstance | null) => void;
+  /** Sharing camera in the room (live badge on the seat). */
+  camera?: boolean;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -87,6 +90,11 @@ export function Seat({
         ) : (
           <View style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }]}>
             <Ionicons name={locked ? 'lock-closed' : 'add'} size={small ? 18 : 22} color={colors.textDim} />
+          </View>
+        )}
+        {camera && user && (
+          <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
+            <Ionicons name="videocam" size={10} color={semantic.liveInk} />
           </View>
         )}
         {muted && (
@@ -409,6 +417,7 @@ const styles = StyleSheet.create({
   hostSeat: { width: '100%' },
   ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live },
   emptySeat: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  camBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.live, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, borderWidth: 1.5, borderColor: colors.bg },
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: colors.bg, borderRadius: 10, padding: 2 },
   seatName: { color: '#fff', fontSize: 12, maxWidth: 64 },

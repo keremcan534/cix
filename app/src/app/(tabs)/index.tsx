@@ -210,7 +210,7 @@ function RankCards() {
 
 function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: boolean }) {
   const items = [
-    { key: 'match', emoji: '⚡', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
+    { key: 'match', emoji: '⚡', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
     { key: 'wheel', emoji: '🎰', label: 'Şans Çarkı', onPress: () => router.push('/cark') },
     { key: 'games', emoji: '🎮', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
     { key: 'tasks', emoji: '🎁', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
