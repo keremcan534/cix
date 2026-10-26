@@ -62,7 +62,7 @@ export default function MatchScreen() {
         {match ? (
           <View style={styles.matchCard}>
             <Image source={{ uri: match.avatar.replace('200', '600') }} style={styles.matchPhoto} />
-            <LinearGradient colors={['transparent', 'rgba(18,11,36,0.95)']} style={[StyleSheet.absoluteFill, { borderRadius: 24 }]} />
+            <LinearGradient colors={['transparent', 'rgba(8,15,30,0.95)']} style={[StyleSheet.absoluteFill, { borderRadius: 24 }]} />
             <View style={styles.matchInfo}>
               <Text style={styles.matchTitle}>Eşleştin! 🎉</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

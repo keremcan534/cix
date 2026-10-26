@@ -29,7 +29,7 @@ import {
   type RoomTab,
 } from '@/data/rooms-ui';
 import { useApp } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradient, gradientDeep, semantic } from '@/theme';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -113,7 +113,7 @@ export default function RoomsScreen() {
         </View>
         <View style={styles.headerIcons}>
           <Pressable onPress={() => setSheet('events')} hitSlop={6} accessibilityLabel="Etkinlikler">
-            <LinearGradient colors={gradient} style={styles.calendarBtn}>
+            <LinearGradient colors={gradientDeep} style={styles.calendarBtn}>
               <Ionicons name="calendar" size={17} color="#fff" />
             </LinearGradient>
           </Pressable>
@@ -161,7 +161,7 @@ export default function RoomsScreen() {
 
       <Pressable style={styles.fab} onPress={() => router.push('/oda/yeni')} accessibilityLabel="Oda oluştur">
         <LinearGradient colors={gradient} style={styles.fabInner}>
-          <Ionicons name="add" size={28} color="#fff" />
+          <Ionicons name="add" size={30} color={semantic.actionInk} />
         </LinearGradient>
       </Pressable>
 
@@ -238,7 +238,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
         ))}
       </ScrollView>
       <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
-        <LinearGradient colors={gradient} style={styles.catIcon}>
+        <LinearGradient colors={gradientDeep} style={styles.catIcon}>
           <Ionicons name="people" size={18} color="#fff" />
           <View style={styles.plusBadge}>
             <Ionicons name="add" size={10} color={colors.primaryText} />
@@ -391,7 +391,7 @@ function RoomRow({ room }: { room: Room }) {
             <Text style={styles.tagText}>{roomTagLabel(room)}</Text>
           </View>
           {x.pk && (
-            <LinearGradient colors={['#EC4899', '#6366F1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
+            <LinearGradient colors={['#FF6576', '#0E7C9A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
               <Text style={styles.pkText}>PK</Text>
             </LinearGradient>
           )}
@@ -545,8 +545,8 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
   lvChip: { backgroundColor: 'rgba(251,191,36,0.18)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   lvText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
-  tagChip: { backgroundColor: 'rgba(139,92,246,0.2)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  tagText: { color: '#C4B5FD', fontSize: 11, fontWeight: '600' },
+  tagChip: { backgroundColor: 'rgba(19,217,223,0.2)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  tagText: { color: '#A5F3F5', fontSize: 11, fontWeight: '600' },
   pkPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   pkText: { color: '#fff', fontSize: 11, fontWeight: '900', fontStyle: 'italic' },
   listeners: { flexDirection: 'row', alignItems: 'center', gap: 3 },

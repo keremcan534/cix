@@ -483,7 +483,7 @@ export function GiftResults({ visible, onClose, results }: { visible: boolean; o
 const styles = StyleSheet.create({
   card: { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, padding: 10, gap: 6, marginHorizontal: 12, marginTop: 6 },
   option: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, overflow: 'hidden' },
-  optionFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: 'rgba(139,92,246,0.45)' },
+  optionFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: 'rgba(19,217,223,0.45)' },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   label: { color: colors.textDim, fontWeight: '700', fontSize: 13, marginTop: 4 },
   input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: '#fff', fontSize: 15, paddingHorizontal: 14, paddingVertical: 11 },

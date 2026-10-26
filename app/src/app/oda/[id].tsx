@@ -783,12 +783,12 @@ export default function VoiceRoom() {
       title: 'Etkileşimli Oyunlar',
       variant: 'round',
       items: [
-        ...(isOwn && !pk ? [{ key: 'pk', label: 'PK Modu', emoji: '⚔️', colors: ['#EC4899', '#7C3AED'] as [string, string], onPress: startPk }] : []),
+        ...(isOwn && !pk ? [{ key: 'pk', label: 'PK Modu', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: startPk }] : []),
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
-        { key: 'dice', label: 'Zar Düellosu', emoji: '🎲', colors: ['#2563EB', '#7C3AED'], onPress: () => setPanel('dice') },
-        { key: 'wheel', label: 'Şans çarkı', emoji: '🎡', colors: ['#F59E0B', '#DB2777'], onPress: () => router.push('/cark') },
-        { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#6366F1', '#A78BFA'], onPress: () => router.push('/gorevler') },
-        { key: 'events', label: 'Aktivite', emoji: '🎉', colors: ['#8B5CF6', '#EC4899'], onPress: () => setPanel('events') },
+        { key: 'dice', label: 'Zar Düellosu', emoji: '🎲', colors: ['#2563EB', '#087A80'], onPress: () => setPanel('dice') },
+        { key: 'wheel', label: 'Şans çarkı', emoji: '🎡', colors: ['#F59E0B', '#C93C4F'], onPress: () => router.push('/cark') },
+        { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
+        { key: 'events', label: 'Aktivite', emoji: '🎉', colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
         ...(canFunctions
           ? [
               { key: 'poll', label: 'Anket', emoji: '📊', colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
@@ -796,7 +796,7 @@ export default function VoiceRoom() {
             ]
           : []),
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
-        { key: 'music', label: 'Müzik', emoji: '🎵', colors: ['#DB2777', '#9333EA'], onPress: () => setPanel('music') },
+        { key: 'music', label: 'Müzik', emoji: '🎵', colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
       ],
     },
     {
@@ -858,7 +858,7 @@ export default function VoiceRoom() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} blurRadius={25} />
-      <LinearGradient colors={['rgba(18,11,36,0.55)', 'rgba(18,11,36,0.97)']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['rgba(8,15,30,0.55)', 'rgba(8,15,30,0.97)']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1266,7 +1266,7 @@ const styles = StyleSheet.create({
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center', marginTop: 4 },
-  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(139,92,246,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
+  queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, paddingLeft: 10, height: 48 },
   input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },

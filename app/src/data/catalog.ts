@@ -24,14 +24,14 @@ export const COSMETIC_KINDS: { kind: CosmeticKind; label: string }[] = [
 ];
 
 export const COSMETICS: Cosmetic[] = [
-  { id: 'fr-neon', kind: 'frame', name: 'Ses Dalgası', emoji: '🔊', price: 150, days: 7, color: ['#2DD4BF', '#7C3AED'], fx: 'pulse' },
+  { id: 'fr-neon', kind: 'frame', name: 'Ses Dalgası', emoji: '🔊', price: 150, days: 7, color: ['#13D9DF', '#076A70'], fx: 'pulse' },
   { id: 'fr-ocean', kind: 'frame', name: 'Yörünge', emoji: '🪐', price: 300, days: 30, color: ['#38BDF8', '#A78BFA'], fx: 'orbit' },
-  { id: 'fr-aurora', kind: 'frame', name: 'Aurora', emoji: '🌌', price: 600, days: 30, color: ['#2DD4BF', '#F472B6'], fx: 'aurora' },
+  { id: 'fr-aurora', kind: 'frame', name: 'Aurora', emoji: '🌌', price: 600, days: 30, color: ['#13D9DF', '#FF6576'], fx: 'aurora' },
   { id: 'fr-fire', kind: 'frame', name: 'Ateş', emoji: '🔥', price: 900, days: 30, color: ['#EF4444', '#F59E0B'], fx: 'flame' },
-  { id: 'fr-gold', kind: 'frame', name: 'Platin Taç', emoji: '👑', price: 2_500, days: null, color: ['#E2E8F0', '#818CF8'], minVip: 4, fx: 'crown' },
-  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#4C1D95', '#7C3AED'], fx: 'sparkle' },
+  { id: 'fr-gold', kind: 'frame', name: 'Altın Taç', emoji: '👑', price: 2_500, days: null, color: ['#F6BD60', '#B7832E'], minVip: 4, fx: 'crown' },
+  { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle' },
   { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder' },
-  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#0B1022', '#312E81'], fx: 'comet' },
+  { id: 'en-comet', kind: 'entry', name: 'Kuyruklu Yıldız', emoji: '☄️', price: 1_200, days: 30, color: ['#080F1E', '#12304A'], fx: 'comet' },
   { id: 'en-dragon', kind: 'entry', name: 'Ejderha', emoji: '🐉', price: 3_000, days: 30, color: ['#450A0A', '#B91C1C'], minVip: 7, fx: 'dragon' },
   { id: 'rd-scooter', kind: 'ride', name: 'Scooter', emoji: '🛵', price: 250, days: 7 },
   { id: 'rd-sport', kind: 'ride', name: 'Spor Araba', emoji: '🏎️', price: 1_200, days: 30 },

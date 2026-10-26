@@ -160,7 +160,7 @@ function WalletTab() {
   const cashable = rules.bonusCashable > 0;
   return (
     <>
-      <LinearGradient colors={['#262C4D', '#181C33']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={['#1F3050', '#16253C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <Text style={styles.heroLabel}>Jeton bakiyesi</Text>
         <Text style={styles.heroN}>🪙 {fmt(coins)}</Text>
         <Text style={styles.heroSub}>Jetonlar satın alınır ve hediyelerde harcanır. Nakde çevrilmez.</Text>
@@ -466,7 +466,7 @@ function BdTab() {
         <Note text={`Örnek: yayıncı ${dia(100_000)} = ${usd(ex.streamer)}, ajans ${usd(ex.commission)}, BD ${pct(rules.bdCommission)} = ${usd(exBd)}. Platform yükümlülüğü: ${usd(ex.platformTotal + exBd)}.`} />
       </Card>
 
-      <Card style={{ gap: 4, borderWidth: 1, borderColor: 'rgba(236,72,153,0.4)' }}>
+      <Card style={{ gap: 4, borderWidth: 1, borderColor: 'rgba(255,101,118,0.4)' }}>
         <SectionTitle icon="shield" title={`Çift komisyon engellendi (${b.dupes.length})`} />
         {b.dupes.map((d) => (
           <View key={`${d.earningId}-${d.agencyId}-${d.period}`} style={styles.row}>
@@ -1081,7 +1081,7 @@ const styles = StyleSheet.create({
   versionText: { color: colors.gold, fontWeight: '800', fontSize: 12 },
   auditRow: { flexDirection: 'row', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   auditTime: { color: colors.textDim, fontSize: 12, fontFamily: MONO, width: 58 },
-  tableName: { color: '#C4B5FD', fontFamily: MONO, fontSize: 13, fontWeight: '700' },
+  tableName: { color: '#A5F3F5', fontFamily: MONO, fontSize: 13, fontWeight: '700' },
   payout: { backgroundColor: colors.cardAlt, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   step: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5 },

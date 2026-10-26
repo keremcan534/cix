@@ -18,10 +18,10 @@ export type DiscoverShortcut = {
 };
 
 export const DISCOVER_SHORTCUTS: DiscoverShortcut[] = [
-  { id: 'call', title: 'Arama Merkezi', subtitle: 'Görüntülü&Sesli', emoji: '📞', colors: ['#6366F1', '#8B5CF6'], href: '/eslesme', wide: true },
-  { id: 'party', title: 'Parti', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#14B8A6', '#6366F1'], href: '/(tabs)' },
-  { id: 'tribe', title: 'Kabile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#8B5CF6', '#A855F7'], href: '/aile' },
-  { id: 'free', title: 'Bedava', subtitle: 'Jeton kazan', emoji: '⭐', colors: ['#F472B6', '#EC4899'], href: '/gorevler' },
+  { id: 'call', title: 'Arama Merkezi', subtitle: 'Görüntülü&Sesli', emoji: '📞', colors: ['#0E7C9A', '#0A8F95'], href: '/eslesme', wide: true },
+  { id: 'party', title: 'Parti', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#14B8A6', '#0E7C9A'], href: '/(tabs)' },
+  { id: 'tribe', title: 'Kabile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#0A8F95', '#0FB8BE'], href: '/aile' },
+  { id: 'free', title: 'Bedava', subtitle: 'Jeton kazan', emoji: '⭐', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
 ];
 
 /** Avatars shown on the "Parti" shortcut card. */
@@ -75,11 +75,11 @@ export const DISCOVER_PROMO = {
 export type MomentTopic = { id: string; title: string; views: string; emoji: string; colors: readonly [string, string] };
 
 export const MOMENT_TOPICS: MomentTopic[] = [
-  { id: 'date', title: 'Romantik Randevu', views: '238.36k', emoji: '💞', colors: ['#7C3AED', '#DB2777'] },
+  { id: 'date', title: 'Romantik Randevu', views: '238.36k', emoji: '💞', colors: ['#087A80', '#C93C4F'] },
   { id: 'pk', title: 'Odalar Arası PK', views: '25.59k', emoji: '⚔️', colors: ['#1D4ED8', '#DC2626'] },
   { id: 'ootd', title: 'OOTD', views: '109.33k', emoji: '👗', colors: ['#BE185D', '#F59E0B'] },
-  { id: 'travel', title: 'Gezi Günlüğü', views: '64.12k', emoji: '🧳', colors: ['#0F766E', '#0EA5E9'] },
-  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41.08k', emoji: '🎧', colors: ['#4338CA', '#A855F7'] },
+  { id: 'travel', title: 'Gezi Günlüğü', views: '64.12k', emoji: '🧳', colors: ['#0A8F95', '#0EA5E9'] },
+  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41.08k', emoji: '🎧', colors: ['#0B4F63', '#0FB8BE'] },
 ];
 
 /** Extra moments so every topic has content (ids don't clash with MOMENTS). */
@@ -110,7 +110,7 @@ export const MOMENT_TOPIC_OF: Record<string, string> = {
 export const AUTHOR_SVIP: Record<string, number> = { u1: 9, u5: 6, u11: 14, u7: 3 };
 
 /** Colored names for high-status authors. */
-export const NAME_COLORS: Record<string, string> = { u1: '#FBBF24', u5: '#F472B6', u11: '#FB923C', u7: '#C4B5FD' };
+export const NAME_COLORS: Record<string, string> = { u1: '#FBBF24', u5: '#FF8A97', u11: '#FB923C', u7: '#A5F3F5' };
 
 /** "12 dk" -> "12 dakika önce", "3 sa" -> "3 saat önce". */
 export const agoLabel = (time: string) => {

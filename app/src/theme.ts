@@ -1,54 +1,58 @@
-// SimilarClub palette "Ortak frekans": calm ink surfaces, one violet action color, a turquoise
-// signature for sound (live, speaking, mic on), gold only for money, pink only for social signals.
+// SimilarClub palette v2 "Gece mavisi": night-navy surfaces, turquoise as the single brand color
+// (actions, live, sound), coral for social signals, gold for coins, gifts and VIP. No purple.
 export const colors = {
-  bg: '#0D1020',
-  card: '#161A2E',
-  cardAlt: '#20253D',
-  border: '#2C3252',
+  bg: '#080F1E',
+  card: '#16253C',
+  cardAlt: '#1F3050',
+  border: '#2B3F63',
   text: '#FFFFFF',
-  textDim: '#A3A8C9',
-  // Fill for buttons and selected states; white text on it is 5.7:1.
-  primary: '#7C3AED',
-  // Purple for text and icons on dark surfaces (primary itself is too dark there).
-  primaryText: '#A78BFA',
-  /** Social signals only: likes, follows, hearts, intimacy, gender. */
-  pink: '#EC4899',
-  gold: '#FBBF24',
-  /** Success / approved. Sound and presence use `semantic.live` (turquoise) instead. */
+  textDim: '#A3B1CF',
+  /** Turquoise fill for chips, tags and selected states; white text on it is 5.1:1. */
+  primary: '#087A80',
+  /** Turquoise for text, icons and outlines on dark surfaces (10.9:1 on bg). */
+  primaryText: '#13D9DF',
+  /** Coral: social signals only (likes, follows, hearts, intimacy, messages). */
+  pink: '#FF6576',
+  gold: '#F6BD60',
+  /** Success / approved. */
   green: '#22C55E',
-  red: '#EF4444',
+  red: '#D93A45',
 };
 
 /**
  * Each color carries one meaning, so the eye learns it once:
- * action = buttons, social = likes/follows, money = coins and gifts only,
- * live = sound and presence (online, speaking, mic on), success = approved/done,
- * danger = destructive actions and unread counts.
+ * action/live = turquoise (buttons, online, speaking, mic on), social = coral,
+ * money/status = gold (coins, gifts, VIP), success = green, danger = red.
+ * Bright turquoise, coral and gold fills always take dark navy text.
  */
 export const semantic = {
-  action: colors.primary,
-  actionEdge: '#4C1D95',
-  social: '#DB2777',
+  action: '#13D9DF',
+  actionEdge: '#0A8F95',
+  actionInk: '#04161D',
+  social: '#FF6576',
+  socialFill: '#C93C4F',
   money: colors.gold,
-  moneyEdge: '#B45309',
+  moneyEdge: '#B7832E',
   moneyInk: '#3B2300',
-  live: '#2DD4BF',
-  liveEdge: '#0F766E',
-  liveInk: '#042F2E',
+  live: '#13D9DF',
+  liveEdge: '#0A8F95',
+  liveInk: '#04161D',
   success: colors.green,
   successInk: '#052E16',
   /** Fill for approve/claim buttons with white text (5:1). */
   successFill: '#15803D',
-  danger: '#F87171',
-  tonal: 'rgba(139,92,246,0.18)',
-  tonalText: '#DDD6FE',
-  /** Status (VIP, SVIP, nobility) is metallic, never money-gold. */
-  status: ['#E2E8F0', '#A5B4FC'] as const,
-  statusInk: '#1E1B4B',
+  danger: '#FF7A82',
+  tonal: 'rgba(19,217,223,0.14)',
+  tonalText: '#A5F3F5',
+  /** VIP / SVIP / nobility: gold, the "valuable" color. */
+  status: ['#F6BD60', '#E89B2C'] as const,
+  statusInk: '#3B2300',
 };
 
-/** The hero fill: reserved for the one primary button on a screen (violet only, no pink). */
-export const gradient = ['#7C3AED', '#5B21B6'] as const;
+/** The hero fill: bright turquoise, reserved for the one primary button on a screen (navy text on it). */
+export const gradient = ['#13D9DF', '#0FB8BE'] as const;
+/** Deep turquoise for icon buttons, headers and bubbles that carry white content. */
+export const gradientDeep = ['#0A8F95', '#076A70'] as const;
 
 /** 4-pt spacing scale: every gap and padding in new screens comes from here. */
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;

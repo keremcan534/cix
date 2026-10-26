@@ -32,7 +32,7 @@ import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradientDeep, semantic } from '@/theme';
 
 const CREATE_COST = 500;
 type Role = 'owner' | 'helper' | 'member';
@@ -325,7 +325,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           </View>
 
           <View style={styles.cards}>
-            <Pressable style={[styles.miniCard, { backgroundColor: '#0F766E' }]} onPress={() => featured && featured.id !== 'me' && router.push(`/kullanici/${featured.id}`)}>
+            <Pressable style={[styles.miniCard, { backgroundColor: '#0A8F95' }]} onPress={() => featured && featured.id !== 'me' && router.push(`/kullanici/${featured.id}`)}>
               <Text style={styles.miniTitle} numberOfLines={1}>
                 Haftanın Öne Çıkan Kişisi
               </Text>
@@ -341,7 +341,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 </View>
               )}
             </Pressable>
-            <Pressable style={[styles.miniCard, { backgroundColor: '#5B21B6' }]} onPress={() => setSheet('ranking')}>
+            <Pressable style={[styles.miniCard, { backgroundColor: '#065A60' }]} onPress={() => setSheet('ranking')}>
               <Text style={styles.miniTitle} numberOfLines={1}>
                 Haftalık Kabile Sıralaması
               </Text>
@@ -533,7 +533,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                   <Text style={[styles.th, { width: 60, textAlign: 'right' }]}>Bonus</Text>
                 </View>
                 {FAMILY_XP.map((xp, i) => (
-                  <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: 'rgba(139,92,246,0.25)', borderRadius: 8 }]}>
+                  <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: 'rgba(19,217,223,0.25)', borderRadius: 8 }]}>
                     <Text style={[styles.td, { width: 44 }]}>LV{i + 1}</Text>
                     <Text style={[styles.td, { flex: 1 }]}>{fmt(xp)}</Text>
                     <Text style={[styles.td, { width: 70 }]}>{familyCapacity(i + 1)}</Text>
@@ -568,7 +568,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           </LinearGradient>
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.sohbet)} accessibilityLabel="Sohbet">
-          <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bottomBtn}>
+          <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bottomBtn}>
             <Ionicons name="chatbubbles" size={20} color="#fff" />
             <Text style={styles.bottomText}>Sohbet</Text>
           </LinearGradient>
@@ -648,11 +648,11 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             const m = kabileMeta(f.id);
             const mine = f.id === family.id;
             return (
-              <View key={f.id} style={[styles.row, mine && { backgroundColor: 'rgba(139,92,246,0.2)', borderRadius: 10, paddingHorizontal: 6 }]}>
+              <View key={f.id} style={[styles.row, mine && { backgroundColor: 'rgba(19,217,223,0.2)', borderRadius: 10, paddingHorizontal: 6 }]}>
                 <Text style={[styles.rank, { width: 40 }]}>No.{m.weeklyRank}</Text>
                 <Text style={{ fontSize: 24 }}>{f.emoji}</Text>
                 <Text style={{ color: '#fff', flex: 1, fontWeight: mine ? '800' : '500' }}>{f.name}</Text>
-                <Text style={{ color: '#C4B5FD', fontWeight: '800' }}>⚔ {fmtK(mine ? weeklyPower : m.weeklyPower)}</Text>
+                <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>⚔ {fmtK(mine ? weeklyPower : m.weeklyPower)}</Text>
               </View>
             );
           })}
@@ -687,7 +687,7 @@ function PlayingChip({ u, onPress }: { u: User; onPress: () => void }) {
   return (
     <Pressable style={{ alignItems: 'center', width: 66 }} onPress={onPress} accessibilityLabel={`${u.name} ${presenceLabel(p, u.online)}`}>
       <Avatar uri={u.avatar} size={50} />
-      <Text style={[styles.chip, p?.kind === 'room' ? { backgroundColor: '#A855F7' } : p?.kind === 'call' ? { backgroundColor: '#F59E0B' } : null]} numberOfLines={1}>
+      <Text style={[styles.chip, p?.kind === 'room' ? { backgroundColor: '#0FB8BE' } : p?.kind === 'call' ? { backgroundColor: '#F59E0B' } : null]} numberOfLines={1}>
         {p?.kind === 'room' ? '🎉 Partide' : p?.kind === 'call' ? '📞 Görüşmede' : '💬 Çevrimiçi'}
       </Text>
       <Text style={[styles.dim, { fontSize: 12 }]} numberOfLines={1}>
@@ -709,7 +709,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
       <Card style={{ gap: 8 }}>
         <View style={styles.row}>
           <Text style={[styles.title, { flex: 1 }]}>Günlük Görev</Text>
-          <Text style={{ color: '#C4B5FD', fontWeight: '800' }}>
+          <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>
             {done}/{countTasks.length}
           </Text>
         </View>
@@ -754,7 +754,7 @@ function CoupleTab() {
   return (
     <>
       {top && (
-        <LinearGradient colors={['#6D28D9', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 18, padding: 16, gap: 10 }}>
+        <LinearGradient colors={['#076A70', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 18, padding: 16, gap: 10 }}>
           <Text style={[styles.title, { textAlign: 'center' }]}>💞 En Tatlı Çift</Text>
           <View style={styles.row}>
             <Avatar uri={userById(top.a).avatar} size={48} />
@@ -880,7 +880,7 @@ const styles = StyleSheet.create({
   lvChip: { color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   body: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -8, padding: 16, gap: 6 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  tag: { color: '#E9D5FF', fontSize: 13, fontWeight: '600', backgroundColor: 'rgba(139,92,246,0.22)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, overflow: 'hidden' },
+  tag: { color: '#E9D5FF', fontSize: 13, fontWeight: '600', backgroundColor: 'rgba(19,217,223,0.22)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, overflow: 'hidden' },
   cards: { flexDirection: 'row', gap: 8, marginTop: 14 },
   miniCard: { flex: 1, borderRadius: 14, padding: 10, gap: 6, minHeight: 96 },
   miniTitle: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
@@ -892,8 +892,8 @@ const styles = StyleSheet.create({
   chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 66 },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10 },
   roleBadge: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: '#EA580C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
-  goBtn: { backgroundColor: '#A855F7', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
-  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: 'rgba(18,11,36,0.92)' },
+  goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: 'rgba(8,15,30,0.92)' },
   bottomBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },
   bottomText: { color: '#fff', fontWeight: '900', fontSize: 17 },
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

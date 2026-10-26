@@ -11,7 +11,7 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, gradientDeep } from '@/theme';
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
 
@@ -29,7 +29,7 @@ export default function HostCenter() {
       <SafeAreaView style={styles.safe}>
         <Header title="Yayıncı Merkezi" />
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
-          <LinearGradient colors={gradient} style={styles.hero}>
+          <LinearGradient colors={gradientDeep} style={styles.hero}>
             <Text style={{ fontSize: 48 }}>🎙️</Text>
             <Text style={styles.heroTitle}>Yayıncı ol, kazanmaya başla</Text>
             <Text style={styles.heroText}>Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.</Text>
@@ -82,7 +82,7 @@ function Dashboard() {
     <SafeAreaView style={styles.safe}>
       <Header title="Yayıncı Merkezi" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-        <LinearGradient colors={['#0EA5E9', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
+        <LinearGradient colors={['#0EA5E9', '#0A8F95']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Text style={styles.balanceLabel}>Elmas bakiyesi</Text>
           <Text style={styles.balanceN}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
           <Text style={styles.balanceLabel}>≈ {usd(diamonds)}</Text>

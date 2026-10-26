@@ -175,7 +175,7 @@ export function ChatLine({ msg, bubbleId }: { msg: ChatMsg; bubbleId?: string })
   const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : undefined;
   const content = (
     <Text style={styles.chatText}>
-      <Text style={{ color: msg.userId === 'me' ? colors.gold : '#C4B5FD', fontWeight: '700' }}>{u.name}: </Text>
+      <Text style={{ color: msg.userId === 'me' ? colors.gold : '#A5F3F5', fontWeight: '700' }}>{u.name}: </Text>
       {msg.text}
     </Text>
   );
@@ -327,10 +327,10 @@ export function PkBar({ pk, roomTitle }: { pk: Pk; roomTitle: string }) {
         </Text>
       </View>
       <View style={styles.pkTrack}>
-        <LinearGradient colors={['#EC4899', '#F43F5E']} style={{ flex: Math.max(ratio, 0.04), justifyContent: 'center', paddingLeft: 8 }}>
+        <LinearGradient colors={['#FF6576', '#F43F5E']} style={{ flex: Math.max(ratio, 0.04), justifyContent: 'center', paddingLeft: 8 }}>
           <Text style={styles.pkScore}>{pk.ours}</Text>
         </LinearGradient>
-        <LinearGradient colors={['#3B82F6', '#6366F1']} style={{ flex: Math.max(1 - ratio, 0.04), justifyContent: 'center', alignItems: 'flex-end', paddingRight: 8 }}>
+        <LinearGradient colors={['#3B82F6', '#0E7C9A']} style={{ flex: Math.max(1 - ratio, 0.04), justifyContent: 'center', alignItems: 'flex-end', paddingRight: 8 }}>
           <Text style={styles.pkScore}>{pk.theirs}</Text>
         </LinearGradient>
       </View>
@@ -404,8 +404,8 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: colors.bg, borderRadius: 10, padding: 2 },
   seatName: { color: '#fff', fontSize: 12, maxWidth: 64 },
-  systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(139,92,246,0.25)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  systemText: { color: '#DDD6FE', fontSize: 12 },
+  systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(19,217,223,0.25)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  systemText: { color: '#CFFAFE', fontSize: 12 },
   botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
   botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },

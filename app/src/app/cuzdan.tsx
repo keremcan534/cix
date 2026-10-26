@@ -103,7 +103,7 @@ export default function WalletScreen() {
             </Pressable>
           </View>
           <Pressable onPress={() => router.push('/vip')} accessibilityLabel="SVIP Sistemi">
-            <LinearGradient colors={['#78350F', '#4C1D95', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+            <LinearGradient colors={['#78350F', '#0B3B4A', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
               <Text style={styles.bannerTitle}>SVIP Sistemi</Text>
               <Text style={{ color: '#FDE7C7', fontSize: 12 }}>{svipLevel ? `SVIP${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Her yüklenen jeton = 1 deneyim puanı'}</Text>
               <Text style={{ position: 'absolute', right: 16, top: 14, fontSize: 40 }}>👑💎</Text>
@@ -137,7 +137,7 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(139,92,246,0.18)' },
+  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(19,217,223,0.18)' },
   testText: { color: colors.primaryText, fontWeight: '700', fontSize: 13 },
   segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, marginBottom: 12 },
   segBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999 },

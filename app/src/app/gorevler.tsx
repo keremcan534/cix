@@ -106,7 +106,7 @@ export default function TaskCenter() {
                 </Text>
                 <Text style={styles.dim}>{TASK_INFO[t.key].desc}</Text>
                 <View style={styles.rowBetween}>
-                  <Text style={{ color: '#C4B5FD', fontSize: 15 }}>
+                  <Text style={{ color: '#A5F3F5', fontSize: 15 }}>
                     🪙 x{t.reward} <Text style={styles.dim}>({progress}/{t.goal})</Text>
                   </Text>
                   {claimed ? (
@@ -129,7 +129,7 @@ export default function TaskCenter() {
         </View>
 
         <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
-          <LinearGradient colors={['#F97316', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
+          <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
             <Text style={{ fontSize: 34 }}>🤝</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }}>Ödüllü Davet</Text>
@@ -147,15 +147,15 @@ export default function TaskCenter() {
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, gap: 14 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  checkTitle: { color: '#C4B5FD', fontSize: 22, fontWeight: '900' },
+  checkTitle: { color: '#A5F3F5', fontSize: 22, fontWeight: '900' },
   checkBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
   day: { width: 64, alignItems: 'center', gap: 4, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.cardAlt },
   daySel: { backgroundColor: '#FDE68A' },
   large: { position: 'absolute', top: 2, color: '#F59E0B', fontSize: 9, fontWeight: '900' },
   dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  tomorrow: { backgroundColor: 'rgba(139,92,246,0.12)', borderRadius: 16, padding: 14, gap: 12 },
-  tomorrowTitle: { color: '#C4B5FD', fontWeight: '800', fontSize: 16 },
+  tomorrow: { backgroundColor: 'rgba(19,217,223,0.12)', borderRadius: 16, padding: 14, gap: 12 },
+  tomorrowTitle: { color: '#A5F3F5', fontWeight: '800', fontSize: 16 },
   rewardBox: { width: 88, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
   h1: { color: '#fff', fontWeight: '900', fontSize: 22 },
   task: { gap: 6, paddingVertical: 14 },

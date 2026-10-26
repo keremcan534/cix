@@ -331,7 +331,7 @@ export function RoomInfoSheet({
                   <Text style={[styles.cardValue, { fontSize: 22 }]}>{pct(RULES.roomOwnerBonus)}</Text>
                 </LinearGradient>
                 <Pressable style={{ flex: 1 }} onPress={() => setSub('traffic')} accessibilityLabel="Trafik paneli izleme">
-                  <LinearGradient colors={['#7E22CE', '#6B21A8']} style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <LinearGradient colors={['#0A8F95', '#076A70']} style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
                     <Text style={[styles.cardLabel, { flex: 1 }]}>Trafik paneli izleme</Text>
                     <Ionicons name="stats-chart" size={20} color="#fff" />
                   </LinearGradient>
@@ -826,7 +826,7 @@ export function BossSeat({ userId, speaking, onPress }: { userId: string | null;
   const u = userId ? userById(userId) : null;
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Patron koltuğu">
-      <LinearGradient colors={speaking ? ['#FDE68A', '#EC4899'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
+      <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
         {u ? (
           <Image source={{ uri: u.avatar }} style={{ width: 62, height: 62, borderRadius: 31 }} />
         ) : (

@@ -43,7 +43,7 @@ export default function NotificationsScreen() {
         keyExtractor={(n) => n.id}
         ListEmptyComponent={<Text style={styles.empty}>Bildirim yok.</Text>}
         renderItem={({ item }) => (
-          <Pressable style={[styles.row, !item.read && { backgroundColor: 'rgba(139,92,246,0.12)' }]} onPress={() => open(item)}>
+          <Pressable style={[styles.row, !item.read && { backgroundColor: 'rgba(19,217,223,0.12)' }]} onPress={() => open(item)}>
             <Text style={{ fontSize: 24 }}>{item.icon}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: item.read ? '500' : '800' }}>{item.title}</Text>

@@ -9,7 +9,7 @@ import { Card, GradientButton, Header } from '@/components/ui';
 import { FAQ, TICKET_CATEGORIES, type TicketCategory } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useApp, type Ticket } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradientDeep } from '@/theme';
 
 const STATUS_COLOR: Record<Ticket['status'], string> = { Açık: colors.gold, Yanıtlandı: '#7DD3FC', Çözüldü: colors.green, 'Yeniden açıldı': colors.primaryText };
 
@@ -95,7 +95,7 @@ export default function SupportScreen() {
                 <Text style={styles.heroTitle}>Müşteri hizmetleri</Text>
                 <Text style={styles.heroSub}>Merhaba, size nasıl yardımcı olabilirim?</Text>
               </View>
-              <LinearGradient colors={gradient} style={styles.bot}>
+              <LinearGradient colors={gradientDeep} style={styles.bot}>
                 <Text style={{ fontSize: 30 }}>😉</Text>
               </LinearGradient>
             </View>
@@ -124,7 +124,7 @@ export default function SupportScreen() {
             </Card>
 
             <ServiceRow icon="headset" tint={['#F59E0B', '#F97316']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
-            <ServiceRow icon="create" tint={['#3B82F6', '#6366F1']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
+            <ServiceRow icon="create" tint={['#3B82F6', '#0E7C9A']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
             <ServiceRow
               icon="chatbubbles"
               tint={['#38BDF8', '#3B82F6']}
@@ -132,7 +132,7 @@ export default function SupportScreen() {
               sub={tickets.length ? `${tickets.length} talep · ${tickets.filter((t) => t.status === 'Yanıtlandı').length} yanıtlandı` : undefined}
               onPress={() => setTab('list')}
             />
-            <ServiceRow icon="mail" tint={['#D946EF', '#EC4899']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={email} />
+            <ServiceRow icon="mail" tint={['#D946EF', '#FF6576']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={email} />
           </>
         )}
 

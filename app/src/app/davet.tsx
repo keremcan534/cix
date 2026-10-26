@@ -116,7 +116,7 @@ export default function InviteScreen() {
         }
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 110 }}>
-        <LinearGradient colors={['#F97316', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.ticker}>
             <Ionicons name="volume-medium-outline" size={18} color="#fff" />
             <Text style={styles.tickerText} numberOfLines={2}>
@@ -155,7 +155,7 @@ export default function InviteScreen() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {INCOME_TASKS.map((x) => (
               <View key={x.days} style={styles.taskCard}>
-                <LinearGradient colors={['#F97316', '#DB2777']} style={styles.taskTop}>
+                <LinearGradient colors={['#F97316', '#C93C4F']} style={styles.taskTop}>
                   <Text style={styles.taskAmount}>{usd(x.reward)}</Text>
                   <Text style={{ fontSize: 30 }}>💰</Text>
                 </LinearGradient>
@@ -329,7 +329,7 @@ export default function InviteScreen() {
 
       <View style={styles.sticky}>
         <Pressable onPress={shareInvite} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}>
-          <LinearGradient colors={['#F97316', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.stickyBtn}>
+          <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.stickyBtn}>
             <Text style={styles.stickyText}>Arkadaşlarını Davet Et</Text>
           </LinearGradient>
         </Pressable>
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   cardTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 18 },
-  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, backgroundColor: 'rgba(18,11,36,0.92)' },
+  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, backgroundColor: 'rgba(8,15,30,0.92)' },
   stickyBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
   stickyText: { color: '#fff', fontWeight: '900', fontSize: 18 },
 });

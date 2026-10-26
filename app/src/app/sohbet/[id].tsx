@@ -10,7 +10,7 @@ import { Avatar, VerifiedBadge } from '@/components/ui';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradientDeep } from '@/theme';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -110,7 +110,7 @@ export default function ChatScreen() {
           }
           renderItem={({ item }) =>
             item.fromMe ? (
-              <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mine]}>
+              <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mine]}>
                 <Text style={styles.bubbleText}>{item.text}</Text>
                 <Text style={styles.time}>
                   {item.time}{' '}
@@ -151,7 +151,7 @@ export default function ChatScreen() {
             returnKeyType="send"
           />
           <Pressable onPress={send}>
-            <LinearGradient colors={gradient} style={styles.sendBtn}>
+            <LinearGradient colors={gradientDeep} style={styles.sendBtn}>
               <Ionicons name="send" size={18} color="#fff" />
             </LinearGradient>
           </Pressable>

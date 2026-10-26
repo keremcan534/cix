@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 16, paddingHorizontal: 16, paddingVertical: 13 },
   error: { color: colors.red, fontSize: 13, marginTop: -12 },
   chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: 'transparent' },
-  chipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(139,92,246,0.18)' },
+  chipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
   chipText: { color: colors.textDim, fontWeight: '600' },
 });

@@ -1,21 +1,21 @@
-# SimilarClub Tasarım Yönü ve Temel UX Kararları (v1)
+# SimilarClub Tasarım Yönü ve Temel UX Kararları (v2)
 
 Bu belge SimilarClub'ın özgün tasarım dilini, her ekranda uygulanacak UX kurallarını ve ilk yeniden tasarlanan ekranı (Hediye gönder paneli) tanımlar. Referans ekranlar (Timo, BIGO, Clubhouse, Discord, TikTok LIVE, Twitch) yalnız **analiz girdisidir**; yerleşimleri, renkleri ve bileşenleri kopyalanmaz.
 
-Durum: **Palet v1.1 uygulandı** (mürekkep zemin, turkuaz imza rengi). Sonraki ekranlar onay bekliyor. Onaylandıktan sonra sıradaki ekranlar aynı sistemle tasarlanır (bkz. "Sonraki ekranlar").
+Durum: **Palet v2 "Gece mavisi" uygulandı** (gece laciverti zemin, turkuaz marka rengi, mercan sosyal, altın para ve VIP; mor tamamen kaldırıldı). Sonraki ekranlar aynı sistemle tasarlanır (bkz. "Sonraki ekranlar").
 
 ---
 
-## 1. Tasarım yönü: "Ortak frekans"
+## 1. Tasarım yönü: "Gece mavisi" (ortak frekans)
 
 SimilarClub'ın vaadi: *benzer insanlarla aynı anda, sesle buluşmak.* Görsel kimlik bu fikirden çıkar:
 
 | Karar | Gerekçe |
 | --- | --- |
-| **Sakin mürekkep zemin, tek canlı eylem rengi.** Mavimsi koyu yüzeyler (`bg`, `card`, `cardAlt`), eylemler mor. Mürdüm zemin + mor→pembe gradyan kategorinin (Timo, Yalla) ortak paleti olduğu için bırakıldı. | Uygulama çoğunlukla akşam ve gece, uzun oturumlarda kullanılıyor. Koyu zemin gözü yormuyor; tek eylem rengi, gözün ilk bakışta doğru butonu bulmasını sağlıyor (Von Restorff). |
-| **Renk = anlam.** Mor eylem, pembe **yalnız sosyal** (beğeni, takip, kalp, yakınlık), altın **yalnız para**, **turkuaz ses ve varlık** (çevrimiçi, konuşuyor, mikrofon açık), yeşil başarılı/onaylandı, kırmızı yalnız tehlike ve okunmamış sayısı. Statü (VIP, SVIP, Asil) metalik ve koyu tonlarda, asla para altını değil. | Kullanıcı rengi bir kez öğrenir: altın gördüğü yerde jeton harcanır veya kazanılır. Referans uygulamalarda altın; rozet, başlık ve reklamda da kullanıldığı için anlamını yitiriyor. |
-| **Gradyan nadir ve tek tonlu.** Birincil butonda morun iki tonu (`#7C3AED → #5B21B6`); pembe marka gradyanından çıkarıldı. | Bugün 97 yerde gradyan vardı; her şey özel görününce hiçbir şey öne çıkmıyor. |
-| **İmza rengi turkuaz: sesin görünür hali.** Konuşan kişi kalın, nabız atan turkuaz halkayla; açık mikrofon turkuaz; durum her zaman renk + ikon + yazıyla. Sesli odalarda neredeyse kimse turkuaz kullanmıyor; SimilarClub'ı ilk bakışta tanınır kılar ve "ortak frekans" fikrini taşır. | Sesli odanın en önemli bilgisi "kim konuşuyor, ben açık mıyım". Renk körlüğü için tek başına renk kullanılmıyor. |
+| **Gece laciverti zemin, tek marka rengi turkuaz.** Lacivert yüzeyler (`bg`, `card`, `cardAlt`), eylemler ve marka turkuaz. **Mor yok.** | Mürdüm/mor zemin ve mor→pembe gradyan kategorinin (Timo, Yalla) ortak paleti; mor olmadan SimilarClub ilk bakışta ayırt edilir. Lacivert sakin ve güven verir, gece kullanımında gözü yormaz. |
+| **Renk = anlam.** Turkuaz eylem + canlı/ses (çevrimiçi, konuşuyor, mikrofon açık), mercan **yalnız sosyal** (beğeni, takip, kalp, yakınlık, mesaj), altın **para ve değer** (jeton, hediye, VIP, ödül), yeşil başarılı/onaylandı, kırmızı yalnız hata ve okunmamış sayısı (her zaman ikonla). | Kullanıcı rengi bir kez öğrenir. Mercan ile hata kırmızısı birbirine yakın olduğu için hata durumları ayrıca ikon ve metin taşır. |
+| **Parlak dolgularda koyu yazı.** Turkuaz, mercan ve altın butonlarda yazı gece laciverti. Küçük dolgular (seçili çip, etiket) derin turkuaz `#087A80` + beyaz yazı. | Beyaz yazı parlak turkuaz üzerinde 1,75:1, mercanda 2,85:1, altında 1,7:1 ile okunmaz; lacivert yazı 6,7–11:1. |
+| **Turkuaz: sesin ve markanın rengi.** Konuşan kişi kalın, nabız atan turkuaz halkayla; açık mikrofon turkuaz ve "AÇIK" yazılı; ana butonlar düz turkuaz. Durum her zaman renk + ikon + yazıyla. | Sesli odalarda neredeyse kimse turkuaz kullanmıyor; tek renk hem markayı hem "canlılık" hissini taşıyor. |
 | **Finans ekranları daha sade.** Animasyon, parıltı, gradyan yok; düz kartlar, tabular rakamlar, durum etiketleri. | Para ekranında güven, eğlenceden önce gelir. |
 | **Sosyal ekranlar sıcak.** Avatar halkaları, hediye animasyonları, yumuşak köşeler. | Eğlence ve bağ kurma hissi sosyal alanlarda kalır. |
 
@@ -23,10 +23,10 @@ SimilarClub'ın vaadi: *benzer insanlarla aynı anda, sesle buluşmak.* Görsel 
 
 | Grup | Değerler |
 | --- | --- |
-| Yüzeyler | `bg #0D1020` · `card #161A2E` · `cardAlt #20253D` · `border #2C3252` |
-| Yazı | `text #FFFFFF` · `textDim #A3A8C9` (bg üzerinde 8,1:1, cardAlt üzerinde 6,5:1) · `primaryText #A78BFA` (koyu zeminde mor yazı, 6,9:1) |
-| Anlamlı renkler (`semantic`) | `action #7C3AED` (beyaz yazı 5,7:1) · `social #DB2777` · `money #FBBF24` + `moneyInk #3B2300` · `live #2DD4BF` turkuaz + `liveInk #042F2E` (bg üzerinde 10:1) · `success #22C55E` + `successFill #15803D` (beyaz yazılı onay butonu, 5:1) · `danger #F87171` · `status` metalik (`#E2E8F0 → #A5B4FC`) · `tonal` (%18 mor) |
-| Birincil dolgu | `#7C3AED → #5B21B6` (beyaz yazı iki uçta da ≥ 5,7:1) |
+| Yüzeyler | `bg #080F1E` · `card #16253C` · `cardAlt #1F3050` · `border #2B3F63` |
+| Yazı | `text #FFFFFF` · `textDim #A3B1CF` (bg 8,9:1 · card 7,2:1 · cardAlt 6,1:1) · `primaryText #13D9DF` (koyu zeminde turkuaz yazı, 10,9:1) |
+| Anlamlı renkler (`semantic`) | `action`/`live #13D9DF` + `actionInk #04161D` (koyu yazı) · `primary #087A80` dolgu (beyaz yazı 5,1:1) · `social #FF6576` + `socialFill #C93C4F` (beyaz yazı 5:1) · `money #F6BD60` + `moneyInk #3B2300` · `status` (VIP) altın `#F6BD60 → #E89B2C` · `success #22C55E` + `successFill #15803D` · `red #D93A45` (beyaz yazı 4,5:1) · `tonal` (%14 turkuaz) |
+| Dolgu gradyanları | `gradient #13D9DF → #0FB8BE` (ana buton, lacivert içerik) · `gradientDeep #0A8F95 → #076A70` (beyaz ikon/yazı taşıyan başlık, balon ve ikon butonları) |
 | Boşluk (`space`, 4 pt) | 4 · 8 · 12 · 16 · 24 · 32 |
 | Köşe (`radius`) | 8 küçük · 12 kart içi · 16 kart · 24 alt panel · 999 hap/çip |
 | Yazı ölçeği (`type`) | 12 açıklama (en küçük) · 14 gövde · 16 büyük gövde · 18 başlık · 22 ekran başlığı · 24 tutar. Tutarlar `tabular-nums` |
@@ -201,7 +201,7 @@ Görsel dosya satın almadan, lisans riski olmadan ve uygulama boyutunu büyütm
 | Yörünge | Mavi-mor halka, etrafında dönen üç ışık |
 | Aurora | Çok renkli dönen halka, köşelerde yanıp sönen kıvılcımlar |
 | Ateş | Sıcak renkli hızlı halka, yükselen korlar |
-| Platin Taç (VIP 4) | Metalik halka, kıvılcımlar, sallanan taç |
+| Altın Taç (VIP 4) | Altın halka, kıvılcımlar, sallanan taç |
 
 **Giriş efektleri** (`components/fx/entry.tsx`). Tek zaman çizelgesi (~3,2 sn):
 1. Bant kayarak gelir ve avatardan parçacıklar saçılır.
@@ -211,11 +211,11 @@ Görsel dosya satın almadan, lisans riski olmadan ve uygulama boyutunu büyütm
 
 | Efekt | Özellik |
 | --- | --- |
-| Işıltı | Mor-turkuaz bant |
+| Işıltı | Derin turkuaz bant, turkuaz ve altın parçacıklar |
 | Şimşek | Mavi bant, çift şimşek parlaması |
 | Kuyruklu Yıldız | Gece bandı, geçen kuyruklu yıldız |
 | Ejderha (VIP 7) | Kızıl bant, geçen ejderha |
-| VIP | Seviye renklerinde bant |
+| VIP | Altın bant |
 
 Binek (scooter, araba, jet) varsa ekrandan geçer. Mağazada her giriş efekti ve binek "Önizle" ile tam boyutta oynatılabilir. Odaya katılan diğer kişilerin de zaman zaman giriş efekti olur.
 

@@ -11,7 +11,7 @@ import { colors } from '@/theme';
 
 const SIZE = 300;
 const SLICE = 360 / WHEEL_PRIZES.length;
-const SLICE_COLORS = ['#8B5CF6', '#EC4899', '#6366F1', '#F59E0B', '#0EA5E9', '#22C55E', '#A855F7', '#EF4444'];
+const SLICE_COLORS = ['#0A8F95', '#FF6576', '#0E7C9A', '#F59E0B', '#0EA5E9', '#22C55E', '#0FB8BE', '#EF4444'];
 
 export default function LuckyWheel() {
   const { coins, spendCoins, addCoins } = useApp();

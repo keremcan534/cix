@@ -237,7 +237,7 @@ function MomentCard({
         <Pressable onPress={openProfile}>
           <FramedAvatar uri={author.avatar} size={50} vipLevel={svip} frameId={frameId} online={!svip && author.online} />
           {svip > 0 && (
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={styles.svipTag}>
+            <LinearGradient colors={['#0FB8BE', '#FF6576']} style={styles.svipTag}>
               <Text style={styles.svipText}>SVIP{svip}</Text>
             </LinearGradient>
           )}
@@ -248,7 +248,7 @@ function MomentCard({
               {author.name}
             </Text>
             {author.gender && (
-              <View style={[styles.genderChip, { backgroundColor: female ? 'rgba(236,72,153,0.18)' : 'rgba(56,189,248,0.18)' }]}>
+              <View style={[styles.genderChip, { backgroundColor: female ? 'rgba(255,101,118,0.18)' : 'rgba(56,189,248,0.18)' }]}>
                 <Text style={{ color: female ? colors.pink : '#38BDF8', fontSize: 12, fontWeight: '700' }}>
                   {female ? '♀' : '♂'}
                   {author.age}
@@ -261,7 +261,7 @@ function MomentCard({
         </Pressable>
         {!isMe && (
           <Pressable onPress={onGreet} hitSlop={6}>
-            <LinearGradient colors={greeted ? [colors.cardAlt, colors.cardAlt] : ['rgba(244,114,182,0.25)', 'rgba(236,72,153,0.4)']} style={styles.hiBtn}>
+            <LinearGradient colors={greeted ? [colors.cardAlt, colors.cardAlt] : ['rgba(255,138,151,0.25)', 'rgba(255,101,118,0.4)']} style={styles.hiBtn}>
               <Text style={styles.hiText}>{greeted ? 'Sohbet' : 'Hi ❤'}</Text>
             </LinearGradient>
           </Pressable>
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   name: { color: '#fff', fontWeight: '800', fontSize: 15, maxWidth: 150 },
   genderChip: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   meta: { color: colors.textDim, fontSize: 12 },
-  hiBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(236,72,153,0.5)' },
+  hiBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.5)' },
   hiText: { color: colors.pink, fontWeight: '900', fontStyle: 'italic', fontSize: 14 },
   body: { paddingLeft: 60, gap: 10 },
   text: { color: '#fff', fontSize: 15, lineHeight: 21 },
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   preview: { width: 110, height: 110, borderRadius: 12, backgroundColor: colors.cardAlt },
   removeImage: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, padding: 3 },
   topicChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'transparent' },
-  topicChipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(139,92,246,0.18)' },
+  topicChipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },

@@ -256,7 +256,7 @@ function UserRow({
       </View>
       <View style={{ alignItems: 'center', gap: 8 }}>
         <Pressable onPress={onGreet} hitSlop={6}>
-          <LinearGradient colors={greeted ? [colors.cardAlt, colors.cardAlt] : ['#F472B6', colors.pink]} style={styles.hiBtn}>
+          <LinearGradient colors={greeted ? [colors.cardAlt, colors.cardAlt] : [semantic.socialFill, '#A82F42']} style={styles.hiBtn}>
             {greeted ? (
               <>
                 <Ionicons name="chatbubble-ellipses" size={13} color="#fff" />
@@ -280,7 +280,7 @@ function PromoCard() {
   const room = roomById(DISCOVER_PROMO.roomId);
   return (
     <Pressable style={styles.promoWrap} onPress={() => router.push(`/oda/${room.id}`)}>
-      <LinearGradient colors={['rgba(236,72,153,0.22)', 'rgba(139,92,246,0.22)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
+      <LinearGradient colors={['rgba(255,101,118,0.22)', 'rgba(19,217,223,0.22)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
         <View style={styles.promoTop}>
           <Image source={{ uri: room.cover }} style={styles.promoCover} />
           <View style={{ flex: 1, gap: 4 }}>
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   sheetLabel: { color: colors.textDim, fontWeight: '700', fontSize: 12, marginTop: 4 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  optionActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(139,92,246,0.18)' },
+  optionActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
   optionText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchText: { color: '#fff', fontSize: 14 },
