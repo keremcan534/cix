@@ -47,6 +47,8 @@ export type Settings = {
   // personal room audio (affects only this user)
   roomMuted: boolean;
   musicVolume: number; // 0..1
+  /** Game sound effects, separate from voice chat; games never duck or mute voices. */
+  gameVolume: number;
   voiceVolume: number;
   giftSounds: boolean;
   bigGiftsOnly: boolean;
@@ -384,6 +386,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     snoozeUntil: 0,
     roomMuted: false,
     musicVolume: 0.7,
+    gameVolume: 0.4,
     voiceVolume: 1,
     giftSounds: true,
     bigGiftsOnly: false, micDenoise: true,

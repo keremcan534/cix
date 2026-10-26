@@ -23,12 +23,11 @@ const GROWTH: Item[] = [
   { icon: 'chatbubbles-outline', img: 'chat', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
   { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
-  { icon: 'game-controller-outline', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
-  { icon: 'aperture-outline', img: 'wheel', label: 'Şans çarkı', onPress: () => router.push('/cark') },
   { icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
+  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi') },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim') },
 ];
@@ -145,6 +144,37 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
+        <View style={styles.gameCard}>
+          <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Merkezi">
+            <Icon3D name="wheel" size={30} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Oyun Merkezi</Text>
+              <Text style={{ color: colors.textDim, fontSize: 12 }}>
+                Casino oyunları VIP2+ · {vipLevel >= 2 ? 'erişimin açık' : `şu an VIP${vipLevel}`} · odaya girmeden oyna
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+          <View style={styles.gameRow}>
+            {(
+              [
+                ['wheel', '🎡', 'Çark'],
+                ['dice', '🎲', 'Zar'],
+                ['slot', '🎰', 'Lucky 77'],
+                ['dragon', '🐉', 'Dragon Tiger'],
+              ] as const
+            ).map(([id, e, l]) => (
+              <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
+                <Text style={{ fontSize: 26 }}>{e}</Text>
+                <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
+                  {l}
+                </Text>
+                {vipLevel < 2 && <Text style={styles.gameLock}>🔒</Text>}
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <Group items={main} />
         <Group items={GROWTH.filter(visible)} />
         <Group items={SUPPORT} />
@@ -234,6 +264,11 @@ const styles = StyleSheet.create({
   newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: '#F97316', color: '#fff', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   earnTag: { position: 'absolute', top: -10, right: 4, color: '#FDE047', fontWeight: '900', fontStyle: 'italic', fontSize: 12, zIndex: 1 },
+  gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)' },
+  gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  gameRow: { flexDirection: 'row', gap: 8 },
+  gameTile: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 8 },
+  gameLock: { position: 'absolute', top: 4, right: 6, fontSize: 10 },
   roomCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)' },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
