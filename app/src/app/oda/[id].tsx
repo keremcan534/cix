@@ -39,6 +39,7 @@ import {
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
+import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
@@ -107,7 +108,9 @@ export default function VoiceRoom() {
   const invisible = settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
   const typeInfo = roomTypeInfo(roomType);
-  const lockedSeats = isOwn ? myRoom.lockedSeats : [];
+  // Seat locks: saved for my own room; in rooms I moderate they last for this session.
+  const [localLocks, setLocalLocks] = useState<number[]>([]);
+  const lockedSeats = isOwn ? myRoom.lockedSeats : localLocks;
   // Personal effect preferences never change the gift transaction itself.
   const showFx = (price: number) => !settings.effectsOff && !settings.reduceMotion && (!isOwn || myRoom.giftEffects) && (!settings.bigGiftsOnly || price >= 100);
 
@@ -161,7 +164,10 @@ export default function VoiceRoom() {
   // Gifts flying to seats: seat avatar views by user id, measured when a gift is sent.
   // A mutable map kept in state (never replaced), so ref callbacks can fill it during commit.
   const [seatViews] = useState(() => new Map<string, HostInstance>());
-  const seatAnchor = (uid: string | null) => (v: HostInstance | null) => {
+  const [seatSlots] = useState(() => new Map<number, HostInstance>());
+  const seatAnchor = (uid: string | null, index: number) => (v: HostInstance | null) => {
+    if (v) seatSlots.set(index, v);
+    else seatSlots.delete(index);
     if (!uid) return;
     if (v) seatViews.set(uid, v);
     else seatViews.delete(uid);
@@ -170,6 +176,9 @@ export default function VoiceRoom() {
   const win = useWindowDimensions();
   const [listeners, setListeners] = useState(isOwn ? 1 : base!.listeners);
   const [listOpen, setListOpen] = useState(false);
+  const [seatMenu, setSeatMenu] = useState<{ anchor: Rect; title: string; items: SeatMenuItem[] } | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
+  const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
   const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'sound' | 'mod' | 'invite' | 'results'>(null);
@@ -596,9 +605,9 @@ export default function VoiceRoom() {
   const mvp = pk?.phase === 'done' ? Object.entries(contrib).sort((a, b) => b[1] - a[1])[0]?.[0] : undefined;
 
   // --- Seat actions ------------------------------------------------------------
-  const placeOnSeat = (userId: string) => {
+  const placeOnSeat = (userId: string, target?: number) => {
     if (allSeats.includes(userId)) return showAlert('Zaten koltukta', `${userById(userId).name} zaten mikrofonda.`);
-    const free = allSeats.findIndex((s, i) => i > 0 && s === null);
+    const free = target !== undefined && allSeats[target] === null ? target : allSeats.findIndex((s, i) => i > 0 && s === null && !lockedSeats.includes(i));
     if (free < 0) return showAlert('Boş koltuk yok', `Bu oda ${capacity} mikrofonlu.`);
     setSeats((s) => pad(s, capacity).map((x, i) => (i === free ? userId : x)));
     addMsg({ system: true, text: `${userById(userId).name} ${free + 1}. koltuğa oturdu` });
@@ -652,116 +661,168 @@ export default function VoiceRoom() {
   };
 
   const freeMic = roomType === 'free';
+  // --- Seat menu (opens next to the seat). Managers act only on lower roles; every action is logged. ---
+  const openSeatMenu = (index: number, title: string, items: SeatMenuItem[]) => {
+    const v = seatSlots.get(index);
+    if (!v) return setSeatMenu({ anchor: { x: win.width / 2 - 30, y: win.height / 3, w: 60, h: 60 }, title, items });
+    v.measureInWindow((x, y, w, h) => setSeatMenu({ anchor: { x, y, w, h }, title, items }));
+  };
+  const toggleLock = (index: number, lock: boolean) => {
+    const next = lock ? [...new Set([...lockedSeats, index])] : lockedSeats.filter((x) => x !== index);
+    if (isOwn) updateMyRoom({ lockedSeats: next });
+    else setLocalLocks(next);
+    logMod(lock ? 'Mikrofonu kilitledi' : 'Mikrofon kilidini açtı', `${index + 1}. koltuk`);
+  };
+  const kickFromRoom = (uid: string) => {
+    const u = userById(uid);
+    removeFromSeat(uid);
+    setKicked((k) => new Set(k).add(uid));
+    setBans((b) => [...b.filter((x) => x.userId !== uid), { userId: uid, until: '10 dk' }]);
+    addMsg({ system: true, text: `${u.name} odadan çıkarıldı · 10 dk giriş yasağı (denetim kaydına yazıldı)` });
+    logMod('Odadan çıkardı', u.name, '10 dk giriş yasağı');
+  };
+  const canManage = myRole !== 'member';
+
   const onSeatPress = (index: number) => {
     const uid = allSeats[index];
-    if (uid === 'me') {
-      if (isOwn) return;
-      showAlert('Koltuktan in', 'Dinleyici olarak devam etmek ister misin?', [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'İn', onPress: () => removeFromSeat('me') },
-      ]);
+    // "Koltuk değiştir" mode: the next tap on a free seat moves that person there.
+    if (moving) {
+      const who = moving;
+      setMoving(null);
+      if (uid || lockedSeats.includes(index)) return showAlert('Boş koltuk seç', 'Taşımak için kilitli olmayan boş bir koltuğa dokun.');
+      setSeats((s) => pad(s, capacity).map((x, i) => (i === index ? who : x === who ? null : x)));
+      addMsg({ system: true, text: `${userById(who).name} ${index + 1}. koltuğa taşındı` });
+      logMod('Koltuk değiştirdi', userById(who).name, `${index + 1}. koltuk`);
       return;
+    }
+    if (uid === 'me') {
+      const items: SeatMenuItem[] = [{ key: 'profile', label: 'Profilim', icon: 'person-circle-outline', onPress: () => router.push('/kullanici/me') }];
+      if (!isOwn || index !== 0) items.push({ key: 'leave', label: 'Koltuktan in', icon: 'arrow-down-circle-outline', onPress: () => removeFromSeat('me') });
+      return openSeatMenu(index, `${index + 1}. koltuk · sen`, items);
     }
     if (uid) {
       const u = userById(uid);
       const targetRole = roleOf(uid);
-      const options: SheetOption[] = [
-        { label: '👤 Profili gör', onPress: () => router.push(`/kullanici/${uid}`) },
-        {
-          label: '🎁 Hediye gönder',
-          onPress: () => {
-            setGiftTo(uid);
-            setGiftOpen(true);
-          },
-        },
-        { label: '💬 Mesaj gönder', onPress: () => router.push(`/sohbet/${uid}`) },
-      ];
-      if (myRole !== 'member') {
-        if (ROLE_RANK[myRole] > ROLE_RANK[targetRole]) {
-          const muted = mutedUsers.has(uid);
-          options.push(
-            {
-              label: muted ? '🔊 Sesini aç' : '🔇 Sustur',
-              onPress: () => {
-                setMutedUsers((m) => {
-                  const n = new Set(m);
-                  if (muted) n.delete(uid);
-                  else n.add(uid);
-                  return n;
-                });
-                logMod(muted ? 'Sesini açtı' : 'Susturdu', u.name);
-              },
-            },
-            {
-              label: '⬇️ Mikrofondan indir',
-              onPress: () => {
-                removeFromSeat(uid);
-                addMsg({ system: true, text: `${u.name} mikrofondan indirildi` });
-                logMod('Mikrofondan indirdi', u.name);
-              },
-            },
-          );
-          if (myRole === 'owner') {
-            const isAdmin = adminIds.includes(uid);
-            options.push(
-              {
-                label: isAdmin ? '🛡️ Yöneticilikten al' : '🛡️ Yönetici yap',
-                onPress: () => {
-                  if (!isAdmin && adminIds.length >= adminCapacity(level)) return showAlert('Yönetici kontenjanı dolu', `Lv.${level} odada en fazla ${adminCapacity(level)} yönetici olabilir.`);
-                  updateMyRoom({ adminIds: isAdmin ? adminIds.filter((x) => x !== uid) : [...adminIds, uid] });
-                  logMod(isAdmin ? 'Yöneticilikten aldı' : 'Yönetici atadı', u.name);
-                  addMsg({ system: true, text: isAdmin ? `${u.name} artık yönetici değil` : `🛡️ ${u.name} oda yöneticisi oldu` });
-                },
-              },
-              {
-                label: '⛔ Kara listeye ekle (kalıcı)',
-                destructive: true,
-                onPress: () => {
-                  removeFromSeat(uid);
-                  setKicked((k) => new Set(k).add(uid));
-                  updateMyRoom({ blacklist: [...new Set([...myRoom.blacklist, uid])], memberIds: myRoom.memberIds.filter((x) => x !== uid) });
-                  addMsg({ system: true, text: `${u.name} oda kara listesine eklendi` });
-                  logMod('Kara listeye ekledi', u.name, 'kalıcı');
-                },
-              },
-              {
-                label: '🚫 Odadan çıkar (10 dk giriş yasağı)',
-                destructive: true,
-                onPress: () => {
-                  removeFromSeat(uid);
-                  setKicked((k) => new Set(k).add(uid));
-                  setBans((b) => [...b.filter((x) => x.userId !== uid), { userId: uid, until: '10 dk' }]);
-                  addMsg({ system: true, text: `${u.name} odadan çıkarıldı · 10 dk giriş yasağı (denetim kaydına yazıldı)` });
-                  logMod('Odadan çıkardı', u.name, '10 dk giriş yasağı');
-                },
-              },
-            );
-          }
-        } else {
-          options.push({
-            label: '🔒 Üst role müdahale edilemez',
+      const outranks = canManage && ROLE_RANK[myRole] > ROLE_RANK[targetRole];
+      const items: SeatMenuItem[] = [{ key: 'profile', label: 'Profil', icon: 'person-circle-outline', onPress: () => router.push(`/kullanici/${uid}`) }];
+      if (outranks) {
+        const muted = mutedUsers.has(uid);
+        items.push(
+          {
+            key: 'down',
+            label: 'Mikrodan at',
+            icon: 'arrow-down-circle-outline',
             onPress: () => {
-              logMod('Reddedilen deneme: üst role müdahale', u.name);
-              showAlert('Yetki yok', `${targetRole === 'owner' ? 'Oda sahibini' : 'Aynı veya üst rolü'} susturamaz ya da mikrofondan indiremezsin. Bu deneme denetim kaydına yazıldı.`);
+              removeFromSeat(uid);
+              addMsg({ system: true, text: `${u.name} mikrofondan indirildi` });
+              logMod('Mikrofondan indirdi', u.name);
             },
-          });
-        }
+          },
+          {
+            key: 'lock',
+            label: 'Mikrofonu kilitle',
+            icon: 'lock-closed-outline',
+            onPress: () => {
+              removeFromSeat(uid);
+              toggleLock(index, true);
+              addMsg({ system: true, text: `${u.name} mikrofondan indirildi · ${index + 1}. koltuk kilitlendi` });
+            },
+          },
+          { key: 'kick', label: 'Odadan at', icon: 'exit-outline', destructive: true, onPress: () => kickFromRoom(uid) },
+          {
+            key: 'move',
+            label: 'Koltuk değiştir',
+            icon: 'swap-horizontal-outline',
+            onPress: () => {
+              if (!allSeats.some((x, i) => i > 0 && x === null && !lockedSeats.includes(i))) return showAlert('Boş koltuk yok', 'Taşımak için önce bir koltuğu boşalt veya kilidini aç.');
+              setMoving(uid);
+            },
+          },
+          {
+            key: 'mute',
+            label: muted ? 'Sesini aç' : 'Sustur',
+            icon: muted ? 'volume-high-outline' : 'volume-mute-outline',
+            dividerBefore: true,
+            onPress: () => {
+              setMutedUsers((m) => {
+                const n = new Set(m);
+                if (muted) n.delete(uid);
+                else n.add(uid);
+                return n;
+              });
+              logMod(muted ? 'Sesini açtı' : 'Susturdu', u.name);
+            },
+          },
+        );
       }
-      setSheet({ title: `${u.name} · ${targetRole === 'owner' ? 'Oda sahibi' : targetRole === 'admin' ? 'Yönetici' : 'Üye'}`, options });
-      return;
+      items.push(
+        { key: 'gift', label: 'Hediye gönder', icon: 'gift-outline', dividerBefore: !outranks, onPress: () => (setGiftTo(uid), setGiftOpen(true)) },
+        { key: 'dm', label: 'Mesaj gönder', icon: 'chatbubble-outline', onPress: () => router.push(`/sohbet/${uid}`) },
+      );
+      if (outranks && myRole === 'owner') {
+        const isAdmin = adminIds.includes(uid);
+        items.push(
+          {
+            key: 'admin',
+            label: isAdmin ? 'Yöneticilikten al' : 'Yönetici yap',
+            icon: 'shield-half-outline',
+            dividerBefore: true,
+            onPress: () => {
+              if (!isAdmin && adminIds.length >= adminCapacity(level)) return showAlert('Yönetici kontenjanı dolu', `Lv.${level} odada en fazla ${adminCapacity(level)} yönetici olabilir.`);
+              updateMyRoom({ adminIds: isAdmin ? adminIds.filter((x) => x !== uid) : [...adminIds, uid] });
+              logMod(isAdmin ? 'Yöneticilikten aldı' : 'Yönetici atadı', u.name);
+              addMsg({ system: true, text: isAdmin ? `${u.name} artık yönetici değil` : `🛡️ ${u.name} oda yöneticisi oldu` });
+            },
+          },
+          {
+            key: 'black',
+            label: 'Kara listeye ekle',
+            icon: 'ban-outline',
+            destructive: true,
+            onPress: () => {
+              removeFromSeat(uid);
+              setKicked((k) => new Set(k).add(uid));
+              updateMyRoom({ blacklist: [...new Set([...myRoom.blacklist, uid])], memberIds: myRoom.memberIds.filter((x) => x !== uid) });
+              addMsg({ system: true, text: `${u.name} oda kara listesine eklendi` });
+              logMod('Kara listeye ekledi', u.name, 'kalıcı');
+            },
+          },
+        );
+      }
+      if (canManage && !outranks)
+        items.push({
+          key: 'denied',
+          label: 'Yetkin yok (üst rol)',
+          icon: 'lock-closed-outline',
+          dividerBefore: true,
+          onPress: () => {
+            logMod('Reddedilen deneme: üst role müdahale', u.name);
+            showAlert('Yetki yok', `${targetRole === 'owner' ? 'Oda sahibini' : 'Aynı veya üst rolü'} mikrofondan indiremez, odadan atamaz ya da susturamazsın. Bu deneme denetim kaydına yazıldı.`);
+          },
+        });
+      const roleLabel = targetRole === 'owner' ? 'Oda sahibi' : targetRole === 'admin' ? 'Yönetici' : 'Üye';
+      return openSeatMenu(index, `${index + 1}. koltuk · ${u.name} · ${roleLabel}`, items);
     }
     if (index === 0) return isOwn ? sitMe(0) : undefined;
-    if (isOwn) {
+    if (canManage) {
       const locked = lockedSeats.includes(index);
-      setSheet({
-        title: `${index + 1}. mikrofon`,
-        options: [
-          { label: locked ? '🔓 Kilidi aç' : '🔒 Mikrofonu kilitle', onPress: () => updateMyRoom({ lockedSeats: locked ? lockedSeats.filter((x) => x !== index) : [...lockedSeats, index] }) },
-          { label: '👥 Dinleyicilerden davet et', onPress: () => setListOpen(true) },
-        ],
-      });
-      return;
+      const items: SeatMenuItem[] = [
+        {
+          key: 'invite',
+          label: 'Davet et',
+          icon: 'person-add-outline',
+          onPress: () => {
+            if (locked) toggleLock(index, false);
+            setInviteSeat(index);
+            setListOpen(true);
+          },
+        },
+        ...(!locked ? [{ key: 'sit', label: 'Bu koltuğa geç', icon: 'enter-outline' as const, onPress: () => sitMe(index) }] : []),
+        { key: 'lock', label: locked ? 'Kilidi aç' : 'Mikrofonu kilitle', icon: locked ? ('lock-open-outline' as const) : ('lock-closed-outline' as const), onPress: () => toggleLock(index, !locked) },
+      ];
+      return openSeatMenu(index, `${index + 1}. koltuk · ${locked ? 'kilitli' : 'boş'}`, items);
     }
+    if (lockedSeats.includes(index)) return showAlert('Bu mikrofon kilitli', 'Oda yönetimi bu koltuğu kilitledi. Boş başka bir koltuk seçebilir veya el kaldırabilirsin.');
     if (myRole === 'member' && micPermission === 'members' && membership !== 'member') {
       showAlert('Mikrofon yalnızca oda üyelerine açık', 'Bu odada mikrofon almak için önce oda üyesi olmalısın.', [
         { text: 'Vazgeç', style: 'cancel' },
@@ -1130,7 +1191,7 @@ export default function VoiceRoom() {
                   compact
                   reaction={allSeats[0] ? reactions[allSeats[0]] : undefined}
                   still={settings.reduceMotion}
-                  anchorRef={seatAnchor(allSeats[0])}
+                  anchorRef={seatAnchor(allSeats[0], 0)}
                   camera={allSeats[0] === 'me' && camOn}
                   onPress={() => onSeatPress(0)}
                 />
@@ -1152,7 +1213,7 @@ export default function VoiceRoom() {
                 locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
                 reaction={uid ? reactions[uid] : undefined}
                 still={settings.reduceMotion}
-                anchorRef={seatAnchor(uid)}
+                anchorRef={seatAnchor(uid, i)}
                 camera={uid === 'me' && camOn}
                 onPress={() => onSeatPress(i)}
               />
@@ -1233,10 +1294,18 @@ export default function VoiceRoom() {
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
       <ListenersModal
         visible={listOpen}
-        onClose={() => setListOpen(false)}
+        onClose={() => {
+          setListOpen(false);
+          setInviteSeat(null);
+        }}
         users={audience}
         canInvite={myRole !== 'member'}
-        onInvite={(uid) => placeOnSeat(uid)}
+        onInvite={(uid) => {
+          placeOnSeat(uid, inviteSeat ?? undefined);
+          setInviteSeat(null);
+          setListOpen(false);
+          logMod('Koltuğa davet etti', userById(uid).name);
+        }}
         total={listeners}
         invisibleMe={invisible}
       />
@@ -1431,6 +1500,12 @@ export default function VoiceRoom() {
         off={settings.effectsOff}
         micEffect={{ animationId: app.micFx, active: amSeated && micOn && !callActive, isSpeaking: () => speakingMe.current }}
       />
+      <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
+      {moving && (
+        <Pressable style={styles.moveBanner} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">
+          <Text style={styles.moveText}>{userById(moving).name} için boş bir koltuğa dokun · iptal için buraya dokun</Text>
+        </Pressable>
+      )}
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
       {game && (
         <GamePanel
@@ -1464,6 +1539,8 @@ const styles = StyleSheet.create({
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  moveBanner: { position: 'absolute', left: 12, right: 12, top: 110, backgroundColor: semantic.action, borderRadius: 12, padding: 10, zIndex: 35 },
+  moveText: { color: semantic.actionInk, fontWeight: '800', textAlign: 'center', fontSize: 13 },
   gameChip: { position: 'absolute', right: 12, bottom: 96, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, zIndex: 30 },
   gameChipText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
   callBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: semantic.success, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
