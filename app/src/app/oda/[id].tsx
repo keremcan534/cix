@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
@@ -39,6 +39,7 @@ import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { ChatLine, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
@@ -48,6 +49,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { shareLink } from '@/lib/links';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
@@ -141,6 +143,16 @@ export default function VoiceRoom() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
+  // Gifts flying to seats: seat avatar views by user id, measured when a gift is sent.
+  // A mutable map kept in state (never replaced), so ref callbacks can fill it during commit.
+  const [seatViews] = useState(() => new Map<string, HostInstance>());
+  const seatAnchor = (uid: string | null) => (v: HostInstance | null) => {
+    if (!uid) return;
+    if (v) seatViews.set(uid, v);
+    else seatViews.delete(uid);
+  };
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const win = useWindowDimensions();
   const [listeners, setListeners] = useState(isOwn ? 1 : base!.listeners);
   const [listOpen, setListOpen] = useState(false);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
@@ -262,6 +274,17 @@ export default function VoiceRoom() {
     setReactions((r) => ({ ...r, [uid]: { emoji, key } }));
     setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), REACTION_MS);
   };
+  // Only recipients sitting on a seat get a flight; listeners see the chat line instead.
+  const flyGift = (emoji: string, count: number, toIds: string[], from: Point) => {
+    if (settings.effectsOff || settings.reduceMotion) return;
+    toIds.forEach((uid, i) =>
+      seatViews.get(uid)?.measureInWindow((x, y, w, h) => {
+        if (!w) return;
+        const key = `${Date.now()}-${uid}-${Math.random()}`;
+        setFlights((f) => [...f.slice(-11), { key, emoji, count, from, to: { x: x + w / 2, y: y + h / 2 }, delay: i * 90 }]);
+      }),
+    );
+  };
   // Other people on mic send seat emoji now and then (quiet when effects are off).
   const botReactions = !settings.effectsOff;
   useEffect(() => {
@@ -307,6 +330,7 @@ export default function VoiceRoom() {
         addContrib(u.id, g.price);
         logGift(u.id, hostId, g, 1);
         addMsg({ system: true, text: `🎁 ${u.name}, ${userById(hostId).name} kişisine ${g.emoji} ${g.name} gönderdi` });
+        flyGift(g.emoji, 1, [hostId], { x: 36, y: win.height * 0.72 });
       } else {
         addMsg({ userId: u.id, text: pick(BOT_LINES) });
       }
@@ -328,6 +352,7 @@ export default function VoiceRoom() {
       gainXp(gift.price);
       addContrib(from.id, gift.price);
       logGift(from.id, 'me', gift, 1);
+      flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 });
       if (gift.price >= 50 && showFx(gift.price)) setGiftFx(gift);
       addMsg({ system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)` });
       setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + gift.price } : p));
@@ -690,6 +715,8 @@ export default function VoiceRoom() {
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
     if (showFx(gift.price)) setGiftFx(gift);
+    // From the gift button (bottom right) to each recipient's seat.
+    flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 });
     setPk((p) => (p?.phase === 'live' ? { ...p, ours: p.ours + total } : p));
     addMsg({ system: true, text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!` });
     if (toIds.length > 1 || delivered.length < toIds.length) {
@@ -771,7 +798,7 @@ export default function VoiceRoom() {
     },
   };
 
-  const shareRoom = () => Share.share({ message: `Similar Club'da "${title}" odasına gel! 🎙️ similarclub://oda/${id}` }).catch(() => {});
+  const shareRoom = () => shareLink(`Similar Club'da "${title}" odasına gel! 🎙️ Şu an ${listeners} kişi dinliyor.`, `oda/${id}`);
 
   const report = () => {
     const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);
@@ -959,6 +986,7 @@ export default function VoiceRoom() {
                   compact
                   reaction={allSeats[0] ? reactions[allSeats[0]] : undefined}
                   still={settings.reduceMotion}
+                  anchorRef={seatAnchor(allSeats[0])}
                   onPress={() => onSeatPress(0)}
                 />
                 <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
@@ -979,6 +1007,7 @@ export default function VoiceRoom() {
                 locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
                 reaction={uid ? reactions[uid] : undefined}
                 still={settings.reduceMotion}
+                anchorRef={seatAnchor(uid)}
                 onPress={() => onSeatPress(i)}
               />
             ))}
@@ -1247,6 +1276,7 @@ export default function VoiceRoom() {
         ]}
       />
       <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
+      {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
       {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>

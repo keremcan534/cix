@@ -1,4 +1,4 @@
-// Mock data for the Timo-style user profile screen (kullanici/[id]).
+// Mock data for the user profile screen (kullanici/[id]).
 // Everything here is deterministic per user id so render stays pure.
 import { COSMETICS } from '@/data/catalog';
 import { FAMILIES } from '@/data/economy';
@@ -9,7 +9,7 @@ export const seedOf = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charC
 
 const pick = <T>(list: readonly T[], id: string, salt = 0) => list[(seedOf(id) + salt * 7) % list.length];
 
-/** Timo-like 12-digit public ID. */
+/** 12-digit public ID. */
 export const displayId = (id: string) => String(100_000_000_000 + ((seedOf(id) * 7919) % 900_000_000_000));
 
 // --- Personal profile --------------------------------------------------------
@@ -155,7 +155,7 @@ export const vehiclesOf = (id: string) => COSMETICS.filter((c) => c.kind === 'ri
 export const giftWallOf = (id: string): (Gift & { count: number })[] =>
   GIFTS.map((g, i) => ({ ...g, count: Math.max(0, ((seedOf(id) * (i + 3)) % 11) - 3) }));
 
-/** Total gifts in the (mock) global catalog, as in Timo's "Aydınlatılmış 5/2169". */
+/** Total gifts in the (mock) global catalog, shown as "Aydınlatılmış 5/2169". */
 export const GIFT_CATALOG_TOTAL = 2169;
 
 export type GiftCollection = { id: string; name: string; emoji: string; colors: [string, string]; total: number };

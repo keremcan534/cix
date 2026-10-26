@@ -23,11 +23,12 @@ const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
 const DEMO_TEST_COINS = 1_000_000;
 
 export default function WelcomeScreen() {
-  const { updateMe, login, addCoins } = useApp();
+  const { updateMe, login, addCoins, coins } = useApp();
   const demoLogin = () => {
-    updateMe({ name: 'Demo', age: 25, verified: true, bio: '🎧 Müzik 🎮 Oyun' });
+    updateMe({ name: 'Demo', age: 25, verified: true, bio: '🎧 Müzik 🎮 Oyun', interests: ['🎧 Müzik', '🎮 Oyun', '💬 Sohbet'] });
     // Test balance so every paid flow (gifts, store, VIP) can be tried without the payment step.
-    addCoins(DEMO_TEST_COINS, 'Demo test bakiyesi');
+    // Balance is saved between launches, so only top up to the test amount instead of adding it every login.
+    if (coins < DEMO_TEST_COINS) addCoins(DEMO_TEST_COINS - coins, 'Demo test bakiyesi');
     login();
   };
 

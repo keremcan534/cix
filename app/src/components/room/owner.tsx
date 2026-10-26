@@ -1,4 +1,4 @@
-// Timo-style room info card ("oda kartı"), full-screen "Oda Ayarları" and the boss seat.
+// Room info card ("oda kartı"), full-screen "Oda Ayarları" and the boss seat.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';

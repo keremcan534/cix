@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, FlatList, Image, Modal, Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
 
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { cosmeticById } from '@/data/catalog';
@@ -30,6 +30,7 @@ export function Seat({
   compact,
   reaction,
   still,
+  anchorRef,
   onPress,
 }: {
   index: number;
@@ -48,6 +49,8 @@ export function Seat({
   reaction?: SeatReactionData;
   /** Reduce motion: show the reaction without bouncing. */
   still?: boolean;
+  /** Receives the avatar view so the room can measure where gifts should land. */
+  anchorRef?: (v: HostInstance | null) => void;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -67,7 +70,7 @@ export function Seat({
 
   return (
     <Pressable onPress={onPress} style={[styles.seat, host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}>
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View ref={anchorRef} collapsable={false} style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
         {speaking && (
           <Animated.View
             style={[
@@ -112,7 +115,7 @@ export function Seat({
 export type SeatReactionData = { emoji: string; key: number };
 export const REACTION_MS = 2600;
 
-/** An emoji that pops over a seated person's avatar, wiggles, then fades (Timo-style seat emoji). */
+/** An emoji that pops over a seated person's avatar, wiggles, then fades (seat reaction). */
 function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
   const [v] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {
@@ -310,19 +313,23 @@ export function PkBar({ pk, roomTitle }: { pk: Pk; roomTitle: string }) {
       : pk.phase === 'countdown'
         ? `⏳ ${pk.left}`
         : pk.phase === 'live'
-          ? `⚔️ ${pk.left}s`
+          ? `${pk.left}s`
           : pk.result === 'win'
-            ? '🏆 KAZANDIN'
+            ? 'KAZANDIN'
             : pk.result === 'lose'
               ? 'KAYBETTİN'
               : 'BERABERE';
+  const badge = pk.phase === 'live' ? 'swords' : pk.phase === 'done' && pk.result === 'win' ? 'trophy' : null;
   return (
     <View style={styles.pk}>
       <View style={styles.pkTop}>
         <Text style={styles.pkName} numberOfLines={1}>
           {roomTitle}
         </Text>
-        <Text style={styles.pkTimer}>{status}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {badge && <Icon3D name={badge} size={22} />}
+          <Text style={styles.pkTimer}>{status}</Text>
+        </View>
         <Text style={[styles.pkName, { textAlign: 'right' }]} numberOfLines={1}>
           {pk.opponent.title}
         </Text>

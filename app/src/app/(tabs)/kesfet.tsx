@@ -11,6 +11,8 @@ import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
+import { SimilarityChip } from '@/components/similarity';
+import { similarity } from '@/lib/similarity';
 
 const TABS = ['Senin için', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
@@ -219,6 +221,8 @@ function UserRow({
   onToggleFollow: () => void;
 }) {
   const female = user.gender === 'Kadın';
+  const { me } = useApp();
+  const sim = similarity(me, user);
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
       <View>
@@ -250,6 +254,7 @@ function UserRow({
             <Text style={[styles.chipText, { color: female ? colors.pink : '#38BDF8' }]}>{female ? '♀' : '♂'}</Text>
             <Text style={styles.chipText}>{user.age}</Text>
           </View>
+          <SimilarityChip score={sim.score} />
         </View>
         <Text style={styles.bio} numberOfLines={1}>
           {EXTRA_BIOS[user.id] ?? user.bio}
@@ -394,7 +399,7 @@ const styles = StyleSheet.create({
   name: { color: '#fff', fontWeight: '800', fontSize: 17, maxWidth: 140 },
   realBadge: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(34,197,94,0.14)', borderRadius: 6, paddingLeft: 2, paddingRight: 6, paddingVertical: 1 },
   realText: { color: colors.green, fontSize: 12, fontWeight: '700' },
-  chips: { flexDirection: 'row', gap: 6 },
+  chips: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 2, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   chipText: { color: '#fff', fontSize: 12 },
   bio: { color: colors.textDim, fontSize: 13 },

@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#120B24",
+        "backgroundColor": "#080F1E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -32,11 +32,24 @@
           "photosPermission": "Profil fotoğrafı seçmek için galerine erişmemiz gerekiyor.",
           "cameraPermission": "Gerçek kişi doğrulaması için selfie çekmen gerekiyor."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#080F1E",
+          "imageWidth": 200,
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#080F1E"
+          }
+        }
       ]
     ],
     "scheme": "similarclub",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "backgroundColor": "#080F1E"
   }
 }

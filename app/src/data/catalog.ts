@@ -118,7 +118,7 @@ export const roomLevel = (xp: number) => {
 export const micCapacity = (agencyRoom: boolean, level: number) =>
   agencyRoom ? AGENCY_MICS : Math.min(15, STANDARD_MICS + (level >= 8 ? 2 : 0) + (level >= 15 ? 3 : 0));
 export const adminCapacity = (level: number) => ROOM_LIMITS[level - 1].admins;
-// Room settings gates (Timo-style "Oda Ayarları").
+// Room settings gates ("Oda Ayarları").
 export const ROOM_THEMES = [
   { id: 'chat', name: 'Sohbet', emoji: '💬' },
   { id: 'pk', name: 'PK', emoji: '🥊' },

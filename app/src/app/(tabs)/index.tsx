@@ -28,6 +28,7 @@ import {
   type CountryId,
   type RoomTab,
 } from '@/data/rooms-ui';
+import { StarterPath } from '@/components/starter';
 import { useApp } from '@/store';
 import { colors, gradient, gradientDeep, semantic } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
@@ -135,6 +136,7 @@ export default function RoomsScreen() {
         ListHeaderComponent={
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
+              <StarterPath />
               <RankCards />
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
               <CategoryBar cat={cat} onCat={setCat} countryFlag={country === 'ALL' ? null : countryFlag(country)} onCountry={() => setSheet('country')} />

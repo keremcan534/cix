@@ -265,12 +265,12 @@ const SEED_APPS: Application[] = [
     id: 'app3',
     number: 'SC-AJ-2026-000109',
     applicantId: 'u10',
-    form: form({ agencyName: 'Anadolu Ses Ajansı', fullName: 'Kaan Aydın', email: 'kaan@anadoluses.com', phone: '0505 333 44 55', city: 'Eskişehir', experience: 'running', platforms: 'Timo, StarMaker', company: 'Anadolu Medya Ltd.', estimatedHosts: '80', recruitPlan: 'Mevcut 80 yayıncının yarısını taşımayı planlıyorum.', growthGoals: 'Yıl sonunda bölgenin en büyük ajansı.' }),
+    form: form({ agencyName: 'Anadolu Ses Ajansı', fullName: 'Kaan Aydın', email: 'kaan@anadoluses.com', phone: '0505 333 44 55', city: 'Eskişehir', experience: 'running', platforms: 'Diğer sesli sohbet uygulamaları', company: 'Anadolu Medya Ltd.', estimatedHosts: '80', recruitPlan: 'Mevcut 80 yayıncının yarısını taşımayı planlıyorum.', growthGoals: 'Yıl sonunda bölgenin en büyük ajansı.' }),
     emailVerified: true,
     phoneVerified: true,
     docs: [
       { id: 'd2', name: 'faaliyet-belgesi.pdf', kind: 'İşletme belgesi', at: stamp(T0 - 9 * DAY), size: '1,2 MB' },
-      { id: 'd3', name: 'timo-yayinci-listesi.png', kind: 'Deneyim kanıtı', at: stamp(T0 - 9 * DAY), size: '688 KB' },
+      { id: 'd3', name: 'onceki-yayinci-listesi.png', kind: 'Deneyim kanıtı', at: stamp(T0 - 9 * DAY), size: '688 KB' },
     ],
     status: 'Admin Onayı Bekleniyor',
     assignedBd: 'u3',
@@ -282,7 +282,7 @@ const SEED_APPS: Application[] = [
       [8, 'Ön İncelemede', 'BD Değerlendirmesinde', 'u3', 'BD atandı: Zeynep (geçici)'],
       [3, 'BD Değerlendirmesinde', 'Admin Onayı Bekleniyor', 'u3', 'Güçlü aday, belgeler tamam.'],
     ]),
-    reviews: [{ id: 'r1', at: stamp(T0 - 3 * DAY), actor: 'u3', kind: 'Değerlendirme notu', text: 'Timo’da 2 yıllık ajans geçmişi doğrulandı. Yayıncı kapasitesi gerçekçi.', scores: { experience: 5, capacity: 4 } }],
+    reviews: [{ id: 'r1', at: stamp(T0 - 3 * DAY), actor: 'u3', kind: 'Değerlendirme notu', text: 'Önceki platformda 2 yıllık ajans geçmişi doğrulandı. Yayıncı kapasitesi gerçekçi.', scores: { experience: 5, capacity: 4 } }],
     infoRequests: [],
   },
   {

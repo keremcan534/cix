@@ -1,8 +1,15 @@
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
+
+// Keep the splash up until the saved state is loaded, so the app doesn't flash the login screen first.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+const hideSplash = () => {
+  SplashScreen.hideAsync().catch(() => {});
+};
 
 const theme = {
   ...DarkTheme,
@@ -11,7 +18,7 @@ const theme = {
 
 export default function RootLayout() {
   return (
-    <AppProvider>
+    <AppProvider onReady={hideSplash}>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
         <RootStack />

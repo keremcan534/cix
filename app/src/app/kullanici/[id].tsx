@@ -29,6 +29,9 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
+import { shareLink } from '@/lib/links';
+import { similarity } from '@/lib/similarity';
+import { SimilarityCard } from '@/components/similarity';
 import { useApp, type FanClub } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
 
@@ -316,6 +319,15 @@ export default function UserProfile() {
             </View>
             <Band />
 
+            {!isMe && (
+              <>
+                <View style={styles.section}>
+                  <SimilarityCard sim={similarity(me, user)} name={user.name} />
+                </View>
+                <Band />
+              </>
+            )}
+
             <View style={styles.section}>
               <SectionTitle title="Kişisel profil" />
               <View style={styles.chips}>
@@ -514,6 +526,7 @@ export default function UserProfile() {
         title={user.name}
         onClose={() => setSheet('none')}
         options={[
+          { label: '🔗 Profili paylaş', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
           { label: '🚩 Şikayet et', onPress: () => setTimeout(() => setSheet('report'), 300) },
           { label: isBlocked ? 'Engeli kaldır' : '⛔ Engelle', destructive: true, onPress: () => toggleBlock(user.id) },
         ]}

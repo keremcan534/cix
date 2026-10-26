@@ -1,4 +1,4 @@
-// Status systems (Timo-style): SVIP (recharge experience), VIP (subscription), Asil/Noble (monthly title).
+// Status systems: SVIP (recharge experience), VIP (subscription), Asil/Noble (monthly title).
 import { DM_PRICE } from '@/data/mock';
 
 // --- SVIP: 1 recharged coin = 1 experience point; levels never expire ---------------

@@ -1,4 +1,4 @@
-// Timo-style room menu: grid sections (interactive games, coin games, room tools/settings).
+// Room menu: grid sections (interactive games, coin games, room tools/settings).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
