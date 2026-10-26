@@ -10,6 +10,7 @@ import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
+import { EmojiIcon } from '@/components/Icon3D';
 
 const TABS = ['Senin için', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
@@ -197,7 +198,7 @@ function ShortcutArt({ id, emoji }: { id: string; emoji: string }) {
     );
   return (
     <View style={styles.artCenter}>
-      <Text style={{ fontSize: 34 }}>{emoji}</Text>
+      <EmojiIcon emoji={emoji} size={34} />
     </View>
   );
 }

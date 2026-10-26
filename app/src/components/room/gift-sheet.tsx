@@ -13,6 +13,7 @@ import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 type Shelf = GiftCat | 'fav' | 'bag';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -188,7 +189,7 @@ export function GiftSheet({
             </View>
           </View>
           <Pressable onPress={goWallet} style={g.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
-            <Text style={g.coin}>🪙</Text>
+            <Icon3D name="coin" size={20} />
             <Text style={g.balanceText}>{fmt(coins)}</Text>
             <Ionicons name="add-circle" size={18} color={semantic.money} />
           </Pressable>
@@ -309,9 +310,10 @@ export function GiftSheet({
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={g.totalLabel}>Toplam</Text>
-              <Text style={[g.total, short > 0 && !locked && targets.length > 0 && { color: '#FCA5A5' }]} accessibilityLabel={`Toplam ${fmt(total)} jeton`}>
-                🪙 {fmt(total)}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={`Toplam ${fmt(total)} jeton`}>
+                <Icon3D name="coin" size={22} />
+                <Text style={[g.total, short > 0 && !locked && targets.length > 0 && { color: '#FCA5A5' }]}>{fmt(total)}</Text>
+              </View>
             </View>
           </View>
 
@@ -401,7 +403,10 @@ function GiftTile({
         ) : stock !== undefined ? (
           <Text style={[g.tilePrice, { color: semantic.success }]}>Ücretsiz · {stock}</Text>
         ) : (
-          <Text style={g.tilePrice}>🪙 {fmt(gift.price)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Icon3D name="coin" size={13} />
+            <Text style={g.tilePrice}>{fmt(gift.price)}</Text>
+          </View>
         )}
         {badge && (
           <View style={g.badge}>

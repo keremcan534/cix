@@ -12,6 +12,7 @@ import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKin
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -72,7 +73,7 @@ export default function StoreScreen() {
                         if (err) showAlert('Satın alınamadı', err);
                       }}
                     >
-                      <Text style={styles.buyText}>🪙 {p.price}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon3D name="coin" size={16} /><Text style={styles.buyText}>{p.price}</Text></View>
                     </Pressable>
                   )}
                 </View>
@@ -105,7 +106,7 @@ export default function StoreScreen() {
                     </Pressable>
                   ) : (
                     <Pressable style={styles.buy} onPress={() => buy(c)}>
-                      <Text style={styles.buyText}>🪙 {c.price.toLocaleString('tr-TR')}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon3D name="coin" size={16} /><Text style={styles.buyText}>{c.price.toLocaleString('tr-TR')}</Text></View>
                     </Pressable>
                   )}
                 </View>

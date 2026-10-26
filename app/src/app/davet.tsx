@@ -10,6 +10,7 @@ import { RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 // --- Campaign config (demo values; reward amounts are diamond-equivalents shown in USD via usd()) ----
 const DAY = 86_400_000;
@@ -140,7 +141,7 @@ export default function InviteScreen() {
             style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
           >
             <LinearGradient colors={['#EA580C', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.signup}>
-              <Text style={{ fontSize: 34 }}>🪙</Text>
+              <Icon3D name="coin" size={44} />
               <Text style={styles.signupAmount}>{usd(SIGNUP_REWARD)}</Text>
               <Text style={styles.signupText}>
                 Davet ettiğin arkadaşın kayıt olup 2 gün içinde Gerçek Kişi Doğrulamasını tamamladığında {usd(SIGNUP_REWARD)} ödül verilir. Ödül tüm kullanıcılar için aynıdır.

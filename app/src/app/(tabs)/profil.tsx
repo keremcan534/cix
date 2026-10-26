@@ -12,20 +12,21 @@ import { nobleInfo } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Item = { icon: IconName; label: string; onPress: () => void; tag?: string; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean };
+type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; tag?: string; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean };
 
 const GROWTH: Item[] = [
-  { icon: 'mic-outline', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
-  { icon: 'business-outline', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
-  { icon: 'chatbubbles-outline', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
+  { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
+  { icon: 'business-outline', img: 'briefcase', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
+  { icon: 'chatbubbles-outline', img: 'chat', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
-  { icon: 'add-circle-outline', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
+  { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   { icon: 'game-controller-outline', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
-  { icon: 'trophy-outline', label: 'Sıralama', onPress: () => router.push('/siralama') },
-  { icon: 'aperture-outline', label: 'Şans çarkı', onPress: () => router.push('/cark') },
-  { icon: 'flash-outline', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
+  { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
+  { icon: 'aperture-outline', img: 'wheel', label: 'Şans çarkı', onPress: () => router.push('/cark') },
+  { icon: 'flash-outline', img: 'bolt', label: 'Rastgele Eşleş', onPress: () => router.push('/eslesme') },
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
@@ -46,17 +47,17 @@ export default function ProfileScreen() {
   const friends = USERS.filter((u) => following.has(u.id)).slice(0, 1);
 
   const main: Item[] = [
-    { icon: 'diamond-outline', label: 'Gelir', onPress: () => router.push('/gelir') },
-    { icon: 'business-outline', label: 'Coins Bank', tag: 'Yeni!', onPress: () => router.push('/coins-bank') },
-    { icon: 'storefront-outline', label: 'Alışveriş Merkezi', tag: 'Yeni!', onPress: () => router.push('/magaza') },
+    { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
+    { icon: 'business-outline', img: 'coin', label: 'Coins Bank', tag: 'Yeni!', onPress: () => router.push('/coins-bank') },
+    { icon: 'storefront-outline', img: 'bag', label: 'Alışveriş Merkezi', tag: 'Yeni!', onPress: () => router.push('/magaza') },
     {
       icon: 'checkmark-circle-outline',
       label: 'Kimlik Doğrulamam',
       dot: !me.verified,
       onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı ✅' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
     },
-    { icon: 'bag-handle-outline', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
-    { icon: 'ribbon-outline', label: 'Kullanıcı Seviyesi', onPress: () => router.push('/seviye') },
+    { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
+    { icon: 'ribbon-outline', img: 'crown', label: 'Kullanıcı Seviyesi', onPress: () => router.push('/seviye') },
   ];
   const visible = (m: Item) => (m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
 
@@ -107,7 +108,8 @@ export default function ProfileScreen() {
           <Pressable style={styles.rechargeRow} onPress={() => router.push('/cuzdan')} accessibilityLabel="Yükleme">
             <Text style={styles.h2}>Yükleme</Text>
             <Text style={styles.rewardTag}>🎁 Ödül</Text>
-            <Text style={styles.coinN}>🪙 {coins.toLocaleString('tr-TR')}</Text>
+            <Icon3D name="coin" size={20} />
+            <Text style={styles.coinN}>{coins.toLocaleString('tr-TR')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -125,7 +127,7 @@ export default function ProfileScreen() {
 
         {myRoom.profileVisible && (
           <Pressable onPress={() => router.push('/oda/yeni')} style={styles.roomCta} accessibilityLabel="Odam">
-            <Text style={{ fontSize: 22 }}>🎙️</Text>
+            <Icon3D name="mic" size={28} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>{myRoom.title}</Text>
               <Text style={{ color: colors.textDim, fontSize: 12 }}>
@@ -137,7 +139,7 @@ export default function ProfileScreen() {
         )}
         {!isHost && (
           <Pressable onPress={() => router.push('/yayinci')} style={styles.roomCta}>
-            <Text style={{ fontSize: 22 }}>💎</Text>
+            <Icon3D name="diamond" size={28} />
             <Text style={{ color: '#fff', flex: 1, fontWeight: '600' }}>Yayıncı ol, hediyelerden para kazan</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
@@ -161,7 +163,7 @@ function Group({ items }: { items: Item[] }) {
     <View style={[styles.card, { paddingVertical: 4 }]}>
       {items.map((m, i) => (
         <Pressable key={m.label} style={[styles.menuRow, i > 0 && styles.sep]} onPress={m.onPress} accessibilityLabel={m.label}>
-          <Ionicons name={m.icon} size={24} color="#fff" />
+          {m.img ? <Icon3D name={m.img} size={28} /> : <Ionicons name={m.icon} size={24} color="#fff" />}
           <Text style={styles.menuLabel}>{m.label}</Text>
           {m.tag && <Text style={{ color: '#F59E0B', fontWeight: '800', fontSize: 12 }}>{m.tag}</Text>}
           {m.dot && <View style={styles.redDot} />}
@@ -182,6 +184,7 @@ function StatusCard({ title, sub, colors: c, tag, dot, onPress }: { title: strin
         <Text style={styles.statusSub} numberOfLines={1}>
           {sub}
         </Text>
+        {title !== 'Asil' && <Icon3D name="crown" size={34} style={{ position: 'absolute', right: 6, bottom: 6, opacity: title === 'VIP' ? 1 : 0.9 }} />}
       </LinearGradient>
     </Pressable>
   );
@@ -192,7 +195,7 @@ function Shortcut({ emoji, label, tag, onPress }: { emoji: string; label: string
     <Pressable style={{ flex: 1, alignItems: 'center', gap: 6 }} onPress={onPress} accessibilityLabel={label}>
       {tag && <Text style={styles.earnTag}>{tag}</Text>}
       <View style={styles.shortIcon}>
-        <Text style={{ fontSize: 30 }}>{emoji}</Text>
+        <EmojiIcon emoji={emoji} size={30} />
       </View>
       <Text style={{ color: '#fff', fontSize: 14 }}>{label}</Text>
     </Pressable>

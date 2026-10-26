@@ -12,6 +12,7 @@ import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/dat
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
@@ -137,7 +138,7 @@ export default function MessagesScreen() {
           />
           <View style={styles.sep} />
           <SystemRow
-            icon={<Text style={{ fontSize: 22 }}>🪙</Text>}
+            icon={<Icon3D name="coin" size={30} />}
             iconColors={['#F59E0B', '#FBBF24']}
             title="Jeton kazan Kabile'sine Katıl"
             subtitle="Haydi birlikte ücretsiz sohbet edelim!"
