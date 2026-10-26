@@ -85,7 +85,7 @@ const DEFAULT_CONFIG: LuckyConfig = {
   poolPct: 70,
   dailyPayoutLimit: 20_000_000,
   perUserDaily: 500,
-  perMinute: 20,
+  perMinute: 60,
   announceFrom: 50,
   pkCountsReward: false,
 };

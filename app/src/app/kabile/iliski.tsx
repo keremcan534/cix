@@ -9,6 +9,7 @@ import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { CP_GIFT_IDS, KABILE_COUPLES, KABILE_FRIENDS, KABILE_ROUTES, findKabile, fmtK, kabile, kabileMemberIds, type Pair } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { successHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -35,7 +36,7 @@ export default function IliskiMeydani() {
       return;
     }
     kabile.trackCpGift(g.price);
-    showAlert('CP hediyesi gönderildi 💞', `${g.emoji} ${g.name} → ${u.name}\nYakınlık +${g.intimacy ?? 0} · Görev Merkezi'nde her 350 🪙 için +2 Güç Puanı alabilirsin.`);
+    successHaptic();
   };
 
   return (

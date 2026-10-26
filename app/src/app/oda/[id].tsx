@@ -39,6 +39,7 @@ import {
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
+import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
@@ -58,7 +59,7 @@ import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/da
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, useGames } from '@/lib/games';
-import { getLucky, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
+import { getLucky, luckyGift, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, recordGift, reportMismatch, usePk } from '@/lib/pk';
 import { shareLink } from '@/lib/links';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
@@ -162,6 +163,8 @@ export default function VoiceRoom() {
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
   const [luckyFx, setLuckyFx] = useState<LuckyRecord | null>(null);
+  // Lucky combo wheel: same gift, same person, one tap per repeat (×1, ×2, ×3 …).
+  const [combo, setCombo] = useState<{ giftId: string; toId: string; count: number; key: number } | null>(null);
   const gameCatalog = useGames();
   const [game, setGame] = useState<OpenGame | null>(null);
   const [gameMin, setGameMin] = useState(false);
@@ -899,23 +902,16 @@ export default function VoiceRoom() {
     flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 });
     delivered.forEach((r) => scorePk(`GT-${msgId()}`, 'me', r.userId, gift.id, each));
     addMsg({ system: true, text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!` });
-    if (toIds.length > 1 || delivered.length < toIds.length) {
+    // Only a partial delivery opens the results panel; a normal send shows no extra message.
+    if (delivered.length < toIds.length) {
       setGiftResults(results);
       setPanel('results');
     }
   };
 
-  const sendGift = (gift: Gift, toIds: string[], count: number, confirmed = false) => {
+  // Product rule: gifts never ask for confirmation; one tap sends.
+  const sendGift = (gift: Gift, toIds: string[], count: number) => {
     setGiftOpen(false);
-    const total = gift.price * count * toIds.length;
-    // The gift sheet asks for high-value confirmation itself; other callers still get the dialog.
-    if (!confirmed && settings.bigSpendConfirm > 0 && total >= settings.bigSpendConfirm) {
-      showAlert('Yüksek tutarlı gönderim', `${toIds.length} alıcıya toplam 🪙 ${total.toLocaleString('tr-TR')} gönderilecek. Onaylıyor musun?`, [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Onayla ve gönder', onPress: () => deliverGifts(gift, toIds, count) },
-      ]);
-      return;
-    }
     deliverGifts(gift, toIds, count);
   };
 
@@ -939,14 +935,19 @@ export default function VoiceRoom() {
     flyGift(record.emoji, 1, [toId], { x: win.width - 60, y: win.height - 48 });
     // PK counts the gift value; the reward only when the admin setting says so.
     scorePk(record.txId, 'me', toId, record.giftId, record.price + (cfg.pkCountsReward ? record.reward : 0));
-    addMsg({ system: true, text: `🍀 ${ME.name}, ${to.name} kişisine ${record.emoji} ${record.giftName} (Lucky) gönderdi` });
+    // Combo repeats don't add a chat line each time; the wheel shows the count.
+    const repeat = combo?.giftId === giftId && combo.toId === toId;
+    if (!repeat) addMsg({ system: true, text: `🍀 ${ME.name}, ${to.name} kişisine ${record.emoji} ${record.giftName} (Lucky) gönderdi` });
     if (record.mult >= cfg.announceFrom)
       addMsg({
         system: true,
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı! +${record.reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(record);
+    const at = Date.now();
+    setCombo((c) => (c && c.giftId === giftId && c.toId === toId ? { ...c, count: c.count + 1, key: at } : { giftId, toId, count: 1, key: at }));
   };
+  const comboGift = combo ? luckyGift(combo.giftId) : undefined;
 
   const sendEnvelope = (amount: number, count: number) => {
     setPanel(null);
@@ -1588,6 +1589,18 @@ export default function VoiceRoom() {
         </Pressable>
       )}
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
+      {combo && comboGift && (
+        <LuckyCombo
+          key={`${combo.giftId}-${combo.toId}`}
+          emoji={comboGift.emoji}
+          name={comboGift.name}
+          price={comboGift.price}
+          count={combo.count}
+          restartKey={combo.key}
+          onPress={() => sendLuckyGift(combo.giftId, combo.toId)}
+          onExpire={() => setCombo(null)}
+        />
+      )}
       {luckyFx && <LuckyResult key={luckyFx.txId} record={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>
