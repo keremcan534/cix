@@ -197,3 +197,11 @@ export function roleSpec(role: Role) {
   ];
   return lines.join('\n');
 }
+
+/** Staff badge on profiles. It comes only from role assignments made by authorised staff; users cannot set or edit it. */
+export function staffBadgeOf(state: RbacState, userId: string): 'Yönetici' | 'Moderatör' | null {
+  const ids = state.userRoles.filter((ur) => ur.userId === userId).map((ur) => ur.roleId);
+  if (ids.includes('super') || ids.includes('admin')) return 'Yönetici';
+  if (ids.includes('mod')) return 'Moderatör';
+  return null;
+}

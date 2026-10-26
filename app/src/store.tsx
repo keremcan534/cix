@@ -15,6 +15,7 @@ import { showAlert } from '@/lib/alert';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
+import type { CallsFrom, DmFrom } from '@/data/privacy';
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu';
 export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string };
@@ -31,6 +32,12 @@ export type Settings = {
   invisibleEntry: boolean;
   cityDiscovery: boolean;
   showOnline: boolean;
+  /** Offline users show "son görülme"; off hides it (and you don't see others' either, like most messengers). */
+  showLastSeen: boolean;
+  /** Profile shows which room you are in. */
+  showCurrentRoom: boolean;
+  dmFrom: DmFrom;
+  callsFrom: CallsFrom;
   profilePublic: boolean;
   notifySocial: boolean;
   notifyFinance: boolean;
@@ -48,6 +55,8 @@ export type Settings = {
   dailySpendLimit: number; // coins; 0 = no limit
   bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
 };
+/** Block, unblock, report and data requests are kept as a record (spec: profile §5). */
+export type SafetyLog = { id: string; action: 'Engelledi' | 'Engeli kaldırdı' | 'Şikâyet etti' | 'Veri dökümü istedi' | 'Fotoğraf incelemeye gönderildi' | 'Fotoğraf onaylandı'; targetId?: string; detail?: string; time: string };
 export type RuleChange = { id: string; time: string; field: string; from: string; to: string; version: number };
 export type InviteReward = { id: string; inviteeId: string; ref: string; status: 'Beklemede' | 'Onaylandı' | 'İptal edildi'; time: string };
 export type Session = { id: string; device: string; place: string; last: string; current?: boolean };
@@ -186,6 +195,12 @@ type AppState = {
   toggleFollow: (userId: string) => void;
   blocked: Set<string>;
   toggleBlock: (userId: string) => void;
+  safetyLog: SafetyLog[];
+  logSafety: (action: SafetyLog['action'], targetId?: string, detail?: string) => void;
+  /** New profile photo waiting for moderation; others keep seeing the old one until it is approved. */
+  pendingAvatar: string | null;
+  submitAvatar: (uri: string) => void;
+  requestDataExport: () => void;
   conversations: Conversation[];
   sendMessage: (userId: string, text: string, fromMe?: boolean) => void;
   markRead: (userId: string) => void;
@@ -238,6 +253,7 @@ type Snapshot = {
   blocked: string[];
   conversations: Conversation[];
   starter: { claimed: boolean; hidden: boolean };
+  safetyLog: SafetyLog[];
 };
 
 const Ctx = createContext<AppState | null>(null);
@@ -354,6 +370,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     invisibleEntry: false,
     cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
     showOnline: true,
+    showLastSeen: true,
+    showCurrentRoom: true,
+    dmFrom: 'everyone',
+    callsFrom: 'everyone',
     profilePublic: true,
     notifySocial: true,
     notifyFinance: true,
@@ -433,6 +453,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
   const [conversations, setConversations] = useState(s.conversations ?? CONVERSATIONS);
   const [starter, setStarter] = useState(s.starter ?? { claimed: false, hidden: false });
+  const [safetyLog, setSafetyLog] = useState<SafetyLog[]>(s.safetyLog ?? []);
+  const logSafety = (action: SafetyLog['action'], targetId?: string, detail?: string) =>
+    setSafetyLog((l) => [{ id: uid(), action, targetId, detail, time: `${new Date().toLocaleDateString('tr-TR')} ${now()}` }, ...l].slice(0, 100));
+  const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
 
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
   // are not resumed after a restart; their records keep the last saved status.
@@ -442,7 +466,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     myRoom, isHost, diamonds, totalDiamonds, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
-    following: [...following], blocked: [...blocked], conversations, starter,
+    following: [...following], blocked: [...blocked], conversations, starter, safetyLog,
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -783,7 +807,29 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     following,
     toggleFollow: (id) => setFollowing((prev) => toggle(prev, id)),
     blocked,
-    toggleBlock: (id) => setBlocked((prev) => toggle(prev, id)),
+    toggleBlock: (id) => {
+      logSafety(blocked.has(id) ? 'Engeli kaldırdı' : 'Engelledi', id);
+      setBlocked((prev) => toggle(prev, id));
+    },
+    safetyLog,
+    logSafety,
+    pendingAvatar,
+    submitAvatar: (uri) => {
+      // Demo moderation: the photo is "reviewed" for a few seconds, then goes live.
+      setPendingAvatar(uri);
+      logSafety('Fotoğraf incelemeye gönderildi');
+      setTimeout(() => {
+        Object.assign(ME, { avatar: uri });
+        setMe({ ...ME });
+        setPendingAvatar((p) => (p === uri ? null : p));
+        logSafety('Fotoğraf onaylandı');
+        notify({ kind: 'system', icon: '🖼️', title: 'Profil fotoğrafın onaylandı', body: 'Yeni fotoğrafın artık herkese görünüyor.', href: '/kullanici/me' });
+      }, 4000);
+    },
+    requestDataExport: () => {
+      logSafety('Veri dökümü istedi');
+      notify({ kind: 'security', icon: '📦', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası 30 gün içinde kayıtlı e-postana gönderilir (KVKK md. 11).' });
+    },
     conversations,
     sendMessage: (userId, text, fromMe = true) =>
       setConversations((prev) => {

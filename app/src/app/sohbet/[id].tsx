@@ -9,6 +9,7 @@ import { EmojiPanel } from '@/components/EmojiPanel';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
 import { useApp } from '@/store';
 import { colors, gradientDeep } from '@/theme';
@@ -16,7 +17,8 @@ import { colors, gradientDeep } from '@/theme';
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = userById(id);
-  const { conversations, sendMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket } = useApp();
+  const { conversations, sendMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
+  const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
   const mutual = following.has(user.id) && FOLLOWS_ME.has(user.id);
   const isBlocked = blocked.has(user.id);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -44,6 +46,7 @@ export default function ChatScreen() {
   const send = (checked = false) => {
     const text = draft.trim();
     if (!text || isBlocked) return;
+    if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
     const warning = checked ? null : outgoingWarning(scanMessage(text));
     if (warning) {
       showAlert('Kişisel bilgi paylaşıyorsun', warning, [
@@ -136,6 +139,7 @@ export default function ChatScreen() {
                   text={item.text}
                   onReport={() => {
                     const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Şüpheli mesaj: "${item.text}"`);
+                    logSafety('Şikâyet etti', user.id, `Şüpheli mesaj · #${no}`);
                     showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`, [
                       { text: 'Tamam', style: 'cancel' },
                       { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => !isBlocked && toggleBlock(user.id) },
@@ -148,6 +152,8 @@ export default function ChatScreen() {
         />
         {isBlocked ? (
           <Text style={styles.notice}>Bu kullanıcıyı engelledin; mesaj gönderemezsin.</Text>
+        ) : !allowed.ok ? (
+          <Text style={[styles.notice, { color: colors.gold, textAlign: 'center' }]}>{allowed.reason}</Text>
         ) : (
           !mutual && (
             <Pressable style={styles.notice} onPress={() => toggleFollow(user.id)}>

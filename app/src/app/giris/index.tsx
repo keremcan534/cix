@@ -25,7 +25,7 @@ const DEMO_TEST_COINS = 1_000_000;
 export default function WelcomeScreen() {
   const { updateMe, login, addCoins, coins } = useApp();
   const demoLogin = () => {
-    updateMe({ name: 'Demo', age: 25, verified: true, bio: '🎧 Müzik 🎮 Oyun', interests: ['🎧 Müzik', '🎮 Oyun', '💬 Sohbet'] });
+    updateMe({ name: 'Demo', age: 25, birthDate: '2001-03-14', verified: true, bio: '🎧 Müzik 🎮 Oyun', interests: ['🎧 Müzik', '🎮 Oyun', '💬 Sohbet'] });
     // Test balance so every paid flow (gifts, store, VIP) can be tried without the payment step.
     // Balance is saved between launches, so only top up to the test amount instead of adding it every login.
     if (coins < DEMO_TEST_COINS) addCoins(DEMO_TEST_COINS - coins, 'Demo test bakiyesi');
