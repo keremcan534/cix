@@ -41,15 +41,18 @@ import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLog
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
+import { GamePanel, type OpenGame } from '@/components/games/game-panel';
+import type { CasinoGame } from '@/data/games';
 import { ChatLine, GiftAnimation, ListenersModal, MicBtn, PkBar, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type Pk, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COIN_GAME_TILES, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { casinoAccess, useGames } from '@/lib/games';
 import { shareLink } from '@/lib/links';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
@@ -150,6 +153,9 @@ export default function VoiceRoom() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
+  const gameCatalog = useGames();
+  const [game, setGame] = useState<OpenGame | null>(null);
+  const [gameMin, setGameMin] = useState(false);
   // Gifts flying to seats: seat avatar views by user id, measured when a gift is sent.
   // A mutable map kept in state (never replaced), so ref callbacks can fill it during commit.
   const [seatViews] = useState(() => new Map<string, HostInstance>());
@@ -257,6 +263,9 @@ export default function VoiceRoom() {
   };
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   const audience = USERS.filter((u) => !allSeats.includes(u.id) && !kicked.has(u.id) && !blocked.has(u.id));
+  const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
+  // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
+  const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
   const canControlMusic = canFunctions;
 
   const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
@@ -862,7 +871,27 @@ export default function VoiceRoom() {
     const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);
     showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
   };
-  const toGames = () => router.push('/oyunlar');
+  // --- Games (Oyun Merkezi spec): opened over the room; never touch seats, mic or membership ------------
+  const openRoomGame = (gid: string) => {
+    const g = gameCatalog.roomGames.find((x) => x.id === gid);
+    if (!g || !g.active) return;
+    setPanel(null);
+    if (!g.playable) return showAlert(g.name, 'Bu oyun için sağlayıcı entegrasyonu bekleniyor. Katalogda görünür; bağlandığında buradan açılacak.');
+    if (g.startBy === 'owner_mod' && myRole === 'member') return showAlert('Masayı oda yönetimi açar', `${g.name} masasını oda sahibi veya yöneticiler başlatır. Açık bir masaya davetle katılabilirsin.`);
+    setGame({ kind: 'room', id: g.id });
+    setGameMin(false);
+    addMsg({ system: true, text: `🎮 ${ME.name} ${g.name} masası açtı · ${g.minPlayers}–${g.maxPlayers} oyuncu` });
+  };
+  const openCasino = (gid: CasinoGame['id']) => {
+    const g = gameCatalog.casino.find((x) => x.id === gid);
+    if (!g) return;
+    setPanel(null);
+    const access = casinoAccess(g, gameEntry, vipLevel);
+    if (!access.ok)
+      return showAlert(g.name, access.reason, access.needVip ? [{ text: 'Kapat', style: 'cancel' }, { text: 'VIP ayrıcalıkları', onPress: () => router.push('/vip') }] : undefined);
+    setGame({ kind: 'casino', id: g.id });
+    setGameMin(false);
+  };
   const menuSections: MenuSection[] = [
     {
       title: 'Etkileşimli Oyunlar',
@@ -871,8 +900,6 @@ export default function VoiceRoom() {
         ...(isOwn && !pk ? [{ key: 'pk', label: 'PK Modu', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: startPk }] : []),
         { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
-        { key: 'dice', label: 'Zar Düellosu', emoji: '🎲', colors: ['#2563EB', '#087A80'], onPress: () => setPanel('dice') },
-        { key: 'wheel', label: 'Şans çarkı', emoji: '🎡', colors: ['#F59E0B', '#C93C4F'], onPress: () => router.push('/cark') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
         { key: 'events', label: 'Aktivite', emoji: '🎉', colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
         ...(canFunctions
@@ -886,10 +913,20 @@ export default function VoiceRoom() {
       ],
     },
     {
-      title: 'Jetonlu Oyunlar',
+      title: 'Oda Oyunları · ücretsiz',
       variant: 'tile',
-      note: GATES.games(svipLevel, nobleTier) ? 'Sonuçlar oyun sağlayıcısı tarafından doğrulanır · jeton harcaması günlük limitine dahildir' : 'SVIP 2 veya Asil Vikont ile açılır · katalog önizleme',
-      items: COIN_GAME_TILES.map((g) => ({ key: g.id, label: g.name, emoji: g.emoji, colors: g.colors, badge: g.badge, onPress: toGames })),
+      note: 'Herkes oynayabilir · oyun açıkken mikrofonun ve koltuğun aynen kalır',
+      items: gameCatalog.roomGames
+        .filter((g) => g.active)
+        .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#0A8F95', '#13D9DF'] as [string, string], badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
+    },
+    {
+      title: 'Casino · VIP2',
+      variant: 'tile',
+      note: vipLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `VIP2 ve üzeri aktif üyelere açık · şu an VIP${vipLevel}`,
+      items: gameCatalog.casino
+        .filter((g) => g.active && g.fromRoom)
+        .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#B7832E', '#F6BD60'] as [string, string], onPress: () => openCasino(g.id) })),
     },
     {
       title: 'Oda Araçları',
@@ -1348,6 +1385,24 @@ export default function VoiceRoom() {
       />
       <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
+      {game && (
+        <GamePanel
+          open={game}
+          entry={gameEntry}
+          players={gamePlayers}
+          hidden={gameMin}
+          voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
+          onSwitch={setGame}
+          onMinimize={() => setGameMin(true)}
+          onClose={() => setGame(null)}
+          onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
+        />
+      )}
+      {game && gameMin && (
+        <Pressable style={styles.gameChip} onPress={() => setGameMin(false)} accessibilityLabel="Oyuna dön">
+          <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>
+        </Pressable>
+      )}
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
       {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>
@@ -1362,6 +1417,8 @@ const styles = StyleSheet.create({
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  gameChip: { position: 'absolute', right: 12, bottom: 96, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, zIndex: 30 },
+  gameChipText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
   callBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: semantic.success, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   callBannerText: { color: semantic.successInk, fontWeight: '800', flex: 1, fontSize: 13 },
   callBannerGo: { color: semantic.successInk, fontWeight: '900' },

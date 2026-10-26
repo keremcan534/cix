@@ -1,10 +1,11 @@
-import { DarkTheme, Stack, ThemeProvider } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import { StatusBar } from "expo-status-bar";
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 
-import { MatchLayer } from "@/components/match-layer";
-import { AppProvider, useApp } from "@/store";
-import { colors } from "@/theme";
+import { GamesBridge } from '@/components/games/bridge';
+import { MatchLayer } from '@/components/match-layer';
+import { AppProvider, useApp } from '@/store';
+import { colors } from '@/theme';
 
 // Keep the splash up until the saved state is loaded, so the app doesn't flash the login screen first.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -14,13 +15,7 @@ const hideSplash = () => {
 
 const theme = {
   ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.bg,
-    card: colors.bg,
-    primary: colors.primaryText,
-    border: colors.border,
-  },
+  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg, primary: colors.primaryText, border: colors.border },
 };
 
 export default function RootLayout() {
@@ -36,32 +31,19 @@ export default function RootLayout() {
 
 function RootStack() {
   const { loggedIn } = useApp();
+  // Hemen Tanış and the game platform live above the stack, so they keep running on every screen.
   return (
     <>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.bg },
-        }}
-      >
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Protected guard={loggedIn}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="oda/[id]"
-            options={{ animation: "slide_from_bottom" }}
-          />
+          <Stack.Screen name="oda/[id]" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="sohbet/[id]" />
-          <Stack.Screen name="cuzdan" options={{ presentation: "modal" }} />
+          <Stack.Screen name="cuzdan" options={{ presentation: 'modal' }} />
           <Stack.Screen name="kullanici/[id]" />
-          <Stack.Screen
-            name="arama/[id]"
-            options={{ animation: "fade", gestureEnabled: false }}
-          />
+          <Stack.Screen name="arama/[id]" options={{ animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="eslesme" />
-          <Stack.Screen
-            name="tanis"
-            options={{ animation: "slide_from_bottom", gestureEnabled: false }}
-          />
+          <Stack.Screen name="tanis" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
           <Stack.Screen name="yayinci/index" />
           <Stack.Screen name="yayinci/cek" />
           <Stack.Screen name="ajans/index" />
@@ -90,12 +72,14 @@ function RootStack() {
           <Stack.Screen name="kabile/iliski" />
           <Stack.Screen name="kabile/kasa" />
           <Stack.Screen name="coins-bank" />
+          <Stack.Screen name="oyun-yonetimi" />
         </Stack.Protected>
         <Stack.Protected guard={!loggedIn}>
           <Stack.Screen name="giris" />
         </Stack.Protected>
       </Stack>
       {loggedIn && <MatchLayer />}
+      {loggedIn && <GamesBridge />}
     </>
   );
 }
