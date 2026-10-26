@@ -31,7 +31,8 @@ export type PermissionKey =
   | 'agencies.coinsbank'
   | 'agencies.payout'
   | 'agencies.performance'
-  | 'games.manage';
+  | 'games.manage'
+  | 'animations.manage';
 
 export const PERMISSIONS: { key: PermissionKey; label: string; group: string; critical?: boolean; minScope?: ScopeType }[] = [
   { key: 'users.view', label: 'Kullanıcıları görüntüle', group: 'Kullanıcı' },
@@ -58,6 +59,7 @@ export const PERMISSIONS: { key: PermissionKey; label: string; group: string; cr
   { key: 'agencies.payout', label: 'Ajans ödeme yetkisi, finansal doğrulama ve ödeme onayı', group: 'Ajans başvurusu', critical: true, minScope: 'platform' },
   { key: 'agencies.performance', label: 'Atanmış ajansların performansını görüntüle', group: 'Ajans başvurusu' },
   { key: 'games.manage', label: 'Oyun kataloğu, VIP şartı, limit ve sağlayıcı ayarları', group: 'Oyun', critical: true, minScope: 'platform' },
+  { key: 'animations.manage', label: 'Animasyon kataloğu, fiyat, lisans ve sağlayıcı yönetimi', group: 'İçerik', critical: true, minScope: 'platform' },
 ];
 export const permLabel = (k: PermissionKey) => PERMISSIONS.find((p) => p.key === k)?.label ?? k;
 export const SCOPE_LABEL: Record<ScopeType, string> = { platform: 'Platform', region: 'Bölge', agency: 'Ajans', room: 'Oda' };

@@ -40,6 +40,7 @@ import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { AnimLayer } from '@/components/fx/anim-layer';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
@@ -52,6 +53,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, useGames } from '@/lib/games';
 import { shareLink } from '@/lib/links';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
@@ -331,6 +333,32 @@ export default function VoiceRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botOn]);
 
+  // --- Animated reactions / effect gifts (central catalog, lib/animations) ----------------------------
+  // Seat position for an animation; listeners send from the bottom of the room.
+  const originOf = (uid: string) =>
+    new Promise<Point | null>((resolve) => {
+      const v = seatViews.get(uid);
+      if (!v) return resolve(uid === 'me' ? { x: win.width / 2, y: win.height - 150 } : null);
+      v.measureInWindow((x, y, w, h) => resolve(w ? { x: x + w / 2, y: y + h / 2 } : null));
+    });
+  const sendAnim = (animationId: string) => {
+    // Only the id goes to the "server"; price, licence and activity are read from the catalog there.
+    const r = sendAnimation(animationId, id, 'me', newAnimRequestId(), { spend: spendCoins, refund: addCoins });
+    if (!r.ok) return showAlert('Gönderilemedi', r.reason);
+    tapHaptic();
+    setEmojiOpen(false);
+    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
+    if (a && r.charged) {
+      addMsg({ system: true, text: `✨ ${ME.name} ${a.name} gönderdi (🪙 ${r.charged.toLocaleString('tr-TR')})` });
+      bump('giftsSent', 1);
+    }
+  };
+  // Mic effect follows actual talking (polled by the layer; never charges, never sends anything).
+  const speakingMe = useRef(false);
+  useEffect(() => {
+    speakingMe.current = speaking.has('me');
+  }, [speaking]);
+
   // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
   const react = (uid: string, emoji: string) => {
     const key = Date.now() + Math.random();
@@ -359,6 +387,17 @@ export default function VoiceRoom() {
     }, 3500);
     return () => clearInterval(t);
   }, [seatedKey, botReactions]);
+  // Others also send animated reactions from their seats; they arrive over the same room bus.
+  useEffect(() => {
+    if (!botReactions) return;
+    const t = setInterval(() => {
+      const seated = seatedKey.split(',').filter(Boolean);
+      const free = getAnimations().catalog.filter((a) => a.display_type === 'reaction' && a.is_free && isLive(a));
+      if (!seated.length || !free.length || Math.random() > 0.4) return;
+      simulateRemoteSend(id, pick(seated), pick(free).animation_id);
+    }, 7000);
+    return () => clearInterval(t);
+  }, [seatedKey, botReactions, id]);
 
   // Fake "who is talking".
   useEffect(() => {
@@ -1133,6 +1172,7 @@ export default function VoiceRoom() {
 
           {emojiOpen && (
             <EmojiPanel
+              onAnimate={sendAnim}
               hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
               onPick={(e) => {
                 if (amSeated) {
@@ -1384,6 +1424,13 @@ export default function VoiceRoom() {
         ]}
       />
       <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
+      <AnimLayer
+        roomId={id}
+        originOf={originOf}
+        lite={settings.lowData}
+        off={settings.effectsOff}
+        micEffect={{ animationId: app.micFx, active: amSeated && micOn && !callActive, isSpeaking: () => speakingMe.current }}
+      />
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
       {game && (
         <GamePanel

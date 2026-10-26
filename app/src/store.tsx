@@ -9,6 +9,7 @@ import {
   type TaskKey,
 } from '@/data/economy';
 import { INITIAL_RBAC, type RbacState } from '@/data/rbac';
+import { animById, isLive } from '@/lib/animations';
 import { NOBLE_DAYS, RECHARGE_PACKS, VIP_PLANS, nobleInfo, svipLevelOf } from '@/data/status';
 import { RULES, type Rules } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
@@ -206,6 +207,12 @@ type AppState = {
   conversations: Conversation[];
   sendMessage: (userId: string, text: string, fromMe?: boolean) => void;
   markRead: (userId: string) => void;
+  /** Mic effects (animation catalog, display_type mic_effect): owned ids and the one in use. */
+  ownedAnims: Set<string>;
+  micFx: string | null;
+  /** Buys (price read from the catalog) or claims a free mic effect, then equips it. */
+  buyMicFx: (animationId: string) => string | null;
+  setMicFx: (animationId: string | null) => void;
   /** "İlk adımlar" card on the home tab: reward claimed once, or hidden by the user. */
   starter: { claimed: boolean; hidden: boolean };
   claimStarter: (reward: number) => void;
@@ -256,6 +263,8 @@ type Snapshot = {
   conversations: Conversation[];
   starter: { claimed: boolean; hidden: boolean };
   safetyLog: SafetyLog[];
+  ownedAnims: string[];
+  micFx: string | null;
 };
 
 const Ctx = createContext<AppState | null>(null);
@@ -460,6 +469,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const logSafety = (action: SafetyLog['action'], targetId?: string, detail?: string) =>
     setSafetyLog((l) => [{ id: uid(), action, targetId, detail, time: `${new Date().toLocaleDateString('tr-TR')} ${now()}` }, ...l].slice(0, 100));
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
+  const [ownedAnims, setOwnedAnims] = useState<Set<string>>(new Set(s.ownedAnims));
+  const [micFx, setMicFx] = useState<string | null>(s.micFx ?? null);
 
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
   // are not resumed after a restart; their records keep the last saved status.
@@ -469,7 +480,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     myRoom, isHost, diamonds, totalDiamonds, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
-    following: [...following], blocked: [...blocked], conversations, starter, safetyLog,
+    following: [...following], blocked: [...blocked], conversations, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -846,6 +857,19 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       }),
     markRead: (userId) =>
       setConversations((prev) => prev.map((c) => (c.userId === userId ? { ...c, unread: 0 } : c))),
+    ownedAnims,
+    micFx,
+    buyMicFx: (animationId) => {
+      const a = animById(animationId);
+      if (!a || a.display_type !== 'mic_effect' || !isLive(a)) return 'Bu efekt şu an satışta değil.';
+      if (!ownedAnims.has(animationId)) {
+        if (!a.is_free && !spend(a.coin_price, `Mikrofon efekti: ${a.name}`)) return 'Yetersiz jeton.';
+        setOwnedAnims((o) => new Set(o).add(animationId));
+      }
+      setMicFx(animationId);
+      return null;
+    },
+    setMicFx,
     starter,
     claimStarter: (reward) => {
       if (starter.claimed) return;
