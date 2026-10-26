@@ -172,7 +172,7 @@ function Message({ item }: { item: GroupMsg }) {
         <Text style={styles.systemText}>{item.text}</Text>
         {item.actionLabel && item.actionHref && (
           <Pressable onPress={() => router.push(item.actionHref as Href)}>
-            <Text style={{ color: '#C4B5FD', fontWeight: '800', marginTop: 4 }}>{item.actionLabel}</Text>
+            <Text style={{ color: '#A5F3F5', fontWeight: '800', marginTop: 4 }}>{item.actionLabel}</Text>
           </Pressable>
         )}
       </View>
@@ -228,22 +228,22 @@ const styles = StyleSheet.create({
   section: { color: colors.textDim, fontWeight: '800', fontSize: 12, textTransform: 'uppercase' },
   dim: { color: colors.textDim, fontSize: 12 },
   member: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  pinBox: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(139,92,246,0.15)', borderRadius: 12, padding: 10, gap: 8 },
-  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: 'rgba(139,92,246,0.5)' },
+  pinBox: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(19,217,223,0.15)', borderRadius: 12, padding: 10, gap: 8 },
+  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: 'rgba(19,217,223,0.5)' },
   strip: { gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
   chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 64 },
-  chipParty: { backgroundColor: '#A855F7' },
+  chipParty: { backgroundColor: '#0FB8BE' },
   chipBusy: { backgroundColor: '#F59E0B' },
   system: { alignSelf: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 12, maxWidth: '90%', alignItems: 'center' },
   systemText: { color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   bubble: { backgroundColor: colors.cardAlt, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, maxWidth: '75%', gap: 2 },
-  name: { color: '#C4B5FD', fontWeight: '700', fontSize: 12 },
+  name: { color: '#A5F3F5', fontWeight: '700', fontSize: 12 },
   time: { color: 'rgba(255,255,255,0.55)', fontSize: 11, alignSelf: 'flex-end' },
   quick: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   quickTag: { position: 'absolute', top: -9, right: 8, color: colors.gold, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   input: { flex: 1, minWidth: 0, backgroundColor: colors.card, color: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
   send: { backgroundColor: colors.primary, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  goBtn: { backgroundColor: '#A855F7', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
 });

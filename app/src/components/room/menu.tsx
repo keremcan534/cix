@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradientDeep, semantic } from '@/theme';
 
 export type MenuItem = {
   key: string;
@@ -63,7 +63,7 @@ function Icon({ item, variant }: { item: MenuItem; variant: MenuSection['variant
           {item.icon ? <Ionicons name={item.icon} size={28} color="#fff" /> : <Text style={{ fontSize: 26 }}>{item.emoji}</Text>}
         </View>
       ) : (
-        <LinearGradient colors={item.colors ?? gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, borderRadius: radius, alignItems: 'center', justifyContent: 'center' }}>
+        <LinearGradient colors={item.colors ?? gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, borderRadius: radius, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: variant === 'tile' ? 38 : 30 }}>{item.emoji}</Text>
         </LinearGradient>
       )}

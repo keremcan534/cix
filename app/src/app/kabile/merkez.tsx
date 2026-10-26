@@ -116,7 +116,7 @@ export default function KabileMerkez() {
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)}>
-          <LinearGradient colors={['#4C1D95', '#831843']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.treasury}>
+          <LinearGradient colors={['#0B3B4A', '#831843']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.treasury}>
             <View style={styles.treasureBadge}>
               <Text style={styles.treasureLabel}>Kabile Hazinesi</Text>
               <Text style={styles.treasureValue}>🔮 {fmt(treasure)}</Text>
@@ -137,7 +137,7 @@ export default function KabileMerkez() {
           <View style={styles.row}>
             <Text style={{ fontSize: 40 }}>🛡️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: '#C4B5FD', fontWeight: '600' }}>Kabile haftalık savaş gücü</Text>
+              <Text style={{ color: '#A5F3F5', fontWeight: '600' }}>Kabile haftalık savaş gücü</Text>
               <Text style={styles.bigPower}>⚔ {fmtK(weekly)}</Text>
             </View>
             <View style={styles.mineBox}>
@@ -261,16 +261,16 @@ const styles = StyleSheet.create({
   chests: { flexDirection: 'row', gap: 8 },
   chest: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4, gap: 4 },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border },
-  chestNeed: { color: '#C4B5FD', fontSize: 12, fontWeight: '800' },
+  chestNeed: { color: '#A5F3F5', fontSize: 12, fontWeight: '800' },
   chestReward: { color: colors.textDim, fontSize: 11, textAlign: 'center', minHeight: 26 },
   alBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5, minWidth: 54, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   lvChip: { color: '#fff', fontWeight: '800', fontSize: 12, backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   task: { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 12, gap: 8, marginTop: 6 },
-  taskIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(139,92,246,0.2)', alignItems: 'center', justifyContent: 'center' },
+  taskIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(19,217,223,0.2)', alignItems: 'center', justifyContent: 'center' },
   taskTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  reward: { color: '#C4B5FD', fontWeight: '700', fontSize: 13 },
-  rateText: { color: '#C4B5FD', fontSize: 12, lineHeight: 17 },
+  reward: { color: '#A5F3F5', fontWeight: '700', fontSize: 13 },
+  rateText: { color: '#A5F3F5', fontSize: 12, lineHeight: 17 },
   hint: { color: colors.textDim, fontSize: 12, fontStyle: 'italic' },
   taskBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minWidth: 74, alignItems: 'center' },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },

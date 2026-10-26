@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  headerSub: { color: '#C4B5FD', fontSize: 12, fontWeight: '600', marginTop: 1 },
+  headerSub: { color: '#A5F3F5', fontSize: 12, fontWeight: '600', marginTop: 1 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   locked: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 12 },
   title: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center' },

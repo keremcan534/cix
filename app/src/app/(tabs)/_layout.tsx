@@ -21,7 +21,7 @@ function icon(name: IconName, active: IconName) {
 function RoomsIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
   if (!focused) return <Ionicons name="home-outline" size={26} color={color as string} />;
   return (
-    <LinearGradient colors={['#8B5CF6', '#6D28D9']} style={{ width: 62, height: 62, borderRadius: 31, marginTop: -28, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.card }}>
+    <LinearGradient colors={['#0A8F95', '#076A70']} style={{ width: 62, height: 62, borderRadius: 31, marginTop: -28, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.card }}>
       <Ionicons name="stats-chart" size={24} color="#fff" />
     </LinearGradient>
   );

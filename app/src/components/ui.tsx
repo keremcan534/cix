@@ -77,7 +77,7 @@ export function Button({
 }) {
   const raised = variant === 'hero' || variant === 'money';
   const edge = small ? 3 : 4;
-  const fg = variant === 'money' ? semantic.moneyInk : variant === 'tonal' ? semantic.tonalText : variant === 'ghost' ? colors.primaryText : variant === 'danger' ? semantic.danger : '#fff';
+  const fg = variant === 'money' ? semantic.moneyInk : variant === 'tonal' ? semantic.tonalText : variant === 'ghost' ? colors.primaryText : variant === 'danger' ? semantic.danger : semantic.actionInk;
   const body = [styles.btn, small && styles.btnSmall, !raised && { backgroundColor: variant === 'tonal' ? semantic.tonal : 'transparent' }, variant === 'danger' && styles.btnDanger];
   const label = (
     <>
@@ -221,7 +221,7 @@ export function LevelChips({ wealth, charm }: { wealth: number; charm: number })
       <View style={[styles.levelChip, { backgroundColor: 'rgba(251,191,36,0.18)' }]}>
         <Text style={[styles.levelChipText, { color: colors.gold }]}>💰 Lv.{wealth}</Text>
       </View>
-      <View style={[styles.levelChip, { backgroundColor: 'rgba(236,72,153,0.18)' }]}>
+      <View style={[styles.levelChip, { backgroundColor: 'rgba(255,101,118,0.18)' }]}>
         <Text style={[styles.levelChipText, { color: '#F9A8D4' }]}>✨ Lv.{charm}</Text>
       </View>
     </View>

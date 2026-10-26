@@ -161,7 +161,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
 }
 
 const styles = StyleSheet.create({
-  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: 'rgba(139,92,246,0.18)' },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: 'rgba(19,217,223,0.18)' },
   previewText: { color: colors.primaryText, fontWeight: '700', fontSize: 12 },
   entryPreview: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, borderRadius: 20, paddingHorizontal: 10, marginVertical: 12, maxWidth: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   entryPreviewText: { color: '#fff', fontWeight: '800', fontSize: 12, flexShrink: 1 },

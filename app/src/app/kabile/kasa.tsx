@@ -56,7 +56,7 @@ export default function KabileKasa() {
         }
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-        <LinearGradient colors={['#78350F', '#4C1D95']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={['#78350F', '#0B3B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <Text style={{ fontSize: 56 }}>🧰</Text>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={styles.heroText}>Sandık Değeri {fmt(meta.chestValue)} 🪙</Text>
@@ -98,7 +98,7 @@ export default function KabileKasa() {
                 <Text style={[styles.rank, i < 3 && { color: colors.gold }]}>{i + 1}</Text>
                 <Avatar uri={u.avatar} size={34} />
                 <Text style={{ color: '#fff', flex: 1 }}>{r.id === 'me' ? `${me.name} (sen)` : u.name}</Text>
-                <Text style={{ color: '#C4B5FD', fontWeight: '800' }}>⚔ {fmt(r.power)}</Text>
+                <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>⚔ {fmt(r.power)}</Text>
               </Pressable>
             );
           })}
@@ -139,7 +139,7 @@ function HistoryRow({ avatar, name, text, power, treasure, time }: { avatar: str
         </Text>
         <Text style={styles.dim}>{time}</Text>
       </View>
-      <Text style={{ color: '#C4B5FD', fontWeight: '700', fontSize: 12 }}>
+      <Text style={{ color: '#A5F3F5', fontWeight: '700', fontSize: 12 }}>
         ⚔+{power} 🔮+{treasure}
       </Text>
     </View>

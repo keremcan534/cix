@@ -14,11 +14,11 @@ export type EntryShow = { name: string; avatar: string; fx: EntryFx; ride?: stri
 
 type Look = { colors: readonly [string, string, string]; particle: string[]; mark: string; creature?: string; flash?: boolean };
 export const ENTRY_LOOKS: Record<EntryFx, Look> = {
-  sparkle: { colors: ['#4C1D95', '#7C3AED', '#0F766E'], particle: ['#5EEAD4', '#FFFFFF', '#C4B5FD'], mark: '✨' },
+  sparkle: { colors: ['#0B3B4A', '#087A80', '#0FB8BE'], particle: ['#A5F3F5', '#FFFFFF', '#F6BD60'], mark: '✨' },
   thunder: { colors: ['#172554', '#1D4ED8', '#38BDF8'], particle: ['#E0F2FE', '#FDE047', '#FFFFFF'], mark: '⚡', flash: true },
   dragon: { colors: ['#450A0A', '#B91C1C', '#EA580C'], particle: ['#FDE047', '#F97316', '#FECACA'], mark: '🔥', creature: '🐉' },
-  comet: { colors: ['#0B1022', '#312E81', '#7C3AED'], particle: ['#C7D2FE', '#FFFFFF', '#A78BFA'], mark: '🌠', creature: '☄️' },
-  vip: { colors: ['#1E1B4B', '#4338CA', '#818CF8'], particle: ['#E0E7FF', '#FFFFFF', '#A5B4FC'], mark: '💠' },
+  comet: { colors: ['#080F1E', '#12304A', '#0A8F95'], particle: ['#CFFAFE', '#FFFFFF', '#13D9DF'], mark: '🌠', creature: '☄️' },
+  vip: { colors: ['#3B2A12', '#8A5A1C', '#C98A2E'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '👑' },
 };
 const TOTAL_MS = 3200;
 const BURST = 12;

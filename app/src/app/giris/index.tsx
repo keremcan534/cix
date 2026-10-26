@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
 import { USERS } from '@/data/mock';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 // Avatars floating around the logo: [user index, size, top %, left %]
 const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
@@ -32,7 +32,7 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <LinearGradient colors={['#2B1259', colors.bg, colors.bg]} style={{ flex: 1 }}>
+    <LinearGradient colors={['#0B3B4A', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.hero}>
           {BUBBLES.map(([i, size, top, left]) => (
@@ -42,7 +42,7 @@ export default function WelcomeScreen() {
           ))}
           <View style={styles.center}>
             <LinearGradient colors={gradient} style={styles.logoMark}>
-              <Ionicons name="mic" size={44} color="#fff" />
+              <Ionicons name="mic" size={44} color={semantic.actionInk} />
             </LinearGradient>
             <Text style={styles.logo}>Similar Club</Text>
             <Text style={styles.tagline}>Sesli odalarda yeni insanlarla tanış,{'\n'}sohbet et, eğlen.</Text>
@@ -97,5 +97,5 @@ const styles = StyleSheet.create({
   },
   socialText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   terms: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 16, marginTop: 4 },
-  link: { color: '#C4B5FD', fontWeight: '600' },
+  link: { color: '#A5F3F5', fontWeight: '600' },
 });

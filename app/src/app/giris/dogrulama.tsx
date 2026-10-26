@@ -76,7 +76,7 @@ export default function VerifyScreen() {
           <View style={{ gap: 10, alignSelf: 'stretch', paddingHorizontal: 30 }}>
             {TIPS.map((t) => (
               <View key={t.text} style={styles.tip}>
-                <Ionicons name={t.icon} size={18} color="#C4B5FD" />
+                <Ionicons name={t.icon} size={18} color="#A5F3F5" />
                 <Text style={styles.tipText}>{t.text}</Text>
               </View>
             ))}

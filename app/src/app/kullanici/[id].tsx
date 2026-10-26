@@ -30,7 +30,7 @@ import {
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { useApp, type FanClub } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradientDeep, semantic } from '@/theme';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -178,7 +178,7 @@ export default function UserProfile() {
         {/* Cover + header */}
         <View>
           <Image source={{ uri: user.avatar.replace('200', '800') }} style={styles.cover} />
-          <LinearGradient colors={['rgba(18,11,36,0.55)', 'transparent', 'rgba(18,11,36,0.6)']} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(8,15,30,0.55)', 'transparent', 'rgba(8,15,30,0.6)']} style={StyleSheet.absoluteFill} />
           {isMe && (
             <Pressable style={[styles.voicePill, { top: insets.top + 58 }]} onPress={() => showAlert('Ses tanıtımı', 'Profilin için 15 saniyelik bir ses tanıtımı kaydı yakında burada olacak.')}>
               <View style={styles.micDot}>
@@ -209,7 +209,7 @@ export default function UserProfile() {
                 </View>
               </View>
               <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                <View style={[styles.genderChip, { backgroundColor: user.gender === 'Kadın' ? colors.pink : '#38BDF8' }]}>
+                <View style={[styles.genderChip, { backgroundColor: user.gender === 'Kadın' ? semantic.socialFill : '#0369A1' }]}>
                   <Text style={styles.genderText}>
                     {user.gender === 'Kadın' ? '♀' : '♂'} {user.age}
                   </Text>
@@ -637,7 +637,7 @@ function BarButton({ icon, label, onPress, highlight }: { icon: keyof typeof Ion
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 2 }} accessibilityLabel={label}>
       {highlight ? (
-        <LinearGradient colors={gradient} style={styles.roundBtn}>
+        <LinearGradient colors={gradientDeep} style={styles.roundBtn}>
           <Ionicons name={icon} size={21} color="#fff" />
         </LinearGradient>
       ) : (
@@ -670,7 +670,7 @@ function SectionTitle({ title, onPress, right }: { title: string; onPress?: () =
 function InfoBox({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
   return (
     <View style={styles.infoBox}>
-      <LinearGradient colors={['#A78BFA', colors.primary]} style={styles.infoIcon}>
+      <LinearGradient colors={['#13D9DF', colors.primary]} style={styles.infoIcon}>
         <Ionicons name={icon} size={20} color="#fff" />
       </LinearGradient>
       <Text style={{ color: '#E9E4FF', flex: 1, fontSize: 14 }}>{text}</Text>
@@ -836,7 +836,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
 
       <WallBanner
         title="Unvan Duvarı"
-        colors={['#4C1D95', '#7C3AED', '#4C1D95']}
+        colors={['#0B3B4A', '#087A80', '#0B3B4A']}
         subtitle="Yalnızca dinamik unvanları göster"
         onPress={explain('Unvan Duvarı', 'Sıralamalarda ve etkinliklerde derece yaparak unvan kazan.')}
         right={
@@ -936,7 +936,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
 
   return (
     <View style={{ padding: 16 }}>
-      <LinearGradient colors={['#4A1D6E', '#2A1F4A', colors.card]} style={styles.relCard}>
+      <LinearGradient colors={['#5A2232', '#2A1A24', colors.card]} style={styles.relCard}>
         <View style={styles.row}>
           <Pressable style={styles.relIcon} onPress={() => router.push('/magaza')} accessibilityLabel="Mağaza">
             <Ionicons name="storefront" size={18} color="#fff" />
@@ -973,7 +973,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
         {isMe && (
           <Pressable style={[styles.row, { alignSelf: 'flex-end', marginTop: 10 }]} onPress={() => setTop1Only((v) => !v)}>
             <Ionicons name={top1Only ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={colors.primaryText} />
-            <Text style={{ color: '#C4B5FD', fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
+            <Text style={{ color: '#A5F3F5', fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
           </Pressable>
         )}
         {isMe && hidden && <Text style={[styles.meta, { marginTop: 6, textAlign: 'right', fontSize: 12 }]}>İlişkilerin diğer kullanıcılardan gizli.</Text>}
@@ -1023,7 +1023,7 @@ function RelationRow({ user, relation, kind, canWed }: { user: User; relation: R
         </View>
         <View style={{ alignItems: 'center' }}>
           <Text style={{ fontSize: 40 }}>{kind === 'cp' ? '💖' : '🤝'}</Text>
-          <LinearGradient colors={['#F472B6', '#A855F7']} style={styles.daysPill}>
+          <LinearGradient colors={['#FF8A97', '#0FB8BE']} style={styles.daysPill}>
             <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{relation.days} gün</Text>
           </LinearGradient>
           {relation.label && <Text style={[styles.meta, { fontSize: 12, marginTop: 2 }]}>{relation.label}</Text>}
@@ -1055,7 +1055,7 @@ function RelationRow({ user, relation, kind, canWed }: { user: User; relation: R
 function InviteButton({ icon, title, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}>
-      <LinearGradient colors={['#F472B6', colors.pink]} style={styles.inviteBtn}>
+      <LinearGradient colors={[semantic.socialFill, '#A82F42']} style={styles.inviteBtn}>
         <Ionicons name={icon} size={18} color="#fff" />
         <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{title}</Text>
       </LinearGradient>
@@ -1190,7 +1190,7 @@ const styles = StyleSheet.create({
   familyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 12 },
   familyEmoji: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   leaderTag: { color: colors.gold, fontWeight: '800', fontSize: 12 },
-  fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: 'rgba(236,72,153,0.4)' },
+  fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: 'rgba(255,101,118,0.4)' },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   photo: { width: 110, height: 110, borderRadius: 12 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 4 },
@@ -1222,7 +1222,7 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.primary },
   segmentText: { color: colors.textDim, fontWeight: '800', fontSize: 15 },
   relRow: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: 12, paddingTop: 22 },
-  relLv: { position: 'absolute', top: 6, left: 8, backgroundColor: colors.pink, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
+  relLv: { position: 'absolute', top: 6, left: 8, backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
   relLvText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   relPair: { flexDirection: 'row', alignItems: 'center' },
   relName: { color: '#fff', fontSize: 13, fontWeight: '600', maxWidth: 90 },
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
   slotNo: { color: colors.pink, fontSize: 15, fontWeight: '700', width: 16, textAlign: 'center' },
   inviteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
-  followBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: 23, backgroundColor: colors.pink },
+  followBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: 23, backgroundColor: semantic.socialFill },
   followingBtn: { backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   followText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
@@ -1244,6 +1244,6 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.cardAlt, alignItems: 'center' },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14 },
-  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: 'rgba(168,85,247,0.15)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#A855F7' },
-  presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#A855F7', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
+  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: 'rgba(19,217,223,0.15)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#0FB8BE' },
+  presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
 });

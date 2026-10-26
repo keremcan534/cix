@@ -87,7 +87,7 @@ export default function IncomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
-        <LinearGradient colors={['#262C4D', '#181C33']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
+        <LinearGradient colors={['#1F3050', '#16253C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Pressable onPress={info} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={styles.balanceLabel}>Mevcut Elmaslar {usd(diamonds)}</Text>
             <Ionicons name="help-circle-outline" size={18} color="rgba(255,255,255,0.9)" />
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  sender: { color: '#C084FC', fontWeight: '700' },
+  sender: { color: '#5EEAF0', fontWeight: '700' },
   amount: { color: '#fff', fontWeight: '800', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 13 },
 });

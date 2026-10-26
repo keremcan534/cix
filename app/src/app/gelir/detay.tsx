@@ -179,7 +179,7 @@ function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () 
               <Text style={styles.rowTitle}>
                 {g.label} x{g.count}
               </Text>
-              <Text style={{ color: '#C084FC', fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: '#5EEAF0', fontWeight: '600' }} numberOfLines={1}>
                 {top.map(([id, n]) => `${userById(id).name} (${n})`).join(', ') || '—'}
               </Text>
             </View>
@@ -198,7 +198,7 @@ function Empty({ onRetry }: { onRetry: () => void }) {
       <Text style={[styles.dim, { fontSize: 15 }]}>Veri yok</Text>
       <Text style={[styles.dim, { textAlign: 'center' }]}>Lütfen Yeniden Dene butonuna tıklayın{'\n'}veya listeyi aşağı çekerek yenileyin</Text>
       <Pressable onPress={onRetry} style={styles.retry}>
-        <Text style={{ color: '#C084FC', fontWeight: '800', fontSize: 16 }}>Yeniden dene</Text>
+        <Text style={{ color: '#5EEAF0', fontWeight: '800', fontSize: 16 }}>Yeniden dene</Text>
       </Pressable>
     </View>
   );

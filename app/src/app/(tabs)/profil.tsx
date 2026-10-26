@@ -111,8 +111,8 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#5B3FA8', '#2E2266']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
-            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün` : 'VIP değil'} colors={['#5B6478', '#2C3245']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
+            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#0A8F95', '#0B3B4A']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün` : 'VIP değil'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
             <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz Alınmadı'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
         </View>
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 18, marginHorizontal: 16, padding: 14, gap: 12 },
   rechargeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   h2: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  rewardTag: { color: '#F472B6', backgroundColor: 'rgba(244,114,182,0.15)', fontWeight: '800', fontSize: 12, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  rewardTag: { color: '#FF8A97', backgroundColor: 'rgba(255,138,151,0.15)', fontWeight: '800', fontSize: 12, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto' },
   status: { borderRadius: 14, padding: 12, minHeight: 74, justifyContent: 'center', gap: 4 },
   statusTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },

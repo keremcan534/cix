@@ -71,7 +71,7 @@ export default function Leaderboard() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 8 }}
         ListHeaderComponent={
-          <LinearGradient colors={['#2B1259', colors.bg]} style={styles.podium}>
+          <LinearGradient colors={['#0B3B4A', colors.bg]} style={styles.podium}>
             {second && <Podium row={second} place={2} unit={unit} onPress={() => open(second)} />}
             {first && <Podium row={first} place={1} unit={unit} onPress={() => open(first)} />}
             {third && <Podium row={third} place={3} unit={unit} onPress={() => open(third)} />}

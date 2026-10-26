@@ -13,12 +13,12 @@ export type FrameFx = 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown';
 type FrameLook = { ring: string[]; glow: string; spinMs: number; label: string };
 export const FRAME_LOOKS: Record<FrameFx, FrameLook> = {
   // Sound: turquoise ripples, the app's signature.
-  pulse: { ring: ['#2DD4BF', '#7C3AED', '#2DD4BF', '#5EEAD4'], glow: '#2DD4BF', spinMs: 3600, label: 'Ses dalgası' },
-  orbit: { ring: ['#38BDF8', '#A78BFA', '#E0F2FE', '#38BDF8'], glow: '#38BDF8', spinMs: 3000, label: 'Dönen ışıklar' },
-  aurora: { ring: ['#2DD4BF', '#A78BFA', '#F472B6', '#FDE68A', '#2DD4BF'], glow: '#A78BFA', spinMs: 4200, label: 'Renk geçişi + kıvılcım' },
+  pulse: { ring: ['#13D9DF', '#076A70', '#13D9DF', '#A5F3F5'], glow: '#13D9DF', spinMs: 3600, label: 'Ses dalgası' },
+  orbit: { ring: ['#38BDF8', '#13D9DF', '#E0F2FE', '#38BDF8'], glow: '#38BDF8', spinMs: 3000, label: 'Dönen ışıklar' },
+  aurora: { ring: ['#13D9DF', '#38BDF8', '#FF6576', '#F6BD60', '#13D9DF'], glow: '#13D9DF', spinMs: 4200, label: 'Renk geçişi + kıvılcım' },
   flame: { ring: ['#F97316', '#EF4444', '#FDE047', '#F97316', '#B91C1C'], glow: '#F97316', spinMs: 2200, label: 'Alev + kor' },
-  // Status is metallic, never money-gold.
-  crown: { ring: ['#F8FAFC', '#A5B4FC', '#E2E8F0', '#818CF8', '#F8FAFC'], glow: '#C7D2FE', spinMs: 5200, label: 'Platin + taç' },
+  // Status (VIP) is gold in palette v2.
+  crown: { ring: ['#FDE68A', '#E89B2C', '#FFF7E0', '#B7832E', '#FDE68A'], glow: '#F6BD60', spinMs: 5200, label: 'Altın + taç' },
 };
 
 /** A 0→1 linear loop on the native driver; frozen at `rest` when motion is reduced. */
@@ -148,7 +148,7 @@ export function AnimatedFrame({ fx, size, still, children }: { fx: FrameFx; size
                 width: size * 0.09,
                 height: size * 0.09,
                 borderRadius: size,
-                backgroundColor: i === 2 ? '#A78BFA' : '#E0F2FE',
+                backgroundColor: i === 2 ? '#13D9DF' : '#E0F2FE',
                 shadowColor: '#38BDF8',
                 shadowOpacity: 0.9,
                 shadowRadius: 6,
@@ -175,7 +175,7 @@ export function AnimatedFrame({ fx, size, still, children }: { fx: FrameFx; size
                 left: x * size - size * 0.1,
                 top: y * size - size * 0.12,
                 fontSize: Math.max(9, size * 0.2),
-                color: i % 2 ? '#FFFFFF' : fx === 'crown' ? '#C7D2FE' : '#5EEAD4',
+                color: i % 2 ? '#FFFFFF' : fx === 'crown' ? '#FDE68A' : '#7DEBEF',
                 opacity: t.interpolate({ inputRange: [0, 0.3, 0.6, 1], outputRange: [0, 1, 0, 0] }),
                 transform: [{ scale: t.interpolate({ inputRange: [0, 0.3, 0.6, 1], outputRange: [0.3, 1, 0.3, 0.3] }) }, { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) }],
               }}

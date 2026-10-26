@@ -11,7 +11,7 @@ import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimac
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradientDeep, semantic } from '@/theme';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
@@ -129,7 +129,7 @@ export default function MessagesScreen() {
         <View style={styles.systemCard}>
           <SystemRow
             icon={<Ionicons name="mic" size={22} color="#fff" />}
-            iconColors={gradient}
+            iconColors={gradientDeep}
             title="Parti Odası"
             subtitle={lastRoom ? `Katıldığın oda çok aktif! · ${lastRoom.title}` : 'Katıldığın oda çok aktif!'}
             onPress={openParty}
@@ -146,7 +146,7 @@ export default function MessagesScreen() {
           <View style={styles.sep} />
           <SystemRow
             icon={<Ionicons name="eye" size={22} color="#fff" />}
-            iconColors={['#F472B6', '#EC4899']}
+            iconColors={['#FF8A97', '#FF6576']}
             title="Profilimi Kimler Ziyaret Etti"
             subtitle="O çok utangaç, sık sık seni gizlice ziyaret ediyor"
             onPress={openVisitors}
@@ -393,7 +393,7 @@ function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }
       <View style={{ alignItems: 'flex-end', gap: 6 }}>
         <Text style={styles.time}>{call.time}</Text>
         <Pressable onPress={onCallBack} hitSlop={6} accessibilityLabel={`${u.name} kişisini geri ara`}>
-          <LinearGradient colors={gradient} style={styles.roundBtn}>
+          <LinearGradient colors={gradientDeep} style={styles.roundBtn}>
             <Ionicons name={video ? 'videocam' : 'call'} size={16} color="#fff" />
           </LinearGradient>
         </Pressable>
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: 'rgba(139,92,246,0.18)',
+    backgroundColor: 'rgba(19,217,223,0.18)',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 1,

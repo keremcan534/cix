@@ -21,7 +21,7 @@ export default function UserLevel() {
       <Header title="Kullanıcı Seviyesi" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <LevelCard title="💰 Servet seviyesi" level={wealthLevel(spentTotal)} value={spentTotal} base={100} unit="🪙 harcama" colors={['#F59E0B', '#B45309']} how="Odalarda ve aramalarda geçerli jeton harcaması. İade edilen hediyeler düşülür." />
-        <LevelCard title="✨ Çekicilik seviyesi" level={charmLevel(totalDiamonds)} value={totalDiamonds} base={200} unit="💎 alınan" colors={['#EC4899', '#7C3AED']} how="Aldığın geçerli hediyelerden gelen elmaslar." />
+        <LevelCard title="✨ Çekicilik seviyesi" level={charmLevel(totalDiamonds)} value={totalDiamonds} base={200} unit="💎 alınan" colors={['#FF6576', '#087A80']} how="Aldığın geçerli hediyelerden gelen elmaslar." />
         <Pressable onPress={() => router.push('/vip')} style={styles.card} accessibilityLabel="Ayrıcalıklarım">
           <Text style={styles.title}>Ayrıcalıklarım</Text>
           <Text style={styles.row}>

@@ -8,10 +8,10 @@ import { ROOMS, userById, type Room } from '@/data/mock';
 export type RankCard = { key: string; title: string; board: string; colors: readonly [string, string]; avatars: string[] };
 const topRoomCovers = [...ROOMS].sort((a, b) => b.listeners - a.listeners).slice(0, 3).map((r) => r.cover);
 export const RANK_CARDS: RankCard[] = [
-  { key: 'cazibe', title: 'Cazibe Listesi', board: 'yayinci', colors: ['#5A1F4B', '#2A1838'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
+  { key: 'cazibe', title: 'Cazibe Listesi', board: 'yayinci', colors: ['#5A2232', '#2A1A24'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
   { key: 'zengin', title: 'Zenginlik Sıralaması', board: 'zengin', colors: ['#5C4012', '#2E2414'], avatars: LEADERBOARDS.zengin.daily.slice(0, 3).map((r) => r.user.avatar) },
-  { key: 'oda', title: 'Oda Sıralaması', board: 'oda', colors: ['#24346E', '#1A2140'], avatars: topRoomCovers },
-  { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#4B2266', '#221A3D'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
+  { key: 'oda', title: 'Oda Sıralaması', board: 'oda', colors: ['#0B4F63', '#12304A'], avatars: topRoomCovers },
+  { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#0B3B4A', '#16253C'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
 ];
 
 // --- Category tabs --------------------------------------------------------------------------
@@ -59,7 +59,7 @@ export const roomBadge = (id: string): RoomBadge | null => {
   const agency = x.agencyId ? AGENCIES.find((a) => a.id === x.agencyId) : undefined;
   if (agency) return { emoji: agency.logo, label: agency.name, colors: ['#B45309', '#7C2D12'] };
   const family = x.familyId ? FAMILIES.find((f) => f.id === x.familyId) : undefined;
-  if (family) return { emoji: family.emoji, label: family.name, colors: ['#7C3AED', '#4C1D95'] };
+  if (family) return { emoji: family.emoji, label: family.name, colors: ['#087A80', '#0B3B4A'] };
   return null;
 };
 
@@ -110,7 +110,7 @@ export const ROOM_BANNER = {
   title: 'Mikrofon Pozisyonu Yükseltmesi Seni Bekliyor',
   sub: 'Oda seviyeni yükselt, daha fazla mikrofon aç',
   emoji: '🎤',
-  colors: ['#2563EB', '#7C3AED'] as const,
+  colors: ['#2563EB', '#087A80'] as const,
 };
 
 // --- Calendar (events) ------------------------------------------------------------------------
