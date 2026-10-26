@@ -110,3 +110,11 @@ export const LEADERBOARDS = {
 // Bot gifts while the user hosts a room / is in a call.
 // Every price here must exist in GIFTS (oda/[id] looks the gift up by price); keep them modest (≤ 500).
 export const INCOMING_GIFT_POOL = [10, 10, 10, 50, 50, 99, 99, 200, 500];
+
+// Hemen Tanış (random voice/video match). Voice and video are priced separately; the meter starts only
+// when the call is actually connected (searching and waiting for acceptance are free). The first minute
+// is charged on connect and refunded if the call drops within MATCH_GRACE_SECONDS; then every started
+// minute is charged at its start. Server-side in production (it owns the clock and the ledger).
+export const MATCH_PRICE = { voice: 20, video: 40 } as const; // coins per minute
+export const MATCH_GRACE_SECONDS = 10;
+export const MATCH_ACCEPT_SECONDS = 15;

@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -50,9 +51,10 @@ import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, ROOMS, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { shareLink } from '@/lib/links';
+import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { colors, gradient, semantic } from '@/theme';
 
 const PK_SECONDS = 60;
 const DAILY_DICE = 20;
@@ -120,8 +122,12 @@ export default function VoiceRoom() {
   }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride, app.me.avatar]);
 
   const [unlocked, setUnlocked] = useState(!password);
-  const [seats, setSeats] = useState<(string | null)[]>(() => pad(isOwn ? ['me'] : base!.seatUserIds, capacity));
-  const [micOn, setMicOn] = useState(isOwn);
+  // Entering a room while a one-to-one call is live: join as a listener, never on a mic (lib/media).
+  const [joinedInCall] = useState(() => !!getMedia().call);
+  const [seats, setSeats] = useState<(string | null)[]>(() => pad(isOwn ? (joinedInCall ? [] : ['me']) : base!.seatUserIds, capacity));
+  const [micOn, setMicOn] = useState(isOwn && !joinedInCall);
+  // Room camera (video seat). Only while seated; turned off when a one-to-one call takes the devices.
+  const [camOn, setCamOn] = useState(false);
   const [mutedUsers, setMutedUsers] = useState<Set<string>>(new Set());
   const [kicked, setKicked] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
@@ -132,6 +138,7 @@ export default function VoiceRoom() {
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
     ...(botOn ? [{ id: 'bot0', bot: true, text: `Merhaba ${ME.name}! ${BOT_TIPS[0]}` }] : []),
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
+    ...(joinedInCall ? [{ id: 'incall', system: true, text: '📞 Bire bir görüşmedesin; odaya dinleyici olarak katıldın. Görüşme bitince mikrofon isteyebilirsin.' }] : []),
     // Arrived by following someone from a profile / agency / tribe chat.
     ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek odaya katıldı` }] : []),
     ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girişle girdin. Diğer kullanıcılar katıldığını görmez; moderasyon kayıtlarında görünürsün.' }] : []),
@@ -201,6 +208,53 @@ export default function VoiceRoom() {
   const mySeat = allSeats.indexOf('me');
   const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
+
+  // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
+  const media = useMedia();
+  const callActive = !!media.call;
+  useEffect(() => {
+    reportRoom({ roomId: id, title, seated: amSeated, micOn: amSeated && micOn, camOn: amSeated && camOn });
+  }, [id, title, amSeated, micOn, camOn]);
+  useEffect(() => () => leaveRoom(id), [id]);
+  // Derived transition when a call starts or ends: I stay in the room, but the call owns mic and camera.
+  const [sawCall, setSawCall] = useState(callActive);
+  if (callActive !== sawCall) {
+    setSawCall(callActive);
+    if (callActive) {
+      const wasSeated = amSeated;
+      const hadCam = camOn;
+      setSeats((st) => pad(st, capacity).map((x) => (x === 'me' ? null : x)));
+      if (bossId === 'me') setBossRemoved((b) => new Set(b).add('me'));
+      setMicOn(false);
+      setCamOn(false);
+      setMyQueuePos(null); // the queue must not put me back on a mic during or after the call
+      setMessages((m) => [
+        ...m,
+        {
+          id: msgId(),
+          system: true,
+          text: `📞 Bire bir görüşmeye geçtin: ${wasSeated ? 'mikrofon koltuğundan indin, ' : ''}${hadCam ? 'oda kameran kapatıldı, ' : ''}odada dinleyici olarak kalıyorsun.`,
+        },
+      ]);
+    } else {
+      setMessages((m) => [...m, { id: msgId(), system: true, text: '✅ Görüşme bitti. Hâlâ odadasın; istersen yeniden mikrofon isteyebilir veya kameranı açabilirsin.' }]);
+    }
+  }
+  /** Room mic/seat/camera controls are locked while a call holds the devices. */
+  const devicesBusy = () => {
+    if (!getMedia().call) return false;
+    showAlert('Görüşmedesin', BUSY_DEVICES);
+    return true;
+  };
+  const toggleCam = async () => {
+    if (devicesBusy()) return;
+    if (!camOn && Platform.OS !== 'web') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return showAlert('Kamera izni gerekli', 'Odada görüntünü paylaşmak için cihaz ayarlarından kamera izni ver.');
+    }
+    setCamOn((c) => !c);
+    addMsg({ system: true, text: camOn ? `${ME.name} kamerasını kapattı` : `📹 ${ME.name} kamerasını açtı` });
+  };
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   const audience = USERS.filter((u) => !allSeats.includes(u.id) && !kicked.has(u.id) && !blocked.has(u.id));
   const canControlMusic = canFunctions;
@@ -503,6 +557,7 @@ export default function VoiceRoom() {
   };
   const removeFromSeat = (userId: string) => setSeats((s) => pad(s, capacity).map((x) => (x === userId ? null : x)));
   const sitMe = (index: number) => {
+    if (devicesBusy()) return;
     setSeats((s) => pad(s, capacity).map((x, i) => (i === index ? 'me' : x === 'me' ? null : x)));
     setMicOn(true);
     addMsg({ system: true, text: `${ME.name} ${index + 1}. koltuğa geçti` });
@@ -647,7 +702,7 @@ export default function VoiceRoom() {
       setSheet({ title: `${u.name} · ${targetRole === 'owner' ? 'Oda sahibi' : targetRole === 'admin' ? 'Yönetici' : 'Üye'}`, options });
       return;
     }
-    if (index === 0) return;
+    if (index === 0) return isOwn ? sitMe(0) : undefined;
     if (isOwn) {
       const locked = lockedSeats.includes(index);
       setSheet({
@@ -673,6 +728,7 @@ export default function VoiceRoom() {
 
   // Stage-style rooms: join the speaker queue and see my position.
   const joinQueue = () => {
+    if (devicesBusy()) return;
     if (myQueuePos !== null) return showAlert('Sıradasın', `Konumun: ${myQueuePos + 1}. Sıradan çıkmak için menüyü kullan.`);
     const pos = rollDie() % 3 + 1;
     setMyQueuePos(pos);
@@ -681,6 +737,8 @@ export default function VoiceRoom() {
 
   // The big mic button for a listener (Discord Stage style): take a free mic, or raise a hand when all are taken.
   const raiseHand = () => {
+    if (devicesBusy()) return;
+    if (isOwn && allSeats[0] === null) return sitMe(0);
     if (freeSeatIndex > 0) return isOwn ? sitMe(freeSeatIndex) : onSeatPress(freeSeatIndex);
     if (myRole === 'member' && micPermission === 'members' && membership !== 'member') return onSeatPress(1);
     joinQueue();
@@ -811,6 +869,7 @@ export default function VoiceRoom() {
       variant: 'round',
       items: [
         ...(isOwn && !pk ? [{ key: 'pk', label: 'PK Modu', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: startPk }] : []),
+        { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'dice', label: 'Zar Düellosu', emoji: '🎲', colors: ['#2563EB', '#087A80'], onPress: () => setPanel('dice') },
         { key: 'wheel', label: 'Şans çarkı', emoji: '🎡', colors: ['#F59E0B', '#C93C4F'], onPress: () => router.push('/cark') },
@@ -946,6 +1005,15 @@ export default function VoiceRoom() {
 
           {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
           {pk && <PkBar pk={{ ...pk, mvp }} roomTitle={title} />}
+          {callActive && (
+            <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
+              <Ionicons name="call" size={16} color={semantic.successInk} />
+              <Text style={styles.callBannerText} numberOfLines={1}>
+                {media.call?.kind === 'match' ? 'Hemen Tanış' : 'Bire bir'} görüşmedesin · odada dinleyicisin
+              </Text>
+              <Text style={styles.callBannerGo}>Dön</Text>
+            </Pressable>
+          )}
           {settings.roomMuted && <Text style={styles.mutedChip}>🔇 Oda sesi senin için kapalı · Ses ayarlarından açabilirsin</Text>}
           {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
           {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
@@ -987,6 +1055,7 @@ export default function VoiceRoom() {
                   reaction={allSeats[0] ? reactions[allSeats[0]] : undefined}
                   still={settings.reduceMotion}
                   anchorRef={seatAnchor(allSeats[0])}
+                  camera={allSeats[0] === 'me' && camOn}
                   onPress={() => onSeatPress(0)}
                 />
                 <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
@@ -1008,6 +1077,7 @@ export default function VoiceRoom() {
                 reaction={uid ? reactions[uid] : undefined}
                 still={settings.reduceMotion}
                 anchorRef={seatAnchor(uid)}
+                camera={uid === 'me' && camOn}
                 onPress={() => onSeatPress(i)}
               />
             ))}
@@ -1053,8 +1123,9 @@ export default function VoiceRoom() {
               />
             </View>
             {roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
+            {amSeated && <RoundBtn label={camOn ? 'Kamerayı kapat' : 'Kamerayı aç'} icon={camOn ? 'videocam' : 'videocam-off'} onPress={toggleCam} />}
             {amSeated ? (
-              <MicBtn state={micOn ? 'on' : 'off'} onPress={() => setMicOn((m) => !m)} />
+              <MicBtn state={micOn ? 'on' : 'off'} onPress={() => !devicesBusy() && setMicOn((m) => !m)} />
             ) : (
               <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
             )}
@@ -1291,6 +1362,9 @@ const styles = StyleSheet.create({
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  callBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: semantic.success, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  callBannerText: { color: semantic.successInk, fontWeight: '800', flex: 1, fontSize: 13 },
+  callBannerGo: { color: semantic.successInk, fontWeight: '900' },
   topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
