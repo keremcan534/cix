@@ -164,10 +164,11 @@ export function ParticipantsSheet({
             const u = userById(uid);
             const role = roleOf(uid);
             const seat = seatOf(uid);
-            const onMic = seat >= 0;
+            const onBoss = room.boss === uid && seat < 0;
+            const onMic = seat >= 0 || onBoss;
             const me = uid === 'me';
             const status = [
-              onMic ? `${seat + 1}. mikrofon` : 'Balkon',
+              onBoss ? '👑 Patron koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Balkon',
               onMic && room.micMuted.includes(uid) ? 'mikrofonu kapatıldı' : '',
               pending.has(uid) ? 'davet bekliyor' : '',
               silenced.has(uid) ? 'senin için sessizde' : '',

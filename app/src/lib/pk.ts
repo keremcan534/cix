@@ -74,7 +74,7 @@ export type PkSession = {
   teams: [PkTeam, PkTeam];
   /** Normal PK: everyone competing (mic users at start, then anyone who scores from a mic later). */
   participants: string[];
-  /** PK points received per person (valid gifts only). */
+  /** PK points received per person (valid gifts only). Cross-room PK keys them per room: see `pointKey`. */
   points: Record<string, number>;
   createdAt: number;
   requestId?: string;
@@ -148,6 +148,10 @@ const OPEN: PkStatus[] = ['invite', 'prep', 'active'];
 export const pkOfRoom = (roomId: string) => state.sessions.find((s) => OPEN.includes(s.status) && (s.roomId === roomId || s.opponentRoomId === roomId));
 export const lastPkOfRoom = (roomId: string) => state.sessions.find((s) => s.roomId === roomId || s.opponentRoomId === roomId);
 export const teamOf = (pk: PkSession, uid: string) => pk.teams.find((t) => t.members.includes(uid));
+/** Per-person points key. Across rooms the same person may receive gifts in both rooms; those stay apart. */
+export const pointKey = (pk: Pick<PkSession, 'kind'>, roomId: string, uid: string) => (pk.kind === 'cross' ? `${roomId}|${uid}` : uid);
+/** Points a person received in this PK, as seen from one room. */
+export const pkPointsFor = (pk: PkSession, roomId: string, uid: string) => pk.points[pointKey(pk, roomId, uid)] ?? 0;
 export const modeLabel = (pk: Pick<PkSession, 'kind' | 'mode'>) => (pk.kind === 'cross' ? 'Odalar arası PK' : pk.mode === 'solo' ? 'Normal PK' : 'Takım PK');
 
 // --- Admin ---------------------------------------------------------------------------------------
@@ -370,7 +374,8 @@ export function recordGift(roomId: string, txId: string, senderId: string, recip
   if (points <= 0) return reject('Bu hediye PK puanı kazandırmıyor', teamId);
   const rec: PkRecord = { ...base, teamId, points, status: 'Doğrulandı' };
   const t = pk.teams.map((x) => (x.id === teamId ? { ...x, score: x.score + points } : x)) as [PkTeam, PkTeam];
-  put({ ...pk, teams: t, participants, points: { ...pk.points, [recipientId]: (pk.points[recipientId] ?? 0) + points }, records: [...pk.records, rec] });
+  const key = pointKey(pk, roomId, recipientId);
+  put({ ...pk, teams: t, participants, points: { ...pk.points, [key]: (pk.points[key] ?? 0) + points }, records: [...pk.records, rec] });
   return { ok: true, points, teamId };
 }
 
@@ -396,7 +401,8 @@ export function revokeGift(txId: string, reason: string, actor = 'Ödeme sistemi
   }
   const records = pk.records.map((r) => (r.txId === txId ? { ...r, status: 'İade edildi' as const, note: reason } : r));
   const t = pk.teams.map((x) => (x.id === rec.teamId ? { ...x, score: x.score - rec.points } : x)) as [PkTeam, PkTeam];
-  put({ ...pk, records, teams: t, points: { ...pk.points, [rec.recipientId]: (pk.points[rec.recipientId] ?? 0) - rec.points } });
+  const key = pointKey(pk, pk.teams.find((x) => x.id === rec.teamId)?.roomId ?? pk.roomId, rec.recipientId);
+  put({ ...pk, records, teams: t, points: { ...pk.points, [key]: (pk.points[key] ?? 0) - rec.points } });
   log(actor, 'Hediye iadesi PK puanından düşüldü', pk.id, `${txId} · -${rec.points}`);
   return { ok: true, changed: true };
 }
@@ -467,6 +473,16 @@ export function computeResult(pk: PkSession): PkResultData {
     return { winner: null, winners, red: 0, blue: 0, diff, validGifts, ranking, ...computeCrowns(pk, null, winners) };
   }
   const winner: TeamId | 'tie' = red.score === blue.score ? 'tie' : red.score > blue.score ? 'red' : 'blue';
+  if (pk.kind === 'cross') {
+    // One entry per person per room: keys are `<room>|<user>`.
+    const ranking = Object.entries(pk.points)
+      .map(([key, points]) => {
+        const [roomId, userId] = key.split('|');
+        return { userId, points, teamId: pk.teams.find((t) => t.roomId === roomId)?.id };
+      })
+      .sort((a, b) => b.points - a.points);
+    return { winner, winners: [], red: red.score, blue: blue.score, diff: Math.abs(red.score - blue.score), validGifts, ranking, ...computeCrowns(pk, winner, []) };
+  }
   const teamByUser: Record<string, TeamId> = {};
   pk.teams.forEach((t) => t.members.forEach((m) => (teamByUser[m] = t.id)));
   pk.records.forEach((r) => r.teamId && (teamByUser[r.recipientId] ??= r.teamId));

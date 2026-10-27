@@ -4,8 +4,8 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { computeCrowns, drawTeams, finishNow, getPk, recordGift, resetPk, revokeGift, startRoomPk, type PkSession } from '@/lib/pk';
-import { join, leave, leaveSeat, resetPresence, seedRoom, takeSeat } from '@/lib/room-presence';
+import { computeCrowns, drawTeams, finishNow, getPk, inviteCrossPk, pkPointsFor, recordGift, resetPk, revokeGift, setInviteScenario, startRoomPk, type PkSession } from '@/lib/pk';
+import { join, leave, leaveSeat, resetPresence, seedRoom, setBoss, takeSeat } from '@/lib/room-presence';
 
 const R = 'pk-room';
 const PREP_MS = 5_000;
@@ -301,5 +301,32 @@ describe('Sonuç ve taç', () => {
     mock.timers.tick(30 * 60_000);
     assert.equal(pk().status, 'done');
     assert.deepEqual(pk().result!.winners, ['p1']);
+  });
+});
+
+describe('İnceleme düzeltmeleri', () => {
+  test('odalar arası PK: aynı kişinin iki odadaki puanları karışmaz', () => {
+    room(3);
+    setInviteScenario('accept');
+    assert.ok(inviteCrossPk(R, 'host', 'pk-other', 15).ok);
+    mock.timers.tick(2_500); // the other room accepts
+    activate();
+    assert.ok(recordGift(R, 'x-1', 'fan1', 'u1', 'g-test', 100).ok);
+    assert.ok(recordGift('pk-other', 'x-2', 'fan2', 'u1', 'g-test', 500).ok);
+    assert.equal(pkPointsFor(pk(), R, 'u1'), 100);
+    assert.equal(pkPointsFor(pk(), 'pk-other', 'u1'), 500);
+    finishNow(pk().id);
+    assert.equal(pk().result!.ranking.filter((x) => x.userId === 'u1').length, 2, 'oda başına ayrı satır');
+  });
+
+  test('patron koltuğundaki kişi Normal PK’ya katılır ve puan alır', () => {
+    room(3);
+    setBoss(R, 'spare1');
+    const s = startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' });
+    assert.ok(s.ok);
+    assert.ok(s.pk.participants.includes('spare1'));
+    activate();
+    assert.ok(gift('spare1', 250).r.ok);
+    assert.equal(pk().points.spare1, 250);
   });
 });

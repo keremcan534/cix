@@ -29,7 +29,7 @@ Kaynaklar: *SIMILARCLUP — PK BATTLE MODÜLÜ* ve *Gelişmiş PK Modu, Takım P
 
 ## Takım oluşturma
 
-- **Uygun katılımcı:** başlatma anında mikrofonda olan kişiler (sunucu `micUsersOf` ile okur; istemcinin gönderdiği listeye güvenilmez).
+- **Uygun katılımcı:** başlatma anında mikrofonda (patron koltuğu dahil) olan kişiler (sunucu `micUsersOf` ile okur; istemcinin gönderdiği listeye güvenilmez).
 - **Rastgele:** dağıtım sunucuda yapılır (`drawTeams`, Fisher–Yates). Takım büyüklükleri en fazla 1 farklıdır; tek sayıda fazladan kişi rastgele bir takıma gider. Takımlar doluysa (varsayılan 8+8, 15 mikrofonu karşılar) kalanlar "bu PK'ya katılmayacak" diye gösterilir. Dağılım başlatmadan önce gösterilir; **Yeniden karıştır** yeni bir sunucu dağıtımı ister. Başlatma o dağıtımı aynen kullanır.
 - **Manuel:** oda sahibi/yönetici her kişiyi Kırmızı veya Mavi'ye atar. Fark 1'den büyükse uyarı gösterilir ve başlatma ayrıca onay ister. Takım seçilmeyen kişi PK'ya katılmaz.
 - **Sunucu doğrulaması (iki yöntemde de):** aynı kişi iki takımda olamaz; herkes hâlâ mikrofonda olmalı (biri indiyse "takımları yeniden oluştur"); takım başına en az/en fazla sınırı.
@@ -41,6 +41,7 @@ Kaynaklar: *SIMILARCLUP — PK BATTLE MODÜLÜ* ve *Gelişmiş PK Modu, Takım P
 - PK puanı jeton bakiyesi ve yayıncı kazancından ayrıdır; yalnızca sunucuda, hediye işlemi başarıyla tahsil edildikten sonra yazılır. İstemci puan göndermez.
 - **Kime yazılır:** hediyeyi alan kişi **o anda mikrofondaysa** (Takım PK'de ayrıca bir takımdaysa). Aksi hâlde hediye yine ulaşır ama puan yazılmaz; işlem "Reddedildi" kaydı olarak nedeniyle tutulur.
 - **Takım toplamı = takım üyelerinin geçerli puanlarının toplamı** (testle doğrulanır).
+- Odalar arası PK'de kişi başı puan **oda başına** tutulur (`pointKey`): aynı kişi iki odada hediye alsa da puanları karışmaz.
 - PK başlamadan (hazırlıkta) ve bittikten sonra gönderilen hediyeler sayılmaz.
 - Aynı işlem kimliği ikinci kez gelirse reddedilir ve sayılır (tekrar sayacı).
 - Jeton düşüldüğü hâlde PK puanı yazılamayan işlemler "düzeltme bekliyor" listesine düşer.

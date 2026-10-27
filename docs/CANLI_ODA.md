@@ -22,7 +22,7 @@ Kaynak: *SimilarClub — Canlı Oda UX/UI ve İşlevsel Geliştirme Şartnamesi*
 Tek kaynak: `deriveView(room)` (başka hiçbir yerde sayı hesaplanmaz).
 
 - **Toplam** = odadaki benzersiz kişiler.
-- **Mikrofonda** = odadaki ve bir mikrofon koltuğunda oturan benzersiz kişiler.
+- **Mikrofonda** = odadaki ve bir mikrofon koltuğunda veya **patron koltuğunda** oturan benzersiz kişiler (patron koltuğu konuşan bir koltuktur; PK'ye de katılır).
 - **Balkon** = odadaki ama mikrofonda olmayan kişiler. Toplam = Mikrofonda + Balkon her zaman.
 - Bir kişi aynı anda iki listede olamaz; koltukta görünüp odada olmayan biri sayılmaz.
 - Mikrofon **kapasitesi** (ör. 12) ile mikrofondaki kişi sayısı ayrı tutulur.
@@ -30,6 +30,8 @@ Tek kaynak: `deriveView(room)` (başka hiçbir yerde sayı hesaplanmaz).
 - Gizli giriş: Balkon'dayken listede ve sayıda görünmez; mikrofona geçince görünür.
 - Mikrofon sayısı azalırsa kaldırılan koltuktakiler Balkon'a geçer, odadan düşmez.
 - Odalar ilk açıldıklarında oda kartındaki dinleyici sayısıyla başlar; sonraki ziyaretlerde oda olduğu gibi bulunur. Odadan çıkınca yalnızca sen ayrılırsın.
+- Aynı oda iki kez açılmış olabilir (oda → profil → aynı oda). Odadan ancak o odanın son ekranı kapanınca ayrılırsın.
+- Kara liste (oda ayarları) sunucu modeline eşitlenir: listedekiler odadan çıkar ve giremez; listeden çıkarılan tekrar girebilir. Süresi dolan 10 dk yasaklar etkin sayılmaz.
 
 Örnek (test edildi): 20 mikrofonun hepsi dolu, odada 50 kişi → Balkon 30, Mikrofonda 20, Toplam 50.
 
@@ -60,7 +62,7 @@ Arayüz yalnızca yetkili olunan işlemleri gösterir; **her işlem ayrıca sunu
 | Kara listeye ekle (koltuk menüsü, sahip) | Oda sahibi | Kalıcı giriş yasağı. |
 | Profil, hediye gönder, engelle, şikâyet et | Herkes | Mevcut profil, hediye, engelleme ve destek talebi işlevlerine bağlı. |
 
-Koltuk menüsündeki "Mikrodan at", "Mikrofonu kilitle", "Odadan at" (artık onaylı), "Mikrofonunu sustur", "Koltuk değiştir" de aynı sunucu kurallarından geçer.
+Koltuk menüsündeki "Mikrodan at", "Mikrofonu kilitle", "Odadan at" (artık onaylı), "Mikrofonunu sustur", "Koltuk değiştir" de aynı sunucu kurallarından geçer. Başkasını mikrofona almak (konuşma isteğini kabul, koltuk değiştirme) yönetici ister; mikrofondaki birini taşımak için ondan üst rol gerekir.
 
 ### Mikrofon daveti akışı
 
@@ -95,7 +97,7 @@ Davranış:
 - Hediye olaylarının sohbet kimliği işlem kimliğinden gelir (`gift:<txId>`); aynı olay tekrar gelirse ikinci satır ve ikinci puan oluşmaz.
 - **Bağlantı kopması (test):** Menü › Oda Araçları › *Bağlantı kopması (test)* bu cihazın bağlantısını 8 sn keser. Bu sürede:
   - sayaçlar, listeler ve PK son alınan durumu gösterir (sunucu değişmeye devam eder);
-  - hediye, mikrofon, davet, moderasyon ve PK başlatma yapılmaz, jeton düşülmez ("Bağlantı yok");
+  - hediye, mikrofon (oturma, inme, kilit, taşıma, istek kabulü), davet, moderasyon, PK başlatma ve iptal yapılmaz, jeton düşülmez ("Bağlantı yok");
   - yazdığın mesaj "Gönderilemedi · tekrar dene" olarak işaretlenir;
   - gelen olaylar tamponlanır. Bağlantı dönünce zaman sırasına göre eklenir, sunucunun yeniden gönderdiği eski olaylar kimlikten elenir ve "N olay eşitlendi" yazılır.
 

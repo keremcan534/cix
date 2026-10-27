@@ -23,6 +23,8 @@ export type RoomLive = {
   /** Invisible entry: not listed or counted while on the Balkon (still listed once on a mic). */
   hidden: string[];
   seats: (string | null)[];
+  /** Boss seat ("Patron koltuğu"): a speaking seat outside the numbered mics; counts as being on a mic. */
+  boss: string | null;
   locked: number[];
   /** Mic switched off by a moderator (different from someone's own mic toggle). */
   micMuted: string[];
@@ -57,6 +59,8 @@ export const getPresence = () => state;
 export const getRoom = (roomId: string): RoomLive | undefined => state.rooms[roomId];
 
 const seenEvents = new Map<string, Set<string>>();
+/** Open room screens per person: the same room can be stacked twice (room → profile → room). */
+const screens = new Map<string, number>();
 const guestSeq = new Map<string, number>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -88,22 +92,24 @@ function firstTime(roomId: string, eventId?: string) {
 export type RoomView = { total: number; mic: number; balcony: number; micIds: string[]; balconyIds: string[] };
 export function deriveView(r: RoomLive): RoomView {
   const inRoom = new Set(r.members);
-  const micIds = [...new Set(r.seats.filter((s): s is string => !!s && inRoom.has(s)))];
+  const micIds = [...new Set([...r.seats, r.boss].filter((s): s is string => !!s && inRoom.has(s)))];
   const onMic = new Set(micIds);
   const hidden = new Set(r.hidden);
   const balconyIds = r.members.filter((m) => !onMic.has(m) && !hidden.has(m));
   return { total: micIds.length + balconyIds.length, mic: micIds.length, balcony: balconyIds.length, micIds, balconyIds };
 }
 export const roleIn = (r: RoomLive, uid: string): Role => (uid === r.ownerId ? 'owner' : r.adminIds.includes(uid) ? 'admin' : 'member');
-export const isOnMic = (r: RoomLive | undefined, uid: string) => !!r && r.members.includes(uid) && r.seats.includes(uid);
+export const isOnMic = (r: RoomLive | undefined, uid: string) => !!r && r.members.includes(uid) && (r.seats.includes(uid) || r.boss === uid);
 export const banLeft = (r: RoomLive, uid: string, now = Date.now()) => Math.max(0, (r.bans[uid] ?? 0) - now);
+/** People who can't enter right now (kick ban still running, or blacklisted). */
+export const activeBans = (r: RoomLive, now = Date.now()) => Object.keys(r.bans).filter((uid) => r.bans[uid] > now);
 /** Server-side lookup used by other services (PK): is this user on a mic in that room right now? */
 export const onMicNow = (roomId: string, uid: string) => isOnMic(state.rooms[roomId], uid);
 export const micUsersOf = (roomId: string) => (state.rooms[roomId] ? deriveView(state.rooms[roomId]).micIds : []);
 export const roleOf = (roomId: string, uid: string): Role => (state.rooms[roomId] ? roleIn(state.rooms[roomId], uid) : 'member');
 
 // --- Room lifecycle --------------------------------------------------------------------------------
-export type Seed = { ownerId: string; adminIds: string[]; seats: (string | null)[]; capacity: number; total: number; regulars: string[] };
+export type Seed = { ownerId: string; adminIds: string[]; seats: (string | null)[]; capacity: number; total: number; regulars: string[]; blacklist?: string[] };
 /**
  * Creates the room's presence the first time anyone opens it (later visits find it as it is). The audience
  * is the seated people, then regular users, then guests until the room's listener count is reached.
@@ -112,12 +118,14 @@ export type Seed = { ownerId: string; adminIds: string[]; seats: (string | null)
 export function seedRoom(roomId: string, seed: Seed): RoomLive {
   const have = state.rooms[roomId];
   if (have) return have;
+  const banned = new Set(seed.blacklist ?? []);
   const seats = Array.from({ length: seed.capacity }, (_, i) => seed.seats[i] ?? null);
-  const members = [...new Set([...seats.filter((s): s is string => !!s), ...seed.regulars])];
+  const members = [...new Set([...seats.filter((s): s is string => !!s), ...seed.regulars])].filter((m) => !banned.has(m));
   let n = 0;
   while (members.length < seed.total) members.push(guestId(roomId, ++n));
   guestSeq.set(roomId, n);
-  const room: RoomLive = { roomId, members, hidden: [], seats, locked: [], micMuted: [], bans: {}, ownerId: seed.ownerId, adminIds: seed.adminIds, invites: [], version: 0 };
+  const bans = Object.fromEntries([...banned].map((uid) => [uid, Infinity]));
+  const room: RoomLive = { roomId, members, hidden: [], seats: seats.map((x) => (x && banned.has(x) ? null : x)), boss: null, locked: [], micMuted: [], bans, ownerId: seed.ownerId, adminIds: seed.adminIds, invites: [], version: 0 };
   state = { ...state, rooms: { ...state.rooms, [roomId]: room } };
   return room;
 }
@@ -137,6 +145,23 @@ export function setLocks(roomId: string, locked: number[]) {
   const r = state.rooms[roomId];
   if (!r || r.locked.join() === locked.join()) return;
   put({ ...r, locked });
+}
+/** Room blacklist (owner settings): listed people are out and can't enter; people taken off it can enter again. */
+export function setBlacklist(roomId: string, ids: string[]) {
+  const r = state.rooms[roomId];
+  if (!r) return;
+  const listed = new Set(ids);
+  let next = r;
+  ids.filter((uid) => next.bans[uid] !== Infinity).forEach((uid) => (next = { ...withoutUser(next, uid, 'Kara listeye alındı'), bans: { ...next.bans, [uid]: Infinity } }));
+  const lifted = Object.keys(next.bans).filter((uid) => next.bans[uid] === Infinity && !listed.has(uid));
+  if (lifted.length) next = { ...next, bans: Object.fromEntries(Object.entries(next.bans).filter(([uid]) => !lifted.includes(uid))) };
+  if (next !== r) put(next);
+}
+/** Boss seat holder (decided by the room's gift ranking). */
+export function setBoss(roomId: string, uid: string | null) {
+  const r = state.rooms[roomId];
+  if (!r || r.boss === uid) return;
+  put({ ...r, boss: uid });
 }
 /** Mic count changed: people on removed mics go to the Balkon (they stay in the room). */
 export function resize(roomId: string, capacity: number) {
@@ -168,9 +193,28 @@ export function leave(roomId: string, uid: string, eventId?: string): Result {
   put(withoutUser(r, uid, 'Kişi odadan ayrıldı'));
   return { ok: true };
 }
+
+/**
+ * This viewer's room screen opened / closed. The person joins when their first screen for the room opens and
+ * leaves when the last one closes, so closing a stacked copy of the room doesn't take them out of it.
+ */
+export function enterRoom(roomId: string, uid: string, opts: { hidden?: boolean } = {}): Result {
+  const key = `${roomId}|${uid}`;
+  const open = screens.get(key) ?? 0;
+  const r = open === 0 ? join(roomId, uid, opts) : ({ ok: true } as const);
+  if (r.ok) screens.set(key, open + 1);
+  return r;
+}
+export function exitRoom(roomId: string, uid: string) {
+  const key = `${roomId}|${uid}`;
+  const open = screens.get(key) ?? 0;
+  if (open > 1) return screens.set(key, open - 1);
+  screens.delete(key);
+  leave(roomId, uid);
+}
 function withoutUser(r: RoomLive, uid: string, note: string): RoomLive {
   const invites = r.invites.map((i) => (i.status === 'pending' && (i.toId === uid || i.fromId === uid) ? { ...i, status: 'cancelled' as const, note } : i));
-  return { ...r, members: r.members.filter((m) => m !== uid), seats: r.seats.map((s) => (s === uid ? null : s)), hidden: r.hidden.filter((h) => h !== uid), micMuted: r.micMuted.filter((m) => m !== uid), invites };
+  return { ...r, members: r.members.filter((m) => m !== uid), seats: r.seats.map((s) => (s === uid ? null : s)), boss: r.boss === uid ? null : r.boss, hidden: r.hidden.filter((h) => h !== uid), micMuted: r.micMuted.filter((m) => m !== uid), invites };
 }
 
 // --- Seats -----------------------------------------------------------------------------------------
@@ -184,6 +228,23 @@ export function takeSeat(roomId: string, uid: string, index: number): Result {
   if (r.seats[index]) return fail('Bu mikrofon dolu.');
   put({ ...r, seats: r.seats.map((s, i) => (i === index ? uid : s === uid ? null : s)) });
   return { ok: true };
+}
+/**
+ * Someone seats another person (accepting a speak request, moving someone): validated by role. Seating
+ * yourself needs no role; seating someone needs a manager, and moving someone already on a mic needs a
+ * role above theirs.
+ */
+export function seatBy(roomId: string, actorId: string, targetId: string, index: number): Result {
+  const r = state.rooms[roomId];
+  if (!r) return fail('Oda bulunamadı.');
+  if (actorId !== targetId) {
+    if (roleIn(r, actorId) === 'member') return denied(r, actorId, 'Mikrofona alma', targetId, 'Başkasını mikrofona almak için oda sahibi veya yönetici olmalısın.');
+    if (r.seats.includes(targetId)) {
+      const why = outranks(r, actorId, targetId);
+      if (why) return denied(r, actorId, 'Koltuk değiştirme', targetId, why);
+    }
+  }
+  return takeSeat(roomId, targetId, index);
 }
 export function leaveSeat(roomId: string, uid: string) {
   const r = state.rooms[roomId];
@@ -226,7 +287,7 @@ export function forceLeaveSeat(roomId: string, actorId: string, targetId: string
   if (!r) return fail('Oda bulunamadı.');
   const why = outranks(r, actorId, targetId);
   if (why) return denied(r, actorId, 'Mikrofondan indirme', targetId, why);
-  if (!r.seats.includes(targetId)) return fail('Bu kişi mikrofonda değil.');
+  if (!r.seats.includes(targetId)) return fail('Bu kişi numaralı bir mikrofonda değil.');
   put({ ...r, seats: r.seats.map((s) => (s === targetId ? null : s)) });
   log(roomId, actorId, 'Mikrofondan indirdi', targetId);
   return { ok: true };
@@ -346,6 +407,7 @@ export function resetPresence() {
   timers.forEach(clearTimeout);
   timers.clear();
   seenEvents.clear();
+  screens.clear();
   guestSeq.clear();
   state = { rooms: {}, frozen: null, connection: 'online', duplicates: 0, audit: [], inviteAnswer: 'random' };
 }

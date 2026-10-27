@@ -65,11 +65,14 @@ import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteS
 import { casinoAccess, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
-import { getPk, markPkSeen, modeLabel, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
+import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
+  activeBans,
   answerInvite,
   deriveView,
+  enterRoom,
+  exitRoom,
   forceLeaveSeat,
   getRoom,
   inviteToMic,
@@ -80,7 +83,10 @@ import {
   leaveSeat,
   newGuest,
   resize as resizeSeats,
+  seatBy,
   seedRoom,
+  setBlacklist,
+  setBoss,
   setConnection,
   setLocks,
   setMicMute,
@@ -186,13 +192,15 @@ export default function VoiceRoom() {
       capacity,
       total: isOwn ? 7 : base!.listeners,
       regulars: USERS.filter((u) => u.id !== hostId).map((u) => u.id).slice(0, isOwn ? 6 : USERS.length),
+      blacklist: isOwn ? myRoom.blacklist : [],
     }),
   );
   const { room: live, offline } = useRoomLive(id);
   const view = useMemo(() => deriveView(live), [live]);
   const seats = live.seats;
   const mutedUsers = useMemo(() => new Set(live.micMuted), [live.micMuted]);
-  const kicked = useMemo(() => new Set(Object.keys(live.bans)), [live.bans]);
+  // People who can't be in the room right now (running kick ban or blacklist); expired bans don't count.
+  const kicked = new Set(activeBans(live));
   const [micOn, setMicOn] = useState(isOwn && !joinedInCall);
   // Room camera (video seat). Only while seated; turned off when a one-to-one call takes the devices.
   const [camOn, setCamOn] = useState(false);
@@ -270,7 +278,7 @@ export default function VoiceRoom() {
   const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
   const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
   /** PK points under a seat: everyone on a mic in Normal / cross PK, team members in Takım PK. */
-  const pkPointsOf = (uid: string | null) => (!uid || !pk || pk.status === 'invite' || (teamPk && !teamOf(teamPk, uid)) ? undefined : (pk.points[uid] ?? 0));
+  const pkPointsOf = (uid: string | null) => (!uid || !pk || pk.status === 'invite' || (teamPk && !teamOf(teamPk, uid)) ? undefined : pkPointsFor(pk, id, uid));
   // Profiles opened from the PK end screens: hide them while away, show them again on return.
   const [awayFromRoom, setAwayFromRoom] = useState(false);
   useFocusEffect(useCallback(() => setAwayFromRoom(false), []));
@@ -309,6 +317,8 @@ export default function VoiceRoom() {
   const ranking = Object.entries(contrib).sort((a, b) => b[1] - a[1]);
   const topGifter = ranking.find(([uid]) => !bossRemoved.has(uid) && !kicked.has(uid));
   const bossId = bossOn && topGifter && topGifter[1] >= BOSS_SEAT_MIN_COINS ? topGifter[0] : null;
+  // The boss seat is a speaking seat: the presence server counts its holder as on a mic (PK, lists, counts).
+  useEffect(() => setBoss(id, bossId), [id, bossId]);
   const mySeat = allSeats.indexOf('me');
   const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
@@ -323,7 +333,7 @@ export default function VoiceRoom() {
   // Enter the room (presence) once past the password, and leave it when the screen closes. Own room: the host takes mic 1.
   useEffect(() => {
     if (!unlocked) return;
-    const r = joinPresence(id, 'me', { hidden: invisible });
+    const r = enterRoom(id, 'me', { hidden: invisible });
     if (!r.ok) {
       showAlert('Odaya girilemedi', r.reason);
       router.back();
@@ -331,7 +341,7 @@ export default function VoiceRoom() {
     }
     if (isOwn && !joinedInCall && !getRoom(id)?.seats[0]) takeSeat(id, 'me', 0);
     return () => {
-      leavePresence(id, 'me');
+      exitRoom(id, 'me');
       setConnection('online');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -342,6 +352,10 @@ export default function VoiceRoom() {
   const lockKey = lockedSeats.join(',');
   useEffect(() => setLocks(id, lockKey ? lockKey.split(',').map(Number) : []), [id, lockKey]);
   useEffect(() => resizeSeats(id, capacity), [id, capacity]);
+  const blacklistKey = isOwn ? myRoom.blacklist.join(',') : '';
+  useEffect(() => {
+    if (isOwn) setBlacklist(id, blacklistKey ? blacklistKey.split(',') : []);
+  }, [id, isOwn, blacklistKey]);
   // A call takes the devices: get off the mic (the presence server is updated after this render).
   useEffect(() => {
     if (!callActive) return;
@@ -774,13 +788,17 @@ export default function VoiceRoom() {
 
   // --- Seat actions ------------------------------------------------------------
   // Used for people who asked to speak (their request is their consent); everyone else gets a mic invite.
-  const placeOnSeat = (userId: string, target?: number) => {
-    if (allSeats.includes(userId)) return showAlert('Zaten koltukta', `${userById(userId).name} zaten mikrofonda.`);
+  const placeOnSeat = (userId: string, target?: number): boolean => {
+    if (offlineBlocked()) return false;
     const free = target !== undefined && allSeats[target] === null ? target : allSeats.findIndex((s, i) => i > 0 && s === null && !lockedSeats.includes(i));
-    if (free < 0) return showAlert('Boş koltuk yok', `Bu oda ${capacity} mikrofonlu.`);
-    const r = takeSeat(id, userId, free);
-    if (!r.ok) return showAlert('Mikrofona alınamadı', r.reason);
+    const why = allSeats.includes(userId) ? `${userById(userId).name} zaten mikrofonda.` : free < 0 ? `Boş koltuk yok: bu oda ${capacity} mikrofonlu.` : null;
+    const r = why ? { ok: false as const, reason: why } : seatBy(id, 'me', userId, free);
+    if (!r.ok) {
+      showAlert('Mikrofona alınamadı', r.reason);
+      return false;
+    }
     addMsg({ system: true, text: `${userById(userId).name} ${free + 1}. koltuğa oturdu` });
+    return true;
   };
   const removeFromSeat = (userId: string) => leaveSeat(id, userId);
   const sitMe = (index: number) => {
@@ -839,6 +857,7 @@ export default function VoiceRoom() {
     v.measureInWindow((x, y, w, h) => setSeatMenu({ anchor: { x, y, w, h }, title, items }));
   };
   const toggleLock = (index: number, lock: boolean) => {
+    if (offlineBlocked()) return;
     const next = lock ? [...new Set([...lockedSeats, index])] : lockedSeats.filter((x) => x !== index);
     if (isOwn) updateMyRoom({ lockedSeats: next });
     else setLocalLocks(next);
@@ -889,7 +908,8 @@ export default function VoiceRoom() {
       const who = moving;
       setMoving(null);
       if (uid || lockedSeats.includes(index)) return showAlert('Boş koltuk seç', 'Taşımak için kilitli olmayan boş bir koltuğa dokun.');
-      const moved = takeSeat(id, who, index);
+      if (offlineBlocked()) return;
+      const moved = seatBy(id, 'me', who, index);
       if (!moved.ok) return showAlert('Taşınamadı', moved.reason);
       addMsg({ system: true, text: `${userById(who).name} ${index + 1}. koltuğa taşındı` });
       logMod('Koltuk değiştirdi', userById(who).name, `${index + 1}. koltuk`);
@@ -897,7 +917,7 @@ export default function VoiceRoom() {
     }
     if (uid === 'me') {
       const items: SeatMenuItem[] = [{ key: 'profile', label: 'Profilim', icon: 'person-circle-outline', onPress: () => router.push('/kullanici/me') }];
-      if (!isOwn || index !== 0) items.push({ key: 'leave', label: 'Koltuktan in', icon: 'arrow-down-circle-outline', onPress: () => removeFromSeat('me') });
+      if (!isOwn || index !== 0) items.push({ key: 'leave', label: 'Koltuktan in', icon: 'arrow-down-circle-outline', onPress: () => !offlineBlocked() && removeFromSeat('me') });
       return openSeatMenu(index, `${index + 1}. koltuk · sen`, items);
     }
     if (uid) {
@@ -1548,9 +1568,9 @@ export default function VoiceRoom() {
           <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58) }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {offline && <ConnectionBanner onReconnect={() => setConnection('online')} />}
-            {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage} />}
-            {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage} />}
-            {pk?.kind === 'room' && pk.mode === 'team' && pk.status === 'invite' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage} />}
+            {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
+            {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage && !offline} />}
+            {pk?.kind === 'room' && pk.mode === 'team' && pk.status === 'invite' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
             {callActive && (
               <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
                 <Ionicons name="call" size={16} color={semantic.successInk} />
@@ -1591,7 +1611,7 @@ export default function VoiceRoom() {
                     <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
                   </View>
                 )}
-                <TeamArena pk={teamPk} seats={allSeats} width={win.width} canManage={canManage} renderSeat={(i, slot) => renderSeat(i, { slot })} />
+                <TeamArena pk={teamPk} seats={allSeats} boss={bossId} width={win.width} canManage={canManage && !offline} renderSeat={(i, slot) => renderSeat(i, { slot })} />
               </>
             ) : (
               <View style={styles.seatGrid}>
@@ -1781,8 +1801,7 @@ export default function VoiceRoom() {
         requests={requests}
         freeSeats={allSeats.filter((x, i) => i > 0 && x === null && !lockedSeats.includes(i)).length}
         onAccept={(uid) => {
-          setRequests((r) => r.filter((x) => x !== uid));
-          placeOnSeat(uid);
+          if (placeOnSeat(uid)) setRequests((r) => r.filter((x) => x !== uid));
         }}
         onReject={(uid) => {
           setRequests((r) => r.filter((x) => x !== uid));

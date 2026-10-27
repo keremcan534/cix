@@ -427,7 +427,22 @@ export type ArenaSlot = { width: number; size: number };
  * mics in its own half with the team total; the shared score bar and timer sit on top. Seats keep their own
  * press handlers (room management still works); mics outside the PK are shown below the arena.
  */
-export function TeamArena({ pk, seats, width, renderSeat, canManage }: { pk: PkSession; seats: (string | null)[]; width: number; renderSeat: (index: number, slot: ArenaSlot) => ReactNode; canManage: boolean }) {
+export function TeamArena({
+  pk,
+  seats,
+  boss,
+  width,
+  renderSeat,
+  canManage,
+}: {
+  pk: PkSession;
+  seats: (string | null)[];
+  /** Boss seat holder: on stage but not on a numbered mic. */
+  boss: string | null;
+  width: number;
+  renderSeat: (index: number, slot: ArenaSlot) => ReactNode;
+  canManage: boolean;
+}) {
   const now = useNow(pk.status !== 'done' && pk.status !== 'cancelled');
   const [open, setOpen] = useState(false);
   // Inner width of one half: screen − arena margins (24) − arena padding+border (18) − gap (8), halved, − half padding+border (10).
@@ -445,7 +460,8 @@ export function TeamArena({ pk, seats, width, renderSeat, canManage }: { pk: PkS
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {pk.teams.map((t) => {
             const onMic = t.members.filter((m) => seats.includes(m));
-            const away = t.members.filter((m) => !seats.includes(m));
+            const onBoss = boss && t.members.includes(boss) && !seats.includes(boss) ? boss : null;
+            const away = t.members.filter((m) => !seats.includes(m) && m !== onBoss);
             return (
               <View key={t.id} style={[st.half, { backgroundColor: `${t.color}22`, borderColor: `${t.color}88` }]} accessibilityLabel={`${t.name}: ${fmt(t.score)} puan, ${t.members.length} kişi`}>
                 <View style={st.halfHead}>
@@ -455,7 +471,15 @@ export function TeamArena({ pk, seats, width, renderSeat, canManage }: { pk: PkS
                   <Text style={st.halfScore}>{fmt(t.score)}</Text>
                 </View>
                 <View style={st.halfSeats}>{onMic.map((m) => <View key={m}>{renderSeat(seats.indexOf(m), { width: slotW, size })}</View>)}</View>
-                {onMic.length === 0 && <Text style={[st.dim, { textAlign: 'center' }]}>Bu takımdan mikrofonda kimse yok</Text>}
+                {onBoss && (
+                  <View style={st.awayRow} accessibilityLabel={`${nameOf(onBoss)} patron koltuğunda, ${fmt(pk.points[onBoss] ?? 0)} puan`}>
+                    <Image source={{ uri: userById(onBoss).avatar }} style={st.mini} />
+                    <Text style={[st.awayText, { color: colors.gold }]} numberOfLines={1}>
+                      👑 {nameOf(onBoss)} · {fmt(pk.points[onBoss] ?? 0)}
+                    </Text>
+                  </View>
+                )}
+                {onMic.length === 0 && !onBoss && <Text style={[st.dim, { textAlign: 'center' }]}>Bu takımdan mikrofonda kimse yok</Text>}
                 {away.length > 0 && (
                   <View style={st.awayRow}>
                     {away.map((m) => (

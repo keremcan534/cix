@@ -7,8 +7,11 @@ import assert from 'node:assert/strict';
 import {
   INVITE_COOLDOWN_MS,
   INVITE_TTL_MS,
+  activeBans,
   answerInvite,
   deriveView,
+  enterRoom,
+  exitRoom,
   forceLeaveSeat,
   getPresence,
   getRoom,
@@ -19,7 +22,10 @@ import {
   leaveSeat,
   resetPresence,
   resize,
+  seatBy,
   seedRoom,
+  setBlacklist,
+  setBoss,
   setConnection,
   setInviteAnswer,
   setLocks,
@@ -225,5 +231,55 @@ describe('Mikrofon daveti', () => {
     assert.ok(r.ok);
     leave(R, 'u1');
     assert.equal(getRoom(R)!.invites[0].status, 'cancelled');
+  });
+});
+
+describe('İnceleme düzeltmeleri', () => {
+  test('aynı oda iki ekranda açıksa birini kapatmak kişiyi odadan çıkarmaz', () => {
+    smallRoom();
+    assert.equal(enterRoom(R, 'me').ok, true);
+    takeSeat(R, 'me', 6);
+    enterRoom(R, 'me'); // the same room stacked again (room → profile → room)
+    exitRoom(R, 'me');
+    assert.ok(getRoom(R)!.members.includes('me'));
+    assert.equal(getRoom(R)!.seats[6], 'me', 'mikrofon korunur');
+    exitRoom(R, 'me');
+    assert.ok(!getRoom(R)!.members.includes('me'), 'son ekran kapanınca ayrılır');
+  });
+
+  test('patron koltuğundaki kişi mikrofonda sayılır, Balkon’da değil', () => {
+    smallRoom();
+    const before = deriveView(getRoom(R)!);
+    setBoss(R, 'u1');
+    const v = deriveView(getRoom(R)!);
+    assert.deepEqual([v.mic, v.balcony, v.total], [before.mic + 1, before.balcony - 1, before.total]);
+    leave(R, 'u1');
+    assert.equal(getRoom(R)!.boss, null);
+  });
+
+  test('başkasını mikrofona almak rol ister; üst rolü taşıyamazsın; kendin oturabilirsin', () => {
+    smallRoom();
+    assert.equal(seatBy(R, 'u1', 'u2', 5).ok, false, 'üye başkasını oturtamaz');
+    assert.equal(seatBy(R, 'admin', 'u2', 5).ok, true, 'yönetici Balkon’daki kişiyi alabilir');
+    assert.equal(seatBy(R, 'admin', 'host', 7).ok, false, 'yönetici sahibi taşıyamaz');
+    assert.equal(seatBy(R, 'u3', 'u3', 8).ok, true);
+  });
+
+  test('kara liste: listedeki kişi odadan çıkar ve giremez; listeden çıkınca girebilir', () => {
+    seedRoom(R, { ownerId: 'host', adminIds: [], seats: ['host'], capacity: 5, total: 6, regulars: ['u1', 'u2'], blacklist: ['u2'] });
+    assert.ok(!getRoom(R)!.members.includes('u2'), 'seed kara listeyi uygular');
+    setBlacklist(R, ['u2', 'u1']);
+    assert.ok(!getRoom(R)!.members.includes('u1'));
+    assert.equal(join(R, 'u1').ok, false);
+    setBlacklist(R, ['u2']);
+    assert.equal(join(R, 'u1').ok, true);
+  });
+
+  test('süresi dolan yasak etkin sayılmaz', () => {
+    smallRoom();
+    kick(R, 'host', 'u1');
+    assert.deepEqual(activeBans(getRoom(R)!), ['u1']);
+    mock.timers.tick(10 * 60_000 + 1);
+    assert.deepEqual(activeBans(getRoom(R)!), []);
   });
 });
