@@ -14,6 +14,7 @@ import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { EMOJI_PACKS_ICON, ReactionArt } from '@/components/ReactionArt';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -42,8 +43,9 @@ export default function StoreScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 10 }}>
-        {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: '😀 Emoji paketleri' }].map((k) => (
-          <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, tab === k.kind && styles.tabActive]}>
+        {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Emoji paketleri' }].map((k) => (
+          <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, tab === k.kind && styles.tabActive, k.kind === 'emoji' && styles.tabRow]}>
+            {k.kind === 'emoji' && <Image source={EMOJI_PACKS_ICON} style={{ width: 18, height: 18 }} />}
             <Text style={[styles.tabText, tab === k.kind && { color: '#fff' }]}>{k.label}</Text>
           </Pressable>
         ))}
@@ -59,7 +61,11 @@ export default function StoreScreen() {
               const owned = emojiPacks.has(p.id) || (p.minVip ? vipLevel >= p.minVip : false);
               return (
                 <View key={p.id} style={styles.item}>
-                  <Text style={styles.emojiPreview}>{p.emojis.slice(0, 4).join(' ')}</Text>
+                  <View style={styles.packPreview} accessibilityLabel={p.emojis.slice(0, 4).join(' ')}>
+                    {p.emojis.slice(0, 4).map((e) => (
+                      <ReactionArt key={e} emoji={e} size={30} textStyle={styles.emojiPreview} />
+                    ))}
+                  </View>
                   <Text style={styles.name}>{p.name}</Text>
                   <Text style={styles.meta}>{p.animated ? 'Animasyonlu · kalıcı' : 'Kalıcı koleksiyon'}</Text>
                   {owned ? (
@@ -182,10 +188,12 @@ const styles = StyleSheet.create({
   tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
+  tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   warn: { color: colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingBottom: 30 },
   item: { width: '46%', margin: '2%', backgroundColor: colors.card, borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 2, borderColor: 'transparent' },
-  emojiPreview: { fontSize: 26, height: 64, textAlignVertical: 'center', paddingTop: 14 },
+  packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
+  emojiPreview: { fontSize: 22 },
   name: { color: '#fff', fontWeight: '700' },
   meta: { color: colors.textDim, fontSize: 12 },
   owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { GiftArt } from '@/components/GiftArt';
 import { colors, semantic } from '@/theme';
 
 export const COMBO_MS = 5000;
@@ -13,6 +14,7 @@ const W = 4;
 const LINE = semantic.money;
 
 export function LuckyCombo({
+  giftId,
   emoji,
   name,
   price,
@@ -21,6 +23,7 @@ export function LuckyCombo({
   onPress,
   onExpire,
 }: {
+  giftId: string;
   emoji: string;
   name: string;
   price: number;
@@ -71,7 +74,7 @@ export function LuckyCombo({
             {[0, 45, 90, 135].map((a) => (
               <View key={a} style={[s.spoke, { transform: [{ rotate: `${a}deg` }] }]} />
             ))}
-            <Text style={s.emoji}>{emoji}</Text>
+            <GiftArt giftId={giftId} emoji={emoji} size={40} textStyle={s.emoji} />
           </Animated.View>
         </Animated.View>
         <View style={s.count}>

@@ -27,10 +27,10 @@ const PROVIDERS0: Provider[] = [
 
 // What the demo store "returns". One item is not licensed for in-app coin sale, so it can't go live.
 const DEMO_STORE: ProviderItem[] = [
-  { provider_id: 'ds-1001', name: 'Anka Kuşu', category_id: 'fantasy', format: 'lottie', preview: { kind: 'emoji', value: '🐦‍🔥' }, license: 'approved', terms: 'Ticari kullanım ve uygulama içi satış serbest; önbelleğe alma serbest.', duration_ms: 3000 },
-  { provider_id: 'ds-1002', name: 'Kristal Kale', category_id: 'royal', format: 'svga', preview: { kind: 'emoji', value: '🏰' }, license: 'approved', terms: 'Ticari kullanım serbest; dosya dönüştürme serbest.', duration_ms: 3200 },
-  { provider_id: 'ds-1003', name: 'Peluş Ayı', category_id: 'cute', format: 'lottie', preview: { kind: 'emoji', value: '🧸' }, license: 'pending', terms: 'Uygulama içi coin karşılığı satış için ek lisans gerekli (beklemede).', duration_ms: 2400 },
-  { provider_id: 'ds-1004', name: 'Galaksi Tüneli', category_id: 'space', format: 'vap', preview: { kind: 'emoji', value: '🌌' }, license: 'rejected', terms: 'Yalnızca kişisel kullanım; ticari kullanım ve dağıtım yasak.', duration_ms: 4000 },
+  { provider_id: 'ds-1001', name: 'Anka Kuşu', category_id: 'fantasy', format: 'lottie', preview: { kind: 'art', value: 'anka-kusu' }, license: 'approved', terms: 'Ticari kullanım ve uygulama içi satış serbest; önbelleğe alma serbest.', duration_ms: 3000 },
+  { provider_id: 'ds-1002', name: 'Kristal Kale', category_id: 'royal', format: 'svga', preview: { kind: 'art', value: 'kristal-kale' }, license: 'approved', terms: 'Ticari kullanım serbest; dosya dönüştürme serbest.', duration_ms: 3200 },
+  { provider_id: 'ds-1003', name: 'Peluş Ayı', category_id: 'cute', format: 'lottie', preview: { kind: 'art', value: 'pelus-ayi' }, license: 'pending', terms: 'Uygulama içi coin karşılığı satış için ek lisans gerekli (beklemede).', duration_ms: 2400 },
+  { provider_id: 'ds-1004', name: 'Galaksi Tüneli', category_id: 'space', format: 'vap', preview: { kind: 'art', value: 'galaksi-tuneli' }, license: 'rejected', terms: 'Yalnızca kişisel kullanım; ticari kullanım ve dağıtım yasak.', duration_ms: 4000 },
 ];
 
 // --- State -------------------------------------------------------------------------------------

@@ -1224,7 +1224,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     bump('giftsSent', records.length);
     addContrib('me', spent);
     if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
-    flyGift(first.emoji, 1, sentTo, { x: win.width - 60, y: win.height - 48 });
+    flyGift(first.emoji, 1, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
     // Combo repeats don't add a chat line each time; the wheel shows the count.
     const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join();
     if (!repeat)
@@ -1232,7 +1232,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         id: `gift:${first.txId}`,
         system: true,
         text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName} (Lucky) gönderdi`,
-        gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count: 1, lucky: true },
+        gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count: 1, lucky: true, giftId: first.giftId },
       });
     if (error) addMsg({ system: true, text: `🍀 ${toIds.length - records.length} kişiye gönderilemedi: ${error}` });
     // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
@@ -2040,6 +2040,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {combo && comboGift && (
         <LuckyCombo
           key={`${combo.giftId}-${combo.to.join()}`}
+          giftId={combo.giftId}
           emoji={comboGift.emoji}
           name={comboGift.name}
           price={comboGift.price * combo.to.length}

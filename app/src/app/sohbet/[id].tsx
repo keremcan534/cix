@@ -6,6 +6,7 @@ import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmojiPanel } from '@/components/EmojiPanel';
+import { MessageText } from '@/components/ReactionArt';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -123,7 +124,7 @@ export default function ChatScreen() {
           renderItem={({ item }) =>
             item.fromMe ? (
               <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mine]}>
-                <Text style={styles.bubbleText}>{item.text}</Text>
+                <MessageText text={item.text} style={styles.bubbleText} />
                 <Text style={styles.time}>
                   {item.time}{' '}
                   <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
@@ -132,7 +133,7 @@ export default function ChatScreen() {
             ) : (
               <View style={{ gap: 6 }}>
                 <View style={[styles.bubble, styles.theirs]}>
-                  <Text style={styles.bubbleText}>{item.text}</Text>
+                  <MessageText text={item.text} style={styles.bubbleText} />
                   <Text style={styles.time}>{item.time}</Text>
                 </View>
                 <SafetyNote

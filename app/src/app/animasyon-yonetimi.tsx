@@ -2,9 +2,10 @@
 // an app update, because rooms read the catalog live (lib/animations). Going live needs an approved
 // licence; price, activity and licence changes are written to the audit log.
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ANIM_ART_NAMES, ANIM_CATEGORY_ART, type AnimArtName } from '@/components/fx/anim-art';
 import { AnimPlay, AssetView } from '@/components/fx/anim-player';
 import { Card, Header } from '@/components/ui';
 import type { Icon3DName } from '@/components/Icon3D';
@@ -19,11 +20,12 @@ type Tab = 'catalog' | 'providers' | 'new' | 'audit';
 const LICENSE_LABEL: Record<LicenseStatus, string> = { approved: '✅ Onaylı', pending: '⏳ Beklemede', rejected: '⛔ Uygun değil', expired: '⌛ Süresi dolmuş' };
 const ICONS: Icon3DName[] = ['heart', 'crown', 'coin', 'diamond', 'gift', 'trophy', 'mic', 'bolt'];
 
-function Chips<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+function Chips<T extends string | number>({ value, options, onChange, icons }: { value: T; options: [T, string][]; onChange: (v: T) => void; icons?: Record<string, number> }) {
   return (
     <View style={s.chips}>
       {options.map(([v, l]) => (
-        <Pressable key={String(v)} onPress={() => onChange(v)} style={[s.chip, value === v && s.chipOn]}>
+        <Pressable key={String(v)} onPress={() => onChange(v)} style={[s.chip, value === v && s.chipOn, icons?.[String(v)] !== undefined && s.chipRow]}>
+          {icons?.[String(v)] !== undefined && <Image source={icons[String(v)]} style={s.chipIcon} />}
           <Text style={s.chipText}>{l}</Text>
         </Pressable>
       ))}
@@ -72,7 +74,7 @@ export default function AnimationAdmin() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
         {tab === 'catalog' && (
           <>
-            <Chips value={cat} options={[['all', 'Tümü'], ...ANIM_CATEGORIES.map((c) => [c.id, `${c.emoji} ${c.name}`] as [string, string])]} onChange={setCat} />
+            <Chips value={cat} options={[['all', 'Tümü'], ...ANIM_CATEGORIES.map((c) => [c.id, c.name] as [string, string])]} onChange={setCat} icons={ANIM_CATEGORY_ART} />
             {list.map((a) => (
               <Card key={a.animation_id} style={{ gap: 8 }}>
                 <Pressable style={s.row} onPress={() => setOpen(open === a.animation_id ? null : a.animation_id)} accessibilityLabel={`${a.name} düzenle`}>
@@ -258,7 +260,7 @@ function NewForm({ onCreated }: { onCreated: () => void }) {
   const [category, setCategory] = useState('cute');
   const [free, setFree] = useState(true);
   const [price, setPrice] = useState('100');
-  const asset = (kind === 'icon' ? { kind, value: value as Icon3DName } : { kind, value }) as Asset;
+  const asset = (kind === 'icon' ? { kind, value: value as Icon3DName } : kind === 'art' ? { kind, value: value as AnimArtName } : { kind, value }) as Asset;
   const create = () => {
     if (!name.trim()) return showAlert('Ad gerekli');
     if (!value.trim()) return showAlert('Görsel gerekli');
@@ -295,16 +297,19 @@ function NewForm({ onCreated }: { onCreated: () => void }) {
         value={kind}
         options={[
           ['emoji', 'Emoji'],
+          ['art', 'Efekt görseli'],
           ['icon', '3D ikon'],
           ['url', 'Dosya URL (manuel)'],
         ]}
         onChange={(k) => {
           setKind(k);
-          setValue(k === 'icon' ? 'heart' : k === 'emoji' ? '🎉' : '');
+          setValue(k === 'icon' ? 'heart' : k === 'art' ? 'alkis' : k === 'emoji' ? '🎉' : '');
         }}
       />
       {kind === 'icon' ? (
         <Chips value={value} options={ICONS.map((i) => [i, i] as [string, string])} onChange={setValue} />
+      ) : kind === 'art' ? (
+        <Chips value={value} options={ANIM_ART_NAMES.map((n) => [n, n] as [string, string])} onChange={setValue} />
       ) : (
         <TextInput value={value} onChangeText={setValue} placeholder={kind === 'url' ? 'https://… (PNG/GIF)' : 'Emoji'} placeholderTextColor={colors.textDim} style={s.inputWide} autoCapitalize="none" />
       )}
@@ -340,6 +345,8 @@ const s = StyleSheet.create({
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
   chipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.15)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  chipIcon: { width: 18, height: 18 },
   small: { borderRadius: 999, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start' },
   btn: { backgroundColor: semantic.action, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   btnText: { color: semantic.actionInk, fontWeight: '900' },
