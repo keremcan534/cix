@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Similar Club Maliyet Hesabı</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one answer at the top, then where the money goes, one chart, a short table, and the assumptions last. */
+:root {
+  --bg: #f4f6f7; --surface: #fcfcfb; --ink: #0d1b24; --ink-2: #4a5963; --muted: #7d8a92;
+  --line: #dfe5e8; --axis: #c3ccd1; --accent: #0a7f85; --accent-soft: rgba(10,127,133,.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --good: #0ca30c; --good-ink: #006300; --bad: #d03b3b; --bad-ink: #b42f2f;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1218; --surface: #141c22; --ink: #eef2f3; --ink-2: #b9c4c9; --muted: #85929a;
+  --line: #24303a; --axis: #34424d; --accent: #2ec4ca; --accent-soft: rgba(46,196,202,.12);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --good-ink: #0ca30c; --bad-ink: #ef6b6b; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0b1218; --surface: #141c22; --ink: #eef2f3; --ink-2: #b9c4c9; --muted: #85929a;
+  --line: #24303a; --axis: #34424d; --accent: #2ec4ca; --accent-soft: rgba(46,196,202,.12);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --good-ink: #0ca30c; --bad-ink: #ef6b6b; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -.01em; }
+h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 800; }
+h2 { font-size: 20px; font-weight: 800; }
+p { margin: 0; }
+.sub { color: var(--ink-2); max-width: 70ch; }
+.small { font-size: 13px; color: var(--ink-2); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.verdict { font-size: 17px; line-height: 1.55; border-left: 4px solid var(--accent); padding: 4px 0 4px 14px; }
+.verdict strong { font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.tile .k { font-size: 13px; color: var(--ink-2); }
+.tile .v { font-family: var(--display); font-size: clamp(22px, 3vw, 30px); font-weight: 800; font-variant-numeric: tabular-nums; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.good { color: var(--good-ink); }
+.bad { color: var(--bad-ink); }
+.bar { display: flex; height: 40px; gap: 2px; border-radius: 8px; overflow: hidden; }
+.bar div { display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 18px; }
+.legend .item { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: baseline; font-size: 14px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; transform: translateY(1px); }
+.legend .val { font-family: var(--mono); font-size: 13px; }
+.chartbox { position: relative; }
+.chartbox svg { width: 100%; height: auto; display: block; overflow: visible; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.keys i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+.keys i.line { height: 3px; width: 14px; vertical-align: 3px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.14); border-radius: 10px; padding: 8px 10px; font-size: 13px; min-width: 200px; z-index: 5; }
+.tip .r { display: flex; justify-content: space-between; gap: 12px; }
+.tip .r span:last-child { font-family: var(--mono); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; }
+@media (max-width: 760px) { .groups { grid-template-columns: minmax(0, 1fr); } }
+.group { display: grid; gap: 10px; align-content: start; }
+.group h3 { margin: 0; font-size: 15px; font-family: var(--display); font-weight: 800; }
+.ctl { display: grid; gap: 3px; }
+.ctl label { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; color: var(--ink-2); }
+.ctl output { font-family: var(--mono); font-size: 13px; color: var(--ink); white-space: nowrap; }
+input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+ul.rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ink-2); font-size: 14px; }
+details summary { cursor: pointer; font-weight: 600; }
+a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <h1>Similar Club Maliyet Hesabı</h1>
+    <p class="sub">Uygulamadaki kurallar ve sizin varsayımlarınızla 24 ay. Varsayımları sayfanın altından değiştirebilirsiniz; bütün sayılar anında güncellenir.</p>
+    <div class="seg" id="mode" role="group" aria-label="Büyüme şekli">
+      <button type="button" data-v="ads" aria-pressed="true">Bizim varsayımımız</button>
+      <button type="button" data-v="agency" aria-pressed="false">Ajans ağı planı (3.000 ajans)</button>
+    </div>
+  </header>
+
+  <p class="verdict" id="verdict" aria-live="polite"></p>
+
+  <section class="tiles">
+    <div class="tile"><span class="k">24. ayda aylık satış</span><span class="v" id="tSales"></span><span class="s" id="tSalesS"></span></div>
+    <div class="tile"><span class="k">24. ayda aylık kâr</span><span class="v" id="tProfit"></span><span class="s" id="tProfitS"></span></div>
+    <div class="tile"><span class="k">Kâra geçiş</span><span class="v" id="tBreak"></span><span class="s" id="tBreakS"></span></div>
+    <div class="tile"><span class="k">Başta gereken para</span><span class="v" id="tCash"></span><span class="s" id="tCashS"></span></div>
+  </section>
+
+  <section class="panel">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+      <h2>Kullanıcının ödediği 100 TL nereye gidiyor</h2>
+      <div class="seg" id="month" role="group" aria-label="Ay"><button type="button" data-v="3" aria-pressed="false">3. ay</button><button type="button" data-v="12" aria-pressed="false">12. ay</button><button type="button" data-v="24" aria-pressed="true">24. ay</button></div>
+    </div>
+    <div class="bar" id="bar" role="img"></div>
+    <div class="legend" id="barLegend"></div>
+    <p class="small" id="barNote"></p>
+  </section>
+
+  <section class="panel">
+    <h2>24 ay boyunca her ay ne kalıyor</h2>
+    <p class="small">Sütunlar o ayın kârı veya zararı; çizgi o güne kadar kasada biriken para (mağazalar satış parasını 15–45 gün sonra gönderdiği için kârdan biraz geride gelir).</p>
+    <div class="keys"><span><i style="background:var(--good)"></i>▲ Kâr eden ay</span><span><i style="background:var(--bad)"></i>▼ Zarar eden ay</span><span><i class="line" style="background:var(--s1)"></i>Kasadaki para</span></div>
+    <div class="chartbox" id="chartBox"><svg id="chart" role="img" aria-label="24 aylık kâr ve kasa grafiği"></svg></div>
+  </section>
+
+  <section class="panel">
+    <h2>Dönem dönem</h2>
+    <div class="tablewrap"><table id="table"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Varsayımlarımız</h2>
+    <p class="small">Bunlar tahmin; gerçek rakamlar geldikçe buradan güncelleyin.</p>
+    <div class="groups">
+      <div class="group" id="gAds">
+        <h3>Kullanıcılar</h3>
+        <div class="ctl"><label for="mau0">1. ay aylık kullanıcı <output id="mau0Out"></output></label><input id="mau0" type="range" min="100" max="10000" step="100"></div>
+        <div class="ctl"><label for="mau24">24. ay aylık kullanıcı <output id="mau24Out"></output></label><input id="mau24" type="range" min="1000" max="500000" step="1000"></div>
+        <div class="ctl"><label for="churn">Her ay ayrılan kullanıcı <output id="churnOut"></output></label><input id="churn" type="range" min="0" max="50" step="1"></div>
+        <div class="ctl"><label for="org">Reklamsız kendiliğinden gelen <output id="orgOut"></output></label><input id="org" type="range" min="0" max="100" step="5"></div>
+        <div class="ctl"><label for="cpi">Reklamla gelen kullanıcı başına maliyet <output id="cpiOut"></output></label><input id="cpi" type="range" min="0" max="2.5" step="0.05"></div>
+      </div>
+      <div class="group" id="gAgency" hidden>
+        <h3>Ajans ağı</h3>
+        <div class="ctl"><label for="bigHosts">Büyük ajans (200) başına yayıncı <output id="bigHostsOut"></output></label><input id="bigHosts" type="range" min="5" max="150" step="5"></div>
+        <div class="ctl"><label for="smallHosts">Küçük ajans (2.800) başına yayıncı <output id="smallHostsOut"></output></label><input id="smallHosts" type="range" min="1" max="30" step="1"></div>
+        <div class="ctl"><label for="join">İlk 3 ayda geçen yayıncı <output id="joinOut"></output></label><input id="join" type="range" min="5" max="100" step="5"></div>
+        <div class="ctl"><label for="payPerHost">Yayıncı başına ödeyen destekçi <output id="payPerHostOut"></output></label><input id="payPerHost" type="range" min="0.5" max="10" step="0.5"></div>
+        <div class="ctl"><label for="listenPerHost">Yayıncı başına ödemeyen dinleyici <output id="listenPerHostOut"></output></label><input id="listenPerHost" type="range" min="0" max="100" step="5"></div>
+        <div class="ctl"><label for="growth">3. aydan sonra aylık büyüme <output id="growthOut"></output></label><input id="growth" type="range" min="-5" max="15" step="1"></div>
+      </div>
+      <div class="group">
+        <h3>Harcama</h3>
+        <div class="ctl" id="payRow"><label for="pay">Ödeme yapan kullanıcı <output id="payOut"></output></label><input id="pay" type="range" min="1" max="20" step="0.5"></div>
+        <div class="ctl"><label for="seg1">Küçük ödeyen (ödeyenlerin %75'i), aylık <output id="seg1Out"></output></label><input id="seg1" type="range" min="30" max="500" step="10"></div>
+        <div class="ctl"><label for="seg2">Orta ödeyen (%20), aylık <output id="seg2Out"></output></label><input id="seg2" type="range" min="200" max="4000" step="50"></div>
+        <div class="ctl"><label for="seg3">Büyük ödeyen (%4), aylık <output id="seg3Out"></output></label><input id="seg3" type="range" min="1000" max="30000" step="500"></div>
+        <div class="ctl"><label for="seg4">Balina (%1), aylık <output id="seg4Out"></output></label><input id="seg4" type="range" min="5000" max="250000" step="5000"></div>
+      </div>
+      <div class="group">
+        <h3>Jetonlar nereye harcanıyor</h3>
+        <div class="ctl"><label for="casino">Casino oyunları <output id="casinoOut"></output></label><input id="casino" type="range" min="0" max="60" step="1"></div>
+        <div class="ctl"><label for="lucky">Lucky hediye <output id="luckyOut"></output></label><input id="lucky" type="range" min="0" max="40" step="1"></div>
+        <div class="ctl"><label for="vip">VIP, kozmetik, efekt <output id="vipOut"></output></label><input id="vip" type="range" min="0" max="40" step="1"></div>
+        <p class="small" id="giftShare"></p>
+      </div>
+      <div class="group">
+        <h3>İşletme</h3>
+        <div class="ctl"><label for="cb">Satışların Coins Bank'tan geçen payı <output id="cbOut"></output></label><input id="cb" type="range" min="0" max="80" step="5"></div>
+        <div class="ctl"><label for="agy">Ajanslı yayıncılara giden hediye <output id="agyOut"></output></label><input id="agy" type="range" min="0" max="100" step="5"></div>
+        <div class="ctl"><label for="mins">Aktif kullanıcının günlük oda süresi <output id="minsOut"></output></label><input id="mins" type="range" min="15" max="180" step="5"></div>
+        <div class="ctl"><label for="team">Ekip ve ofis, aylık <output id="teamOut"></output></label><input id="team" type="range" min="0" max="1500000" step="25000"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Sabit kurallar (uygulamada)</h2>
+    <ul class="rules">
+      <li>1 USD = 5.000 elmas; 1 jetonluk hediye yayıncıya 1 elmas. Jeton paketleri 29,99 TL (1.000 jeton) ile 23.599,99 TL (1.000.000 jeton) arası.</li>
+      <li>Ajans komisyonu yayıncı kazancının %40'ı, oda sahibi bonusu %20, diğer bonuslar ~%5; yayıncıdan kesilmez, şirket öder.</li>
+      <li>Casino: oynanan jetonun %60'ı kasaya, %40'ı kazananlara. Kazanç ayrı oyun bakiyesine yazılır, hediye edilemez.</li>
+      <li>Lucky hediye: gönderen ortalama fiyatın %65'ini geri kazanır; alıcıya fiyatın %20'si elmas yazılır.</li>
+      <li>Coins Bank ortalama %2,5 alır ve parayı hemen öder. Mağaza (Apple, Google) KDV hariç tutarın %15'ini alır (yıllık 1 milyon USD'yi geçince %30) ve 15–45 gün sonra öder. KDV %20.</li>
+      <li>Sunucu: her ay ucuz olan seçilir (LiveKit Cloud veya kendi sunucumuz + 400 USD bakım), veritabanı Supabase. Kur 49,8 TL/USD.</li>
+    </ul>
+    <details><summary>Kaynaklar</summary>
+      <p class="small" style="margin-top:8px;display:grid;gap:4px">
+        <a href="https://www.stocktitan.net/news/JOYY/joyy-reports-second-quarter-2026-financial-results-total-revenues-rocdq3yu6pcc.html" target="_blank" rel="noopener">JOYY (BIGO Live) 2026/Ç2 sonuçları</a>
+        <a href="https://www.stocktitan.net/sec-filings/YALA/6-k-yalla-group-ltd-current-report-foreign-issuer-2c7046b74077.html" target="_blank" rel="noopener">Yalla Group 2026/Ç2 sonuçları</a>
+        <a href="https://sensortower.com/blog/2025-q2-unified-top-5-social%20apps-revenue-tr-6009e912241bc16eb8566eef" target="_blank" rel="noopener">Sensor Tower: Türkiye sosyal uygulamalar 2025/Ç2</a>
+        <a href="https://www.forasoft.com/blog/article/livekit-vs-agora-cost-analysis" target="_blank" rel="noopener">LiveKit Cloud ve Agora fiyatları 2026</a>
+        <a href="https://uibakery.io/blog/supabase-pricing" target="_blank" rel="noopener">Supabase fiyatları 2026</a>
+        <a href="https://tradingeconomics.com/turkey/currency" target="_blank" rel="noopener">USD/TRY kuru</a>
+      </p>
+    </details>
+  </section>
+</div>
+
+<script>
+const FX = 49.8;
+const MONTHS = 24;
+const SEG = [{ share: 0.75 }, { share: 0.2 }, { share: 0.04 }, { share: 0.01 }];
+const BIG_AGENCIES = 200;
+const SMALL_AGENCIES = 2800;
+const ANDROID = 0.8;
+const CB_FEE = 0.025;
+/** The app's rules: 5.000 diamonds per USD, ≈41 coins per TL (weighted by pack), casino wins kept apart, Lucky host 20 %. */
+const RULES = { dpu: 5000, cpt: 41, giftable: 0, luckyHost: 0.2 };
+/** Your assumptions (the screenshot), plus the agency network inputs. */
+const DEFAULTS = {
+  mau0: 500, mau24: 5000, pay: 4, seg1: 120, seg2: 900, seg3: 7500, seg4: 50000, churn: 10, cpi: 0.1, org: 10, team: 0, mins: 100,
+  casino: 25, lucky: 10, vip: 10, agy: 50, cb: 30, bigHosts: 30, smallHosts: 4, join: 30, payPerHost: 2, listenPerHost: 20, growth: 3,
+};
+const state = { mode: 'ads', month: 24 };
+const IDS = Object.keys(DEFAULTS);
+const $ = (id) => document.getElementById(id);
+const nf0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const tl = (v) => `${nf0.format(Math.round(v))} TL`;
+const money = (v) => {
+  const a = Math.abs(v), s = v < 0 ? '−' : '';
+  if (a >= 1e6) return `${s}${nf1.format(a / 1e6)} milyon TL`;
+  if (a >= 1e3) return `${s}${nf0.format(a / 1e3)} bin TL`;
+  return `${s}${nf0.format(a)} TL`;
+};
+const users = (n) => (n >= 1e6 ? `${nf1.format(n / 1e6)} milyon` : n >= 1000 ? `${nf1.format(n / 1000)} bin` : nf0.format(Math.round(n)));
+const arppu = (p) => SEG.reduce((s, g, i) => s + g.share * p[`seg${i + 1}`], 0);
+function params() { const p = {}; IDS.forEach((k) => (p[k] = +$(k).value)); return p; }
+
+// --- Infrastructure (USD / month), same price model as before --------------------------------------
+function infraUsd(mau, newUsers, p) {
+  const dau = mau * 0.25;
+  const pm = dau * p.mins * 30;
+  const vid = 0.05, audio = pm * (1 - vid), video = pm * vid;
+  const gb = audio * 0.0009 + video * 0.011;
+  const conc = (dau * p.mins / 1440) * 3;
+  const ship = 50 + Math.max(0, pm - 150000) * 0.0005 + Math.max(0, gb - 250) * 0.12;
+  const scale = 500 + Math.max(0, pm - 1.5e6) * 0.0004 + Math.max(0, gb - 3000) * 0.10;
+  const cloud = pm <= 5000 && gb <= 50 ? 0 : Math.min(ship, scale);
+  const servers = Math.max(2, Math.ceil(conc * (1 - vid) / 1500 + conc * vid / 150));
+  const self = servers * 75 + Math.max(0, gb / 1000 - servers * 20) * 1.2 + 400;
+  const rtc = Math.min(cloud, self);
+  const compute = mau <= 5000 ? 0 : mau <= 20000 ? 5 : mau <= 60000 ? 50 : mau <= 150000 ? 100 : mau <= 400000 ? 200 : 400;
+  const msgs = dau * 20 * 20 * 30;
+  const db = 25 + compute + Math.max(0, mau - 100000) * 0.00325 + Math.max(0, Math.ceil((conc * 1.3 - 500) / 1000)) * 10 + Math.max(0, msgs - 5e6) / 1e6 * 2.5;
+  const sms = newUsers * 0.04;
+  const other = Math.max(0, mau * 0.05 - 10) * 0.015 + 25;
+  return { rtc, rtcKind: rtc === cloud ? 'LiveKit Cloud' : 'Kendi sunucumuz', db, sms, other, total: rtc + db + sms + other };
+}
+
+// --- Where a purchased coin ends up --------------------------------------------------------------
+// Wallet coins are spent on gifts, Lucky gifts, casino and VIP/cosmetics. Coins that come back (Lucky rewards
+// 65 %, casino winnings 40 % when they can be gifted) are spent again with the same mix.
+function flow(p, rules) {
+  const c = p.casino / 100, l = p.lucky / 100, v = p.vip / 100, g = Math.max(0, 1 - c - l - v);
+  const back = l * 0.65 + (rules.giftable ? c * 0.4 : 0);
+  const S = 1 / (1 - back);
+  return {
+    S,
+    diamonds: S * (g + l * rules.luckyHost),
+    end: [g * S, c * S * (rules.giftable ? 0.6 : 1), v * S, l * S * 0.35],
+    luckyDiamonds: S * l * rules.luckyHost,
+  };
+}
+
+// --- 24-month plan -----------------------------------------------------------------------------
+/** Agency network at full size: hosts, paying supporters and everyone in the app. */
+function agencyTarget(p) {
+  const hosts = (BIG_AGENCIES * p.bigHosts + SMALL_AGENCIES * p.smallHosts) * (p.join / 100);
+  return { hosts, payers: hosts * p.payPerHost, mau: hosts * (1 + p.payPerHost + p.listenPerHost) };
+}
+function plan(p, rules, mode = state.mode) {
+  const fl = flow(p, rules);
+  const dpu = rules.dpu;
+  const rows = [];
+  let prev = 0, cum = 0, year1Proceeds = 0;
+  const ap = arppu(p);
+  const ag = agencyTarget(p);
+  for (let t = 1; t <= MONTHS; t++) {
+    // Ads: smooth growth from the first to the 24th month. Agencies: the network moves over in 3 equal steps,
+    // then grows (or shrinks) by itself.
+    const size = t <= 3 ? t / 3 : Math.pow(1 + p.growth / 100, t - 3);
+    const mau = mode === 'agency' ? ag.mau * size : p.mau0 * Math.pow(p.mau24 / p.mau0, (t - 1) / (MONTHS - 1));
+    const payers = mode === 'agency' ? ag.payers * size : mau * (p.pay / 100);
+    const newUsers = t === 1 ? mau : Math.max(0, mau - prev * (1 - p.churn / 100));
+    const storeRate = t > 12 && year1Proceeds > 1e6 ? 0.30 : 0.15;
+    const gross = payers * ap;
+    const vat = gross - gross / 1.2;
+    // Coins Bank sales pay its fee instead of the store's commission and bring the cash in at once.
+    const W = (rules.cb ?? p.cb) / 100;
+    const store = (gross - vat) * (storeRate * (1 - W) + CB_FEE * W);
+    // Apple/Google's 1 mn USD threshold counts only what was sold through the stores.
+    if (t <= 12) year1Proceeds += ((gross - vat) * (1 - W) * (1 - storeRate)) / FX;
+    // App rules: coins per TL from the pack list, 1 gifted coin = 1 diamond (Lucky: the host share), agency 40% on
+    // the gifts that go to agency hosts, room owner 20% on 30%, other bonuses 5% of creator diamonds.
+    const creator = (gross * rules.cpt * fl.diamonds / dpu) * FX;
+    const payouts = creator * (1 + (p.agy / 100) * 0.4 + 0.3 * 0.2 + 0.05);
+    const inf = infraUsd(mau, newUsers, p);
+    const infra = inf.total * FX;
+    // No ads in the agency plan's first 3 months.
+    const ua = mode === 'agency' && t <= 3 ? 0 : (newUsers * (1 - p.org / 100) / 0.5) * p.cpi * FX;
+    const revenue = gross - vat;
+    const keep = revenue - store - payouts - infra;
+    const net = keep - ua - p.team;
+    cum += net;
+    rows.push({ t, mau, payers, newUsers, gross, revenue, store, storeRate, payouts, infra, inf, ua, team: p.team, keep, net, cum, cost: infra + ua + p.team, proceeds: revenue - store, bankProceeds: revenue * W * (1 - CB_FEE) });
+    prev = mau;
+  }
+  // Cash: Apple and Google remit VAT themselves and pay the rest later (Google ~15 days after month end, Apple up
+  // to 45 days), while hosts are paid weekly and servers monthly. The gap is the capital the launch needs.
+  let cash = 0;
+  rows.forEach((r, i) => {
+    const late = (x) => (x ? x.proceeds - x.bankProceeds : 0);
+    const cashIn = r.bankProceeds + ANDROID * late(rows[i - 1]) + (1 - ANDROID) * late(rows[i - 2]);
+    r.cashNet = cashIn - r.payouts - r.infra - r.ua - r.team;
+    cash += r.cashNet;
+    r.cash = cash;
+  });
+  return rows;
+}
+
+
+// --- Rendering -------------------------------------------------------------------------------------------
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
+function niceStep(range) { const raw = range / 4; const e = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
+const short = (v) => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return a >= 1e6 ? `${s}${nf1.format(a / 1e6)} mn` : a >= 1e3 ? `${s}${nf0.format(a / 1e3)} bin` : `${s}${nf0.format(a)}`; };
+
+function verdict(rows) {
+  const be = rows.find((r) => r.net > 0 && rows.slice(r.t - 1).every((x) => x.net > 0));
+  const minCash = rows.reduce((m, r) => (r.cash < m.cash ? r : m), rows[0]);
+  const last = rows[MONTHS - 1];
+  const parts = [];
+  if (!be) parts.push(`Bu varsayımlarla <strong>24 ay boyunca zarar</strong> ediliyor; 24. ayda aylık ${money(last.net)}.`);
+  else if (be.t === 1) parts.push(`Bu varsayımlarla <strong>ilk aydan kâr</strong> ediliyor.`);
+  else parts.push(`Bu varsayımlarla ilk ${be.t - 1} ay zarar, <strong>${be.t}. aydan itibaren kâr</strong> var.`);
+  if (minCash.cash < 0) parts.push(`Başta en fazla <strong>${money(-minCash.cash)}</strong> sermaye gerekiyor (${minCash.t}. ay).`);
+  else parts.push('Dışarıdan sermaye gerekmiyor.');
+  if (last.net > 0) parts.push(`24. ayda her ay <strong>${money(last.net)}</strong> kâr kalıyor; 24 ayın sonunda kasada ${money(last.cash)} oluyor.`);
+  $('verdict').innerHTML = parts.join(' ');
+  return { be, minCash, last };
+}
+
+function tiles(rows, v, p) {
+  const { be, minCash, last } = v;
+  $('tSales').textContent = money(last.gross);
+  $('tSalesS').textContent = `${users(last.mau)} kullanıcı, ${users(last.payers)} ödeyen`;
+  $('tProfit').textContent = money(last.net);
+  $('tProfit').className = `v ${last.net >= 0 ? 'good' : 'bad'}`;
+  $('tProfitS').textContent = last.gross ? `satışın %${nf0.format((last.net / last.gross) * 100)}'i` : '';
+  $('tBreak').textContent = be ? `${be.t}. ay` : 'yok';
+  $('tBreakS').textContent = be ? 'o aydan sonra her ay kâr' : '24 ay içinde kâra geçilmiyor';
+  $('tCash').textContent = minCash.cash < 0 ? money(-minCash.cash) : 'gerekmiyor';
+  $('tCashS').textContent = minCash.cash < 0 ? `kasa en dipte ${minCash.t}. ayda` : 'kasa hiç eksiye düşmüyor';
+}
+
+function breakdown(rows) {
+  const r = rows[state.month - 1];
+  const g = r.gross || 1;
+  const items = [
+    { name: 'Vergi (KDV)', v: r.gross - r.revenue, color: 'var(--s5)' },
+    { name: 'Mağaza ve Coins Bank payı', v: r.store, color: 'var(--s4)' },
+    { name: 'Yayıncı, ajans ve bonuslar', v: r.payouts, color: 'var(--s1)' },
+    { name: 'Sunucu, reklam ve ekip', v: r.infra + r.ua + r.team, color: 'var(--s2)' },
+  ];
+  const left = r.net;
+  if (left > 0) items.push({ name: 'Şirkete kalan', v: left, color: 'var(--s3)' });
+  const total = items.reduce((s, x) => s + x.v, 0);
+  $('bar').innerHTML = items.map((x) => { const w = (x.v / total) * 100; return `<div style="width:${w}%;background:${x.color}" title="${x.name}: ${nf0.format((x.v / g) * 100)} TL">${w >= 9 ? `${nf0.format((x.v / g) * 100)} TL` : ''}</div>`; }).join('');
+  $('bar').setAttribute('aria-label', items.map((x) => `${x.name} ${nf0.format((x.v / g) * 100)} TL`).join(', '));
+  $('barLegend').innerHTML = items.map((x) => `<div class="item"><i style="background:${x.color}"></i><span>${x.name}</span><span class="val">${nf0.format((x.v / g) * 100)} TL</span></div>`).join('') +
+    (left <= 0 ? `<div class="item"><i style="background:var(--bad)"></i><span class="bad">▼ Zarar</span><span class="val bad">${nf0.format((-left / g) * 100)} TL</span></div>` : '');
+  $('barNote').textContent = `${state.month}. ayda toplam satış ${money(r.gross)}. ${left > 0 ? `Her 100 TL'nin ${nf0.format((left / g) * 100)} TL'si şirkete kalıyor.` : `Giderler satıştan ${money(-left)} fazla; her 100 TL'lik satışa ${nf0.format((-left / g) * 100)} TL zarar düşüyor.`} Sunucu gideri kullanıcı sayısıyla az büyüdüğü için, kullanıcı arttıkça şirkete kalan pay büyür.`;
+}
+
+function tip(box, html, px, py) {
+  let t = box.querySelector('.tip');
+  if (!t) { t = document.createElement('div'); t.className = 'tip'; box.appendChild(t); }
+  if (!html) { t.hidden = true; return; }
+  t.hidden = false; t.innerHTML = html;
+  const tw = t.offsetWidth;
+  t.style.left = `${Math.min(Math.max(8, px - tw / 2), box.clientWidth - tw - 8)}px`;
+  t.style.top = `${Math.max(8, py - t.offsetHeight - 14)}px`;
+}
+
+function chart(rows) {
+  const svg = $('chart'), box = $('chartBox');
+  const w = Math.max(300, box.clientWidth), h = 300;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = '';
+  const f = { l: 62, r: 12, t: 12, b: 28 };
+  const vals = rows.flatMap((r) => [r.net, r.cash]);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  if (hi === lo) hi = lo + 1;
+  const st = niceStep(hi - lo);
+  lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st) * st;
+  const ih = h - f.t - f.b, iw = w - f.l - f.r;
+  const y = (v) => f.t + ih - ((v - lo) / (hi - lo)) * ih;
+  for (let v = lo; v <= hi + 1e-9; v += st) {
+    el('line', { x1: f.l, x2: w - f.r, y1: y(v), y2: y(v), stroke: Math.abs(v) < 1e-9 ? 'var(--axis)' : 'var(--line)' }, svg);
+    const tx = el('text', { x: f.l - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)', 'font-family': 'var(--mono)' }, svg);
+    tx.textContent = short(v);
+  }
+  const slot = iw / rows.length, bw = Math.max(4, Math.min(22, slot * 0.6));
+  const cx = (i) => f.l + slot * (i + 0.5);
+  rows.forEach((r, i) => {
+    const y0 = y(0), y1 = y(r.net), top = Math.min(y0, y1), hh = Math.max(1, Math.abs(y1 - y0));
+    el('rect', { x: cx(i) - bw / 2, y: top, width: bw, height: hh, rx: 3, fill: r.net >= 0 ? 'var(--good)' : 'var(--bad)' }, svg);
+  });
+  el('path', { d: rows.map((r, i) => `${i ? 'L' : 'M'}${cx(i)},${y(r.cash)}`).join(''), fill: 'none', stroke: 'var(--s1)', 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg);
+  const lastI = rows.length - 1;
+  el('circle', { cx: cx(lastI), cy: y(rows[lastI].cash), r: 4.5, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2 }, svg);
+  [1, 6, 12, 18, 24].forEach((m) => { const tx = el('text', { x: cx(m - 1), y: h - 8, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, svg); tx.textContent = `${m}. ay`; });
+  const hit = el('rect', { x: f.l, y: f.t, width: iw, height: ih, fill: 'transparent' }, svg);
+  hit.addEventListener('mousemove', (ev) => {
+    const rect = svg.getBoundingClientRect(), sx = ((ev.clientX - rect.left) / rect.width) * w;
+    const i = Math.max(0, Math.min(lastI, Math.floor((sx - f.l) / slot)));
+    const r = rows[i], br = box.getBoundingClientRect();
+    tip(box, `<b>${r.t}. ay · ${users(r.mau)} kullanıcı</b><div class="r"><span>Satış</span><span>${money(r.gross)}</span></div><div class="r"><span>${r.net >= 0 ? '▲ Kâr' : '▼ Zarar'}</span><span>${money(r.net)}</span></div><div class="r"><span>Kasada</span><span>${money(r.cash)}</span></div>`, ev.clientX - br.left, ev.clientY - br.top);
+  });
+  hit.addEventListener('mouseleave', () => tip(box, null));
+}
+
+function table(rows) {
+  const pick = [1, 3, 6, 12, 18, 24].map((m) => rows[m - 1]);
+  $('table').innerHTML = `<thead><tr><th>Ay</th><th>Kullanıcı</th><th>Ödeyen</th><th>Satış</th><th>Yayıncılara</th><th>Vergi ve mağaza</th><th>Sunucu, reklam, ekip</th><th>Kâr / zarar</th><th>Kasada</th></tr></thead><tbody>` +
+    pick.map((r) => `<tr><td>${r.t}. ay</td><td>${users(r.mau)}</td><td>${users(r.payers)}</td><td>${money(r.gross)}</td><td>${money(r.payouts)}</td><td>${money(r.gross - r.revenue + r.store)}</td><td>${money(r.infra + r.ua + r.team)}</td><td class="${r.net >= 0 ? 'good' : 'bad'}">${r.net >= 0 ? '▲' : '▼'} ${money(r.net)}</td><td>${money(r.cash)}</td></tr>`).join('') + '</tbody>';
+}
+
+function outputs(p) {
+  const set = (id, v) => ($(`${id}Out`).textContent = v);
+  set('mau0', users(p.mau0)); set('mau24', users(p.mau24)); set('churn', `%${p.churn}`); set('org', `%${p.org}`);
+  set('cpi', `${nf2.format(p.cpi)} USD`); set('pay', `%${nf1.format(p.pay)}`);
+  for (let i = 1; i <= 4; i++) set(`seg${i}`, tl(p[`seg${i}`]));
+  set('casino', `%${p.casino}`); set('lucky', `%${p.lucky}`); set('vip', `%${p.vip}`);
+  set('cb', `%${p.cb}`); set('agy', `%${p.agy}`); set('mins', `${p.mins} dk`); set('team', tl(p.team));
+  set('bigHosts', `${p.bigHosts} yayıncı`); set('smallHosts', `${p.smallHosts} yayıncı`); set('join', `%${p.join}`);
+  set('payPerHost', nf1.format(p.payPerHost)); set('listenPerHost', nf0.format(p.listenPerHost)); set('growth', `%${p.growth}`);
+  $('giftShare').textContent = `Kalan %${Math.max(0, 100 - p.casino - p.lucky - p.vip)} normal hediyelere gidiyor. Ödeyen başına ortalama aylık harcama: ${tl(arppu(p))}.`;
+}
+
+function render() {
+  const p = params();
+  outputs(p);
+  const rows = plan(p, { ...RULES, cb: p.cb }, state.mode);
+  const v = verdict(rows);
+  tiles(rows, v, p);
+  breakdown(rows);
+  chart(rows);
+  table(rows);
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === mode)));
+  $('gAds').hidden = mode !== 'ads';
+  $('gAgency').hidden = mode !== 'agency';
+  $('payRow').hidden = mode !== 'ads';
+  // In the agency plan nearly every gift goes to agency hosts, and nobody is bought with ads.
+  $('agy').value = mode === 'agency' ? 90 : DEFAULTS.agy;
+  $('org').value = mode === 'agency' ? 100 : DEFAULTS.org;
+}
+
+IDS.forEach((k) => ($(k).value = DEFAULTS[k]));
+IDS.forEach((k) => $(k).addEventListener('input', render));
+document.querySelectorAll('#mode button').forEach((b) => b.addEventListener('click', () => { setMode(b.dataset.v); render(); }));
+document.querySelectorAll('#month button').forEach((b) => b.addEventListener('click', () => {
+  state.month = +b.dataset.v;
+  document.querySelectorAll('#month button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+}));
+let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 120); });
+setMode('ads');
+render();
+</script>
+
+</html>

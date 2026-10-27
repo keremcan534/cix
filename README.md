@@ -91,6 +91,7 @@ Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sö
 - **Küçültülebilir oda:** geri tuşu veya kapatma "Odayı küçült / Odadan çık" diye sorar; küçültülen oda her ekranda mini kart olarak sürer (aynı oturum, yeniden bağlanmadan), başka odaya geçiş önce sorulur, uygulama yeniden açılınca güvenli geri dönüş önerilir. Ses motoru şimdilik simülasyon; gerçek ses ve arka plan sesi için yapılandırma hazır. Ayrıntı ve teslim raporu: [`docs/ODA_OTURUMU.md`](docs/ODA_OTURUMU.md).
 - **PK:** Normal PK (varsayılan, bireysel), Takım PK (sunucuda rastgele veya manuel takımlar, ikiye ayrılan mikrofon alanı) ve odalar arası PK; koltuk altında canlı PK puanı, sonuç ekranı ve "Taç Kazandıranlar". Ayrıntı: [`docs/PK_MODULU.md`](docs/PK_MODULU.md).
 - **Yayına Katılma Modu ve ortak YouTube ekranı:** Oda Ayarları (veya oda menüsü) › Yayına Katılma Modu: Ses / Video / Sinema Salonu / Çift Odası sekmelerinde 34 mikrofon yerleşimi (katalog verisi), oda seviyesi kilidi, PK takım bölgeleri; Video ve Sinema Salonu'nda yalnızca YouTube bağlantısıyla ortak izleme. Yetki, seviye, kapasite ve bağlantı doğrulaması `lib/room-modes` içinde. Ayrıntı: [`docs/ODA_MODLARI.md`](docs/ODA_MODLARI.md).
+- **Maliyet hesabı:** uygulamadaki ekonomi kurallarıyla 24 aylık kâr-zarar, nakit ihtiyacı ve 100 TL'nin dağılımı; varsayımlar sayfada değiştirilebilir. Tarayıcıda açın: [`docs/maliyet-hesabi.html`](docs/maliyet-hesabi.html).
 
 ## Testler
 
