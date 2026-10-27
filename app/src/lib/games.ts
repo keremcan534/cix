@@ -8,6 +8,8 @@
 import { useSyncExternalStore } from 'react';
 
 import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data/games';
+import { ME } from '@/data/mock';
+import { announceWin } from '@/lib/broadcast';
 import { today } from '@/lib/persist';
 
 export type Entry = { from: 'profile' } | { from: 'room'; roomId: string; roomTitle: string };
@@ -149,6 +151,8 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
   const outcome = roll(game.id, pick);
   const payout = Math.floor(bet * outcome.multiplier);
   if (payout > 0) deps.credit(payout, `${game.name} · kazanç ${id}`);
+  // A real win (more back than the stake) is announced in every room.
+  if (payout > bet) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout }, { mine: true });
   return finish({ ok: true, outcome, replay: false, row: { ...base, txId: id, payout, status: 'Tamamlandı', detail: outcome.detail } });
 }
 

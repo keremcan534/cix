@@ -61,7 +61,7 @@ export type Settings = {
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
   bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
-  /** Big Lucky wins are announced in the room with my name (off: "Bir kullanıcı"). */
+  /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
   luckyAnnounce: boolean;
 };
 /** Block, unblock, report and data requests are kept as a record (spec: profile §5). */

@@ -85,7 +85,8 @@ export function GiftSheet({
   initialTo?: string | null;
   coins: number;
   onSend: (g: Gift, to: string[], count: number) => void;
-  onSendLucky: (giftId: string, toId: string) => void;
+  /** One Lucky gift to each person picked (one draw per person). */
+  onSendLucky: (giftId: string, toIds: string[]) => void;
 }) {
   const { svipLevel, spentTotal, me } = useApp();
   const lucky = useLucky();
@@ -162,10 +163,10 @@ export function GiftSheet({
 
   const luckyBlock = isLucky ? (me.age < LUCKY_MIN_AGE ? `Lucky hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` : unavailable(lg)) : null;
   const sendLucky = () => {
-    if (targets.length !== 1 || luckyBlock) return;
-    if (lg.price > coins) return goWallet();
+    if (!targets.length || luckyBlock) return;
+    if (lg.price * targets.length > coins) return goWallet();
     pressHaptic();
-    onSendLucky(lg.id, targets[0]);
+    onSendLucky(lg.id, targets);
   };
 
   const send = () => {
@@ -189,13 +190,11 @@ export function GiftSheet({
   const footer = !targets.length
     ? { tone: 'info' as const, text: roomIds.length ? 'Hediyeyi kime göndereceğini yukarıdan seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
     : isLucky
-      ? targets.length > 1
-        ? { tone: 'warn' as const, text: 'Lucky hediye tek kişiye, tek adet gönderilir. Yukarıdan bir kişi seç.', cta: 'Bir kişi seç', disabled: true }
-        : luckyBlock
-          ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
-          : lg.price > coins
-            ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(lg.price - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
-            : { tone: 'info' as const, text: `En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Gönderdikten sonra sağ alttaki çarka basarak aynı hediyeyi tekrar gönderebilirsin.`, cta: `Gönder · ${fmt(lg.price)}`, variant: 'money' as const }
+      ? luckyBlock
+        ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
+        : total > coins
+          ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
+          : { tone: 'info' as const, text: `${targets.length > 1 ? `Her kişi için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : locked
       ? { tone: 'lock' as const, text: `${gift.name}, SVIP ${gift.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`, cta: 'SVIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -341,7 +340,7 @@ export function GiftSheet({
                 {isLucky ? `${lg.name} · Lucky` : gift.name}
               </Text>
               <Text style={g.dim} numberOfLines={1}>
-                {isLucky ? `${fmt(lg.price)} jeton × 1 adet × ${targets.length} kişi` : fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × {count} adet × {targets.length} kişi
+                {isLucky ? `${fmt(lg.price)} jeton × 1 adet × ${targets.length} kişi` : `${fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × ${count} adet × ${targets.length} kişi`}
                 {!isLucky && gift.intimacy && !fromBag ? ` · 💗 +${fmt(gift.intimacy * count)} yakınlık` : ''}
               </Text>
             </View>
