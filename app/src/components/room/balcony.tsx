@@ -259,20 +259,6 @@ export function MicInvitePrompt({ invite, onAnswer }: { invite: MicInvite; onAns
 }
 
 // --- Connection banner ----------------------------------------------------------------------------------
-export function ConnectionBanner({ onReconnect }: { onReconnect: () => void }) {
-  return (
-    <View style={s.conn} accessibilityLiveRegion="polite">
-      <Ionicons name="cloud-offline-outline" size={16} color={semantic.moneyInk} />
-      <Text style={s.connText} numberOfLines={2}>
-        Bağlantı koptu · yeniden bağlanılıyor. Sayılar ve liste son alınan durumu gösteriyor.
-      </Text>
-      <Pressable onPress={onReconnect} hitSlop={8} accessibilityLabel="Şimdi yeniden bağlan">
-        <Text style={s.connGo}>Bağlan</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 8 },
   balcony: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, backgroundColor: 'rgba(22,37,60,0.72)', borderWidth: 1, borderColor: 'rgba(163,177,207,0.22)', borderRadius: 999, paddingLeft: 12, paddingRight: 6, minHeight: 40 },
@@ -315,7 +301,4 @@ const s = StyleSheet.create({
   declineText: { color: colors.text, fontWeight: '800', fontSize: 13 },
   accept: { backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   acceptText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
-  conn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: colors.gold, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  connText: { color: semantic.moneyInk, fontWeight: '700', fontSize: 12, flex: 1 },
-  connGo: { color: semantic.moneyInk, fontWeight: '900', textDecorationLine: 'underline' },
 });

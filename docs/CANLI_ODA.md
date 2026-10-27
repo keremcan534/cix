@@ -13,7 +13,7 @@ Kaynak: *SimilarClub — Canlı Oda UX/UI ve İşlevsel Geliştirme Şartnamesi*
 | `src/components/room/balcony.tsx` | Balkon şeridi, toplam kullanıcı sayacı, "Odadaki Kullanıcılar" penceresi, mikrofon daveti istemi, bağlantı bandı. |
 | `src/components/room/chat-feed.tsx` | Tümü / Hediyeler / Sohbet sekmeleri ve listeleri. |
 | `src/components/room/parts.tsx` | Sohbet satırı (hediye satırı ve "gönderilemedi" durumu), koltuk (kişisel sessiz rozeti). |
-| `src/app/oda/[id].tsx` | Entegrasyon: koltuklar artık oda katılımcı modelinden okunur; tüm koltuk, moderasyon ve davet işlemleri o katmandan geçer. |
+| `src/components/room/live-room.tsx` (eski `src/app/oda/[id].tsx`) | Entegrasyon: koltuklar artık oda katılımcı modelinden okunur; tüm koltuk, moderasyon ve davet işlemleri o katmandan geçer. |
 | `src/data/mock.ts` | Oda dinleyicileri için belirlenimci "misafir" kullanıcılar (`gx-<oda>-<n>`), böylece sayılar gerçek kişilere karşılık gelir ve profilleri açılır. |
 | `tests/room-presence.test.ts`, `tests/chat-feed.test.ts` | Otomatik testler. |
 
@@ -95,7 +95,7 @@ Davranış:
 
 - Katılımcılar benzersiz kullanıcı kimliğiyle tutulur; yeniden bağlanma ikinci kayıt oluşturmaz.
 - Hediye olaylarının sohbet kimliği işlem kimliğinden gelir (`gift:<txId>`); aynı olay tekrar gelirse ikinci satır ve ikinci puan oluşmaz.
-- **Bağlantı kopması (test):** Menü › Oda Araçları › *Bağlantı kopması (test)* bu cihazın bağlantısını 8 sn keser. Bu sürede:
+- **Bağlantı kopması (test):** Menü › Oda Araçları › *Ses ve bağlantı testi* › *Ağ bağlantısını kes* bu cihazın bağlantısını, aynı yerden geri getirilene kadar keser (yeniden bağlanma kuralları: [`ODA_OTURUMU.md`](ODA_OTURUMU.md)). Bu sürede:
   - sayaçlar, listeler ve PK son alınan durumu gösterir (sunucu değişmeye devam eder);
   - hediye, mikrofon (oturma, inme, kilit, taşıma, istek kabulü), davet, moderasyon, PK başlatma ve iptal yapılmaz, jeton düşülmez ("Bağlantı yok");
   - yazdığın mesaj "Gönderilemedi · tekrar dene" olarak işaretlenir;

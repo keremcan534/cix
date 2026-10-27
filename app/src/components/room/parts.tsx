@@ -335,18 +335,20 @@ export function RoundBtn({
   );
 }
 
-export type MicState = 'on' | 'off' | 'hand' | 'queued';
+/** `held`: the user turned the mic on but no audio goes out right now (permission, call, connection…). */
+export type MicState = 'on' | 'off' | 'hand' | 'queued' | 'held';
 const MIC_LOOK: Record<MicState, { icon: keyof typeof Ionicons.glyphMap; caption: string; bg: string; edge: string; fg: string; a11y: string }> = {
   on: { icon: 'mic', caption: 'AÇIK', bg: semantic.live, edge: semantic.liveEdge, fg: semantic.liveInk, a11y: 'Mikrofon açık, kapatmak için dokun' },
   off: { icon: 'mic-off', caption: 'KAPALI', bg: colors.cardAlt, edge: '#18112E', fg: '#FCA5A5', a11y: 'Mikrofon kapalı, açmak için dokun' },
   hand: { icon: 'hand-left', caption: 'EL KALDIR', bg: colors.primary, edge: semantic.actionEdge, fg: '#fff', a11y: 'El kaldır, konuşmak iste' },
   queued: { icon: 'hourglass', caption: 'SIRADA', bg: semantic.tonal, edge: 'transparent', fg: semantic.tonalText, a11y: 'Konuşmacı sırasındasın' },
+  held: { icon: 'mic-outline', caption: 'DURAKLADI', bg: 'rgba(246,189,96,0.2)', edge: semantic.moneyEdge, fg: colors.gold, a11y: 'Mikrofonun açık ama şu an ses gitmiyor; kapatmak için dokun' },
 };
 
 /** The biggest control in the room: state is shown by color, icon and caption together, never by color alone. */
-export function MicBtn({ state, queuePos, onPress }: { state: MicState; queuePos?: number; onPress: () => void }) {
+export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPress }: { state: MicState; queuePos?: number; caption?: string; hint?: string; onPress: () => void }) {
   const look = MIC_LOOK[state];
-  const caption = state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : look.caption;
+  const caption = captionOverride ?? (state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : look.caption);
   return (
     <Pressable
       onPress={() => {
@@ -354,8 +356,9 @@ export function MicBtn({ state, queuePos, onPress }: { state: MicState; queuePos
         onPress();
       }}
       accessibilityRole="button"
-      accessibilityLabel={look.a11y}
-      accessibilityState={{ checked: state === 'on' }}
+      accessibilityLabel={hint ?? look.a11y}
+      accessibilityState={{ checked: state === 'on' || state === 'held' }}
+      aria-checked={state === 'on' || state === 'held'}
       style={{ alignItems: 'center', gap: 2 }}
     >
       {({ pressed }) => (
@@ -365,7 +368,7 @@ export function MicBtn({ state, queuePos, onPress }: { state: MicState; queuePos
               <Ionicons name={look.icon} size={26} color={look.fg} />
             </View>
           </View>
-          <Text style={[styles.micCaption, state === 'on' && { color: semantic.live }]}>{caption}</Text>
+          <Text style={[styles.micCaption, state === 'on' && { color: semantic.live }, state === 'held' && { color: colors.gold }]}>{caption}</Text>
         </>
       )}
     </Pressable>

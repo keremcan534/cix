@@ -89,13 +89,14 @@ Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sö
 ## Canlı oda ve PK
 
 - **Balkon, oda sayacı, katılımcı yönetimi, sohbet filtreleri:** mikrofonların altında Balkon ve dokunulabilir toplam sayaç; "Odadaki Kullanıcılar" penceresinde mikrofon daveti (davet edilen kabul eder), mikrofon susturma, kişisel sessiz, onaylı odadan çıkarma; sohbette Tümü / Hediyeler / Sohbet sekmeleri. Ayrıntı: [`docs/CANLI_ODA.md`](docs/CANLI_ODA.md).
+- **Küçültülebilir oda:** geri tuşu veya kapatma "Odayı küçült / Odadan çık" diye sorar; küçültülen oda her ekranda mini kart olarak sürer (aynı oturum, yeniden bağlanmadan), başka odaya geçiş önce sorulur, uygulama yeniden açılınca güvenli geri dönüş önerilir. Ses motoru şimdilik simülasyon; gerçek ses ve arka plan sesi için yapılandırma hazır. Ayrıntı ve teslim raporu: [`docs/ODA_OTURUMU.md`](docs/ODA_OTURUMU.md).
 - **PK:** Normal PK (varsayılan, bireysel), Takım PK (sunucuda rastgele veya manuel takımlar, ikiye ayrılan mikrofon alanı) ve odalar arası PK; koltuk altında canlı PK puanı, sonuç ekranı ve "Taç Kazandıranlar". Ayrıntı: [`docs/PK_MODULU.md`](docs/PK_MODULU.md).
 
 ## Testler
 
 ```bash
 cd app
-npm test            # oda katılımcı modeli, PK sunucusu ve sohbet filtreleri (Node yerleşik test koşucusu)
+npm test            # oda katılımcı modeli, oda oturumu, PK sunucusu ve sohbet filtreleri (Node yerleşik test koşucusu)
 npx tsc --noEmit    # tip denetimi
 npx expo lint
 ```

@@ -387,6 +387,8 @@ export function setConnection(connection: Connection) {
   emit({ connection, frozen: connection === 'offline' ? state.rooms : null });
 }
 export const isOnline = () => state.connection === 'online';
+/** The device's realtime connection, as a hook (the room session follows it). */
+export const useOnline = () => useSyncExternalStore(subscribe, isOnline, isOnline);
 
 /** The room as this viewer sees it: live when online, the last received snapshot while offline. */
 export function useRoomLive(roomId: string) {
