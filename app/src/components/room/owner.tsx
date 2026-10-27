@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GiftArt } from '@/components/GiftArt';
 import type { ModLog } from '@/components/room/community';
 import { Avatar } from '@/components/ui';
 import {
@@ -33,7 +34,7 @@ import { showAlert } from '@/lib/alert';
 import type { MyRoom } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 
-export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string };
+export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
 type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean };
 
 const fmtMinutes = (m: number) => (m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${m % 60} dk`);
@@ -428,7 +429,7 @@ export function RoomInfoSheet({
         ) : (
           giftLog.slice(0, 60).map((g) => (
             <View key={g.id} style={styles.listRow}>
-              <Text style={{ fontSize: 22 }}>{g.emoji}</Text>
+              <GiftArt giftId={g.giftId} emoji={g.emoji} size={28} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#fff' }}>
                   {userById(g.from).name} → {userById(g.to).name}

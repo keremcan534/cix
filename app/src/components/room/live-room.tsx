@@ -478,7 +478,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setModLog((l) => [{ id: msgId(), time: new Date().toTimeString().slice(0, 5), actor: myRole === 'owner' ? 'Sahip (sen)' : 'Yönetici (sen)', action, target, reason }, ...l]);
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
   const logGift = (from: string, to: string, gift: Gift, count: number) =>
-    setGiftLog((l) => [{ id: msgId(), from, to, emoji: gift.emoji, name: gift.name, count, coins: gift.price * count, time: clock() }, ...l].slice(0, 100));
+    setGiftLog((l) => [{ id: msgId(), from, to, emoji: gift.emoji, name: gift.name, count, coins: gift.price * count, time: clock(), giftId: gift.id }, ...l].slice(0, 100));
 
   // Room XP for the user's own room. Level-ups are announced once per level.
   const gainXp = (n: number) => {
@@ -568,13 +568,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), REACTION_MS);
   };
   // Only recipients sitting on a seat get a flight; listeners see the chat line instead.
-  const flyGift = (emoji: string, count: number, toIds: string[], from: Point) => {
+  const flyGift = (emoji: string, count: number, toIds: string[], from: Point, giftId?: string) => {
     if (!visibleRef.current || settings.effectsOff || settings.reduceMotion) return;
     toIds.forEach((uid, i) =>
       seatViews.get(uid)?.measureInWindow((x, y, w, h) => {
         if (!w) return;
         const key = `${Date.now()}-${uid}-${Math.random()}`;
-        setFlights((f) => [...f.slice(-11), { key, emoji, count, from, to: { x: x + w / 2, y: y + h / 2 }, delay: i * 90 }]);
+        setFlights((f) => [...f.slice(-11), { key, emoji, count, from, to: { x: x + w / 2, y: y + h / 2 }, delay: i * 90, giftId }]);
       }),
     );
   };
@@ -606,7 +606,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const g = pick(GIFTS.slice(0, 6));
       const tx = `BOT-${msgId()}`;
       const r = scorePk(tx, from.id, to, g.id, g.price);
-      if (r.ok) addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} → ${userById(to).name} ${g.emoji} ${g.name} · PK +${r.points}`, gift: { fromId: from.id, toIds: [to], emoji: g.emoji, name: g.name, count: 1 } });
+      if (r.ok) addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} → ${userById(to).name} ${g.emoji} ${g.name} · PK +${r.points}`, gift: { fromId: from.id, toIds: [to], emoji: g.emoji, name: g.name, count: 1, giftId: g.id } });
     }, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -669,9 +669,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         const tx = `BOT-${msgId()}`;
         addContrib(u.id, g.price);
         logGift(u.id, hostId, g, 1);
-        addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${u.name} → ${userById(hostId).name} ${g.emoji} ${g.name}`, gift: { fromId: u.id, toIds: [hostId], emoji: g.emoji, name: g.name, count: 1 } });
+        addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${u.name} → ${userById(hostId).name} ${g.emoji} ${g.name}`, gift: { fromId: u.id, toIds: [hostId], emoji: g.emoji, name: g.name, count: 1, giftId: g.id } });
         scorePk(tx, u.id, hostId, g.id, g.price);
-        flyGift(g.emoji, 1, [hostId], { x: 36, y: win.height * 0.72 });
+        flyGift(g.emoji, 1, [hostId], { x: 36, y: win.height * 0.72 }, g.id);
       } else {
         addMsg({ userId: u.id, text: pick(BOT_LINES) });
       }
@@ -697,9 +697,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       gainXp(gift.price);
       addContrib(from.id, gift.price);
       logGift(from.id, 'me', gift, 1);
-      flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 });
+      flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, gift.id);
       if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) setGiftFx(gift);
-      addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1 } });
+      addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1, giftId: gift.id } });
       scorePk(tx, from.id, 'me', gift.id, gift.price);
     }, 6000);
     const reqs = setInterval(() => {
@@ -1165,14 +1165,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
     if (showFx(gift.price)) setGiftFx(gift);
     // From the gift button (bottom right) to each recipient's seat.
-    flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 });
+    flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 }, gift.id);
     const sendId = msgId();
     delivered.forEach((r) => scorePk(`GT-${sendId}-${r.userId}`, 'me', r.userId, gift.id, each));
     addMsg({
       id: `gift:GT-${sendId}`,
       system: true,
       text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!`,
-      gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count },
+      gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count, giftId: gift.id },
     });
     // Only a partial delivery opens the results panel; a normal send shows no extra message.
     if (delivered.length < toIds.length) {

@@ -5,7 +5,7 @@
 
 export type FeedKind = 'chat' | 'gift' | 'system' | 'bot';
 export type FeedTab = 'all' | 'gifts' | 'chat';
-export type GiftEvent = { fromId: string; toIds: string[]; emoji: string; name: string; count: number; lucky?: boolean };
+export type GiftEvent = { fromId: string; toIds: string[]; emoji: string; name: string; count: number; lucky?: boolean; /** Catalog gift id (picks the gift's image). */ giftId?: string };
 export type FeedMsg = {
   id: string;
   kind?: FeedKind;

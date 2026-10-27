@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
 
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
+import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
 import { cosmeticById } from '@/data/catalog';
 import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
@@ -250,8 +251,10 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
               <Text style={styles.giftName}>{userById(g.fromId).name}</Text>
               <Text style={{ color: colors.textDim }}> → </Text>
               <Text style={styles.giftName}>{to}</Text>
-              {`  ${g.emoji} ${g.name}${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Lucky' : ''}`}
+              {giftArtOf(g.giftId) ? `  ${g.name}` : `  ${g.emoji} ${g.name}`}
+              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Lucky' : ''}`}
             </Text>
+            {giftArtOf(g.giftId) && <GiftArt giftId={g.giftId} emoji={g.emoji} size={24} />}
           </>
         ) : (
           <Text style={styles.giftText}>{msg.text}</Text>
@@ -389,20 +392,21 @@ export function GiftAnimation({ gift, onDone }: { gift: Gift; onDone: () => void
     ]).start(() => done.current());
   }, [v]);
 
+  const motion = {
+    opacity: v.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }),
+    transform: [
+      { scale: v.interpolate({ inputRange: [0, 1, 2], outputRange: [0.2, 1, 1.6] }) },
+      { translateY: v.interpolate({ inputRange: [0, 1, 2], outputRange: [120, 0, -80] }) },
+    ],
+  };
+  const art = giftArtOf(gift.id);
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-      <Animated.Text
-        style={{
-          fontSize: 140,
-          opacity: v.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }),
-          transform: [
-            { scale: v.interpolate({ inputRange: [0, 1, 2], outputRange: [0.2, 1, 1.6] }) },
-            { translateY: v.interpolate({ inputRange: [0, 1, 2], outputRange: [120, 0, -80] }) },
-          ],
-        }}
-      >
-        {gift.emoji}
-      </Animated.Text>
+      {art ? (
+        <Animated.Image source={giftSource(art, 200)} style={[{ width: 200, height: 200 }, motion]} resizeMode="contain" />
+      ) : (
+        <Animated.Text style={[{ fontSize: 140 }, motion]}>{gift.emoji}</Animated.Text>
+      )}
     </View>
   );
 }

@@ -5,10 +5,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { Icon3D, icon3dFor } from '@/components/Icon3D';
+import { GiftArt, giftArtOf } from '@/components/GiftArt';
 import { colors, semantic } from '@/theme';
 
 export type Point = { x: number; y: number };
-export type Flight = { key: string; emoji: string; count: number; from: Point; to: Point; delay: number };
+export type Flight = { key: string; emoji: string; count: number; from: Point; to: Point; delay: number; /** Catalog gift id: flies its image when it has one. */ giftId?: string };
 
 const FLY_MS = 760;
 const LAND_MS = 520;
@@ -65,7 +66,7 @@ function GiftFlight({ flight, onDone }: { flight: Flight; onDone: (key: string) 
         },
       ]}
     >
-      {icon ? <Icon3D name={icon} size={SIZE} /> : <Text style={s.emoji}>{flight.emoji}</Text>}
+      {giftArtOf(flight.giftId) ? <GiftArt giftId={flight.giftId} emoji={flight.emoji} size={SIZE} /> : icon ? <Icon3D name={icon} size={SIZE} /> : <Text style={s.emoji}>{flight.emoji}</Text>}
       {flight.count > 1 && (
         <Animated.View style={[s.tag, { opacity: land.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 1, 1] }) }]}>
           <Text style={s.tagText}>×{flight.count}</Text>

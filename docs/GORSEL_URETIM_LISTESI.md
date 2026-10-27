@@ -2,6 +2,8 @@
 
 Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir görsel**. Liste kodun taranmasıyla çıkarıldı (uygulamada 1.398 emoji kullanımı, 330 farklı emoji). Aynı görselin birden çok yerde kullanıldığı durumlarda tek satır ve tek dosya adı var.
 
+**Teslim durumu:** Parti 01 (Popüler hediyeler 1–12) teslim alındı ve uygulamaya bağlandı: `app/assets/gifts/192` (liste, sohbet, uçuş) ve `app/assets/gifts/512` (büyük gönderim animasyonu). Tabloda ✅ ile işaretli. Diğer hediyeler görseli gelene kadar emojisiyle görünür.
+
 **Toplam 536 görsel.** Öncelik: P1 134 (çok görünen, para kazandıran) · P2 183 · P3 158 · P4 61 (küçük arayüz simgeleri).
 
 | Bölüm | Adet |
@@ -69,18 +71,18 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 
 | # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
 |---|---|---|---|---|---|---|
-| 1 | `hediye-gul.png` | Gül | 🌹 | tek, uzun saplı kırmızı gül | P1 | Raf: Popüler |
-| 2 | `hediye-kalp.png` | Kalp | 💖 | parlayan mercan kalp, etrafında küçük ışıltılar | P1 | Raf: Popüler |
-| 3 | `hediye-kahve.png` | Kahve | ☕ | buharı tüten fincan kahve | P1 | Raf: Popüler |
-| 4 | `hediye-pasta.png` | Pasta | 🎂 | mumlu, katlı doğum günü pastası | P1 | Raf: Popüler |
-| 5 | `hediye-tac.png` | Taç | 👑 | mücevherli altın taç | P1 | Raf: Popüler |
-| 6 | `hediye-roket.png` | Roket | 🚀 | alev püskürten turkuaz-altın roket | P1 | Raf: Popüler |
-| 7 | `hediye-elmas.png` | Elmas | 💎 | büyük, ışık kıran kesme elmas | P1 | Raf: Popüler |
-| 8 | `hediye-sato.png` | Şato | 🏰 | altın kuleli masal şatosu | P1 | Raf: Popüler |
-| 9 | `hediye-oyun-zamani.png` | Oyun Zamanı | 🎮 | parlak oyun kumandası | P1 | Raf: Popüler |
-| 10 | `hediye-dunya-turu.png` | Dünya Turu | 🌍 | etrafında uçak rotası çizgisi olan dünya küresi | P1 | Raf: Popüler |
-| 11 | `hediye-seni-seviyorum.png` | Seni Seviyorum | 🥰 | kalp tutan sevimli karakter (insan yüzü yok) | P1 | Raf: Popüler |
-| 12 | `hediye-panda-sarilmasi.png` | Panda Sarılması | 🐼 | kalbe sarılmış panda | P1 | Raf: Popüler |
+| 1 | `hediye-gul.png` | Gül | 🌹 | tek, uzun saplı kırmızı gül | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 2 | `hediye-kalp.png` | Kalp | 💖 | parlayan mercan kalp, etrafında küçük ışıltılar | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 3 | `hediye-kahve.png` | Kahve | ☕ | buharı tüten fincan kahve | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 4 | `hediye-pasta.png` | Pasta | 🎂 | mumlu, katlı doğum günü pastası | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 5 | `hediye-tac.png` | Taç | 👑 | mücevherli altın taç | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 6 | `hediye-roket.png` | Roket | 🚀 | alev püskürten turkuaz-altın roket | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 7 | `hediye-elmas.png` | Elmas | 💎 | büyük, ışık kıran kesme elmas | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 8 | `hediye-sato.png` | Şato | 🏰 | altın kuleli masal şatosu | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 9 | `hediye-oyun-zamani.png` | Oyun Zamanı | 🎮 | parlak oyun kumandası | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 10 | `hediye-dunya-turu.png` | Dünya Turu | 🌍 | etrafında uçak rotası çizgisi olan dünya küresi | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 11 | `hediye-seni-seviyorum.png` | Seni Seviyorum | 🥰 | kalp tutan sevimli karakter (insan yüzü yok) | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 12 | `hediye-panda-sarilmasi.png` | Panda Sarılması | 🐼 | kalbe sarılmış panda | P1 | ✅ Teslim edildi · Raf: Popüler |
 | 13 | `hediye-tatil-keyfi.png` | Tatil Keyfi | 🏖️ | şemsiye ve palmiyeli küçük plaj adası | P1 | Raf: Popüler |
 | 14 | `hediye-ucan-opucuk.png` | Uçan Öpücük | 😘 | kalp şeklinde uçan öpücük, dudak izi | P1 | Raf: Popüler |
 | 15 | `hediye-gece-krali.png` | Gece Kralı | 🤴 | taç ve pelerin, gece mavisi, yıldızlar (gerçek kişi yok) | P1 | Raf: Popüler |

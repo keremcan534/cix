@@ -7,6 +7,7 @@ import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { GiftArt } from '@/components/GiftArt';
 import { Avatar, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice, FAMILIES } from '@/data/economy';
@@ -1039,7 +1040,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
       <View style={styles.giftWall}>
         {giftWall.map((g) => (
           <View key={g.id} style={styles.giftCell}>
-            <Text style={{ fontSize: 26, opacity: g.count > 0 ? 1 : 0.25 }}>{g.emoji}</Text>
+            <GiftArt giftId={g.id} emoji={g.emoji} size={34} style={{ opacity: g.count > 0 ? 1 : 0.25 }} textStyle={{ fontSize: 26, opacity: g.count > 0 ? 1 : 0.25 }} />
             <Text style={[styles.meta, { fontSize: 12 }]} numberOfLines={1}>
               {g.name}
             </Text>

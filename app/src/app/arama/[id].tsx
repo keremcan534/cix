@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GiftArt } from '@/components/GiftArt';
 import { CoinPill, VerifiedBadge } from '@/components/ui';
 import { callPrice } from '@/data/economy';
-import { GIFTS, userById } from '@/data/mock';
+import { GIFTS, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
 import { beginCall, endCall } from '@/lib/media';
@@ -31,7 +32,7 @@ export default function CallScreen() {
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [front, setFront] = useState(true);
-  const [floating, setFloating] = useState<string | null>(null);
+  const [floating, setFloating] = useState<Gift | null>(null);
   const pulse = useState(() => new Animated.Value(0))[0];
   const spentRef = useRef(0);
   // Release only what this screen claimed (a busy attempt must not end someone else's call).
@@ -117,7 +118,7 @@ export default function CallScreen() {
     const gift = GIFTS[2];
     if (!spendCoins(gift.price)) return showAlert('Yetersiz jeton');
     bump('giftsSent');
-    setFloating(gift.emoji);
+    setFloating(gift);
     setTimeout(() => setFloating(null), 1200);
   };
 
@@ -178,7 +179,7 @@ export default function CallScreen() {
 
         {floating && (
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ fontSize: 120 }}>{floating}</Text>
+            <GiftArt giftId={floating.id} emoji={floating.emoji} size={180} textStyle={{ fontSize: 120, lineHeight: 150 }} />
           </View>
         )}
 
