@@ -142,8 +142,41 @@ USERS.forEach((u, i) => {
 export const FOLLOWS_ME = new Set(['u1', 'u2', 'u5', 'u7', 'u9']);
 export const DM_PRICE = 10;
 
+// Room audiences are larger than the named mock users: every other person in a room is a deterministic
+// "guest" (id `gx-<room>-<n>`), so room counts, lists and profiles all resolve to the same real person.
+const GUEST_NAMES = ['Ahmet', 'Büşra', 'Cem', 'Derya', 'Ece', 'Furkan', 'Gizem', 'Hakan', 'İrem', 'Kerem', 'Leyla', 'Murat', 'Nazlı', 'Oğuz', 'Pelin', 'Rüzgar', 'Sude', 'Tolga', 'Umut', 'Yağmur', 'Zehra', 'Barış', 'Ceren', 'Doruk', 'Esra', 'Gökhan', 'Hande', 'Kaan', 'Mine', 'Serkan'];
+const GUEST_CITIES = ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Adana', 'Trabzon', 'Samsun', 'Kayseri'];
+const guests = new Map<string, User>();
+export const isGuestId = (id: string) => id.startsWith('gx-');
+export const guestId = (roomId: string, n: number) => `gx-${roomId}-${n}`;
+function guestUser(id: string): User {
+  const hit = guests.get(id);
+  if (hit) return hit;
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const name = GUEST_NAMES[h % GUEST_NAMES.length];
+  const u: User = {
+    id,
+    name: `${name}${h % 3 === 0 ? ` ${String.fromCharCode(65 + (h % 26))}.` : ''}`,
+    age: 19 + (h % 18),
+    city: GUEST_CITIES[h % GUEST_CITIES.length],
+    distanceKm: h % 900,
+    avatar: avatar(1 + (h % 70)),
+    verified: h % 4 === 0,
+    bio: 'Similar Club üyesi',
+    online: true,
+    gender: h % 2 ? 'Kadın' : 'Erkek',
+    username: `uye.${h % 100000}`,
+    country: 'TR',
+    joinedAt: '2026-06-01',
+    showGender: true,
+  };
+  guests.set(id, u);
+  return u;
+}
+
 export const userById = (id: string): User =>
-  id === 'me' ? ME : (USERS.find((u) => u.id === id) ?? USERS[0]);
+  id === 'me' ? ME : (USERS.find((u) => u.id === id) ?? (isGuestId(id) ? guestUser(id) : USERS[0]));
 
 export const ROOMS: Room[] = [
   { id: 'r1', title: 'Gece Sohbeti 🌙', category: 'Sohbet', cover: photo('night'), hostId: 'u1', listeners: 248, seatUserIds: ['u1', 'u2', 'u5', null, 'u7', null, 'u9', null, null], tags: ['Sohbet', 'Gece'], level: 6, roomType: 'free', announcement: 'Gece sohbetine hoş geldin, saygı her şeyden önce 🌙' },

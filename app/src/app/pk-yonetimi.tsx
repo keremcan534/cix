@@ -1,13 +1,13 @@
-// Admin: team PK settings, live PKs, history and integrity records (spec §10). A running PK keeps the
-// settings and scoring it started with; changes here apply to new PKs only.
+// Admin: PK settings (Normal, Takım and cross-room PK), live PKs, history and integrity records. A running PK
+// keeps the settings and scoring it started with; changes here apply to new PKs only.
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, Header } from '@/components/ui';
-import { GIFTS } from '@/data/mock';
+import { GIFTS, userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';
-import { PK_DURATIONS, cancelPk, finishNow, pointsFor, roomTitle, updateConfig, usePk, type PkSession } from '@/lib/pk';
+import { PK_DURATIONS, cancelPk, finishNow, modeLabel, pointsFor, revokeGift, roomTitle, updateConfig, usePk, type PkSession } from '@/lib/pk';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -32,8 +32,16 @@ function Row({ label, value, onChange }: { label: string; value: boolean; onChan
     </View>
   );
 }
+const who = (uid: string) => (uid === 'me' ? 'Sen' : userById(uid).name);
 const describe = (p: PkSession) =>
-  `${p.kind === 'cross' ? `${roomTitle(p.roomId)} vs ${roomTitle(p.opponentRoomId!)}` : `${roomTitle(p.roomId)} · oda içi`} · ${p.durationMin} dk · ${p.teams[0].score}–${p.teams[1].score} · ayar v${p.configVersion}`;
+  `${p.kind === 'cross' ? `${roomTitle(p.roomId)} vs ${roomTitle(p.opponentRoomId!)}` : `${roomTitle(p.roomId)} · ${modeLabel(p)}`} · ${p.durationMin} dk · ${
+    p.mode === 'solo' ? `${p.participants.length} kişi` : `${p.teams[0].score}–${p.teams[1].score}`
+  } · ayar v${p.configVersion}`;
+const outcome = (p: PkSession) => {
+  if (p.status !== 'done' || !p.result) return 'İptal';
+  if (p.mode === 'solo') return p.result.winners.length === 1 ? `Kazanan: ${who(p.result.winners[0])}` : p.result.winners.length ? 'Berabere' : 'Kazanan yok';
+  return p.result.winner === 'tie' ? 'Berabere' : `Kazanan: ${p.teams.find((t) => t.id === p.result?.winner)?.name}`;
+};
 
 export default function PkAdmin() {
   const { rbac } = useApp();
@@ -44,7 +52,7 @@ export default function PkAdmin() {
   if (!can.allowed)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Header title="Takım PK yönetimi" />
+        <Header title="PK yönetimi" />
         <Text style={[s.dim, { padding: 16 }]}>Bu ekran için PK yönetimi yetkisi gerekiyor. {can.reason}</Text>
       </SafeAreaView>
     );
@@ -53,7 +61,7 @@ export default function PkAdmin() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title="Takım PK yönetimi" />
+      <Header title="PK yönetimi" />
       <View style={{ paddingHorizontal: 16 }}>
         <Chips
           value={tab}
@@ -72,9 +80,10 @@ export default function PkAdmin() {
           <>
             <Card style={{ gap: 8 }}>
               <Text style={s.title}>Modlar · ayar sürümü v{config.version}</Text>
+              <Row label="Normal PK (bireysel, oda içi)" value={config.soloPkEnabled} onChange={(v) => updateConfig({ soloPkEnabled: v })} />
               <Row label="Oda içi takım PK" value={config.roomPkEnabled} onChange={(v) => updateConfig({ roomPkEnabled: v })} />
               <Row label="Odalar arası takım PK" value={config.crossPkEnabled} onChange={(v) => updateConfig({ crossPkEnabled: v })} />
-              <Text style={s.dim}>1v1 / bireysel PK bu modülde yoktur.</Text>
+              <Text style={s.dim}>Normal PK varsayılan moddur: mikrofondaki herkes kendi adına yarışır, mikrofon düzeni değişmez.</Text>
             </Card>
             <Card style={{ gap: 8 }}>
               <Text style={s.title}>İzinli süreler</Text>
@@ -120,7 +129,10 @@ export default function PkAdmin() {
             </Card>
             <Card style={{ gap: 4 }}>
               <Text style={s.title}>Sonuç kuralları</Text>
-              <Text style={s.dim}>• Beraberlik: puanlar eşitse “Berabere” ilan edilir.</Text>
+              <Text style={s.dim}>• Beraberlik: puanlar eşitse “Berabere” ilan edilir; Normal PK’da birinciler eşitse kazanan ilan edilmez.</Text>
+              <Text style={s.dim}>• Puan yalnızca hediye anında mikrofonda olan katılımcıya yazılır (Takım PK’da ayrıca bir takımda olmalı). Mikrofondan inenin puanı kalır.</Text>
+              <Text style={s.dim}>• Taç: yalnızca açık bir kazanan varsa verilir. Kazanana PK süresince geçerli hediye gönderenler “taç kazandıran” olarak, katkılarına göre listelenir.</Text>
+              <Text style={s.dim}>• İade: PK sürerken iade edilen hediyenin puanı düşülür; sonuç kesinleştikten sonraki iade sonucu değiştirmez, mutabakat kaydına düşer.</Text>
               <Text style={s.dim}>• Tek katılımcının bağlantısı koparsa PK sürer; takım kaybetmiş sayılmaz.</Text>
               <Text style={s.dim}>• Oda kapanırsa veya moderatör iptal ederse PK iptal edilir: kazanan yok, PK puanları geçersiz; gönderilen hediyeler alıcılarına ulaştığı için iade edilmez.</Text>
               <Text style={s.dim}>• Rakip oda daveti reddeder ya da süresinde yanıt vermezse PK başlamaz.</Text>
@@ -159,6 +171,19 @@ export default function PkAdmin() {
                   {p.id} · {p.status}
                 </Text>
                 <Text style={s.dim}>{describe(p)}</Text>
+                {p.records
+                  .filter((r) => r.status === 'Doğrulandı')
+                  .slice(-3)
+                  .map((r) => (
+                    <View key={r.txId} style={s.row}>
+                      <Text style={[s.dim, { flex: 1 }]} numberOfLines={1}>
+                        {who(r.senderId)} → {who(r.recipientId)} · +{r.points}
+                      </Text>
+                      <Pressable style={s.small} onPress={() => revokeGift(r.txId, 'Ödeme iade edildi (test)', 'Sen (yönetici)')}>
+                        <Text style={s.chipText}>İade et (test)</Text>
+                      </Pressable>
+                    </View>
+                  ))}
                 <View style={s.row}>
                   {p.status === 'active' && (
                     <Pressable style={s.small} onPress={() => finishNow(p.id)}>
@@ -185,11 +210,16 @@ export default function PkAdmin() {
             past.map((p) => (
               <Card key={p.id} style={{ gap: 4 }}>
                 <Text style={s.title}>
-                  {p.id} · {p.status === 'done' ? (p.result?.winner === 'tie' ? 'Berabere' : `Kazanan: ${p.teams.find((t) => t.id === p.result?.winner)?.name}`) : 'İptal'}
+                  {p.id} · {outcome(p)}
                 </Text>
                 <Text style={s.dim}>{describe(p)}</Text>
                 {p.cancelReason && <Text style={s.dim}>{p.cancelReason}</Text>}
-                <Text style={s.dim}>{p.records.length} hediye kaydı · {p.records.filter((r) => r.status === 'Doğrulandı').length} geçerli</Text>
+                <Text style={s.dim}>{p.records.length} hediye kaydı · {p.records.filter((r) => r.status === 'Doğrulandı').length} geçerli · {p.records.filter((r) => r.status === 'İade edildi').length} iade</Text>
+                {p.result && p.result.crowns.length > 0 && (
+                  <Text style={s.dim}>
+                    Taç: {p.result.crowns.filter((c) => c.top).map((c) => `${who(c.senderId)} → ${who(c.recipientId)} (${c.points})`).join(', ')}
+                  </Text>
+                )}
               </Card>
             ))
           ))}

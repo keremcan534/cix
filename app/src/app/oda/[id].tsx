@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
@@ -47,8 +47,11 @@ import { AnimLayer } from '@/components/fx/anim-layer';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
-import { ChatLine, GiftAnimation, ListenersModal, MicBtn, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
-import { PkBoard, PkResult, PkSetupSheet } from '@/components/room/pk';
+import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
+import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
+import { BalconyBar, ConnectionBanner, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
+import { ChatFeed } from '@/components/room/chat-feed';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -60,7 +63,32 @@ import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, useGames } from '@/lib/games';
 import { getLucky, luckyGift, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
-import { getPk, markPkSeen, recordGift, reportMismatch, usePk } from '@/lib/pk';
+import { getPk, markPkSeen, modeLabel, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
+import {
+  KICK_BAN_MIN,
+  answerInvite,
+  deriveView,
+  forceLeaveSeat,
+  getRoom,
+  inviteToMic,
+  isOnline,
+  join as joinPresence,
+  kick,
+  leave as leavePresence,
+  leaveSeat,
+  newGuest,
+  resize as resizeSeats,
+  seedRoom,
+  setConnection,
+  setLocks,
+  setMicMute,
+  setRoles,
+  takeSeat,
+  useLatched,
+  useRoomLive,
+  type InviteStatus,
+} from '@/lib/room-presence';
+import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { shareLink } from '@/lib/links';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
@@ -76,9 +104,18 @@ const BOT_TIPS = [
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 const rollDie = () => 1 + Math.floor(Math.random() * 6);
 const msgId = () => String(Date.now() + Math.random());
+/** Arrival time of a room event (called from handlers and effects, never while rendering). */
+const stamp = () => Date.now();
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
 const clock = () => new Date().toTimeString().slice(0, 5);
 const pad = (s: (string | null)[], n: number) => (s.length >= n ? s.slice(0, n) : [...s, ...Array<string | null>(n - s.length).fill(null)]);
+
+/** Actions need the server: while offline nothing is sent, charged or changed. */
+const offlineBlocked = () => {
+  if (isOnline()) return false;
+  showAlert('Bağlantı yok', 'Bu işlem bağlantı geri gelince yapılabilir. Hiçbir şey gönderilmedi, jeton düşülmedi.');
+  return true;
+};
 
 const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
@@ -106,6 +143,7 @@ export default function VoiceRoom() {
   const adminIds = isOwn ? myRoom.adminIds : (base!.adminIds ?? []);
   const myRole: RoomRole = isOwn ? 'owner' : adminIds.includes('me') ? 'admin' : 'member';
   const roleOf = (uid: string): RoomRole => (uid === hostId ? 'owner' : adminIds.includes(uid) ? 'admin' : 'member');
+  const canManage = myRole !== 'member';
   // "Oda işlevlerini yönet": music, polls, goals, events can be limited to the owner.
   const canFunctions = myRole === 'owner' || (myRole === 'admin' && functionsBy === 'admins');
   const botOn = isOwn ? settings.roomBot : true;
@@ -136,12 +174,28 @@ export default function VoiceRoom() {
   const [unlocked, setUnlocked] = useState(!password);
   // Entering a room while a one-to-one call is live: join as a listener, never on a mic (lib/media).
   const [joinedInCall] = useState(() => !!getMedia().call);
-  const [seats, setSeats] = useState<(string | null)[]>(() => pad(isOwn ? (joinedInCall ? [] : ['me']) : base!.seatUserIds, capacity));
+  // Room presence (lib/room-presence): who is in the room and on which mic. One model for the mics, the
+  // Balkon and every counter. Seeded the first time the room is opened (silent, before the first read).
+  useState(() =>
+    seedRoom(id, {
+      ownerId: hostId,
+      adminIds,
+      seats: isOwn ? (joinedInCall ? [] : ['me']) : base!.seatUserIds,
+      capacity,
+      total: isOwn ? 7 : base!.listeners,
+      regulars: USERS.filter((u) => u.id !== hostId).map((u) => u.id).slice(0, isOwn ? 6 : USERS.length),
+    }),
+  );
+  const { room: live, offline } = useRoomLive(id);
+  const view = useMemo(() => deriveView(live), [live]);
+  const seats = live.seats;
+  const mutedUsers = useMemo(() => new Set(live.micMuted), [live.micMuted]);
+  const kicked = useMemo(() => new Set(Object.keys(live.bans)), [live.bans]);
   const [micOn, setMicOn] = useState(isOwn && !joinedInCall);
   // Room camera (video seat). Only while seated; turned off when a one-to-one call takes the devices.
   const [camOn, setCamOn] = useState(false);
-  const [mutedUsers, setMutedUsers] = useState<Set<string>>(new Set());
-  const [kicked, setKicked] = useState<Set<string>>(new Set());
+  // People I muted for myself only: their voice and chat lines are hidden on my screen, nobody else's.
+  const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
   // Entry effects on screen: mine when I join, then other people's (one at a time).
   const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || settings.effectsOff || !entryInfo ? null : entryInfo.show));
@@ -181,8 +235,10 @@ export default function VoiceRoom() {
   };
   const [flights, setFlights] = useState<Flight[]>([]);
   const win = useWindowDimensions();
-  const [listeners, setListeners] = useState(isOwn ? 1 : base!.listeners);
-  const [listOpen, setListOpen] = useState(false);
+  const listeners = view.total;
+  const [peak, setPeak] = useState(view.total);
+  if (view.total > peak) setPeak(view.total);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const [seatMenu, setSeatMenu] = useState<{ anchor: Rect; title: string; items: SeatMenuItem[] } | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
@@ -203,12 +259,23 @@ export default function VoiceRoom() {
   const [myQueuePos, setMyQueuePos] = useState<number | null>(null);
   const [giftResults, setGiftResults] = useState<{ userId: string; ok: boolean }[]>([]);
   const [musicRequests, setMusicRequests] = useState<{ track: Track; by: string }[]>([]);
-  // Team PK (lib/pk is the PK server: clock, score and result live there).
-  const pkStore = usePk();
+  // PK (lib/pk is the PK server: clock, score and result live there). While the connection is down the
+  // room keeps showing the last PK state it received, like the presence data.
+  const pkStore = useLatched(usePk(), offline);
   const pk = pkStore.sessions.find((x) => ['invite', 'prep', 'active'].includes(x.status) && (x.roomId === id || x.opponentRoomId === id)) ?? null;
   const lastPk = pkStore.sessions.find((x) => x.roomId === id || x.opponentRoomId === id);
   const [pkSetup, setPkSetup] = useState(false);
-  const teamColorOf = (uid: string | null) => (uid && pk?.kind === 'room' && pk.status !== 'invite' ? pk.teams.find((t) => t.members.includes(uid))?.color : undefined);
+  const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
+  const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
+  /** PK points under a seat: everyone on a mic in Normal / cross PK, team members in Takım PK. */
+  const pkPointsOf = (uid: string | null) => (!uid || !pk || pk.status === 'invite' || (teamPk && !teamOf(teamPk, uid)) ? undefined : (pk.points[uid] ?? 0));
+  // Profiles opened from the PK end screens: hide them while away, show them again on return.
+  const [awayFromRoom, setAwayFromRoom] = useState(false);
+  useFocusEffect(useCallback(() => setAwayFromRoom(false), []));
+  const openProfileFromPk = (uid: string) => {
+    setAwayFromRoom(true);
+    router.push(`/kullanici/${uid}`);
+  };
   // Gifts score in a PK only through the PK server, once per transaction id.
   const scorePk = (txId: string, senderId: string, recipientId: string, giftId: string, coins: number) => {
     const r = recordGift(id, txId, senderId, recipientId, giftId, coins);
@@ -251,6 +318,34 @@ export default function VoiceRoom() {
     reportRoom({ roomId: id, title, seated: amSeated, micOn: amSeated && micOn, camOn: amSeated && camOn });
   }, [id, title, amSeated, micOn, camOn]);
   useEffect(() => () => leaveRoom(id), [id]);
+  // Enter the room (presence) once past the password, and leave it when the screen closes. Own room: the host takes mic 1.
+  useEffect(() => {
+    if (!unlocked) return;
+    const r = joinPresence(id, 'me', { hidden: invisible });
+    if (!r.ok) {
+      showAlert('Odaya girilemedi', r.reason);
+      router.back();
+      return;
+    }
+    if (isOwn && !joinedInCall && !getRoom(id)?.seats[0]) takeSeat(id, 'me', 0);
+    return () => {
+      leavePresence(id, 'me');
+      setConnection('online');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, unlocked]);
+  // Keep the presence server's room roles, mic locks and mic count in step with the room settings.
+  const adminKey = adminIds.join(',');
+  useEffect(() => setRoles(id, hostId, adminKey ? adminKey.split(',') : []), [id, hostId, adminKey]);
+  const lockKey = lockedSeats.join(',');
+  useEffect(() => setLocks(id, lockKey ? lockKey.split(',').map(Number) : []), [id, lockKey]);
+  useEffect(() => resizeSeats(id, capacity), [id, capacity]);
+  // A call takes the devices: get off the mic (the presence server is updated after this render).
+  useEffect(() => {
+    if (!callActive) return;
+    const t = setTimeout(() => leaveSeat(id, 'me'), 0);
+    return () => clearTimeout(t);
+  }, [callActive, id]);
   // Derived transition when a call starts or ends: I stay in the room, but the call owns mic and camera.
   const [sawCall, setSawCall] = useState(callActive);
   if (callActive !== sawCall) {
@@ -258,21 +353,22 @@ export default function VoiceRoom() {
     if (callActive) {
       const wasSeated = amSeated;
       const hadCam = camOn;
-      setSeats((st) => pad(st, capacity).map((x) => (x === 'me' ? null : x)));
       if (bossId === 'me') setBossRemoved((b) => new Set(b).add('me'));
       setMicOn(false);
       setCamOn(false);
       setMyQueuePos(null); // the queue must not put me back on a mic during or after the call
-      setMessages((m) => [
-        ...m,
-        {
-          id: msgId(),
-          system: true,
-          text: `📞 Bire bir görüşmeye geçtin: ${wasSeated ? 'mikrofon koltuğundan indin, ' : ''}${hadCam ? 'oda kameran kapatıldı, ' : ''}odada dinleyici olarak kalıyorsun.`,
-        },
-      ]);
+      setMessages((m) =>
+        mergeFeed(m, [
+          {
+            id: msgId(),
+            system: true,
+            at: Date.now(),
+            text: `📞 Bire bir görüşmeye geçtin: ${wasSeated ? 'mikrofon koltuğundan indin, ' : ''}${hadCam ? 'oda kameran kapatıldı, ' : ''}odada dinleyici olarak kalıyorsun.`,
+          },
+        ]),
+      );
     } else {
-      setMessages((m) => [...m, { id: msgId(), system: true, text: '✅ Görüşme bitti. Hâlâ odadasın; istersen yeniden mikrofon isteyebilir veya kameranı açabilirsin.' }]);
+      setMessages((m) => mergeFeed(m, [{ id: msgId(), system: true, at: Date.now(), text: '✅ Görüşme bitti. Hâlâ odadasın; istersen yeniden mikrofon isteyebilir veya kameranı açabilirsin.' }]));
     }
   }
   /** Room mic/seat/camera controls are locked while a call holds the devices. */
@@ -291,14 +387,37 @@ export default function VoiceRoom() {
     addMsg({ system: true, text: camOn ? `${ME.name} kamerasını kapattı` : `📹 ${ME.name} kamerasını açtı` });
   };
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
-  const audience = USERS.filter((u) => !allSeats.includes(u.id) && !kicked.has(u.id) && !blocked.has(u.id));
+  // Balkon: people in the room who are not on a mic (from the presence model, never a separate list).
+  const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
   const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
   const canControlMusic = canFunctions;
 
   const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
-  const addMsg = (msg: Omit<ChatMsg, 'id'>) => setMessages((m) => [...m.slice(-80), { ...msg, text: msg.userId ? mask(msg.text) : msg.text, id: msgId() }]);
+  // Room events arrive once by id (lib/chat-feed). While the connection is down they wait in a buffer and
+  // are merged, in time order and without duplicates, when it comes back.
+  const offlineFeed = useRef<FeedMsg[]>([]);
+  const addMsg = (msg: Omit<ChatMsg, 'id'> & { id?: string }) => {
+    const m: ChatMsg = { ...msg, text: msg.userId ? mask(msg.text) : msg.text, id: msg.id ?? msgId(), at: stamp() };
+    if (!isOnline()) offlineFeed.current.push(m);
+    else setMessages((list) => mergeFeed(list, [m]));
+  };
+  useEffect(() => {
+    if (offline) return;
+    const t = setTimeout(() => {
+      const buffered = offlineFeed.current;
+      offlineFeed.current = [];
+      if (!buffered.length) return;
+      // The server re-sends its latest events on resync; the ones already shown are dropped by id.
+      setMessages((list) => mergeFeed(list, [...list.slice(-3), ...buffered, { id: msgId(), system: true, at: Date.now(), text: `🔄 Bağlantı geri geldi · ${buffered.length} olay eşitlendi` }]));
+    }, 0);
+    return () => clearTimeout(t);
+  }, [offline]);
+  const dropConnection = () => {
+    setConnection('offline');
+    setTimeout(() => setConnection('online'), 8000);
+  };
   const logMod = (action: string, target: string, reason = '') =>
     setModLog((l) => [{ id: msgId(), time: new Date().toTimeString().slice(0, 5), actor: myRole === 'owner' ? 'Sahip (sen)' : 'Yönetici (sen)', action, target, reason }, ...l]);
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
@@ -376,7 +495,7 @@ export default function VoiceRoom() {
     setEmojiOpen(false);
     const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
     if (a && r.charged) {
-      addMsg({ system: true, text: `✨ ${ME.name} ${a.name} gönderdi (🪙 ${r.charged.toLocaleString('tr-TR')})` });
+      addMsg({ system: true, kind: 'gift', text: `✨ ${ME.name} ${a.name} efekt hediyesi gönderdi (🪙 ${r.charged.toLocaleString('tr-TR')})` });
       bump('giftsSent', 1);
     }
   };
@@ -414,20 +533,24 @@ export default function VoiceRoom() {
     }, 3500);
     return () => clearInterval(t);
   }, [seatedKey, botReactions]);
-  // Room PK: listeners back both teams with gifts (prototype stand-in for other people's sends).
+  // Room PK: people on the Balkon back the competitors with gifts (prototype stand-in for other people's sends).
   const roomPkActive = pk?.kind === 'room' && pk.status === 'active' ? pk.id : null;
   useEffect(() => {
     if (!roomPkActive) return;
     const t = setInterval(() => {
       const cur = getPk().sessions.find((x) => x.id === roomPkActive); // live read, not the render-time copy
-      if (!cur || cur.status !== 'active') return;
-      const members = cur.teams.flatMap((x) => x.members).filter((m) => m !== 'me');
-      if (!members.length || Math.random() > 0.6) return;
-      const to = pick(members);
-      const from = pick(USERS.filter((u) => !members.includes(u.id)));
+      const room = getRoom(id);
+      if (!cur || cur.status !== 'active' || !room) return;
+      const { micIds, balconyIds } = deriveView(room);
+      const targets = micIds.filter((m) => m !== 'me' && (cur.mode === 'solo' || !!teamOf(cur, m)));
+      const fans = balconyIds.filter((m) => m !== 'me');
+      if (!targets.length || !fans.length || Math.random() > 0.6) return;
+      const to = pick(targets);
+      const from = userById(pick(fans));
       const g = pick(GIFTS.slice(0, 6));
-      const r = scorePk(`BOT-${msgId()}`, from.id, to, g.id, g.price);
-      if (r.ok) addMsg({ system: true, text: `🎁 ${from.name}, ${userById(to).name} kişisine ${g.emoji} ${g.name} gönderdi · PK +${r.points}` });
+      const tx = `BOT-${msgId()}`;
+      const r = scorePk(tx, from.id, to, g.id, g.price);
+      if (r.ok) addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} → ${userById(to).name} ${g.emoji} ${g.name} · PK +${r.points}`, gift: { fromId: from.id, toIds: [to], emoji: g.emoji, name: g.name, count: 1 } });
     }, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -456,29 +579,41 @@ export default function VoiceRoom() {
     return () => clearInterval(t);
   }, [seatedKey, amSeated, micOn, mutedUsers]);
 
-  // Fake chat, joins and (in other rooms) other people's gifts.
+  // Fake chat, joins, leaves and (in other rooms) other people's gifts. Everyone involved is a real member of
+  // the room's presence (read live from the server, not from this render).
   useEffect(() => {
     const t = setInterval(() => {
-      const u = pick(USERS);
-      if (kicked.has(u.id) || blocked.has(u.id)) return;
+      const room = getRoom(id);
+      if (!room) return;
+      const others = room.members.filter((m) => m !== 'me' && !blocked.has(m));
+      if (!others.length) return;
+      const u = userById(pick(others));
       if (slowMode && Math.random() < 0.6) return;
       const r = Math.random();
-      if (r < 0.25) {
-        setListeners((n) => (isOwn ? Math.min(myRoom.limit, n + 1) : n + 1));
-        addMsg({ system: true, text: `${u.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
+      if (r < 0.2) {
+        if (isOwn && room.members.length >= myRoom.limit) return;
+        const guest = newGuest(id);
+        if (!joinPresence(id, guest, { eventId: `join:${guest}` }).ok) return;
+        const g = userById(guest);
+        addMsg({ system: true, text: `${g.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         // Some joiners own an entry effect; show it if nothing else is playing.
-        if (!settings.effectsOff && Math.random() < 0.4) setEntry((cur) => cur ?? { name: u.name, avatar: u.avatar, fx: pick(BOT_ENTRY_FX), ride: Math.random() < 0.3 ? pick(['🏎️', '🛵', '🛩️']) : undefined, badge: u.vip ? 'VIP' : undefined });
+        if (!settings.effectsOff && Math.random() < 0.4) setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: Math.random() < 0.3 ? pick(['🏎️', '🛵', '🛩️']) : undefined, badge: g.vip ? 'VIP' : undefined });
         gainXp(5);
-        setGoal((g) => (g && g.kind === 'join' ? { ...g, progress: g.progress + 1 } : g));
-      } else if (r < 0.3) {
+        setGoal((gl) => (gl && gl.kind === 'join' ? { ...gl, progress: gl.progress + 1 } : gl));
+      } else if (r < 0.28) {
+        // Someone on the Balkon leaves (never the owner or a manager; mics stay as they are).
+        const leaving = deriveView(room).balconyIds.filter((m) => m !== 'me' && m !== room.ownerId && !room.adminIds.includes(m));
+        if (leaving.length) leavePresence(id, pick(leaving), `leave:${msgId()}`);
+      } else if (r < 0.32) {
         setGoal((g) => (g && g.kind === 'like' ? { ...g, progress: g.progress + 1 } : g));
         addMsg({ system: true, text: `❤️ ${u.name} odayı beğendi` });
-      } else if (r < 0.35 && !isOwn) {
+      } else if (r < 0.37 && !isOwn) {
         const g = pick(GIFTS.slice(0, 5));
+        const tx = `BOT-${msgId()}`;
         addContrib(u.id, g.price);
         logGift(u.id, hostId, g, 1);
-        addMsg({ system: true, text: `🎁 ${u.name}, ${userById(hostId).name} kişisine ${g.emoji} ${g.name} gönderdi` });
-        scorePk(`BOT-${msgId()}`, u.id, hostId, g.id, g.price);
+        addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${u.name} → ${userById(hostId).name} ${g.emoji} ${g.name}`, gift: { fromId: u.id, toIds: [hostId], emoji: g.emoji, name: g.name, count: 1 } });
+        scorePk(tx, u.id, hostId, g.id, g.price);
         flyGift(g.emoji, 1, [hostId], { x: 36, y: win.height * 0.72 });
       } else {
         addMsg({ userId: u.id, text: pick(BOT_LINES) });
@@ -486,14 +621,18 @@ export default function VoiceRoom() {
     }, 3500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kicked, blocked, slowMode, words]);
+  }, [blocked, slowMode, words]);
 
   // Own room: listeners send gifts (host earns diamonds, room earns XP) and ask to speak.
   useEffect(() => {
     if (!isOwn) return;
     const gifts = setInterval(() => {
-      const from = pick(USERS);
+      const room = getRoom(id);
+      const fans = room ? deriveView(room).balconyIds.filter((m) => m !== 'me') : [];
+      if (!fans.length) return;
+      const from = userById(pick(fans));
       const gift = GIFTS.find((g) => g.price === pick(INCOMING_GIFT_POOL)) ?? GIFTS[0];
+      const tx = `BOT-${msgId()}`;
       receiveDiamonds(gift.price, 'Hediye', from.id);
       // Owner bonus is calculated separately and never reduces the streamer's earnings.
       const ownerBonus = Math.round(gift.price * RULES.roomOwnerBonus);
@@ -503,14 +642,16 @@ export default function VoiceRoom() {
       logGift(from.id, 'me', gift, 1);
       flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 });
       if (gift.price >= 50 && showFx(gift.price)) setGiftFx(gift);
-      addMsg({ system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)` });
-      scorePk(`BOT-${msgId()}`, from.id, 'me', gift.id, gift.price);
+      addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1 } });
+      scorePk(tx, from.id, 'me', gift.id, gift.price);
     }, 6000);
     const reqs = setInterval(() => {
+      const room = getRoom(id);
+      const pool = room ? deriveView(room).balconyIds.filter((m) => m !== 'me') : [];
       setRequests((r) => {
         if (r.length >= 4) return r;
-        const u = pick(USERS.filter((x) => !r.includes(x.id)));
-        return u ? [...r, u.id] : r;
+        const free = pool.filter((x) => !r.includes(x));
+        return free.length ? [...r, pick(free)] : r;
       });
     }, 12_000);
     const songs = setInterval(() => {
@@ -564,13 +705,20 @@ export default function VoiceRoom() {
     return () => clearInterval(t);
   }, [inQueue]);
   const freeSeatIndex = allSeats.findIndex((x, i) => i > 0 && x === null && !lockedSeats.includes(i));
-  if (myQueuePos === 0 && freeSeatIndex > 0) {
-    // Derived transition: my turn came and a mic is free.
-    setMyQueuePos(null);
-    setSeats((st) => pad(st, capacity).map((x, i) => (i === freeSeatIndex ? 'me' : x)));
-    setMicOn(true);
-    setMessages((m) => [...m, { id: msgId(), system: true, text: `✅ Sıran geldi: ${freeSeatIndex + 1}. mikrofona geçtin` }]);
-  }
+  // My turn came and a mic is free: take it through the presence server.
+  const queueReady = myQueuePos === 0 && freeSeatIndex > 0 && !offline;
+  useEffect(() => {
+    if (!queueReady) return;
+    const t = setTimeout(() => {
+      const r = takeSeat(id, 'me', freeSeatIndex);
+      if (!r.ok) return;
+      setMyQueuePos(null);
+      setMicOn(true);
+      addMsg({ system: true, text: `✅ Sıran geldi: ${freeSeatIndex + 1}. mikrofona geçtin` });
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueReady, freeSeatIndex]);
 
   // Other rooms: the host drops a red envelope after a while.
   useEffect(() => {
@@ -609,29 +757,34 @@ export default function VoiceRoom() {
   if (pkKey !== pkSeenState) {
     setPkSeenState(pkKey);
     if (lastPk) {
+      const label = modeLabel(lastPk);
       const text: Partial<Record<typeof lastPk.status, string>> = {
-        invite: `📨 Takım PK daveti gönderildi · ${lastPk.durationMin} dk`,
-        prep: `⏳ Takım PK hazırlanıyor · ${lastPk.durationMin} dk`,
-        active: `⚔️ Takım PK başladı! Hediyeler takımına puan kazandırır.`,
-        done: `🏁 Takım PK bitti`,
-        cancelled: `✖️ Takım PK başlamadı/iptal edildi`,
+        invite: `📨 ${label} daveti gönderildi · ${lastPk.durationMin} dk`,
+        prep: `⏳ ${label} hazırlanıyor · ${lastPk.durationMin} dk`,
+        active: lastPk.mode === 'solo' ? `🎤 ${label} başladı! Mikrofondakilere gelen hediyeler kendi puanlarına yazılır.` : `⚔️ ${label} başladı! Hediyeler takımına puan kazandırır.`,
+        done: `🏁 ${label} bitti · sonuç sunucuda kesinleşti`,
+        cancelled: `✖️ ${label} başlamadı/iptal edildi`,
       };
-      if (text[lastPk.status]) setMessages((m) => [...m, { id: msgId(), system: true, text: text[lastPk.status]! }]);
+      // Keyed by PK and status: the same change is announced once.
+      if (text[lastPk.status]) setMessages((m) => mergeFeed(m, [{ id: `pk:${pkKey}`, system: true, at: Date.now(), text: text[lastPk.status]! }]));
     }
   }
 
   // --- Seat actions ------------------------------------------------------------
+  // Used for people who asked to speak (their request is their consent); everyone else gets a mic invite.
   const placeOnSeat = (userId: string, target?: number) => {
     if (allSeats.includes(userId)) return showAlert('Zaten koltukta', `${userById(userId).name} zaten mikrofonda.`);
     const free = target !== undefined && allSeats[target] === null ? target : allSeats.findIndex((s, i) => i > 0 && s === null && !lockedSeats.includes(i));
     if (free < 0) return showAlert('Boş koltuk yok', `Bu oda ${capacity} mikrofonlu.`);
-    setSeats((s) => pad(s, capacity).map((x, i) => (i === free ? userId : x)));
+    const r = takeSeat(id, userId, free);
+    if (!r.ok) return showAlert('Mikrofona alınamadı', r.reason);
     addMsg({ system: true, text: `${userById(userId).name} ${free + 1}. koltuğa oturdu` });
   };
-  const removeFromSeat = (userId: string) => setSeats((s) => pad(s, capacity).map((x) => (x === userId ? null : x)));
+  const removeFromSeat = (userId: string) => leaveSeat(id, userId);
   const sitMe = (index: number) => {
-    if (devicesBusy()) return;
-    setSeats((s) => pad(s, capacity).map((x, i) => (i === index ? 'me' : x === 'me' ? null : x)));
+    if (devicesBusy() || offlineBlocked()) return;
+    const r = takeSeat(id, 'me', index);
+    if (!r.ok) return showAlert('Bu mikrofona geçilemedi', r.reason);
     setMicOn(true);
     addMsg({ system: true, text: `${ME.name} ${index + 1}. koltuğa geçti` });
   };
@@ -689,15 +842,43 @@ export default function VoiceRoom() {
     else setLocalLocks(next);
     logMod(lock ? 'Mikrofonu kilitledi' : 'Mikrofon kilidini açtı', `${index + 1}. koltuk`);
   };
+  // Kick: validated by the presence server (role, target), then the person leaves with a short re-entry ban.
+  // Not a permanent block: after the ban they can come back under the room's normal rules.
   const kickFromRoom = (uid: string) => {
+    if (offlineBlocked()) return;
     const u = userById(uid);
-    removeFromSeat(uid);
-    setKicked((k) => new Set(k).add(uid));
-    setBans((b) => [...b.filter((x) => x.userId !== uid), { userId: uid, until: '10 dk' }]);
-    addMsg({ system: true, text: `${u.name} odadan çıkarıldı · 10 dk giriş yasağı (denetim kaydına yazıldı)` });
-    logMod('Odadan çıkardı', u.name, '10 dk giriş yasağı');
+    const r = kick(id, 'me', uid, KICK_BAN_MIN);
+    if (!r.ok) {
+      logMod('Reddedilen deneme: odadan çıkarma', u.name, r.reason);
+      return showAlert('Odadan çıkarılamadı', r.reason);
+    }
+    setBans((b) => [...b.filter((x) => x.userId !== uid), { userId: uid, until: `${KICK_BAN_MIN} dk` }]);
+    addMsg({ system: true, text: `${u.name} odadan çıkarıldı · ${KICK_BAN_MIN} dk giriş yasağı (denetim kaydına yazıldı)` });
+    logMod('Odadan çıkardı', u.name, `${KICK_BAN_MIN} dk giriş yasağı`);
   };
-  const canManage = myRole !== 'member';
+  const confirmKick = (uid: string) =>
+    showAlert('Odadan çıkarılsın mı?', `${userById(uid).name} odadan çıkarılır ve ${KICK_BAN_MIN} dk tekrar giremez. Bu kalıcı engelleme değildir.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Odadan çıkar', style: 'destructive', onPress: () => kickFromRoom(uid) },
+    ]);
+  const toggleSilence = (uid: string) =>
+    setSilenced((s) => {
+      const n = new Set(s);
+      if (n.has(uid)) n.delete(uid);
+      else n.add(uid);
+      return n;
+    });
+  const sendMicInvite = (uid: string, seat?: number) => {
+    if (offlineBlocked()) return false;
+    const r = inviteToMic(id, 'me', uid, seat);
+    if (!r.ok) {
+      showAlert('Davet gönderilemedi', r.reason);
+      return false;
+    }
+    logMod('Mikrofona davet etti', userById(uid).name);
+    addMsg({ system: true, text: `🎙️ ${userById(uid).name} mikrofona davet edildi · yanıtı bekleniyor` });
+    return true;
+  };
 
   const onSeatPress = (index: number) => {
     const uid = allSeats[index];
@@ -706,7 +887,8 @@ export default function VoiceRoom() {
       const who = moving;
       setMoving(null);
       if (uid || lockedSeats.includes(index)) return showAlert('Boş koltuk seç', 'Taşımak için kilitli olmayan boş bir koltuğa dokun.');
-      setSeats((s) => pad(s, capacity).map((x, i) => (i === index ? who : x === who ? null : x)));
+      const moved = takeSeat(id, who, index);
+      if (!moved.ok) return showAlert('Taşınamadı', moved.reason);
       addMsg({ system: true, text: `${userById(who).name} ${index + 1}. koltuğa taşındı` });
       logMod('Koltuk değiştirdi', userById(who).name, `${index + 1}. koltuk`);
       return;
@@ -729,7 +911,9 @@ export default function VoiceRoom() {
             label: 'Mikrodan at',
             icon: 'arrow-down-circle-outline',
             onPress: () => {
-              removeFromSeat(uid);
+              if (offlineBlocked()) return;
+              const r = forceLeaveSeat(id, 'me', uid);
+              if (!r.ok) return showAlert('Mikrofondan indirilemedi', r.reason);
               addMsg({ system: true, text: `${u.name} mikrofondan indirildi` });
               logMod('Mikrofondan indirdi', u.name);
             },
@@ -739,12 +923,14 @@ export default function VoiceRoom() {
             label: 'Mikrofonu kilitle',
             icon: 'lock-closed-outline',
             onPress: () => {
-              removeFromSeat(uid);
+              if (offlineBlocked()) return;
+              const r = forceLeaveSeat(id, 'me', uid);
+              if (!r.ok) return showAlert('Mikrofondan indirilemedi', r.reason);
               toggleLock(index, true);
               addMsg({ system: true, text: `${u.name} mikrofondan indirildi · ${index + 1}. koltuk kilitlendi` });
             },
           },
-          { key: 'kick', label: 'Odadan at', icon: 'exit-outline', destructive: true, onPress: () => kickFromRoom(uid) },
+          { key: 'kick', label: 'Odadan at', icon: 'exit-outline', destructive: true, onPress: () => confirmKick(uid) },
           {
             key: 'move',
             label: 'Koltuk değiştir',
@@ -756,17 +942,14 @@ export default function VoiceRoom() {
           },
           {
             key: 'mute',
-            label: muted ? 'Sesini aç' : 'Sustur',
-            icon: muted ? 'volume-high-outline' : 'volume-mute-outline',
+            label: muted ? 'Mikrofonunu aç' : 'Mikrofonunu sustur',
+            icon: muted ? 'mic-outline' : 'mic-off-outline',
             dividerBefore: true,
             onPress: () => {
-              setMutedUsers((m) => {
-                const n = new Set(m);
-                if (muted) n.delete(uid);
-                else n.add(uid);
-                return n;
-              });
-              logMod(muted ? 'Sesini açtı' : 'Susturdu', u.name);
+              if (offlineBlocked()) return;
+              const r = setMicMute(id, 'me', uid, !muted);
+              if (!r.ok) return showAlert('Yapılamadı', r.reason);
+              logMod(muted ? 'Mikrofonunu açtı' : 'Mikrofonunu susturdu', u.name);
             },
           },
         );
@@ -774,6 +957,7 @@ export default function VoiceRoom() {
       items.push(
         { key: 'gift', label: 'Hediye gönder', icon: 'gift-outline', dividerBefore: !outranks, onPress: () => (setGiftTo(uid), setGiftOpen(true)) },
         { key: 'dm', label: 'Mesaj gönder', icon: 'chatbubble-outline', onPress: () => router.push(`/sohbet/${uid}`) },
+        { key: 'silence', label: silenced.has(uid) ? 'Sesini benim için aç' : 'Benim için sessize al', icon: silenced.has(uid) ? 'volume-high-outline' : 'volume-mute-outline', onPress: () => toggleSilence(uid) },
       );
       if (outranks && myRole === 'owner') {
         const isAdmin = adminIds.includes(uid);
@@ -796,8 +980,9 @@ export default function VoiceRoom() {
             icon: 'ban-outline',
             destructive: true,
             onPress: () => {
-              removeFromSeat(uid);
-              setKicked((k) => new Set(k).add(uid));
+              if (offlineBlocked()) return;
+              const r = kick(id, 'me', uid, null);
+              if (!r.ok) return showAlert('Kara listeye eklenemedi', r.reason);
               updateMyRoom({ blacklist: [...new Set([...myRoom.blacklist, uid])], memberIds: myRoom.memberIds.filter((x) => x !== uid) });
               addMsg({ system: true, text: `${u.name} oda kara listesine eklendi` });
               logMod('Kara listeye ekledi', u.name, 'kalıcı');
@@ -830,7 +1015,7 @@ export default function VoiceRoom() {
           onPress: () => {
             if (locked) toggleLock(index, false);
             setInviteSeat(index);
-            setListOpen(true);
+            setPeopleOpen(true);
           },
         },
         ...(!locked ? [{ key: 'sit', label: 'Bu koltuğa geç', icon: 'enter-outline' as const, onPress: () => sitMe(index) }] : []),
@@ -853,7 +1038,7 @@ export default function VoiceRoom() {
 
   // Stage-style rooms: join the speaker queue and see my position.
   const joinQueue = () => {
-    if (devicesBusy()) return;
+    if (devicesBusy() || offlineBlocked()) return;
     if (myQueuePos !== null) return showAlert('Sıradasın', `Konumun: ${myQueuePos + 1}. Sıradan çıkmak için menüyü kullan.`);
     const pos = rollDie() % 3 + 1;
     setMyQueuePos(pos);
@@ -872,11 +1057,23 @@ export default function VoiceRoom() {
   // --- Chat, gifts, games ---------------------------------------------------------
   const send = () => {
     if (!draft.trim()) return;
+    if (!isOnline()) {
+      // Not sent: kept on my screen only, marked as failed with a retry.
+      setMessages((list) => mergeFeed(list, [{ id: msgId(), userId: 'me', text: mask(draft.trim()), status: 'failed', at: Date.now() }]));
+      setDraft('');
+      return;
+    }
     addMsg({ userId: 'me', text: draft.trim() });
     setDraft('');
     setEmojiOpen(false);
     gainXp(2);
   };
+  // A failed message is sent again as a new event (its text was already filtered when it was written).
+  const retrySend = useCallback((msg: ChatMsg) => {
+    if (offlineBlocked()) return;
+    setMessages((list) => mergeFeed(list.filter((m) => m.id !== msg.id), [{ id: msgId(), userId: 'me', text: msg.text, at: Date.now() }]));
+  }, []);
+  const renderChat = useCallback(({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} onRetry={retrySend} />, [equipped.bubble, retrySend]);
 
   const deliverGifts = (gift: Gift, toIds: string[], count: number) => {
     const each = gift.price * count;
@@ -900,8 +1097,14 @@ export default function VoiceRoom() {
     if (showFx(gift.price)) setGiftFx(gift);
     // From the gift button (bottom right) to each recipient's seat.
     flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 });
-    delivered.forEach((r) => scorePk(`GT-${msgId()}`, 'me', r.userId, gift.id, each));
-    addMsg({ system: true, text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!` });
+    const sendId = msgId();
+    delivered.forEach((r) => scorePk(`GT-${sendId}-${r.userId}`, 'me', r.userId, gift.id, each));
+    addMsg({
+      id: `gift:GT-${sendId}`,
+      system: true,
+      text: `🎁 ${ME.name}, ${delivered.length > 1 ? `${delivered.length} kişiye` : `${userById(delivered[0].userId).name} kişisine`} ${gift.emoji} ${gift.name} x${count} gönderdi!`,
+      gift: { fromId: 'me', toIds: delivered.map((r) => r.userId), emoji: gift.emoji, name: gift.name, count },
+    });
     // Only a partial delivery opens the results panel; a normal send shows no extra message.
     if (delivered.length < toIds.length) {
       setGiftResults(results);
@@ -912,6 +1115,7 @@ export default function VoiceRoom() {
   // Product rule: gifts never ask for confirmation; one tap sends.
   const sendGift = (gift: Gift, toIds: string[], count: number) => {
     setGiftOpen(false);
+    if (offlineBlocked()) return;
     deliverGifts(gift, toIds, count);
   };
 
@@ -919,6 +1123,7 @@ export default function VoiceRoom() {
   // records the normal gift for the recipient and shows the stored result.
   const sendLuckyGift = (giftId: string, toId: string) => {
     setGiftOpen(false);
+    if (offlineBlocked()) return;
     const to = userById(toId);
     const r = sendLucky({ txId: newLuckyTxId(), userId: 'me', userAge: app.me.age, roomId: id, giftId, toId, toName: to.name }, { spend: spendCoins, credit: addCoins });
     if (!r.ok) {
@@ -937,10 +1142,11 @@ export default function VoiceRoom() {
     scorePk(record.txId, 'me', toId, record.giftId, record.price + (cfg.pkCountsReward ? record.reward : 0));
     // Combo repeats don't add a chat line each time; the wheel shows the count.
     const repeat = combo?.giftId === giftId && combo.toId === toId;
-    if (!repeat) addMsg({ system: true, text: `🍀 ${ME.name}, ${to.name} kişisine ${record.emoji} ${record.giftName} (Lucky) gönderdi` });
+    if (!repeat) addMsg({ id: `gift:${record.txId}`, system: true, text: `🍀 ${ME.name}, ${to.name} kişisine ${record.emoji} ${record.giftName} (Lucky) gönderdi`, gift: { fromId: 'me', toIds: [toId], emoji: record.emoji, name: record.giftName, count: 1, lucky: true } });
     if (record.mult >= cfg.announceFrom)
       addMsg({
         system: true,
+        kind: 'gift',
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı! +${record.reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(record);
@@ -1040,7 +1246,7 @@ export default function VoiceRoom() {
       title: 'Etkileşimli Oyunlar',
       variant: 'round',
       items: [
-        ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'Takım PK', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
+        ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'PK', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
@@ -1079,10 +1285,12 @@ export default function VoiceRoom() {
         ...(isOwn ? [{ key: 'settings', label: 'Oda ayarları', icon: 'settings-outline' as const, onPress: () => setPanel('settings') }] : []),
         ...(myRole !== 'member' ? [{ key: 'mod', label: 'Moderasyon', icon: 'shield-checkmark-outline' as const, onPress: () => setPanel('mod') }] : []),
         { key: 'invite', label: 'Arkadaş davet et', icon: 'person-add-outline', onPress: () => setPanel('invite') },
-        { key: 'listeners', label: 'Dinleyiciler', icon: 'people-outline', onPress: () => setListOpen(true) },
+        { key: 'listeners', label: 'Odadakiler', icon: 'people-outline', onPress: () => setPeopleOpen(true) },
         { key: 'contrib', label: 'Katkı sıralaması', icon: 'trophy-outline', onPress: () => setPanel('contrib') },
         ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: () => setMyQueuePos(null) }] : []),
         { key: 'report', label: 'Odayı şikâyet et', icon: 'flag-outline', onPress: report },
+        // Test: drops this device's realtime connection for 8 s (counters freeze, events buffer, actions wait).
+        { key: 'conn', label: offline ? 'Bağlantıyı geri getir' : 'Bağlantı kopması (test)', icon: 'cloud-offline-outline', onPress: () => (setPanel(null), offline ? setConnection('online') : dropConnection()) },
       ],
     },
     {
@@ -1118,9 +1326,132 @@ export default function VoiceRoom() {
         : null;
   const top3 = ranking.slice(0, 3).map(([uid]) => uid);
 
-  if (!unlocked) return <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} />;
+  // Mic invites I sent: announce each answer once (accepted, declined, no answer, no free mic left).
+  // Invites answered before this visit (the presence server keeps them) are taken as already announced.
+  const inviteSeen = useRef<Record<string, InviteStatus> | null>(null);
+  useEffect(() => {
+    const first = inviteSeen.current === null;
+    const seen = inviteSeen.current ?? {};
+    const changes = first ? [] : live.invites.filter((i) => i.fromId === 'me' && i.status !== 'pending' && seen[i.id] !== i.status);
+    live.invites.forEach((i) => (seen[i.id] = i.status));
+    inviteSeen.current = seen;
+    if (!changes.length) return;
+    const t = setTimeout(() =>
+      changes.forEach((i) => {
+        const who = userById(i.toId).name;
+        const text: Partial<Record<InviteStatus, string>> = {
+          accepted: `✅ ${who} mikrofon davetini kabul etti · ${(i.seat ?? 0) + 1}. mikrofona geçti`,
+          declined: `${who} mikrofon davetini reddetti`,
+          expired: `${who} mikrofon davetine yanıt vermedi`,
+          failed: `${who} daveti kabul etti ama boş mikrofon kalmadı; mikrofona alınmadı`,
+        };
+        if (text[i.status]) addMsg({ id: `inv:${i.id}:${i.status}`, system: true, text: text[i.status]! });
+      }),
+    );
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.invites]);
+  // In someone else's room the host invites me to a mic once per visit while I'm on the Balkon (simulated).
+  const onBalcony = unlocked && !isOwn && !amSeated && view.balconyIds.includes('me');
+  const hostInvited = useRef(false);
+  useEffect(() => {
+    if (!onBalcony || hostInvited.current) return;
+    const t = setTimeout(() => {
+      hostInvited.current = true;
+      inviteToMic(id, hostId, 'me');
+    }, 40_000);
+    return () => clearTimeout(t);
+  }, [onBalcony, id, hostId]);
+  const myInvite = live.invites.find((i) => i.toId === 'me' && i.status === 'pending');
+  const answerMyInvite = (accept: boolean) => {
+    if (!myInvite || offlineBlocked() || (accept && devicesBusy())) return;
+    const r = answerInvite(id, myInvite.id, 'me', accept);
+    if (!r.ok) return showAlert('Mikrofona geçilemedi', r.reason);
+    if (!accept) return addMsg({ system: true, text: 'Mikrofon davetini reddettin' });
+    setMyQueuePos(null);
+    setMicOn(true);
+    addMsg({ system: true, text: `${ME.name} davetle ${(r.seat ?? 0) + 1}. mikrofona geçti` });
+  };
+
+  // Chat: personal mutes hide that person's lines on my screen; message settings apply to the Tümü tab.
+  const feed = useMemo(() => (silenced.size ? messages.filter((m) => !(m.userId && silenced.has(m.userId) && kindOf(m) === 'chat')) : messages), [messages, silenced]);
+  const visibleInAll = useCallback(
+    (m: FeedMsg) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('odaya katıldı'))) && (msgFilter.gifts || kindOf(m) !== 'gift'),
+    [msgFilter],
+  );
+
+  const peopleActions: ParticipantActions = {
+    invite: (uid) => {
+      if (!sendMicInvite(uid, inviteSeat ?? undefined) || inviteSeat === null) return;
+      setInviteSeat(null);
+      setPeopleOpen(false);
+    },
+    micMute: (uid, muted) => {
+      if (offlineBlocked()) return;
+      const r = setMicMute(id, 'me', uid, muted);
+      if (!r.ok) return showAlert('Yapılamadı', r.reason);
+      logMod(muted ? 'Mikrofonunu susturdu' : 'Mikrofonunu açtı', userById(uid).name);
+    },
+    silence: toggleSilence,
+    kick: confirmKick,
+    profile: (uid) => {
+      setPeopleOpen(false);
+      router.push(`/kullanici/${uid}`);
+    },
+    gift: (uid) => {
+      setPeopleOpen(false);
+      setGiftTo(uid);
+      setGiftOpen(true);
+    },
+    block: (uid) => app.toggleBlock(uid),
+    report: (uid) => {
+      const no = createTicket('Şikâyet', `Kullanıcı şikâyeti: ${userById(uid).name} (${uid}) · oda ${title} (${id})`);
+      showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
+    },
+  };
+
+  // PK end: the result once per viewer, then the crown screen (cancelled PKs have no crowns).
+  const pkEnded = lastPk && (lastPk.status === 'done' || lastPk.status === 'cancelled') ? lastPk : null;
+  const showPkResult = !!pkEnded && !awayFromRoom && !pkStore.seen.includes(pkEnded.id);
+  const showCrowns = !!pkEnded && !awayFromRoom && pkEnded.status === 'done' && pkStore.seen.includes(pkEnded.id) && !pkStore.seen.includes(`${pkEnded.id}:crowns`);
+  const closePkResult = () => {
+    if (!pkEnded) return;
+    markPkSeen(pkEnded.id);
+    if (pkEnded.status !== 'done') markPkSeen(`${pkEnded.id}:crowns`);
+  };
 
   const small = capacity > 10;
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot }) => {
+    const uid = allSeats[i];
+    return (
+      <Seat
+        key={i}
+        index={i}
+        userId={uid}
+        host={extra?.slot ? false : (extra?.host ?? i === 0)}
+        small={small}
+        vipLevel={uid === 'me' ? vipLevel : 0}
+        frameId={uid === 'me' ? equipped.frame : undefined}
+        speaking={!!uid && speaking.has(uid) && !silenced.has(uid)}
+        muted={uid === 'me' ? !micOn : !!uid && mutedUsers.has(uid)}
+        role={uid ? roleOf(uid) : i === 0 && extra?.host ? 'owner' : undefined}
+        locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
+        compact={extra?.compact}
+        reaction={uid ? reactions[uid] : undefined}
+        still={settings.reduceMotion}
+        anchorRef={seatAnchor(uid, i)}
+        camera={uid === 'me' && camOn}
+        teamColor={teamColorOf(uid)}
+        pkPoints={pkPointsOf(uid)}
+        silenced={!!uid && silenced.has(uid)}
+        avatarSize={extra?.slot?.size}
+        slotWidth={extra?.slot?.width}
+        onPress={() => onSeatPress(i)}
+      />
+    );
+  };
+
+  if (!unlocked) return <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} />;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} blurRadius={25} />
@@ -1142,7 +1473,7 @@ export default function VoiceRoom() {
                   <Text style={styles.levelText}>Lv.{level}</Text>
                 </View>
               </Pressable>
-              <Pressable onPress={() => setListOpen(true)}>
+              <Pressable onPress={() => setPeopleOpen(true)} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
                 <Text style={styles.sub} numberOfLines={1}>
                   {typeInfo.emoji} {typeInfo.name} · 👥 {listeners} · 🎙️ {capacity}
                   {agencyRoom ? ' · 🏢 Ajans odası' : ''}
@@ -1183,98 +1514,77 @@ export default function VoiceRoom() {
             </Pressable>
           </View>
 
-          {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
-          {pk && <PkBoard pk={pk} viewerRoomId={id} canManage={myRole !== 'member'} />}
-          {callActive && (
-            <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
-              <Ionicons name="call" size={16} color={semantic.successInk} />
-              <Text style={styles.callBannerText} numberOfLines={1}>
-                {media.call?.kind === 'match' ? 'Hemen Tanış' : 'Bire bir'} görüşmedesin · odada dinleyicisin
-              </Text>
-              <Text style={styles.callBannerGo}>Dön</Text>
-            </Pressable>
-          )}
-          {settings.roomMuted && <Text style={styles.mutedChip}>🔇 Oda sesi senin için kapalı · Ses ayarlarından açabilirsin</Text>}
-          {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
-          {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
-            <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
-              <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
-                📅 {events.filter((e) => !e.cancelled)[0].title} · {events.filter((e) => !e.cancelled)[0].when}
-              </Text>
-              <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{events.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
-            </Pressable>
-          )}
-          {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
-          {poll && (
-            <PollCard
-              poll={poll}
-              canManage={myRole !== 'member'}
-              onVote={(i) => setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p))}
-              onClose={() => {
-                setPoll((p) => (p ? { ...p, closed: true, endsIn: 0 } : p));
-                logMod('Anketi kapattı', poll.question);
-              }}
-            />
-          )}
-          {goal && <GoalCard goal={goal} />}
+          {/* Stage: boards and mics. Capped so the Balkon and the chat always keep their space on small phones; scrolls when taller. */}
+          <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58) }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+            {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
+            {offline && <ConnectionBanner onReconnect={() => setConnection('online')} />}
+            {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage} />}
+            {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage} />}
+            {pk?.kind === 'room' && pk.mode === 'team' && pk.status === 'invite' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage} />}
+            {callActive && (
+              <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
+                <Ionicons name="call" size={16} color={semantic.successInk} />
+                <Text style={styles.callBannerText} numberOfLines={1}>
+                  {media.call?.kind === 'match' ? 'Hemen Tanış' : 'Bire bir'} görüşmedesin · odada dinleyicisin
+                </Text>
+                <Text style={styles.callBannerGo}>Dön</Text>
+              </Pressable>
+            )}
+            {settings.roomMuted && <Text style={styles.mutedChip}>🔇 Oda sesi senin için kapalı · Ses ayarlarından açabilirsin</Text>}
+            {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
+            {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
+              <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
+                <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                  📅 {events.filter((e) => !e.cancelled)[0].title} · {events.filter((e) => !e.cancelled)[0].when}
+                </Text>
+                <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{events.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
+              </Pressable>
+            )}
+            {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
+            {poll && (
+              <PollCard
+                poll={poll}
+                canManage={myRole !== 'member'}
+                onVote={(i) => setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p))}
+                onClose={() => {
+                  setPoll((p) => (p ? { ...p, closed: true, endsIn: 0 } : p));
+                  logMod('Anketi kapattı', poll.question);
+                }}
+              />
+            )}
+            {goal && <GoalCard goal={goal} />}
 
-          <View style={styles.seatGrid}>
-            {bossOn && (
-              <View style={styles.topRow}>
-                <Seat
-                  index={0}
-                  userId={allSeats[0]}
-                  host
-                  small={small}
-                  vipLevel={allSeats[0] === 'me' ? vipLevel : 0}
-                  frameId={allSeats[0] === 'me' ? equipped.frame : undefined}
-                  speaking={!!allSeats[0] && speaking.has(allSeats[0])}
-                  muted={allSeats[0] === 'me' ? !micOn : !!allSeats[0] && mutedUsers.has(allSeats[0])}
-                  role="owner"
-                  compact
-                  reaction={allSeats[0] ? reactions[allSeats[0]] : undefined}
-                  still={settings.reduceMotion}
-                  anchorRef={seatAnchor(allSeats[0], 0)}
-                  camera={allSeats[0] === 'me' && camOn}
-                  teamColor={teamColorOf(allSeats[0])}
-                  onPress={() => onSeatPress(0)}
-                />
-                <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+            {teamPk ? (
+              <>
+                {bossOn && (
+                  <View style={[styles.topRow, { marginTop: 6 }]}>
+                    <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+                  </View>
+                )}
+                <TeamArena pk={teamPk} seats={allSeats} width={win.width} canManage={canManage} renderSeat={(i, slot) => renderSeat(i, { slot })} />
+              </>
+            ) : (
+              <View style={styles.seatGrid}>
+                {bossOn && (
+                  <View style={styles.topRow}>
+                    {renderSeat(0, { host: true, compact: true })}
+                    <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+                  </View>
+                )}
+                {allSeats.map((_, i) => (bossOn && i === 0 ? null : renderSeat(i)))}
               </View>
             )}
-            {allSeats.map((uid, i) => bossOn && i === 0 ? null : (
-              <Seat
-                key={i}
-                index={i}
-                userId={uid}
-                host={i === 0}
-                small={small}
-                vipLevel={uid === 'me' ? vipLevel : 0}
-                frameId={uid === 'me' ? equipped.frame : undefined}
-                speaking={!!uid && speaking.has(uid)}
-                muted={uid === 'me' ? !micOn : !!uid && mutedUsers.has(uid)}
-                role={uid ? roleOf(uid) : undefined}
-                locked={!uid && i > 0 && (lockedSeats.includes(i) || (myRole === 'member' && !amSeated && !freeMic))}
-                reaction={uid ? reactions[uid] : undefined}
-                still={settings.reduceMotion}
-                anchorRef={seatAnchor(uid, i)}
-                camera={uid === 'me' && camOn}
-                teamColor={teamColorOf(uid)}
-                onPress={() => onSeatPress(i)}
-              />
-            ))}
-          </View>
-
-          <FlatList
-            style={{ flex: 1, marginHorizontal: 12 }}
-            data={[...messages]
-              .filter((m) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('odaya katıldı'))) && (msgFilter.gifts || !(m.system && m.text.startsWith('🎁'))))
-              .reverse()}
-            inverted
-            keyExtractor={(m) => m.id}
-            renderItem={({ item }) => <ChatLine msg={item} bubbleId={equipped.bubble} />}
-            contentContainerStyle={{ gap: 6, paddingVertical: 8 }}
+          </ScrollView>
+          <BalconyBar
+            view={view}
+            stale={offline}
+            onOpen={() => {
+              setInviteSeat(null);
+              setPeopleOpen(true);
+            }}
           />
+
+          <ChatFeed messages={feed} visible={visibleInAll} renderItem={renderChat} />
 
           {emojiOpen && (
             <EmojiPanel
@@ -1339,22 +1649,21 @@ export default function VoiceRoom() {
         onSendLucky={sendLuckyGift}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
-      <ListenersModal
-        visible={listOpen}
+      <ParticipantsSheet
+        visible={peopleOpen}
         onClose={() => {
-          setListOpen(false);
+          setPeopleOpen(false);
           setInviteSeat(null);
         }}
-        users={audience}
-        canInvite={myRole !== 'member'}
-        onInvite={(uid) => {
-          placeOnSeat(uid, inviteSeat ?? undefined);
-          setInviteSeat(null);
-          setListOpen(false);
-          logMod('Koltuğa davet etti', userById(uid).name);
-        }}
-        total={listeners}
-        invisibleMe={invisible}
+        room={live}
+        view={view}
+        myRole={myRole}
+        offline={offline}
+        inviteSeat={inviteSeat}
+        silenced={silenced}
+        blocked={blocked}
+        hiddenMe={invisible && !amSeated}
+        actions={peopleActions}
       />
       <RoomInfoSheet
         key={panel === 'info' ? 'info-open' : 'info-closed'}
@@ -1386,7 +1695,7 @@ export default function VoiceRoom() {
           updateMyRoom({ memberIds: myRoom.memberIds.filter((x) => x !== uid) });
           logMod('Oda üyeliğinden çıkardı', userById(uid).name);
         }}
-        stats={{ coins: Object.entries(contrib).reduce((sum, [uid, v]) => (uid === 'me' && isOwn ? sum : sum + v), 0), peak: listeners, minutes }}
+        stats={{ coins: Object.entries(contrib).reduce((sum, [uid, v]) => (uid === 'me' && isOwn ? sum : sum + v), 0), peak, minutes }}
         giftLog={giftLog}
         announcement={announcement ?? ''}
         onSave={(p) => updateMyRoom(p)}
@@ -1547,22 +1856,27 @@ export default function VoiceRoom() {
         off={settings.effectsOff}
         micEffect={{ animationId: app.micFx, active: amSeated && micOn && !callActive, isSpeaking: () => speakingMe.current }}
       />
-      <PkSetupSheet visible={pkSetup} roomId={id} starterId="me" participants={[app.me, ...seatedOthers.map(userById)]} onClose={() => setPkSetup(false)} />
-      {lastPk && (lastPk.status === 'done' || lastPk.status === 'cancelled') && !pkStore.seen.includes(lastPk.id) && (
-        <PkResult
-          pk={lastPk}
+      <PkSetupSheet key={pkSetup ? 'pk-open' : 'pk-closed'} visible={pkSetup} roomId={id} starterId="me" micUsers={view.micIds} offline={offline} onClose={() => setPkSetup(false)} />
+      {showPkResult && pkEnded && (
+        <PkResultScreen
+          pk={pkEnded}
           viewerRoomId={id}
-          onClose={() => markPkSeen(lastPk.id)}
+          still={settings.reduceMotion || settings.effectsOff}
+          onContinue={closePkResult}
+          onProfile={openProfileFromPk}
           onNew={
-            myRole !== 'member'
+            canManage
               ? () => {
-                  markPkSeen(lastPk.id);
+                  markPkSeen(pkEnded.id);
+                  markPkSeen(`${pkEnded.id}:crowns`);
                   setPkSetup(true);
                 }
               : undefined
           }
         />
       )}
+      {showCrowns && pkEnded && <CrownScreen pk={pkEnded} still={settings.reduceMotion || settings.effectsOff} onClose={() => markPkSeen(`${pkEnded.id}:crowns`)} onProfile={openProfileFromPk} />}
+      {myInvite && !offline && <MicInvitePrompt key={myInvite.id} invite={myInvite} onAnswer={answerMyInvite} />}
       <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
       {moving && (
         <Pressable style={styles.moveBanner} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">

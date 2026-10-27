@@ -62,7 +62,7 @@ export const PERMISSIONS: { key: PermissionKey; label: string; group: string; cr
   { key: 'agencies.performance', label: 'Atanmış ajansların performansını görüntüle', group: 'Ajans başvurusu' },
   { key: 'games.manage', label: 'Oyun kataloğu, VIP şartı, limit ve sağlayıcı ayarları', group: 'Oyun', critical: true, minScope: 'platform' },
   { key: 'animations.manage', label: 'Animasyon kataloğu, fiyat, lisans ve sağlayıcı yönetimi', group: 'İçerik', critical: true, minScope: 'platform' },
-  { key: 'pk.manage', label: 'Takım PK ayarları, aktif PK izleme ve iptal', group: 'Oda', critical: true, minScope: 'platform' },
+  { key: 'pk.manage', label: 'PK ayarları (Normal, Takım, odalar arası), aktif PK izleme, iade ve iptal', group: 'Oda', critical: true, minScope: 'platform' },
   { key: 'lucky.manage', label: 'Lucky hediye paketleri, olasılıklar, ödül rezervi ve kayıtlar', group: 'Oda', critical: true, minScope: 'platform' },
 ];
 export const permLabel = (k: PermissionKey) => PERMISSIONS.find((p) => p.key === k)?.label ?? k;
