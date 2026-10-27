@@ -90,6 +90,7 @@ Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sö
 - **Balkon, oda sayacı, katılımcı yönetimi, sohbet filtreleri:** mikrofonların altında Balkon ve dokunulabilir toplam sayaç; "Odadaki Kullanıcılar" penceresinde mikrofon daveti (davet edilen kabul eder), mikrofon susturma, kişisel sessiz, onaylı odadan çıkarma; sohbette Tümü / Hediyeler / Sohbet sekmeleri. Ayrıntı: [`docs/CANLI_ODA.md`](docs/CANLI_ODA.md).
 - **Küçültülebilir oda:** geri tuşu veya kapatma "Odayı küçült / Odadan çık" diye sorar; küçültülen oda her ekranda mini kart olarak sürer (aynı oturum, yeniden bağlanmadan), başka odaya geçiş önce sorulur, uygulama yeniden açılınca güvenli geri dönüş önerilir. Ses motoru şimdilik simülasyon; gerçek ses ve arka plan sesi için yapılandırma hazır. Ayrıntı ve teslim raporu: [`docs/ODA_OTURUMU.md`](docs/ODA_OTURUMU.md).
 - **PK:** Normal PK (varsayılan, bireysel), Takım PK (sunucuda rastgele veya manuel takımlar, ikiye ayrılan mikrofon alanı) ve odalar arası PK; koltuk altında canlı PK puanı, sonuç ekranı ve "Taç Kazandıranlar". Ayrıntı: [`docs/PK_MODULU.md`](docs/PK_MODULU.md).
+- **Yayına Katılma Modu ve ortak YouTube ekranı:** Oda Ayarları (veya oda menüsü) › Yayına Katılma Modu: Ses / Video / Sinema Salonu / Çift Odası sekmelerinde 34 mikrofon yerleşimi (katalog verisi), oda seviyesi kilidi, PK takım bölgeleri; Video ve Sinema Salonu'nda yalnızca YouTube bağlantısıyla ortak izleme. Yetki, seviye, kapasite ve bağlantı doğrulaması `lib/room-modes` içinde. Ayrıntı: [`docs/ODA_MODLARI.md`](docs/ODA_MODLARI.md).
 
 ## Testler
 
