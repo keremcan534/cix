@@ -44,6 +44,7 @@ import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { AnimLayer } from '@/components/fx/anim-layer';
+import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
@@ -62,6 +63,7 @@ import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/da
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, useGames } from '@/lib/games';
+import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, modeLabel, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
@@ -216,9 +218,9 @@ export default function VoiceRoom() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
-  const [luckyFx, setLuckyFx] = useState<LuckyRecord | null>(null);
-  // Lucky combo wheel: same gift, same person, one tap per repeat (×1, ×2, ×3 …).
-  const [combo, setCombo] = useState<{ giftId: string; toId: string; count: number; key: number } | null>(null);
+  const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
+  // Lucky combo wheel: same gift, same people, one tap per repeat (×1, ×2, ×3 …).
+  const [combo, setCombo] = useState<{ giftId: string; to: string[]; count: number; key: number } | null>(null);
   const gameCatalog = useGames();
   const [game, setGame] = useState<OpenGame | null>(null);
   const [gameMin, setGameMin] = useState(false);
@@ -1121,37 +1123,65 @@ export default function VoiceRoom() {
 
   // Lucky: one gift, one recipient. The server (lib/lucky) charges, draws and credits; the room only
   // records the normal gift for the recipient and shows the stored result.
-  const sendLuckyGift = (giftId: string, toId: string) => {
+  // Lucky: one gift to each person picked, one server draw per person. The room only records the
+  // normal gift for each recipient and shows the stored results; wins go out to every room.
+  const sendLuckyGift = (giftId: string, toIds: string[]) => {
     setGiftOpen(false);
     if (offlineBlocked()) return;
-    const to = userById(toId);
-    const r = sendLucky({ txId: newLuckyTxId(), userId: 'me', userAge: app.me.age, roomId: id, giftId, toId, toName: to.name }, { spend: spendCoins, credit: addCoins });
-    if (!r.ok) {
-      errorHaptic();
-      return showAlert('Lucky gönderilemedi', r.reason);
+    const records: LuckyRecord[] = [];
+    let error: string | null = null;
+    for (const toId of toIds) {
+      const r = sendLucky({ txId: newLuckyTxId(), userId: 'me', userAge: app.me.age, roomId: id, giftId, toId, toName: userById(toId).name }, { spend: spendCoins, credit: addCoins });
+      if (!r.ok) {
+        error = r.reason;
+        break;
+      }
+      records.push(r.record);
     }
-    const { record } = r;
+    if (!records.length) {
+      errorHaptic();
+      return showAlert('Lucky gönderilemedi', error ?? 'Gönderilemedi.');
+    }
     const cfg = getLucky().config;
+    const first = records[0];
+    const spent = records.reduce((n, r) => n + r.price, 0);
+    const reward = records.reduce((n, r) => n + r.reward, 0);
+    const best = records.reduce((a, b) => (b.mult > a.mult ? b : a), first);
+    const sentTo = records.map((r) => r.toId);
     successHaptic();
-    logGift('me', toId, { id: record.giftId, name: record.giftName, emoji: record.emoji, price: record.price }, 1);
-    bump('giftsSent', 1);
-    addContrib('me', record.price);
-    if (!isOwn) addFanPoints(hostId, Math.ceil(record.price / 10), `Hediye gönderdin (${record.price} jeton)`);
-    flyGift(record.emoji, 1, [toId], { x: win.width - 60, y: win.height - 48 });
-    // PK counts the gift value; the reward only when the admin setting says so.
-    scorePk(record.txId, 'me', toId, record.giftId, record.price + (cfg.pkCountsReward ? record.reward : 0));
+    records.forEach((r) => {
+      logGift('me', r.toId, { id: r.giftId, name: r.giftName, emoji: r.emoji, price: r.price }, 1);
+      // PK counts the gift value; the reward only when the admin setting says so.
+      scorePk(r.txId, 'me', r.toId, r.giftId, r.price + (cfg.pkCountsReward ? r.reward : 0));
+    });
+    bump('giftsSent', records.length);
+    addContrib('me', spent);
+    if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
+    flyGift(first.emoji, 1, sentTo, { x: win.width - 60, y: win.height - 48 });
     // Combo repeats don't add a chat line each time; the wheel shows the count.
-    const repeat = combo?.giftId === giftId && combo.toId === toId;
-    if (!repeat) addMsg({ id: `gift:${record.txId}`, system: true, text: `🍀 ${ME.name}, ${to.name} kişisine ${record.emoji} ${record.giftName} (Lucky) gönderdi`, gift: { fromId: 'me', toIds: [toId], emoji: record.emoji, name: record.giftName, count: 1, lucky: true } });
-    if (record.mult >= cfg.announceFrom)
+    const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join();
+    if (!repeat)
+      addMsg({
+        id: `gift:${first.txId}`,
+        system: true,
+        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName} (Lucky) gönderdi`,
+        gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count: 1, lucky: true },
+      });
+    if (error) addMsg({ system: true, text: `🍀 ${toIds.length - records.length} kişiye gönderilemedi: ${error}` });
+    // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
+    if (reward > 0) {
+      const wins = records.filter((r) => r.reward > 0).length;
+      announceWin({ userName: ME.name, avatar: app.me.avatar, source: `Lucky › ${first.giftName}`, roomTitle: roomTitleOf(id), mult: best.mult, amount: reward, wins: wins > 1 ? wins : undefined }, { mine: true });
+    }
+    if (best.mult >= cfg.announceFrom)
       addMsg({
         system: true,
         kind: 'gift',
-        text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı! +${record.reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${record.mult.toLocaleString('tr-TR')} kazandı!`,
+        text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
-    setLuckyFx(record);
+    setLuckyFx(records);
     const at = Date.now();
-    setCombo((c) => (c && c.giftId === giftId && c.toId === toId ? { ...c, count: c.count + 1, key: at } : { giftId, toId, count: 1, key: at }));
+    setCombo((c) => (c && c.giftId === giftId && c.to.join() === toIds.join() ? { ...c, count: c.count + 1, key: at } : { giftId, to: toIds, count: 1, key: at }));
   };
   const comboGift = combo ? luckyGift(combo.giftId) : undefined;
 
@@ -1905,17 +1935,19 @@ export default function VoiceRoom() {
       {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
       {combo && comboGift && (
         <LuckyCombo
-          key={`${combo.giftId}-${combo.toId}`}
+          key={`${combo.giftId}-${combo.to.join()}`}
           emoji={comboGift.emoji}
           name={comboGift.name}
-          price={comboGift.price}
+          price={comboGift.price * combo.to.length}
           count={combo.count}
           restartKey={combo.key}
-          onPress={() => sendLuckyGift(combo.giftId, combo.toId)}
+          onPress={() => sendLuckyGift(combo.giftId, combo.to)}
           onExpire={() => setCombo(null)}
         />
       )}
-      {luckyFx && <LuckyResult key={luckyFx.txId} record={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
+      {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
+      {/* Platform-wide win announcements (every room shows every win). */}
+      <WinBanner top={110} still={settings.reduceMotion} />
       {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
     </View>
   );
