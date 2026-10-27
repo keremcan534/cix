@@ -10,7 +10,8 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 |---|---|
 | `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, limitler, kayıtlar, denetim. |
 | `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Lucky** rafı: paketler, tam olasılık tablosu, Geçmişim. |
-| `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişiye tekrar gönderir (×1, ×2, ×3 …). |
+| `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişilere tekrar gönderir (×1, ×2, ×3 …). |
+| `src/lib/broadcast.ts`, `src/components/fx/win-banner.tsx` | Tüm odalara kazanç duyurusu: üst ortada ışıltılı bant, sırayla gösterilir. |
 | `src/components/room/lucky-result.tsx` | Odadaki sonuç kartı (çarpan + ödül veya "ödül çıkmadı"). Dokunmaları engellemez, mikrofona dokunmaz. |
 | `src/app/oda/[id].tsx` | `sendLuckyGift`: alıcının hediye kaydı, PK puanı, sohbet bildirimi. |
 | `src/app/lucky-yonetimi.tsx` | Yönetim paneli (`lucky.manage`). |
@@ -25,9 +26,9 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 - **Gönderim akışı:**
   1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir.
   2. **Onay yok:** Hiçbir hediye onay sormaz; tek dokunuşla gönderilir.
-  3. Gönderimden sonra sağ altta o hediyeye ait çark çıkar. Çevresindeki çizgi 5 saniyede tamamlanır; bu sürede çarka basmak aynı hediyeyi aynı kişiye tekrar gönderir ve sayaç ×1, ×2, ×3 diye ilerler. Her basış çizgiyi baştan başlatır, çizgi kapanınca çark kaybolur.
+  3. Gönderimden sonra sağ altta o hediyeye ait çark çıkar. Çevresindeki çizgi 5 saniyede tamamlanır; bu sürede çarka basmak aynı hediyeyi aynı kişilere tekrar gönderir ve sayaç ×1, ×2, ×3 diye ilerler. Her basış çizgiyi baştan başlatır, çizgi kapanınca çark kaybolur.
   4. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi ve limitleri kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
-- **Kapsam:** İlk sürümde tek kişiye, tek adet gönderilir. Çoklu gönderim kapsam dışıdır.
+- **Alıcılar:** Tek kişiye, seçilen kişilere veya "Tümü" ile mikrofondaki herkese gönderilebilir. Her kişi için tek adet gönderilir ve ayrı çekiliş yapılır (ayrı işlem kimliği). Bakiye bir yerde biterse kalan kişilere gönderilmez ve sohbette yazılır.
 - **Tekrar eden istek:** Aynı işlem kimliği gelirse ilk sonuç döner. İkinci kez jeton düşülmez, ödül verilmez.
 - **Bütçe:**
   - Her gönderimin bir payı (varsayılan %70) ödül rezervine aktarılır.
@@ -39,8 +40,12 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
   - Yaş sınırı 18; kişi kendine Lucky gönderemez.
 - **PK:** Varsayılan olarak yalnızca hediye bedeli PK puanı getirir. Ödülün eklenmesi yönetim panelinden ayrı bir ayarla açılır.
 - **Servet puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
-- **Duyuru:** ×50 ve üzeri kazanç odada duyurulur.
+- **Duyuru:** Herhangi bir odada biri kazanç elde edince (Lucky veya Oyun Merkezi) **tüm odalarda** üst ortada ışıltılı bir bant çıkar: "X kazandı! Lucky › Uğur Böceği ×10 · +1.000 jeton · oda adı".
+  - Bantlar sırayla gösterilir (en fazla 6 bekler); 30 saniyeden eski duyuru gösterilmez.
+  - Bir gönderimde birden çok kazanç varsa tek bant: en yüksek çarpan ve toplam ödül.
   - Kullanıcı Ayarlar › Gizlilik'ten adının gizlenmesini seçebilir; o zaman "Bir kullanıcı kazandı" yazar.
+  - ×50 ve üzeri kazanç ayrıca o odanın sohbetine de yazılır.
+  - Prototipte diğer odaların kazançları 25–50 saniyede bir örnek olarak üretilir; gerçek sistemde sunucunun yayın kanalından gelir.
 - **Mikrofon ve oda:** Sonuç kartı yalnızca görseldir. Koltuk, mikrofon ve ses bağlantısı değişmez.
 
 ## Kabul testleri (web prototipi, Playwright)
@@ -54,6 +59,8 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 | Olasılık toplamı %100 olmayan paket kaydedilmez | ✅ "%136; %100 olmalı" |
 | Gösterilen oranlar gerçek yapılandırmayla aynı (sürüm numarası) | ✅ |
 | Geçmiş: harcanan, çarpan, ödül, ayar sürümü | ✅ Kullanıcı (Geçmişim) ve yönetim panelinde |
+| Mikrofondaki 5 kişiye tek dokunuşla gönderim: 5 ayrı çekiliş ve kayıt, bakiye doğru | ✅ −500 +1.000 (×10) |
+| Kazanç tüm odalarda bantla duyurulur; başka odaların kazançları da görünür | ✅ |
 | Rezerv yetersizse paket gönderime kapanır | ✅ ("Rezervi 1.000’e düşür (test)") |
 | Lucky gönderiminde koltuk ve mikrofon korunur | ✅ |
 
