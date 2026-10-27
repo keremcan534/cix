@@ -77,7 +77,7 @@ Sonradan eklenenler: Ben sayfası, SVIP 1–10 / VIP abonelik / Asil (Şövalye�
 
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 
-Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Uygulamada bu değerler sabit varsayılanlardır; finans yönetimi (kurallar, onay, mutabakat) mobil uygulamadan çıkarıldı ve ayrı Finance Control platformuna taşınıyor.
+Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD (1.000.000 jetonluk paket 23.599,99 TL), Lucky hediyede alıcıya değerin %20'si, elmas → jeton yalnız ana Coins Bank hesabında değere göre (%3), Coins Bank toptan %2, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Uygulamada bu değerler sabit varsayılanlardır; finans yönetimi (kurallar, onay, mutabakat) mobil uygulamadan çıkarıldı ve ayrı Finance Control platformuna taşınıyor.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 

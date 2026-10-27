@@ -66,7 +66,7 @@ import { RULES } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
-import { casinoAccess, useGames } from '@/lib/games';
+import { casinoAccess, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
@@ -1343,17 +1343,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       showAlert('Günlük limit', 'Bugünkü oyun hakkın bitti.');
       return null;
     }
-    if (!spendCoins(bet, 'Zar Düellosu bahis')) {
-      showAlert('Yetersiz jeton');
+    // Same house rule and payout pool as the casino (lib/games, lib/casino-odds).
+    const r = playDuel(bet);
+    if (!r.ok) {
+      showAlert('Zar Düellosu', r.reason);
       return null;
     }
     setDicePlays((n) => n - 1);
-    const me = rollDie();
-    const them = rollDie();
+    const { me, them, payout } = r;
     const opponent = pick(seatedOthers.length ? seatedOthers : USERS.map((u) => u.id));
-    if (me > them) addCoins(bet * 2, 'Zar Düellosu kazanç');
-    else if (me === them) addCoins(bet, 'Zar Düellosu iade');
-    addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${me > them ? `${ME.name} kazandı! +${bet * 2}` : me < them ? `${userById(opponent).name} kazandı` : 'berabere'}` });
+    addMsg({ system: true, text: `🎲 ${ME.name} (${me}) vs ${userById(opponent).name} (${them}) → ${payout > 0 ? `${ME.name} kazandı! +${payout} (oyun bakiyesine)` : 'kasa kazandı'}` });
     return { me, them, opponent };
   };
 

@@ -3,6 +3,11 @@
 // the game server: it re-checks VIP and limits on every request, is idempotent per request id, and
 // refunds when the provider fails after the stake was taken.
 //
+// House rule (lib/casino-odds): 60 % of every coin played stays with the house, 40 % is paid back as random
+// winnings. Each stake is split at once — 60 % booked to the house, 40 % into the payout pool — and wins are
+// paid only from the pool. A round whose top prize the pool can't cover is refused before the stake is taken.
+// Winnings go to a separate game balance (playable only here; never gifted, exchanged or withdrawn).
+//
 // Hard rule (spec §5): nothing in this file touches rooms, seats, microphones or calls. It does not
 // import lib/media and the game UI never changes room state; voice chat simply keeps running.
 import { useSyncExternalStore } from 'react';
@@ -10,11 +15,12 @@ import { useSyncExternalStore } from 'react';
 import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data/games';
 import { ME } from '@/data/mock';
 import { announceWin } from '@/lib/broadcast';
+import { CASINO_HOUSE_SHARE, DRAWS, DUEL_MULT, PICKS, duelMultiplier, evaluate, maxMultiplier, splitStake, type Outcome } from '@/lib/casino-odds';
 import { today } from '@/lib/persist';
 
 export type Entry = { from: 'profile' } | { from: 'room'; roomId: string; roomTitle: string };
 export type CasinoPick = string; // e.g. 'big' | 'small' | 'dragon' | 'tiger' | 'tie' | '' for wheel/slot
-export type Outcome = { display: string[]; multiplier: number; detail: string };
+export type { Outcome };
 export type HistoryRow = {
   txId: string;
   requestId: string;
@@ -35,14 +41,23 @@ export type GameDeps = {
   coins: () => number;
   spend: (n: number, reason: string) => boolean;
   credit: (n: number, reason: string) => void;
+  /** Casino winnings balance: stakes use it first; every win is credited to it, never to the wallet. */
+  gameCoins: () => number;
+  spendGame: (n: number, reason: string) => boolean;
+  creditGame: (n: number, reason: string) => void;
 };
 let deps: GameDeps | null = null;
 export const setGameDeps = (d: GameDeps) => {
   deps = d;
 };
 
-type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number> };
-let state: State = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {} };
+/** House book of all coin games: coins played, the house's 60 %, the payout pool and what it paid. */
+export type CasinoBank = { wagered: number; house: number; pool: number; paid: number; seed: number };
+/** Opening pool: a house advance so the first rounds can pay their top prize. */
+export const POOL_SEED = 200_000;
+type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number>; bank: CasinoBank };
+const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED });
+let state: State = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank() };
 const listeners = new Set<() => void>();
 const emit = (patch: Partial<State>) => {
   state = { ...state, ...patch };
@@ -83,37 +98,36 @@ const txId = () => `GM-${Date.now().toString(36).toUpperCase()}-${Math.random().
 export const newRequestId = () => `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const rnd = (n: number) => Math.floor(Math.random() * n);
 
-const WHEEL = [0, 0.5, 1, 1.5, 2, 3, 5, 10];
-const WHEEL_WEIGHTS = [30, 22, 16, 12, 9, 6, 4, 1];
-const SLOT = ['7', '🍒', '🍋', '🍇', '🔔'];
-const CARD = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-
-function roll(game: CasinoGame['id'], pick: CasinoPick): Outcome {
-  if (game === 'wheel') {
-    let r = rnd(WHEEL_WEIGHTS.reduce((a, b) => a + b, 0));
-    const i = WHEEL_WEIGHTS.findIndex((w) => (r -= w) < 0);
-    return { display: [String(i)], multiplier: WHEEL[i], detail: `Çark ${WHEEL[i]}x` };
-  }
-  if (game === 'dice') {
-    const a = rnd(6) + 1;
-    const b = rnd(6) + 1;
-    const sum = a + b;
-    const side = sum >= 8 ? 'big' : sum <= 6 ? 'small' : 'seven';
-    return { display: [String(a), String(b)], multiplier: side === pick ? 1.9 : 0, detail: `${a}+${b}=${sum} · ${side === 'seven' ? '7, kasa' : side === 'big' ? 'Büyük' : 'Küçük'}` };
-  }
-  if (game === 'slot') {
-    const reels = [SLOT[rnd(5)], SLOT[rnd(5)], SLOT[rnd(5)]];
-    const sevens = reels.filter((x) => x === '7').length;
-    const same = reels[0] === reels[1] && reels[1] === reels[2];
-    const m = sevens === 3 ? 20 : same ? 5 : sevens === 2 ? 2 : 0;
-    return { display: reels, multiplier: m, detail: reels.join(' ') };
-  }
-  const d = rnd(13);
-  const t = rnd(13);
-  const winner = d > t ? 'dragon' : t > d ? 'tiger' : 'tie';
-  const m = pick === winner ? (winner === 'tie' ? 8 : 1.95) : winner === 'tie' ? 0.5 : 0;
-  return { display: [CARD[d], CARD[t]], multiplier: m, detail: `Ejder ${CARD[d]} · Kaplan ${CARD[t]} · ${winner === 'tie' ? 'Beraberlik' : winner === 'dragon' ? 'Ejder' : 'Kaplan'}` };
+/** Splits a stake: the house share is booked at once, the rest joins the payout pool. */
+function book(bet: number) {
+  const house = Math.round(bet * CASINO_HOUSE_SHARE);
+  const b = state.bank;
+  emit({ bank: { ...b, wagered: b.wagered + bet, house: b.house + house, pool: b.pool + (bet - house) } });
 }
+/** Pays a win from the pool (never from the house share). */
+function payFromPool(n: number) {
+  const b = state.bank;
+  emit({ bank: { ...b, pool: b.pool - n, paid: b.paid + n } });
+}
+/**
+ * Takes a stake from the game balance first, then the wallet. Returns the split, or null when the wallet part
+ * can't be taken (balance or daily spending limit); nothing is taken then.
+ */
+function takeStake(d: GameDeps, bet: number, reason: string) {
+  const split = splitStake(bet, d.gameCoins());
+  if (split.fromWallet > 0 && !d.spend(split.fromWallet, reason)) return null;
+  if (split.fromGame > 0 && !d.spendGame(split.fromGame, reason)) {
+    if (split.fromWallet > 0) d.credit(split.fromWallet, `${reason} · iade`);
+    return null;
+  }
+  return split;
+}
+/** Gives a stake back to where it came from. */
+function refundStake(d: GameDeps, split: { fromGame: number; fromWallet: number }, reason: string) {
+  if (split.fromWallet > 0) d.credit(split.fromWallet, reason);
+  if (split.fromGame > 0) d.creditGame(split.fromGame, reason);
+}
+const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşılayamıyor. Daha küçük bir bahisle dene; jetonun düşülmedi.';
 
 /**
  * One casino round. Order mirrors the server: idempotency → access (VIP re-read now, not from the UI)
@@ -134,23 +148,30 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
   const access = casinoAccess(game, entry, deps.wealthLevel());
   if (!access.ok) return finish({ ok: false, reason: access.reason, row: { ...base, txId: txId(), payout: 0, status: 'Reddedildi', detail: access.reason } });
   if (!game.bets.includes(bet)) return { ok: false, reason: 'Geçersiz bahis tutarı.' };
+  if (!PICKS[game.id].includes(pick)) return { ok: false, reason: 'Geçersiz seçim.' };
+  if (state.bank.pool < bet * maxMultiplier(game.id, pick)) return { ok: false, reason: POOL_LOW };
   const day = today();
   const spent = state.spentByDay[`${gameId}:${day}`] ?? 0;
   if (spent + bet > game.dailyLimit) return { ok: false, reason: `${game.name} için günlük limit ${game.dailyLimit.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, game.dailyLimit - spent)}.` };
-  if (deps.coins() < bet) return { ok: false, reason: 'Yetersiz jeton.' };
+  if (deps.coins() + deps.gameCoins() < bet) return { ok: false, reason: 'Yetersiz jeton.' };
 
   const id = txId();
-  if (!deps.spend(bet, `${game.name} · tur ${id}`)) return { ok: false, reason: 'Jeton düşülemedi (bakiye veya günlük harcama limiti).' };
+  const split = takeStake(deps, bet, `${game.name} · tur ${id}`);
+  if (!split) return { ok: false, reason: 'Jeton düşülemedi (bakiye veya günlük harcama limiti).' };
   emit({ spentByDay: { ...state.spentByDay, [`${gameId}:${day}`]: spent + bet } });
 
   // Provider call. If it fails after the stake was taken, the stake is refunded with the same tx id.
   if (game.providerStatus === 'error') {
-    deps.credit(bet, `${game.name} · iade ${id} (sağlayıcı hatası)`);
+    refundStake(deps, split, `${game.name} · iade ${id} (sağlayıcı hatası)`);
     return finish({ ok: false, reason: 'Sağlayıcı yanıt vermedi; jetonun iade edildi. Oda ve sesli sohbetin etkilenmedi.', row: { ...base, txId: id, payout: bet, status: 'İade edildi', detail: 'Sağlayıcı hatası' } });
   }
-  const outcome = roll(game.id, pick);
+  book(bet);
+  const outcome = evaluate(game.id, pick, DRAWS[game.id].map(rnd));
   const payout = Math.floor(bet * outcome.multiplier);
-  if (payout > 0) deps.credit(payout, `${game.name} · kazanç ${id}`);
+  if (payout > 0) {
+    payFromPool(payout);
+    deps.creditGame(payout, `${game.name} · kazanç ${id}`);
+  }
   // A real win (more back than the stake) is announced in every room.
   if (payout > bet) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout }, { mine: true });
   return finish({ ok: true, outcome, replay: false, row: { ...base, txId: id, payout, status: 'Tamamlandı', detail: outcome.detail } });
@@ -158,3 +179,28 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
 
 /** Demo: simulate a provider outage from the admin screen (casino rounds then refund). */
 export const setProviderStatus = (id: string, s: CasinoGame['providerStatus']) => updateCasino(id, { providerStatus: s });
+
+/**
+ * Zar Düellosu in a room: both dice are rolled on the server; under the house rule you win 2.4× your stake when
+ * your die beats the other by 3 or more. Same split and pool as the casino.
+ */
+export function playDuel(bet: number): { ok: true; me: number; them: number; payout: number } | { ok: false; reason: string } {
+  if (!deps) return { ok: false, reason: 'Oyun şu an açılamıyor.' };
+  if (state.bank.pool < bet * DUEL_MULT) return { ok: false, reason: POOL_LOW };
+  if (deps.coins() + deps.gameCoins() < bet || !takeStake(deps, bet, 'Zar Düellosu bahis')) return { ok: false, reason: 'Yetersiz jeton.' };
+  book(bet);
+  const me = rnd(6) + 1;
+  const them = rnd(6) + 1;
+  const payout = Math.floor(bet * duelMultiplier(me, them));
+  if (payout > 0) {
+    payFromPool(payout);
+    deps.creditGame(payout, 'Zar Düellosu kazanç');
+  }
+  return { ok: true, me, them, payout };
+}
+
+/** Test support: forget rounds, limits and the house book. */
+export function resetGames() {
+  results.clear();
+  state = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank() };
+}

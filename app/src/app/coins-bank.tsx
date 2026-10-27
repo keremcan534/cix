@@ -222,7 +222,7 @@ function WalletTab() {
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <Text style={[styles.amount, { color: r.amount >= 0 ? colors.green : colors.red }]}>
                   {r.amount >= 0 ? '+' : ''}
-                  {fmt(r.amount)} {r.currency === 'coin' ? '🪙' : '💎'}
+                  {fmt(r.amount)} {r.currency === 'coin' ? '🪙' : r.currency === 'game' ? '🎮' : '💎'}
                 </Text>
                 <Badge text={r.status} />
               </View>

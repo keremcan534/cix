@@ -4,7 +4,6 @@ import { agencyByCode, type AgencyRole } from '@/data/agency';
 import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
-  EXCHANGE_FEE,
   TASKS,
   type TaskKey,
 } from '@/data/economy';
@@ -25,7 +24,7 @@ const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
 export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
-export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
+export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond' | 'game'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
 export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: string; title: string; body: string; time: string; read: boolean; href?: string };
 export type Ticket = { id: string; number: string; category: TicketCategory; text: string; status: 'Açık' | 'Yanıtlandı' | 'Çözüldü' | 'Yeniden açıldı'; time: string; replies: { from: 'me' | 'support'; text: string; time: string }[] };
 export type NotifyType = 'live' | 'invite' | 'event' | 'agency' | 'fanclub' | 'game' | 'payment' | 'system';
@@ -101,6 +100,10 @@ type AppState = {
   coins: number;
   addCoins: (n: number, reason?: string) => void;
   spendCoins: (n: number, reason?: string) => boolean;
+  /** Casino winnings: playable only in the games; never gifted, exchanged or withdrawn. */
+  gameCoins: number;
+  addGameCoins: (n: number, reason?: string) => void;
+  spendGameCoins: (n: number, reason?: string) => boolean;
   spentTotal: number;
   /** Servet puanı: qualifying spending only (data/wealth). */
   wealthXp: number;
@@ -144,7 +147,6 @@ type AppState = {
   receiveDiamonds: (n: number, source: EarningSource, fromId?: string) => void;
   withdrawals: Withdrawal[];
   requestWithdraw: (diamonds: number, iban: string) => string | null;
-  exchangeDiamonds: (diamonds: number) => number;
   // tasks & check-in
   stats: Record<TaskKey, number>;
   bump: (key: TaskKey, n?: number) => void;
@@ -235,6 +237,7 @@ type Snapshot = {
   loggedIn: boolean;
   me: User;
   coins: number;
+  gameCoins?: number;
   spentTotal: number;
   wealthXp?: number;
   ledger: LedgerRow[];
@@ -332,6 +335,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const setCoins = (fn: (c: number) => number) => {
     coinsRef.current = fn(coinsRef.current);
     setCoinsState(coinsRef.current);
+  };
+
+  // Separate balance for casino winnings, mirrored in a ref for the same synchronous reads.
+  const [gameCoins, setGameCoinsState] = useState(s.gameCoins ?? 0);
+  const gameCoinsRef = useRef(s.gameCoins ?? 0);
+  const setGameCoins = (fn: (c: number) => number) => {
+    gameCoinsRef.current = fn(gameCoinsRef.current);
+    setGameCoinsState(gameCoinsRef.current);
   };
 
   const [isHost, setIsHost] = useState(s.isHost ?? false);
@@ -493,7 +504,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
   // are not resumed after a restart; their records keep the last saved status.
   const snapshot: Snapshot = {
-    loggedIn, me, coins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
+    loggedIn, me, coins, gameCoins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
     myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
@@ -573,6 +584,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       log('coin', n, reason);
     },
     spendCoins: spend,
+    gameCoins,
+    addGameCoins: (n, reason = 'Oyun kazancı') => {
+      setGameCoins((c) => c + n);
+      log('game', n, reason);
+    },
+    spendGameCoins: (n, reason = 'Oyun') => {
+      if (gameCoinsRef.current < n) return false;
+      setGameCoins((c) => c - n);
+      log('game', -n, reason);
+      return true;
+    },
     spentTotal,
     wealthXp,
     wealthLevel: wealthLevelOf(wealthXp),
@@ -666,15 +688,6 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       }, 5000);
       return null;
     },
-    exchangeDiamonds: (amount) => {
-      const n = Math.min(amount, diamonds);
-      const gained = Math.floor(n * (1 - EXCHANGE_FEE));
-      setDiamonds((d) => d - n);
-      setCoins((c) => c + gained);
-      log('diamond', -n, 'Jetona çevrildi');
-      log('coin', gained, 'Elmas dönüşümü');
-      return gained;
-    },
 
     stats,
     bump: (key, n = 1) => setStats((s) => ({ ...s, [key]: s[key] + n })),
@@ -706,9 +719,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       const pack = RECHARGE_PACKS.find((p) => p.id === packId);
       if (!pack) return 0;
       // First-purchase bonus applies once per pack; SVIP experience counts the purchased coins only.
-      const first = 'firstBonus' in pack && pack.firstBonus && !firstBuys.has(pack.id) ? pack.firstBonus : 0;
-      const extra = 'bonus' in pack && pack.bonus ? pack.bonus : 0;
-      const total = pack.coins + first + extra;
+      const first = pack.firstBonus && !firstBuys.has(pack.id) ? pack.firstBonus : 0;
+      const total = pack.coins + first;
       setCoins((c) => c + total);
       setSvipXp((x) => x + pack.coins);
       setFirstBuys((f) => new Set(f).add(pack.id));

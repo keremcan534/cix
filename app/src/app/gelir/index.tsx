@@ -1,17 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Card } from '@/components/ui';
-import { EXCHANGE_FEE } from '@/data/economy';
 import { GIFTS, userById } from '@/data/mock';
 import { RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
-import { blockedFor, useBank } from '@/lib/bank';
+import { diamondValueTl } from '@/lib/coins-bank';
 import { useApp, type Earning, type EarningSource } from '@/store';
 import { colors } from '@/theme';
 
@@ -39,37 +36,25 @@ export const incomeDetail = (e: Earning) => {
 };
 
 const PREVIEW = 10;
-const EXCHANGE_STEPS = [1_000, 5_000, 10_000, 50_000];
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function IncomeScreen() {
-  const { diamonds, earnings, exchangeDiamonds } = useApp();
-  // Diamonds blocked by open payout requests can't be converted (same balance can't be used twice).
-  const convertible = Math.max(0, diamonds - blockedFor(useBank(), 'creator'));
-  const [sheet, setSheet] = useState(false);
-
-  const convert = (amount: number) => {
-    const gained = exchangeDiamonds(amount);
-    // Let the sheet's modal finish closing first (iOS drops alerts shown during a modal dismissal).
-    setTimeout(() => showAlert('Dönüştürüldü ✅', `${fmt(amount)} 💎 → ${fmt(gained)} 🪙\nDönüşüm ücreti: ${fmt(amount - gained)} 💎 (%${EXCHANGE_FEE * 100})`), 350);
-  };
-
-  const options: SheetOption[] = [...EXCHANGE_STEPS.filter((s) => s < convertible), convertible]
-    .filter((s) => s > 0)
-    .map((s, i, all) => ({
-      label: `${i === all.length - 1 ? 'Tümü · ' : ''}${fmt(s)} 💎 → ${fmt(Math.floor(s * (1 - EXCHANGE_FEE)))} 🪙`,
-      onPress: () => convert(s),
-    }));
-
-  const openConvert = () => {
-    if (convertible <= 0) return showAlert('Dönüştürülecek elmas yok', diamonds > 0 ? 'Elmasların bekleyen para çekme talebinde bloke. Talep sonuçlanınca dönüştürebilirsin.' : 'Hediye ve aramalardan elmas kazandıkça jetona dönüştürebilirsin.');
-    setSheet(true);
-  };
+  const { diamonds, earnings } = useApp();
+  // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
+  const instant = () =>
+    showAlert(
+      'Anında bozdur',
+      `Coins Bank elmasını resmi değerinden hemen öder: ${fmt(diamonds)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(diamonds)))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.`,
+      [
+        { text: 'Kapat', style: 'cancel' },
+        { text: "Coins Bank'a git", onPress: () => router.push('/coins-bank') },
+      ],
+    );
 
   const info = () =>
     showAlert(
       'Mevcut Elmaslar',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Bakiyen yaklaşık ${usd(diamonds)} değerindedir.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir. Elmasları jetona dönüştürürken %${EXCHANGE_FEE * 100} ücret kesilir.`,
+      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Bakiyen yaklaşık ${usd(diamonds)} değerindedir.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir. Haftalık ödemeyi beklemeden Coins Bank üzerinden anında bozdurabilirsin; elmas jetona yalnızca Coins Bank hesabında çevrilir.`,
     );
 
   return (
@@ -98,8 +83,8 @@ export default function IncomeScreen() {
             <Pressable style={styles.outlineBtn} onPress={() => router.push('/yayinci/cek')}>
               <Text style={styles.outlineText}>Para Çek</Text>
             </Pressable>
-            <Pressable style={styles.outlineBtn} onPress={openConvert}>
-              <Text style={styles.outlineText}>Dönüştür</Text>
+            <Pressable style={styles.outlineBtn} onPress={instant}>
+              <Text style={styles.outlineText}>Anında bozdur</Text>
             </Pressable>
           </View>
         </LinearGradient>
@@ -138,7 +123,6 @@ export default function IncomeScreen() {
         )}
       </ScrollView>
 
-      <ActionSheet visible={sheet} title={`Elmas → jeton · %${EXCHANGE_FEE * 100} dönüşüm ücreti`} options={options} onClose={() => setSheet(false)} />
     </SafeAreaView>
   );
 }

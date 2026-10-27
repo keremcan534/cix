@@ -6,6 +6,16 @@
 export type Rules = {
   version: number;
   diamondsPerUsd: number; // 5.000 elmas = 1 USD
+  /** TL per USD used for TL values of diamonds (Coins Bank conversion); updated with the pack prices. */
+  usdTry: number;
+  /** Coins Bank's selling price, coins per TL (the 1.000.000-coin pack: 23.599,99 TL). */
+  coinsBankRetailCoinsPerTl: number;
+  /** Coins Bank margin when it buys coins from management (wholesale). */
+  coinsBankWholesaleFee: number;
+  /** Coins Bank margin when it pays a host/agency their diamonds and turns them into coins (main account only). */
+  coinsBankExchangeFee: number;
+  /** Lucky gifts: share of the gift value written to the recipient as diamonds (the rest funds the rewards). */
+  luckyHostShare: number;
   agencyCommission: number; // paid on top, never deducted from the streamer
   roomOwnerBonus: number; // on eligible gifts in the owner's room
   familyRates: number[]; // index 0 = LV1 … 14 = LV15
@@ -41,6 +51,11 @@ export type Rules = {
 export const DEFAULT_RULES: Rules = {
   version: 1,
   diamondsPerUsd: 5_000,
+  usdTry: 49.8,
+  coinsBankRetailCoinsPerTl: 1_000_000 / 23_599.99,
+  coinsBankWholesaleFee: 0.02,
+  coinsBankExchangeFee: 0.03,
+  luckyHostShare: 0.2,
   agencyCommission: 0.4,
   roomOwnerBonus: 0.2,
   familyRates: [0.01, 0.0125, 0.015, 0.0175, 0.02, 0.0225, 0.025, 0.0275, 0.03, 0.0325, 0.035, 0.0375, 0.04, 0.045, 0.05],
@@ -77,6 +92,8 @@ export const RULES: Rules = { ...DEFAULT_RULES, familyRates: [...DEFAULT_RULES.f
 
 export const pct = (r: number) => `%${(r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
 export const usdValue = (diamonds: number) => diamonds / RULES.diamondsPerUsd;
+/** Lucky gifts: diamonds the recipient earns for one send (a share of the price, rounded down). */
+export const luckyHostDiamonds = (price: number, share = RULES.luckyHostShare) => Math.floor(price * share);
 export const usd = (diamonds: number) => `$${usdValue(diamonds).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Streamer keeps 100% of earned diamonds; agency commission is a separate platform liability. */
