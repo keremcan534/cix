@@ -1,0 +1,537 @@
+﻿Bölüm,Dosya adı,Ad,Şu anki emoji,Ne çizilecek,Öncelik,Not
+1. Hediyeler,hediye-gul.png,Gül,🌹,"tek, uzun saplı kırmızı gül",P1,Raf: Popüler
+1. Hediyeler,hediye-kalp.png,Kalp,💖,"parlayan mercan kalp, etrafında küçük ışıltılar",P1,Raf: Popüler
+1. Hediyeler,hediye-kahve.png,Kahve,☕,buharı tüten fincan kahve,P1,Raf: Popüler
+1. Hediyeler,hediye-pasta.png,Pasta,🎂,"mumlu, katlı doğum günü pastası",P1,Raf: Popüler
+1. Hediyeler,hediye-tac.png,Taç,👑,mücevherli altın taç,P1,Raf: Popüler
+1. Hediyeler,hediye-roket.png,Roket,🚀,alev püskürten turkuaz-altın roket,P1,Raf: Popüler
+1. Hediyeler,hediye-elmas.png,Elmas,💎,"büyük, ışık kıran kesme elmas",P1,Raf: Popüler
+1. Hediyeler,hediye-sato.png,Şato,🏰,altın kuleli masal şatosu,P1,Raf: Popüler
+1. Hediyeler,hediye-oyun-zamani.png,Oyun Zamanı,🎮,parlak oyun kumandası,P1,Raf: Popüler
+1. Hediyeler,hediye-dunya-turu.png,Dünya Turu,🌍,etrafında uçak rotası çizgisi olan dünya küresi,P1,Raf: Popüler
+1. Hediyeler,hediye-seni-seviyorum.png,Seni Seviyorum,🥰,kalp tutan sevimli karakter (insan yüzü yok),P1,Raf: Popüler
+1. Hediyeler,hediye-panda-sarilmasi.png,Panda Sarılması,🐼,kalbe sarılmış panda,P1,Raf: Popüler
+1. Hediyeler,hediye-tatil-keyfi.png,Tatil Keyfi,🏖️,şemsiye ve palmiyeli küçük plaj adası,P1,Raf: Popüler
+1. Hediyeler,hediye-ucan-opucuk.png,Uçan Öpücük,😘,"kalp şeklinde uçan öpücük, dudak izi",P1,Raf: Popüler
+1. Hediyeler,hediye-gece-krali.png,Gece Kralı,🤴,"taç ve pelerin, gece mavisi, yıldızlar (gerçek kişi yok)",P1,Raf: Popüler
+1. Hediyeler,hediye-birlikte-bisiklet.png,Birlikte Bisiklet,🚲,"iki kişilik tandem bisiklet, kalp balonlu",P1,Raf: Popüler
+1. Hediyeler,hediye-parti-zamani.png,Parti Zamanı,🎉,konfeti patlatan parti kornası,P1,Raf: Popüler
+1. Hediyeler,hediye-ani-fotografi.png,Anı Fotoğrafı,📸,polaroid fotoğraf makinesi ve çıkan fotoğraf,P1,Raf: Popüler
+1. Hediyeler,hediye-altin-can.png,Altın Çan,🔔,kurdeleli altın çan,P1,Raf: Popüler
+1. Hediyeler,hediye-altin-kugu.png,Altın Kuğu,🦢,"altın kuğu, zarif boyun",P1,Raf: Popüler
+1. Hediyeler,hediye-kar-topu.png,Kar Topu,❄️,"kar topu, buz parçacıkları",P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-sulu-balon.png,Sulu Balon,🎈,"su dolu balon, damlalar",P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-domates-at.png,Domates At,🍅,olgun domates,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-kagit-ucak.png,Kâğıt Uçak,✈️,katlanmış kâğıt uçak,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-su-kovasi.png,Su Kovası,🪣,ağzına kadar su dolu kova,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-pasta-at.png,Pasta At,🥧,kremalı tabak pasta,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-yumurta-at.png,Yumurta At,🥚,yumurta,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-terlik-at.png,Terlik At,🩴,terlik,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-konfeti-topu.png,Konfeti Topu,🎊,patlayan konfeti topu,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-ask-oku.png,Aşk Oku,💘,oklu kalp,P1,Raf: Eğlenceli (atış)
+1. Hediyeler,hediye-can-dostum.png,Can Dostum,💞,iç içe dönen iki kalp,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-dilek-kavanozu.png,Dilek Kavanozu,🫙,parlayan dilek kâğıtlarıyla dolu cam kavanoz,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-masal-kalesi.png,Masal Kalesi,🏯,bulutların üstünde mercan-altın masal kalesi,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-ask-mektubu.png,Aşk Mektubu,💌,kalp mühürlü zarf,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-sevgi-tatlisi.png,Sevgi Tatlısı,🍰,kalp süslü dilim pasta,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-yildiz-faytonu.png,Yıldız Faytonu,🐎,yıldız tozu saçan atlı fayton,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-evlilik-teklifi.png,Evlilik Teklifi,💍,açık kutuda pırlanta yüzük,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-dugun-gunu.png,Düğün Günü,👰,gelin buketi ve düğün pastası (kişi yok),P1,Raf: İkili (çift)
+1. Hediyeler,hediye-sonsuz-opucuk.png,Sonsuz Öpücük,💋,parlak dudak izi,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-kristal-kolye.png,Kristal Kolye,📿,kristal taşlı kolye,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-lunapark-randevusu.png,Lunapark Randevusu,🎡,ışıklı dönme dolap,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-ask-atesi.png,Aşk Ateşi,❤️‍🔥,alevler içinde kalp,P1,Raf: İkili (çift)
+1. Hediyeler,hediye-zumrut-saat.png,Zümrüt Saat,⌚,zümrüt taşlı lüks kol saati,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-gizemli-gul.png,Gizemli Gül,🥀,"koyu, gizemli parlayan gül",P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-sihirli-sapka.png,Sihirli Şapka,🎩,yıldızlar çıkan silindir şapka,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-kristal-ayakkabi.png,Kristal Ayakkabı,👠,kristal topuklu ayakkabı,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-altin-kilic.png,Altın Kılıç,🗡️,süslü altın kılıç,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-kartal.png,Kartal,🦅,kanatlarını açmış altın-turkuaz kartal,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-uzay-yolculugu.png,Uzay Yolculuğu,👨‍🚀,astronot kaskı ve roket (yüz görünmez),P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-gokyuzu-turu.png,Gökyüzü Turu,🚁,parlak helikopter,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-altin-kanatlar.png,Altın Kanatlar,🪽,bir çift altın kanat,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-luks-yat.png,Lüks Yat,🛥️,lüks yat,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-altin-tavus.png,Altın Tavus,🦚,kuyruğu açık altın tavus kuşu,P1,Raf: Özel (SVIP)
+1. Hediyeler,hediye-atlikarinca-gecesi.png,Atlıkarınca Gecesi,🎠,ışıklı atlıkarınca,P1,Raf: Özel (SVIP)
+1. Hediyeler,lucky-sans-yoncasi.png,Şans Yoncası,🍀,dört yapraklı yonca,P1,Lucky hediye
+1. Hediyeler,lucky-ugur-bocegi.png,Uğur Böceği,🐞,uğur böceği,P1,Lucky hediye
+1. Hediyeler,lucky-altin-nal.png,Altın Nal,🧲,altın at nalı (şu an mıknatıs emojisi duruyor),P1,Lucky hediye
+1. Hediyeler,lucky-kayan-yildiz.png,Kayan Yıldız,🌠,kuyruklu kayan yıldız,P1,Lucky hediye
+1. Hediyeler,lucky-yeni-lucky.png,Yeni Lucky,🎁,Lucky hediyeleri için varsayılan simge: üstünde yonca olan hediye kutusu,P1,Lucky hediye
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-mikrofon-ve-ses.png,Mikrofon ve ses,🎙️,kategori simgesi: Mikrofon ve ses,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-romantik.png,Romantik,💞,kategori simgesi: Romantik,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-araclar.png,Araçlar,🏎️,kategori simgesi: Araçlar,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-fantastik.png,Fantastik,🐉,kategori simgesi: Fantastik,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-ihtisam.png,İhtişam,👑,kategori simgesi: İhtişam,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/crown.png
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-uzay-ve-gosteri.png,Uzay ve gösteri,🚀,kategori simgesi: Uzay ve gösteri,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-zenginlik.png,Zenginlik,💰,kategori simgesi: Zenginlik,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-sevimli.png,Sevimli,🧸,kategori simgesi: Sevimli,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-ozel-gun.png,Özel gün,🎄,kategori simgesi: Özel gün,P2,
+2. Efekt hediyeleri ve animasyonlar,animasyon-neon-halka.png,Neon Halka,💠,avatar etrafında neon turkuaz halka,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-ses-dalgasi.png,Ses Dalgası,🔊,ses dalgası halkaları,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-donen-yildizlar.png,Dönen Yıldızlar,⭐,dönen küçük yıldızlar,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-muzik-notalari.png,Müzik Notaları,🎵,uçuşan müzik notaları,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-ucan-kalpler.png,Uçan Kalpler,💖,yukarı uçan kalpler,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-alkis.png,Alkış,👏,alkışlayan eller,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-kahkaha.png,Kahkaha,😂,kahkaha atan sevimli karakter,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-kelebekler.png,Kelebekler,🦋,turkuaz-altın kelebekler,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-gul-buketi.png,Gül Buketi,💐,gül buketi,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-dans-eden-panda.png,Dans Eden Panda,🐼,dans eden panda,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-kalp-yagmuru.png,Kalp Yağmuru,💗,yağan kalpler,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-spor-araba.png,Spor Araba,🏎️,spor araba,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-ozel-jet.png,Özel Jet,🛩️,özel jet,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-ejderha.png,Ejderha,🐉,turkuaz-altın ejderha,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-roket-firlatma.png,Roket Fırlatma,🚀,fırlayan roket ve duman,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-havai-fisek.png,Havai Fişek,🎆,havai fişek patlaması,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-yilbasi-kutlamasi.png,Yılbaşı Kutlaması,🎄,süslü yılbaşı ağacı,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-anka-kusu.png,Anka Kuşu,🐦‍🔥,alevden anka kuşu,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-kristal-kale.png,Kristal Kale,🏰,kristal kale,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-pelus-ayi.png,Peluş Ayı,🧸,peluş ayı,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-galaksi-tuneli.png,Galaksi Tüneli,🌌,galaksi tüneli,P2,"Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-gulumseme.png,Gülümseme,😀,"""Gülümseme"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-kahkaha.png,Kahkaha,😂,"""Kahkaha"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-asik.png,Aşık,😍,"""Aşık"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-duygulandim.png,Duygulandım,🥹,"""Duygulandım"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-mutlu.png,Mutlu,😊,"""Mutlu"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-uzgun.png,Üzgün,😢,"""Üzgün"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-kizgin.png,Kızgın,😡,"""Kızgın"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-begendim.png,Beğendim,👍,"""Beğendim"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-tesekkurler.png,Teşekkürler,🙏,"""Teşekkürler"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-selam.png,Selam,👋,"""Selam"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-dusunuyorum.png,Düşünüyorum,🤔,"""Düşünüyorum"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-temel-uykulu.png,Uykulu,😴,"""Uykulu"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Temel
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-yerlere-yattim.png,Yerlere Yattım,🤣,"""Yerlere Yattım"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-cilgin.png,Çılgın,🤪,"""Çılgın"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-havali.png,Havalı,😎,"""Havalı"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-parti.png,Parti,🥳,"""Parti"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-palyaco.png,Palyaço,🤡,"""Palyaço"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-hayalet.png,Hayalet,👻,"""Hayalet"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-ters-gulus.png,Ters Gülüş,🙃,"""Ters Gülüş"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-eglence-beynim-yandi.png,Beynim Yandı,🤯,"""Beynim Yandı"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Eğlence
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-kalp.png,Kalp,❤️,"""Kalp"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-iki-kalp.png,İki Kalp,💕,"""İki Kalp"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-opucuk.png,Öpücük,💋,"""Öpücük"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-kalp-eller.png,Kalp Eller,🫶,"""Kalp Eller"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-oklu-kalp.png,Oklu Kalp,💘,"""Oklu Kalp"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-opucuk-at.png,Öpücük At,😘,"""Öpücük At"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-gul.png,Gül,🌹,"""Gül"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-ask-donen-kalpler.png,Dönen Kalpler,💞,"""Dönen Kalpler"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Aşk
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-kopek.png,Köpek,🐶,"""Köpek"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-kedi.png,Kedi,🐱,"""Kedi"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-tilki.png,Tilki,🦊,"""Tilki"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-panda.png,Panda,🐼,"""Panda"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-kurbaga.png,Kurbağa,🐸,"""Kurbağa"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-tek-boynuzlu-at.png,Tek Boynuzlu At,🦄,"""Tek Boynuzlu At"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-penguen.png,Penguen,🐧,"""Penguen"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-hayvanlar-ari.png,Arı,🐝,"""Arı"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Hayvanlar
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-tac.png,Taç,👑,"""Taç"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-elmas.png,Elmas,💎,"""Elmas"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-ates.png,Ateş,🔥,"""Ateş"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-isilti.png,Işıltı,✨,"""Işıltı"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-kupa.png,Kupa,🏆,"""Kupa"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-aslan.png,Aslan,🦁,"""Aslan"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-zambak-armasi.png,Zambak Arması,⚜️,"""Zambak Arması"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-vip-kristal.png,Kristal,💠,"""Kristal"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: VIP
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-animasyonlu-havai-fisek.png,Havai Fişek,🎆,"""Havai Fişek"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Animasyonlu
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-animasyonlu-maytap.png,Maytap,🎇,"""Maytap"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Animasyonlu
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-animasyonlu-gokkusagi.png,Gökkuşağı,🌈,"""Gökkuşağı"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Animasyonlu
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-animasyonlu-patlama.png,Patlama,💥,"""Patlama"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Animasyonlu
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-animasyonlu-konfeti.png,Konfeti,🎉,"""Konfeti"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Animasyonlu
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-animasyonlu-disko-topu.png,Disko Topu,🪩,"""Disko Topu"" tepkisi; yüz ifadesi gereken tepkileri kendi maskotunuzla çizdirin",P1,Paket: Animasyonlu
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-oda-alkis.png,Alkış,👏,"""Alkış"" tepkisi (koltukta oynar)",P1,Odada koltuk tepkisi
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-oda-saskin.png,Şaşkın,😮,"""Şaşkın"" tepkisi (koltukta oynar)",P1,Odada koltuk tepkisi
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-sekme-hareketli.png,Hareketli,✨,"emoji panelinde ""hareketli"" sekmesi simgesi",P2,
+3. Tepkiler ve emoji paketleri (çıkartma),tepki-sekme-son-kullanilanlar.png,Son kullanılanlar,🕘,"emoji panelinde ""son kullanılanlar"" sekmesi: saat",P2,
+3. Tepkiler ve emoji paketleri (çıkartma),magaza-emoji-paketleri.png,Emoji paketleri,😀,mağazada emoji paketleri sekmesi simgesi,P2,
+4. Mağaza ürünleri,magaza-sekme-cerceve.png,Çerçeve,🖼️,mağaza sekmesi: Çerçeve,P2,
+4. Mağaza ürünleri,magaza-sekme-giris-efekti.png,Giriş efekti,✨,mağaza sekmesi: Giriş efekti,P2,
+4. Mağaza ürünleri,magaza-sekme-binek.png,Binek,🏎️,mağaza sekmesi: Binek,P2,
+4. Mağaza ürünleri,magaza-sekme-sohbet-balonu.png,Sohbet balonu,💬,mağaza sekmesi: Sohbet balonu,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/chat.png
+4. Mağaza ürünleri,magaza-sekme-ozel-id.png,Özel ID,🔢,mağaza sekmesi: Özel ID,P2,
+4. Mağaza ürünleri,cerceve-ses-dalgasi.png,Ses Dalgası,🔊,"""Ses Dalgası"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçeve kodla çiziliyor; yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-yorunge.png,Yörünge,🪐,"""Yörünge"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçeve kodla çiziliyor; yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-aurora.png,Aurora,🌌,"""Aurora"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçeve kodla çiziliyor; yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-ates.png,Ateş,🔥,"""Ateş"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçeve kodla çiziliyor; yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-altin-tac.png,Altın Taç,👑,"""Altın Taç"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçeve kodla çiziliyor; yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-gumus-kristal.png,Gümüş Kristal,💠,"""Gümüş Kristal"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-buz-kristali.png,Buz Kristali,❄️,"""Buz Kristali"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-gul-kalpler.png,Gül Kalpler,💗,"""Gül Kalpler"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-altin-defne.png,Altın Defne,🌿,"""Altın Defne"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-gumus-tac.png,Gümüş Taç,👑,"""Gümüş Taç"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-kraliyet-kanatlari.png,Kraliyet Kanatları,🪽,"""Kraliyet Kanatları"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-melek-kalp-mercan.png,Melek Kalp · Mercan,💞,"""Melek Kalp · Mercan"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-melek-kalp-turkuaz.png,Melek Kalp · Turkuaz,💙,"""Melek Kalp · Turkuaz"" avatar çerçevesinin mağaza küçük resmi",P2,Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
+4. Mağaza ürünleri,giris-efekti-isilti.png,Işıltı,✨,"""Işıltı"" odaya giriş efektinin simgesi",P2,Efekt kodla oynuyor; simge
+4. Mağaza ürünleri,giris-efekti-simsek.png,Şimşek,⚡,"""Şimşek"" odaya giriş efektinin simgesi",P2,Efekt kodla oynuyor; simge
+4. Mağaza ürünleri,giris-efekti-kuyruklu-yildiz.png,Kuyruklu Yıldız,☄️,"""Kuyruklu Yıldız"" odaya giriş efektinin simgesi",P2,Efekt kodla oynuyor; simge
+4. Mağaza ürünleri,giris-efekti-ejderha.png,Ejderha,🐉,"""Ejderha"" odaya giriş efektinin simgesi",P2,Efekt kodla oynuyor; simge
+4. Mağaza ürünleri,binek-scooter.png,Scooter,🛵,binek: Scooter,P2,
+4. Mağaza ürünleri,binek-spor-araba.png,Spor Araba,🏎️,binek: Spor Araba,P2,
+4. Mağaza ürünleri,binek-ozel-jet.png,Özel Jet,🛩️,binek: Özel Jet,P2,
+4. Mağaza ürünleri,balon-seker.png,Şeker,🍬,"""Şeker"" sohbet balonu simgesi",P2,
+4. Mağaza ürünleri,balon-galaksi.png,Galaksi,🌌,"""Galaksi"" sohbet balonu simgesi",P2,
+4. Mağaza ürünleri,balon-altin.png,Altın,🏆,"""Altın"" sohbet balonu simgesi",P2,
+4. Mağaza ürünleri,ozel-id-ozel-id.png,Özel ID,🔢,parlak numara rozeti (özel kullanıcı numarası),P2,
+5. Oda,oda-turu-serbest-sohbet.png,Serbest sohbet,💬,oda türü: Serbest sohbet,P1,
+5. Oda,oda-turu-sahne.png,Sahne,🎭,oda türü: Sahne,P1,
+5. Oda,oda-turu-soru-cevap.png,Soru-cevap,❓,oda türü: Soru-cevap,P1,
+5. Oda,oda-turu-muzik-odasi.png,Müzik odası,🎵,oda türü: Müzik odası,P1,
+5. Oda,oda-turu-etkinlik-odasi.png,Etkinlik odası,📅,oda türü: Etkinlik odası,P1,
+5. Oda,oda-turu-ozel-oda.png,Özel oda,🔒,oda türü: Özel oda,P1,
+5. Oda,oda-tema-sohbet.png,Sohbet,💬,oda teması: Sohbet,P2,
+5. Oda,oda-tema-pk.png,PK,🥊,oda teması: PK,P2,
+5. Oda,oda-tema-muzik.png,Müzik,🎵,oda teması: Müzik,P2,
+5. Oda,oda-tema-oyun.png,Oyun,🎮,oda teması: Oyun,P2,
+5. Oda,oda-tema-parti.png,Parti,🎉,oda teması: Parti,P2,
+5. Oda,oda-tema-arkadaslik.png,Arkadaşlık,💜,oda teması: Arkadaşlık,P2,Mor kalp marka paletine uymuyor; mercan veya turkuaz önerilir
+5. Oda,oda-seviye-bronz.png,Bronz (Lv.1–2),🥉,oda seviye rozeti Lv.1–2: Bronz,P2,
+5. Oda,oda-seviye-gumus.png,Gümüş (Lv.3–4),🥈,oda seviye rozeti Lv.3–4: Gümüş,P2,
+5. Oda,oda-seviye-altin.png,Altın (Lv.5–6),🥇,oda seviye rozeti Lv.5–6: Altın,P2,
+5. Oda,oda-seviye-madalya.png,Madalya (Lv.7–8),🏅,oda seviye rozeti Lv.7–8: Madalya,P2,
+5. Oda,oda-seviye-nisan.png,Nişan (Lv.9),🎖️,oda seviye rozeti Lv.9: Nişan,P2,
+5. Oda,oda-seviye-kalp.png,Kalp (Lv.10–11),💜,oda seviye rozeti Lv.10–11: Kalp,P2,
+5. Oda,oda-seviye-elmas.png,Elmas (Lv.12–13),💎,oda seviye rozeti Lv.12–13: Elmas,P2,
+5. Oda,oda-seviye-tac.png,Taç (Lv.14),👑,oda seviye rozeti Lv.14: Taç,P2,
+5. Oda,oda-seviye-uc-disli.png,Üç Dişli (Lv.15),🔱,oda seviye rozeti Lv.15: Üç Dişli,P2,
+5. Oda,oda-sansli-canta-oda-zarfi.png,Şanslı çanta / oda zarfı,🧧,oda simgesi: Şanslı çanta / oda zarfı,P1,
+5. Oda,oda-aktivite.png,Aktivite,🎉,oda simgesi: Aktivite,P2,
+5. Oda,oda-anket.png,Anket,📊,oda simgesi: Anket,P2,
+5. Oda,oda-topluluk-hedefi.png,Topluluk hedefi,🎯,oda simgesi: Topluluk hedefi,P2,
+5. Oda,oda-sorular.png,Sorular,❓,oda simgesi: Sorular,P2,
+5. Oda,oda-muzik.png,Müzik,🎵 🎶,oda simgesi: Müzik,P2,
+5. Oda,oda-ailem.png,Ailem,🏰,oda simgesi: Ailem,P2,
+5. Oda,oda-ajans-odasi.png,Ajans odası,🏢,oda simgesi: Ajans odası,P2,
+5. Oda,oda-konusmaci-kuyrugu-el-kaldir.png,Konuşmacı kuyruğu / el kaldır,🙋,oda simgesi: Konuşmacı kuyruğu / el kaldır,P2,
+5. Oda,oda-oda-botu.png,Oda botu,🤖,oda simgesi: Oda botu,P2,
+5. Oda,oda-patron-koltugu.png,Patron koltuğu,👑,oda simgesi: Patron koltuğu,P1,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/crown.png
+5. Oda,oda-zar-duellosu.png,Zar düellosu,🎲,oda simgesi: Zar düellosu,P2,
+5. Oda,oda-yavas-mod.png,Yavaş mod,🐢,oda simgesi: Yavaş mod,P2,
+5. Oda,oda-moderasyon.png,Moderasyon,🛡️,oda simgesi: Moderasyon,P2,
+5. Oda,oda-ses-ve-efekt-ayarlari.png,Ses ve efekt ayarları,🔊,oda simgesi: Ses ve efekt ayarları,P2,
+5. Oda,oda-oda-sesi-kapali.png,Oda sesi kapalı,🔇,oda simgesi: Oda sesi kapalı,P2,
+5. Oda,oda-gizli-giris.png,Gizli giriş,👻,oda simgesi: Gizli giriş,P2,
+5. Oda,oda-oda-kamerasi.png,Oda kamerası,📹,oda simgesi: Oda kamerası,P2,
+5. Oda,oda-oda-uyesi-ol.png,Oda üyesi ol,➕,oda simgesi: Oda üyesi ol,P2,
+5. Oda,zar-zar-yuzu-1.png,Zar yüzü 1,⚀,1 noktalı zar yüzü,P3,
+5. Oda,zar-zar-yuzu-2.png,Zar yüzü 2,⚁,2 noktalı zar yüzü,P3,
+5. Oda,zar-zar-yuzu-3.png,Zar yüzü 3,⚂,3 noktalı zar yüzü,P3,
+5. Oda,zar-zar-yuzu-4.png,Zar yüzü 4,⚃,4 noktalı zar yüzü,P3,
+5. Oda,zar-zar-yuzu-5.png,Zar yüzü 5,⚄,5 noktalı zar yüzü,P3,
+5. Oda,zar-zar-yuzu-6.png,Zar yüzü 6,⚅,6 noktalı zar yüzü,P3,
+5. Oda,pk-normal-pk.png,Normal PK,🎤,PK simgesi: Normal PK,P1,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png
+5. Oda,pk-takim-pk.png,Takım PK,⚔️,PK simgesi: Takım PK,P1,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/swords.png
+5. Oda,pk-kirmizi-takim.png,Kırmızı takım,🔴,PK simgesi: Kırmızı takım,P1,
+5. Oda,pk-mavi-takim.png,Mavi takım,🔵,PK simgesi: Mavi takım,P1,
+5. Oda,pk-rastgele-dagit.png,Rastgele dağıt,🔀,PK simgesi: Rastgele dağıt,P1,
+5. Oda,pk-manuel-dagit.png,Manuel dağıt,✋,PK simgesi: Manuel dağıt,P1,
+5. Oda,pk-beraberlik.png,Beraberlik,🤝,PK simgesi: Beraberlik,P1,
+5. Oda,pk-pk-mvp-one-cikan.png,PK MVP / öne çıkan,⭐,PK simgesi: PK MVP / öne çıkan,P1,
+5. Oda,pk-pk-bitti.png,PK bitti,🏁,PK simgesi: PK bitti,P1,
+6. Oyunlar,oyun-ludo.png,Ludo,🎲,oyun kapak simgesi: Ludo,P3,
+6. Oyunlar,oyun-cizim-tahmin.png,Çizim Tahmin,🎨,oyun kapak simgesi: Çizim Tahmin,P3,
+6. Oyunlar,oyun-bilgi-turnuvasi.png,Bilgi Turnuvası,🏆,oyun kapak simgesi: Bilgi Turnuvası,P3,
+6. Oyunlar,oyun-roket.png,Roket,🚀,oyun kapak simgesi: Roket,P3,
+6. Oyunlar,oyun-meyve-partisi.png,Meyve Partisi,🍓,oyun kapak simgesi: Meyve Partisi,P3,
+6. Oyunlar,oyun-hazine-sandigi.png,Hazine Sandığı,💰,oyun kapak simgesi: Hazine Sandığı,P3,
+6. Oyunlar,oyun-penalti.png,Penaltı,⚽,oyun kapak simgesi: Penaltı,P3,
+6. Oyunlar,oyun-balik-avi.png,Balık Avı,🦈,oyun kapak simgesi: Balık Avı,P3,
+6. Oyunlar,oyun-kelime-avi.png,Kelime Avı,🔤,oyun kapak simgesi: Kelime Avı,P3,
+6. Oyunlar,oyun-bilgi-yarismasi.png,Bilgi Yarışması,🧠,oyun kapak simgesi: Bilgi Yarışması,P3,
+6. Oyunlar,oyun-hizli-matematik.png,Hızlı Matematik,➗,oyun kapak simgesi: Hızlı Matematik,P3,
+6. Oyunlar,oyun-8-top-bilardo.png,8 Top Bilardo,🎱,oyun kapak simgesi: 8 Top Bilardo,P3,
+6. Oyunlar,oyun-jackaroo.png,Jackaroo,♠️,oyun kapak simgesi: Jackaroo,P3,
+6. Oyunlar,oyun-xox.png,XOX,⭕,oyun kapak simgesi: XOX,P3,
+6. Oyunlar,oyun-dort-tas.png,Dört Taş,🔴,oyun kapak simgesi: Dört Taş,P3,
+6. Oyunlar,oyun-kelime-zinciri.png,Kelime Zinciri,🔤,oyun kapak simgesi: Kelime Zinciri,P3,
+6. Oyunlar,oyun-dogru-yanlis.png,Doğru / Yanlış,✅,oyun kapak simgesi: Doğru / Yanlış,P3,
+6. Oyunlar,oyun-hafiza-eslestirme.png,Hafıza Eşleştirme,🧩,oyun kapak simgesi: Hafıza Eşleştirme,P3,
+6. Oyunlar,oyun-sans-carki.png,Şans Çarkı,🎡,oyun kapak simgesi: Şans Çarkı,P3,
+6. Oyunlar,oyun-zar-casino.png,Zar (casino),🎲,oyun kapak simgesi: Zar (casino),P3,
+6. Oyunlar,oyun-lucky-77.png,Lucky 77,🎰,oyun kapak simgesi: Lucky 77,P3,
+6. Oyunlar,oyun-dragon-tiger.png,Dragon Tiger,🐉,oyun kapak simgesi: Dragon Tiger,P3,
+6. Oyunlar,casino-kart-ejder.png,Ejder,🐉,Dragon Tiger masası: Ejder tarafı,P3,
+6. Oyunlar,casino-kart-kaplan.png,Kaplan,🐯,Dragon Tiger masası: Kaplan tarafı,P3,
+6. Oyunlar,slot-kiraz.png,Kiraz,🍒,slot makinesi sembolü: Kiraz,P3,
+6. Oyunlar,slot-limon.png,Limon,🍋,slot makinesi sembolü: Limon,P3,
+6. Oyunlar,slot-uzum.png,Üzüm,🍇,slot makinesi sembolü: Üzüm,P3,
+6. Oyunlar,slot-can.png,Çan,🔔,slot makinesi sembolü: Çan,P3,
+"7. VIP, SVIP, Asil, seviyeler",vip-01-uye.png,VIP 1 · Üye,🔰,VIP seviye 1 rozeti: Üye,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-02-bronz.png,VIP 2 · Bronz,🥉,VIP seviye 2 rozeti: Bronz,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-03-gumus.png,VIP 3 · Gümüş,🥈,VIP seviye 3 rozeti: Gümüş,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-04-altin.png,VIP 4 · Altın,🥇,VIP seviye 4 rozeti: Altın,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-05-platin.png,VIP 5 · Platin,💿,VIP seviye 5 rozeti: Platin,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-06-safir.png,VIP 6 · Safir,🔷,VIP seviye 6 rozeti: Safir,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-07-yakut.png,VIP 7 · Yakut,♦️,VIP seviye 7 rozeti: Yakut,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-08-zumrut.png,VIP 8 · Zümrüt,💚,VIP seviye 8 rozeti: Zümrüt,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-09-elmas.png,VIP 9 · Elmas,💎,VIP seviye 9 rozeti: Elmas,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-10-usta.png,VIP 10 · Usta,🎖️,VIP seviye 10 rozeti: Usta,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-11-asil.png,VIP 11 · Asil,⚜️,VIP seviye 11 rozeti: Asil,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-12-lord.png,VIP 12 · Lord,🗡️,VIP seviye 12 rozeti: Lord,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-13-kont.png,VIP 13 · Kont,💠,VIP seviye 13 rozeti: Kont,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-14-duk.png,VIP 14 · Dük,👑,VIP seviye 14 rozeti: Dük,P2,
+"7. VIP, SVIP, Asil, seviyeler",vip-15-imparator.png,VIP 15 · İmparator,🦁,VIP seviye 15 rozeti: İmparator,P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-01.png,SVIP 1,💠,SVIP 1 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-02.png,SVIP 2,🟢,SVIP 2 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-03.png,SVIP 3,🔷,SVIP 3 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-04.png,SVIP 4,🔹,SVIP 4 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-05.png,SVIP 5,🏵️,SVIP 5 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-06.png,SVIP 6,🎖️,SVIP 6 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-07.png,SVIP 7,🔮,SVIP 7 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-08.png,SVIP 8,⚜️,SVIP 8 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-09.png,SVIP 9,👑,SVIP 9 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",svip-10.png,SVIP 10,🌈,SVIP 10 rozeti (1→10 giderek daha gösterişli),P2,
+"7. VIP, SVIP, Asil, seviyeler",asil-1-sovalye.png,Asil 1 · Şövalye,🛡️,asil unvan arması: Şövalye,P2,
+"7. VIP, SVIP, Asil, seviyeler",asil-2-vikont.png,Asil 2 · Vikont,🗡️,asil unvan arması: Vikont,P2,
+"7. VIP, SVIP, Asil, seviyeler",asil-3-kont.png,Asil 3 · Kont,⚔️,asil unvan arması: Kont,P2,
+"7. VIP, SVIP, Asil, seviyeler",asil-4-markiz.png,Asil 4 · Markiz,🏹,asil unvan arması: Markiz,P2,
+"7. VIP, SVIP, Asil, seviyeler",asil-5-duk.png,Asil 5 · Dük,🦁,asil unvan arması: Dük,P2,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-puan-takas-magazasi.png,Puan Takas Mağazası,🏪,ayrıcalık simgesi: Puan Takas Mağazası,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-svip-etiket.png,SVIP Etiket,🏷️,ayrıcalık simgesi: SVIP Etiket,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-yukseltme-bildirimleri.png,Yükseltme bildirimleri,📣,ayrıcalık simgesi: Yükseltme bildirimleri,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-svip-rozeti.png,SVIP rozeti,🎖️,ayrıcalık simgesi: SVIP rozeti,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-genel-sohbet-balonu.png,Genel sohbet balonu,🎨,ayrıcalık simgesi: Genel sohbet balonu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-profil-cercevesi.png,Profil çerçevesi,🖼️,ayrıcalık simgesi: Profil çerçevesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-giris-ekrani-kayan-yazi.png,Giriş ekranı kayan yazı,✨,ayrıcalık simgesi: Giriş ekranı kayan yazı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-urunu-satin-al.png,Özel ürünü satın al,🛍️,ayrıcalık simgesi: Özel ürünü satın al,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-arac.png,Araç,🚗,ayrıcalık simgesi: Araç,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-svip-e-ozel-hediye.png,SVIP'e özel hediye,🎁,ayrıcalık simgesi: SVIP'e özel hediye,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-bilgi-karti-cercevesi.png,Bilgi kartı çerçevesi,🪪,ayrıcalık simgesi: Bilgi kartı çerçevesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-servet-puani-bonusu.png,Servet Puanı Bonusu,💰,ayrıcalık simgesi: Servet Puanı Bonusu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-diy-unvani.png,DIY unvanı,✏️,ayrıcalık simgesi: DIY unvanı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-oda-profil-arka-plani.png,Oda Profil Arka Planı,🏞️,ayrıcalık simgesi: Oda Profil Arka Planı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-profil-hediyesi.png,Profil hediyesi,💝,ayrıcalık simgesi: Profil hediyesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-musteri-temsilcisi.png,Özel müşteri temsilcisi,🎧,ayrıcalık simgesi: Özel müşteri temsilcisi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-kisisel-album-animasyonlu-gorsel.png,Kişisel albüm animasyonlu görsel,🎞️,ayrıcalık simgesi: Kişisel albüm animasyonlu görsel,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-profil-araci.png,Profil aracı,🏎️,ayrıcalık simgesi: Profil aracı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-yukleme-indirimi.png,Yükleme indirimi,💸,ayrıcalık simgesi: Yükleme indirimi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-hediye-combo-skin.png,Hediye Combo Skin,🔥,ayrıcalık simgesi: Hediye Combo Skin,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-gizli-ziyaret.png,Gizli ziyaret,🥷,ayrıcalık simgesi: Gizli ziyaret,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-oda-kapagi.png,Özel oda kapağı,🖼️,ayrıcalık simgesi: Özel oda kapağı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-renkli-takma-ad.png,Renkli takma ad,🌈,ayrıcalık simgesi: Renkli takma ad,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ai-hediye.png,AI hediye,🤖,ayrıcalık simgesi: AI hediye,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-dogum-gunu-hediyesi.png,Doğum günü hediyesi,🎂,ayrıcalık simgesi: Doğum günü hediyesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-profil-sayfasi-cercevesi.png,Profil Sayfası Çerçevesi,🪞,ayrıcalık simgesi: Profil Sayfası Çerçevesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-profil-sayfasi-arka-plani.png,Profil Sayfası Arka Planı,🌌,ayrıcalık simgesi: Profil Sayfası Arka Planı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-id.png,Özel ID,🔢,ayrıcalık simgesi: Özel ID,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-etkinlik-onceligi.png,Etkinlik önceliği,⏫,ayrıcalık simgesi: Etkinlik önceliği,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-kisiye-ozel-tasarim-hediye.png,Kişiye özel tasarım hediye,💎,ayrıcalık simgesi: Kişiye özel tasarım hediye,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-jeton-hediye-et.png,Jeton Hediye Et,💗,ayrıcalık simgesi: Jeton Hediye Et,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-vip-listesi.png,VIP Listesi,👑,ayrıcalık simgesi: VIP Listesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-araclar.png,Araçlar,🚘,ayrıcalık simgesi: Araçlar,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-asil-madalyasi.png,Asil Madalyası,🏅,ayrıcalık simgesi: Asil Madalyası,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-asil-etiketi.png,Asil Etiketi,🔖,ayrıcalık simgesi: Asil Etiketi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-giris-ekrani.png,Giriş Ekranı,🌟,ayrıcalık simgesi: Giriş Ekranı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-oda-kilitleme.png,Oda Kilitleme,🔒,ayrıcalık simgesi: Oda Kilitleme,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-asil-koltugu.png,Asil Koltuğu,🛋️,ayrıcalık simgesi: Asil Koltuğu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-arka-plan.png,Özel arka plan,🏞️,ayrıcalık simgesi: Özel arka plan,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-hediyeler.png,Özel Hediyeler,🎁,ayrıcalık simgesi: Özel Hediyeler,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-sohbet-balonu.png,Sohbet balonu,💬,ayrıcalık simgesi: Sohbet balonu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-profil-kart-cercevesi.png,Profil kart çerçevesi,🪪,ayrıcalık simgesi: Profil kart çerçevesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-oda-karti.png,Oda Kartı,🗂️,ayrıcalık simgesi: Oda Kartı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-oda-kenarligi.png,Oda Kenarlığı,🔲,ayrıcalık simgesi: Oda Kenarlığı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-emoji-paketleri.png,Özel Emoji Paketleri,😊,ayrıcalık simgesi: Özel Emoji Paketleri,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-dinamik-oda-kapagi.png,Dinamik Oda Kapağı,🎞️,ayrıcalık simgesi: Dinamik Oda Kapağı,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-gizli-ziyaret-asil.png,Gizli Ziyaret (asil),🎭,ayrıcalık simgesi: Gizli Ziyaret (asil),P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-tam-dolu-odalar.png,Tam Dolu Odalar,🚪,ayrıcalık simgesi: Tam Dolu Odalar,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-cevrimici-gizlilik.png,Çevrimiçi Gizlilik,🫥,ayrıcalık simgesi: Çevrimiçi Gizlilik,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ulusal-dolasim.png,Ulusal Dolaşım,🌍,ayrıcalık simgesi: Ulusal Dolaşım,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-gizemli-kisi-kimligi.png,Gizemli Kişi Kimliği,🕵️,ayrıcalık simgesi: Gizemli Kişi Kimliği,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-gizli-oda-girisi.png,Gizli Oda Girişi,👻,ayrıcalık simgesi: Gizli Oda Girişi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-yayin-engelleme.png,Yayın Engelleme,🔇,ayrıcalık simgesi: Yayın Engelleme,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-klan-gizliligi.png,Klan Gizliliği,🎭,ayrıcalık simgesi: Klan Gizliliği,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-metin-cevirisi.png,Metin Çevirisi,🔤,ayrıcalık simgesi: Metin Çevirisi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-seviye-rozeti.png,Seviye rozeti,🏅,ayrıcalık simgesi: Seviye rozeti,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-one-cikma.png,Öne çıkma,⬆️,ayrıcalık simgesi: Öne çıkma,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-seviye-hediyesi.png,Seviye hediyesi,🎁,ayrıcalık simgesi: Seviye hediyesi,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-odada-seviye-duyurusu.png,Odada seviye duyurusu,📣,ayrıcalık simgesi: Odada seviye duyurusu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-platform-duyurusu.png,Platform duyurusu,📡,ayrıcalık simgesi: Platform duyurusu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-giris-efekti.png,Giriş efekti,✨,ayrıcalık simgesi: Giriş efekti,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-seviye-madalyasi.png,Seviye madalyası,🎖️,ayrıcalık simgesi: Seviye madalyası,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-cazibe-rozeti.png,Cazibe rozeti,🏅,ayrıcalık simgesi: Cazibe rozeti,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-kesfette-one-cikma.png,Keşfette öne çıkma,📈,ayrıcalık simgesi: Keşfette öne çıkma,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-kazanc-bonusu.png,Kazanç bonusu,💎,ayrıcalık simgesi: Kazanç bonusu,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-cazibe-madalyasi.png,Cazibe madalyası,🎖️,ayrıcalık simgesi: Cazibe madalyası,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-mikrofon-dalgasi.png,Mikrofon dalgası,🎙️,ayrıcalık simgesi: Mikrofon dalgası,P3,
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-arac.png,Özel araç,🛸,ayrıcalık simgesi: Özel araç,P3,
+"7. VIP, SVIP, Asil, seviyeler",seviye-servet-seviyesi.png,Servet seviyesi,💰,Servet seviyesi simgesi,P2,
+"7. VIP, SVIP, Asil, seviyeler",seviye-cazibe-seviyesi.png,Cazibe seviyesi,🌹,Cazibe seviyesi simgesi,P2,
+"8. Aile, kabile, ilişki",kabile-rol-lider.png,Lider,👑,kabile rolü: Lider,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/crown.png
+"8. Aile, kabile, ilişki",kabile-rol-yardimci.png,Yardımcı,🛡️,kabile rolü: Yardımcı,P3,
+"8. Aile, kabile, ilişki",kabile-kabile-hazinesi.png,Kabile Hazinesi,🔮,parlayan hazine küresi,P3,
+"8. Aile, kabile, ilişki",kabile-guc-puani.png,Güç Puanı,⚔,çapraz kılıçlı güç simgesi,P3,
+"8. Aile, kabile, ilişki",kabile-kabile-kasasi.png,Kabile Kasası,🧰,altın işlemeli büyük sandık (sayfa üstü illüstrasyon),P3,
+"8. Aile, kabile, ilişki",kabile-ahsap-sandik.png,Ahşap Sandık,🟫,ahşap ödül sandığı,P3,
+"8. Aile, kabile, ilişki",kabile-yesil-sandik.png,Yeşil Sandık,🟩,yeşil ödül sandığı,P3,
+"8. Aile, kabile, ilişki",kabile-mavi-sandik.png,Mavi Sandık,🟦,mavi ödül sandığı,P3,
+"8. Aile, kabile, ilişki",kabile-kirmizi-sandik.png,Kırmızı Sandık,🟥,kırmızı ödül sandığı,P3,
+"8. Aile, kabile, ilişki",kabile-premium-sandik.png,Premium Sandık,🌙,premium ödül sandığı,P3,
+"8. Aile, kabile, ilişki",kabile-yeni-kabile.png,Yeni Kabile,🌱,filiz: yeni kabile etiketi,P3,
+"8. Aile, kabile, ilişki",kabile-haftalik-kabile-siralamasi.png,Haftalık Kabile Sıralaması,🏆,kabile sıralama kupası,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/trophy.png
+"8. Aile, kabile, ilişki",kabile-kabile-kurallari.png,Kabile kuralları,📜,parşömen,P3,
+"8. Aile, kabile, ilişki",kabile-veri-merkezi.png,Veri Merkezi,📊,istatistik paneli,P3,
+"8. Aile, kabile, ilişki",kabile-gorev-sohbet-grubuna-mesaj-at.png,Sohbet grubuna mesaj at,💬,kabile görevi: Sohbet grubuna mesaj at,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/chat.png
+"8. Aile, kabile, ilişki",kabile-gorev-kabile-odasinda-15-dk-kal.png,Kabile odasında 15 dk kal,🎙️,kabile görevi: Kabile odasında 15 dk kal,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png
+"8. Aile, kabile, ilişki",kabile-gorev-yeni-uyeye-hediye-gonder.png,Yeni üyeye hediye gönder,🎁,kabile görevi: Yeni üyeye hediye gönder,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/gift.png
+"8. Aile, kabile, ilişki",kabile-gorev-check-in-yap.png,Check-in yap,📅,kabile görevi: Check-in yap,P3,
+"8. Aile, kabile, ilişki",kabile-gorev-kabile-odasinda-hediye-gonder.png,Kabile odasında hediye gönder,🎉,kabile görevi: Kabile odasında hediye gönder,P3,
+"8. Aile, kabile, ilişki",kabile-gorev-cift-cp-kur.png,Çift (CP) kur,💞,kabile görevi: Çift (CP) kur,P3,
+"8. Aile, kabile, ilişki",kabile-gorev-kabile-sohbetinde-hediye-gonder.png,Kabile sohbetinde hediye gönder,💌,kabile görevi: Kabile sohbetinde hediye gönder,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/envelope.png
+"8. Aile, kabile, ilişki",iliski-cift-cp-en-tatli-cift.png,Çift (CP) / En tatlı çift,💞,ilişki simgesi: Çift (CP) / En tatlı çift,P2,
+"8. Aile, kabile, ilişki",iliski-dost-en-yakin-dostlar.png,Dost / En yakın dostlar,🤝,ilişki simgesi: Dost / En yakın dostlar,P2,
+"8. Aile, kabile, ilişki",iliski-dugun-salonu.png,Düğün salonu,💒,ilişki simgesi: Düğün salonu,P2,
+"8. Aile, kabile, ilişki",iliski-bulusma-odasi.png,Buluşma odası,🏠,ilişki simgesi: Buluşma odası,P2,
+"8. Aile, kabile, ilişki",iliski-koruma.png,Koruma,👑,ilişki simgesi: Koruma,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/crown.png
+"8. Aile, kabile, ilişki",aile-logo-gece-kuslari.png,Gece Kuşları,🦉,aile logosu: Gece Kuşları,P4,Örnek (demo) aileler. Aileler kendi logosunu yükleyecekse üretmeyin; seçilecek hazır logo seti olacaksa üretin.
+"8. Aile, kabile, ilişki",aile-logo-karaoke-ailesi.png,Karaoke Ailesi,🎤,aile logosu: Karaoke Ailesi,P4,Örnek (demo) aileler. Aileler kendi logosunu yükleyecekse üretmeyin; seçilecek hazır logo seti olacaksa üretin.
+"8. Aile, kabile, ilişki",aile-logo-oyun-kurtlari.png,Oyun Kurtları,🐺,aile logosu: Oyun Kurtları,P4,Örnek (demo) aileler. Aileler kendi logosunu yükleyecekse üretmeyin; seçilecek hazır logo seti olacaksa üretin.
+"8. Aile, kabile, ilişki",aile-logo-istanbul-sohbet.png,İstanbul Sohbet,🌉,aile logosu: İstanbul Sohbet,P4,Örnek (demo) aileler. Aileler kendi logosunu yükleyecekse üretmeyin; seçilecek hazır logo seti olacaksa üretin.
+"9. Görevler, çark, davet ödülleri",gorev-bir-odada-5-dakika-kal.png,Bir odada 5 dakika kal,🎙️,günlük görev: Bir odada 5 dakika kal,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png
+"9. Görevler, çark, davet ödülleri",gorev-3-hediye-gonder.png,3 hediye gönder,🎁,günlük görev: 3 hediye gönder,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/gift.png
+"9. Görevler, çark, davet ödülleri",gorev-5-kisiye-selam-ver.png,5 kişiye selam ver,👋,günlük görev: 5 kişiye selam ver,P2,
+"9. Görevler, çark, davet ödülleri",gorev-1-an-paylas.png,1 an paylaş,📸,günlük görev: 1 an paylaş,P2,
+"9. Görevler, çark, davet ödülleri",gorev-1-goruntulu-arama-yap.png,1 görüntülü arama yap,📹,günlük görev: 1 görüntülü arama yap,P2,
+"9. Görevler, çark, davet ödülleri",cark-kucuk-jeton.png,Küçük jeton,🪙,birkaç jeton (5–20 jeton ödülü),P2,
+"9. Görevler, çark, davet ödülleri",cark-jeton-kesesi.png,Jeton kesesi,💰,dolu jeton kesesi (50 jeton),P2,
+"9. Görevler, çark, davet ödülleri",cark-elmas-odul.png,Elmas ödül,💎,elmas (100 jeton ödülü),P2,
+"9. Görevler, çark, davet ödülleri",cark-roket-odul.png,Roket ödül,🚀,roket (500 jeton ödülü),P2,
+"9. Görevler, çark, davet ödülleri",cark-buyuk-odul.png,Büyük ödül,🏆,altın kupa ve jeton yığını (büyük ödül),P2,
+"9. Görevler, çark, davet ödülleri",cark-tekrar-dene.png,Tekrar dene,😅,"boş dilim: ""tekrar dene"" (üzgün maskot)",P2,
+"9. Görevler, çark, davet ödülleri",odul-pm-karti.png,PM kartı,💬,ödül: PM kartı,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/chat.png
+"9. Görevler, çark, davet ödülleri",odul-merhaba-karti.png,Merhaba kartı,❤️,ödül: Merhaba kartı,P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/heart.png
+"9. Görevler, çark, davet ödülleri",odul-bonus-kredi-bileti.png,Bonus kredi bileti,🎟️,ödül: Bonus kredi bileti,P3,
+"9. Görevler, çark, davet ödülleri",odul-sinirli-sureli-odul.png,Sınırlı süreli ödül,⏰,ödül: Sınırlı süreli ödül,P3,
+"9. Görevler, çark, davet ödülleri",odul-kilitli-odul.png,Kilitli ödül,🔒,ödül: Kilitli ödül,P3,
+"9. Görevler, çark, davet ödülleri",odul-tum-bonuslar-acildi.png,Tüm bonuslar açıldı,🎉,ödül: Tüm bonuslar açıldı,P3,
+"10. Profil, keşfet, sosyal",rozet-haftanin-yildizi.png,Haftanın Yıldızı,🏆,başarı rozeti: Haftanın Yıldızı,P2,
+"10. Profil, keşfet, sosyal",rozet-karaoke-ustasi.png,Karaoke Ustası,🎤,başarı rozeti: Karaoke Ustası,P2,
+"10. Profil, keşfet, sosyal",rozet-sohbet-krali.png,Sohbet Kralı,💬,başarı rozeti: Sohbet Kralı,P2,
+"10. Profil, keşfet, sosyal",rozet-comert-kalp.png,Cömert Kalp,🎁,başarı rozeti: Cömert Kalp,P2,
+"10. Profil, keşfet, sosyal",rozet-30-gun-seri.png,30 Gün Seri,🔥,başarı rozeti: 30 Gün Seri,P2,
+"10. Profil, keşfet, sosyal",rozet-sosyal-kelebek.png,Sosyal Kelebek,🤝,başarı rozeti: Sosyal Kelebek,P2,
+"10. Profil, keşfet, sosyal",onur-romantik-randevu.png,Romantik Randevu,🏰,onur duvarı etkinlik rozeti: Romantik Randevu,P3,
+"10. Profil, keşfet, sosyal",onur-mucize-kesif.png,Mucize Keşif,🧭,onur duvarı etkinlik rozeti: Mucize Keşif,P3,
+"10. Profil, keşfet, sosyal",onur-odalar-arasi-pk-savasi.png,Odalar Arası PK Savaşı,⚔️,onur duvarı etkinlik rozeti: Odalar Arası PK Savaşı,P3,
+"10. Profil, keşfet, sosyal",onur-yildizli-gece.png,Yıldızlı Gece,🌌,onur duvarı etkinlik rozeti: Yıldızlı Gece,P3,
+"10. Profil, keşfet, sosyal",etiket-basketbol.png,Basketbol,🏀,kişilik etiketi: Basketbol,P3,
+"10. Profil, keşfet, sosyal",etiket-mangal.png,Mangal,🍖,kişilik etiketi: Mangal,P3,
+"10. Profil, keşfet, sosyal",etiket-punk.png,Punk,🎸,kişilik etiketi: Punk,P3,
+"10. Profil, keşfet, sosyal",etiket-karaoke.png,Karaoke,🎤,kişilik etiketi: Karaoke,P3,
+"10. Profil, keşfet, sosyal",etiket-kahve.png,Kahve,☕,kişilik etiketi: Kahve,P3,
+"10. Profil, keşfet, sosyal",etiket-oyuncu.png,Oyuncu,🎮,kişilik etiketi: Oyuncu,P3,
+"10. Profil, keşfet, sosyal",etiket-kitap-kurdu.png,Kitap kurdu,📚,kişilik etiketi: Kitap kurdu,P3,
+"10. Profil, keşfet, sosyal",etiket-gezgin.png,Gezgin,✈️,kişilik etiketi: Gezgin,P3,
+"10. Profil, keşfet, sosyal",etiket-gece-kusu.png,Gece kuşu,🌙,kişilik etiketi: Gece kuşu,P3,
+"10. Profil, keşfet, sosyal",etiket-esprili.png,Esprili,😂,kişilik etiketi: Esprili,P3,
+"10. Profil, keşfet, sosyal",etiket-kedisever.png,Kedisever,🐱,kişilik etiketi: Kedisever,P3,
+"10. Profil, keşfet, sosyal",etiket-dans.png,Dans,💃,kişilik etiketi: Dans,P3,
+"10. Profil, keşfet, sosyal",ilgi-karaoke.png,Karaoke,🎤,ilgi alanı: Karaoke,P2,
+"10. Profil, keşfet, sosyal",ilgi-oyun.png,Oyun,🎮,ilgi alanı: Oyun,P2,
+"10. Profil, keşfet, sosyal",ilgi-sohbet.png,Sohbet,💬,ilgi alanı: Sohbet,P2,
+"10. Profil, keşfet, sosyal",ilgi-spor.png,Spor,⚽,ilgi alanı: Spor,P2,
+"10. Profil, keşfet, sosyal",ilgi-seyahat.png,Seyahat,✈️,ilgi alanı: Seyahat,P2,
+"10. Profil, keşfet, sosyal",ilgi-film.png,Film,🎬,ilgi alanı: Film,P2,
+"10. Profil, keşfet, sosyal",ilgi-dans.png,Dans,💃,ilgi alanı: Dans,P2,
+"10. Profil, keşfet, sosyal",ilgi-kitap.png,Kitap,📚,ilgi alanı: Kitap,P2,
+"10. Profil, keşfet, sosyal",ilgi-muzik.png,Müzik,🎧,ilgi alanı: Müzik,P2,
+"10. Profil, keşfet, sosyal",ilgi-kahve.png,Kahve,☕,ilgi alanı: Kahve,P2,
+"10. Profil, keşfet, sosyal",cinsiyet-kadin.png,Kadın,♀ 👩,cinsiyet simgesi: Kadın,P2,Kayıtta 👩/👨 olarak da geçiyor; aynı görsel
+"10. Profil, keşfet, sosyal",cinsiyet-erkek.png,Erkek,♂ 👨,cinsiyet simgesi: Erkek,P2,Kayıtta 👩/👨 olarak da geçiyor; aynı görsel
+"10. Profil, keşfet, sosyal",maskot-bos-durum-maskotu.png,Boş durum maskotu,🦭,uyuyan sevimli fok (boş liste / veri yok ekranları). Uygulamanın maskotu olabilir,P1,
+"10. Profil, keşfet, sosyal",maskot-uyuyan-bakiye.png,Uyuyan bakiye,💤,"uyku ""z z Z""",P1,
+"10. Profil, keşfet, sosyal",konu-arama-merkezi.png,Arama Merkezi,📞,keşfet/an konu etiketi: Arama Merkezi,P3,
+"10. Profil, keşfet, sosyal",konu-parti.png,Parti,🎉,keşfet/an konu etiketi: Parti,P3,
+"10. Profil, keşfet, sosyal",konu-ootd.png,OOTD,👗,keşfet/an konu etiketi: OOTD,P3,
+"10. Profil, keşfet, sosyal",konu-gezi-gunlugu.png,Gezi Günlüğü,🧳,keşfet/an konu etiketi: Gezi Günlüğü,P3,
+"10. Profil, keşfet, sosyal",konu-bu-aksam-ne-dinliyoruz.png,Bu Akşam Ne Dinliyoruz,🎧,keşfet/an konu etiketi: Bu Akşam Ne Dinliyoruz,P3,
+"10. Profil, keşfet, sosyal",konu-romantik-randevu-konu.png,Romantik Randevu (konu),💞,keşfet/an konu etiketi: Romantik Randevu (konu),P3,
+"10. Profil, keşfet, sosyal",konu-odalar-arasi-pk-konu.png,Odalar Arası PK (konu),⚔️,keşfet/an konu etiketi: Odalar Arası PK (konu),P3,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/swords.png
+"10. Profil, keşfet, sosyal",ana-yaklasan-etkinlikler.png,Yaklaşan etkinlikler,📅,ana sayfa kısayolu: Yaklaşan etkinlikler,P2,
+"10. Profil, keşfet, sosyal",ana-oyun-merkezi.png,Oyun merkezi,🎮,ana sayfa kısayolu: Oyun merkezi,P2,
+"10. Profil, keşfet, sosyal",ana-gorevler.png,Görevler,🎯,ana sayfa kısayolu: Görevler,P2,
+"10. Profil, keşfet, sosyal",ana-senin-icin.png,Senin için,✨,ana sayfa kısayolu: Senin için,P2,
+"10. Profil, keşfet, sosyal",ana-ipucu.png,İpucu,💡,ana sayfa kısayolu: İpucu,P2,
+"10. Profil, keşfet, sosyal",siralama-zenginler.png,Zenginler,💰,sıralama sekmesi: Zenginler,P2,
+"10. Profil, keşfet, sosyal",siralama-yayincilar.png,Yayıncılar,🎙️,sıralama sekmesi: Yayıncılar,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png
+"10. Profil, keşfet, sosyal",siralama-odalar.png,Odalar,🔥,sıralama sekmesi: Odalar,P2,
+"10. Profil, keşfet, sosyal",siralama-ajanslar.png,Ajanslar,🏢,sıralama sekmesi: Ajanslar,P2,
+"10. Profil, keşfet, sosyal",siralama-oda-xp.png,Oda XP,⭐,sıralama sekmesi: Oda XP,P2,
+"10. Profil, keşfet, sosyal",derece-1.png,1. madalya,🥇,sıralama 1. madalyası,P1,
+"10. Profil, keşfet, sosyal",derece-2.png,2. madalya,🥈,sıralama 2. madalyası,P1,
+"10. Profil, keşfet, sosyal",derece-3.png,3. madalya,🥉,sıralama 3. madalyası,P1,
+"10. Profil, keşfet, sosyal",ulke-tum-ulkeler.png,Tüm ülkeler,🌍,ülke: Tüm ülkeler (bayrak doğru renk ve oranla; stilize ama değiştirilmemiş),P3,
+"10. Profil, keşfet, sosyal",ulke-turkiye.png,Türkiye,🇹🇷,ülke: Türkiye (bayrak doğru renk ve oranla; stilize ama değiştirilmemiş),P3,
+"10. Profil, keşfet, sosyal",ulke-azerbaycan.png,Azerbaycan,🇦🇿,ülke: Azerbaycan (bayrak doğru renk ve oranla; stilize ama değiştirilmemiş),P3,
+"10. Profil, keşfet, sosyal",ulke-almanya.png,Almanya,🇩🇪,ülke: Almanya (bayrak doğru renk ve oranla; stilize ama değiştirilmemiş),P3,
+"10. Profil, keşfet, sosyal",ulke-hollanda.png,Hollanda,🇳🇱,ülke: Hollanda (bayrak doğru renk ve oranla; stilize ama değiştirilmemiş),P3,
+"10. Profil, keşfet, sosyal",ulke-kibris.png,Kıbrıs,🇨🇾,ülke: Kıbrıs (bayrak doğru renk ve oranla; stilize ama değiştirilmemiş),P3,
+11. Para ve finans,finans-bonus-kredi.png,Bonus Kredi,🎟️,kampanya bileti,P2,
+11. Para ve finans,finans-hediyelerden-kazan.png,Hediyelerden kazan,🎁,hediye → elmas,P2,Mevcut 3D ikonla aynı anlam olabilir: assets/icons/gift.png
+11. Para ve finans,finans-ucretli-aramalar.png,Ücretli aramalar,📹,görüntülü arama kazancı,P2,
+11. Para ve finans,finans-haftalik-odeme-banka.png,Haftalık ödeme / banka,🏦,banka binası,P2,
+11. Para ve finans,finans-odeme-ve-hak-edis.png,Ödeme ve hak ediş,💳,kart,P2,
+11. Para ve finans,finans-yukleme-indirimi.png,Yükleme indirimi,💸,kanatlı para,P2,
+11. Para ve finans,finans-ilk-alim-firsati.png,İlk alım fırsatı,🔥,"""sadece ilk defa"" alevi",P2,
+11. Para ve finans,finans-vip-elmas-paketi.png,VIP + elmas paketi,👑 💎,taç ve elmas birlikte,P2,
+11. Para ve finans,finans-yayinci-analizi.png,Yayıncı analizi,📈,yükselen grafik,P2,
+11. Para ve finans,finans-ajanssiz-yayinci.png,Ajanssız yayıncı,🏛️,bağımsız yayıncı binası,P2,
+11. Para ve finans,finans-para-cekme.png,Para çekme,🏧,para çekme,P2,
+12. Arayüz durum ve işlem simgeleri,ui-onaylandi-tamam.png,Onaylandı / tamam,✅,arayüz simgesi: Onaylandı / tamam,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-iptal-hata.png,İptal / hata,❌ ✖️,arayüz simgesi: İptal / hata,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-engel-askida.png,Engel / askıda,⛔ 🚫,arayüz simgesi: Engel / askıda,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-uyari.png,Uyarı,⚠️,arayüz simgesi: Uyarı,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-kilitli.png,Kilitli,🔒,arayüz simgesi: Kilitli,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-oturum-guvenlik.png,Oturum / güvenlik,🔐,arayüz simgesi: Oturum / güvenlik,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-bekliyor.png,Bekliyor,⏳,arayüz simgesi: Bekliyor,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-suresi-doldu.png,Süresi doldu,⌛,arayüz simgesi: Süresi doldu,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-hatirlatma-sureli.png,Hatırlatma / süreli,⏰,arayüz simgesi: Hatırlatma / süreli,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-sure.png,Süre,⏱,arayüz simgesi: Süre,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-bildirim-acik.png,Bildirim açık,🔔,arayüz simgesi: Bildirim açık,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-sessize-alindi.png,Sessize alındı,🔕,arayüz simgesi: Sessize alındı,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-aktif-cevrimici.png,Aktif / çevrimiçi,🟢,arayüz simgesi: Aktif / çevrimiçi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-pasif.png,Pasif,⚪,arayüz simgesi: Pasif,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-canli-bakimda.png,Canlı / bakımda,🔴,arayüz simgesi: Canlı / bakımda,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-hata-test.png,Hata (test),🟠,arayüz simgesi: Hata (test),P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-baglanti-dusuk-veri.png,Bağlantı / düşük veri,📶,arayüz simgesi: Bağlantı / düşük veri,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-yeniden-baglandi.png,Yeniden bağlandı,🔄,arayüz simgesi: Yeniden bağlandı,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-paylas-baglanti.png,Paylaş / bağlantı,🔗,arayüz simgesi: Paylaş / bağlantı,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-kopyala-liste.png,Kopyala / liste,📋,arayüz simgesi: Kopyala / liste,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-sikayet.png,Şikâyet,🚩,arayüz simgesi: Şikâyet,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-destek.png,Destek,🛟,arayüz simgesi: Destek,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-belge.png,Belge,📄,arayüz simgesi: Belge,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-veri-paket.png,Veri / paket,📦,arayüz simgesi: Veri / paket,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-ek-dosya.png,Ek dosya,📎,arayüz simgesi: Ek dosya,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-ayarlar-sistem.png,Ayarlar / sistem,⚙️,arayüz simgesi: Ayarlar / sistem,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-ara.png,Ara,🔍,arayüz simgesi: Ara,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-konum.png,Konum,📍,arayüz simgesi: Konum,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-ag.png,Ağ,🌐,arayüz simgesi: Ağ,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-istatistik.png,İstatistik,📊,arayüz simgesi: İstatistik,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-profil.png,Profil,👤,arayüz simgesi: Profil,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-duzenle.png,Düzenle,✏️,arayüz simgesi: Düzenle,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-duyuru.png,Duyuru,📢,arayüz simgesi: Duyuru,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-davet-gonderildi.png,Davet gönderildi,📨,arayüz simgesi: Davet gönderildi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-sesli-arama.png,Sesli arama,📞,arayüz simgesi: Sesli arama,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-goruntulu-arama.png,Görüntülü arama,🎥,arayüz simgesi: Görüntülü arama,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-ajans.png,Ajans,🏢,arayüz simgesi: Ajans,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-ev-oda.png,Ev / oda,🏠,arayüz simgesi: Ev / oda,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-itiraz.png,İtiraz,⚖️,arayüz simgesi: İtiraz,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-gizli-kisi.png,Gizli kişi,🕵️,arayüz simgesi: Gizli kişi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-katiliyorum.png,Katılıyorum,💪,arayüz simgesi: Katılıyorum,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-kutlama.png,Kutlama,🎉,arayüz simgesi: Kutlama,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-one-cikan.png,Öne çıkan,⭐,arayüz simgesi: Öne çıkan,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-populer-seri.png,Popüler / seri,🔥,arayüz simgesi: Popüler / seri,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-indir-asagi.png,İndir / aşağı,⬇️,arayüz simgesi: İndir / aşağı,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-takip-ederek-geldi.png,Takip ederek geldi,👣,arayüz simgesi: Takip ederek geldi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-basvuru-gonderildi.png,Başvuru gönderildi,📝,arayüz simgesi: Başvuru gönderildi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-canli-yayin-bildirimi.png,Canlı yayın bildirimi,🔴,arayüz simgesi: Canlı yayın bildirimi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-hayran-kulubu.png,Hayran kulübü,💜,arayüz simgesi: Hayran kulübü,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-selam.png,Selam,👋,arayüz simgesi: Selam,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-hedef.png,Hedef,🎯,arayüz simgesi: Hedef,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-duyuru-megafon.png,Duyuru (megafon),📣,arayüz simgesi: Duyuru (megafon),P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-kapat.png,Kapat,✕,arayüz simgesi: Kapat,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-okundu.png,Okundu,✓✓,arayüz simgesi: Okundu,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-gonderilmedi.png,Gönderilmedi,✗,arayüz simgesi: Gönderilmedi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-isaretsiz-kutu.png,İşaretsiz kutu,⬜,arayüz simgesi: İşaretsiz kutu,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+12. Arayüz durum ve işlem simgeleri,ui-bilgi.png,Bilgi,ℹ️,arayüz simgesi: Bilgi,P4,"Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade"
+"7. VIP, SVIP, Asil, seviyeler",svip-svip-isareti.png,SVIP işareti,✦,SVIP adının yanındaki küçük parıltı işareti,P2,
+1. Hediyeler,hediye-rozet-muzikli-hediye-rozeti.png,Müzikli hediye rozeti,♪,"hediye kutusunun köşesindeki küçük ""müzikli"" rozeti (nota)",P2,
+"10. Profil, keşfet, sosyal",maskot-destek-botu.png,Destek botu,😉,destek sohbetindeki botun yüzü; boş durum maskotuyla aynı karakter olabilir,P1,
