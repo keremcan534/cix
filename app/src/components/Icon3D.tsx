@@ -19,6 +19,8 @@ const SRC = {
   tent: require('../../assets/icons/tent.png'),
   briefcase: require('../../assets/icons/briefcase.png'),
   bag: require('../../assets/icons/bag.png'),
+  group: require('../../assets/icons/group.png'),
+  userAdd: require('../../assets/icons/user-add.png'),
 } as const;
 export type Icon3DName = keyof typeof SRC;
 
@@ -43,6 +45,7 @@ const FROM_EMOJI: Record<string, Icon3DName> = {
   '⛺': 'tent',
   '💼': 'briefcase',
   '🛍️': 'bag',
+  '👥': 'group',
 };
 export const icon3dFor = (emoji?: string): Icon3DName | undefined => (emoji ? FROM_EMOJI[emoji] : undefined);
 

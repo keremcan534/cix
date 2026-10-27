@@ -34,6 +34,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      - run: npm test
       - name: Configure base URL for Pages
         run: |
           node -e '

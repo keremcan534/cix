@@ -19,6 +19,7 @@ import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGif
 import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { GiftArt } from '@/components/GiftArt';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -295,7 +296,8 @@ export function GiftSheet({
         </View>
 
         {/* What: grid */}
-        <ScrollView style={g.gridScroll} contentContainerStyle={g.grid}>
+        {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
+        <ScrollView key={shelf} style={g.gridScroll} contentContainerStyle={g.grid}>
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}
@@ -334,7 +336,7 @@ export function GiftSheet({
         {/* How much + one action */}
         <View style={g.footer}>
           <View style={g.summary}>
-            <Text style={g.summaryArt}>{isLucky ? lg.emoji : gift.emoji}</Text>
+            {isLucky ? <Text style={g.summaryArt}>{lg.emoji}</Text> : <GiftArt giftId={gift.id} emoji={gift.emoji} size={36} textStyle={g.summaryArt} />}
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={g.summaryName} numberOfLines={1}>
                 {isLucky ? `${lg.name} · Lucky` : gift.name}
@@ -522,7 +524,7 @@ function GiftTile({
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
-        <Text style={[g.tileArt, locked && { opacity: 0.4 }]}>{gift.emoji}</Text>
+        <GiftArt giftId={gift.id} emoji={gift.emoji} size={42} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
         <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={1}>
           {gift.name}
         </Text>

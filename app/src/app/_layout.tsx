@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
+import { RoomHost } from '@/components/room/room-host';
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -31,13 +32,14 @@ export default function RootLayout() {
 
 function RootStack() {
   const { loggedIn } = useApp();
-  // Hemen Tanış and the game platform live above the stack, so they keep running on every screen.
+  // The live room, Hemen Tanış and the game platform live above the stack, so they keep running on every screen.
   return (
     <>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Protected guard={loggedIn}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="oda/[id]" options={{ animation: 'slide_from_bottom' }} />
+          {/* The route only marks where the room is shown full screen; RoomHost renders the room itself. */}
+          <Stack.Screen name="oda/[id]" options={{ animation: 'fade' }} />
           <Stack.Screen name="sohbet/[id]" />
           <Stack.Screen name="cuzdan" options={{ presentation: 'modal' }} />
           <Stack.Screen name="kullanici/[id]" />
@@ -81,6 +83,7 @@ function RootStack() {
           <Stack.Screen name="giris" />
         </Stack.Protected>
       </Stack>
+      {loggedIn && <RoomHost />}
       {loggedIn && <MatchLayer />}
       {loggedIn && <GamesBridge />}
     </>
