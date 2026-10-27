@@ -71,14 +71,13 @@ Ek ve yeni güncelleme belgeleriyle eklenenler:
 | Aile | `src/app/aile.tsx` | Sahip/yardımcı/üye rolleri, başvuru onayı, aile sohbeti, LV1–15, aktif üye, haftalık bonus %1–5 |
 | Ajans sohbeti | `src/app/ajans/sohbet.tsx` | Yalnız üyeler; çevrimiçi/çevrimdışı listesi; ajanslar arası transfer akışı (panelde onay) |
 | Oyun merkezi | `src/app/oyunlar.tsx` | VIP2'de açılır, sağlayıcı doğrulamalı sonuç |
-| Yönetim (demo) | `src/app/yonetim.tsx` | USD kuru, ajans %40, oda sahibi %20, aile oranları, arama bonusları, sınırlar, örnek hesaplayıcı, değişiklik geçmişi |
 | Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
 
 Sonradan eklenenler: Ben sayfası, SVIP 1–10 / VIP abonelik / Asil (Şövalye–Dük) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
 
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 
-Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Değerler Profil > Kazanç & bonus yönetimi ekranından (demo) değiştirilebilir.
+Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Uygulamada bu değerler sabit varsayılanlardır; finans yönetimi (kurallar, onay, mutabakat) mobil uygulamadan çıkarıldı ve ayrı Finance Control platformuna taşınıyor.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 

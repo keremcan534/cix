@@ -66,7 +66,6 @@ export type Settings = {
 };
 /** Block, unblock, report and data requests are kept as a record (spec: profile §5). */
 export type SafetyLog = { id: string; action: 'Engelledi' | 'Engeli kaldırdı' | 'Şikâyet etti' | 'Veri dökümü istedi' | 'Fotoğraf incelemeye gönderildi' | 'Fotoğraf onaylandı'; targetId?: string; detail?: string; time: string };
-export type RuleChange = { id: string; time: string; field: string; from: string; to: string; version: number };
 export type InviteReward = { id: string; inviteeId: string; ref: string; status: 'Beklemede' | 'Onaylandı' | 'İptal edildi'; time: string };
 export type Session = { id: string; device: string; place: string; last: string; current?: boolean };
 export type FanClub = { points: number; history: { text: string; pts: number; time: string }[] };
@@ -183,10 +182,8 @@ type AppState = {
   requestTransfer: (toCode: string | null, reason: string) => string | null;
   agencyChat: GroupMsg[];
   sendAgencyMessage: (text: string) => void;
-  // rules (admin demo), invites, security, fan clubs, rooms, family
+  // rules (fixed defaults; edited only on the Finance Control platform), invites, security, fan clubs, rooms, family
   rules: Rules;
-  setRule: <K extends keyof Rules>(k: K, v: Rules[K]) => void;
-  ruleHistory: RuleChange[];
   inviteRewards: InviteReward[];
   simulateInviteePurchase: () => void;
   spentToday: number;
@@ -363,8 +360,6 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const spentTodayRef = useRef(spentStart);
   const [spentToday, setSpentToday] = useState(spentStart);
 
-  const [rules, setRules] = useState<Rules>({ ...RULES });
-  const [ruleHistory, setRuleHistory] = useState<RuleChange[]>([]);
   const [inviteRewards, setInviteRewards] = useState<InviteReward[]>([
     { id: 'ir1', inviteeId: 'u3', ref: 'PUR-••41', status: 'Onaylandı', time: 'Pzt' },
     { id: 'ir2', inviteeId: 'u3', ref: 'PUR-••58', status: 'Onaylandı', time: 'Sal' },
@@ -825,15 +820,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     agencyChat,
     sendAgencyMessage: (text) => setAgencyChat((m) => [...m, { id: uid(), userId: 'me', text, time: now() }]),
-    rules,
-    setRule: (k, v) => {
-      const from = JSON.stringify(RULES[k]);
-      (RULES as Record<string, unknown>)[k] = v;
-      RULES.version += 1;
-      setRules({ ...RULES });
-      setRuleHistory((h) => [{ id: uid(), time: now(), field: String(k), from, to: JSON.stringify(v), version: RULES.version }, ...h]);
-    },
-    ruleHistory,
+    rules: RULES,
     inviteRewards,
     simulateInviteePurchase: () => {
       const id = uid();

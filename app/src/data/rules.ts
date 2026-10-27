@@ -1,6 +1,7 @@
 // Earnings & bonus rules (spec "Merkezi kazanç ve bonus yönetim paneli").
-// All values are defaults that the (demo) admin panel can change; changes are versioned
-// and only apply from their effective time — past ledger rows keep the rule they were made with.
+// In the app these are fixed, read-only defaults. Editing them (versioned, effective only from their
+// start time — past ledger rows keep the rule they were made with) is done on the separate
+// Finance Control platform, not in the mobile app.
 
 export type Rules = {
   version: number;
@@ -70,8 +71,8 @@ export const DEFAULT_RULES: Rules = {
   period: 'Haftalık',
 };
 
-// Module-level mirror so plain helpers (usd(), etc.) see the current rules without hooks.
-// The store keeps React state in sync and is the only writer.
+// Module-level copy so plain helpers (usd(), etc.) see the rules without hooks; the store exposes
+// the same object as `rules`. Nothing in the app writes to it.
 export const RULES: Rules = { ...DEFAULT_RULES, familyRates: [...DEFAULT_RULES.familyRates] };
 
 export const pct = (r: number) => `%${(r * 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;

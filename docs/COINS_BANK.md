@@ -1,6 +1,8 @@
 # Coins Bank ve yayıncı/ajans yaşam döngüsü
 
-Uygulamada: **Ben > Coins Bank** (`app/src/app/coins-bank.tsx`), kurallar `app/src/data/rules.ts`, düzenleme **Ben > Kazanç & bonus yönetimi** (`/yonetim`).
+Uygulamada: **Ben > Coins Bank** (`app/src/app/coins-bank.tsx`), kurallar `app/src/data/rules.ts` (uygulamada sabit varsayılanlar, salt okunur).
+
+Finans yönetimi (kurallar, ödeme onayı/reddi, mutabakat) mobil uygulamada yer almaz; ayrı Finance Control platformuna taşınıyor. Uygulamada kullanıcı bakiyesini görür, çekim talebi oluşturur ve talebin durumunu izler; manuel incelemedeki talepte "Finans ekibi inceliyor" notu görünür.
 
 ## Para birimleri
 - **Coins**: satın alınır, hediyede harcanır.

@@ -92,7 +92,7 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Oturumlar ve oturum sonlandırma, şüpheli giriş / yeniden doğrulama, çoklu hesap/IBAN risk notları | ✅ (gerçek kontrol sunucuda ⛔) |
 | İtiraz kategorileri: moderasyon kararı, hesap kısıtlaması, ajans transferi, oyun sonucu | ✅ Destek |
 | İşlem geçmişi referans numarası, günlük özet | ✅ Cüzdan |
-| Merkezi kazanç & bonus yönetim paneli (USD kuru, ajans %, oda sahibi %, aile oranları, arama bonusları, üst sınır, min. çekim, davet birimi, örnek hesaplayıcı, sürüm geçmişi) | ✅ Profil > Kazanç & bonus yönetimi (demo, kaydedilmez) |
+| Merkezi kazanç & bonus yönetim paneli (USD kuru, ajans %, oda sahibi %, aile oranları, arama bonusları, üst sınır, min. çekim, davet birimi, örnek hesaplayıcı, sürüm geçmişi) | ⛔ Mobil uygulamadan çıkarıldı; ayrı Finance Control platformuna taşınıyor (uygulamada sabit varsayılanlar) |
 | Oda kartı (başlığa dokun): kapak seç, ad düzenle, tema, oda ID, seviye kartı, kabile (aile/ajans), oda üyeleri (sayı/limit, başvuru rozeti), Oda Sahibi Merkezi (%20 pay, trafik paneli, bu oturumun hediye/zirve/süre istatistikleri), oda süslemesi, hediye kaydı, bülten, Paylaş / Davet et | ✅ |
 | Tam ekran "Oda Ayarları": oda tipi, tema, kilit (Lv4 veya VIP), oda günlüğü, yayına katılma modu (mikrofon sayısı), mikrofon kontrolü, mikrofon izni (Lv4, oda üyeleri), patron koltuğu (Lv3), üyelik başvurusu (gerekmiyor/başvuru/kapalı), üyeleri/işlevleri kim yönetir, otomatik eleme (7/14/30 gün, her gün 00:00 UTC+3), kara liste, profilde oda görünürlüğü, video gizlilik koruması | ✅ |
 | Patron koltuğu: oturumun en çok hediye gönderen kişisi (en az 1.000 jeton) oturur, geçilince el değiştirir, sahip indirebilir | ✅ (`Yeni Arkadaşlar`, `Karaoke Akşamı` odalarında açık) |
@@ -104,10 +104,10 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Gelir / Kazanç detayları, Ödüllü Davet (kayıt ödülü cinsiyetten bağımsız, gelir görevi, %8 gelir / %4 şarj payı, süreli ek bonus), Müşteri hizmetleri | ✅ |
 | Kullanıcı profili (Profil / dinamik / Onur / İlişki, koruma, CP) ve hediye paneli (Hot / Gameplay / Çift / Ayrıcalık, SVIP kilitli hediyeler, çanta, favoriler) | ✅ |
 | Sekme düzeni: Senin İçin · Anlar · Odalar (ortada büyük düğme) · Mesajlar · Ben; Odalar (Benim/Önerilen, sıralama kartları, kategori sekmeleri, TOP odalar), Senin İçin (kısayol kartları, Hi, Gerçek rozeti), Anlar (konu kartları, yorum), Mesajlar (Arkadaşlarım, Aramalar, ziyaretçiler) | ✅ |
-| Merkezi Rol ve Yetki Merkezi: roller, izinler (yasak dahil), kapsamlar (platform/bölge/ajans/oda), çoklu rol ataması, etkin yetki kontrolü, moderasyon kayıtları, BD/ajans komisyon kuralları, denetim kaydı, teknik şartname çıktısı | ✅ `docs/YETKI_MODELI.md` (gerçek koruma sunucuda ⛔) |
+| Merkezi Rol ve Yetki Merkezi: roller, izinler (yasak dahil), kapsamlar (platform/bölge/ajans/oda), çoklu rol ataması, etkin yetki kontrolü, moderasyon kayıtları, denetim kaydı, teknik şartname çıktısı | ✅ `docs/YETKI_MODELI.md` (gerçek koruma sunucuda ⛔) |
 | Kabile: profil (seviye kartı, duyuru, etiket, haftalık sıralama, Oda/Görev/Çift/Durum/Tema), kabile sohbeti, Görev Merkezi (sabit ödüllü sandıklar), Kabile Kasası, İlişki Meydanı | ✅ |
 | Hangi odada olduğu: profil, ajans sohbeti ve kabile sohbetinde görünür, dokununca o odaya gidilir (kilitliyse şifre), odada "A, B kişisini takip ederek odaya katıldı" mesajı | ✅ |
-| Coins Bank: cüzdan, yayıncı/ajans/BD defterleri, blokajlı para çekme, otomatik/manuel onay, ters kayıt, kurallar & denetim, mutabakat | ✅ `docs/COINS_BANK.md` (ödeme simüle) |
+| Coins Bank: cüzdan, yayıncı/ajans/BD defterleri, blokajlı para çekme, otomatik onay / manuel inceleme durumu | ✅ `docs/COINS_BANK.md` (ödeme simüle; kurallar, onay ve mutabakat ayrı Finance Control platformunda) |
 | Yayıncı/ajans yaşam döngüsü: ajanssız yayıncı 3 gün → yönetim hesabı, 90 gün pasif → ajanstan düşer, ajans aktivasyonu 20 yayıncı / 10×10 USD, aylık 5 yeni yayıncı, komisyon düşüşü, aday statüsüne düşme; süreler panelden | ✅ |
 | Jackpot / şans çarpanlı hediye ve rastgele ödüllü kutular | ⛔ bilinçli olarak eklenmedi (kumar niteliği; lisans/hukuk gerekir) |
 
