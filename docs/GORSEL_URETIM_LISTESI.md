@@ -2,7 +2,7 @@
 
 Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir görsel**. Liste kodun taranmasıyla çıkarıldı (uygulamada 1.398 emoji kullanımı, 330 farklı emoji). Aynı görselin birden çok yerde kullanıldığı durumlarda tek satır ve tek dosya adı var.
 
-**Teslim durumu:** Parti 01 (Popüler hediyeler 1–12) teslim alındı ve uygulamaya bağlandı: `app/assets/gifts/192` (liste, sohbet, uçuş) ve `app/assets/gifts/512` (büyük gönderim animasyonu). Tabloda ✅ ile işaretli. Diğer hediyeler görseli gelene kadar emojisiyle görünür.
+**Teslim durumu:** Parti 01 (hediyeler 1–12) ve Parti 02 (hediyeler 13–24) teslim alındı ve uygulamaya bağlandı: `app/assets/gifts/192` (liste, sohbet, uçuş) ve `app/assets/gifts/512` (büyük gönderim animasyonu). Tabloda ✅ ile işaretli. Diğer hediyeler görseli gelene kadar emojisiyle görünür.
 
 **Toplam 536 görsel.** Öncelik: P1 134 (çok görünen, para kazandıran) · P2 183 · P3 158 · P4 61 (küçük arayüz simgeleri).
 
@@ -83,18 +83,18 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 10 | `hediye-dunya-turu.png` | Dünya Turu | 🌍 | etrafında uçak rotası çizgisi olan dünya küresi | P1 | ✅ Teslim edildi · Raf: Popüler |
 | 11 | `hediye-seni-seviyorum.png` | Seni Seviyorum | 🥰 | kalp tutan sevimli karakter (insan yüzü yok) | P1 | ✅ Teslim edildi · Raf: Popüler |
 | 12 | `hediye-panda-sarilmasi.png` | Panda Sarılması | 🐼 | kalbe sarılmış panda | P1 | ✅ Teslim edildi · Raf: Popüler |
-| 13 | `hediye-tatil-keyfi.png` | Tatil Keyfi | 🏖️ | şemsiye ve palmiyeli küçük plaj adası | P1 | Raf: Popüler |
-| 14 | `hediye-ucan-opucuk.png` | Uçan Öpücük | 😘 | kalp şeklinde uçan öpücük, dudak izi | P1 | Raf: Popüler |
-| 15 | `hediye-gece-krali.png` | Gece Kralı | 🤴 | taç ve pelerin, gece mavisi, yıldızlar (gerçek kişi yok) | P1 | Raf: Popüler |
-| 16 | `hediye-birlikte-bisiklet.png` | Birlikte Bisiklet | 🚲 | iki kişilik tandem bisiklet, kalp balonlu | P1 | Raf: Popüler |
-| 17 | `hediye-parti-zamani.png` | Parti Zamanı | 🎉 | konfeti patlatan parti kornası | P1 | Raf: Popüler |
-| 18 | `hediye-ani-fotografi.png` | Anı Fotoğrafı | 📸 | polaroid fotoğraf makinesi ve çıkan fotoğraf | P1 | Raf: Popüler |
-| 19 | `hediye-altin-can.png` | Altın Çan | 🔔 | kurdeleli altın çan | P1 | Raf: Popüler |
-| 20 | `hediye-altin-kugu.png` | Altın Kuğu | 🦢 | altın kuğu, zarif boyun | P1 | Raf: Popüler |
-| 21 | `hediye-kar-topu.png` | Kar Topu | ❄️ | kar topu, buz parçacıkları | P1 | Raf: Eğlenceli (atış) |
-| 22 | `hediye-sulu-balon.png` | Sulu Balon | 🎈 | su dolu balon, damlalar | P1 | Raf: Eğlenceli (atış) |
-| 23 | `hediye-domates-at.png` | Domates At | 🍅 | olgun domates | P1 | Raf: Eğlenceli (atış) |
-| 24 | `hediye-kagit-ucak.png` | Kâğıt Uçak | ✈️ | katlanmış kâğıt uçak | P1 | Raf: Eğlenceli (atış) |
+| 13 | `hediye-tatil-keyfi.png` | Tatil Keyfi | 🏖️ | şemsiye ve palmiyeli küçük plaj adası | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 14 | `hediye-ucan-opucuk.png` | Uçan Öpücük | 😘 | kalp şeklinde uçan öpücük, dudak izi | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 15 | `hediye-gece-krali.png` | Gece Kralı | 🤴 | taç ve pelerin, gece mavisi, yıldızlar (gerçek kişi yok) | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 16 | `hediye-birlikte-bisiklet.png` | Birlikte Bisiklet | 🚲 | iki kişilik tandem bisiklet, kalp balonlu | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 17 | `hediye-parti-zamani.png` | Parti Zamanı | 🎉 | konfeti patlatan parti kornası | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 18 | `hediye-ani-fotografi.png` | Anı Fotoğrafı | 📸 | polaroid fotoğraf makinesi ve çıkan fotoğraf | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 19 | `hediye-altin-can.png` | Altın Çan | 🔔 | kurdeleli altın çan | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 20 | `hediye-altin-kugu.png` | Altın Kuğu | 🦢 | altın kuğu, zarif boyun | P1 | ✅ Teslim edildi · Raf: Popüler |
+| 21 | `hediye-kar-topu.png` | Kar Topu | ❄️ | kar topu, buz parçacıkları | P1 | ✅ Teslim edildi · Raf: Eğlenceli (atış) |
+| 22 | `hediye-sulu-balon.png` | Sulu Balon | 🎈 | su dolu balon, damlalar | P1 | ✅ Teslim edildi · Raf: Eğlenceli (atış) |
+| 23 | `hediye-domates-at.png` | Domates At | 🍅 | olgun domates | P1 | ✅ Teslim edildi · Raf: Eğlenceli (atış) |
+| 24 | `hediye-kagit-ucak.png` | Kâğıt Uçak | ✈️ | katlanmış kâğıt uçak | P1 | ✅ Teslim edildi · Raf: Eğlenceli (atış) |
 | 25 | `hediye-su-kovasi.png` | Su Kovası | 🪣 | ağzına kadar su dolu kova | P1 | Raf: Eğlenceli (atış) |
 | 26 | `hediye-pasta-at.png` | Pasta At | 🥧 | kremalı tabak pasta | P1 | Raf: Eğlenceli (atış) |
 | 27 | `hediye-yumurta-at.png` | Yumurta At | 🥚 | yumurta | P1 | Raf: Eğlenceli (atış) |

@@ -296,7 +296,8 @@ export function GiftSheet({
         </View>
 
         {/* What: grid */}
-        <ScrollView style={g.gridScroll} contentContainerStyle={g.grid}>
+        {/* Keyed by shelf: each shelf opens at its top, not at the previous shelf's scroll offset. */}
+        <ScrollView key={shelf} style={g.gridScroll} contentContainerStyle={g.grid}>
           {isLucky ? (
             <LuckyShelf
               gifts={lucky.config.gifts}

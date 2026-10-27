@@ -1,4 +1,4 @@
-// Produced gift visuals (docs/GORSEL_URETIM_LISTESI.md, "Popüler hediyeler" batch 1): transparent PNGs,
+// Produced gift visuals (docs/GORSEL_URETIM_LISTESI.md, gifts 1–24 so far): transparent PNGs,
 // 192 px for lists, chat and flights, 512 px for the full-screen send animation. Gifts without a
 // visual yet keep their emoji until their image is delivered.
 import { Image, Text, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
@@ -17,6 +17,18 @@ const ART: Record<string, Art> = {
   h2: { sm: require('../../assets/gifts/192/hediye-dunya-turu.png'), lg: require('../../assets/gifts/512/hediye-dunya-turu.png') },
   h3: { sm: require('../../assets/gifts/192/hediye-seni-seviyorum.png'), lg: require('../../assets/gifts/512/hediye-seni-seviyorum.png') },
   h4: { sm: require('../../assets/gifts/192/hediye-panda-sarilmasi.png'), lg: require('../../assets/gifts/512/hediye-panda-sarilmasi.png') },
+  h5: { sm: require('../../assets/gifts/192/hediye-tatil-keyfi.png'), lg: require('../../assets/gifts/512/hediye-tatil-keyfi.png') },
+  h6: { sm: require('../../assets/gifts/192/hediye-ucan-opucuk.png'), lg: require('../../assets/gifts/512/hediye-ucan-opucuk.png') },
+  h7: { sm: require('../../assets/gifts/192/hediye-gece-krali.png'), lg: require('../../assets/gifts/512/hediye-gece-krali.png') },
+  h8: { sm: require('../../assets/gifts/192/hediye-birlikte-bisiklet.png'), lg: require('../../assets/gifts/512/hediye-birlikte-bisiklet.png') },
+  h9: { sm: require('../../assets/gifts/192/hediye-parti-zamani.png'), lg: require('../../assets/gifts/512/hediye-parti-zamani.png') },
+  h10: { sm: require('../../assets/gifts/192/hediye-ani-fotografi.png'), lg: require('../../assets/gifts/512/hediye-ani-fotografi.png') },
+  h11: { sm: require('../../assets/gifts/192/hediye-altin-can.png'), lg: require('../../assets/gifts/512/hediye-altin-can.png') },
+  h12: { sm: require('../../assets/gifts/192/hediye-altin-kugu.png'), lg: require('../../assets/gifts/512/hediye-altin-kugu.png') },
+  p1: { sm: require('../../assets/gifts/192/hediye-kar-topu.png'), lg: require('../../assets/gifts/512/hediye-kar-topu.png') },
+  p2: { sm: require('../../assets/gifts/192/hediye-sulu-balon.png'), lg: require('../../assets/gifts/512/hediye-sulu-balon.png') },
+  p3: { sm: require('../../assets/gifts/192/hediye-domates-at.png'), lg: require('../../assets/gifts/512/hediye-domates-at.png') },
+  p4: { sm: require('../../assets/gifts/192/hediye-kagit-ucak.png'), lg: require('../../assets/gifts/512/hediye-kagit-ucak.png') },
 };
 
 /** The image for a catalog gift (by GIFTS id), if it has been produced. */
