@@ -1,4 +1,4 @@
-// Admin: Lucky gift packages, odds, reward reserve, limits, records (spec §8). Every change bumps the
+// Admin: Lucky gift packages, odds, reward reserve, records (spec §8). Every change bumps the
 // config version; each send keeps the odds it was drawn with, so past results stay auditable.
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -7,9 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';
+import { pct } from '@/data/rules';
 import {
   DOC_TEST_TIERS,
   LUCKY_MULTS,
+  LUCKY_RECIPIENT_SHARE,
   ODDS_TOTAL,
   STANDARD_TIERS,
   getLucky,
@@ -149,16 +151,9 @@ export default function LuckyAdmin() {
               <Chips value={config.poolPct} options={[50, 60, 70, 80].map((n) => [n, `%${n}`] as [number, string])} onChange={(v) => updateConfig({ poolPct: v })} />
               <Text style={s.label}>Günlük toplam ödül limiti</Text>
               <Chips value={config.dailyPayoutLimit} options={[1_000_000, 5_000_000, 20_000_000, 100_000_000].map((n) => [n, fmt(n)] as [number, string])} onChange={(v) => updateConfig({ dailyPayoutLimit: v })} />
-              <Text style={s.label}>Kullanıcı başına günlük gönderim</Text>
-              <Chips value={config.perUserDaily} options={[50, 200, 500, 1000].map((n) => [n, String(n)] as [number, string])} onChange={(v) => updateConfig({ perUserDaily: v })} />
-              <Text style={s.label}>Dakikada en fazla gönderim (aşan şüpheli kaydına düşer)</Text>
-              <Chips value={config.perMinute} options={[5, 10, 20, 60].map((n) => [n, String(n)] as [number, string])} onChange={(v) => updateConfig({ perMinute: v })} />
               <Text style={s.label}>Odada duyurulan en düşük çarpan</Text>
               <Chips value={config.announceFrom} options={[20, 50, 100, 500].map((n) => [n, `×${n}`] as [number, string])} onChange={(v) => updateConfig({ announceFrom: v })} />
-              <View style={s.row}>
-                <Text style={s.label}>Kazanılan ödül PK puanına eklensin (varsayılan kapalı)</Text>
-                <Switch value={config.pkCountsReward} onValueChange={(v) => updateConfig({ pkCountsReward: v })} />
-              </View>
+              <Text style={s.dim}>Kullanıcı başına gönderim sınırı yok; jetonu yettiği kadar gönderebilir. Alıcıya hediye değerinin {pct(LUCKY_RECIPIENT_SHARE)}’si elmas olarak yazılır; PK’da da aynı {pct(LUCKY_RECIPIENT_SHARE)} puan sayılır (ödül sayılmaz).</Text>
             </Card>
             <Card style={{ gap: 8 }}>
               <Text style={s.title}>Test araçları</Text>
@@ -204,12 +199,6 @@ export default function LuckyAdmin() {
             <Card style={{ gap: 4 }}>
               <Text style={s.title}>Tutarlılık</Text>
               <Text style={s.dim}>Aynı işlem kimliğiyle tekrar gelen istek: {lucky.duplicates} (ücret ve ödül tekrar işlenmedi)</Text>
-              <Text style={s.dim}>Şüpheli işlem kaydı: {lucky.suspicious.length}</Text>
-              {lucky.suspicious.slice(0, 10).map((x) => (
-                <Text key={x} style={s.dim}>
-                  • {x}
-                </Text>
-              ))}
             </Card>
             <Card style={{ gap: 4 }}>
               <Text style={s.title}>Denetim ve yapılandırma kayıtları</Text>

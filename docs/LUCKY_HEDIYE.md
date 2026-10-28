@@ -2,13 +2,13 @@
 
 Kaynak: *LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ*.
 
-Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişi normal hediye gelirini alır; gönderenin ödülü bundan ayrı hesaplanır.
+Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişiye hediye değerinin **%20'si** elmas olarak yazılır (`LUCKY_RECIPIENT_SHARE`, `src/data/rules.ts`); PK'da da aynı %20 puan sayılır. Gönderenin ödülü bundan ayrı hesaplanır.
 
 ## Dosyalar
 
 | Dosya | Görevi |
 |---|---|
-| `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, limitler, kayıtlar, denetim. |
+| `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, kayıtlar, denetim. |
 | `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Lucky** rafı: paketler, tam olasılık tablosu, Geçmişim. |
 | `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişilere tekrar gönderir (×1, ×2, ×3 …). |
 | `src/lib/broadcast.ts`, `src/components/fx/win-banner.tsx` | Tüm odalara kazanç duyurusu: üst ortada ışıltılı bant, sırayla gösterilir. |
@@ -27,18 +27,16 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
   1. Panelde fiyat, her çarpanın olasılığı ve ödülü gösterilir.
   2. **Onay yok:** Hiçbir hediye onay sormaz; tek dokunuşla gönderilir.
   3. Gönderimden sonra sağ altta o hediyeye ait çark çıkar. Çevresindeki çizgi 5 saniyede tamamlanır; bu sürede çarka basmak aynı hediyeyi aynı kişilere tekrar gönderir ve sayaç ×1, ×2, ×3 diye ilerler. Her basış çizgiyi baştan başlatır, çizgi kapanınca çark kaybolur.
-  4. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi ve limitleri kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
-- **Alıcılar:** Tek kişiye, seçilen kişilere veya "Tümü" ile mikrofondaki herkese gönderilebilir. Her kişi için tek adet gönderilir ve ayrı çekiliş yapılır (ayrı işlem kimliği). Bakiye bir yerde biterse kalan kişilere gönderilmez ve sohbette yazılır.
+  4. Sunucu sırayla şunları yapar: aynı işlem mi diye bakar, paketi kontrol eder, jetonu düşer, çeker, ödülü yazar, kaydeder.
+- **Alıcılar:** Tek kişiye, seçilen kişilere veya "Tümü" ile mikrofondaki herkese gönderilebilir. Adet seçilebilir (×1, ×10, ×66 …); her hediye için ayrı çekiliş yapılır (ayrı işlem kimliği). Bakiye bir yerde biterse kalan hediyeler gönderilmez ve sohbette yazılır.
 - **Tekrar eden istek:** Aynı işlem kimliği gelirse ilk sonuç döner. İkinci kez jeton düşülmez, ödül verilmez.
 - **Bütçe:**
   - Her gönderimin bir payı (varsayılan %70) ödül rezervine aktarılır.
   - Rezerv bir paketin en yüksek ödülünü karşılayamazsa ya da günlük ödül limiti dolarsa paket **jeton düşülmeden önce** kapanır.
 - **Ayar sürümü:** Her değişiklik sürümü artırır. Her kayıt, çekildiği olasılık tablosunu ve sürümü saklar.
-- **Limitler:**
-  - Kullanıcı başına günlük gönderim sınırı.
-  - Dakikalık sınır (varsayılan 60; çarkla hızlı tekrar için yükseltildi); aşılırsa istek reddedilir ve şüpheli kaydına düşer.
+- **Gönderim sınırı yok:** Kullanıcı jetonu yettiği kadar Lucky gönderebilir; günlük ya da dakikalık kullanıcı sınırı yoktur.
   - Yaş sınırı 18; kişi kendine Lucky gönderemez.
-- **PK:** Varsayılan olarak yalnızca hediye bedeli PK puanı getirir. Ödülün eklenmesi yönetim panelinden ayrı bir ayarla açılır.
+- **Alıcı ve PK:** Alıcıya hediye değerinin %20'si elmas yazılır (aşağı yuvarlanır). PK'da alıcının (Takım PK'da takımının) puanına da aynı %20 eklenir; gönderenin kazandığı ödül PK'ya hiç sayılmaz. Normal hediyeler değişmedi (tam değer).
 - **Servet puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
 - **Duyuru:** Herhangi bir odada biri kazanç elde edince (Lucky veya Oyun Merkezi) **tüm odalarda** üst ortada ışıltılı bir bant çıkar: "X kazandı! Lucky › Uğur Böceği ×10 · +1.000 jeton · oda adı".
   - Bantlar sırayla gösterilir (en fazla 6 bekler); 30 saniyeden eski duyuru gösterilmez.
