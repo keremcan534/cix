@@ -1,10 +1,13 @@
-// Room menu: grid sections (interactive games, coin games, room tools/settings).
+// Room menu: grid sections (interactive games, coin games, room tools/settings). Icons stand free on their
+// own colored light (fx/float) instead of sitting in boxes; game tiles break out of a lit plate.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { colors, gradientDeep, semantic } from '@/theme';
-import { Icon3D, icon3dFor } from '@/components/Icon3D';
+import { FloatIcon, hueAt } from '@/components/fx/float';
+import { EdgeLight, PressableScale } from '@/components/fx/surface';
+import { icon3dSourceFor } from '@/components/Icon3D';
+import { colors, fonts, semantic } from '@/theme';
 
 export type MenuItem = {
   key: string;
@@ -15,96 +18,116 @@ export type MenuItem = {
   art?: number;
   icon?: keyof typeof Ionicons.glyphMap;
   colors?: [string, string];
+  /** The item's own color (its light and plate); falls back to `colors[0]`, then a color by position. */
+  hue?: string;
   /** small corner tag: on/off state or a ribbon */
   badge?: 'on' | 'off' | 'HOT' | 'NEW' | number;
 };
 export type MenuSection = { title: string; variant: 'round' | 'tile' | 'tool'; items: MenuItem[]; note?: string };
 
+const SHEET = '#111B2E';
+
 export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean; onClose: () => void; sections: MenuSection[] }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Menüyü kapat" />
-      <View style={styles.sheet}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+      <LinearGradient colors={['#1B2944', SHEET]} locations={[0, 0.35]} style={styles.sheet}>
+        <EdgeLight inset={40} strength={0.35} />
+        <View style={styles.handle} />
+        <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           {sections.map((s) => (
-            <View key={s.title} style={{ marginBottom: 6 }}>
+            <View key={s.title} style={{ marginBottom: 10 }}>
               <Text style={styles.title}>{s.title}</Text>
               {s.note && <Text style={styles.note}>{s.note}</Text>}
               <View style={styles.grid}>
-                {s.items.map((it) => (
-                  <Pressable
-                    key={it.key}
-                    style={styles.cell}
-                    accessibilityLabel={it.label}
-                    onPress={() => {
-                      onClose();
-                      it.onPress();
-                    }}>
-                    <Icon item={it} variant={s.variant} />
-                    <Text style={styles.label} numberOfLines={2}>
-                      {it.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                {s.items.map((it, i) => {
+                  const hue = it.hue ?? it.colors?.[0] ?? hueAt(i);
+                  const press = () => {
+                    onClose();
+                    it.onPress();
+                  };
+                  return s.variant === 'tile' ? (
+                    <Tile key={it.key} item={it} hue={hue} index={i} onPress={press} />
+                  ) : (
+                    <View key={it.key} style={styles.cellBox}>
+                    <PressableScale style={styles.cell} accessibilityLabel={it.label} onPress={press}>
+                      <View>
+                        {s.variant === 'tool' ? (
+                          <View style={[styles.tool, { borderColor: `${hue}38` }]}>
+                            <LinearGradient colors={[`${hue}2E`, `${hue}08`]} style={StyleSheet.absoluteFill} />
+                            {it.icon ? <Ionicons name={it.icon} size={24} color={hue} /> : <Text style={{ fontSize: 22 }}>{it.emoji}</Text>}
+                          </View>
+                        ) : (
+                          <FloatIcon source={it.art ?? icon3dSourceFor(it.emoji)} emoji={it.emoji} size={46} hue={hue} />
+                        )}
+                        <Badge badge={it.badge} />
+                      </View>
+                      <Text style={styles.label} numberOfLines={2}>
+                        {it.label}
+                      </Text>
+                    </PressableScale>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           ))}
         </ScrollView>
-      </View>
+      </LinearGradient>
     </Modal>
   );
 }
 
-function Icon({ item, variant }: { item: MenuItem; variant: MenuSection['variant'] }) {
-  const size = variant === 'tile' ? 76 : 62;
-  const radius = variant === 'tile' ? 18 : size / 2;
-  const badge = item.badge;
+/** A game: a low plate lit in the game's color, its icon standing on the plate and over its top edge. */
+function Tile({ item, hue, index, onPress }: { item: MenuItem; hue: string; index: number; onPress: () => void }) {
   return (
-    <View style={{ width: size, height: size }}>
-      {variant === 'tool' ? (
-        <View style={[styles.tool, { width: size, height: size, borderRadius: radius }]}>
-          {item.icon ? <Ionicons name={item.icon} size={28} color="#fff" /> : <Text style={{ fontSize: 26 }}>{item.emoji}</Text>}
-        </View>
-      ) : item.art || icon3dFor(item.emoji) ? (
-        <View style={{ width: size, height: size, borderRadius: radius, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border }}>
-          {item.art ? (
-            <Image source={item.art} style={{ width: variant === 'tile' ? 50 : 40, height: variant === 'tile' ? 50 : 40 }} />
-          ) : (
-            <Icon3D name={icon3dFor(item.emoji)!} size={variant === 'tile' ? 50 : 40} />
-          )}
-        </View>
-      ) : (
-        <LinearGradient colors={item.colors ?? gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, borderRadius: radius, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: variant === 'tile' ? 38 : 30 }}>{item.emoji}</Text>
+    <View style={styles.tileCell}>
+      <PressableScale accessibilityLabel={item.label} onPress={onPress}>
+        <LinearGradient colors={[`${hue}50`, `${hue}10`]} style={[styles.plate, { borderColor: `${hue}55`, boxShadow: `0 6px 16px ${hue}26` }]}>
+          <EdgeLight inset={12} strength={0.45} />
+          <Text style={styles.tileLabel} numberOfLines={1}>
+            {item.label}
+          </Text>
         </LinearGradient>
-      )}
-      {badge === 'on' && (
-        <View style={[styles.state, { backgroundColor: colors.green }]}>
-          <Ionicons name="checkmark" size={12} color={semantic.successInk} />
+        <View style={styles.tileIcon}>
+          <FloatIcon source={item.art ?? icon3dSourceFor(item.emoji)} emoji={item.emoji} size={58} hue={hue} bob delay={index * 230} />
         </View>
-      )}
-      {badge === 'off' && (
-        <View style={[styles.state, { backgroundColor: '#555' }]}>
-          <Ionicons name="close" size={12} color="#fff" />
+        <View style={{ position: 'absolute', top: 4, left: 8 }}>
+          <Badge badge={item.badge} />
         </View>
-      )}
-      {(badge === 'HOT' || badge === 'NEW') && (
-        <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : '#2563EB' }]}>{badge}</Text>
-      )}
-      {typeof badge === 'number' && badge > 0 && <Text style={[styles.ribbon, { backgroundColor: colors.red, left: undefined, right: -4 }]}>{badge}</Text>}
+      </PressableScale>
     </View>
   );
 }
 
+function Badge({ badge }: { badge: MenuItem['badge'] }) {
+  if (badge === 'on' || badge === 'off')
+    return (
+      <View style={[styles.state, { backgroundColor: badge === 'on' ? colors.green : '#555' }]}>
+        <Ionicons name={badge === 'on' ? 'checkmark' : 'close'} size={12} color={badge === 'on' ? semantic.successInk : '#fff'} />
+      </View>
+    );
+  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : '#2563EB' }]}>{badge}</Text>;
+  if (typeof badge === 'number' && badge > 0) return <Text style={[styles.ribbon, { backgroundColor: colors.red, left: undefined, right: -4 }]}>{badge}</Text>;
+  return null;
+}
+
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 12, paddingTop: 18, maxHeight: '78%' },
-  title: { color: '#fff', fontWeight: '800', fontSize: 18, marginLeft: 8, marginBottom: 6 },
-  note: { color: colors.textDim, fontSize: 12, marginLeft: 8, marginBottom: 6 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 12, paddingTop: 10, maxHeight: '78%', borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', marginBottom: 10 },
+  title: { color: '#fff', fontFamily: fonts.display, fontSize: 20, lineHeight: 26, marginLeft: 8, marginBottom: 2 },
+  note: { color: colors.textDim, fontSize: 12, marginLeft: 8, marginBottom: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '25%', alignItems: 'center', gap: 6, paddingVertical: 10 },
-  label: { color: '#fff', fontSize: 12, textAlign: 'center', maxWidth: 84 },
-  tool: { backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
-  state: { position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#24232B' },
+  // PressableScale styles its inner view, so the grid width sits on a plain wrapper.
+  cellBox: { width: '25%' },
+  cell: { alignItems: 'center', gap: 8, paddingVertical: 12 },
+  label: { color: '#E6ECF7', fontSize: 12, textAlign: 'center', maxWidth: 84 },
+  tool: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  tileCell: { width: '33.33%', padding: 5, paddingTop: 24 },
+  plate: { borderRadius: 18, borderWidth: 1, paddingTop: 44, paddingBottom: 10, paddingHorizontal: 6, alignItems: 'center' },
+  tileLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18 },
+  tileIcon: { position: 'absolute', top: -24, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' },
+  state: { position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: SHEET },
   ribbon: { position: 'absolute', top: -6, left: -4, color: '#fff', fontSize: 11, fontWeight: '900', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
 });

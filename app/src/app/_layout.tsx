@@ -1,5 +1,7 @@
+import { Baloo2_700Bold, Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 
 import { ScreenEnter } from '@/components/fx/screen-enter';
@@ -21,6 +23,9 @@ const theme = {
 };
 
 export default function RootLayout() {
+  // The display face (theme `fonts`); a failed load falls back to the system font instead of blocking the app.
+  const [fontsLoaded, fontError] = useFonts({ Display: Baloo2_800ExtraBold, DisplayBold: Baloo2_700Bold });
+  if (!fontsLoaded && !fontError) return null;
   return (
     <AppProvider onReady={hideSplash}>
       <ThemeProvider value={theme}>

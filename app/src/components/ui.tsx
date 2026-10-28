@@ -12,7 +12,7 @@ import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { useApp } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, fonts, gradient, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 
 export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   wealthNum: { fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerTitle: { color: '#fff', fontSize: 20, fontFamily: fonts.display, flex: 1, textAlign: 'center' },
 });
 
 export function Header({ title, right }: { title: string; right?: ReactNode }) {
