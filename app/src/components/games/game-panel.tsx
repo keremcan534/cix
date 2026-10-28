@@ -3,9 +3,10 @@
 // mic button only mirrors and toggles the user's own mic (an explicit user action), and opening,
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { gameArtOf } from '@/components/GameArt';
 import { CasinoPlayer } from '@/components/games/casino';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
@@ -52,16 +53,20 @@ export function GamePanel({
   const casinoGame = open.kind === 'casino' ? casino.find((g) => g.id === open.id) : undefined;
   const title = roomGame?.name ?? casinoGame?.name ?? '';
   const switchable = [
-    ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, label: `${g.emoji} ${g.name}`, go: { kind: 'room', id: g.id } as OpenGame })),
-    ...casino.filter((g) => g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, label: `${g.emoji} ${g.name}`, go: { kind: 'casino', id: g.id } as OpenGame })),
+    ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
+    ...casino.filter((g) => g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = open.kind === 'room' ? `r:${open.id}` : `c:${open.id}`;
+  const titleEmoji = roomGame?.emoji ?? casinoGame?.emoji;
+  const titleArt = gameArtOf(open.id);
 
   const body = (
     <View style={[p.panel, inRoom ? p.sheet : p.full, hidden && { display: 'none' }]}>
       <View style={p.head}>
+        {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
         <Text style={p.title} numberOfLines={1}>
-          {roomGame?.emoji ?? casinoGame?.emoji} {title}
+          {titleArt ? '' : `${titleEmoji} `}
+          {title}
           {casinoGame ? <Text style={p.badge}> Servet Lv.{casinoGame.minWealth}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
         {onMinimize && (
@@ -90,8 +95,9 @@ export function GamePanel({
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
         {switchable.map((s) => (
-          <Pressable key={s.key} onPress={() => onSwitch(s.go)} style={[p.chip, s.key === current && p.chipOn]} accessibilityLabel={`${s.label} oyununa geç`}>
-            <Text style={p.chipText}>{s.label}</Text>
+          <Pressable key={s.key} onPress={() => onSwitch(s.go)} style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]} accessibilityLabel={`${s.name} oyununa geç`}>
+            {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
+            <Text style={p.chipText}>{s.art ? s.name : `${s.emoji} ${s.name}`}</Text>
           </Pressable>
         ))}
       </ScrollView>

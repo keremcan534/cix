@@ -40,10 +40,10 @@ export const CHARM_PERKS: LevelPerk[] = [
   { key: 'badge', title: 'Cazibe rozeti', detail: 'Profilde, odada ve sohbette adının yanında', emoji: '🏅', from: 1, kind: 'privilege' },
   { key: 'rank', title: 'Keşfette öne çıkma', detail: 'Seviyen yükseldikçe önerilerde daha üstte', emoji: '📈', from: 1, kind: 'privilege' },
   { key: 'bonus', title: 'Kazanç bonusu', detail: 'Aldığın hediyelerin elmasına ek', emoji: '💎', from: 6, kind: 'privilege' },
-  { key: 'bubble', title: 'Sohbet balonu', detail: 'Oda sohbetinde seviye renginde balon', emoji: '💬', from: 6, kind: 'costume' },
+  { key: 'bubble', title: 'Sohbet balonu', detail: 'Oda sohbetinde seviye renginde balon', emoji: '💬', art: 'ayricalik-sohbet-balonu', from: 6, kind: 'costume' },
   { key: 'medal', title: 'Cazibe madalyası', detail: 'Profil vitrininde grubunun amblemi', emoji: '🎖️', from: 11, kind: 'costume' },
   { key: 'entry', title: 'Giriş efekti', detail: 'Odaya girişte seviye renginde karşılama', emoji: '✨', from: 11, kind: 'costume' },
   { key: 'wave', title: 'Mikrofon dalgası', detail: 'Konuşurken seviye renginde ses halkası', emoji: '🎙️', from: 16, kind: 'costume' },
-  { key: 'frame', title: 'Profil çerçevesi', detail: 'Grubunun renklerinde avatar çerçevesi', emoji: '🖼️', from: 21, kind: 'costume' },
+  { key: 'frame', title: 'Profil çerçevesi', detail: 'Grubunun renklerinde avatar çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi', from: 21, kind: 'costume' },
   { key: 'ride', title: 'Özel araç', detail: 'Odaya girişte gösterilen araç', emoji: '🛸', from: 31, kind: 'costume' },
 ];

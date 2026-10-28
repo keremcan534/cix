@@ -51,6 +51,7 @@ import {
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { Art, type ArtName } from '@/components/Art';
 
 type Tab = 'wallet' | 'creator' | 'agency' | 'bd';
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -168,7 +169,7 @@ function WalletTab() {
       </LinearGradient>
 
       <View style={styles.grid}>
-        <Stat label="Bonus Kredi" value={`🎟️ ${fmt(BONUS_BALANCE)}`} sub={cashable ? `${pct(rules.bonusCashable)} çekilebilir` : 'Çekilemez · yalnız uygulama içi'} color={colors.primaryText} />
+        <Stat label="Bonus Kredi" art="finans-bonus-kredi" value={fmt(BONUS_BALANCE)} sub={cashable ? `${pct(rules.bonusCashable)} çekilebilir` : 'Çekilemez · yalnız uygulama içi'} color={colors.primaryText} />
         <Stat label="Elmas (ayrı birim)" value={dia(diamonds)} sub={`≈ ${usd(diamonds)} · Yayıncı sekmesi`} color="#7DD3FC" />
       </View>
 
@@ -730,13 +731,23 @@ function MockPayoutRow({ p }: { p: Pick<MockPayout, 'ref' | 'diamonds' | 'time' 
 }
 
 // --- small UI pieces ---------------------------------------------------------------------
-function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+function Stat({ label, value, sub, color, art }: { label: string; value: string; sub?: string; color: string; art?: ArtName }) {
+  const text = (
+    <Text style={[styles.statValue, { color }, art && { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
+      {value}
+    </Text>
+  );
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
-        {value}
-      </Text>
+      {art ? (
+        <View style={styles.statRow}>
+          <Art name={art} size={22} />
+          {text}
+        </View>
+      ) : (
+        text
+      )}
       {sub && <Text style={styles.statSub}>{sub}</Text>}
     </View>
   );
@@ -829,6 +840,7 @@ const styles = StyleSheet.create({
   stat: { flexGrow: 1, flexBasis: '45%', backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 2, borderWidth: 1, borderColor: colors.border },
   statLabel: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   statValue: { fontSize: 17, fontWeight: '900' },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statSub: { color: colors.textDim, fontSize: 12 },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   sectionText: { color: '#fff', fontSize: 15, fontWeight: '800', flexShrink: 1 },

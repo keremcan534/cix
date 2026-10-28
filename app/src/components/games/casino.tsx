@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Art, type ArtName } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import type { CasinoGame } from '@/data/games';
 import { WHEEL } from '@/lib/casino-odds';
@@ -11,18 +12,26 @@ import { casinoAccess, newRequestId, playCasino, useGames, type Entry, type Outc
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
-const PICKS: Partial<Record<CasinoGame['id'], [string, string][]>> = {
+const PICKS: Partial<Record<CasinoGame['id'], [key: string, label: string, art?: ArtName][]>> = {
   dice: [
     ['small', 'Küçük (2–4) · 2.4x'],
     ['big', 'Büyük (10–12) · 2.4x'],
   ],
   dragon: [
-    ['dragon', '🐉 Ejder · 1.5x'],
+    ['dragon', 'Ejder · 1.5x', 'casino-kart-ejder'],
     ['tie', 'Beraberlik · 5.2x'],
-    ['tiger', '🐯 Kaplan · 1.5x'],
+    ['tiger', 'Kaplan · 1.5x', 'casino-kart-kaplan'],
   ],
 };
+/** Lucky 77 reel symbols (lib/casino-odds SLOT) drawn as pictures; "7" stays a glyph. */
+const SLOT_ART: Record<string, ArtName> = { '🍒': 'slot-kiraz', '🍋': 'slot-limon', '🍇': 'slot-uzum', '🔔': 'slot-can' };
+const DIE_ART: ArtName[] = ['zar-zar-yuzu-1', 'zar-zar-yuzu-2', 'zar-zar-yuzu-3', 'zar-zar-yuzu-4', 'zar-zar-yuzu-5', 'zar-zar-yuzu-6'];
+/** The picture for one face of the stage (a slot symbol or a die), if there is one. */
+const faceArt = (gameId: CasinoGame['id'], f: string): ArtName | undefined => (gameId === 'slot' ? SLOT_ART[f] : gameId === 'dice' ? DIE_ART[Number(f) - 1] : undefined);
 const WHEEL_LABELS = WHEEL.map((s) => `${s.mult}x`);
+/** Prize picture per wheel slice, by its multiplier: empty slice "tekrar dene", then growing coin prizes. */
+const wheelArt = (mult: number): ArtName =>
+  mult === 0 ? 'cark-tekrar-dene' : mult < 2 ? 'cark-kucuk-jeton' : mult < 5 ? 'cark-jeton-kesesi' : mult < 10 ? 'cark-elmas-odul' : mult < 20 ? 'cark-roket-odul' : 'cark-buyuk-odul';
 
 export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entry: Entry }) {
   const { wealthLevel, coins, gameCoins } = useApp();
@@ -87,8 +96,9 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
       )}
       {PICKS[gameId] && (
         <View style={c.row}>
-          {PICKS[gameId]!.map(([k, l]) => (
+          {PICKS[gameId]!.map(([k, l, art]) => (
             <Pressable key={k} onPress={() => setPick(k)} style={[c.chip, pick === k && c.chipOn]} accessibilityLabel={l}>
+              {art && <Art name={art} size={17} />}
               <Text style={c.chipText}>{l}</Text>
             </Pressable>
           ))}
@@ -132,6 +142,7 @@ function Stage({ gameId, outcome, spin, busy }: { gameId: CasinoGame['id']; outc
           {WHEEL_LABELS.map((l, i) => (
             <View key={l} style={[StyleSheet.absoluteFill, { alignItems: 'center', transform: [{ rotate: `${i * 45 + 22.5}deg` }] }]}>
               <Text style={[c.wheelLabel, { color: i % 2 ? colors.gold : semantic.action }]}>{l}</Text>
+              <Art name={wheelArt(WHEEL[i].mult)} size={20} />
             </View>
           ))}
           <Icon3D name="wheel" size={70} style={{ position: 'absolute', top: 55, left: 55 }} />
@@ -142,12 +153,20 @@ function Stage({ gameId, outcome, spin, busy }: { gameId: CasinoGame['id']; outc
   const faces = outcome?.display ?? (gameId === 'slot' ? ['7', '7', '7'] : gameId === 'dragon' ? ['?', '?'] : ['?', '?']);
   return (
     <Animated.View style={[c.row, { transform: [{ scale: spin.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.9, 1] }) }] }]}>
-      {faces.map((f, i) => (
-        <View key={i} style={[c.face, gameId === 'dragon' && c.cardFace]}>
-          {gameId === 'dragon' && <Text style={c.dim}>{i === 0 ? '🐉 Ejder' : '🐯 Kaplan'}</Text>}
-          <Text style={c.faceText}>{busy ? '…' : f}</Text>
-        </View>
-      ))}
+      {faces.map((f, i) => {
+        const art = busy ? undefined : faceArt(gameId, f);
+        return (
+          <View key={i} style={[c.face, gameId === 'dragon' && c.cardFace]}>
+            {gameId === 'dragon' && (
+              <View style={{ alignItems: 'center', gap: 2 }}>
+                <Art name={i === 0 ? 'casino-kart-ejder' : 'casino-kart-kaplan'} size={28} />
+                <Text style={c.dim}>{i === 0 ? 'Ejder' : 'Kaplan'}</Text>
+              </View>
+            )}
+            {art ? <Art name={art} size={44} /> : <Text style={c.faceText}>{busy ? '…' : f}</Text>}
+          </View>
+        );
+      })}
     </Animated.View>
   );
 }

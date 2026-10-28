@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { Card, GradientButton, Header } from '@/components/ui';
 import { FAQ, TICKET_CATEGORIES, type TicketCategory } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
@@ -96,7 +97,7 @@ export default function SupportScreen() {
                 <Text style={styles.heroSub}>Merhaba, size nasıl yardımcı olabilirim?</Text>
               </View>
               <LinearGradient colors={gradientDeep} style={styles.bot}>
-                <Text style={{ fontSize: 30 }}>😉</Text>
+                <Art name="maskot-destek-botu" size={38} />
               </LinearGradient>
             </View>
 

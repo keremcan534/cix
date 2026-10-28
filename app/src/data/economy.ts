@@ -1,3 +1,4 @@
+import type { ArtName } from '@/components/Art';
 import { USERS, type User } from '@/data/mock';
 
 // --- Rates -----------------------------------------------------------------
@@ -23,7 +24,9 @@ export const hostLevel = (totalDiamonds: number) => {
 // --- VIP 1–15 ---------------------------------------------------------------
 // Titles/perks follow the product spec (our design, not a competitor's official table).
 // Perks are cumulative: each level includes everything below it.
-export type VipTier = { level: number; name: string; emoji: string; price: number; color: readonly [string, string]; perk: string };
+export type VipTier = { level: number; name: string; emoji: string; art: ArtName; price: number; color: readonly [string, string]; perk: string };
+/** 3D badge per VIP level (index = level - 1); `emoji` stays as the text fallback. */
+const VIP_ART: ArtName[] = ['vip-01-uye', 'vip-02-bronz', 'vip-03-gumus', 'vip-04-altin', 'vip-05-platin', 'vip-06-safir', 'vip-07-yakut', 'vip-08-zumrut', 'vip-09-elmas', 'vip-10-usta', 'vip-11-asil', 'vip-12-lord', 'vip-13-kont', 'vip-14-duk', 'vip-15-imparator'];
 const VIP_DEFS: [string, string, number, string, string, string][] = [
   ['Üye', '🔰', 100, '#64748B', '#94A3B8', 'VIP rozeti'],
   ['Bronz', '🥉', 300, '#B45309', '#D97706', 'İsim rengi'],
@@ -41,7 +44,7 @@ const VIP_DEFS: [string, string, number, string, string, string][] = [
   ['Dük', '👑', 35_000, '#D97706', '#FDE047', 'Nadir kozmetik seçenekleri'],
   ['İmparator', '🦁', 50_000, '#DC2626', '#F97316', 'En üst VIP rozeti ve özel tema'],
 ];
-export const VIP_TIERS: VipTier[] = VIP_DEFS.map(([name, emoji, price, c1, c2, perk], i) => ({ level: i + 1, name, emoji, price, color: [c1, c2] as const, perk }));
+export const VIP_TIERS: VipTier[] = VIP_DEFS.map(([name, emoji, price, c1, c2, perk], i) => ({ level: i + 1, name, emoji, art: VIP_ART[i], price, color: [c1, c2] as const, perk }));
 export const vipTier = (level: number) => VIP_TIERS.find((t) => t.level === level);
 export const vipPerks = (level: number) => VIP_TIERS.filter((t) => t.level <= level).map((t) => t.perk);
 export const VIP_ENTRY_LEVEL = 4; // entry banner unlocks at Altın
@@ -61,12 +64,12 @@ export const charmLevel = (diamonds: number) => levelFrom(diamonds, 200);
 export const CHECKIN_REWARDS = [10, 15, 20, 30, 40, 50, 100];
 
 export type TaskKey = 'roomMinutes' | 'giftsSent' | 'greetings' | 'moments' | 'calls';
-export const TASKS: { id: string; key: TaskKey; title: string; goal: number; reward: number; icon: string }[] = [
-  { id: 't1', key: 'roomMinutes', title: 'Bir odada 5 dakika kal', goal: 5, reward: 20, icon: '🎙️' },
-  { id: 't2', key: 'giftsSent', title: '3 hediye gönder', goal: 3, reward: 30, icon: '🎁' },
-  { id: 't3', key: 'greetings', title: '5 kişiye selam ver', goal: 5, reward: 15, icon: '👋' },
-  { id: 't4', key: 'moments', title: '1 an paylaş', goal: 1, reward: 10, icon: '📸' },
-  { id: 't5', key: 'calls', title: '1 görüntülü arama yap', goal: 1, reward: 25, icon: '📹' },
+export const TASKS: { id: string; key: TaskKey; title: string; goal: number; reward: number; icon: string; art?: ArtName }[] = [
+  { id: 't1', key: 'roomMinutes', title: 'Bir odada 5 dakika kal', goal: 5, reward: 20, icon: '🎙️', art: 'gorev-bir-odada-5-dakika-kal' },
+  { id: 't2', key: 'giftsSent', title: '3 hediye gönder', goal: 3, reward: 30, icon: '🎁', art: 'gorev-3-hediye-gonder' },
+  { id: 't3', key: 'greetings', title: '5 kişiye selam ver', goal: 5, reward: 15, icon: '👋', art: 'gorev-5-kisiye-selam-ver' },
+  { id: 't4', key: 'moments', title: '1 an paylaş', goal: 1, reward: 10, icon: '📸', art: 'gorev-1-an-paylas' },
+  { id: 't5', key: 'calls', title: '1 görüntülü arama yap', goal: 1, reward: 25, icon: '📹', art: 'gorev-1-goruntulu-arama-yap' },
 ];
 
 // --- Lucky wheel -------------------------------------------------------------

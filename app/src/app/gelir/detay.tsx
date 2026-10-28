@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EarningRow } from '@/app/gelir/index';
+import { Art } from '@/components/Art';
 import { Card } from '@/components/ui';
 import { GIFTS, userById } from '@/data/mock';
 import { usd } from '@/data/rules';
@@ -194,7 +195,7 @@ function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () 
 function Empty({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.empty}>
-      <Text style={{ fontSize: 56 }}>🦭</Text>
+      <Art name="maskot-bos-durum-maskotu" size={72} />
       <Text style={[styles.dim, { fontSize: 15 }]}>Veri yok</Text>
       <Text style={[styles.dim, { textAlign: 'center' }]}>Lütfen Yeniden Dene butonuna tıklayın{'\n'}veya listeyi aşağı çekerek yenileyin</Text>
       <Pressable onPress={onRetry} style={styles.retry}>

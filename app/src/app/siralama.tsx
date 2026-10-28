@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, type ArtName } from '@/components/Art';
 import { Avatar, Header } from '@/components/ui';
 import { LEADERBOARDS } from '@/data/economy';
 import { AGENCIES } from '@/data/agency';
@@ -11,12 +12,12 @@ import { ROOMS, USERS, type User } from '@/data/mock';
 import { colors } from '@/theme';
 
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
-const BOARDS: { key: Board; label: string; unit: string; how: string }[] = [
-  { key: 'zengin', label: '💰 Zenginler', unit: '🪙', how: 'Geçerli hediye harcaması' },
-  { key: 'yayinci', label: '🎙️ Yayıncılar', unit: '💎', how: 'Alınan geçerli hediyeler (elmas)' },
-  { key: 'oda', label: '🔥 Odalar', unit: '👥', how: 'Tekil katılımcı' },
-  { key: 'ajans', label: '🏢 Ajanslar', unit: '💎', how: 'Ajans yayıncılarının toplam geçerli kazancı' },
-  { key: 'odaxp', label: '⭐ Oda XP', unit: 'XP', how: 'Doğrulanmış oda deneyim puanı' },
+const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: string; how: string }[] = [
+  { key: 'zengin', label: 'Zenginler', emoji: '💰', art: 'siralama-zenginler', unit: '🪙', how: 'Geçerli hediye harcaması' },
+  { key: 'yayinci', label: 'Yayıncılar', emoji: '🎙️', art: 'siralama-yayincilar', unit: '💎', how: 'Alınan geçerli hediyeler (elmas)' },
+  { key: 'oda', label: 'Odalar', emoji: '🔥', art: 'siralama-odalar', unit: '👥', how: 'Tekil katılımcı' },
+  { key: 'ajans', label: 'Ajanslar', emoji: '🏢', art: 'siralama-ajanslar', unit: '💎', how: 'Ajans yayıncılarının toplam geçerli kazancı' },
+  { key: 'odaxp', label: 'Oda XP', emoji: '⭐', art: 'siralama-oda-xp', unit: 'XP', how: 'Doğrulanmış oda deneyim puanı' },
 ];
 const PERIOD_RANGE = { daily: '24 Ekim 2026', weekly: '19–25 Ekim 2026', monthly: '1–31 Ekim 2026' } as const;
 
@@ -50,8 +51,9 @@ export default function Leaderboard() {
       <Header title="Sıralama" />
       <View style={styles.tabs}>
         {BOARDS.map((b) => (
-          <Pressable key={b.key} onPress={() => setBoard(b.key)} style={[styles.tab, board === b.key && styles.tabActive]}>
-            <Text style={[styles.tabText, board === b.key && { color: '#fff' }]}>{b.label}</Text>
+          <Pressable key={b.key} onPress={() => setBoard(b.key)} style={[styles.tab, board === b.key && styles.tabActive]} accessibilityLabel={b.label}>
+            {b.art && <Art name={b.art} size={17} />}
+            <Text style={[styles.tabText, board === b.key && { color: '#fff' }]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
           </Pressable>
         ))}
       </View>
@@ -94,13 +96,17 @@ export default function Leaderboard() {
   );
 }
 
-const MEDAL = { 1: { emoji: '🥇', color: '#FBBF24', size: 84 }, 2: { emoji: '🥈', color: '#CBD5E1', size: 68 }, 3: { emoji: '🥉', color: '#F59E0B', size: 68 } } as const;
+const MEDAL = {
+  1: { emoji: '🥇', art: 'derece-1', color: '#FBBF24', size: 84 },
+  2: { emoji: '🥈', art: 'derece-2', color: '#CBD5E1', size: 68 },
+  3: { emoji: '🥉', art: 'derece-3', color: '#F59E0B', size: 68 },
+} as const satisfies Record<1 | 2 | 3, { emoji: string; art: ArtName; color: string; size: number }>;
 
 function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; unit: string; onPress: () => void }) {
   const m = MEDAL[place];
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1, gap: 4, marginTop: place === 1 ? 0 : 28 }}>
-      <Text style={{ fontSize: 26 }}>{m.emoji}</Text>
+      <Art name={m.art} size={33} />
       <Image source={{ uri: row.avatar }} style={{ width: m.size, height: m.size, borderRadius: m.size / 2, borderWidth: 3, borderColor: m.color }} />
       <Text style={styles.podiumName} numberOfLines={1}>
         {row.name}
@@ -115,7 +121,7 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
 const styles = StyleSheet.create({
   how: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
   tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, flexWrap: 'wrap' },
-  tab: { flexGrow: 1, paddingVertical: 9, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
+  tab: { flexGrow: 1, flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 9, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   periods: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingVertical: 12 },

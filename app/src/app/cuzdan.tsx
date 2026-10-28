@@ -13,6 +13,7 @@ import { colors } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
+import { Art } from '@/components/Art';
 
 export default function WalletScreen() {
   const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp, addCoins } = useApp();
@@ -111,7 +112,7 @@ export default function WalletScreen() {
             <LinearGradient colors={['#78350F', '#0B3B4A', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
               <Text style={styles.bannerTitle}>SVIP Sistemi</Text>
               <Text style={{ color: '#FDE7C7', fontSize: 12 }}>{svipLevel ? `SVIP${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Her yüklenen jeton = 1 deneyim puanı'}</Text>
-              <Text style={{ position: 'absolute', right: 16, top: 14, fontSize: 40 }}>👑💎</Text>
+              <Art name="finans-vip-elmas-paketi" size={52} style={{ position: 'absolute', right: 16, top: 8 }} />
             </LinearGradient>
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
@@ -125,7 +126,12 @@ export default function WalletScreen() {
               return (
                 <Pressable key={p.id} onPress={() => buy(p)} accessibilityLabel={`${p.coins} jeton paketi`} style={{ width: '31.3%', margin: '1%' }}>
                   <LinearGradient colors={first ? ['#FB923C', '#F97316'] : ['#2A2433', '#1E1A26']} style={[styles.pack, processing === p.id && { opacity: 0.5 }]}>
-                    {first && <Text style={styles.firstTag}>🔥 Sadece İlk Defa</Text>}
+                    {first && (
+                      <View style={styles.firstTag}>
+                        <Art name="finans-ilk-alim-firsati" size={14} />
+                        <Text style={styles.firstTagText}>Sadece İlk Defa</Text>
+                      </View>
+                    )}
                     <Icon3D name="coin" size={40} />
                     <Text style={styles.packCoins}>{p.coins.toLocaleString('tr-TR')}</Text>
                     {bonus ? <Text style={[styles.packBonus, first && { color: '#FFF7ED' }]}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
@@ -162,7 +168,8 @@ const styles = StyleSheet.create({
   banner: { marginHorizontal: 16, borderRadius: 14, padding: 16, gap: 4, overflow: 'hidden' },
   bannerTitle: { color: '#FDE68A', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   flag: { color: '#fff', backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, overflow: 'hidden' },
-  firstTag: { position: 'absolute', top: -8, left: 4, backgroundColor: '#DC2626', color: '#FDE68A', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  firstTag: { position: 'absolute', top: -8, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#DC2626', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  firstTagText: { color: '#FDE68A', fontSize: 11, fontWeight: '800' },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
   packSelected: { borderColor: colors.primaryText },
   bonus: {

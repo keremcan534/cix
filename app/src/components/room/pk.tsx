@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Art, type ArtName } from '@/components/Art';
 import { roomById, userById } from '@/data/mock';
 import {
   PK_DURATIONS,
@@ -141,8 +142,8 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
             <>
               <Text style={st.label}>PK modu</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <ModeCard on={mode === 'solo'} off={soloOff} emoji="🎤" title="Normal PK" sub="Herkes kendi adına · mikrofon düzeni değişmez" onPress={() => setMode('solo')} />
-                <ModeCard on={mode === 'team'} off={teamOff} emoji="⚔️" title="Takım PK" sub="Kırmızı vs Mavi · alan ikiye ayrılır" onPress={() => setMode('team')} />
+                <ModeCard on={mode === 'solo'} off={soloOff} emoji="🎤" art="pk-normal-pk" title="Normal PK" sub="Herkes kendi adına · mikrofon düzeni değişmez" onPress={() => setMode('solo')} />
+                <ModeCard on={mode === 'team'} off={teamOff} emoji="⚔️" art="pk-takim-pk" title="Takım PK" sub="Kırmızı vs Mavi · alan ikiye ayrılır" onPress={() => setMode('team')} />
               </View>
             </>
           )}
@@ -177,11 +178,12 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               <View style={st.chips}>
                 {(
                   [
-                    ['random', '🔀 Rastgele'],
-                    ['manual', '✋ Manuel'],
+                    ['random', 'Rastgele', 'pk-rastgele-dagit'],
+                    ['manual', 'Manuel', 'pk-manuel-dagit'],
                   ] as const
-                ).map(([k, l]) => (
-                  <Pressable key={k} onPress={() => setMethod(k)} style={[st.chip, method === k && st.chipOn]} accessibilityRole="radio" aria-checked={method === k}>
+                ).map(([k, l, art]) => (
+                  <Pressable key={k} onPress={() => setMethod(k)} style={[st.chip, st.artRow, method === k && st.chipOn]} accessibilityRole="radio" aria-checked={method === k}>
+                    <Art name={art} size={17} />
                     <Text style={st.chipText}>{l}</Text>
                   </Pressable>
                 ))}
@@ -193,7 +195,10 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                     {draft.out.length > 0 && <Text style={st.dim}>Takımlar doldu, bu PK’ya katılmayacak: {draft.out.map(nameOf).join(', ')}</Text>}
                     {draftStale && <Notice icon="alert-circle-outline" text="Mikrofondaki kişiler değişti. Takımları yeniden karıştır." warn />}
                     <Pressable style={st.secondary} onPress={draw} accessibilityLabel="Takımları yeniden karıştır">
-                      <Text style={st.secondaryText}>🔀 Yeniden karıştır</Text>
+                      <View style={st.artRow}>
+                        <Art name="pk-rastgele-dagit" size={18} />
+                        <Text style={st.secondaryText}>Yeniden karıştır</Text>
+                      </View>
                     </Pressable>
                   </>
                 ) : (
@@ -281,10 +286,10 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   );
 }
 
-function ModeCard({ on, off, emoji, title, sub, onPress }: { on: boolean; off: boolean; emoji: string; title: string; sub: string; onPress: () => void }) {
+function ModeCard({ on, off, emoji, art, title, sub, onPress }: { on: boolean; off: boolean; emoji: string; art?: ArtName; title: string; sub: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={[st.modeCard, on && st.modeOn, off && { opacity: 0.45 }]} accessibilityRole="radio" aria-checked={on} aria-disabled={off} accessibilityLabel={`${title}. ${sub}${off ? '. Şu an kapalı' : ''}`}>
-      <Text style={{ fontSize: 26 }}>{emoji}</Text>
+      {art ? <Art name={art} size={33} /> : <Text style={{ fontSize: 26 }}>{emoji}</Text>}
       <Text style={st.modeTitle}>{title}</Text>
       <Text style={st.modeSub}>{off ? 'Şu an kapalı' : sub}</Text>
     </Pressable>
@@ -341,7 +346,10 @@ export function SoloBoard({ pk, canManage }: { pk: PkSession; canManage: boolean
     <>
       <Pressable style={st.board} onPress={() => setOpen(true)} accessibilityLabel={`Normal PK, ${clockText(pk, now)}. Sıralamayı aç`}>
         <View style={st.boardTop}>
-          <Text style={[st.teamName, { color: colors.gold }]}>🎤 Normal PK</Text>
+          <View style={[st.artRow, { flex: 1 }]}>
+            <Art name="pk-normal-pk" size={17} />
+            <Text style={[st.teamName, { color: colors.gold }]}>Normal PK</Text>
+          </View>
           <View style={st.timer}>
             <Text style={st.timerText}>{clockText(pk, now)}</Text>
           </View>
@@ -353,7 +361,7 @@ export function SoloBoard({ pk, canManage }: { pk: PkSession; canManage: boolean
           ) : (
             top.map((r, i) => (
               <View key={r.userId} style={st.soloChip}>
-                <Text style={st.soloRank}>{['🥇', '🥈', '🥉'][i]}</Text>
+                <Art name={(['derece-1', 'derece-2', 'derece-3'] as const)[i]} size={15} />
                 <Image source={{ uri: userById(r.userId).avatar }} style={st.mini} />
                 <Text style={st.soloName} numberOfLines={1}>
                   {nameOf(r.userId)}
@@ -392,16 +400,19 @@ export function PkBoard({ pk, viewerRoomId, canManage }: { pk: PkSession; viewer
 }
 
 /** Shared score bar and timer; `teamColors` colours the side labels (room names in a cross-room PK). */
-function ScoreBar({ pk, now, left, right, teamColors }: { pk: PkSession; now: number; left: string; right: string; teamColors?: boolean }) {
+function ScoreBar({ pk, now, left, leftArt, right, teamColors }: { pk: PkSession; now: number; left: string; leftArt?: ArtName; right: string; teamColors?: boolean }) {
   const [red, blue] = pk.teams;
   const total = red.score + blue.score;
   const ratio = total === 0 ? 0.5 : red.score / total;
   return (
     <>
       <View style={st.boardTop}>
-        <Text style={[st.teamName, { color: teamColors ? red.color : colors.text }]} numberOfLines={1}>
-          {left}
-        </Text>
+        <View style={[st.artRow, { flex: 1 }]}>
+          {leftArt && <Art name={leftArt} size={17} />}
+          <Text style={[st.teamName, { color: teamColors ? red.color : colors.text }]} numberOfLines={1}>
+            {left}
+          </Text>
+        </View>
         <View style={st.timer}>
           <Text style={st.timerText}>{clockText(pk, now)}</Text>
         </View>
@@ -455,7 +466,7 @@ export function TeamArena({
     <>
       <View style={st.arena}>
         <Pressable onPress={() => setOpen(true)} accessibilityLabel="Takım PK ayrıntıları" style={{ gap: 6 }}>
-          <ScoreBar pk={pk} now={now} left="⚔️ Takım PK" right="Ayrıntılar ›" />
+          <ScoreBar pk={pk} now={now} left="Takım PK" leftArt="pk-takim-pk" right="Ayrıntılar ›" />
         </Pressable>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {pk.teams.map((t) => {
@@ -465,9 +476,12 @@ export function TeamArena({
             return (
               <View key={t.id} style={[st.half, { backgroundColor: `${t.color}22`, borderColor: `${t.color}88` }]} accessibilityLabel={`${t.name}: ${fmt(t.score)} puan, ${t.members.length} kişi`}>
                 <View style={st.halfHead}>
-                  <Text style={[st.halfName, { color: t.color }]} numberOfLines={1}>
-                    {t.id === 'red' ? '🔴' : '🔵'} {t.name}
-                  </Text>
+                  <View style={[st.artRow, { flexShrink: 1, gap: 3 }]}>
+                    <Art name={t.id === 'red' ? 'pk-kirmizi-takim' : 'pk-mavi-takim'} size={15} />
+                    <Text style={[st.halfName, { color: t.color }]} numberOfLines={1}>
+                      {t.name}
+                    </Text>
+                  </View>
                   <Text style={st.halfScore}>{fmt(t.score)}</Text>
                 </View>
                 <View style={st.halfSeats}>{onMic.map((m) => <View key={m}>{renderSeat(seats.indexOf(m), { width: slotW, size })}</View>)}</View>
@@ -653,6 +667,7 @@ const st = StyleSheet.create({
   inviteText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   board: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(8,15,30,0.78)', borderRadius: 14, padding: 8, gap: 6, borderWidth: 1, borderColor: colors.border },
   boardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  artRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   teamName: { flex: 1, fontWeight: '900', fontSize: 13 },
   timer: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   timerText: { color: colors.gold, fontWeight: '900', fontSize: 12, fontVariant: ['tabular-nums'] },
@@ -661,7 +676,6 @@ const st = StyleSheet.create({
   boardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   soloRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   soloChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 999, paddingRight: 8, paddingLeft: 4, paddingVertical: 2, maxWidth: '32%' },
-  soloRank: { fontSize: 12 },
   soloName: { color: colors.text, fontSize: 12, fontWeight: '700', flexShrink: 1 },
   soloPts: { color: colors.gold, fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   mini: { width: 20, height: 20, borderRadius: 10, marginRight: -4, borderWidth: 1, borderColor: colors.bg },

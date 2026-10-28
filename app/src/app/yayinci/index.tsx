@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, type ArtName } from '@/components/Art';
 import { Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { hostLevel } from '@/data/economy';
@@ -16,11 +17,14 @@ import { colors, gradient, gradientDeep } from '@/theme';
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
 
-const PERKS = [
-  { icon: '🎁', title: 'Hediyelerden kazan', text: 'Gelen her hediye elmasa dönüşür.' },
-  { icon: '📹', title: 'Ücretli aramalar', text: 'Görüntülü aramalarda dakika başı kazan.' },
-  { icon: '🏦', title: 'Haftalık ödeme', text: 'Elmaslarını banka hesabına çek.' },
+const PERKS: { icon: string; art?: ArtName; title: string; text: string }[] = [
+  { icon: '🎁', art: 'finans-hediyelerden-kazan', title: 'Hediyelerden kazan', text: 'Gelen her hediye elmasa dönüşür.' },
+  { icon: '📹', art: 'finans-ucretli-aramalar', title: 'Ücretli aramalar', text: 'Görüntülü aramalarda dakika başı kazan.' },
+  { icon: '🏦', art: 'finans-haftalik-odeme-banka', title: 'Haftalık ödeme', text: 'Elmaslarını banka hesabına çek.' },
 ];
+
+/** The picture for an earning row by its source; other sources keep the emoji. */
+const EARNING_ART: Partial<Record<string, ArtName>> = { Hediye: 'finans-hediyelerden-kazan', Arama: 'finans-ucretli-aramalar' };
 
 export default function HostCenter() {
   const { isHost, becomeHost, me } = useApp();
@@ -37,7 +41,7 @@ export default function HostCenter() {
           </LinearGradient>
           {PERKS.map((p) => (
             <Card key={p.title} style={styles.perk}>
-              <Text style={{ fontSize: 28 }}>{p.icon}</Text>
+              {p.art ? <Art name={p.art} size={36} /> : <Text style={{ fontSize: 28 }}>{p.icon}</Text>}
               <View style={{ flex: 1 }}>
                 <Text style={styles.perkTitle}>{p.title}</Text>
                 <Text style={styles.dim}>{p.text}</Text>
@@ -101,7 +105,14 @@ function Dashboard() {
         </LinearGradient>
 
         <View style={[styles.affil, { borderColor: agency ? colors.green : colors.gold }]}>
-          <Text style={{ color: '#fff', fontWeight: '800' }}>{agency ? `🏢 Ajans: ${agency.name}` : '🏛️ Ajanssız yayıncı'}</Text>
+          {agency ? (
+            <Text style={{ color: '#fff', fontWeight: '800' }}>{`🏢 Ajans: ${agency.name}`}</Text>
+          ) : (
+            <View style={styles.titleRow}>
+              <Art name="finans-ajanssiz-yayinci" size={20} />
+              <Text style={{ color: '#fff', fontWeight: '800' }}>Ajanssız yayıncı</Text>
+            </View>
+          )}
           <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
             {agency
               ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmaz ve çekim yapmazsan ajanstan düşer, yönetim hesabına aktarılırsın. Kazancın etkilenmez.`
@@ -170,7 +181,7 @@ function Dashboard() {
           ) : (
             earnings.slice(0, 15).map((e) => (
               <View key={e.id} style={styles.earning}>
-                <Text style={{ fontSize: 18 }}>{e.source === 'Hediye' ? '🎁' : e.source === 'Arama' ? '📹' : '⭐'}</Text>
+                {EARNING_ART[e.source] ? <Art name={EARNING_ART[e.source]!} size={23} /> : <Text style={{ fontSize: 18 }}>⭐</Text>}
                 <Text style={{ color: '#fff', flex: 1 }}>
                   {e.source}
                   {e.fromId ? ` · ${userById(e.fromId).name}` : ''}
@@ -208,7 +219,10 @@ function Analytics() {
   ];
   return (
     <Card style={{ gap: 8 }}>
-      <Text style={styles.cardTitle}>📈 Yayıncı analizi (bu hafta)</Text>
+      <View style={styles.titleRow}>
+        <Art name="finans-yayinci-analizi" size={20} />
+        <Text style={styles.cardTitle}>Yayıncı analizi (bu hafta)</Text>
+      </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {metrics.map(([l, v]) => (
           <View key={l} style={styles.metric}>
@@ -264,6 +278,7 @@ const styles = StyleSheet.create({
   balanceBtnText: { color: '#fff', fontWeight: '700' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   track: { height: 8, borderRadius: 4, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 150 },
