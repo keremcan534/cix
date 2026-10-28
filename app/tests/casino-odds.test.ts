@@ -14,7 +14,7 @@ describe('Kasa kuralı: %60 kasa, %40 dağıtım', () => {
     assert.equal(CASINO_HOUSE_SHARE + CASINO_RETURN_SHARE, 1);
   });
 
-  test('her oyun ve her seçimde beklenen geri ödeme %40 (Dragon Tiger kenar seçimleri en fazla 0,1 puan altında)', () => {
+  test('her oyun ve her seçimde beklenen geri ödeme %40 (Dragon Tiger kenar seçimleri ve Altın Kasa en fazla 0,1 puan altında)', () => {
     for (const g of GAMES)
       for (const p of PICKS[g]) {
         const r = expectedReturn(g, p);

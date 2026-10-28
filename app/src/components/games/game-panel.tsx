@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameArtOf } from '@/components/GameArt';
 import { CasinoPlayer } from '@/components/games/casino';
+import { FortunePlayer } from '@/components/games/fortune';
 import { OkeyTable } from '@/components/games/okey';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
@@ -125,7 +126,7 @@ export function GamePanel({
           ) : (
             <Text style={p.dim}>{roomGame.name} için sağlayıcı entegrasyonu bekleniyor. Katalogda görünür, sağlayıcı bağlanınca bu alanda açılır.</Text>
           ))}
-        {casinoGame && <CasinoPlayer key={casinoGame.id} gameId={casinoGame.id} entry={entry} />}
+        {casinoGame && (casinoGame.id === 'fortune' ? <FortunePlayer entry={entry} /> : <CasinoPlayer key={casinoGame.id} gameId={casinoGame.id} entry={entry} />)}
         <View style={p.volume}>
           <Text style={p.dim}>Oyun sesi</Text>
           {VOLUMES.map(([v, l]) => (

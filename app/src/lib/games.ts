@@ -15,7 +15,7 @@ import { useSyncExternalStore } from 'react';
 import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data/games';
 import { ME } from '@/data/mock';
 import { announceWin } from '@/lib/broadcast';
-import { CASINO_HOUSE_SHARE, DRAWS, DUEL_MULT, PICKS, duelMultiplier, evaluate, maxMultiplier, splitStake, type Outcome } from '@/lib/casino-odds';
+import { CASINO_HOUSE_SHARE, DUEL_MULT, PICKS, duelMultiplier, maxMultiplier, outcomeOf, splitStake, type Outcome } from '@/lib/casino-odds';
 import { today } from '@/lib/persist';
 
 export type Entry = { from: 'profile' } | { from: 'room'; roomId: string; roomTitle: string };
@@ -166,7 +166,7 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
     return finish({ ok: false, reason: 'Sağlayıcı yanıt vermedi; jetonun iade edildi. Oda ve sesli sohbetin etkilenmedi.', row: { ...base, txId: id, payout: bet, status: 'İade edildi', detail: 'Sağlayıcı hatası' } });
   }
   book(bet);
-  const outcome = evaluate(game.id, pick, DRAWS[game.id].map(rnd));
+  const outcome = outcomeOf(game.id, pick, rnd);
   const payout = Math.floor(bet * outcome.multiplier);
   if (payout > 0) {
     payFromPool(payout);

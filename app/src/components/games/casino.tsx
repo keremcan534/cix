@@ -61,19 +61,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
     });
   };
 
-  if (!access.ok) {
-    return (
-      <View style={c.lock}>
-        <Text style={{ fontSize: 44 }}>🔒</Text>
-        <Text style={c.lockText}>{access.reason}</Text>
-        {access.needWealth && (
-          <Pressable style={c.btn} onPress={() => router.push('/seviye')}>
-            <Text style={c.btnText}>Servet Seviyemi gör</Text>
-          </Pressable>
-        )}
-      </View>
-    );
-  }
+  if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
   const outcome = result?.ok ? result.outcome : null;
   return (
@@ -124,6 +112,21 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
       {lastReq && !busy && (
         <Pressable onPress={() => play(lastReq)} accessibilityLabel="Aynı isteği tekrar gönder">
           <Text style={c.test}>Test: aynı isteği tekrar gönder (bağlantı tekrarı)</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+/** Shown instead of a casino game when access is refused (e.g. Servet Seviyesi too low). */
+export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?: number }) {
+  return (
+    <View style={c.lock}>
+      <Text style={{ fontSize: 44 }}>🔒</Text>
+      <Text style={c.lockText}>{reason}</Text>
+      {needWealth && (
+        <Pressable style={c.btn} onPress={() => router.push('/seviye')}>
+          <Text style={c.btnText}>Servet Seviyemi gör</Text>
         </Pressable>
       )}
     </View>

@@ -30,6 +30,7 @@ const HUE: Record<string, string> = {
   dice: '#FF6576',
   slot: '#F6BD60',
   dragon: '#4ADE80',
+  fortune: '#FACC15',
   ludo: '#60A5FA',
   okey: '#F6BD60',
   cards: '#F472B6',

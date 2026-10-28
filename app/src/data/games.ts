@@ -27,7 +27,7 @@ export type RoomGame = {
 };
 
 export type CasinoGame = {
-  id: 'wheel' | 'dice' | 'slot' | 'dragon';
+  id: 'wheel' | 'dice' | 'slot' | 'dragon' | 'fortune';
   name: string;
   emoji: string;
   provider: string;
@@ -112,4 +112,19 @@ export const CASINO_GAMES: CasinoGame[] = [
   { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: true, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 10–12 "Büyük", 2–4 "Küçük" kazandırır (2.4x); 5–9 gelirse kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
   { id: 'slot', name: 'Lucky 77', emoji: '🎰', provider: 'Sağlayıcı (araştırılıyor)', active: true, minWealth: 2, fromProfile: true, fromRoom: false, bets: [10, 50, 100], dailyLimit: 3000, rules: '3 makara. Üç 7 = 30x, üç aynı meyve = 5x. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
   { id: 'dragon', name: 'Dragon Tiger', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: true, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
+  {
+    id: 'fortune',
+    name: 'Altın Kasa',
+    emoji: '🏦',
+    provider: 'Yerleşik (sunucu RNG)',
+    active: true,
+    minWealth: 2,
+    fromProfile: true,
+    fromRoom: true,
+    bets: [10, 20, 50, 100],
+    dailyLimit: 5000,
+    rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 💰 Servet her sembolün yerine geçer (Kasa hariç). 3 veya daha fazla 🏦 Kasa 8 bedava dönüş verir, bedava dönüşlerde kazançlar 2 katı. Bir turda en fazla bahsin 850 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    providerStatus: 'online',
+    license: 'Yerleşik · hukuki inceleme bekliyor',
+  },
 ];

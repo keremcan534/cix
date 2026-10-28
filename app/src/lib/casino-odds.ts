@@ -6,12 +6,14 @@
 //      pool, and winnings are paid only from the pool, so the house share holds exactly, not just on average.
 //
 // Pure functions only (no app or storage imports), so the server and the tests run the same rules.
+import { FORTUNE_MAX, SYMBOLS, fortuneReturn, playRound, type FortuneRound } from '@/lib/fortune-slot';
 
 export const CASINO_HOUSE_SHARE = 0.6;
 export const CASINO_RETURN_SHARE = 0.4;
 
-export type CasinoId = 'wheel' | 'dice' | 'slot' | 'dragon';
-export type Outcome = { display: string[]; multiplier: number; detail: string };
+export type CasinoId = 'wheel' | 'dice' | 'slot' | 'dragon' | 'fortune';
+/** fortune: the whole Altın Kasa round (base spin and free spins) for the reels to replay. */
+export type Outcome = { display: string[]; multiplier: number; detail: string; fortune?: FortuneRound };
 
 /** Wheel slices (in drawing order) and their weights out of 1000: expected return 400 / 1000. */
 export const WHEEL = [
@@ -40,12 +42,29 @@ export const DT_TIE = 5.2;
 export const DUEL_GAP = 3;
 export const DUEL_MULT = 2.4;
 
-/** How many equally likely values each random draw of a game takes (the server draws them uniformly). */
-export const DRAWS: Record<CasinoId | 'duel', number[]> = { wheel: [WHEEL_TOTAL], dice: [6, 6], slot: [5, 5, 5], dragon: [13, 13], duel: [6, 6] };
-export const PICKS: Record<CasinoId, string[]> = { wheel: [''], dice: ['small', 'big'], slot: [''], dragon: ['dragon', 'tie', 'tiger'] };
+/**
+ * How many equally likely values each random draw of a game takes (the server draws them uniformly). Altın Kasa
+ * draws one stop per reel for the base spin and again for each free spin, so it has its own round (outcomeOf).
+ */
+export const DRAWS: Record<Exclude<CasinoId, 'fortune'> | 'duel', number[]> = { wheel: [WHEEL_TOTAL], dice: [6, 6], slot: [5, 5, 5], dragon: [13, 13], duel: [6, 6] };
+export const PICKS: Record<CasinoId, string[]> = { wheel: [''], dice: ['small', 'big'], slot: [''], dragon: ['dragon', 'tie', 'tiger'], fortune: [''] };
+
+/** One round of any casino game from a uniform draw function (rnd(n) → 0…n−1). */
+export function outcomeOf(game: CasinoId, pick: string, rnd: (n: number) => number): Outcome {
+  if (game !== 'fortune') return evaluate(game, pick, DRAWS[game].map(rnd));
+  const round = playRound(rnd);
+  const lines = round.base.wins.length;
+  const detail = [
+    round.base.grid.map((reel) => SYMBOLS[reel[1]].emoji).join(''),
+    lines ? `${lines} çizgi` : 'çizgi yok',
+    round.free.length ? `${round.free.length} bedava dönüş` : '',
+    `${Math.round(round.multiplier * 10) / 10}x`,
+  ];
+  return { display: round.base.grid.flat(), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), fortune: round };
+}
 
 /** The result of one round from its raw draws (each draw in 0…n−1). */
-export function evaluate(game: CasinoId, pick: string, d: number[]): Outcome {
+export function evaluate(game: Exclude<CasinoId, 'fortune'>, pick: string, d: number[]): Outcome {
   if (game === 'wheel') {
     let r = d[0];
     const i = WHEEL.findIndex((s) => (r -= s.weight) < 0);
@@ -91,6 +110,8 @@ function* combos(sizes: number[], prefix: number[] = []): Generator<number[]> {
 }
 /** Exact expected return (share of the stake paid back) of a game and pick, over all outcomes. */
 export function expectedReturn(game: CasinoId | 'duel', pick = ''): number {
+  // Too many reel combinations to list; lib/fortune-slot computes it exactly from the strip counts instead.
+  if (game === 'fortune') return fortuneReturn().total;
   let sum = 0;
   let n = 0;
   for (const d of combos(DRAWS[game])) {
@@ -102,6 +123,7 @@ export function expectedReturn(game: CasinoId | 'duel', pick = ''): number {
 /** Highest multiplier a round can pay (the pool must cover bet × this before the round starts). */
 export function maxMultiplier(game: CasinoId | 'duel', pick = ''): number {
   if (game === 'duel') return DUEL_MULT;
+  if (game === 'fortune') return FORTUNE_MAX;
   let max = 0;
   for (const d of combos(DRAWS[game])) max = Math.max(max, evaluate(game, pick, d).multiplier);
   return max;

@@ -11,6 +11,8 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
 | `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları (UNO benzeri, özgün ad), XOX. |
 | `src/components/games/casino.tsx` | Şans Çarkı, Zar, Lucky 77, Dragon Tiger. |
+| `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |
+| `src/lib/fortune-slot.ts` | Altın Kasa matematiği: makara şeritleri, ödeme tablosu, 10 çizgi, tam beklenen geri ödeme hesabı. |
 | `src/app/oyunlar.tsx` | Profildeki **Oyun Merkezi**: Casino · Oda oyunları · Geçmiş. |
 | `src/app/oyun-yonetimi.tsx` | Yönetim paneli (`games.manage` yetkisi). |
 
@@ -43,7 +45,7 @@ Her tur `GM-…` işlem numarasıyla Oyun Merkezi › Geçmiş'te ve cüzdan har
 
 ## Kasa kuralı: %60 kasa, %40 dağıtım
 
-Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Lucky 77, Dragon Tiger ve odadaki Zar Düellosu) oynanan jetonun %60'ı kasaya kalır, %40'ı kazananlara rastgele dağılır.
+Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Lucky 77, Dragon Tiger, Altın Kasa ve odadaki Zar Düellosu) oynanan jetonun %60'ı kasaya kalır, %40'ı kazananlara rastgele dağılır.
 
 - **Olasılıklar** (`app/src/lib/casino-odds.ts`): her oyun ve her seçimde beklenen geri ödeme %40'tır. Testler bütün sonuçları tek tek sayarak bunu kanıtlar (`tests/casino-odds.test.ts`). Dragon Tiger'da Ejder/Kaplan seçimi %39,94'tür (kart farkı kuralı tam %40'a bölünmüyor; kasa lehine yuvarlandı).
 - **Havuz** (`app/src/lib/games.ts`): her bahsin %60'ı anında kasaya yazılır, %40'ı ödül havuzuna girer; kazançlar yalnızca havuzdan ödenir. Havuz bir turun en yüksek ödülünü karşılayamıyorsa tur jeton düşülmeden reddedilir. Havuz 200.000 jetonluk başlangıç avansıyla açılır (ilk turların büyük ödülü karşılanabilsin diye). Yönetim ekranında "Kasa defteri" oynanan, kasa, dağıtılan ve havuz tutarlarını gösterir.
@@ -55,8 +57,11 @@ Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Lucky 77, Dragon Tiger ve odadaki
 | Lucky 77 | Üç 7 / üç aynı meyve | 30x / 5x | 1/125 / 4/125 |
 | Dragon Tiger | Seçilen taraf en az 4 yüksek / beraberlik | 1,5x / 5,2x | 45/169 / 13/169 |
 | Zar Düellosu (oda) | Rakipten en az 3 fazla | 2,4x | 6/36 |
+| Altın Kasa | 10 çizgide soldan 3/4/5 aynı; 3+ Kasa → 8 bedava dönüş ×2 | çizgi bahsinin 3–50 katı; tur başına en fazla 850x | kazanç her ~2,3 dönüşte bir, bedava dönüş ~1/117 |
 
 **Oyun bakiyesi:** kazançlar cüzdana değil ayrı oyun bakiyesine yazılır; bahisler önce oradan düşer. Oyun bakiyesi hediye edilemez, elmasa veya paraya çevrilemez (kazancın paraya dönüşmesi gerçek paralı kumar sayılır). Sağlayıcı hatasında bahis geldiği yere iade edilir. Testler: `tests/game-balance.test.ts`.
+
+**Altın Kasa:** 5 makara × 3 sıra, 30 duraklı sabit makara şeritleri, 10 sabit çizgi (bahis çizgilere eşit bölünür). 💰 Servet (Wild) yalnızca 2.–4. makarada çıkar ve Kasa dışında her sembolün yerine geçer. 🏦 Kasa (Scatter) ekranın herhangi bir yerinde 3+ gelirse 8 bedava dönüş verir; bedava dönüşlerde kazançlar 2 katıdır ve yeniden tetiklenmez. Bütün tur (bedava dönüşler dahil) tek istekte sunucuda çözülür, tek bahis ve tek ödeme yazılır; ekran sadece sonucu oynatır. Beklenen geri ödeme %39,97'dir (makara sayıları tam %40'a bölünmüyor; kasa lehine). Kombinasyon sayısı (30⁵) tek tek saymaya çok büyük olduğu için oran şerit sayılarından tam olarak hesaplanır ve 200.000 turluk simülasyonla doğrulanır (`tests/fortune-slot.test.ts`). Havuz kontrolü için en yüksek çarpan 850x alınır (her çizgi en yüksek ödemede, ana dönüş + 8 bedava dönüş ×2). Otomatik çevirme 10/25/50 tur; bedava dönüşte, 10x+ kazançta, seçilen kayıp limitinde ve reddedilen turda kendiliğinden durur.
 
 Lucky hediye bu kurala dahil değildir; ayrı bir modüldür (`lib/lucky.ts`, beklenen geri ödeme %65).
 
