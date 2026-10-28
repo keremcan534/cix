@@ -15,6 +15,27 @@ const ART: Record<string, number> = {
 
 export const gameArtOf = (id: string): number | undefined => ART[id];
 
+// Each game's own color: its card and the light under its icon (fx/float), so a games grid reads as
+// different games instead of one repeated tile.
+const HUE: Record<string, string> = {
+  wheel: '#FF8A5B',
+  dice: '#FF6576',
+  slot: '#F6BD60',
+  dragon: '#4ADE80',
+  ludo: '#60A5FA',
+  cards: '#F472B6',
+  domino: '#C4B5FD',
+  pool: '#22C55E',
+  jackaroo: '#F59E0B',
+  xox: '#13D9DF',
+  connect4: '#3B82F6',
+  words: '#A78BFA',
+  quiz: '#FACC15',
+  truefalse: '#34D399',
+  memory: '#FB7185',
+};
+export const gameHueOf = (id: string): string => HUE[id] ?? '#13D9DF';
+
 /** The game's picture when it has one, otherwise its emoji. */
 export function GameIcon({ id, emoji, size }: { id: string; emoji: string; size: number }) {
   const art = ART[id];

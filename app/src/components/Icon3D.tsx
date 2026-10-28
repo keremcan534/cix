@@ -48,6 +48,13 @@ const FROM_EMOJI: Record<string, Icon3DName> = {
   '👥': 'group',
 };
 export const icon3dFor = (emoji?: string): Icon3DName | undefined => (emoji ? FROM_EMOJI[emoji] : undefined);
+/** The picture itself, for components that draw the image themselves (fx/float). */
+export const icon3dSource = (name: Icon3DName): number => SRC[name];
+/** The picture behind an emoji, for components that draw the image themselves (fx/float). */
+export const icon3dSourceFor = (emoji?: string): number | undefined => {
+  const name = icon3dFor(emoji);
+  return name ? SRC[name] : undefined;
+};
 
 export function Icon3D({ name, size = 24, style }: { name: Icon3DName; size?: number; style?: StyleProp<ImageStyle> }) {
   return <Image source={SRC[name]} style={[{ width: size, height: size }, style]} resizeMode="contain" accessibilityIgnoresInvertColors />;

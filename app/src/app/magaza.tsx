@@ -1,18 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
+import { Ambient, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, ReactionArt } from '@/components/ReactionArt';
 import { STORE_TAB_ART, storeArtOf } from '@/components/StoreArt';
@@ -48,18 +50,21 @@ export default function StoreScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Ambient />
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 10 }}>
-        {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Emoji paketleri', emoji: '' }].map((k) => {
-          const art = k.kind === 'emoji' ? EMOJI_PACKS_ICON : STORE_TAB_ART[k.kind];
-          return (
-            <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
-              {art ? <Image source={art} style={{ width: 18, height: 18 }} /> : <Text style={styles.tabText}>{k.emoji}</Text>}
-              <Text style={[styles.tabText, tab === k.kind && { color: '#fff' }]}>{k.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.tabTrack}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, padding: 4 }}>
+          {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Emoji paketleri', emoji: '' }].map((k) => {
+            const art = k.kind === 'emoji' ? EMOJI_PACKS_ICON : STORE_TAB_ART[k.kind];
+            return (
+              <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
+                {art ? <Image source={art} style={{ width: 18, height: 18 }} /> : <Text style={styles.tabText}>{k.emoji}</Text>}
+                <Text style={[styles.tabText, tab === k.kind && { color: semantic.actionInk }]}>{k.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {settings.effectsOff && (tab === 'entry' || tab === 'ride') && (
         <Text style={styles.warn}>Efektler ayarlardan kapalı: satın aldığın giriş efektleri sende gösterilmez, diğerleri görür.</Text>
@@ -67,10 +72,11 @@ export default function StoreScreen() {
 
       <ScrollView contentContainerStyle={styles.grid}>
         {tab === 'emoji'
-          ? EMOJI_PACKS.map((p) => {
+          ? EMOJI_PACKS.map((p, i) => {
               const owned = emojiPacks.has(p.id) || (p.minVip ? vipLevel >= p.minVip : false);
+              const hue = hueAt(i + 2);
               return (
-                <View key={p.id} style={styles.item}>
+                <Shelf key={p.id} hue={hue}>
                   <View style={styles.packPreview} accessibilityLabel={p.emojis.slice(0, 4).join(' ')}>
                     {p.emojis.slice(0, 4).map((e) => (
                       <ReactionArt key={e} emoji={e} size={30} textStyle={styles.emojiPreview} />
@@ -81,26 +87,27 @@ export default function StoreScreen() {
                   {owned ? (
                     <Text style={styles.owned}>✓ Açık</Text>
                   ) : p.minVip && !p.price ? (
-                    <Text style={styles.locked}>🔒 VIP {p.minVip}</Text>
+                    <View>
+                      <GlossButton label={`🔒 VIP ${p.minVip}`} tone="locked" small />
+                    </View>
                   ) : (
-                    <Pressable
-                      style={styles.buy}
+                    <PressableScale
                       onPress={() => {
                         const err = buyEmojiPack(p.id);
                         if (err) showAlert('Satın alınamadı', err);
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon3D name="coin" size={16} /><Text style={styles.buyText}>{p.price}</Text></View>
-                    </Pressable>
+                      <GlossButton label={String(p.price)} small icon={<Icon3D name="coin" size={16} />} />
+                    </PressableScale>
                   )}
-                </View>
+                </Shelf>
               );
             })
-          : items.map((c) => {
+          : items.map((c, i) => {
               const owned = inventory.has(c.id);
               const isEquipped = equipped[c.kind] === c.id;
               return (
-                <View key={c.id} style={[styles.item, isEquipped && { borderColor: colors.primaryText }]}>
+                <Shelf key={c.id} hue={c.color?.[0] ?? hueAt(i)} on={isEquipped}>
                   <Preview item={c} avatar={me.avatar} still={settings.reduceMotion} />
                   {(c.kind === 'entry' || c.kind === 'ride') && (
                     <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
@@ -114,25 +121,43 @@ export default function StoreScreen() {
                     {c.minVip ? ` · VIP ${c.minVip}+` : ''}
                   </Text>
                   {owned ? (
-                    <Pressable style={[styles.buy, { backgroundColor: isEquipped ? colors.cardAlt : colors.primary }]} onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
-                      <Text style={styles.buyText}>{isEquipped ? 'Çıkar' : 'Kullan'}</Text>
-                    </Pressable>
+                    <PressableScale onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
+                      <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
+                    </PressableScale>
                   ) : c.minVip && vipLevel < c.minVip ? (
-                    <Pressable onPress={() => router.push('/vip')}>
-                      <Text style={styles.locked}>🔒 VIP {c.minVip}</Text>
-                    </Pressable>
+                    <PressableScale onPress={() => router.push('/vip')}>
+                      <GlossButton label={`🔒 VIP ${c.minVip}`} tone="locked" small />
+                    </PressableScale>
                   ) : (
-                    <Pressable style={styles.buy} onPress={() => buy(c)}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon3D name="coin" size={16} /><Text style={styles.buyText}>{c.price.toLocaleString('tr-TR')}</Text></View>
-                    </Pressable>
+                    <PressableScale onPress={() => buy(c)}>
+                      <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
+                    </PressableScale>
                   )}
-                </View>
+                </Shelf>
               );
             })}
       </ScrollView>
       <Text style={styles.footer}>Kozmetik satın alımları komisyon programına dahil değildir.</Text>
       {preview && <EntryEffect key={`${preview.fx}-${preview.ride}`} show={preview} still={settings.reduceMotion} top={140} onDone={() => setPreview(null)} />}
     </SafeAreaView>
+  );
+}
+
+/** A store item: a card lit in the item's color, its preview standing on a pool of that light. */
+function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: ReactNode }) {
+  return (
+    <LinearGradient
+      colors={[`${hue}38`, `${hue}0A`, '#101C30']}
+      locations={[0, 0.5, 1]}
+      style={[styles.item, { borderColor: on ? colors.primaryText : `${hue}40`, boxShadow: `0 8px 20px rgba(0,0,0,0.35), 0 0 16px ${hue}1F` }]}
+    >
+      <EdgeLight inset={16} strength={0.4} />
+      <View style={styles.halo}>
+        <Halo size={90} hue={hue} strength={0.45} />
+      </View>
+      {on && <Text style={styles.onTag}>Kullanılıyor</Text>}
+      {children}
+    </LinearGradient>
   );
 }
 
@@ -215,21 +240,21 @@ const styles = StyleSheet.create({
   artStack: { alignItems: 'center', gap: 4 },
   artIcon: { width: 56, height: 56 },
   rideArt: { width: 72, height: 72 },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card },
-  tabActive: { backgroundColor: colors.primary },
-  tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
+  tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChip },
+  tab: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 999 },
+  tabActive: { backgroundColor: semantic.action, boxShadow: '0 3px 12px rgba(19,217,223,0.4)' },
+  tabText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   warn: { color: colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingBottom: 30 },
-  item: { width: '46%', margin: '2%', backgroundColor: colors.card, borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 2, borderColor: 'transparent' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, paddingHorizontal: 16, paddingBottom: 30 },
+  item: { width: '48.5%', borderRadius: 20, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1.5 },
+  halo: { position: 'absolute', top: 14, alignSelf: 'center', width: 90, height: 90 },
+  onTag: { position: 'absolute', top: 8, right: 8, color: semantic.actionInk, backgroundColor: colors.primaryText, fontSize: 10, fontWeight: '800', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', zIndex: 1 },
   packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
   emojiPreview: { fontSize: 22 },
-  name: { color: '#fff', fontWeight: '700' },
+  name: { color: '#fff', fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
   meta: { color: colors.textDim, fontSize: 12 },
   owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },
-  locked: { color: colors.textDim, fontWeight: '700', paddingVertical: 7 },
-  buy: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
-  buyText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   framePreview: { width: 64, height: 64, borderRadius: 32, padding: 4 },
   frameInner: { flex: 1, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   bubblePreview: { height: 64, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 16, marginVertical: 0 },

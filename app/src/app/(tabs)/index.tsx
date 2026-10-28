@@ -6,9 +6,11 @@ import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
-import { Ambient, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glassChip, glow } from '@/components/fx/surface';
-import { Icon3D, type Icon3DName } from '@/components/Icon3D';
-import { Avatar, CoinPill } from '@/components/ui';
+import { FloatIcon } from '@/components/fx/float';
+import { gameArtOf } from '@/components/GameArt';
+import { Ambient, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
+import { Icon3D, icon3dSource, type Icon3DName } from '@/components/Icon3D';
+import { Avatar } from '@/components/ui';
 import { roomCode } from '@/data/catalog';
 import { ROOMS, USERS, userById, type Room, type User } from '@/data/mock';
 import {
@@ -32,8 +34,7 @@ import {
 } from '@/data/rooms-ui';
 import { StarterPath } from '@/components/starter';
 import { useApp } from '@/store';
-import { TAB_BAR_HEIGHT, colors, gradient, gradientDeep, semantic } from '@/theme';
-import { EmojiIcon } from '@/components/Icon3D';
+import { TAB_BAR_HEIGHT, colors, fonts, gradient, gradientDeep, semantic } from '@/theme';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -230,25 +231,31 @@ function RankCards() {
   );
 }
 
+// Shortcuts as a shelf of objects standing on their own light, not a row of small chips.
 function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: boolean }) {
   const items = [
-    { key: 'match', emoji: '⚡', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
-    { key: 'wheel', emoji: '🎰', label: 'Şans Çarkı', onPress: () => router.push('/cark') },
-    { key: 'games', emoji: '🎮', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
-    { key: 'tasks', emoji: '🎁', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
+    { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
+    { key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
+    { key: 'wheel', source: gameArtOf('wheel'), hue: '#FF8A5B', label: 'Şans Çarkı', onPress: () => router.push('/cark') },
+    { key: 'games', source: gameArtOf('dice'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
+    { key: 'tasks', source: icon3dSource('tasks'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, alignItems: 'center' }}>
-      <CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />
-      {items.map((it) => (
-        <PressableScale key={it.key} style={styles.quick} onPress={it.onPress}>
-          <EdgeLight inset={10} strength={0.22} />
-          <EmojiIcon emoji={it.emoji} size={15} />
-          <Text style={styles.quickText}>{it.label}</Text>
-          {it.dot && <View style={styles.dot} />}
-        </PressableScale>
+    <View style={styles.shelf}>
+      {items.map((it, i) => (
+        <View key={it.key} style={{ flex: 1 }}>
+          <PressableScale style={styles.shelfItem} onPress={it.onPress} accessibilityLabel={it.a11y ?? it.label}>
+            <View>
+              <FloatIcon source={it.source} size={42} hue={it.hue} bob delay={i * 280} />
+              {it.dot && <View style={[styles.dot, { top: 0, right: 0 }]} />}
+            </View>
+            <Text style={[styles.shelfText, it.key === 'coins' && { color: colors.gold }]} numberOfLines={1}>
+              {it.label}
+            </Text>
+          </PressableScale>
+        </View>
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -374,7 +381,7 @@ function PromoBanner() {
           <Text style={styles.bannerTitle}>{ROOM_BANNER.title}</Text>
           <Text style={styles.bannerSub}>{ROOM_BANNER.sub}</Text>
         </View>
-        <Text style={{ fontSize: 48 }}>{ROOM_BANNER.emoji}</Text>
+        <FloatIcon source={icon3dSource('mic')} size={64} hue="#7DD3FC" bob />
       </LinearGradient>
     </Pressable>
   );
@@ -531,27 +538,28 @@ const styles = StyleSheet.create({
   headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
   mainTabs: { flexDirection: 'row', alignItems: 'flex-end', gap: 22 },
-  mainTab: { color: colors.textDim, fontSize: 20, fontWeight: '600' },
-  mainTabActive: { color: colors.text, fontSize: 24, fontWeight: '800', textShadowColor: 'rgba(19,217,223,0.45)', textShadowRadius: 12 },
+  mainTab: { color: colors.textDim, fontSize: 20, lineHeight: 28, fontFamily: fonts.displayBold },
+  mainTabActive: { color: colors.text, fontSize: 25, lineHeight: 32, fontFamily: fonts.display, textShadowColor: 'rgba(19,217,223,0.45)', textShadowRadius: 12 },
   // Active tab marker: bright turquoise with a soft glow, like a lit LED.
   underline: { width: 18, height: 4, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 8px rgba(19,217,223,0.9)' },
   underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 6px rgba(19,217,223,0.9)' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   calendarBtn: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-8deg' }], overflow: 'hidden' },
   dot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
-  section: { color: colors.text, fontSize: 16, fontWeight: '700', paddingHorizontal: 16 },
+  section: { color: colors.text, fontSize: 18, lineHeight: 24, fontFamily: fonts.display, paddingHorizontal: 16 },
   // ranking cards
   rankCard: { width: 148, height: 80, borderRadius: 14, padding: 10, justifyContent: 'space-between', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
-  rankTitle: { color: '#fff', fontWeight: '800', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  rankTitle: { color: '#fff', fontFamily: fonts.display, fontSize: 15, lineHeight: 20, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
   rankIcon: { position: 'absolute', right: -4, bottom: -6, transform: [{ rotate: '-12deg' }] },
   rankAvatar: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: colors.cardAlt },
   // quick strip
-  quick: { flexDirection: 'row', alignItems: 'center', gap: 5, ...glassChip, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999 },
-  quickText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  shelf: { flexDirection: 'row', paddingHorizontal: 8, paddingTop: 4 },
+  shelfItem: { alignItems: 'center', gap: 6 },
+  shelfText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  catText: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
-  catTextActive: { color: colors.text, fontSize: 19, fontWeight: '800' },
+  catText: { color: colors.textDim, fontSize: 17, lineHeight: 24, fontFamily: fonts.displayBold },
+  catTextActive: { color: colors.text, fontSize: 19, lineHeight: 26, fontFamily: fonts.display },
   catIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   plusBadge: { position: 'absolute', right: -2, bottom: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   // hosts
@@ -615,7 +623,7 @@ const styles = StyleSheet.create({
   subTab: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
   subTabActive: { color: colors.text, fontSize: 16, fontWeight: '800' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 18 },
-  bannerTitle: { color: '#fff', fontSize: 18, fontWeight: '900', fontStyle: 'italic' },
+  bannerTitle: { color: '#fff', fontSize: 18, lineHeight: 23, fontFamily: fonts.display },
   bannerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
   // search sheet
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
