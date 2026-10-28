@@ -5,12 +5,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
 import { Avatar } from '@/components/ui';
-import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type User } from '@/data/mock';
+import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
@@ -97,6 +97,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
             item.fromMe ? (
               <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mine]}>
                 <MessageText text={item.text} style={styles.bubbleText} />
+                {item.room && <RoomCard room={item.room} />}
                 <Text style={styles.time}>
                   {item.time}{' '}
                   <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
@@ -106,6 +107,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
               <View style={{ gap: 6 }}>
                 <View style={[styles.bubble, styles.theirs]}>
                   <MessageText text={item.text} style={styles.bubbleText} />
+                  {item.room && <RoomCard room={item.room} />}
                   <Text style={styles.time}>{item.time}</Text>
                 </View>
                 <SafetyNote
@@ -161,6 +163,22 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   );
 }
 
+/** Room invite sent from a room's "Paylaş": opens the room. */
+function RoomCard({ room }: { room: RoomInviteCard }) {
+  return (
+    <Pressable onPress={() => router.push(`/oda/${room.roomId}`)} style={styles.roomCard} accessibilityRole="button" accessibilityLabel={`${room.title} odasına katıl`}>
+      <Image source={{ uri: room.cover }} style={styles.roomCover} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.roomTitle} numberOfLines={1}>
+          {room.title}
+        </Text>
+        <Text style={styles.roomJoin}>🎙️ Odaya katıl</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#fff" />
+    </Pressable>
+  );
+}
+
 function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) {
   const warning = incomingWarning(scanMessage(text));
   if (!warning) return null;
@@ -187,6 +205,10 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: colors.cardAlt, borderBottomLeftRadius: 4 },
   bubbleText: { color: '#fff', fontSize: 15 },
   time: { color: 'rgba(255,255,255,0.6)', fontSize: 11, alignSelf: 'flex-end', marginTop: 2 },
+  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 200 },
+  roomCover: { width: 44, height: 44, borderRadius: 10 },
+  roomTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  roomJoin: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
   notice: { paddingHorizontal: 16, paddingVertical: 6, color: colors.textDim, textAlign: 'center', fontSize: 12 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   input: {
