@@ -68,13 +68,13 @@ import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
-import { RULES } from '@/data/rules';
+import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
-import { getLucky, luckyGift, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
+import { getLucky, luckyGift, luckyPkPoints, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
@@ -299,8 +299,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [giftTo, setGiftTo] = useState<string | null>(null);
   const [giftFx, setGiftFx] = useState<Gift | null>(null);
   const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
-  // Lucky combo wheel: same gift, same people, one tap per repeat (×1, ×2, ×3 …).
-  const [combo, setCombo] = useState<{ giftId: string; to: string[]; count: number; key: number } | null>(null);
+  // Lucky combo wheel: same gift, same people, same count, one tap per repeat (×1, ×2, ×3 …).
+  const [combo, setCombo] = useState<{ giftId: string; to: string[]; each: number; count: number; key: number } | null>(null);
   const gameCatalog = useGames();
   const [game, setGame] = useState<OpenGame | null>(null);
   const [gameMin, setGameMin] = useState(false);
@@ -792,8 +792,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const fans = room ? deriveView(room).balconyIds.filter((m) => m !== 'me') : [];
       if (!fans.length) return;
       const from = userById(pick(fans));
-      const gift = GIFTS.find((g) => g.price === pick(INCOMING_GIFT_POOL)) ?? GIFTS[0];
       const tx = `BOT-${msgId()}`;
+      // Now and then a fan sends a Lucky gift: I earn 20 % of its value (no owner bonus) and PK scores the same.
+      const lk = Math.random() < 0.25 ? pick(getLucky().config.gifts.filter((g) => g.enabled && g.price <= 100)) : undefined;
+      if (lk) {
+        const earned = luckyHostDiamonds(lk.price);
+        receiveDiamonds(earned, 'Hediye', from.id);
+        gainXp(lk.price);
+        addContrib(from.id, lk.price);
+        logGift(from.id, 'me', { id: lk.id, name: lk.name, emoji: lk.emoji, price: lk.price }, 1);
+        flyGift(lk.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, lk.id);
+        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Lucky) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
+        scorePk(tx, from.id, 'me', lk.id, luckyPkPoints(lk));
+        return;
+      }
+      const gift = GIFTS.find((g) => g.price === pick(INCOMING_GIFT_POOL)) ?? GIFTS[0];
       receiveDiamonds(gift.price, 'Hediye', from.id);
       // Owner bonus is calculated separately and never reduces the streamer's earnings.
       const ownerBonus = Math.round(gift.price * RULES.roomOwnerBonus);
@@ -1310,16 +1323,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     deliverGifts(gift, toIds, count);
   };
 
-  // Lucky: one gift, one recipient. The server (lib/lucky) charges, draws and credits; the room only
-  // records the normal gift for the recipient and shows the stored result.
-  // Lucky: one gift to each person picked, one server draw per person. The room only records the
-  // normal gift for each recipient and shows the stored results; wins go out to every room.
-  const sendLuckyGift = (giftId: string, toIds: string[]) => {
+  // Lucky: `count` gifts to each person picked, one server draw per gift; no send cap beyond the balance.
+  // The room only records the gift for each recipient and shows the stored results; wins go out to every room.
+  const sendLuckyGift = (giftId: string, toIds: string[], count = 1) => {
     setGiftOpen(false);
     if (offlineBlocked()) return;
     const records: LuckyRecord[] = [];
     let error: string | null = null;
-    for (const toId of toIds) {
+    for (const toId of toIds.flatMap((t) => Array<string>(count).fill(t))) {
       const r = sendLucky({ txId: newLuckyTxId(), userId: 'me', userAge: app.me.age, roomId: id, giftId, toId, toName: userById(toId).name }, { spend: spendCoins, credit: addCoins });
       if (!r.ok) {
         error = r.reason;
@@ -1336,27 +1347,27 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
     const best = records.reduce((a, b) => (b.mult > a.mult ? b : a), first);
-    const sentTo = records.map((r) => r.toId);
+    const sentTo = [...new Set(records.map((r) => r.toId))];
     successHaptic();
     records.forEach((r) => {
       logGift('me', r.toId, { id: r.giftId, name: r.giftName, emoji: r.emoji, price: r.price }, 1);
-      // PK counts the gift value; the reward only when the admin setting says so.
-      scorePk(r.txId, 'me', r.toId, r.giftId, r.price + (cfg.pkCountsReward ? r.reward : 0));
+      // PK scores the recipient's 20 % share of the gift value, never the reward.
+      scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r));
     });
     bump('giftsSent', records.length);
     addContrib('me', spent);
     if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
-    flyGift(first.emoji, 1, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
+    flyGift(first.emoji, count, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
     // Combo repeats don't add a chat line each time; the wheel shows the count.
-    const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join();
+    const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join() && combo.each === count;
     if (!repeat)
       addMsg({
         id: `gift:${first.txId}`,
         system: true,
-        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName} (Lucky) gönderdi`,
-        gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count: 1, lucky: true, giftId: first.giftId },
+        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Lucky) gönderdi`,
+        gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count, lucky: true, giftId: first.giftId },
       });
-    if (error) addMsg({ system: true, text: `🍀 ${toIds.length - records.length} kişiye gönderilemedi: ${error}` });
+    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Lucky hediye gönderilemedi: ${error}` });
     // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
     if (reward > 0) {
       const wins = records.filter((r) => r.reward > 0).length;
@@ -1370,7 +1381,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       });
     setLuckyFx(records);
     const at = Date.now();
-    setCombo((c) => (c && c.giftId === giftId && c.to.join() === toIds.join() ? { ...c, count: c.count + 1, key: at } : { giftId, to: toIds, count: 1, key: at }));
+    setCombo((c) => (c && c.giftId === giftId && c.to.join() === toIds.join() && c.each === count ? { ...c, count: c.count + 1, key: at } : { giftId, to: toIds, each: count, count: 1, key: at }));
   };
   const comboGift = combo ? luckyGift(combo.giftId) : undefined;
 
@@ -2246,10 +2257,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           giftId={combo.giftId}
           emoji={comboGift.emoji}
           name={comboGift.name}
-          price={comboGift.price * combo.to.length}
+          price={comboGift.price * combo.each * combo.to.length}
           count={combo.count}
           restartKey={combo.key}
-          onPress={() => sendLuckyGift(combo.giftId, combo.to)}
+          onPress={() => sendLuckyGift(combo.giftId, combo.to, combo.each)}
           onExpire={() => setCombo(null)}
         />
       )}

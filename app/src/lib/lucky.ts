@@ -1,13 +1,15 @@
 // Lucky gift module (spec "LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ").
 // The sender pays the gift price; the server draws a multiplier from the published odds and, on a win,
-// credits price × multiplier to the sender. The recipient earns diamonds for only part of the gift value
-// (RULES.luckyHostShare, 20 %); the rest of the price funds the rewards. Both are recorded on the send.
+// credits price × multiplier to the sender. The recipient earns only part of the gift value
+// (LUCKY_RECIPIENT_SHARE, 20 %) as diamonds, and the same 20 % is what the gift scores in PK; the rest of
+// the price funds the rewards. Both are recorded on the send.
 //
-// This file plays the Lucky server: it owns the odds, the draw, the reward reserve, limits and records.
+// This file plays the Lucky server: it owns the odds, the draw, the reward reserve and records.
+// There is no per-user send cap: a user can send as many Lucky gifts as their coins cover.
 // The client only sends (txId, gift, recipient) and shows the stored result. Each txId is processed once.
 import { useSyncExternalStore } from 'react';
 
-import { luckyHostDiamonds } from '@/data/rules';
+import { LUCKY_RECIPIENT_SHARE, luckyHostDiamonds } from '@/data/rules';
 import { today } from '@/lib/persist';
 
 /** Odds are whole numbers out of 100,000 (0.001 % steps), so the total check is exact. */
@@ -25,12 +27,8 @@ export type LuckyConfig = {
   poolPct: number;
   /** Rewards paid per day across the platform. */
   dailyPayoutLimit: number;
-  perUserDaily: number;
-  perMinute: number;
   /** Wins from this multiplier up are announced in the room (if the winner allows it). */
   announceFrom: number;
-  /** Default off: only the gift value scores in PK, never the reward. */
-  pkCountsReward: boolean;
 };
 export type LuckyRecord = {
   txId: string;
@@ -62,7 +60,6 @@ type State = {
   records: LuckyRecord[];
   audit: Audit[];
   duplicates: number;
-  suspicious: string[];
   /** Test tool only: the next draw returns this multiplier. Never reachable from a user screen. */
   forceNext: number | null;
 };
@@ -87,13 +84,10 @@ const DEFAULT_CONFIG: LuckyConfig = {
   ],
   poolPct: 70,
   dailyPayoutLimit: 20_000_000,
-  perUserDaily: 500,
-  perMinute: 60,
   announceFrom: 50,
-  pkCountsReward: false,
 };
 
-let state: State = { config: DEFAULT_CONFIG, pool: 50_000_000, day: today(), paidToday: 0, spentTotal: 0, paidTotal: 0, records: [], audit: [], duplicates: 0, suspicious: [], forceNext: null };
+let state: State = { config: DEFAULT_CONFIG, pool: 50_000_000, day: today(), paidToday: 0, spentTotal: 0, paidTotal: 0, records: [], audit: [], duplicates: 0, forceNext: null };
 const listeners = new Set<() => void>();
 const emit = (patch: Partial<State>) => {
   state = { ...state, ...patch };
@@ -122,6 +116,9 @@ export const oddsLabel = (weight: number) => `%${(weight / 1000).toLocaleString(
 export const oddsSum = (t: LuckyTier[]) => t.reduce((n, x) => n + x.weight, 0);
 export const maxMult = (g: LuckyGift) => Math.max(0, ...g.tiers.filter((t) => t.weight > 0).map((t) => t.mult));
 export const luckyGift = (id: string) => state.config.gifts.find((g) => g.id === id);
+/** PK points a Lucky send scores for its recipient: the same 20 % the recipient is credited, never the reward. */
+export const luckyPkPoints = (r: Pick<LuckyRecord, 'price'>) => luckyHostDiamonds(r.price);
+export { LUCKY_RECIPIENT_SHARE };
 
 export function validate(g: Pick<LuckyGift, 'price' | 'tiers'>): string | null {
   if (!(g.price > 0)) return 'Fiyat 0’dan büyük olmalı.';
@@ -164,7 +161,7 @@ function draw(t: LuckyTier[]): number {
 }
 
 /**
- * One Lucky send. Order: replay check → package and limits → charge → draw → credit → record.
+ * One Lucky send. Order: replay check → package → charge → draw → credit → record.
  * The same txId always returns the first result and never charges or pays twice.
  */
 export function sendLucky(
@@ -183,13 +180,6 @@ export function sendLucky(
   if (req.toId === req.userId) return { ok: false, reason: 'Kendine Lucky hediye gönderemezsin.' };
   const closed = unavailable(g);
   if (closed) return { ok: false, reason: closed };
-  const mine = state.records.filter((r) => r.userId === req.userId);
-  if (mine.filter((r) => r.at.startsWith(new Date().toLocaleDateString('tr-TR'))).length >= state.config.perUserDaily)
-    return { ok: false, reason: `Günlük Lucky gönderim sınırına ulaştın (${state.config.perUserDaily}).` };
-  if (mine.filter((r) => Date.now() - r.ts < 60_000).length >= state.config.perMinute) {
-    emit({ suspicious: [`${clock()} · ${req.userId} · 1 dakikada ${state.config.perMinute}+ Lucky gönderimi denedi`, ...state.suspicious].slice(0, 100) });
-    return { ok: false, reason: 'Çok hızlı gönderim. Bir dakika sonra tekrar dene.' };
-  }
   if (state.day !== today()) emit({ day: today(), paidToday: 0 });
   if (!wallet.spend(g.price, `Lucky hediye: ${g.name} → ${req.toName}`)) return { ok: false, reason: 'Yetersiz bakiye.' };
 

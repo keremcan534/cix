@@ -14,6 +14,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 
 import { Avatar, Button } from '@/components/ui';
 import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
+import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
@@ -36,7 +37,7 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
-  lucky: 'Gönderdiğin hediyenin katları kadar jeton kazanma ihtimali. Ödül garanti değildir; olasılıklar aşağıda. Alıcıya hediye değerinin %20’si elmas olarak yazılır.',
+  lucky: `Gönderdiğin hediyenin katları kadar jeton kazanma ihtimali. Ödül garanti değildir; olasılıklar aşağıda. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
   couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
   privilege: 'SVIP üyelerine özel hediyeler.',
@@ -86,8 +87,8 @@ export function GiftSheet({
   initialTo?: string | null;
   coins: number;
   onSend: (g: Gift, to: string[], count: number) => void;
-  /** One Lucky gift to each person picked (one draw per person). */
-  onSendLucky: (giftId: string, toIds: string[]) => void;
+  /** `count` Lucky gifts to each person picked (one draw per gift). */
+  onSendLucky: (giftId: string, toIds: string[], count: number) => void;
 }) {
   const { svipLevel, spentTotal, me } = useApp();
   const lucky = useLucky();
@@ -119,7 +120,7 @@ export function GiftSheet({
   const gift = GIFTS.find((g) => g.id === sel.id) ?? GIFTS[0];
   const fromBag = sel.bag;
   const locked = !fromBag && isLocked(gift, svipLevel);
-  const total = isLucky ? lg.price * targets.length : (fromBag ? 0 : gift.price) * count * targets.length;
+  const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * count * targets.length;
   const short = fromBag ? 0 : total - coins;
   const bagNeed = count * targets.length;
   const bagShort = fromBag && bagNeed > (bag[gift.id] ?? 0);
@@ -165,9 +166,9 @@ export function GiftSheet({
   const luckyBlock = isLucky ? (me.age < LUCKY_MIN_AGE ? `Lucky hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` : unavailable(lg)) : null;
   const sendLucky = () => {
     if (!targets.length || luckyBlock) return;
-    if (lg.price * targets.length > coins) return goWallet();
+    if (total > coins) return goWallet();
     pressHaptic();
-    onSendLucky(lg.id, targets);
+    onSendLucky(lg.id, targets, count);
   };
 
   const send = () => {
@@ -195,7 +196,7 @@ export function GiftSheet({
         ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
         : total > coins
           ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
-          : { tone: 'info' as const, text: `${targets.length > 1 ? `Her kişi için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : locked
       ? { tone: 'lock' as const, text: `${gift.name}, SVIP ${gift.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`, cta: 'SVIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -342,7 +343,7 @@ export function GiftSheet({
                 {isLucky ? `${lg.name} · Lucky` : gift.name}
               </Text>
               <Text style={g.dim} numberOfLines={1}>
-                {isLucky ? `${fmt(lg.price)} jeton × 1 adet × ${targets.length} kişi` : `${fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × ${count} adet × ${targets.length} kişi`}
+                {isLucky ? `${fmt(lg.price)} jeton × ${count} adet × ${targets.length} kişi` : `${fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × ${count} adet × ${targets.length} kişi`}
                 {!isLucky && gift.intimacy && !fromBag ? ` · 💗 +${fmt(gift.intimacy * count)} yakınlık` : ''}
               </Text>
             </View>
@@ -361,12 +362,10 @@ export function GiftSheet({
           </View>
 
           <View style={g.actions}>
-            {!isLucky && (
             <Pressable onPress={() => setCountOpen((o) => !o)} style={g.countBtn} accessibilityRole="button" accessibilityLabel={`Adet ${count}, değiştir`}>
               <Text style={g.countText}>×{count}</Text>
               <Ionicons name={countOpen ? 'chevron-down' : 'chevron-up'} size={14} color={colors.text} />
             </Pressable>
-            )}
             <Button
               title={footer.cta}
               variant={'variant' in footer ? footer.variant : 'hero'}
