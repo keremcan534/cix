@@ -39,6 +39,8 @@ export function Seat({
   silenced,
   avatarSize,
   slotWidth,
+  modMuted,
+  invitee,
   onPress,
 }: {
   index: number;
@@ -70,6 +72,10 @@ export function Seat({
   /** Layout overrides (team PK arena). */
   avatarSize?: number;
   slotWidth?: number;
+  /** The mic was switched off by the room's management (red badge), not by its owner (grey badge). */
+  modMuted?: boolean;
+  /** Empty seat held for a pending mic invite (name of the invited person). */
+  invitee?: string;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -86,7 +92,10 @@ export function Seat({
 
   const user = userId ? userById(userId) : null;
   const size = avatarSize ?? (host ? 70 : small ? 48 : 56);
-  const label = user ? `${index + 1}. mikrofon, ${user.name}${muted ? ', mikrofonu kapalı' : ''}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}` : `${index + 1}. mikrofon, ${locked ? 'kilitli' : 'boş'}`;
+  const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
+  const label = user
+    ? `${index + 1}. mikrofon, ${user.name}${muteText}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
+    : `${index + 1}. mikrofon, ${locked ? 'kilitli' : invitee ? `${invitee} için davet bekliyor` : 'boş'}`;
 
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}>
@@ -105,9 +114,12 @@ export function Seat({
         ) : user ? (
           <Image source={{ uri: user.avatar }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
         ) : (
-          // A glass bubble lit from above instead of a dashed outline.
-          <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.03)']} style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }]}>
-            <Ionicons name={locked ? 'lock-closed' : 'add'} size={small ? 18 : 22} color="rgba(255,255,255,0.72)" />
+          // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
+          <LinearGradient
+            colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.03)']}
+            style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
+          >
+            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 18 : 22} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.72)'} />
           </LinearGradient>
         )}
         {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
@@ -116,9 +128,9 @@ export function Seat({
             <Ionicons name="videocam" size={10} color={semantic.liveInk} />
           </View>
         )}
-        {muted && (
-          <View style={styles.mutedBadge}>
-            <Ionicons name="mic-off" size={10} color="#fff" />
+        {(muted || modMuted) && (
+          <View style={[styles.mutedBadge, !modMuted && styles.selfMutedBadge]}>
+            <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
           </View>
         )}
         {role === 'admin' && (
@@ -136,7 +148,7 @@ export function Seat({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
         {host && <Text style={{ fontSize: 12 }}>👑</Text>}
         <Text style={[styles.seatName, small && { fontSize: 12 }]} numberOfLines={1}>
-          {user ? user.name : `${index + 1}`}
+          {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
         </Text>
         {user?.verified && !small && <VerifiedBadge size={11} />}
       </View>
@@ -446,6 +458,8 @@ const styles = StyleSheet.create({
   teamRing: { position: 'absolute', borderWidth: 3 },
   camBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.live, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, borderWidth: 1.5, borderColor: colors.bg },
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
+  selfMutedBadge: { backgroundColor: '#475569' },
+  invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
   roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: colors.bg, borderRadius: 10, padding: 2 },
   silencedBadge: { position: 'absolute', right: 0, top: 0, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: colors.border },
   pkWrap: { alignItems: 'center', marginTop: -1 },

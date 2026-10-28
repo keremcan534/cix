@@ -16,7 +16,6 @@ export type PermissionKey =
   | 'agencies.apply'
   | 'agencies.assign'
   | 'bd.commission.view'
-  | 'commission.rate.edit'
   | 'finance.reports.view'
   | 'roles.create'
   | 'roles.edit'
@@ -45,7 +44,6 @@ export const PERMISSIONS: { key: PermissionKey; label: string; group: string; cr
   { key: 'agencies.apply', label: 'Ajans oluşturma başvurusu', group: 'Ajans' },
   { key: 'agencies.assign', label: 'Ajans atama', group: 'Ajans' },
   { key: 'bd.commission.view', label: 'BD komisyon raporunu görüntüle', group: 'Finans' },
-  { key: 'commission.rate.edit', label: 'Komisyon oranı değiştirme', group: 'Finans', critical: true, minScope: 'platform' },
   { key: 'finance.reports.view', label: 'Finansal raporları görüntüle', group: 'Finans', critical: true },
   { key: 'roles.create', label: 'Rol oluşturma', group: 'Yetki', critical: true, minScope: 'platform' },
   { key: 'roles.edit', label: 'Rol ve yetki değiştirme', group: 'Yetki', critical: true, minScope: 'platform' },
@@ -109,14 +107,13 @@ export type Role = {
 export type UserRole = { id: string; userId: string; roleId: string; scope: Scope; grantedBy: string; at: string };
 export type AuditLog = { id: string; at: string; actor: string; action: string; target: string; before?: string; after?: string; result: 'Uygulandı' | 'Reddedildi' };
 export type ModerationAction = { id: string; at: string; actor: string; action: 'Susturma' | 'Ban' | 'Ban kaldırma' | 'Uyarı'; userId: string; scope: Scope; reason: string; duration: string; result: 'Uygulandı' | 'Reddedildi'; note?: string };
-export type CommissionRule = { id: string; name: string; party: 'agency' | 'bd'; rate: number; basis: string; version: number; effective: string };
-export type RbacState = { roles: Role[]; userRoles: UserRole[]; audit: AuditLog[]; moderation: ModerationAction[]; commissions: CommissionRule[] };
+export type RbacState = { roles: Role[]; userRoles: UserRole[]; audit: AuditLog[]; moderation: ModerationAction[] };
 
 const ALL = PERMISSIONS.map((p) => p.key);
 export const INITIAL_RBAC: RbacState = {
   roles: [
     { id: 'super', name: 'Super Admin', permissions: ALL, denies: [], scopeTypes: ['platform'], priority: 100, protected: true, system: true },
-    { id: 'admin', name: 'Admin', permissions: ALL.filter((k) => k !== 'roles.edit' && k !== 'commission.rate.edit'), denies: [], scopeTypes: ['platform', 'region'], priority: 80, system: true },
+    { id: 'admin', name: 'Admin', permissions: ALL.filter((k) => k !== 'roles.edit'), denies: [], scopeTypes: ['platform', 'region'], priority: 80, system: true },
     { id: 'mod', name: 'Moderatör', permissions: ['users.view', 'users.mute', 'users.ban', 'rooms.manage'], denies: ['finance.reports.view'], scopeTypes: ['region', 'agency', 'room'], priority: 50, system: true },
     // BD: final approval, commission rates, payouts and bans stay off by default (spec: agency applications §4).
     {
@@ -139,10 +136,6 @@ export const INITIAL_RBAC: RbacState = {
   ],
   audit: [],
   moderation: [],
-  commissions: [
-    { id: 'c-agency', name: 'Ajans komisyonu', party: 'agency', rate: 0.4, basis: 'Ajans yayıncılarının geçerli elmas kazancı · yayıncıdan kesilmez, platform öder', version: 1, effective: '01.10.2026' },
-    { id: 'c-bd', name: 'BD komisyonu', party: 'bd', rate: 0.05, basis: 'BD’nin getirdiği ajansların platforma toplam maliyeti (yayıncı + ajans) · platform öder', version: 1, effective: '01.10.2026' },
-  ],
 };
 
 export const userName = (id: string) => (id === 'me' ? 'Sen' : (USERS.find((u) => u.id === id)?.name ?? id));

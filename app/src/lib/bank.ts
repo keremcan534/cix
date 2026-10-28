@@ -4,6 +4,8 @@
 // a bank ledger of block/release entries and an audit log. Every record carries the rule version
 // in effect when it was written; nothing is ever deleted — errors are fixed with reversal entries.
 // In production all of this runs server-side (atomic balance + ledger updates, idempotency keys).
+// The app only creates and tracks requests; review, approval, rejection and settlement are done by
+// the finance team on the separate Finance Control platform.
 import { useSyncExternalStore } from 'react';
 
 import { RULES } from '@/data/rules';
@@ -25,11 +27,9 @@ export type PayoutAccount = {
   handle?: string;
   status: VerifyStatus;
   created: string;
-  /** 26-char reference accepted by the app store's legacy requestWithdraw (IBAN-length check). */
-  legacyRef: string;
 };
 
-export type Actor = 'Kullanıcı' | 'Sistem' | 'Finans (demo)';
+export type Actor = 'Kullanıcı' | 'Sistem';
 export type PayoutStatus = 'Manuel inceleme' | 'Onaylandı' | 'Ödendi' | 'Başarısız' | 'Reddedildi';
 /** Statuses whose amount is still blocked (reserved) and can't be spent or requested again. */
 export const OPEN_STATUSES: PayoutStatus[] = ['Manuel inceleme', 'Onaylandı'];
@@ -40,7 +40,7 @@ export type Payout = {
   key: string; // idempotency key
   scope: Scope;
   diamonds: number;
-  account: { id: string; label: string; legacyRef: string };
+  account: { id: string; label: string };
   status: PayoutStatus;
   review: 'Otomatik onay' | 'Manuel inceleme';
   createdTs: number;
@@ -48,16 +48,9 @@ export type Payout = {
   ruleVersion: number;
   steps: PayoutStep[];
   reason?: string;
-  /** Set when a creator payout was settled through the app store's requestWithdraw. */
-  legacy?: { diamonds: number; iban: string };
 };
 
 export type EntryKind = 'Blokaj' | 'Blokaj çözüldü' | 'Ödeme çıkışı';
-export const ENTRY_EFFECT: Record<EntryKind, string> = {
-  Blokaj: 'Kullanılabilir → Blokeli',
-  'Blokaj çözüldü': 'Blokeli → Kullanılabilir (ters kayıt)',
-  'Ödeme çıkışı': 'Blokeli → Ödendi',
-};
 export type BankEntry = { id: string; ref: string; scope: Scope; kind: EntryKind; amount: number; payoutRef: string; time: string; ruleVersion: number };
 export type AuditRow = { id: string; ref: string; time: string; actor: Actor; action: string; detail: string; ruleVersion: number };
 
@@ -121,17 +114,6 @@ export const rejectedFor = (s: BankState, scope: Scope) => sum(byScope(s, scope)
  */
 export const weeklyUsedFor = (s: BankState, scope: Scope) => blockedFor(s, scope) + paidFor(s, scope);
 
-/** App-store withdrawals (made on /yayinci/cek) that weren't created by a Coins Bank payout. */
-export function unlinkedWithdrawals<T extends { diamonds: number; iban: string }>(withdrawals: T[], payouts: Payout[]): T[] {
-  const linked = payouts.filter((p) => p.legacy).map((p) => p.legacy!);
-  return withdrawals.filter((w) => {
-    const i = linked.findIndex((l) => l.diamonds === w.diamonds && l.iban === w.iban);
-    if (i === -1) return true;
-    linked.splice(i, 1);
-    return false;
-  });
-}
-
 // --- payout accounts -------------------------------------------------------------
 export type AccountInput = { kind: AccountKind; holder: string; iban?: string; provider?: Provider; handle?: string };
 
@@ -141,10 +123,6 @@ export function saveAccount(scope: Scope, input: AccountInput): string | null {
   if (input.kind === 'bank' && !validIban(input.iban ?? '')) return 'Geçerli bir IBAN gir (TR + 24 hane).';
   const handle = (input.handle ?? '').trim();
   if (input.kind === 'provider' && (!input.provider || handle.length < 4)) return 'Sağlayıcıyı seç ve hesap kimliğini (e-posta / hesap no) gir.';
-  const legacyRef =
-    input.kind === 'bank'
-      ? cleanIban(input.iban ?? '')
-      : `PV${input.provider!.slice(0, 2).toUpperCase()}${handle.toUpperCase().replace(/[^A-Z0-9]/g, '')}`.padEnd(26, '0').slice(0, 26);
   const prev = state.accounts[scope];
   const acc: PayoutAccount = {
     id: nextId('ACC'),
@@ -157,7 +135,6 @@ export function saveAccount(scope: Scope, input: AccountInput): string | null {
     // A new or changed account always starts unverified (re-verification on every change).
     status: 'Doğrulanmadı',
     created: clock(),
-    legacyRef,
   };
   const row = prev
     ? auditRow('Kullanıcı', 'Ödeme hesabı değiştirildi', `${SCOPE_LABEL[scope]}: ${accountLabel(prev)} → ${accountLabel(acc)} · yeniden doğrulama gerekli`, acc.id)
@@ -222,7 +199,7 @@ export function createPayout(input: { scope: Scope; diamonds: number; available:
     key: input.key,
     scope: input.scope,
     diamonds: input.diamonds,
-    account: { id: acc.id, label: accountLabel(acc), legacyRef: acc.legacyRef },
+    account: { id: acc.id, label: accountLabel(acc) },
     status: auto ? 'Onaylandı' : 'Manuel inceleme',
     review: auto ? 'Otomatik onay' : 'Manuel inceleme',
     createdTs: Date.now(),
@@ -251,35 +228,6 @@ export function createPayout(input: { scope: Scope; diamonds: number; available:
   });
   return { ok: true, payout, duplicate: false };
 }
-
-/** Moves a payout from one of `from` to `to`. Repeated taps are no-ops (status already changed). */
-function transition(id: string, from: PayoutStatus[], to: PayoutStatus, actor: Actor, step: string, action: string, entryKind?: EntryKind, patch?: Partial<Payout>): string | null {
-  const p = state.payouts.find((x) => x.id === id);
-  if (!p) return 'Talep bulunamadı.';
-  if (!from.includes(p.status)) return `Bu talep zaten "${p.status}" durumunda.`;
-  const t = clock();
-  const next: Payout = { ...p, ...patch, status: to, steps: [...p.steps, { label: step, time: t, actor, note: patch?.reason }] };
-  const entry: BankEntry | null = entryKind
-    ? { id: nextId('ENT'), ref: nextId('TX'), scope: p.scope, kind: entryKind, amount: p.diamonds, payoutRef: p.ref, time: t, ruleVersion: RULES.version }
-    : null;
-  const rows = [auditRow(actor, action, `${SCOPE_LABEL[p.scope]} · ${fmt(p.diamonds)} 💎${patch?.reason ? ` · ${patch.reason}` : ''}`, p.ref)];
-  if (entry?.kind === 'Blokaj çözüldü') rows.unshift(auditRow('Sistem', 'Blokaj çözüldü', `${fmt(p.diamonds)} 💎 tekrar kullanılabilir · ${entry.ref}`, p.ref));
-  emit({
-    ...state,
-    payouts: state.payouts.map((x) => (x.id === id ? next : x)),
-    entries: entry ? [entry, ...state.entries] : state.entries,
-    audit: [...rows, ...state.audit],
-  });
-  return null;
-}
-
-export const approvePayout = (id: string) => transition(id, ['Manuel inceleme'], 'Onaylandı', 'Finans (demo)', 'Manuel onay verildi', 'Ödeme manuel onaylandı');
-export const rejectPayout = (id: string, reason: string) =>
-  transition(id, ['Manuel inceleme'], 'Reddedildi', 'Finans (demo)', 'Reddedildi · blokaj çözüldü', 'Ödeme reddedildi', 'Blokaj çözüldü', { reason });
-export const completePayout = (id: string, legacy?: { diamonds: number; iban: string }) =>
-  transition(id, ['Onaylandı'], 'Ödendi', 'Sistem', 'Ödeme tamamlandı', 'Ödeme tamamlandı', 'Ödeme çıkışı', legacy ? { legacy } : undefined);
-export const failPayout = (id: string, reason: string) =>
-  transition(id, ['Onaylandı'], 'Başarısız', 'Sistem', 'Ödeme başarısız · blokaj çözüldü', 'Ödeme başarısız', 'Blokaj çözüldü', { reason });
 
 export function setBdView(v: boolean) {
   emit({ ...state, bdView: v, audit: [auditRow('Kullanıcı', v ? 'BD görünümü açıldı (demo)' : 'BD görünümü kapatıldı (demo)', 'Kapsam: yalnızca kendi ajansları', 'BD'), ...state.audit] });
@@ -313,6 +261,3 @@ export function computeBdShares(feed: BdEarning[], rate: number, ruleVersion: nu
   const rows = [...groups.values()].map((g) => ({ ...g, amount: Math.round(g.base * rate) }));
   return { rows, blocked, seen };
 }
-
-/** Live (non-render) read of a payout, for handlers that must not act on a stale snapshot. */
-export const getPayout = (id: string) => state.payouts.find((p) => p.id === id);

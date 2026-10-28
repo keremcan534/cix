@@ -127,14 +127,19 @@ export const GATES = {
 };
 
 // --- Recharge packs (TRY, store prices) -------------------------------------------------
-export const RECHARGE_PACKS = [
-  { id: 'p1', coins: 1_750, firstBonus: 750, price: 'TRY 27.99' },
-  { id: 'p2', coins: 4_000, firstBonus: 1_500, price: 'TRY 63.99' },
-  { id: 'p3', coins: 7_000, price: 'TRY 139' },
-  { id: 'p4', coins: 20_000, firstBonus: 3_000, price: 'TRY 369' },
-  { id: 'p5', coins: 40_000, price: 'TRY 729' },
-  { id: 'p6', coins: 70_000, bonus: 10_500, price: 'TRY 1,429.99' },
-  { id: 'p7', coins: 175_000, bonus: 26_250, price: 'TRY 3,449.99' },
-  { id: 'p8', coins: 350_000, bonus: 52_500, price: 'TRY 6,899.99' },
+// Priced for 5.000 diamonds = 1 USD: small packs cost a little more per coin, big packs cost the least
+// (1.000.000 coins = 23.599,99 TL). Every pack leaves the company a margin even if all its coins are gifted.
+// `tl` is the store price; prices are snapped to the App Store's TRY price points before release.
+const PACK_LIST: { id: string; coins: number; tl: number; firstBonus?: number }[] = [
+  { id: 'p1', coins: 1_000, firstBonus: 1_000, tl: 29.99 },
+  { id: 'p2', coins: 5_000, firstBonus: 2_500, tl: 139.99 },
+  { id: 'p3', coins: 10_000, tl: 269.99 },
+  { id: 'p4', coins: 20_000, tl: 519.99 },
+  { id: 'p5', coins: 50_000, tl: 1_279.99 },
+  { id: 'p6', coins: 100_000, tl: 2_499.99 },
+  { id: 'p7', coins: 200_000, tl: 4_899.99 },
+  { id: 'p8', coins: 500_000, tl: 11_999.99 },
+  { id: 'p9', coins: 1_000_000, tl: 23_599.99 },
 ];
-export type RechargePack = (typeof RECHARGE_PACKS)[number] & { firstBonus?: number; bonus?: number };
+export const RECHARGE_PACKS = PACK_LIST.map((p) => ({ ...p, price: `${p.tl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL` }));
+export type RechargePack = (typeof RECHARGE_PACKS)[number] & { bonus?: number };

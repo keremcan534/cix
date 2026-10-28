@@ -25,7 +25,6 @@ const GROWTH: Item[] = [
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
   { icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
-  { icon: 'construct-outline', label: 'Kazanç & bonus yönetimi (demo)', onPress: () => router.push('/yonetim') },
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi') },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi') },
   { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi') },

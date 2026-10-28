@@ -67,7 +67,6 @@ function RootStack() {
           <Stack.Screen name="vip" />
           <Stack.Screen name="aile" />
           <Stack.Screen name="cark" />
-          <Stack.Screen name="yonetim" />
           <Stack.Screen name="gelir/index" />
           <Stack.Screen name="gelir/detay" />
           <Stack.Screen name="davet" />

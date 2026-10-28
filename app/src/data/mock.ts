@@ -50,6 +50,8 @@ export type Room = {
   theme?: RoomTheme;
   bossSeat?: boolean;
   micPermission?: 'everyone' | 'members';
+  /** Mic layout (data/room-layouts); absent = classic grid. */
+  layoutId?: string;
 };
 
 export type Moment = {
@@ -185,7 +187,7 @@ export const ROOMS: Room[] = [
   { id: 'r4', title: 'Yeni Arkadaşlar 💜', category: 'Arkadaşlık', cover: photo('friends'), hostId: 'u7', listeners: 389, seatUserIds: ['u7', 'u5', 'u9', null, null, 'u3', null, null, null], tags: ['Tanışma'], level: 8, adminIds: ['me'], roomType: 'stage', theme: 'friends', bossSeat: true, announcement: 'Sen bu odanın yöneticisisin 🛡️' },
   { id: 'r5', title: 'Lo-fi & Ders Çalışma', category: 'Müzik', cover: photo('lofi'), hostId: 'u9', listeners: 76, seatUserIds: ['u9', null, null, null, null, null, null, null, null], tags: ['Lo-fi', 'Sessiz'], level: 3, track: 'm3', roomType: 'music' },
   { id: 'r6', title: 'Futbol Muhabbeti ⚽', category: 'Sohbet', cover: photo('football'), hostId: 'u6', listeners: 201, seatUserIds: ['u6', 'u2', 'u10', null, 'u12', null, null, null, null], tags: ['Spor'], level: 5, password: '1234', roomType: 'private', announcement: 'Özel oda · şifre: 1234 (demo)' },
-  { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', theme: 'pk', bossSeat: true, micPermission: 'members', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
+  { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', theme: 'pk', bossSeat: true, micPermission: 'members', layoutId: 'audio-9-team', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
 ];
 
 export const roomById = (id: string) => ROOMS.find((r) => r.id === id) ?? ROOMS[0];

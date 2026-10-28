@@ -22,18 +22,16 @@ import {
   type Scope,
   type ScopeType,
 } from '@/data/rbac';
-import { pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
-type Tab = 'roles' | 'assign' | 'check' | 'mod' | 'commission' | 'audit' | 'model';
+type Tab = 'roles' | 'assign' | 'check' | 'mod' | 'audit' | 'model';
 const TABS: [Tab, string][] = [
   ['roles', 'Roller'],
   ['assign', 'Atamalar'],
   ['check', 'Yetki kontrolü'],
   ['mod', 'Moderasyon'],
-  ['commission', 'Komisyon'],
   ['audit', 'Denetim'],
   ['model', 'Veri modeli'],
 ];
@@ -76,7 +74,6 @@ export default function RoleCenter() {
         {tab === 'assign' && <Assignments rbac={rbac} update={updateRbac} actor={actor} />}
         {tab === 'check' && <Checker rbac={rbac} />}
         {tab === 'mod' && <Moderation rbac={rbac} update={updateRbac} actor={actor} />}
-        {tab === 'commission' && <Commissions rbac={rbac} update={updateRbac} actor={actor} />}
         {tab === 'audit' && <Audit rbac={rbac} />}
         {tab === 'model' && <DataModel />}
         <Text style={styles.note}>Bu, panel davranışını gösteren bir prototiptir; değişiklikler gerçek sunucuya kaydedilmez. Canlıda her kontrol sunucuda yapılır.</Text>
@@ -433,70 +430,11 @@ function Moderation({ rbac, update, actor }: Props) {
   );
 }
 
-// --- Commission rules (BD + agency revenue share) -----------------------------------------------
-function Commissions({ rbac, update, actor }: Props) {
-  const { setRule } = useApp();
-  const change = (id: string, delta: number) => {
-    const rule = rbac.commissions.find((c) => c.id === id)!;
-    const next = Math.round(Math.min(0.9, Math.max(0, rule.rate + delta)) * 100) / 100;
-    const { d, entry } = guard(rbac, actor, 'commission.rate.edit', PLATFORM, 'Komisyon oranı', `${rule.name}: ${pct(rule.rate)} → ${pct(next)}`);
-    update((s) => ({
-      ...s,
-      commissions: d.allowed ? s.commissions.map((c) => (c.id === id ? { ...c, rate: next, version: c.version + 1, effective: clock() } : c)) : s.commissions,
-      audit: [entry, ...s.audit],
-    }));
-    if (!d.allowed) return showAlert('Reddedildi', d.reason);
-    setRule(rule.party === 'agency' ? 'agencyCommission' : 'bdCommission', next);
-  };
-  const agency = rbac.commissions.find((c) => c.party === 'agency')!;
-  const bd = rbac.commissions.find((c) => c.party === 'bd')!;
-  const streamer = 100_000;
-  const agencyCut = Math.round(streamer * agency.rate);
-  const bdCut = Math.round((streamer + agencyCut) * bd.rate);
-  return (
-    <>
-      <View style={styles.card}>
-        <Text style={styles.h2}>commission_rules</Text>
-        {rbac.commissions.map((c) => (
-          <View key={c.id} style={styles.assignRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>
-                {c.name} · {pct(c.rate)}
-              </Text>
-              <Text style={styles.dim}>
-                {c.basis} · v{c.version} · {c.effective}
-              </Text>
-            </View>
-            <Pressable onPress={() => change(c.id, -0.01)} accessibilityLabel={`${c.name} azalt`}>
-              <Ionicons name="remove-circle" size={26} color={colors.textDim} />
-            </Pressable>
-            <Pressable onPress={() => change(c.id, 0.01)} accessibilityLabel={`${c.name} artır`}>
-              <Ionicons name="add-circle" size={26} color={colors.primaryText} />
-            </Pressable>
-          </View>
-        ))}
-        <Text style={styles.dim}>Oran değişikliği kritik işlemdir: yalnızca platform kapsamında “Komisyon oranı değiştirme” izni olanlar yapabilir, yeni sürüm oluşturur ve geçmiş hak edişler eski sürümle kalır.</Text>
-      </View>
-      <View style={styles.summary}>
-        <Text style={styles.h2}>Örnek</Text>
-        <Text style={styles.sumText}>Yayıncı: 💎 {streamer.toLocaleString('tr-TR')} (kesinti yok)</Text>
-        <Text style={styles.sumText}>
-          Ajans ({pct(agency.rate)}): 💎 {agencyCut.toLocaleString('tr-TR')}
-        </Text>
-        <Text style={styles.sumText}>
-          BD ({pct(bd.rate)} × yayıncı+ajans): 💎 {bdCut.toLocaleString('tr-TR')}
-        </Text>
-        <Text style={styles.sumText}>Platform toplam maliyet: 💎 {(streamer + agencyCut + bdCut).toLocaleString('tr-TR')}</Text>
-      </View>
-    </>
-  );
-}
-
 function Audit({ rbac }: { rbac: RbacState }) {
   return (
     <View style={styles.card}>
       <Text style={styles.h2}>permission_audit_logs</Text>
-      {rbac.audit.length === 0 && <Text style={styles.dim}>Henüz kayıt yok. Rol, izin, atama ve komisyon değişiklikleri (reddedilen denemeler dahil) burada görünür.</Text>}
+      {rbac.audit.length === 0 && <Text style={styles.dim}>Henüz kayıt yok. Rol, izin ve atama değişiklikleri (reddedilen denemeler dahil) burada görünür.</Text>}
       {rbac.audit.map((a) => (
         <View key={a.id} style={{ gap: 2, paddingVertical: 4 }}>
           <Text style={{ color: a.result === 'Uygulandı' ? '#fff' : colors.red, fontWeight: '700' }}>
@@ -519,7 +457,6 @@ const TABLES: [string, string, string][] = [
   ['user_roles', 'id, user_id, role_id, scope_type, scope_id, granted_by, granted_at, expires_at', 'Kullanıcılara atanmış roller; bir kullanıcının birden fazla rolü olabilir.'],
   ['permission_audit_logs', 'id, actor_id, action, target, before_json, after_json, result, reason, ip, at', 'Yetki değişikliklerinin değiştirilemez geçmişi (reddedilenler dahil).'],
   ['moderation_actions', 'id, actor_id, user_id, action (mute|ban|unban|warn), scope_type, scope_id, reason, duration, expires_at, result, at', 'Ban, susturma vb. işlemlerin kaydı; itiraz akışına bağlanır.'],
-  ['commission_rules', 'id, party (agency|bd), rate, basis, version, effective_from, created_by', 'BD ve ajans gelir paylaşımı kuralları; sürümlüdür.'],
   ['permissions (kod)', 'key, label, group, critical, min_scope', 'İşlem türleri kataloğu: yeni işlem türü yazılım desteği gerektirir.'],
 ];
 function DataModel() {
