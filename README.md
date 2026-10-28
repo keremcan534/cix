@@ -71,14 +71,13 @@ Ek ve yeni güncelleme belgeleriyle eklenenler:
 | Aile | `src/app/aile.tsx` | Sahip/yardımcı/üye rolleri, başvuru onayı, aile sohbeti, LV1–15, aktif üye, haftalık bonus %1–5 |
 | Ajans sohbeti | `src/app/ajans/sohbet.tsx` | Yalnız üyeler; çevrimiçi/çevrimdışı listesi; ajanslar arası transfer akışı (panelde onay) |
 | Oyun merkezi | `src/app/oyunlar.tsx` | VIP2'de açılır, sağlayıcı doğrulamalı sonuç |
-| Yönetim (demo) | `src/app/yonetim.tsx` | USD kuru, ajans %40, oda sahibi %20, aile oranları, arama bonusları, sınırlar, örnek hesaplayıcı, değişiklik geçmişi |
 | Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
 
 Sonradan eklenenler: Ben sayfası, SVIP 1–10 / VIP abonelik / Asil (Şövalye–Dük) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
 
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 
-Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Değerler Profil > Kazanç & bonus yönetimi ekranından (demo) değiştirilebilir.
+Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD (1.000.000 jetonluk paket 23.599,99 TL), Lucky hediyede alıcıya değerin %20'si, elmas → jeton yalnız ana Coins Bank hesabında değere göre (%3), Coins Bank toptan %2, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Uygulamada bu değerler sabit varsayılanlardır; finans yönetimi (kurallar, onay, mutabakat) mobil uygulamadan çıkarıldı ve ayrı Finance Control platformuna taşınıyor.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 
@@ -91,6 +90,8 @@ Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sö
 - **Balkon, oda sayacı, katılımcı yönetimi, sohbet filtreleri:** mikrofonların altında Balkon ve dokunulabilir toplam sayaç; "Odadaki Kullanıcılar" penceresinde mikrofon daveti (davet edilen kabul eder), mikrofon susturma, kişisel sessiz, onaylı odadan çıkarma; sohbette Tümü / Hediyeler / Sohbet sekmeleri. Ayrıntı: [`docs/CANLI_ODA.md`](docs/CANLI_ODA.md).
 - **Küçültülebilir oda:** geri tuşu veya kapatma "Odayı küçült / Odadan çık" diye sorar; küçültülen oda her ekranda mini kart olarak sürer (aynı oturum, yeniden bağlanmadan), başka odaya geçiş önce sorulur, uygulama yeniden açılınca güvenli geri dönüş önerilir. Ses motoru şimdilik simülasyon; gerçek ses ve arka plan sesi için yapılandırma hazır. Ayrıntı ve teslim raporu: [`docs/ODA_OTURUMU.md`](docs/ODA_OTURUMU.md).
 - **PK:** Normal PK (varsayılan, bireysel), Takım PK (sunucuda rastgele veya manuel takımlar, ikiye ayrılan mikrofon alanı) ve odalar arası PK; koltuk altında canlı PK puanı, sonuç ekranı ve "Taç Kazandıranlar". Ayrıntı: [`docs/PK_MODULU.md`](docs/PK_MODULU.md).
+- **Yayına Katılma Modu ve ortak YouTube ekranı:** Oda Ayarları (veya oda menüsü) › Yayına Katılma Modu: Ses / Video / Sinema Salonu / Çift Odası sekmelerinde 34 mikrofon yerleşimi (katalog verisi), oda seviyesi kilidi, PK takım bölgeleri; Video ve Sinema Salonu'nda yalnızca YouTube bağlantısıyla ortak izleme. Yetki, seviye, kapasite ve bağlantı doğrulaması `lib/room-modes` içinde. Ayrıntı: [`docs/ODA_MODLARI.md`](docs/ODA_MODLARI.md).
+- **Maliyet hesabı:** uygulamadaki ekonomi kurallarıyla 24 aylık kâr-zarar, nakit ihtiyacı ve 100 TL'nin dağılımı; varsayımlar sayfada değiştirilebilir. Tarayıcıda açın: [`docs/maliyet-hesabi.html`](docs/maliyet-hesabi.html).
 
 ## Testler
 

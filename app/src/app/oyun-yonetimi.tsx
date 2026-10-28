@@ -33,7 +33,7 @@ function Row({ label, value, onChange }: { label: string; value: boolean; onChan
 
 export default function GameAdmin() {
   const { rbac } = useApp();
-  const { roomGames, casino, history } = useGames();
+  const { roomGames, casino, history, bank } = useGames();
   const [tab, setTab] = useState<'room' | 'casino'>('room');
   const can = resolve(rbac, 'me', 'games.manage', { type: 'platform' });
 
@@ -114,6 +114,13 @@ export default function GameAdmin() {
                 <Text style={s.dim}>Lisans: {g.license}</Text>
               </Card>
             ))}
+            <Card style={{ gap: 4 }}>
+              <Text style={s.title}>Kasa defteri</Text>
+              <Text style={s.dim}>Kural: oynanan jetonun %60’ı kasaya kalır, %40’ı ödül havuzuna girer ve kazananlara rastgele dağılır. Ödüller yalnızca havuzdan ödenir.</Text>
+              <Text style={s.dim}>
+                Oynanan {bank.wagered.toLocaleString('tr-TR')} · Kasa {bank.house.toLocaleString('tr-TR')} · Dağıtılan {bank.paid.toLocaleString('tr-TR')} · Havuz {bank.pool.toLocaleString('tr-TR')} (başlangıç avansı {bank.seed.toLocaleString('tr-TR')})
+              </Text>
+            </Card>
             <Card style={{ gap: 4 }}>
               <Text style={s.title}>Son oyun işlemleri</Text>
               {history.length === 0 ? (

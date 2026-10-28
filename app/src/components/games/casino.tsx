@@ -6,25 +6,26 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 
 import { Icon3D } from '@/components/Icon3D';
 import type { CasinoGame } from '@/data/games';
+import { WHEEL } from '@/lib/casino-odds';
 import { casinoAccess, newRequestId, playCasino, useGames, type Entry, type Outcome, type PlayResult } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
 const PICKS: Partial<Record<CasinoGame['id'], [string, string][]>> = {
   dice: [
-    ['small', 'Küçük (2–6)'],
-    ['big', 'Büyük (8–12)'],
+    ['small', 'Küçük (2–4) · 2.4x'],
+    ['big', 'Büyük (10–12) · 2.4x'],
   ],
   dragon: [
-    ['dragon', '🐉 Ejder'],
-    ['tie', 'Beraberlik'],
-    ['tiger', '🐯 Kaplan'],
+    ['dragon', '🐉 Ejder · 1.5x'],
+    ['tie', 'Beraberlik · 5.2x'],
+    ['tiger', '🐯 Kaplan · 1.5x'],
   ],
 };
-const WHEEL_LABELS = ['0x', '0.5x', '1x', '1.5x', '2x', '3x', '5x', '10x'];
+const WHEEL_LABELS = WHEEL.map((s) => `${s.mult}x`);
 
 export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entry: Entry }) {
-  const { wealthLevel, coins } = useApp();
+  const { wealthLevel, coins, gameCoins } = useApp();
   const { casino } = useGames();
   const game = casino.find((x) => x.id === gameId)!;
   const [bet, setBet] = useState(game.bets[0]);
@@ -73,7 +74,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
         <View style={[c.result, result.ok && result.row.payout > 0 && { borderColor: semantic.money }]} accessibilityLiveRegion="polite">
           {result.ok ? (
             <>
-              <Text style={c.resultMain}>{result.row.payout > 0 ? `+${result.row.payout.toLocaleString('tr-TR')} jeton` : 'Bu tur kazanç yok'}</Text>
+              <Text style={c.resultMain}>{result.row.payout > 0 ? `+${result.row.payout.toLocaleString('tr-TR')} jeton · oyun bakiyesine` : 'Bu tur kazanç yok'}</Text>
               <Text style={c.dim}>
                 {result.outcome.detail} · İşlem {result.row.txId}
                 {result.replay ? ' · aynı istek tekrar geldi, ikinci kez jeton düşülmedi' : ''}
@@ -106,6 +107,9 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
           {busy ? 'Sonuç bekleniyor…' : `Oyna · ${bet} jeton`} <Text style={{ fontWeight: '600' }}>(bakiye {coins.toLocaleString('tr-TR')})</Text>
         </Text>
       </Pressable>
+      <Text style={c.dim} accessibilityLabel={`Oyun bakiyesi ${gameCoins} jeton`}>
+        🎮 Oyun bakiyesi: {gameCoins.toLocaleString('tr-TR')} jeton · kazançlar buraya yazılır; bahisler önce buradan düşer. Yalnızca oyunlarda kullanılır, hediye edilemez ve paraya çevrilemez.
+      </Text>
       <Text style={c.dim}>{game.rules}</Text>
       {lastReq && !busy && (
         <Pressable onPress={() => play(lastReq)} accessibilityLabel="Aynı isteği tekrar gönder">

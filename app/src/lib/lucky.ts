@@ -1,12 +1,13 @@
 // Lucky gift module (spec "LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ").
 // The sender pays the gift price; the server draws a multiplier from the published odds and, on a win,
-// credits price × multiplier to the sender. The recipient's gift income is the normal gift value and is
-// accounted separately from the reward.
+// credits price × multiplier to the sender. The recipient earns diamonds for only part of the gift value
+// (RULES.luckyHostShare, 20 %); the rest of the price funds the rewards. Both are recorded on the send.
 //
 // This file plays the Lucky server: it owns the odds, the draw, the reward reserve, limits and records.
 // The client only sends (txId, gift, recipient) and shows the stored result. Each txId is processed once.
 import { useSyncExternalStore } from 'react';
 
+import { luckyHostDiamonds } from '@/data/rules';
 import { today } from '@/lib/persist';
 
 /** Odds are whole numbers out of 100,000 (0.001 % steps), so the total check is exact. */
@@ -44,6 +45,8 @@ export type LuckyRecord = {
   price: number;
   mult: number;
   reward: number;
+  /** Diamonds written to the recipient (share of the price, not the full value). */
+  hostDiamonds: number;
   configVersion: number;
   /** The odds this send was drawn with (frozen; later edits never change it). */
   odds: LuckyTier[];
@@ -207,6 +210,7 @@ export function sendLucky(
     price: g.price,
     mult,
     reward,
+    hostDiamonds: luckyHostDiamonds(g.price),
     configVersion: state.config.version,
     odds,
   };

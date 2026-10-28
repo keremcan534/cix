@@ -12,12 +12,11 @@ Tüm yetkiler tek bir merkezi panelden (uygulamada: **Ben > Rol ve Yetki Merkezi
 | `user_roles` | id, user_id, role_id, scope_type, scope_id, granted_by, granted_at, expires_at | Kullanıcılara atanmış roller (bir kullanıcının birden çok rolü olabilir) |
 | `permission_audit_logs` | id, actor_id, action, target, before_json, after_json, result, reason, ip, at | Yetki değişikliklerinin değiştirilemez geçmişi (reddedilen denemeler dahil) |
 | `moderation_actions` | id, actor_id, user_id, action (mute/ban/unban/warn), scope_type, scope_id, reason, duration, expires_at, result, at | Ban, susturma vb. işlemler |
-| `commission_rules` | id, party (`agency`/`bd`), rate, basis, version, effective_from, created_by | BD ve ajans gelir paylaşımı (sürümlü) |
 | `permissions` (kodda) | key, label, group, critical, min_scope | Desteklenen işlem türleri kataloğu |
 
 ## İzinler (işlem türleri)
 
-Kullanıcıları görüntüle, Kullanıcı susturma, Kullanıcı banlama (kritik), Oda yönetimi, Ajansları görüntüle, Ajans oluşturma başvurusu, Ajans atama, BD komisyon raporunu görüntüle, Komisyon oranı değiştirme (kritik, yalnız platform kapsamı), Finansal raporları görüntüle (kritik), Rol oluşturma (kritik, platform), Rol ve yetki değiştirme (kritik, platform).
+Kullanıcıları görüntüle, Kullanıcı susturma, Kullanıcı banlama (kritik), Oda yönetimi, Ajansları görüntüle, Ajans oluşturma başvurusu, Ajans atama, BD komisyon raporunu görüntüle, Finansal raporları görüntüle (kritik), Rol oluşturma (kritik, platform), Rol ve yetki değiştirme (kritik, platform).
 
 Ajans başvurusu grubu (atanmış/tüm başvurular, değerlendirme, belgeler, BD atama, kesin karar, ajans yönetimi, ajans komisyonu, Coins Bank, ödeme yetkisi, performans): ayrıntı [`AJANS_BASVURU.md`](AJANS_BASVURU.md).
 
@@ -42,4 +41,4 @@ Yeni rol, izin kombinasyonu, kapsam ve atama **kod değiştirmeden** panelden ek
 
 ## Komisyon (örnek)
 
-Yayıncı 100.000 💎 (kesinti yok) · Ajans %40 = 40.000 💎 · BD %5 × (yayıncı + ajans) = 7.000 💎 · platform maliyeti 147.000 💎. Oranlar `commission_rules` üzerinden sürümlenir; geçmiş hak edişler eski sürümle kalır.
+Yayıncı 100.000 💎 (kesinti yok) · Ajans %40 = 40.000 💎 · BD %5 × (yayıncı + ajans) = 7.000 💎 · platform maliyeti 147.000 💎. Oranlar sürümlenir; geçmiş hak edişler eski sürümle kalır. BD/ajans komisyon oranları Rol ve Yetki Merkezi'nde değil, ayrı Finance Control platformunda düzenlenir.

@@ -275,7 +275,7 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
   const [result, setResult] = useState<{ me: number; them: number; opponent: string } | null>(null);
   return (
     <Sheet visible={visible} onClose={onClose} title="🎲 Zar Düellosu">
-      <Text style={styles.dim}>Odadaki rastgele biriyle zar at; yüksek atan bahsi 2 katı alır, eşitlikte iade. 18+ · Günlük {playsLeft} hak kaldı. Sonuç sunucuda belirlenir (demo).</Text>
+      <Text style={styles.dim}>Odadaki rastgele biriyle zar at; rakibinden en az 3 fazla atarsan bahsinin 2,4 katı oyun bakiyene yazılır (yalnızca oyunlarda kullanılır). Oyunlarda oynanan jetonun %60&apos;ı kasaya kalır, %40&apos;ı kazananlara dağılır. 18+ · Günlük {playsLeft} hak kaldı. Sonuç sunucuda belirlenir.</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
         {[10, 50, 100].map((n) => (
           <Pressable key={n} onPress={() => setBet(n)} style={[styles.chip, bet === n && { borderColor: colors.primaryText }]}>
@@ -289,7 +289,7 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
             <Text style={styles.die}>{DIE[result.me - 1]}</Text>
             <Text style={styles.dim}>Sen</Text>
           </View>
-          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>{result.me > result.them ? '🏆' : result.me < result.them ? '😢' : '🤝'}</Text>
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>{result.me - result.them >= 3 ? '🏆' : '😢'}</Text>
           <View style={{ alignItems: 'center' }}>
             <Text style={styles.die}>{DIE[result.them - 1]}</Text>
             <Text style={styles.dim}>{userById(result.opponent).name}</Text>
