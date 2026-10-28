@@ -10,6 +10,8 @@ import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 
 export default function WalletScreen() {
@@ -34,6 +36,7 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Backdrop scene={SCENES.wallet} />
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="arrow-back" size={26} color="#fff" />

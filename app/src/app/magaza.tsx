@@ -9,7 +9,8 @@ import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/compon
 import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
-import { Ambient, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
@@ -50,7 +51,7 @@ export default function StoreScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Ambient />
+      <Backdrop scene={SCENES.store} />
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
       <View style={styles.tabTrack}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, padding: 4 }}>

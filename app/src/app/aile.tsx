@@ -5,6 +5,8 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet } from '@/components/ActionSheet';
 import { goToMember } from '@/components/GroupChat';
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
@@ -66,6 +68,7 @@ export default function FamilyScreen() {
   const ranked = [...FAMILIES].sort((a, b) => b.points - a.points);
   return (
     <SafeAreaView style={styles.safe}>
+      <Backdrop scene={SCENES.family} />
       <Header title="Kabileler" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
         {creating ? (

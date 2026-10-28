@@ -46,6 +46,25 @@ export function Gloss({ radius = 999, strength = 0.4 }: { radius?: number; stren
   );
 }
 
+/**
+ * The screen's own picture (fx/scenes) covering it under a navy veil, with the ambient glows on top. The veil
+ * is darkest at the top and bottom, where headers and tab bars sit, so the art shows mostly between cards.
+ * `strength` is the picture's opacity.
+ */
+export function Backdrop({ scene, strength = 0.9 }: { scene: number; strength?: number }) {
+  return (
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden' }]}>
+      <Image source={scene} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength }]} />
+      <LinearGradient
+        colors={['rgba(8,15,30,0.62)', 'rgba(8,15,30,0.12)', 'rgba(8,15,30,0.22)', 'rgba(8,15,30,0.78)']}
+        locations={[0, 0.3, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <Ambient />
+    </View>
+  );
+}
+
 /** Frosted glass for surfaces that float over scrolling content (bars, headers, sheets). */
 export function Glass({ children, style, intensity = 45 }: { children?: ReactNode; style?: StyleProp<ViewStyle>; intensity?: number }) {
   // Android without a blur target shows BlurView as a plain translucent layer; the tint keeps text legible there too.
