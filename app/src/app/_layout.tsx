@@ -2,6 +2,7 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
+import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
 import { RoomHost } from '@/components/room/room-host';
@@ -35,7 +36,11 @@ function RootStack() {
   // The live room, Hemen Tanış and the game platform live above the stack, so they keep running on every screen.
   return (
     <>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack
+        // Pushed screens slide in from the right on both platforms; screens with their own animation keep it.
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right' }}
+        screenLayout={({ children }) => <ScreenEnter>{children}</ScreenEnter>}
+      >
         <Stack.Protected guard={loggedIn}>
           <Stack.Screen name="(tabs)" />
           {/* The route only marks where the room is shown full screen; RoomHost renders the room itself. */}

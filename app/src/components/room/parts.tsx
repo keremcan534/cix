@@ -12,6 +12,7 @@ import type { FeedMsg } from '@/lib/chat-feed';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { Gloss, Shine } from '@/components/fx/surface';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -89,7 +90,7 @@ export function Seat({
 
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}>
-      <View ref={anchorRef} collapsable={false} style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }, speaking && styles.speakingGlow]}>
         {speaking && (
           <Animated.View
             style={[
@@ -104,9 +105,10 @@ export function Seat({
         ) : user ? (
           <Image source={{ uri: user.avatar }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
         ) : (
-          <View style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }]}>
-            <Ionicons name={locked ? 'lock-closed' : 'add'} size={small ? 18 : 22} color={colors.textDim} />
-          </View>
+          // A glass bubble lit from above instead of a dashed outline.
+          <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.03)']} style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }]}>
+            <Ionicons name={locked ? 'lock-closed' : 'add'} size={small ? 18 : 22} color="rgba(255,255,255,0.72)" />
+          </LinearGradient>
         )}
         {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
         {camera && user && (
@@ -292,7 +294,7 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
       {content}
     </LinearGradient>
   ) : (
-    <View style={[styles.chatLine, { backgroundColor: 'rgba(0,0,0,0.35)' }]}>{content}</View>
+    <View style={[styles.chatLine, styles.chatGlass]}>{content}</View>
   );
   if (msg.status !== 'failed') return line;
   return (
@@ -333,9 +335,10 @@ export function RoundBtn({
       {gift ? (
         <View style={[styles.round, styles.giftRound]}>
           <Icon3D name="gift" size={34} />
+          <Shine radius={24} every={3600} />
         </View>
       ) : (
-        <View style={[styles.round, { backgroundColor: colors.cardAlt }]}>
+        <View style={[styles.round, styles.glassRound]}>
           <Ionicons name={icon} size={22} color="#fff" />
         </View>
       )}
@@ -377,7 +380,8 @@ export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPres
       {({ pressed }) => (
         <>
           <View style={{ borderRadius: 28, backgroundColor: look.edge, paddingBottom: pressed ? 0 : 4, marginTop: pressed ? 4 : 0 }}>
-            <View style={[styles.micRound, { backgroundColor: look.bg }]}>
+            <View style={[styles.micRound, { backgroundColor: look.bg }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
+              <Gloss strength={0.32} />
               <Ionicons name={look.icon} size={26} color={look.fg} />
             </View>
           </View>
@@ -422,15 +426,23 @@ export function GiftAnimation({ gift, onDone }: { gift: Gift; onDone: () => void
 }
 
 export const roomStyles = StyleSheet.create({
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34 },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 -10px 30px rgba(0,0,0,0.45)' },
   sheetTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 10 },
 });
 
 const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
-  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live },
-  emptySeat: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live, boxShadow: '0 0 12px rgba(19,217,223,0.8)' },
+  speakingGlow: { boxShadow: '0 0 18px rgba(19,217,223,0.65)' },
+  emptySeat: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderTopColor: 'rgba(255,255,255,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: 'inset 0 -6px 12px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.25)',
+  },
   teamRing: { position: 'absolute', borderWidth: 3 },
   camBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.live, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, borderWidth: 1.5, borderColor: colors.bg },
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
@@ -446,16 +458,21 @@ const styles = StyleSheet.create({
   giftName: { color: '#fff', fontWeight: '800' },
   failed: { color: '#FF9AA1', fontSize: 12, fontWeight: '700' },
   seatName: { color: '#fff', fontSize: 12, maxWidth: 64 },
-  systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(19,217,223,0.25)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(19,217,223,0.2)', borderWidth: 1, borderColor: 'rgba(19,217,223,0.3)', borderTopColor: 'rgba(165,243,245,0.45)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
   systemText: { color: '#CFFAFE', fontSize: 12 },
-  botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
+  botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.15)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.28)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
   botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },
   chatLine: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, maxWidth: '85%' },
   chatText: { color: '#fff', fontSize: 14 },
+  // Dark glass: keeps white text readable over any room cover, with a lit top edge.
+  chatGlass: { backgroundColor: 'rgba(12,22,40,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.18)' },
   round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  giftRound: { backgroundColor: colors.cardAlt, borderWidth: 2, borderColor: semantic.money },
-  micRound: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  giftRound: { backgroundColor: 'rgba(246,189,96,0.16)', borderWidth: 2, borderColor: semantic.money, overflow: 'hidden', boxShadow: '0 0 16px rgba(246,189,96,0.45)' },
+  glassRound: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
+  micRound: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  micGlowOn: { boxShadow: '0 4px 16px rgba(19,217,223,0.6)' },
+  micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
   micCaption: { color: colors.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },

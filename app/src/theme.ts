@@ -54,6 +54,9 @@ export const gradient = ['#13D9DF', '#0FB8BE'] as const;
 /** Deep turquoise for icon buttons, headers and bubbles that carry white content. */
 export const gradientDeep = ['#0A8F95', '#076A70'] as const;
 
+/** Bottom tab bar height (without the safe-area inset); screens drawn under the glass bar pad by it. */
+export const TAB_BAR_HEIGHT = 64;
+
 /** 4-pt spacing scale: every gap and padding in new screens comes from here. */
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 /** Corner radii by role: chips and pills are round, cards medium, sheets large. */

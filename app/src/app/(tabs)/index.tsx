@@ -3,9 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { Ambient, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glassChip, glow } from '@/components/fx/surface';
+import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { Avatar, CoinPill } from '@/components/ui';
 import { roomCode } from '@/data/catalog';
 import { ROOMS, USERS, userById, type Room, type User } from '@/data/mock';
@@ -30,7 +32,7 @@ import {
 } from '@/data/rooms-ui';
 import { StarterPath } from '@/components/starter';
 import { useApp } from '@/store';
-import { colors, gradient, gradientDeep, semantic } from '@/theme';
+import { TAB_BAR_HEIGHT, colors, gradient, gradientDeep, semantic } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
 
 type MainTab = 'mine' | 'rec';
@@ -50,6 +52,8 @@ export default function RoomsScreen() {
   const [country, setCountry] = useState<CountryId>('ALL');
   const [sheet, setSheet] = useState<'events' | 'country' | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [headerH, setHeaderH] = useState(64);
+  const insets = useSafeAreaInsets();
 
   const visible = ROOMS.filter((r) => !blocked.has(r.hostId));
 
@@ -97,9 +101,9 @@ export default function RoomsScreen() {
           ? 'Üyesi olduğun oda yok.'
           : 'Takip ettiğin kimse şu an oda açmamış.';
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <View style={styles.header}>
+  const header = (
+    <Glass style={[styles.headerBar, { paddingTop: insets.top }]}>
+      <View style={styles.header} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height + insets.top)}>
         <View style={styles.mainTabs}>
           {(
             [
@@ -114,11 +118,12 @@ export default function RoomsScreen() {
           ))}
         </View>
         <View style={styles.headerIcons}>
-          <Pressable onPress={() => setSheet('events')} hitSlop={6} accessibilityLabel="Etkinlikler">
-            <LinearGradient colors={gradientDeep} style={styles.calendarBtn}>
+          <PressableScale onPress={() => setSheet('events')} hitSlop={6} accessibilityLabel="Etkinlikler">
+            <LinearGradient colors={gradientDeep} style={[styles.calendarBtn, glow('rgba(19,217,223,0.35)', 12, 3)]}>
+              <Gloss radius={9} strength={0.3} />
               <Ionicons name="calendar" size={17} color="#fff" />
             </LinearGradient>
-          </Pressable>
+          </PressableScale>
           <Pressable onPress={() => setSearchOpen(true)} hitSlop={6} accessibilityLabel="Oda ara">
             <Ionicons name="search" size={23} color={colors.text} />
           </Pressable>
@@ -128,11 +133,17 @@ export default function RoomsScreen() {
           </Pressable>
         </View>
       </View>
+    </Glass>
+  );
 
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Ambient />
       <FlatList
         data={main === 'rec' ? recRooms : mineRooms}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ gap: 10, paddingBottom: 96 }}
+        contentContainerStyle={{ gap: 12, paddingTop: headerH + 8, paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 96 }}
+        scrollIndicatorInsets={{ top: headerH }}
         ListHeaderComponent={
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
@@ -162,11 +173,17 @@ export default function RoomsScreen() {
         renderItem={({ item }) => <RoomRow room={item} />}
       />
 
-      <Pressable style={styles.fab} onPress={() => router.push('/oda/yeni')} accessibilityLabel="Oda oluştur">
-        <LinearGradient colors={gradient} style={styles.fabInner}>
-          <Ionicons name="add" size={30} color={semantic.actionInk} />
-        </LinearGradient>
-      </Pressable>
+      {/* Glass blurs what is already drawn beneath it, so the header comes after the list. */}
+      {header}
+
+      <View style={[styles.fab, { bottom: TAB_BAR_HEIGHT + insets.bottom + 18 }]}>
+        <PressableScale to={0.9} onPress={() => router.push('/oda/yeni')} accessibilityLabel="Oda oluştur">
+          <LinearGradient colors={gradient} style={[styles.fabInner, glow('rgba(19,217,223,0.5)', 14, 4)]}>
+            <Gloss />
+            <Ionicons name="add" size={30} color={semantic.actionInk} />
+          </LinearGradient>
+        </PressableScale>
+      </View>
 
       <ActionSheet
         visible={sheet === 'events'}
@@ -181,16 +198,21 @@ export default function RoomsScreen() {
         onClose={() => setSheet(null)}
       />
       <RoomSearch visible={searchOpen} rooms={visible} onClose={() => setSearchOpen(false)} />
-    </SafeAreaView>
+    </View>
   );
 }
 
+const RANK_ICON: Record<string, Icon3DName> = { cazibe: 'heart', zengin: 'crown', oda: 'trophy', dost: 'group' };
+
 function RankCards() {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
-      {RANK_CARDS.map((c) => (
-        <Pressable key={c.key} onPress={() => router.push({ pathname: '/siralama', params: { board: c.board } })}>
-          <LinearGradient colors={c.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rankCard}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
+      {RANK_CARDS.map((c, i) => (
+        <PressableScale key={c.key} onPress={() => router.push({ pathname: '/siralama', params: { board: c.board } })}>
+          <LinearGradient colors={c.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.rankCard, glow(`${c.colors[0]}99`, 12, 4)]}>
+            <EdgeLight strength={0.4} />
+            <Icon3D name={RANK_ICON[c.key] ?? 'trophy'} size={44} style={styles.rankIcon} />
+            <Shine radius={14} delay={i * 700} />
             <Text style={styles.rankTitle} numberOfLines={1}>
               {c.title}
             </Text>
@@ -202,7 +224,7 @@ function RankCards() {
               ))}
             </View>
           </LinearGradient>
-        </Pressable>
+        </PressableScale>
       ))}
     </ScrollView>
   );
@@ -219,11 +241,12 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, alignItems: 'center' }}>
       <CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />
       {items.map((it) => (
-        <Pressable key={it.key} style={styles.quick} onPress={it.onPress}>
+        <PressableScale key={it.key} style={styles.quick} onPress={it.onPress}>
+          <EdgeLight inset={10} strength={0.22} />
           <EmojiIcon emoji={it.emoji} size={15} />
           <Text style={styles.quickText}>{it.label}</Text>
           {it.dot && <View style={styles.dot} />}
-        </Pressable>
+        </PressableScale>
       ))}
     </ScrollView>
   );
@@ -259,14 +282,15 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
 
 function HostsRow({ hosts, rooms }: { hosts: User[]; rooms: Room[] }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 16 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 16, paddingHorizontal: 16 }, styles.glowRoomInner]}>
       {hosts.map((u) => {
         const hosted = rooms.find((r) => r.hostId === u.id);
         return (
-          <Pressable key={u.id} style={{ alignItems: 'center', gap: 2, width: 64 }} onPress={() => router.push(hosted ? `/oda/${hosted.id}` : `/kullanici/${u.id}`)}>
-            <View>
+          <PressableScale key={u.id} style={{ alignItems: 'center', gap: 2, width: 64 }} onPress={() => router.push(hosted ? `/oda/${hosted.id}` : `/kullanici/${u.id}`)}>
+            <View style={[{ borderRadius: 30 }, glow('rgba(19,217,223,0.4)', 12, 0)]}>
               <Avatar uri={u.avatar} size={60} ring />
               <View style={styles.hostLevel}>
+                <Gloss strength={0.3} />
                 <Ionicons name="stats-chart" size={9} color="#fff" />
                 <Text style={styles.hostLevelText}>{hostLevel(u.id)}</Text>
               </View>
@@ -274,7 +298,7 @@ function HostsRow({ hosts, rooms }: { hosts: User[]; rooms: Room[] }) {
             <Text style={styles.hostName} numberOfLines={1}>
               {u.name}
             </Text>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </ScrollView>
@@ -286,17 +310,25 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
   return (
     <View style={{ gap: 10 }}>
       <Text style={styles.section}>✨ Senin için</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
         {items.map(({ r, reason }) => (
-          <Pressable key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
-            <Image source={{ uri: r.cover }} style={styles.suggestImg} />
+          <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
+            <View style={styles.suggestFrame}>
+              <Image source={{ uri: r.cover }} style={styles.suggestImg} />
+              <LinearGradient colors={['rgba(8,15,30,0)', 'rgba(8,15,30,0.55)']} style={styles.suggestFade} />
+              <EdgeLight inset={10} strength={0.35} />
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>{r.listeners}</Text>
+              </View>
+            </View>
             <Text style={styles.suggestTitle} numberOfLines={1}>
               {r.title}
             </Text>
             <Text style={styles.suggestWhy} numberOfLines={1}>
               💡 {reason}
             </Text>
-          </Pressable>
+          </PressableScale>
         ))}
       </ScrollView>
     </View>
@@ -366,7 +398,10 @@ function RoomRow({ room }: { room: Room }) {
           <Text style={styles.watermarkBig}>TOP{top}</Text>
         </View>
       )}
-      <Image source={{ uri: room.cover }} style={styles.cover} />
+      <View style={styles.coverFrame}>
+        <Image source={{ uri: room.cover }} style={styles.cover} />
+        <EdgeLight inset={8} strength={0.4} />
+      </View>
       <View style={{ flex: 1, gap: 5, justifyContent: 'center' }}>
         <View style={styles.titleRow}>
           <Text style={styles.flag}>{countryFlag(roomCountry(room.id))}</Text>
@@ -381,6 +416,7 @@ function RoomRow({ room }: { room: Room }) {
         <View style={styles.chipRow}>
           {badge && (
             <LinearGradient colors={badge.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.badgeChip}>
+              <Gloss strength={0.3} />
               <Text style={{ fontSize: 11 }}>{badge.emoji}</Text>
               <Text style={styles.badgeText} numberOfLines={1}>
                 {badge.label}
@@ -395,6 +431,7 @@ function RoomRow({ room }: { room: Room }) {
           </View>
           {x.pk && (
             <LinearGradient colors={['#FF6576', '#0E7C9A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
+              <Gloss strength={0.35} />
               <Text style={styles.pkText}>PK</Text>
             </LinearGradient>
           )}
@@ -408,15 +445,16 @@ function RoomRow({ room }: { room: Room }) {
     </>
   );
   return (
-    <Pressable style={{ marginHorizontal: 16 }} onPress={() => router.push(`/oda/${room.id}`)}>
+    <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)}>
       {top > 0 ? (
-        <LinearGradient colors={TOP_BG[top]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.roomCard, styles.roomCardTop]}>
+        <DepthCard tint={TOP_BG[top]} style={[styles.roomCard, styles.roomCardTop, glow('rgba(246,189,96,0.18)', 22, 6)]}>
           {content}
-        </LinearGradient>
+          <Shine delay={top * 900} every={5200} />
+        </DepthCard>
       ) : (
-        <View style={styles.roomCard}>{content}</View>
+        <DepthCard style={styles.roomCard}>{content}</DepthCard>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -490,22 +528,25 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
 }
 
 const styles = StyleSheet.create({
+  headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
   mainTabs: { flexDirection: 'row', alignItems: 'flex-end', gap: 22 },
   mainTab: { color: colors.textDim, fontSize: 20, fontWeight: '600' },
-  mainTabActive: { color: colors.text, fontSize: 24, fontWeight: '800' },
-  underline: { width: 18, height: 4, borderRadius: 2, backgroundColor: colors.primary, marginTop: 3 },
-  underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 3 },
+  mainTabActive: { color: colors.text, fontSize: 24, fontWeight: '800', textShadowColor: 'rgba(19,217,223,0.45)', textShadowRadius: 12 },
+  // Active tab marker: bright turquoise with a soft glow, like a lit LED.
+  underline: { width: 18, height: 4, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 8px rgba(19,217,223,0.9)' },
+  underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 6px rgba(19,217,223,0.9)' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  calendarBtn: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-8deg' }] },
+  calendarBtn: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-8deg' }], overflow: 'hidden' },
   dot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
   section: { color: colors.text, fontSize: 16, fontWeight: '700', paddingHorizontal: 16 },
   // ranking cards
-  rankCard: { width: 148, height: 76, borderRadius: 14, padding: 10, justifyContent: 'space-between' },
-  rankTitle: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  rankCard: { width: 148, height: 80, borderRadius: 14, padding: 10, justifyContent: 'space-between', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
+  rankTitle: { color: '#fff', fontWeight: '800', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  rankIcon: { position: 'absolute', right: -4, bottom: -6, transform: [{ rotate: '-12deg' }] },
   rankAvatar: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: colors.cardAlt },
   // quick strip
-  quick: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999 },
+  quick: { flexDirection: 'row', alignItems: 'center', gap: 5, ...glassChip, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999 },
   quickText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -527,30 +568,37 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderWidth: 1.5,
     borderColor: colors.bg,
+    overflow: 'hidden',
   },
   hostLevelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   hostName: { color: colors.text, fontSize: 12, marginTop: 4 },
   // suggestions
   suggest: { width: 150, gap: 4 },
-  suggestImg: { width: 150, height: 90, borderRadius: 12, backgroundColor: colors.card },
+  suggestFrame: { width: 150, height: 90, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', boxShadow: '0 6px 16px rgba(0,0,0,0.4)' },
+  suggestImg: { width: '100%', height: '100%' },
+  suggestFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 40 },
+  liveBadge: { position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.6)', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: semantic.live, boxShadow: '0 0 6px #13D9DF' },
+  liveText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   suggestTitle: { color: '#fff', fontWeight: '700', fontSize: 13 },
   suggestWhy: { color: colors.textDim, fontSize: 12 },
   // room rows
-  roomCard: { flexDirection: 'row', gap: 12, padding: 10, borderRadius: 16, backgroundColor: colors.card, overflow: 'hidden' },
-  roomCardTop: { borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)' },
-  cover: { width: 84, height: 84, borderRadius: 12, backgroundColor: colors.cardAlt },
+  roomCard: { flexDirection: 'row', gap: 12, padding: 10, overflow: 'hidden' },
+  roomCardTop: { borderColor: 'rgba(246,189,96,0.35)' },
+  coverFrame: { width: 84, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cardAlt, boxShadow: '0 4px 10px rgba(0,0,0,0.35)' },
+  cover: { width: '100%', height: '100%' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   flag: { fontSize: 14 },
   roomTitle: { color: colors.text, fontWeight: '800', fontSize: 15, flexShrink: 1 },
   announce: { color: colors.textDim, fontSize: 12 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 92 },
+  badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 92, overflow: 'hidden' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
   lvChip: { backgroundColor: 'rgba(251,191,36,0.18)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   lvText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
   tagChip: { backgroundColor: 'rgba(19,217,223,0.2)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { color: '#A5F3F5', fontSize: 11, fontWeight: '600' },
-  pkPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  pkPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   pkText: { color: '#fff', fontSize: 11, fontWeight: '900', fontStyle: 'italic' },
   listeners: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   listenerText: { color: colors.text, fontSize: 13, fontWeight: '700' },
@@ -577,6 +625,10 @@ const styles = StyleSheet.create({
   searchHint: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12 },
   searchCover: { width: 44, height: 44, borderRadius: 10, backgroundColor: colors.cardAlt },
-  fab: { position: 'absolute', right: 20, bottom: 20 },
-  fabInner: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  fab: { position: 'absolute', right: 20 },
+  // Horizontal lists clip whatever spills past their bounds; this padding gives glows and shadows room
+  // to fade out, and the negative margin keeps the list's place in the layout.
+  glowRoom: { marginVertical: -16 },
+  glowRoomInner: { paddingVertical: 16 },
+  fabInner: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', overflow: 'hidden' },
 });
