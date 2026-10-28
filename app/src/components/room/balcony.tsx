@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
+import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { ROLE_RANK, type RoomRole } from '@/components/room/parts';
 import { userById } from '@/data/mock';
@@ -133,7 +134,12 @@ export function ParticipantsSheet({
             <Text style={[s.dim, { flex: 1, color: '#FDE7C2' }]}>Bağlantı yok: liste son alınan durumu gösteriyor; işlemler bağlantı dönünce yapılabilir.</Text>
           </View>
         )}
-        {hiddenMe && <Text style={s.dim}>👻 Gizli girişle Balkon’dasın: diğerlerinin listesinde ve sayısında görünmüyorsun.</Text>}
+        {hiddenMe && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Art name="oda-gizli-giris" size={18} />
+            <Text style={[s.dim, { flex: 1 }]}>Gizli girişle Balkon’dasın: diğerlerinin listesinde ve sayısında görünmüyorsun.</Text>
+          </View>
+        )}
         <View style={s.tabs} accessibilityRole="tablist">
           {(
             [

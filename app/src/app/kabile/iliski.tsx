@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { Art } from '@/components/Art';
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { CP_GIFT_IDS, KABILE_COUPLES, KABILE_FRIENDS, KABILE_ROUTES, findKabile, fmtK, kabile, kabileMemberIds, type Pair } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
@@ -77,7 +78,10 @@ export default function IliskiMeydani() {
         </View>
 
         <Card style={{ gap: 10 }}>
-          <Text style={styles.sectionTitle}>{mode === 'cp' ? '💞 En tatlı çift' : '🤝 En yakın dostlar'}</Text>
+          <View style={styles.titleRow}>
+            <Art name={mode === 'cp' ? 'iliski-cift-cp-en-tatli-cift' : 'iliski-dost-en-yakin-dostlar'} size={22} />
+            <Text style={styles.sectionTitle}>{mode === 'cp' ? 'En tatlı çift' : 'En yakın dostlar'}</Text>
+          </View>
           <Text style={[styles.dim, { textAlign: 'center' }]}>Dostlar aynı kabilede olduğunda kabile avantajlarından yararlanabilir.</Text>
           {list.map((pair, i) => (
             <View key={`${pair.a}-${pair.b}`} style={styles.rankRow}>
@@ -155,6 +159,7 @@ const styles = StyleSheet.create({
   toggleActive: { backgroundColor: semantic.socialFill },
   toggleText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   sectionTitle: { color: '#fff', fontWeight: '800', fontSize: 16, textAlign: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   rankRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rank: { color: colors.textDim, fontWeight: '900', width: 18 },
   pair: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(255,101,118,0.35)' },

@@ -3,6 +3,7 @@ import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Art, type ArtName } from '@/components/Art';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
 import { Avatar } from '@/components/ui';
@@ -11,7 +12,7 @@ import { followRoute, presenceLabel, presenceOf } from '@/data/presence';
 import type { GroupMsg } from '@/store';
 import { colors } from '@/theme';
 
-export type QuickAction = { key: string; label: string; emoji: string; tag?: string; onPress: () => void };
+export type QuickAction = { key: string; label: string; emoji: string; art?: ArtName; tag?: string; onPress: () => void };
 
 /** Open the room a member is in (asks for the password if locked) and announce whom we followed. */
 export const goToMember = (u: User) => {
@@ -139,7 +140,7 @@ export function GroupChat({
               {quickActions.map((a) => (
                 <Pressable key={a.key} style={styles.quick} onPress={a.onPress} accessibilityLabel={a.label}>
                   {a.tag && <Text style={styles.quickTag}>{a.tag}</Text>}
-                  <Text style={{ fontSize: 15 }}>{a.emoji}</Text>
+                  {a.art ? <Art name={a.art} size={19} /> : <Text style={{ fontSize: 15 }}>{a.emoji}</Text>}
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{a.label}</Text>
                 </Pressable>
               ))}

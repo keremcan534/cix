@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Art, type ArtName } from '@/components/Art';
 import type { User } from '@/data/mock';
 import { colors, semantic } from '@/theme';
 
@@ -69,10 +70,10 @@ export function Ludo({ players }: { players: Player[] }) {
           <Text style={g.small}>{pos[i] < 0 ? 'Ev' : pos[i] === TRACK ? '🏁' : pos[i]}</Text>
         </View>
       ))}
-      <Text style={g.log}>
-        {die ? `🎲 ${die} · ` : ''}
-        {log}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {die ? <Art name={`zar-zar-yuzu-${die}` as ArtName} size={24} /> : null}
+        <Text style={[g.log, { flexShrink: 1 }]}>{log}</Text>
+      </View>
       {winner === null ? (
         <Pressable style={[g.btn, turn !== 0 && g.btnOff]} disabled={turn !== 0} onPress={() => move(0, rnd(6) + 1)} accessibilityLabel="Zar at">
           <Text style={g.btnText}>{turn === 0 ? 'Zar at' : `${players[turn].name} oynuyor…`}</Text>

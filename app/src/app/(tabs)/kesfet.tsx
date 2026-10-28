@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 import { CharmBadge, VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
@@ -64,6 +67,7 @@ export default function DiscoverScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
+      <Backdrop scene={SCENES.discover} />
       <FlatList
         data={rows}
         keyExtractor={(r) => (r.kind === 'promo' ? 'promo' : r.user.id)}
@@ -255,7 +259,7 @@ function UserRow({
             </View>
           )}
           <View style={styles.chip}>
-            <Text style={[styles.chipText, { color: female ? colors.pink : '#38BDF8' }]}>{female ? '♀' : '♂'}</Text>
+            <Art name={female ? 'cinsiyet-kadin' : 'cinsiyet-erkek'} size={15} />
             <Text style={styles.chipText}>{user.age}</Text>
           </View>
           <SimilarityChip score={sim.score} />

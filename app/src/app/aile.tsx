@@ -5,7 +5,10 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet } from '@/components/ActionSheet';
+import { Art } from '@/components/Art';
 import { goToMember } from '@/components/GroupChat';
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { FAMILIES } from '@/data/economy';
@@ -66,6 +69,7 @@ export default function FamilyScreen() {
   const ranked = [...FAMILIES].sort((a, b) => b.points - a.points);
   return (
     <SafeAreaView style={styles.safe}>
+      <Backdrop scene={SCENES.family} />
       <Header title="Kabileler" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
         {creating ? (
@@ -666,7 +670,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           .slice(0, 3)
           .map((r, i) => (
             <View key={r.id} style={styles.row}>
-              <Text style={{ fontSize: 20 }}>{['🥇', '🥈', '🥉'][i]}</Text>
+              <Art name={(['derece-1', 'derece-2', 'derece-3'] as const)[i]} size={25} />
               <Avatar uri={userById(r.id).avatar} size={34} />
               <Text style={{ color: '#fff', flex: 1 }}>{userById(r.id).name}</Text>
               <Text style={{ color: colors.gold, fontWeight: '700' }}>{fmt(r.contribution)} katkı</Text>

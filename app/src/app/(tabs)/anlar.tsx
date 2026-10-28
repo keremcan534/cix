@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { FramedAvatar, GradientButton, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
 import {
@@ -249,10 +250,8 @@ function MomentCard({
             </Text>
             {author.gender && (
               <View style={[styles.genderChip, { backgroundColor: female ? 'rgba(255,101,118,0.18)' : 'rgba(56,189,248,0.18)' }]}>
-                <Text style={{ color: female ? colors.pink : '#38BDF8', fontSize: 12, fontWeight: '700' }}>
-                  {female ? '♀' : '♂'}
-                  {author.age}
-                </Text>
+                <Art name={female ? 'cinsiyet-kadin' : 'cinsiyet-erkek'} size={14} />
+                <Text style={{ color: female ? colors.pink : '#38BDF8', fontSize: 12, fontWeight: '700' }}>{author.age}</Text>
               </View>
             )}
             {author.verified && <VerifiedBadge size={15} />}
@@ -449,7 +448,7 @@ const styles = StyleSheet.create({
   svipText: { color: '#fff', fontSize: 8, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { color: '#fff', fontWeight: '800', fontSize: 15, maxWidth: 150 },
-  genderChip: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  genderChip: { flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   meta: { color: colors.textDim, fontSize: 12 },
   hiBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.5)' },
   hiText: { color: colors.pink, fontWeight: '900', fontStyle: 'italic', fontSize: 14 },

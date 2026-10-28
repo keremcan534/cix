@@ -2,6 +2,7 @@
 // (gifts, Lucky gifts at the coins actually spent, paid messages and calls, store, family, room activities).
 // Coin games and coin hand-outs (room envelopes, transfers) never add points.
 // Thresholds are product data; Lv.35 and Lv.36 are interpolated until the product team confirms them.
+import type { ArtName } from '@/components/Art';
 
 export const WEALTH_XP = [
   0, 10, 30, 55, 88, 130, 160, 195, 345, 555, // 0–9
@@ -32,7 +33,7 @@ export type LevelIcon = 'leaf' | 'diamond-outline' | 'diamond' | 'flower' | 'rib
 /** A group of levels sharing one emblem (used by Servet and Cazibe). */
 export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string };
 export type WealthTier = LevelTier;
-export type LevelPerk = { key: string; title: string; detail: string; emoji: string; from: number; kind: 'privilege' | 'costume' };
+export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume' };
 export const WEALTH_TIERS: WealthTier[] = [
   { from: 0, to: 4, name: 'Filiz', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
   { from: 5, to: 9, name: 'Kristal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
@@ -58,7 +59,7 @@ export const WEALTH_PERKS: WealthPerk[] = [
   { key: 'broadcast', title: 'Platform duyurusu', detail: 'Seviye atlaman tüm platformda kayan yazıyla görünür', emoji: '📡', from: 33, kind: 'privilege' },
   { key: 'entry', title: 'Giriş efekti', detail: 'Odaya girişte seviye renginde efekt', emoji: '✨', from: 5, kind: 'costume' },
   { key: 'medal', title: 'Seviye madalyası', detail: 'Profil vitrininde seviye grubunun amblemi', emoji: '🎖️', from: 10, kind: 'costume' },
-  { key: 'frame', title: 'Profil çerçevesi', detail: 'Seviye grubunun renklerinde avatar çerçevesi', emoji: '🖼️', from: 20, kind: 'costume' },
+  { key: 'frame', title: 'Profil çerçevesi', detail: 'Seviye grubunun renklerinde avatar çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi', from: 20, kind: 'costume' },
 ];
 
 /** Level gift names by group (shown in the perk card). */

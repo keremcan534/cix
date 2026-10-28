@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
@@ -120,6 +121,7 @@ export function ChoiceSheet<T extends string | number>({
 
 function Row({
   label,
+  labelArt,
   hint,
   value,
   valueArt,
@@ -128,6 +130,8 @@ function Row({
   locked,
 }: {
   label: string;
+  /** 3D picture drawn before the label. */
+  labelArt?: ArtName;
   hint?: string;
   value?: string;
   valueArt?: number;
@@ -139,7 +143,14 @@ function Row({
   return (
     <Pressable style={styles.row} onPress={toggle ? undefined : press} accessibilityLabel={label}>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.rowLabel}>{label}</Text>
+        {labelArt ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Art name={labelArt} size={22} />
+            <Text style={[styles.rowLabel, { flexShrink: 1 }]}>{label}</Text>
+          </View>
+        ) : (
+          <Text style={styles.rowLabel}>{label}</Text>
+        )}
         {hint && <Text style={styles.hint}>{hint}</Text>}
       </View>
       {toggle ? (
@@ -696,7 +707,7 @@ export function RoomSettingsScreen({
             hint="Etkinleştirildiğinde video odası ekran görüntüsü alma veya kaydetmeye karşı korunur"
             toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
           />
-          <Row label="🤖 Oda botu (karşılama ve kurallar)" toggle={{ value: botOn, onChange: setBot }} />
+          <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} />
           <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve patron koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
         </ScrollView>
       </SafeAreaView>

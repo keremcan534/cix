@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, artSource, type ArtName } from '@/components/Art';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
@@ -271,7 +272,7 @@ export function EnvelopeDrop({ from, seconds, onGrab }: { from: string; seconds:
 }
 
 // --- Dice mini game ----------------------------------------------------------------
-const DIE = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const DIE: ArtName[] = ['zar-zar-yuzu-1', 'zar-zar-yuzu-2', 'zar-zar-yuzu-3', 'zar-zar-yuzu-4', 'zar-zar-yuzu-5', 'zar-zar-yuzu-6'];
 export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: boolean; onClose: () => void; onPlay: (bet: number) => { me: number; them: number; opponent: string } | null; playsLeft: number }) {
   const [bet, setBet] = useState(10);
   const [result, setResult] = useState<{ me: number; them: number; opponent: string } | null>(null);
@@ -288,12 +289,12 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
       {result && (
         <View style={styles.diceRow}>
           <View style={{ alignItems: 'center' }}>
-            <Text style={styles.die}>{DIE[result.me - 1]}</Text>
+            <Art name={DIE[result.me - 1]} size={80} style={styles.die} />
             <Text style={styles.dim}>Sen</Text>
           </View>
           <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>{result.me - result.them >= 3 ? '🏆' : '😢'}</Text>
           <View style={{ alignItems: 'center' }}>
-            <Text style={styles.die}>{DIE[result.them - 1]}</Text>
+            <Art name={DIE[result.them - 1]} size={80} style={styles.die} />
             <Text style={styles.dim}>{userById(result.opponent).name}</Text>
           </View>
         </View>
@@ -331,7 +332,7 @@ export function ContributionModal({ visible, onClose, data, locked }: { visible:
 // --- Speak requests -----------------------------------------------------------------
 export function RequestsModal({ visible, onClose, requests, onAccept, onReject, freeSeats }: { visible: boolean; onClose: () => void; requests: string[]; onAccept: (id: string) => void; onReject: (id: string) => void; freeSeats: number }) {
   return (
-    <Sheet visible={visible} onClose={onClose} title={`🙋 Konuşmacı kuyruğu (${requests.length})`}>
+    <Sheet visible={visible} onClose={onClose} title={`Konuşmacı kuyruğu (${requests.length})`} art={artSource('oda-konusmaci-kuyrugu-el-kaldir')}>
       <Text style={styles.dim}>Sıra geliş sırasına göre. Boş mikrofon: {freeSeats}. Mikrofon doluysa kabul edilen kişi bekleme listesinde kalır.</Text>
       {requests.length === 0 && <Text style={styles.dim}>Bekleyen istek yok.</Text>}
       {requests.map((id, i) => (
@@ -365,5 +366,5 @@ const styles = StyleSheet.create({
   envelopeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   envelopeTimer: { color: colors.gold, fontSize: 12, fontWeight: '900' },
   diceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 12 },
-  die: { fontSize: 64, color: '#fff' },
+  die: { marginBottom: 4 },
 });

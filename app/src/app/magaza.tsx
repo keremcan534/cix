@@ -9,7 +9,8 @@ import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/compon
 import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
-import { Ambient, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
@@ -17,7 +18,7 @@ import { useApp } from '@/store';
 import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, ReactionArt } from '@/components/ReactionArt';
-import { STORE_TAB_ART, storeArtOf } from '@/components/StoreArt';
+import { SPECIAL_ID_ART, STORE_TAB_ART, frameBadgeArtOf, storeArtOf } from '@/components/StoreArt';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -50,7 +51,7 @@ export default function StoreScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Ambient />
+      <Backdrop scene={SCENES.store} />
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
       <View style={styles.tabTrack}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, padding: 4 }}>
@@ -175,11 +176,13 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
     );
   }
   if (item.kind === 'frame' && item.fx) {
+    const badge = frameBadgeArtOf(item.id);
     return (
       <View style={{ height: 76, justifyContent: 'center' }}>
         <AnimatedFrame fx={item.fx as FrameFx} size={64} still={still}>
           <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
+        {badge && <Image source={badge} style={styles.frameBadge} accessibilityLabel={item.name} />}
       </View>
     );
   }
@@ -227,7 +230,14 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
       </View>
     );
   }
-  if (item.kind === 'specialId') return <Text style={styles.idPreview}>{item.name.replace('ID ', '')}</Text>;
+  if (item.kind === 'specialId') {
+    return (
+      <View style={styles.artStack}>
+        <Image source={SPECIAL_ID_ART} style={styles.idArt} accessibilityLabel={item.name} />
+        <Text style={[styles.idPreview, styles.idPreviewSmall]}>{item.name.replace('ID ', '')}</Text>
+      </View>
+    );
+  }
   return <Text style={{ fontSize: 44, height: 64, textAlignVertical: 'center' }}>{item.emoji}</Text>;
 }
 
@@ -260,5 +270,8 @@ const styles = StyleSheet.create({
   bubblePreview: { height: 64, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 16, marginVertical: 0 },
   bubblePreviewSmall: { height: 32 },
   idPreview: { color: colors.gold, fontSize: 30, fontWeight: '900', height: 64, textAlignVertical: 'center', letterSpacing: 2, paddingTop: 12 },
+  idPreviewSmall: { fontSize: 20, height: 26, paddingTop: 0 },
+  idArt: { width: 44, height: 44 },
+  frameBadge: { position: 'absolute', right: -14, bottom: 0, width: 30, height: 30 },
   footer: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },
 });

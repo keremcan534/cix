@@ -2,7 +2,7 @@
 // own colored light (fx/float) instead of sitting in boxes; game tiles break out of a lit plate.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FloatIcon, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
@@ -55,7 +55,7 @@ export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean
                         {s.variant === 'tool' ? (
                           <View style={[styles.tool, { borderColor: `${hue}38` }]}>
                             <LinearGradient colors={[`${hue}2E`, `${hue}08`]} style={StyleSheet.absoluteFill} />
-                            {it.icon ? <Ionicons name={it.icon} size={24} color={hue} /> : <Text style={{ fontSize: 22 }}>{it.emoji}</Text>}
+                            {it.icon ? <Ionicons name={it.icon} size={24} color={hue} /> : it.art ? <Image source={it.art} style={{ width: 28, height: 28 }} /> : <Text style={{ fontSize: 22 }}>{it.emoji}</Text>}
                           </View>
                         ) : (
                           <FloatIcon source={it.art ?? icon3dSourceFor(it.emoji)} emoji={it.emoji} size={46} hue={hue} />

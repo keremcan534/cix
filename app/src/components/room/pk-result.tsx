@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
+import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { fmt, nameOf } from '@/components/room/pk';
 import { userById } from '@/data/mock';
@@ -104,7 +105,12 @@ export function PkResultScreen({
             <Text style={s.kicker}>
               {modeLabel(pk)} · {pk.durationMin} dk
             </Text>
-            {!cancelled && <Icon3D name={r && (pk.mode === 'solo' ? r.winners.length === 1 : r.winner !== 'tie') ? 'crown' : 'trophy'} size={58} />}
+            {!cancelled &&
+              (r && (pk.mode === 'solo' ? r.winners.length === 1 : r.winner !== 'tie') ? (
+                <Icon3D name="crown" size={58} />
+              ) : (
+                <Art name={r && (pk.mode === 'solo' ? r.winners.length > 1 : r.winner === 'tie') ? 'pk-beraberlik' : 'pk-pk-bitti'} size={58} />
+              ))}
             <Text style={s.title} accessibilityRole="header">
               {title}
             </Text>
@@ -155,8 +161,8 @@ export function PkResultScreen({
                       {members.map((m, i) => (
                         <View key={m.userId} style={s.memberRow}>
                           <Face uid={m.userId} size={28} onProfile={onProfile} />
+                          {i === 0 && m.points > 0 && <Art name="pk-pk-mvp-one-cikan" size={17} />}
                           <Text style={s.memberName} numberOfLines={1}>
-                            {i === 0 && m.points > 0 ? '⭐ ' : ''}
                             {nameOf(m.userId)}
                           </Text>
                           <Text style={s.memberPts}>{fmt(m.points)}</Text>
@@ -245,7 +251,7 @@ export function CrownScreen({ pk, still, onClose, onProfile }: { pk: PkSession; 
           <ScrollView contentContainerStyle={{ padding: 14, gap: 14 }}>
             {!r || groups.length === 0 ? (
               <View style={s.empty}>
-                <Text style={{ fontSize: 34 }}>🤝</Text>
+                <Art name="pk-beraberlik" size={43} />
                 <Text style={s.body}>{r?.noCrown ?? 'Bu PK için taç bilgisi yok.'}</Text>
                 <Text style={s.dim}>Taç yalnızca açık bir kazanan olduğunda verilir ve kazanana PK süresince geçerli hediye gönderenlerden oluşur.</Text>
               </View>

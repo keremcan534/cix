@@ -11,6 +11,7 @@ import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { Art } from '@/components/Art';
 
 const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
   roomMinutes: { desc: 'Sohbet odasında belirtilen süre kadar kal', go: () => router.push('/(tabs)') },
@@ -103,9 +104,16 @@ export default function TaskCenter() {
             const claimed = claimedTasks.has(t.id);
             return (
               <View key={t.id} style={[styles.task, i > 0 && styles.sep]}>
-                <Text style={styles.taskTitle}>
-                  {t.icon} {t.title}
-                </Text>
+                {t.art ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Art name={t.art} size={26} />
+                    <Text style={[styles.taskTitle, { flexShrink: 1 }]}>{t.title}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.taskTitle}>
+                    {t.icon} {t.title}
+                  </Text>
+                )}
                 <Text style={styles.dim}>{TASK_INFO[t.key].desc}</Text>
                 <View style={styles.rowBetween}>
                   <Text style={{ color: '#A5F3F5', fontSize: 15 }}>

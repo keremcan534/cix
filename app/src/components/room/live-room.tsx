@@ -46,6 +46,7 @@ import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry
 import { storeArtOf } from '@/components/StoreArt';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
+import { Art, artSource } from '@/components/Art';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
@@ -1503,7 +1504,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       title: 'Etkileşimli Oyunlar',
       variant: 'round',
       items: [
-        ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'PK', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
+        ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
@@ -1573,7 +1574,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
   const clan = isOwn
     ? familyId
-      ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : '🏰 Ailem', href: '/aile' as const }
+      ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : 'Ailem', href: '/aile' as const, ...(ownFamily ? {} : { art: artSource('oda-ailem') }) }
       : ownAgencyName
         ? { label: ownAgencyName, href: '/ajans' as const, art: ROOM_ICON_ART.agency }
         : null
@@ -1779,7 +1780,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </View>
             {canManage && (micQueue || queue.length > 0) && (
               <Pressable onPress={() => setPanel('requests')} accessibilityLabel={`Konuşma istekleri, ${queue.length} kişi`} hitSlop={6}>
-                <Text style={{ fontSize: 20 }}>🙋</Text>
+                <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={25} />
                 {queue.length > 0 && (
                   <View style={styles.reqBadge}>
                     <Text style={styles.reqBadgeText}>{queue.length}</Text>
@@ -1832,7 +1833,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 </ArtText>
               </View>
             )}
-            {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
+            {myQueuePos !== null && (
+              <View style={[styles.queueChipRow, { backgroundColor: 'rgba(19,217,223,0.35)' }]}>
+                <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={18} />
+                <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
+              </View>
+            )}
             {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
               <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
                 <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
@@ -2277,6 +2283,8 @@ const styles = StyleSheet.create({
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
+  queueChipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  queueChipText: { color: '#fff', fontSize: 12, flexShrink: 1 },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 10, height: 48 },
   input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },

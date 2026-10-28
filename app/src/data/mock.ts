@@ -113,6 +113,7 @@ export const ME: User = {
   birthDate: '2002-03-14',
   joinedAt: '2026-09-02',
   photos: [],
+  gender: 'Erkek',
   showGender: true,
 };
 

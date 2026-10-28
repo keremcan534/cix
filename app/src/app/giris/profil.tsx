@@ -6,9 +6,11 @@ import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, type ArtName } from '@/components/Art';
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
 import { INTERESTS } from '@/data/mock';
+import { GENDER_ART, interestParts } from '@/data/profile-art';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -77,7 +79,7 @@ export default function ProfileSetupScreen() {
           <Field label="Cinsiyet">
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {(['Kadın', 'Erkek'] as const).map((g) => (
-                <Chip key={g} label={g === 'Kadın' ? '👩 Kadın' : '👨 Erkek'} active={gender === g} onPress={() => setGender(g)} grow />
+                <Chip key={g} label={g} art={GENDER_ART[g]} active={gender === g} onPress={() => setGender(g)} grow />
               ))}
             </View>
           </Field>
@@ -106,7 +108,7 @@ export default function ProfileSetupScreen() {
           <Field label={`İlgi alanları (${interests.length}/5)`}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {INTERESTS.map((i) => (
-                <Chip key={i} label={i} active={interests.includes(i)} onPress={() => toggleInterest(i)} />
+                <InterestChip key={i} label={i} active={interests.includes(i)} onPress={() => toggleInterest(i)} />
               ))}
             </View>
           </Field>
@@ -128,12 +130,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Chip({ label, active, onPress, grow }: { label: string; active: boolean; onPress: () => void; grow?: boolean }) {
+function Chip({ label, art, active, onPress, grow }: { label: string; art?: ArtName; active: boolean; onPress: () => void; grow?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, grow && { flex: 1, alignItems: 'center' }, active && styles.chipActive]}>
+    <Pressable onPress={onPress} style={[styles.chip, art && styles.chipRow, grow && { flex: 1, alignItems: 'center', justifyContent: 'center' }, active && styles.chipActive]}>
+      {art && <Art name={art} size={18} />}
       <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
     </Pressable>
   );
+}
+
+/** An interest chip: its 3D picture and name, or the stored emoji label when there is no picture. */
+function InterestChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const { art, name } = interestParts(label);
+  return <Chip label={art ? name : label} art={art} active={active} onPress={onPress} />;
 }
 
 const styles = StyleSheet.create({
@@ -145,6 +154,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 16, paddingHorizontal: 16, paddingVertical: 13 },
   error: { color: colors.red, fontSize: 13, marginTop: -12 },
   chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: 'transparent' },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
   chipText: { color: colors.textDim, fontWeight: '600' },
 });

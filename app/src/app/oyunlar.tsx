@@ -9,7 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { BreakoutCard, FloatIcon, GlossButton } from '@/components/fx/float';
-import { Ambient, DepthCard, glassChip } from '@/components/fx/surface';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop, DepthCard, glassChip } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
@@ -33,7 +34,7 @@ export default function GameCenter() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Ambient />
+      <Backdrop scene={SCENES.games} />
       <Header title="Oyun Merkezi" />
       <View style={s.tabs}>
         {(
