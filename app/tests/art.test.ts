@@ -16,7 +16,7 @@ import { emojiKey, stickersOf } from '@/lib/stickers';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
 const read = (file: string) => readFileSync(resolve(SRC, file), 'utf8');
-const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/RoomArt.tsx', 'components/GameArt.tsx', 'components/fx/anim-art.tsx'];
+const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/RoomArt.tsx', 'components/Art.tsx', 'components/fx/anim-art.tsx'];
 
 describe('Görsel dosyaları', () => {
   test('bağlanan her PNG diskte var', () => {
@@ -58,9 +58,13 @@ describe('Görsel dosyaları', () => {
   });
 
   test('oyun görselleri gerçek oyunlara bağlı', () => {
-    const ids = [...read('components/GameArt.tsx').matchAll(/^  (\w+): require/gm)].map((m) => m[1]);
-    assert.ok(ids.length > 0);
-    for (const id of ids) assert.ok([...ROOM_GAMES, ...CASINO_GAMES].some((g) => g.id === id), id);
+    const covers = [...read('components/GameArt.tsx').matchAll(/^  (\w+): '(oyun-[^']+)',/gm)].map((m) => [m[1], m[2]]);
+    const art = read('components/Art.tsx');
+    assert.ok(covers.length > 0);
+    for (const [id, name] of covers) {
+      assert.ok([...ROOM_GAMES, ...CASINO_GAMES].some((g) => g.id === id), id);
+      assert.ok(art.includes(`'${name}': require`), name);
+    }
   });
 
   test('yerleşik animasyonlar emoji değil görsel çizer', () => {

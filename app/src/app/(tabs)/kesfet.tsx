@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { CharmBadge, VerifiedBadge, VipBadge } from '@/components/ui';
@@ -258,7 +259,7 @@ function UserRow({
             </View>
           )}
           <View style={styles.chip}>
-            <Text style={[styles.chipText, { color: female ? colors.pink : '#38BDF8' }]}>{female ? '♀' : '♂'}</Text>
+            <Art name={female ? 'cinsiyet-kadin' : 'cinsiyet-erkek'} size={15} />
             <Text style={styles.chipText}>{user.age}</Text>
           </View>
           <SimilarityChip score={sim.score} />
