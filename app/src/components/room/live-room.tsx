@@ -49,6 +49,7 @@ import { gameArtOf } from '@/components/GameArt';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
+import { Ambient } from '@/components/fx/surface';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
@@ -57,6 +58,7 @@ import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
 import { SessionBanner, SessionTestSheet, closeRoomScreen } from '@/components/room/session-ui';
 import { ChatFeed } from '@/components/room/chat-feed';
+import { InboxSheet, useInboxUnread } from '@/components/room/inbox-sheet';
 import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
 import { StageLayout } from '@/components/room/stage-layout';
@@ -264,8 +266,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => {
     visibleRef.current = visible;
   }, [visible]);
-  // Room camera (video seat). Only while seated; turned off when a one-to-one call takes the devices.
+  // Room camera. Only on a video seat of the layout: on when I take one, off when I leave it or a one-to-one
+  // call takes the devices; I can still switch it off from my own seat's menu.
   const [camOn, setCamOn] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const inboxUnread = useInboxUnread();
   // People I muted for myself only: their voice and chat lines are hidden on my screen, nobody else's.
   const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
@@ -468,15 +473,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     showAlert('Görüşmedesin', BUSY_DEVICES);
     return true;
   };
+  const cameraAllowed = async () => {
+    if (Platform.OS === 'web') return true;
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) showAlert('Kamera izni gerekli', 'Video odasında görüntünü paylaşmak için cihaz ayarlarından kamera izni ver.');
+    return perm.granted;
+  };
   const toggleCam = async () => {
     if (devicesBusy()) return;
-    if (!camOn && Platform.OS !== 'web') {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) return showAlert('Kamera izni gerekli', 'Odada görüntünü paylaşmak için cihaz ayarlarından kamera izni ver.');
-    }
+    if (!camOn && !(await cameraAllowed())) return;
     setCamOn((c) => !c);
     addMsg({ system: true, text: camOn ? `${ME.name} kamerasını kapattı` : `📹 ${ME.name} kamerasını açtı` });
   };
+  // A video seat (görüntülü yuva) of the active layout turns the camera on; leaving it, or a layout without
+  // that slot, switches the camera off in the same render.
+  const camAllowed = mySeat >= 0 && layout?.layoutSchema.slots.find((x) => x.index === mySeat)?.kind === 'video';
+  const [sawCamAllowed, setSawCamAllowed] = useState(camAllowed);
+  if (camAllowed !== sawCamAllowed) {
+    setSawCamAllowed(camAllowed);
+    if (!camAllowed) setCamOn(false);
+  }
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   // Balkon: people in the room who are not on a mic (from the presence model, never a separate list).
   const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
@@ -494,6 +510,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!isOnline()) offlineFeed.current.push(m);
     else setMessages((list) => mergeFeed(list, [m]));
   };
+  // Taking a video seat turns the camera on (after the permission prompt on phones).
+  useEffect(() => {
+    if (!camAllowed || getMedia().call) return;
+    let live = true;
+    (Platform.OS === 'web' ? Promise.resolve(true) : ImagePicker.requestCameraPermissionsAsync().then((p) => p.granted)).then((ok) => {
+      if (!live) return;
+      if (!ok) return addMsg({ system: true, text: '📹 Kamera izni verilmedi; koltukta sesli devam ediyorsun.' });
+      setCamOn(true);
+      addMsg({ system: true, text: `📹 Video koltuğuna çıktın, ${ME.name} kamerasını açtı` });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camAllowed]);
   useEffect(() => {
     if (offline) return;
     const t = setTimeout(() => {
@@ -1031,6 +1062,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     if (uid === 'me') {
       const items: SeatMenuItem[] = [{ key: 'profile', label: 'Profilim', icon: 'person-circle-outline', onPress: () => router.push('/kullanici/me') }];
+      if (camAllowed) items.push({ key: 'cam', label: camOn ? 'Kamerayı kapat' : 'Kamerayı aç', icon: camOn ? 'videocam-off-outline' : 'videocam-outline', onPress: toggleCam });
       if (!isOwn || index !== 0) items.push({ key: 'leave', label: 'Koltuktan in', icon: 'arrow-down-circle-outline', onPress: () => !offlineBlocked() && removeFromSeat('me') });
       return openSeatMenu(index, `${index + 1}. koltuk · sen`, items);
     }
@@ -1593,6 +1625,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setPanel(null);
       setGiftOpen(false);
       setPeopleOpen(false);
+      setInboxOpen(false);
       setInviteSeat(null);
       setSheet(null);
       setSeatMenu(null);
@@ -1654,6 +1687,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} blurRadius={25} />
       <LinearGradient colors={['rgba(8,15,30,0.55)', 'rgba(8,15,30,0.97)']} style={StyleSheet.absoluteFill} />
+      <Ambient />
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1842,7 +1876,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               />
             </View>
             {roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
-            {amSeated && <RoundBtn label={camOn ? 'Kamerayı kapat' : 'Kamerayı aç'} icon={camOn ? 'videocam' : 'videocam-off'} onPress={toggleCam} />}
+            <RoundBtn label="Mesajlar" icon="chatbubble-ellipses" onPress={() => setInboxOpen(true)} badge={inboxUnread} />
             {amSeated ? (
               <MicBtn
                 state={!micOn ? 'off' : sending ? 'on' : 'held'}
@@ -1880,6 +1914,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onSendLucky={sendLuckyGift}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
+      <InboxSheet visible={inboxOpen} onClose={() => setInboxOpen(false)} />
       <ParticipantsSheet
         visible={peopleOpen}
         onClose={() => {
@@ -2166,7 +2201,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
-  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+  levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(19,217,223,0.35)' },
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   reqBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
@@ -2185,6 +2220,6 @@ const styles = StyleSheet.create({
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, paddingLeft: 10, height: 48 },
+  inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 10, height: 48 },
   input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },
 });

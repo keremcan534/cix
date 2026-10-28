@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { RewardBurst } from '@/components/fx/reward';
+import { DepthCard } from '@/components/fx/surface';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
@@ -34,7 +35,7 @@ export function StarterPath() {
   const shown = open ? steps : next ? [next] : [];
 
   return (
-    <View style={s.card}>
+    <DepthCard style={s.card}>
       <View style={s.head}>
         <Text style={s.title}>İlk adımlar</Text>
         <Text style={s.count}>
@@ -80,18 +81,18 @@ export function StarterPath() {
       <Modal visible={celebrate} transparent animationType="fade" onRequestClose={() => setCelebrate(false)}>
         {celebrate && <RewardBurst reward={{ icon: 'trophy', title: 'İlk adımları tamamladın!', amount: REWARD }} still={settings.reduceMotion} onDone={() => setCelebrate(false)} />}
       </Modal>
-    </View>
+    </DepthCard>
   );
 }
 
 const s = StyleSheet.create({
-  card: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 10, borderWidth: 1, borderColor: colors.border },
+  card: { marginHorizontal: 16, padding: 14, gap: 10 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { color: colors.text, fontWeight: '900', fontSize: 16 },
   count: { color: semantic.action, fontWeight: '800', fontSize: 13 },
   link: { color: semantic.tonalText, fontWeight: '700', fontSize: 13, marginRight: 6 },
-  track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
-  fill: { height: 6, borderRadius: 3, backgroundColor: semantic.action },
+  track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.3)', overflow: 'hidden' },
+  fill: { height: 6, borderRadius: 3, backgroundColor: semantic.action, boxShadow: '0 0 8px rgba(19,217,223,0.8)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   stepText: { color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 },
   stepDone: { color: colors.textDim, textDecorationLine: 'line-through' },
