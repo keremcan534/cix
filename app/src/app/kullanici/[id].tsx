@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ColorValue } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { ActionSheet } from '@/components/ActionSheet';
 import { GiftArt } from '@/components/GiftArt';
 import { Avatar, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
-import { callPrice, FAMILIES } from '@/data/economy';
+import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type User } from '@/data/mock';
 import { privacyOf } from '@/data/privacy';
 import { staffBadgeOf } from '@/data/rbac';
@@ -20,7 +20,6 @@ import {
   GIFT_COLLECTIONS,
   collectionProgress,
   displayId,
-  familyOf,
   giftWallOf,
   guardianOf,
   medalsOf,
@@ -40,6 +39,7 @@ import { shareLink } from '@/lib/links';
 import { LIMITS, ageFrom, formatTrDate, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
 import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
+import { AffiliationPills, GenderChip, useAffiliations, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
@@ -61,7 +61,7 @@ const TAB_H = 48;
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
-    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, familyId, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory,
+    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory,
     rbac, coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   const isMe = id === 'me';
@@ -210,7 +210,7 @@ export default function UserProfile() {
     : otherRoom
       ? { title: otherRoom.title, desc: otherRoom.announcement ?? `${otherRoom.listeners} dinleyici`, cover: otherRoom.cover, level: otherRoom.level ?? 1, go: () => router.push(`/oda/${otherRoom.id}`) }
       : null;
-  const family = isMe ? (FAMILIES.find((f) => f.id === familyId) ?? null) : familyOf(user.id);
+  const { agency, kabile } = useAffiliations(user);
 
   const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
   const pickerUsers = USERS.filter((u) => following.has(u.id) && !blocked.has(u.id));
@@ -270,17 +270,7 @@ export default function UserProfile() {
                 </Pressable>
               )}
               <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                {user.showGender === false || !user.gender ? (
-                  <View style={[styles.genderChip, { backgroundColor: colors.cardAlt }]}>
-                    <Text style={styles.genderText}>{user.age}</Text>
-                  </View>
-                ) : (
-                  <View style={[styles.genderChip, { backgroundColor: user.gender === 'Kadın' ? semantic.socialFill : '#0369A1' }]}>
-                    <Text style={styles.genderText}>
-                      {user.gender === 'Kadın' ? '♀' : '♂'} {user.age}
-                    </Text>
-                  </View>
-                )}
+                <GenderChip user={user} owner={isMe} />
                 <LevelChips wealth={levels.wealth} charm={levels.charm} />
                 {isMe ? <VipTitle level={vipLevel} /> : user.vip && <VipBadge />}
                 {staff && (
@@ -291,6 +281,7 @@ export default function UserProfile() {
                 )}
                 {user.verified && <VerifiedBadge size={18} />}
               </View>
+              <AffiliationPills user={user} />
               <View style={styles.row}>
                 {priv.showOnline ? (
                   <>
@@ -512,6 +503,11 @@ export default function UserProfile() {
                     </Pressable>
                   </InfoRow>
                 )}
+                {!!user.gender && (isMe || user.showGender !== false) && (
+                  <InfoRow icon={user.gender === 'Kadın' ? 'female-outline' : 'male-outline'} label="Cinsiyet" hint={user.showGender === false ? 'Gizli · yalnızca sen görüyorsun, diğerleri sadece yaşını görür' : undefined}>
+                    <Text style={styles.infoValue}>{user.gender}</Text>
+                  </InfoRow>
+                )}
                 {country && (
                   <InfoRow icon="flag-outline" label="Ülke">
                     <Text style={styles.infoValue}>
@@ -564,27 +560,10 @@ export default function UserProfile() {
             </View>
             <Band />
 
-            <View style={styles.section}>
-              {family ? (
-                <>
-                  <SectionTitle title="Kabile" onPress={() => router.push('/aile')} />
-                  <Pressable style={styles.familyCard} onPress={() => router.push('/aile')}>
-                    <View style={styles.familyEmoji}>
-                      <Text style={{ fontSize: 26 }}>{family.emoji}</Text>
-                    </View>
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={styles.roomTitle}>{family.name}</Text>
-                      <Text style={styles.meta}>
-                        Lv.{family.level} · {family.members} üye
-                      </Text>
-                    </View>
-                    {!isMe && family.leaderId === user.id && <Text style={styles.leaderTag}>Lider</Text>}
-                  </Pressable>
-                </>
-              ) : (
-                <SectionTitle title="Kabile" right={isMe ? 'Katıl' : 'Kabilesi yok'} onPress={isMe ? () => router.push('/aile') : undefined} />
-              )}
-            </View>
+            <AffiliationSection title="Ajans" item={agency} empty={isMe ? 'Katıl' : 'Ajansı yok'} emptyHref={isMe ? '/ajans' : undefined} />
+            <Band />
+
+            <AffiliationSection title="Kabile" item={kabile} empty={isMe ? 'Katıl' : 'Kabilesi yok'} emptyHref={isMe ? '/aile' : undefined} />
           </View>
         )}
 
@@ -808,6 +787,30 @@ function BarButton({ icon, label, onPress, highlight, off }: { icon: keyof typeo
 
 function Band() {
   return <View style={styles.band} />;
+}
+
+function AffiliationSection({ title, item, empty, emptyHref }: { title: string; item: Affiliation | null; empty: string; emptyHref?: Href }) {
+  if (!item) return (
+    <View style={styles.section}>
+      <SectionTitle title={title} right={empty} onPress={emptyHref ? () => router.push(emptyHref) : undefined} />
+    </View>
+  );
+  const go = item.href ? () => router.push(item.href!) : undefined;
+  return (
+    <View style={styles.section}>
+      <SectionTitle title={title} onPress={go} />
+      <Pressable style={styles.familyCard} onPress={go} disabled={!go} accessibilityLabel={`${title}: ${item.name}, ${item.sub}`}>
+        <View style={styles.familyEmoji}>
+          <Text style={{ fontSize: 26 }}>{item.emoji}</Text>
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={styles.roomTitle}>{item.name}</Text>
+          <Text style={styles.meta}>{item.sub}</Text>
+        </View>
+        {go && <Ionicons name="chevron-forward" size={18} color={colors.textDim} />}
+      </Pressable>
+    </View>
+  );
 }
 
 function SectionTitle({ title, onPress, right }: { title: string; onPress?: () => void; right?: string }) {
@@ -1419,7 +1422,6 @@ const styles = StyleSheet.create({
   name: { color: '#fff', fontSize: 26, fontWeight: '900', flexShrink: 1 },
   flag: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4 },
   flagText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  genderChip: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   genderText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   vSep: { width: 1, height: 14, backgroundColor: colors.border, marginHorizontal: 4 },
@@ -1466,7 +1468,6 @@ const styles = StyleSheet.create({
   lvText: { color: colors.green, fontWeight: '800', fontSize: 12 },
   familyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 12 },
   familyEmoji: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  leaderTag: { color: colors.gold, fontWeight: '800', fontSize: 12 },
   fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: 'rgba(255,101,118,0.4)' },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   photo: { width: 110, height: 110, borderRadius: 12 },

@@ -24,7 +24,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Benzersiz kullanıcı ID'si | 2 | ✓ | 12 haneli, değiştirilemez, kopyalanabilir. ID'yi sunucu üretmeli. |
 | Görünen ad / takma ad | 2 | ✓ (kurallar 🆕) | En fazla 20 karakter, küfür filtresi. |
 | Doğum tarihi / yaş | 2 | 🆕 tarih düzenleme | GG.AA.YYYY olarak girilir, 18 yaş altı reddedilir. Doğum tarihini yalnızca sahibi görür, diğerleri sadece yaşı görür. Not: kayıt ekranı şu an sadece doğum yılını soruyor. |
-| Cinsiyet (isteğe bağlı) | 2 | 🆕 gizleme | Kadın / Erkek / Belirtmek istemiyorum. Gizlenirse rozette sadece yaş görünür. |
+| Cinsiyet (isteğe bağlı) | 2 | 🆕 gizleme, 🆕 görünürlük | Kadın / Erkek / Belirtmek istemiyorum. Rozette simge, cinsiyet ve yaş yazar (örn. "♂ Erkek · 24"); ayrıca *Temel Bilgiler → Cinsiyet*. Gizlenirse başkaları rozette sadece yaşı görür, satır gösterilmez. Sahibi kendi cinsiyetini soluk ve göz kapalı simgesiyle görür. Profil sekmesinde de rozet var. |
 | Ülke | 2 | 🆕 | Bayrak ve ülke adı gösterilir (önceden her profilde sabit TR yazıyordu). Keşfet'teki ülke filtresi de bu alanı kullanıyor. |
 | Şehir (isteğe bağlı) | 2 | ✓ (boş bırakma 🆕) | Boş bırakılırsa profilde gösterilmez. Mesafe yalnızca "Aynı şehirde keşfedilebilir ol" açıkken görünür. |
 | Biyografi | 2 | ✓ (kurallar 🆕) | 150 karakter (önceden 80). Küfür, telefon, IBAN, bağlantı ve başka uygulama hesabı engellenir. |
@@ -47,7 +47,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Takipçi / takip sayısı | 2 | ✓ | Diğer kullanıcılarda sayılar örnek veri. |
 | Arkadaş sayısı | 2 | 🆕 | Arkadaş = karşılıklı takip. Ayrı bir istek sistemi için 3. bölümdeki ürün kararına bak. |
 | Profil ziyaretçileri | 2 | ✓ | *Mesajlar → Profilimi kimler ziyaret etti* (VIP ayrıcalığı). |
-| Katıldığı odalar / topluluklar | 2 | ✓ | Profilde *Oda* ve *Kabile* kartları. |
+| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Kabile* kartları; ajans ve kabile adı ayrıca adın altında küçük etiket olarak görünür (Profil sekmesinde de). Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya kabilesi olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Kabilesi yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/kabileyi gösteriyorsa bağlantı vardır. |
 | Rozetler ve başarılar | 2 | ✓ | *Onur* sekmesi: madalyalar, unvanlar, hediye duvarı, koleksiyonlar. |
 
 ## 2-D. Görseller ve kişiselleştirme

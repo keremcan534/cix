@@ -48,6 +48,22 @@ export const AGENCIES: Agency[] = [
 ];
 export const agencyByCode = (code: string) => AGENCIES.find((a) => a.code === code.trim().toUpperCase());
 
+// Which agency each demo user streams for (server: agency_members). Public on profiles, like the room's agency tag.
+const USER_AGENCY: Record<string, { agencyId: string; role: AgencyRole }> = {
+  u1: { agencyId: 'a1', role: 'owner' },
+  u4: { agencyId: 'a1', role: 'member' },
+  u11: { agencyId: 'a1', role: 'member' },
+  u2: { agencyId: 'a2', role: 'owner' },
+  u9: { agencyId: 'a2', role: 'member' },
+  u5: { agencyId: 'a3', role: 'owner' },
+  u7: { agencyId: 'a3', role: 'assistant' },
+};
+export const agencyOf = (userId: string): { agency: Agency; role: AgencyRole } | null => {
+  const m = USER_AGENCY[userId];
+  const agency = m && AGENCIES.find((a) => a.id === m.agencyId);
+  return agency && agency.status === 'active' ? { agency, role: m.role } : null;
+};
+
 // --- Agency members & performance -----------------------------------------
 export type MemberStatus = 'active' | 'passive' | 'new';
 export type AgencyMember = { user: User; status: MemberStatus; joined: string; hours: { d: number; w: number; m: number }; days: number; diamonds: number; goal: number };
