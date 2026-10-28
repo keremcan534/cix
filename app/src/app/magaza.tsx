@@ -15,6 +15,7 @@ import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, ReactionArt } from '@/components/ReactionArt';
+import { STORE_TAB_ART, storeArtOf } from '@/components/StoreArt';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -23,7 +24,13 @@ export default function StoreScreen() {
   const [tab, setTab] = useState<Tab>('frame');
   const [preview, setPreview] = useState<EntryShow | null>(null);
   const playPreview = (c: Cosmetic) =>
-    setPreview({ name: me.name, avatar: me.avatar, fx: c.kind === 'entry' ? ((c.fx as EntryFx | undefined) ?? 'vip') : 'vip', ride: c.kind === 'ride' ? c.emoji : undefined });
+    setPreview({
+      name: me.name,
+      avatar: me.avatar,
+      fx: c.kind === 'entry' ? ((c.fx as EntryFx | undefined) ?? 'vip') : 'vip',
+      ride: c.kind === 'ride' ? c.emoji : undefined,
+      rideArt: c.kind === 'ride' ? storeArtOf(c.id) : undefined,
+    });
   const items = COSMETICS.filter((c) => c.kind === tab);
 
   const buy = (c: Cosmetic) => {
@@ -43,12 +50,15 @@ export default function StoreScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 10 }}>
-        {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Emoji paketleri' }].map((k) => (
-          <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, tab === k.kind && styles.tabActive, k.kind === 'emoji' && styles.tabRow]}>
-            {k.kind === 'emoji' && <Image source={EMOJI_PACKS_ICON} style={{ width: 18, height: 18 }} />}
-            <Text style={[styles.tabText, tab === k.kind && { color: '#fff' }]}>{k.label}</Text>
-          </Pressable>
-        ))}
+        {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Emoji paketleri', emoji: '' }].map((k) => {
+          const art = k.kind === 'emoji' ? EMOJI_PACKS_ICON : STORE_TAB_ART[k.kind];
+          return (
+            <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
+              {art ? <Image source={art} style={{ width: 18, height: 18 }} /> : <Text style={styles.tabText}>{k.emoji}</Text>}
+              <Text style={[styles.tabText, tab === k.kind && { color: '#fff' }]}>{k.label}</Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       {settings.effectsOff && (tab === 'entry' || tab === 'ride') && (
@@ -148,10 +158,11 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
       </View>
     );
   }
+  const pic = storeArtOf(item.id);
   if (item.kind === 'entry') {
     const look = ENTRY_LOOKS[(item.fx as EntryFx | undefined) ?? 'vip'];
-    return (
-      <LinearGradient colors={look.colors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.entryPreview}>
+    const banner = (
+      <LinearGradient colors={look.colors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={[styles.entryPreview, !!pic && styles.entryPreviewSmall]}>
         {look.creature && <Text style={{ fontSize: 16 }}>{look.creature}</Text>}
         <Text style={styles.entryPreviewText} numberOfLines={1}>
           Hoş geldin
@@ -159,7 +170,15 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
         <Text style={{ fontSize: 14 }}>{look.mark}</Text>
       </LinearGradient>
     );
+    if (!pic) return banner;
+    return (
+      <View style={styles.artStack}>
+        <Image source={pic} style={styles.artIcon} accessibilityLabel={item.name} />
+        {banner}
+      </View>
+    );
   }
+  if (item.kind === 'ride' && pic) return <Image source={pic} style={styles.rideArt} accessibilityLabel={item.name} />;
   if (item.kind === 'frame' && item.color) {
     return (
       <LinearGradient colors={item.color} style={styles.framePreview}>
@@ -170,10 +189,17 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
     );
   }
   if (item.kind === 'bubble' && item.color) {
-    return (
-      <LinearGradient colors={item.color} style={styles.bubblePreview}>
-        <Text style={{ color: '#fff', fontSize: 12 }}>Merhaba! {item.emoji}</Text>
+    const bubble = (
+      <LinearGradient colors={item.color} style={[styles.bubblePreview, !!pic && styles.bubblePreviewSmall]}>
+        <Text style={{ color: '#fff', fontSize: 12 }}>Merhaba!{pic ? '' : ` ${item.emoji}`}</Text>
       </LinearGradient>
+    );
+    if (!pic) return bubble;
+    return (
+      <View style={styles.artStack}>
+        <Image source={pic} style={styles.artIcon} accessibilityLabel={item.name} />
+        {bubble}
+      </View>
     );
   }
   if (item.kind === 'specialId') return <Text style={styles.idPreview}>{item.name.replace('ID ', '')}</Text>;
@@ -184,7 +210,11 @@ const styles = StyleSheet.create({
   previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: 'rgba(19,217,223,0.18)' },
   previewText: { color: colors.primaryText, fontWeight: '700', fontSize: 12 },
   entryPreview: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, borderRadius: 20, paddingHorizontal: 10, marginVertical: 12, maxWidth: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  entryPreviewSmall: { height: 32, marginVertical: 0 },
   entryPreviewText: { color: '#fff', fontWeight: '800', fontSize: 12, flexShrink: 1 },
+  artStack: { alignItems: 'center', gap: 4 },
+  artIcon: { width: 56, height: 56 },
+  rideArt: { width: 72, height: 72 },
   tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
@@ -203,6 +233,7 @@ const styles = StyleSheet.create({
   framePreview: { width: 64, height: 64, borderRadius: 32, padding: 4 },
   frameInner: { flex: 1, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   bubblePreview: { height: 64, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 16, marginVertical: 0 },
+  bubblePreviewSmall: { height: 32 },
   idPreview: { color: colors.gold, fontSize: 30, fontWeight: '900', height: 64, textAlignVertical: 'center', letterSpacing: 2, paddingTop: 12 },
   footer: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },
 });

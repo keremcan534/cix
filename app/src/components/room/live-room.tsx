@@ -43,6 +43,9 @@ import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { storeArtOf } from '@/components/StoreArt';
+import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
+import { gameArtOf } from '@/components/GameArt';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
@@ -59,7 +62,7 @@ import { RoomScreen } from '@/components/room/room-screen';
 import { StageLayout } from '@/components/room/stage-layout';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
@@ -133,6 +136,7 @@ const offlineBlocked = () => {
 
 const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
+const BOT_RIDES = COSMETICS.filter((c) => c.kind === 'ride');
 
 /** Short mic-button captions for a mic that is on but not sending (lib/room-session micBlock). */
 const HELD_CAPTION: Record<Exclude<MicBlock, null>, string> = {
@@ -203,7 +207,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya katıldı!`;
     const badge = [noble?.emoji, svipLevel ? `SVIP${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
     const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
-    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
+    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
     return { text, show };
   }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride, app.me.avatar]);
 
@@ -714,7 +718,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         const g = userById(guest);
         addMsg({ system: true, text: `${g.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         // Some joiners own an entry effect; show it if nothing else is playing.
-        if (visibleRef.current && !settings.effectsOff && Math.random() < 0.4) setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: Math.random() < 0.3 ? pick(['🏎️', '🛵', '🛩️']) : undefined, badge: g.vip ? 'VIP' : undefined });
+        if (visibleRef.current && !settings.effectsOff && Math.random() < 0.4) {
+          const ride = Math.random() < 0.3 ? pick(BOT_RIDES) : undefined;
+          setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: ride?.emoji, rideArt: storeArtOf(ride?.id), badge: g.vip ? 'VIP' : undefined });
+        }
         gainXp(5);
         setGoal((gl) => (gl && gl.kind === 'join' ? { ...gl, progress: gl.progress + 1 } : gl));
       } else if (r < 0.28) {
@@ -1404,17 +1411,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items: [
         ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'PK', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
-        { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
+        { key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
-        { key: 'events', label: 'Aktivite', emoji: '🎉', colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
+        { key: 'events', label: 'Aktivite', emoji: '🎉', art: ROOM_ICON_ART.activity, colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
         ...(canFunctions
           ? [
-              { key: 'poll', label: 'Anket', emoji: '📊', colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
-              { key: 'goal', label: 'Topluluk hedefi', emoji: '🎯', colors: ['#16A34A', '#0D9488'] as [string, string], onPress: () => setPanel('goal') },
+              { key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
+              { key: 'goal', label: 'Topluluk hedefi', emoji: '🎯', art: ROOM_ICON_ART.goal, colors: ['#16A34A', '#0D9488'] as [string, string], onPress: () => setPanel('goal') },
             ]
           : []),
-        ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
-        { key: 'music', label: 'Müzik', emoji: '🎵', colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
+        ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
+        { key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
       ],
     },
     {
@@ -1423,7 +1430,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       note: 'Herkes oynayabilir · oyun açıkken mikrofonun ve koltuğun aynen kalır',
       items: gameCatalog.roomGames
         .filter((g) => g.active)
-        .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#0A8F95', '#13D9DF'] as [string, string], badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
+        .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), colors: ['#0A8F95', '#13D9DF'] as [string, string], badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
     },
     {
       title: 'Casino · Servet Lv.2',
@@ -1431,7 +1438,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       note: app.wealthLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `Servet Seviyesi 2 ve üzeri üyelere açık · şu an Lv.${app.wealthLevel}`,
       items: gameCatalog.casino
         .filter((g) => g.active && g.fromRoom)
-        .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#B7832E', '#F6BD60'] as [string, string], onPress: () => openCasino(g.id) })),
+        .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), colors: ['#B7832E', '#F6BD60'] as [string, string], onPress: () => openCasino(g.id) })),
     },
     {
       title: 'Oda Araçları',
@@ -1474,10 +1481,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ? familyId
       ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : '🏰 Ailem', href: '/aile' as const }
       : ownAgencyName
-        ? { label: `🏢 ${ownAgencyName}`, href: '/ajans' as const }
+        ? { label: ownAgencyName, href: '/ajans' as const, art: ROOM_ICON_ART.agency }
         : null
     : base!.agency
-      ? { label: '🏢 Ajans odası', href: '/ajans' as const }
+      ? { label: 'Ajans odası', href: '/ajans' as const, art: ROOM_ICON_ART.agency }
       : level >= 5
         ? { label: `${otherFamily.emoji} ${otherFamily.name}`, href: '/aile' as const }
         : null;
@@ -1722,7 +1729,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Text style={styles.callBannerGo}>Dön</Text>
               </Pressable>
             )}
-            {settings.roomMuted && <Text style={styles.mutedChip}>🔇 Oda sesi senin için kapalı · Ses ayarlarından açabilirsin</Text>}
+            {settings.roomMuted && (
+              <View style={styles.mutedRow}>
+                <ArtText art={ROOM_ICON_ART.soundOff} size={18} style={styles.mutedChip}>
+                  Oda sesi senin için kapalı · Ses ayarlarından açabilirsin
+                </ArtText>
+              </View>
+            )}
             {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
             {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
               <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
@@ -2168,7 +2181,8 @@ const styles = StyleSheet.create({
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center', marginTop: 4 },
+  mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
+  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, paddingLeft: 10, height: 48 },

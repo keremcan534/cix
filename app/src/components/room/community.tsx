@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
@@ -15,12 +16,13 @@ export type RoomEvent = { id: string; title: string; desc: string; when: string;
 export type Question = { id: string; userId: string; text: string; picked: boolean };
 export type ModLog = { id: string; time: string; actor: string; action: string; target: string; reason: string };
 
-function Sheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+function Sheet({ visible, onClose, title, art, children }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
       <View style={[roomStyles.sheet, { maxHeight: '80%' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
           <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
             <Ionicons name="close" size={22} color={colors.textDim} />
@@ -89,7 +91,7 @@ export function PollCreate({ visible, onClose, onCreate }: { visible: boolean; o
     setOpts(['', '']);
   };
   return (
-    <Sheet visible={visible} onClose={onClose} title="📊 Anket oluştur">
+    <Sheet visible={visible} onClose={onClose} title="Anket oluştur" art={ROOM_ICON_ART.poll}>
       <TextInput value={q} onChangeText={setQ} placeholder="Soru" placeholderTextColor={colors.textDim} style={styles.input} />
       {opts.map((o, i) => (
         <TextInput key={i} value={o} onChangeText={(t) => setOpts((l) => l.map((x, j) => (j === i ? t : x)))} placeholder={`Seçenek ${i + 1}`} placeholderTextColor={colors.textDim} style={styles.input} />
@@ -144,7 +146,7 @@ export function GoalCreate({ visible, onClose, onCreate }: { visible: boolean; o
   const [target, setTarget] = useState(10);
   const titles: Record<Goal['kind'], string> = { join: 'Yeni katılımcı', like: 'Geçerli beğeni', event: 'Etkinliğe katılım' };
   return (
-    <Sheet visible={visible} onClose={onClose} title="🎯 Topluluk hedefi">
+    <Sheet visible={visible} onClose={onClose} title="Topluluk hedefi" art={ROOM_ICON_ART.goal}>
       <Text style={styles.dim}>Hedefler ücretli hediye gerektirmez. Hediye temelli hedefler açıkça &quot;ücretli&quot; olarak işaretlenir.</Text>
       <Chips
         items={[
@@ -194,7 +196,7 @@ export function EventsSheet({
   const [when, setWhen] = useState('Bugün 21:00');
   const [type, setType] = useState('Sohbet');
   return (
-    <Sheet visible={visible} onClose={onClose} title="📅 Oda etkinlikleri">
+    <Sheet visible={visible} onClose={onClose} title="Oda etkinlikleri" art={ROOM_ICON_ART.activity}>
       {events.length === 0 && <Text style={styles.dim}>Planlanmış etkinlik yok.</Text>}
       {events.map((e) => (
         <View key={e.id} style={[styles.card, e.cancelled && { opacity: 0.5 }]}>
@@ -267,7 +269,7 @@ export function EventsSheet({
 export function QuestionsSheet({ visible, onClose, questions, canManage, onAsk, onPick }: { visible: boolean; onClose: () => void; questions: Question[]; canManage: boolean; onAsk: (t: string) => void; onPick: (id: string) => void }) {
   const [text, setText] = useState('');
   return (
-    <Sheet visible={visible} onClose={onClose} title="❓ Sorular">
+    <Sheet visible={visible} onClose={onClose} title="Sorular" art={ROOM_ICON_ART.questions}>
       {questions.length === 0 && <Text style={styles.dim}>Henüz soru yok.</Text>}
       {questions.map((q) => (
         <View key={q.id} style={[styles.row, q.picked && styles.picked]}>
@@ -340,7 +342,7 @@ export function SoundSheet({
   setRoomFx: (p: Partial<{ giftEffects: boolean; joinSounds: boolean }>) => void;
 }) {
   return (
-    <Sheet visible={visible} onClose={onClose} title="🔊 Ses ve efekt ayarları">
+    <Sheet visible={visible} onClose={onClose} title="Ses ve efekt ayarları" art={ROOM_ICON_ART.sound}>
       <Text style={styles.dim}>Bu ayarlar yalnızca senin deneyimini etkiler; hediye işlemlerini ve kayıtlarını değiştirmez.</Text>
       <SoundToggle settings={settings} set={set} k="roomMuted" label="Oda sesini kapat" />
       <Volume settings={settings} set={set} k="voiceVolume" label="Konuşma sesi" />
@@ -389,9 +391,10 @@ export function ModerationSheet({
 }) {
   const [word, setWord] = useState('');
   return (
-    <Sheet visible={visible} onClose={onClose} title="🛡️ Moderasyon">
+    <Sheet visible={visible} onClose={onClose} title="Moderasyon" art={ROOM_ICON_ART.moderation}>
       <View style={styles.row}>
-        <Text style={{ color: '#fff', flex: 1 }}>🐢 Yavaş mod (10 sn&apos;de 1 mesaj)</Text>
+        <Image source={ROOM_ICON_ART.slowMode} style={{ width: 26, height: 26, marginRight: 8 }} />
+        <Text style={{ color: '#fff', flex: 1 }}>Yavaş mod (10 sn&apos;de 1 mesaj)</Text>
         <Switch value={slowMode} onValueChange={setSlowMode} />
       </View>
       <Text style={styles.label}>Kelime filtresi</Text>

@@ -5,7 +5,9 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 **Teslim durumu:** 536 görselin hepsi 512 px PNG olarak teslim alındı (iki ZIP, klasör 01–12). Tablonun "Not" sütunu her satırın durumunu söyler.
 
 - **Bölüm 1–3 (145 görsel): ✅ uygulamaya bağlandı.** Hediyeler `app/assets/gifts/192` ve `/512` (`components/GiftArt.tsx`, Lucky paketleri dahil; yönetimden eklenen yeni Lucky paketi `lucky-yeni-lucky.png` ile görünür; müzikli hediye köşesinde müzik rozeti). Efekt hediyeleri ve animasyonlar `app/assets/anim/192` ve `/512` (`components/fx/anim-art.tsx`, katalogda görsel türü `art`; kategori simgeleri animasyon yönetiminde). Tepkiler `app/assets/reactions` (`components/ReactionArt.tsx`): emoji panelinde, koltuk tepkisinde ve yalnız tepki emojisinden oluşan mesajlarda (oda, birebir ve grup sohbeti) çıkartma olarak görünür; yazıyla karışık emoji metin kalır. Paketler Unicode emojiyi saklamaya devam eder.
-- **Bölüm 4–12 (391 görsel): taslak, bağlanmadı.** Teslim notuna göre bunlar bir ikon fontunun (Font Awesome 4, SIL OFL 1.1) siluetlerinden otomatik üretilmiş düz vektör taslaklar; istenen 3D cam stilinde değil. 211 dosya başka dosyalarla birebir aynı görsel (ör. 27 farklı öğe aynı yıldız, 19 öğe yıldız+rozet, 11 kabile öğesi aynı grup simgesi, 10 ödül/finans öğesi aynı banknot; Erkek ve Kadın simgesi de aynı yıldız). Ayrıca: zar yüzü 6'da 8 nokta var; slot kirazı ve üzümü, bilardo ve dört taş düz daire; giriş efekti Ejderha ve Ejder kartı alev simgesi; Kıbrıs bayrağı boş bayrak. Bunlarla emojiyi değiştirmek birçok yerde anlamı bozacağı için emoji (ve mevcut 3D ikonlar) yerinde kaldı. Yeniden üretilmesi gerekenler "Not" sütununda `⚠️ yeniden üretilmeli` ile işaretli.
+- **Bölüm 4 (29 görsel): 19'u kabul edildi, 11'i bağlandı** (iki 3D teslim: `SimilarClub_04_3D_20_DOGRULANMIS_TASLAK.zip` ve `SimilarClub_DUZELTME_04_TAM_05_ILK40_69_PNG_Claude.zip`). Mağaza sekmeleri, giriş efekti simgeleri, Spor Araba ve Özel Jet binekleri, Altın sohbet balonu `app/assets/store` içinde (`components/StoreArt.tsx`, 192 px, içeriğe göre kırpıldı): mağaza sekmelerinde, ürün kartlarında ve odaya girişte geçen binek olarak görünür. Kuyruklu Yıldız ve Özel Jet yakın eşleşme olarak onaylandı. 8 resimli çerçevenin küçük resmi gerekmedi (mağaza çerçevenin kendisini gösteriyor). İkinci teslimdeki 9 yakın eşleşme/prototip (Özel ID sekmesi ve rozeti, Ses Dalgası, Yörünge, Aurora, Ateş, Scooter, Şeker, Galaksi) onaylanmadı; `cerceve-altin-tac.png` iki teslimde de Kraliyet Kanatları ile aynı dosya. Bu 10 görselde emoji kaldı.
+- **Bölüm 5, ilk 40 (`SimilarClub_DUZELTME_04_TAM_05_ILK40_69_PNG_Claude.zip`): 35'i bağlandı**, `app/assets/room` içinde (`components/RoomArt.tsx`, 192 px): oda tipi ve tema seçicileri, seviye rozetleri, oda menüsü, oda kartı, patron koltuğu ve oda pencerelerinin başlıkları. Ailem, Konuşmacı kuyruğu, Oda botu ve Gizli giriş onaylanmadı; Oda kamerası teslim edildi ama düğme açık/kapalı durumunu gösterdiği için bağlanmadı. 19 kaynak görselde kenar düz kesik (sayfadan kesilirken), "Not" sütununda yazılı. 41–55 (zar yüzleri, PK simgeleri) bu teslimde yok.
+- **Bölüm 5'in 41–55'i ve 6–12: taslak, bağlanmadı.** Teslim notuna göre bunlar bir ikon fontunun (Font Awesome 4, SIL OFL 1.1) siluetlerinden otomatik üretilmiş düz vektör taslaklar; istenen 3D cam stilinde değil. 211 dosya başka dosyalarla birebir aynı görsel (ör. 27 farklı öğe aynı yıldız, 19 öğe yıldız+rozet, 11 kabile öğesi aynı grup simgesi, 10 ödül/finans öğesi aynı banknot; Erkek ve Kadın simgesi de aynı yıldız). Ayrıca: zar yüzü 6'da 8 nokta var; slot kirazı ve üzümü, bilardo ve dört taş düz daire; giriş efekti Ejderha ve Ejder kartı alev simgesi; Kıbrıs bayrağı boş bayrak. Bunlarla emojiyi değiştirmek birçok yerde anlamı bozacağı için emoji (ve mevcut 3D ikonlar) yerinde kaldı. Yeniden üretilmesi gerekenler "Not" sütununda `⚠️ yeniden üretilmeli` ile işaretli.
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Bağlandılar; yenileri gelince aynı adla değiştirmek yeterli.
 
 **Toplam 536 görsel.** Öncelik: P1 134 (çok görünen, para kazandıran) · P2 183 · P3 158 · P4 61 (küçük arayüz simgeleri).
@@ -235,95 +237,95 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 
 | # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
 |---|---|---|---|---|---|---|
-| 1 | `magaza-sekme-cerceve.png` | Çerçeve | 🖼️ | mağaza sekmesi: Çerçeve | P2 | Taslak teslim (parti 04–12) |
-| 2 | `magaza-sekme-giris-efekti.png` | Giriş efekti | ✨ | mağaza sekmesi: Giriş efekti | P2 | Taslak teslim (parti 04–12) |
-| 3 | `magaza-sekme-binek.png` | Binek | 🏎️ | mağaza sekmesi: Binek | P2 | Taslak teslim (parti 04–12) |
-| 4 | `magaza-sekme-sohbet-balonu.png` | Sohbet balonu | 💬 | mağaza sekmesi: Sohbet balonu | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 6 dosyada · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/chat.png |
-| 5 | `magaza-sekme-ozel-id.png` | Özel ID | 🔢 | mağaza sekmesi: Özel ID | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 6 | `cerceve-ses-dalgasi.png` | Ses Dalgası | 🔊 | "Ses Dalgası" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
-| 7 | `cerceve-yorunge.png` | Yörünge | 🪐 | "Yörünge" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
-| 8 | `cerceve-aurora.png` | Aurora | 🌌 | "Aurora" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
-| 9 | `cerceve-ates.png` | Ateş | 🔥 | "Ateş" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
-| 10 | `cerceve-altin-tac.png` | Altın Taç | 👑 | "Altın Taç" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
-| 11 | `cerceve-gumus-kristal.png` | Gümüş Kristal | 💠 | "Gümüş Kristal" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 12 | `cerceve-buz-kristali.png` | Buz Kristali | ❄️ | "Buz Kristali" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 13 | `cerceve-gul-kalpler.png` | Gül Kalpler | 💗 | "Gül Kalpler" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 14 | `cerceve-altin-defne.png` | Altın Defne | 🌿 | "Altın Defne" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 15 | `cerceve-gumus-tac.png` | Gümüş Taç | 👑 | "Gümüş Taç" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 16 | `cerceve-kraliyet-kanatlari.png` | Kraliyet Kanatları | 🪽 | "Kraliyet Kanatları" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 17 | `cerceve-melek-kalp-mercan.png` | Melek Kalp · Mercan | 💞 | "Melek Kalp · Mercan" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 18 | `cerceve-melek-kalp-turkuaz.png` | Melek Kalp · Turkuaz | 💙 | "Melek Kalp · Turkuaz" avatar çerçevesinin mağaza küçük resmi | P2 | Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi |
-| 19 | `giris-efekti-isilti.png` | Işıltı | ✨ | "Işıltı" odaya giriş efektinin simgesi | P2 | Taslak teslim (parti 04–12) · Efekt kodla oynuyor; simge |
-| 20 | `giris-efekti-simsek.png` | Şimşek | ⚡ | "Şimşek" odaya giriş efektinin simgesi | P2 | Taslak teslim (parti 04–12) · Efekt kodla oynuyor; simge |
-| 21 | `giris-efekti-kuyruklu-yildiz.png` | Kuyruklu Yıldız | ☄️ | "Kuyruklu Yıldız" odaya giriş efektinin simgesi | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 19 dosyada · Efekt kodla oynuyor; simge |
-| 22 | `giris-efekti-ejderha.png` | Ejderha | 🐉 | "Ejderha" odaya giriş efektinin simgesi | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: ejderha yerine alev simgesi · Efekt kodla oynuyor; simge |
-| 23 | `binek-scooter.png` | Scooter | 🛵 | binek: Scooter | P2 | Taslak teslim (parti 04–12) |
-| 24 | `binek-spor-araba.png` | Spor Araba | 🏎️ | binek: Spor Araba | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 4 dosyada |
-| 25 | `binek-ozel-jet.png` | Özel Jet | 🛩️ | binek: Özel Jet | P2 | Taslak teslim (parti 04–12) |
-| 26 | `balon-seker.png` | Şeker | 🍬 | "Şeker" sohbet balonu simgesi | P2 | Taslak teslim (parti 04–12) |
-| 27 | `balon-galaksi.png` | Galaksi | 🌌 | "Galaksi" sohbet balonu simgesi | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 28 | `balon-altin.png` | Altın | 🏆 | "Altın" sohbet balonu simgesi | P2 | Taslak teslim (parti 04–12) |
-| 29 | `ozel-id-ozel-id.png` | Özel ID | 🔢 | parlak numara rozeti (özel kullanıcı numarası) | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
+| 1 | `magaza-sekme-cerceve.png` | Çerçeve | 🖼️ | mağaza sekmesi: Çerçeve | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 2 | `magaza-sekme-giris-efekti.png` | Giriş efekti | ✨ | mağaza sekmesi: Giriş efekti | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 3 | `magaza-sekme-binek.png` | Binek | 🏎️ | mağaza sekmesi: Binek | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 4 | `magaza-sekme-sohbet-balonu.png` | Sohbet balonu | 💬 | mağaza sekmesi: Sohbet balonu | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 5 | `magaza-sekme-ozel-id.png` | Özel ID | 🔢 | mağaza sekmesi: Özel ID | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: altın madalyon, numara göstermiyor |
+| 6 | `cerceve-ses-dalgasi.png` | Ses Dalgası | 🔊 | "Ses Dalgası" avatar çerçevesinin mağaza küçük resmi | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: ses dalgası yerine kulaklık motifi · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
+| 7 | `cerceve-yorunge.png` | Yörünge | 🪐 | "Yörünge" avatar çerçevesinin mağaza küçük resmi | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: yörünge simgesi arma gibi duruyor · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
+| 8 | `cerceve-aurora.png` | Aurora | 🌌 | "Aurora" avatar çerçevesinin mağaza küçük resmi | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: Buz Kristali çerçevesinin turkuaz renk değişimi, aurora kimliği yok · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
+| 9 | `cerceve-ates.png` | Ateş | 🔥 | "Ateş" avatar çerçevesinin mağaza küçük resmi | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: altın çerçeve üstüne alev arması · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
+| 10 | `cerceve-altin-tac.png` | Altın Taç | 👑 | "Altın Taç" avatar çerçevesinin mağaza küçük resmi | P2 | ⚠️ yeniden üretilmeli: iki 3D teslimde de dosya `cerceve-kraliyet-kanatlari.png` ile birebir aynı · Çerçeve kodla çiziliyor; yalnız mağaza simgesi |
+| 11 | `cerceve-gumus-kristal.png` | Gümüş Kristal | 💠 | "Gümüş Kristal" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 12 | `cerceve-buz-kristali.png` | Buz Kristali | ❄️ | "Buz Kristali" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 13 | `cerceve-gul-kalpler.png` | Gül Kalpler | 💗 | "Gül Kalpler" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 14 | `cerceve-altin-defne.png` | Altın Defne | 🌿 | "Altın Defne" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 15 | `cerceve-gumus-tac.png` | Gümüş Taç | 👑 | "Gümüş Taç" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 16 | `cerceve-kraliyet-kanatlari.png` | Kraliyet Kanatları | 🪽 | "Kraliyet Kanatları" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 17 | `cerceve-melek-kalp-mercan.png` | Melek Kalp · Mercan | 💞 | "Melek Kalp · Mercan" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 18 | `cerceve-melek-kalp-turkuaz.png` | Melek Kalp · Turkuaz | 💙 | "Melek Kalp · Turkuaz" avatar çerçevesinin mağaza küçük resmi | P2 | ✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı |
+| 19 | `giris-efekti-isilti.png` | Işıltı | ✨ | "Işıltı" odaya giriş efektinin simgesi | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 20 | `giris-efekti-simsek.png` | Şimşek | ⚡ | "Şimşek" odaya giriş efektinin simgesi | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 21 | `giris-efekti-kuyruklu-yildiz.png` | Kuyruklu Yıldız | ☄️ | "Kuyruklu Yıldız" odaya giriş efektinin simgesi | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) · yakın eşleşme (onaylandı): kuyruklu yıldız değil yörüngeli yıldız |
+| 22 | `giris-efekti-ejderha.png` | Ejderha | 🐉 | "Ejderha" odaya giriş efektinin simgesi | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 23 | `binek-scooter.png` | Scooter | 🛵 | binek: Scooter | P2 | İkinci 3D teslimde prototip geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: 3D değil, düz cam stili çizim |
+| 24 | `binek-spor-araba.png` | Spor Araba | 🏎️ | binek: Spor Araba | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 25 | `binek-ozel-jet.png` | Özel Jet | 🛩️ | binek: Özel Jet | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) · yakın eşleşme (onaylandı): özel jet değil kalpli yolcu uçağı (hediye görseli) |
+| 26 | `balon-seker.png` | Şeker | 🍬 | "Şeker" sohbet balonu simgesi | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: şeker yerine kalp şekeri |
+| 27 | `balon-galaksi.png` | Galaksi | 🌌 | "Galaksi" sohbet balonu simgesi | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: lacivert sohbet balonu ve yörünge, galaksi teması zayıf |
+| 28 | `balon-altin.png` | Altın | 🏆 | "Altın" sohbet balonu simgesi | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) |
+| 29 | `ozel-id-ozel-id.png` | Özel ID | 🔢 | parlak numara rozeti (özel kullanıcı numarası) | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: rozette numara yok; mağaza sekmesi görseliyle aynı dosya |
 
 ## 5. Oda (55)
 
 | # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
 |---|---|---|---|---|---|---|
-| 1 | `oda-turu-serbest-sohbet.png` | Serbest sohbet | 💬 | oda türü: Serbest sohbet | P1 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 6 dosyada |
-| 2 | `oda-turu-sahne.png` | Sahne | 🎭 | oda türü: Sahne | P1 | Taslak teslim (parti 04–12) |
-| 3 | `oda-turu-soru-cevap.png` | Soru-cevap | ❓ | oda türü: Soru-cevap | P1 | Taslak teslim (parti 04–12) |
-| 4 | `oda-turu-muzik-odasi.png` | Müzik odası | 🎵 | oda türü: Müzik odası | P1 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 8 dosyada |
-| 5 | `oda-turu-etkinlik-odasi.png` | Etkinlik odası | 📅 | oda türü: Etkinlik odası | P1 | Taslak teslim (parti 04–12) |
-| 6 | `oda-turu-ozel-oda.png` | Özel oda | 🔒 | oda türü: Özel oda | P1 | Taslak teslim (parti 04–12) |
-| 7 | `oda-tema-sohbet.png` | Sohbet | 💬 | oda teması: Sohbet | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 6 dosyada |
-| 8 | `oda-tema-pk.png` | PK | 🥊 | oda teması: PK | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 9 | `oda-tema-muzik.png` | Müzik | 🎵 | oda teması: Müzik | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 8 dosyada |
-| 10 | `oda-tema-oyun.png` | Oyun | 🎮 | oda teması: Oyun | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 4 dosyada |
-| 11 | `oda-tema-parti.png` | Parti | 🎉 | oda teması: Parti | P2 | Taslak teslim (parti 04–12) |
-| 12 | `oda-tema-arkadaslik.png` | Arkadaşlık | 💜 | oda teması: Arkadaşlık | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada · Mor kalp marka paletine uymuyor; mercan veya turkuaz önerilir |
-| 13 | `oda-seviye-bronz.png` | Bronz (Lv.1–2) | 🥉 | oda seviye rozeti Lv.1–2: Bronz | P2 | Taslak teslim (parti 04–12) |
-| 14 | `oda-seviye-gumus.png` | Gümüş (Lv.3–4) | 🥈 | oda seviye rozeti Lv.3–4: Gümüş | P2 | Taslak teslim (parti 04–12) |
-| 15 | `oda-seviye-altin.png` | Altın (Lv.5–6) | 🥇 | oda seviye rozeti Lv.5–6: Altın | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 16 | `oda-seviye-madalya.png` | Madalya (Lv.7–8) | 🏅 | oda seviye rozeti Lv.7–8: Madalya | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 5 dosyada |
-| 17 | `oda-seviye-nisan.png` | Nişan (Lv.9) | 🎖️ | oda seviye rozeti Lv.9: Nişan | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 5 dosyada |
-| 18 | `oda-seviye-kalp.png` | Kalp (Lv.10–11) | 💜 | oda seviye rozeti Lv.10–11: Kalp | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 19 | `oda-seviye-elmas.png` | Elmas (Lv.12–13) | 💎 | oda seviye rozeti Lv.12–13: Elmas | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 4 dosyada |
-| 20 | `oda-seviye-tac.png` | Taç (Lv.14) | 👑 | oda seviye rozeti Lv.14: Taç | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 4 dosyada |
-| 21 | `oda-seviye-uc-disli.png` | Üç Dişli (Lv.15) | 🔱 | oda seviye rozeti Lv.15: Üç Dişli | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 22 | `oda-sansli-canta-oda-zarfi.png` | Şanslı çanta / oda zarfı | 🧧 | oda simgesi: Şanslı çanta / oda zarfı | P1 | Taslak teslim (parti 04–12) |
-| 23 | `oda-aktivite.png` | Aktivite | 🎉 | oda simgesi: Aktivite | P2 | Taslak teslim (parti 04–12) |
-| 24 | `oda-anket.png` | Anket | 📊 | oda simgesi: Anket | P2 | Taslak teslim (parti 04–12) |
-| 25 | `oda-topluluk-hedefi.png` | Topluluk hedefi | 🎯 | oda simgesi: Topluluk hedefi | P2 | Taslak teslim (parti 04–12) |
-| 26 | `oda-sorular.png` | Sorular | ❓ | oda simgesi: Sorular | P2 | Taslak teslim (parti 04–12) |
-| 27 | `oda-muzik.png` | Müzik | 🎵 🎶 | oda simgesi: Müzik | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 8 dosyada |
-| 28 | `oda-ailem.png` | Ailem | 🏰 | oda simgesi: Ailem | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 29 | `oda-ajans-odasi.png` | Ajans odası | 🏢 | oda simgesi: Ajans odası | P2 | Taslak teslim (parti 04–12) |
-| 30 | `oda-konusmaci-kuyrugu-el-kaldir.png` | Konuşmacı kuyruğu / el kaldır | 🙋 | oda simgesi: Konuşmacı kuyruğu / el kaldır | P2 | Taslak teslim (parti 04–12) |
-| 31 | `oda-oda-botu.png` | Oda botu | 🤖 | oda simgesi: Oda botu | P2 | Taslak teslim (parti 04–12) |
-| 32 | `oda-patron-koltugu.png` | Patron koltuğu | 👑 | oda simgesi: Patron koltuğu | P1 | Taslak teslim (parti 04–12) · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/crown.png |
-| 33 | `oda-zar-duellosu.png` | Zar düellosu | 🎲 | oda simgesi: Zar düellosu | P2 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 3 dosyada |
-| 34 | `oda-yavas-mod.png` | Yavaş mod | 🐢 | oda simgesi: Yavaş mod | P2 | Taslak teslim (parti 04–12) |
-| 35 | `oda-moderasyon.png` | Moderasyon | 🛡️ | oda simgesi: Moderasyon | P2 | Taslak teslim (parti 04–12) |
-| 36 | `oda-ses-ve-efekt-ayarlari.png` | Ses ve efekt ayarları | 🔊 | oda simgesi: Ses ve efekt ayarları | P2 | Taslak teslim (parti 04–12) |
-| 37 | `oda-oda-sesi-kapali.png` | Oda sesi kapalı | 🔇 | oda simgesi: Oda sesi kapalı | P2 | Taslak teslim (parti 04–12) |
-| 38 | `oda-gizli-giris.png` | Gizli giriş | 👻 | oda simgesi: Gizli giriş | P2 | Taslak teslim (parti 04–12) |
-| 39 | `oda-oda-kamerasi.png` | Oda kamerası | 📹 | oda simgesi: Oda kamerası | P2 | Taslak teslim (parti 04–12) |
-| 40 | `oda-oda-uyesi-ol.png` | Oda üyesi ol | ➕ | oda simgesi: Oda üyesi ol | P2 | Taslak teslim (parti 04–12) |
-| 41 | `zar-zar-yuzu-1.png` | Zar yüzü 1 | ⚀ | 1 noktalı zar yüzü | P3 | Taslak teslim (parti 04–12) |
-| 42 | `zar-zar-yuzu-2.png` | Zar yüzü 2 | ⚁ | 2 noktalı zar yüzü | P3 | Taslak teslim (parti 04–12) |
-| 43 | `zar-zar-yuzu-3.png` | Zar yüzü 3 | ⚂ | 3 noktalı zar yüzü | P3 | Taslak teslim (parti 04–12) |
-| 44 | `zar-zar-yuzu-4.png` | Zar yüzü 4 | ⚃ | 4 noktalı zar yüzü | P3 | Taslak teslim (parti 04–12) |
-| 45 | `zar-zar-yuzu-5.png` | Zar yüzü 5 | ⚄ | 5 noktalı zar yüzü | P3 | Taslak teslim (parti 04–12) |
-| 46 | `zar-zar-yuzu-6.png` | Zar yüzü 6 | ⚅ | 6 noktalı zar yüzü | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: 6 yerine 8 nokta var |
-| 47 | `pk-normal-pk.png` | Normal PK | 🎤 | PK simgesi: Normal PK | P1 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png |
-| 48 | `pk-takim-pk.png` | Takım PK | ⚔️ | PK simgesi: Takım PK | P1 | Taslak teslim (parti 04–12) · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/swords.png |
-| 49 | `pk-kirmizi-takim.png` | Kırmızı takım | 🔴 | PK simgesi: Kırmızı takım | P1 | Taslak teslim (parti 04–12) |
-| 50 | `pk-mavi-takim.png` | Mavi takım | 🔵 | PK simgesi: Mavi takım | P1 | Taslak teslim (parti 04–12) |
-| 51 | `pk-rastgele-dagit.png` | Rastgele dağıt | 🔀 | PK simgesi: Rastgele dağıt | P1 | Taslak teslim (parti 04–12) |
-| 52 | `pk-manuel-dagit.png` | Manuel dağıt | ✋ | PK simgesi: Manuel dağıt | P1 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 53 | `pk-beraberlik.png` | Beraberlik | 🤝 | PK simgesi: Beraberlik | P1 | Taslak teslim (parti 04–12) |
-| 54 | `pk-pk-mvp-one-cikan.png` | PK MVP / öne çıkan | ⭐ | PK simgesi: PK MVP / öne çıkan | P1 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 19 dosyada |
-| 55 | `pk-pk-bitti.png` | PK bitti | 🏁 | PK simgesi: PK bitti | P1 | Taslak teslim (parti 04–12) |
+| 1 | `oda-turu-serbest-sohbet.png` | Serbest sohbet | 💬 | oda türü: Serbest sohbet | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, oda tipi satırı ve seçicisi · Sohbet teması ile aynı görsel |
+| 2 | `oda-turu-sahne.png` | Sahne | 🎭 | oda türü: Sahne | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, oda tipi satırı ve seçicisi · yakın eşleşme (onaylandı): sahne yerine mikrofon |
+| 3 | `oda-turu-soru-cevap.png` | Soru-cevap | ❓ | oda türü: Soru-cevap | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, oda tipi satırı ve seçicisi · yakın eşleşme (onaylandı): soru işareti · Sorular ile aynı görsel |
+| 4 | `oda-turu-muzik-odasi.png` | Müzik odası | 🎵 | oda türü: Müzik odası | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, oda tipi satırı ve seçicisi · Müzik ve Müzik teması ile aynı görsel · kaynak görselde sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 5 | `oda-turu-etkinlik-odasi.png` | Etkinlik odası | 📅 | oda türü: Etkinlik odası | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, oda tipi satırı ve seçicisi · kaynak görselde üst ve sol kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 6 | `oda-turu-ozel-oda.png` | Özel oda | 🔒 | oda türü: Özel oda | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, oda tipi satırı ve seçicisi |
+| 7 | `oda-tema-sohbet.png` | Sohbet | 💬 | oda teması: Sohbet | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, tema satırı ve seçicisi · Serbest sohbet ile aynı görsel |
+| 8 | `oda-tema-pk.png` | PK | 🥊 | oda teması: PK | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, tema satırı ve seçicisi |
+| 9 | `oda-tema-muzik.png` | Müzik | 🎵 | oda teması: Müzik | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, tema satırı ve seçicisi · Müzik ve Müzik odası ile aynı görsel · kaynak görselde sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 10 | `oda-tema-oyun.png` | Oyun | 🎮 | oda teması: Oyun | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, tema satırı ve seçicisi · kaynak görselde sol ve sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 11 | `oda-tema-parti.png` | Parti | 🎉 | oda teması: Parti | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, tema satırı ve seçicisi · Aktivite ile aynı görsel |
+| 12 | `oda-tema-arkadaslik.png` | Arkadaşlık | 💜 | oda teması: Arkadaşlık | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Oda ayarları, tema satırı ve seçicisi · Kalp seviyesi ile aynı görsel · kaynak görselde sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli · Mor kalp marka paletine uymuyor; mercan veya turkuaz önerilir |
+| 13 | `oda-seviye-bronz.png` | Bronz (Lv.1–2) | 🥉 | oda seviye rozeti Lv.1–2: Bronz | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · kaynak görselde alt ve sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 14 | `oda-seviye-gumus.png` | Gümüş (Lv.3–4) | 🥈 | oda seviye rozeti Lv.3–4: Gümüş | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · kaynak görselde alt ve sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 15 | `oda-seviye-altin.png` | Altın (Lv.5–6) | 🥇 | oda seviye rozeti Lv.5–6: Altın | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · kaynak görselde alt ve sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 16 | `oda-seviye-madalya.png` | Madalya (Lv.7–8) | 🏅 | oda seviye rozeti Lv.7–8: Madalya | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · yakın eşleşme (onaylandı): madalya yerine kupa |
+| 17 | `oda-seviye-nisan.png` | Nişan (Lv.9) | 🎖️ | oda seviye rozeti Lv.9: Nişan | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · yakın eşleşme (onaylandı): nişan yerine yıldız |
+| 18 | `oda-seviye-kalp.png` | Kalp (Lv.10–11) | 💜 | oda seviye rozeti Lv.10–11: Kalp | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · Arkadaşlık teması ile aynı görsel · kaynak görselde sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 19 | `oda-seviye-elmas.png` | Elmas (Lv.12–13) | 💎 | oda seviye rozeti Lv.12–13: Elmas | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı |
+| 20 | `oda-seviye-tac.png` | Taç (Lv.14) | 👑 | oda seviye rozeti Lv.14: Taç | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı |
+| 21 | `oda-seviye-uc-disli.png` | Üç Dişli (Lv.15) | 🔱 | oda seviye rozeti Lv.15: Üç Dişli | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartı seviye kutusu, seviye tablosu, ayarlardaki seviye satırı · yakın eşleşme (onaylandı): üç dişli yerine asa · kaynak görselde üst kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 22 | `oda-sansli-canta-oda-zarfi.png` | Şanslı çanta / oda zarfı | 🧧 | oda simgesi: Şanslı çanta / oda zarfı | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda menüsü, zarf dağıtma penceresi, odaya düşen zarf · yakın eşleşme (onaylandı): kırmızı zarf yerine zarf |
+| 23 | `oda-aktivite.png` | Aktivite | 🎉 | oda simgesi: Aktivite | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda menüsü, etkinlikler penceresi · Parti teması ile aynı görsel |
+| 24 | `oda-anket.png` | Anket | 📊 | oda simgesi: Anket | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda menüsü, anket penceresi · yakın eşleşme (onaylandı): grafik yerine görev listesi · kaynak görselde üst kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 25 | `oda-topluluk-hedefi.png` | Topluluk hedefi | 🎯 | oda simgesi: Topluluk hedefi | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda menüsü, topluluk hedefi penceresi · kaynak görselde sol kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 26 | `oda-sorular.png` | Sorular | ❓ | oda simgesi: Sorular | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda menüsü, sorular penceresi · yakın eşleşme (onaylandı): soru işareti · Soru-cevap ile aynı görsel |
+| 27 | `oda-muzik.png` | Müzik | 🎵 🎶 | oda simgesi: Müzik | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda menüsü, müzik penceresi · Müzik teması ve Müzik odası ile aynı görsel · kaynak görselde sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 28 | `oda-ailem.png` | Ailem | 🏰 | oda simgesi: Ailem | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: kale simgesi |
+| 29 | `oda-ajans-odasi.png` | Ajans odası | 🏢 | oda simgesi: Ajans odası | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartındaki Kabile kutusu (ajans odası / ajansın) · kaynak görselde üst kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 30 | `oda-konusmaci-kuyrugu-el-kaldir.png` | Konuşmacı kuyruğu / el kaldır | 🙋 | oda simgesi: Konuşmacı kuyruğu / el kaldır | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: el kaldırma yerine kişi ekle simgesi, "Oda üyesi ol" ile aynı dosya |
+| 31 | `oda-oda-botu.png` | Oda botu | 🤖 | oda simgesi: Oda botu | P2 | İkinci 3D teslimde prototip geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli |
+| 32 | `oda-patron-koltugu.png` | Patron koltuğu | 👑 | oda simgesi: Patron koltuğu | P1 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): boş patron koltuğu |
+| 33 | `oda-zar-duellosu.png` | Zar düellosu | 🎲 | oda simgesi: Zar düellosu | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Zar Düellosu penceresi · kaynak görselde alt kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 34 | `oda-yavas-mod.png` | Yavaş mod | 🐢 | oda simgesi: Yavaş mod | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Moderasyon, yavaş mod satırı · yakın eşleşme (onaylandı): kaplumbağa yerine kum saati · kaynak görselde alt ve sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 35 | `oda-moderasyon.png` | Moderasyon | 🛡️ | oda simgesi: Moderasyon | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Moderasyon penceresi |
+| 36 | `oda-ses-ve-efekt-ayarlari.png` | Ses ve efekt ayarları | 🔊 | oda simgesi: Ses ve efekt ayarları | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): Ses ve efekt ayarları penceresi · yakın eşleşme (onaylandı): hoparlör yerine kulaklık · kaynak görselde sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 37 | `oda-oda-sesi-kapali.png` | Oda sesi kapalı | 🔇 | oda simgesi: Oda sesi kapalı | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): odada "oda sesi kapalı" uyarısı · yakın eşleşme (onaylandı): sessiz simgesi |
+| 38 | `oda-gizli-giris.png` | Gizli giriş | 👻 | oda simgesi: Gizli giriş | P2 | İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: kilit simgesi, "Özel oda" ile aynı dosya |
+| 39 | `oda-oda-kamerasi.png` | Oda kamerası | 📹 | oda simgesi: Oda kamerası | P2 | ✅ 3D teslim edildi · bağlanmadı: kamera düğmesi açık/kapalı durumunu Ionicons simgesiyle gösteriyor · kaynak görselde sol kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 40 | `oda-oda-uyesi-ol.png` | Oda üyesi ol | ➕ | oda simgesi: Oda üyesi ol | P2 | ✅ 3D teslim edildi, bağlandı (`app/assets/room`, `components/RoomArt.tsx`): oda kartında "Oda üyesi ol" düğmesi · kaynak görselde alt ve sağ kenar düz kesik (sayfadan kesilirken), yeniden üretilirse düzelmeli |
+| 41 | `zar-zar-yuzu-1.png` | Zar yüzü 1 | ⚀ | 1 noktalı zar yüzü | P3 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 42 | `zar-zar-yuzu-2.png` | Zar yüzü 2 | ⚁ | 2 noktalı zar yüzü | P3 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 43 | `zar-zar-yuzu-3.png` | Zar yüzü 3 | ⚂ | 3 noktalı zar yüzü | P3 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 44 | `zar-zar-yuzu-4.png` | Zar yüzü 4 | ⚃ | 4 noktalı zar yüzü | P3 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 45 | `zar-zar-yuzu-5.png` | Zar yüzü 5 | ⚄ | 5 noktalı zar yüzü | P3 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 46 | `zar-zar-yuzu-6.png` | Zar yüzü 6 | ⚅ | 6 noktalı zar yüzü | P3 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: 6 yerine 8 nokta var |
+| 47 | `pk-normal-pk.png` | Normal PK | 🎤 | PK simgesi: Normal PK | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/mic.png |
+| 48 | `pk-takim-pk.png` | Takım PK | ⚔️ | PK simgesi: Takım PK | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/swords.png |
+| 49 | `pk-kirmizi-takim.png` | Kırmızı takım | 🔴 | PK simgesi: Kırmızı takım | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 50 | `pk-mavi-takim.png` | Mavi takım | 🔵 | PK simgesi: Mavi takım | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 51 | `pk-rastgele-dagit.png` | Rastgele dağıt | 🔀 | PK simgesi: Rastgele dağıt | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 52 | `pk-manuel-dagit.png` | Manuel dağıt | ✋ | PK simgesi: Manuel dağıt | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
+| 53 | `pk-beraberlik.png` | Beraberlik | 🤝 | PK simgesi: Beraberlik | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
+| 54 | `pk-pk-mvp-one-cikan.png` | PK MVP / öne çıkan | ⭐ | PK simgesi: PK MVP / öne çıkan | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 19 dosyada |
+| 55 | `pk-pk-bitti.png` | PK bitti | 🏁 | PK simgesi: PK bitti | P1 | İkinci 3D teslimde yok (paket 5. bölümün ilk 40 öğesini kapsıyor) · Taslak teslim (parti 04–12) |
 
 ## 6. Oyunlar (28)
 
@@ -338,18 +340,18 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 7 | `oyun-penalti.png` | Penaltı | ⚽ | oyun kapak simgesi: Penaltı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 3 dosyada |
 | 8 | `oyun-balik-avi.png` | Balık Avı | 🦈 | oyun kapak simgesi: Balık Avı | P3 | Taslak teslim (parti 04–12) |
 | 9 | `oyun-kelime-avi.png` | Kelime Avı | 🔤 | oyun kapak simgesi: Kelime Avı | P3 | Taslak teslim (parti 04–12) |
-| 10 | `oyun-bilgi-yarismasi.png` | Bilgi Yarışması | 🧠 | oyun kapak simgesi: Bilgi Yarışması | P3 | Taslak teslim (parti 04–12) |
+| 10 | `oyun-bilgi-yarismasi.png` | Bilgi Yarışması | 🧠 | oyun kapak simgesi: Bilgi Yarışması | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 11 | `oyun-hizli-matematik.png` | Hızlı Matematik | ➗ | oyun kapak simgesi: Hızlı Matematik | P3 | Taslak teslim (parti 04–12) |
-| 12 | `oyun-8-top-bilardo.png` | 8 Top Bilardo | 🎱 | oyun kapak simgesi: 8 Top Bilardo | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
+| 12 | `oyun-8-top-bilardo.png` | 8 Top Bilardo | 🎱 | oyun kapak simgesi: 8 Top Bilardo | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 13 | `oyun-jackaroo.png` | Jackaroo | ♠️ | oyun kapak simgesi: Jackaroo | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 4 dosyada |
 | 14 | `oyun-xox.png` | XOX | ⭕ | oyun kapak simgesi: XOX | P3 | Taslak teslim (parti 04–12) |
 | 15 | `oyun-dort-tas.png` | Dört Taş | 🔴 | oyun kapak simgesi: Dört Taş | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 16 | `oyun-kelime-zinciri.png` | Kelime Zinciri | 🔤 | oyun kapak simgesi: Kelime Zinciri | P3 | Taslak teslim (parti 04–12) |
+| 16 | `oyun-kelime-zinciri.png` | Kelime Zinciri | 🔤 | oyun kapak simgesi: Kelime Zinciri | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü · yakın eşleşme: ABC harf taşları ve ampul |
 | 17 | `oyun-dogru-yanlis.png` | Doğru / Yanlış | ✅ | oyun kapak simgesi: Doğru / Yanlış | P3 | Taslak teslim (parti 04–12) |
-| 18 | `oyun-hafiza-eslestirme.png` | Hafıza Eşleştirme | 🧩 | oyun kapak simgesi: Hafıza Eşleştirme | P3 | Taslak teslim (parti 04–12) |
-| 19 | `oyun-sans-carki.png` | Şans Çarkı | 🎡 | oyun kapak simgesi: Şans Çarkı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 20 | `oyun-zar-casino.png` | Zar (casino) | 🎲 | oyun kapak simgesi: Zar (casino) | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 3 dosyada |
-| 21 | `oyun-lucky-77.png` | Lucky 77 | 🎰 | oyun kapak simgesi: Lucky 77 | P3 | Taslak teslim (parti 04–12) |
+| 18 | `oyun-hafiza-eslestirme.png` | Hafıza Eşleştirme | 🧩 | oyun kapak simgesi: Hafıza Eşleştirme | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 19 | `oyun-sans-carki.png` | Şans Çarkı | 🎡 | oyun kapak simgesi: Şans Çarkı | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 20 | `oyun-zar-casino.png` | Zar (casino) | 🎲 | oyun kapak simgesi: Zar (casino) | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 21 | `oyun-lucky-77.png` | Lucky 77 | 🎰 | oyun kapak simgesi: Lucky 77 | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 22 | `oyun-dragon-tiger.png` | Dragon Tiger | 🐉 | oyun kapak simgesi: Dragon Tiger | P3 | Taslak teslim (parti 04–12) |
 | 23 | `casino-kart-ejder.png` | Ejder | 🐉 | Dragon Tiger masası: Ejder tarafı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: ejderha yerine alev simgesi, aynı görsel 2 dosyada |
 | 24 | `casino-kart-kaplan.png` | Kaplan | 🐯 | Dragon Tiger masası: Kaplan tarafı | P3 | Taslak teslim (parti 04–12) |
