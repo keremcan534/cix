@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameArtOf } from '@/components/GameArt';
 import { CasinoPlayer } from '@/components/games/casino';
+import { OkeyTable } from '@/components/games/okey';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
 import { useGames, type Entry } from '@/lib/games';
@@ -61,7 +62,7 @@ export function GamePanel({
   const titleArt = gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && open.id === 'okey' && p.tall, hidden && { display: 'none' }]}>
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
         <Text style={p.title} numberOfLines={1}>
@@ -109,6 +110,7 @@ export function GamePanel({
               {open.id === 'ludo' && <Ludo key={players.map((x) => x.id).join()} players={players.slice(0, roomGame.maxPlayers)} />}
               {open.id === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
               {open.id === 'xox' && <Xox players={players.slice(0, 2)} />}
+              {open.id === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1)} />}
               <Text style={p.dim}>
                 {roomGame.minPlayers}–{roomGame.maxPlayers} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
                 {roomGame.note ? ` · ${roomGame.note}` : ''}
@@ -142,6 +144,8 @@ export function GamePanel({
 const p = StyleSheet.create({
   panel: { backgroundColor: colors.card, padding: 14, gap: 8 },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, top: '34%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, zIndex: 40 },
+  // Okey needs the table and the rack on screen together; the top row of seats stays visible.
+  tall: { top: '22%' },
   full: { flex: 1, backgroundColor: colors.bg },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: colors.text, fontWeight: '900', fontSize: 17, flex: 1 },
