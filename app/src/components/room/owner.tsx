@@ -640,7 +640,12 @@ export function RoomSettingsScreen({
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
           <Section title="Mikrofon pozisyonu" />
-          <Row label="Yayına Katılma Modu" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />
+          <Row
+            label="Yayına Katılma Modu"
+            hint={room.video ? 'Video odası: koltuğa çıkanın kamerası açılır' : undefined}
+            value={`${room.video ? 'Video' : 'Sesli'} · ${Math.min(room.micCount, maxMics)} mikrofon`}
+            onPress={() => setPicker('mics')}
+          />
           <Row label="Mikrofon kontrolü" value={room.micMode === 'free' ? 'Serbest' : room.micMode === 'request' ? 'Mikrofon için başvur' : 'Sadece takipçiler'} onPress={() => setPicker('micMode')} />
           <Row
             label="Mikrofon izni"
@@ -694,10 +699,20 @@ export function RoomSettingsScreen({
       <ChoiceSheet
         visible={picker === 'mics'}
         title="Yayına Katılma Modu"
-        desc={`Bu odada en fazla ${maxMics} mikrofon açılabilir (ajans odası 15, Lv.8'de +2). Azaltınca fazla koltuktakiler dinleyiciye geçer.`}
-        options={MIC_COUNT_OPTIONS.map((n) => ({ value: n, label: `${n} mikrofon`, disabled: n > maxMics, sub: n > maxMics ? 'Oda seviyesi veya ajans odası gerekir' : undefined }))}
-        value={Math.min(room.micCount, maxMics)}
-        onPick={(v) => update({ micCount: v, lockedSeats: room.lockedSeats.filter((i) => i < v) })}
+        desc={`Sesli odada koltuktakiler yalnızca konuşur; video odasında koltuğa çıkanın kamerası açılır (koltuktan inince kapanır). En fazla ${maxMics} mikrofon (ajans odası 15, Lv.8'de +2); azaltınca fazla koltuktakiler dinleyiciye geçer.`}
+        options={(['audio', 'video'] as const).flatMap((mode) =>
+          MIC_COUNT_OPTIONS.map((n) => ({
+            value: `${mode}:${n}`,
+            label: `${mode === 'video' ? '📹 Video' : '🎙️ Sesli'} · ${n} mikrofon`,
+            disabled: n > maxMics,
+            sub: n > maxMics ? 'Oda seviyesi veya ajans odası gerekir' : undefined,
+          })),
+        )}
+        value={`${room.video ? 'video' : 'audio'}:${Math.min(room.micCount, maxMics)}`}
+        onPick={(v) => {
+          const [mode, n] = v.split(':');
+          update({ video: mode === 'video', micCount: Number(n), lockedSeats: room.lockedSeats.filter((i) => i < Number(n)) });
+        }}
         onClose={close}
       />
       <ChoiceSheet

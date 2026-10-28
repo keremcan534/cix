@@ -74,7 +74,9 @@ export type GroupMsg = { id: string; userId: string; text: string; time: string;
 export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members'; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
   theme: RoomTheme; micCount: number; micPermission: 'everyone' | 'members'; bossSeat: boolean;
   joinMode: 'open' | 'apply' | 'closed'; manageMembers: 'owner' | 'admins'; manageFunctions: 'owner' | 'admins';
-  autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[] };
+  autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[];
+  /** Video room (set in Yayına Katılma Modu): taking a mic seat turns that person's camera on. */
+  video: boolean };
 export type OwnedAgency = { name: string; code: string; status: 'İnceleniyor' | 'Onaylandı' };
 export type TransferStep = { label: string; status: 'Bekliyor' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı'; time?: string; note?: string };
 export type TransferRequest = {
@@ -461,6 +463,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     autoRemoveDays: 14,
     profileVisible: true,
     videoPrivacy: true,
+    video: false,
     memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
     blacklist: ['u6'],
     ...s.myRoom,
