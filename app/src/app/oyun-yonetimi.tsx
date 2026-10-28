@@ -1,9 +1,10 @@
 // Admin: the two independent game catalogs (spec §6). Changes apply to both entry points at once,
 // because profile and rooms read the same platform state (lib/games).
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { gameArtOf } from '@/components/GameArt';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { resolve } from '@/data/rbac';
@@ -27,6 +28,20 @@ function Row({ label, value, onChange }: { label: string; value: boolean; onChan
     <View style={s.row}>
       <Text style={s.label}>{label}</Text>
       <Switch value={value} onValueChange={onChange} />
+    </View>
+  );
+}
+
+/** Game name line: the game's 3D cover when it has one, otherwise its emoji. */
+function GameTitle({ id, emoji, children }: { id: string; emoji: string; children: React.ReactNode }) {
+  const art = gameArtOf(id);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {art && <Image source={art} style={{ width: 22, height: 22 }} />}
+      <Text style={[s.title, { flexShrink: 1 }]}>
+        {art ? '' : `${emoji} `}
+        {children}
+      </Text>
     </View>
   );
 }
@@ -62,9 +77,9 @@ export default function GameAdmin() {
         {tab === 'room' &&
           roomGames.map((g) => (
             <Card key={g.id} style={{ gap: 8 }}>
-              <Text style={s.title}>
-                {g.emoji} {g.name} <Text style={s.dim}>· {g.provider} · v{g.version} · {g.phase}. aşama</Text>
-              </Text>
+              <GameTitle id={g.id} emoji={g.emoji}>
+                {g.name} <Text style={s.dim}>· {g.provider} · v{g.version} · {g.phase}. aşama</Text>
+              </GameTitle>
               <Row label="Aktif" value={g.active} onChange={(v) => updateRoomGame(g.id, { active: v })} />
               <Text style={s.label}>Maksimum oyuncu</Text>
               <Chips value={g.maxPlayers} options={[2, 4, 6, 10, 20].filter((n) => n >= g.minPlayers).map((n) => [n, String(n)] as [number, string])} onChange={(v) => updateRoomGame(g.id, { maxPlayers: v })} />
@@ -88,9 +103,9 @@ export default function GameAdmin() {
           <>
             {casino.map((g) => (
               <Card key={g.id} style={{ gap: 8 }}>
-                <Text style={s.title}>
-                  {g.emoji} {g.name} <Text style={s.dim}>· {g.provider}</Text>
-                </Text>
+                <GameTitle id={g.id} emoji={g.emoji}>
+                  {g.name} <Text style={s.dim}>· {g.provider}</Text>
+                </GameTitle>
                 <Row label="Aktif" value={g.active} onChange={(v) => updateCasino(g.id, { active: v })} />
                 <Text style={s.label}>Minimum VIP seviyesi</Text>
                 <Chips value={g.minWealth} options={[1, 2, 3, 5, 10].map((n) => [n, `Servet Lv.${n}`] as [number, string])} onChange={(v) => updateCasino(g.id, { minWealth: v })} />

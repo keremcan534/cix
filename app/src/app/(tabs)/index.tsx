@@ -6,9 +6,11 @@ import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
+import { Art, artSource } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
 import { gameArtOf } from '@/components/GameArt';
-import { Ambient, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
 import { Icon3D, icon3dSource, type Icon3DName } from '@/components/Icon3D';
 import { Avatar } from '@/components/ui';
 import { roomCode } from '@/data/catalog';
@@ -139,7 +141,7 @@ export default function RoomsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Ambient />
+      <Backdrop scene={SCENES.home} />
       <FlatList
         data={main === 'rec' ? recRooms : mineRooms}
         keyExtractor={(r) => r.id}
@@ -188,7 +190,8 @@ export default function RoomsScreen() {
 
       <ActionSheet
         visible={sheet === 'events'}
-        title={events.length ? '📅 Yaklaşan etkinlikler' : 'Yaklaşan etkinlik yok'}
+        title={events.length ? 'Yaklaşan etkinlikler' : 'Yaklaşan etkinlik yok'}
+        titleArt={events.length ? artSource('ana-yaklasan-etkinlikler') : undefined}
         options={events.map((e) => ({ label: `${e.when} · ${e.title}`, onPress: () => router.push(`/oda/${e.roomId}`) }))}
         onClose={() => setSheet(null)}
       />
@@ -237,8 +240,8 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
     { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
     { key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
     { key: 'wheel', source: gameArtOf('wheel'), hue: '#FF8A5B', label: 'Şans Çarkı', onPress: () => router.push('/cark') },
-    { key: 'games', source: gameArtOf('dice'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
-    { key: 'tasks', source: icon3dSource('tasks'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
+    { key: 'games', source: artSource('ana-oyun-merkezi'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
+    { key: 'tasks', source: artSource('ana-gorevler'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];
   return (
     <View style={styles.shelf}>
@@ -316,7 +319,10 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
   if (items.length === 0) return null;
   return (
     <View style={{ gap: 10 }}>
-      <Text style={styles.section}>✨ Senin için</Text>
+      <View style={styles.sectionRow}>
+        <Art name="ana-senin-icin" size={24} />
+        <Text style={[styles.section, { paddingHorizontal: 0 }]}>Senin için</Text>
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
         {items.map(({ r, reason }) => (
           <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
@@ -332,9 +338,12 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
             <Text style={styles.suggestTitle} numberOfLines={1}>
               {r.title}
             </Text>
-            <Text style={styles.suggestWhy} numberOfLines={1}>
-              💡 {reason}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Art name="ana-ipucu" size={15} />
+              <Text style={[styles.suggestWhy, { flexShrink: 1 }]} numberOfLines={1}>
+                {reason}
+              </Text>
+            </View>
           </PressableScale>
         ))}
       </ScrollView>
@@ -590,6 +599,7 @@ const styles = StyleSheet.create({
   liveText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   suggestTitle: { color: '#fff', fontWeight: '700', fontSize: 13 },
   suggestWhy: { color: colors.textDim, fontSize: 12 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16 },
   // room rows
   roomCard: { flexDirection: 'row', gap: 12, padding: 10, overflow: 'hidden' },
   roomCardTop: { borderColor: 'rgba(246,189,96,0.35)' },

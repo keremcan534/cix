@@ -19,7 +19,7 @@ const LAST_ACTIVE = ['5 dk önce', '40 dk önce', 'Dün 21:15', '2 gün önce', 
 const CHAT_GIFTS = CHAT_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
 const QUICK: QuickAction[] = [
-  { key: 'iliski', label: 'İlişki Meydanı', emoji: '💞', onPress: () => router.push(KABILE_ROUTES.iliski) },
+  { key: 'iliski', label: 'İlişki Meydanı', emoji: '💞', art: 'iliski-cift-cp-en-tatli-cift', onPress: () => router.push(KABILE_ROUTES.iliski) },
   { key: 'merkez', label: 'Kabile Merkezi', emoji: '🎯', tag: 'ücretsiz', onPress: () => router.push(KABILE_ROUTES.merkez) },
   { key: 'kasa', label: 'Kabile Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];

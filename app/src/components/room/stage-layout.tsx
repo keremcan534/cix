@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { LayoutSlot, RoomLayout } from '@/data/room-layouts';
+import { Art } from '@/components/Art';
 import type { ArenaSlot } from '@/components/room/pk';
 import { colors, radius, semantic, space } from '@/theme';
 
@@ -104,7 +105,12 @@ export function StageLayout({
               key={t}
               style={[st.zone, pkRoom && { backgroundColor: `${TEAM[t].color}1F`, borderColor: `${TEAM[t].color}88` }]}
               accessibilityLabel={pkRoom ? `${TEAM[t].name} takım bölgesi` : undefined}>
-              {pkRoom && <Text style={[st.zoneName, { color: TEAM[t].color }]}>{t === 'red' ? '🔴' : '🔵'} {TEAM[t].name}</Text>}
+              {pkRoom && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <Art name={t === 'red' ? 'pk-kirmizi-takim' : 'pk-mavi-takim'} size={15} />
+                  <Text style={[st.zoneName, { color: TEAM[t].color }]}>{TEAM[t].name}</Text>
+                </View>
+              )}
               <View style={st.zoneSeats}>{stage.filter((x) => x.team === t).map((x) => <View key={x.index}>{renderSeat(x.index, slot)}</View>)}</View>
             </View>
           ))}

@@ -12,6 +12,7 @@ import type { FeedMsg } from '@/lib/chat-feed';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { Art } from '@/components/Art';
 import { Gloss, Shine } from '@/components/fx/surface';
 
 export type ChatMsg = FeedMsg;
@@ -249,7 +250,8 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
   if (msg.bot) {
     return (
       <View style={styles.botMsg}>
-        <Text style={styles.botTag}>🤖 BOT</Text>
+        <Art name="oda-oda-botu" size={18} />
+        <Text style={styles.botTag}>BOT</Text>
         <Text style={styles.botText}>{msg.text}</Text>
       </View>
     );

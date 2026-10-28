@@ -14,6 +14,7 @@ import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { useApp } from '@/store';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { Art } from '@/components/Art';
 
 export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
   return (
@@ -210,7 +211,7 @@ export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online, ar
         <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion}>
           <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
-        {tier && <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{tier.emoji}</Text>}
+        {tier && <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />}
       </View>
     );
   }
@@ -222,8 +223,10 @@ export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online, ar
       <LinearGradient colors={frameColors} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
         <Image source={{ uri }} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
       </LinearGradient>
-      {(tier || frame) && (
-        <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{tier?.emoji ?? frame?.emoji}</Text>
+      {tier ? (
+        <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />
+      ) : (
+        frame && <Text style={{ position: 'absolute', top: -size * 0.12, right: -size * 0.05, fontSize: size * 0.3 }}>{frame.emoji}</Text>
       )}
     </View>
   );
@@ -269,10 +272,9 @@ export function VipTitle({ level }: { level: number }) {
   const tier = vipTier(level);
   if (!tier) return null;
   return (
-    <LinearGradient colors={tier.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.vip}>
-      <Text style={[styles.vipText, { color: '#fff' }]}>
-        {tier.emoji} VIP {tier.level}
-      </Text>
+    <LinearGradient colors={tier.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.vip, { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 2 }]}>
+      <Art name={tier.art} size={15} />
+      <Text style={[styles.vipText, { color: '#fff' }]}>VIP {tier.level}</Text>
     </LinearGradient>
   );
 }

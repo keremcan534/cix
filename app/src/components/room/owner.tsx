@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
@@ -31,6 +32,7 @@ import {
 import { userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
@@ -119,6 +121,7 @@ export function ChoiceSheet<T extends string | number>({
 
 function Row({
   label,
+  labelArt,
   hint,
   value,
   valueArt,
@@ -127,6 +130,8 @@ function Row({
   locked,
 }: {
   label: string;
+  /** 3D picture drawn before the label. */
+  labelArt?: ArtName;
   hint?: string;
   value?: string;
   valueArt?: number;
@@ -138,7 +143,14 @@ function Row({
   return (
     <Pressable style={styles.row} onPress={toggle ? undefined : press} accessibilityLabel={label}>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.rowLabel}>{label}</Text>
+        {labelArt ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Art name={labelArt} size={22} />
+            <Text style={[styles.rowLabel, { flexShrink: 1 }]}>{label}</Text>
+          </View>
+        ) : (
+          <Text style={styles.rowLabel}>{label}</Text>
+        )}
         {hint && <Text style={styles.hint}>{hint}</Text>}
       </View>
       {toggle ? (
@@ -560,7 +572,6 @@ type Picker =
   | 'theme'
   | 'mics'
   | 'layouts'
-  | 'micMode'
   | 'micPerm'
   | 'join'
   | 'manageMembers'
@@ -656,7 +667,11 @@ export function RoomSettingsScreen({
           <Section title="Mikrofon pozisyonu" />
           <Row label="Yayına Katılma Modu" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
-          <Row label="Mikrofon kontrolü" value={room.micMode === 'free' ? 'Serbest' : room.micMode === 'request' ? 'Mikrofon için başvur' : 'Sadece takipçiler'} onPress={() => setPicker('micMode')} />
+          <Row
+            label="Mikrofon kuyruğu"
+            hint={room.micQueue ? 'Açık: boş mikrofona çıkmak isteyenler kuyruğa girer, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
+            toggle={{ value: room.micQueue, onChange: (v) => update({ micQueue: v }) }}
+          />
           <Row
             label="Mikrofon izni"
             hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
@@ -692,7 +707,7 @@ export function RoomSettingsScreen({
             hint="Etkinleştirildiğinde video odası ekran görüntüsü alma veya kaydetmeye karşı korunur"
             toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
           />
-          <Row label="🤖 Oda botu (karşılama ve kurallar)" toggle={{ value: botOn, onChange: setBot }} />
+          <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} />
           <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve patron koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
         </ScrollView>
       </SafeAreaView>
@@ -702,7 +717,7 @@ export function RoomSettingsScreen({
         title="Oda tipi"
         options={ROOM_TYPES.map((t) => ({ value: t.id, label: t.name, sub: t.desc, art: ROOM_TYPE_ART[t.id] }))}
         value={room.roomType}
-        onPick={(v) => update({ roomType: v, micMode: v === 'free' ? 'free' : 'request' })}
+        onPick={(v) => update({ roomType: v, micQueue: defaultMicQueue(v) })}
         onClose={close}
       />
       <ChoiceSheet visible={picker === 'theme'} title="Oda teması" options={ROOM_THEMES.map((t) => ({ value: t.id, label: t.name, art: ROOM_THEME_ART[t.id] }))} value={room.theme} onPick={(v) => update({ theme: v })} onClose={close} />
@@ -716,18 +731,6 @@ export function RoomSettingsScreen({
           const r = onClassicMics(v);
           if (!r.ok) showAlert('Mikrofon sayısı değiştirilemedi', r.reason);
         }}
-        onClose={close}
-      />
-      <ChoiceSheet
-        visible={picker === 'micMode'}
-        title="Mikrofon kontrolü"
-        options={[
-          { value: 'free', label: 'Serbest', sub: 'Yetkili herkes boş mikrofona doğrudan oturur' },
-          { value: 'request', label: 'Mikrofon için başvur', sub: 'Konuşmacı kuyruğu; sahip/yönetici onaylar' },
-          { value: 'members', label: 'Sadece takipçiler', sub: level >= 5 ? 'Seni takip edenler oturabilir' : 'Lv.5 odada açılır', disabled: level < 5 },
-        ]}
-        value={room.micMode}
-        onPick={(v) => update({ micMode: v })}
         onClose={close}
       />
       <ChoiceSheet

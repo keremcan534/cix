@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art, type ArtName } from '@/components/Art';
 import { Avatar, Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
@@ -12,12 +13,19 @@ import { colors } from '@/theme';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 
-function Toggle({ k, label, hint, disabled }: { k: BoolKey; label: string; hint?: string; disabled?: boolean }) {
+function Toggle({ k, label, art, hint, disabled }: { k: BoolKey; label: string; art?: ArtName; hint?: string; disabled?: boolean }) {
   const { settings, setSetting } = useApp();
   return (
     <View style={[styles.row, disabled && { opacity: 0.45 }]}>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#fff' }}>{label}</Text>
+        {art ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Art name={art} size={20} />
+            <Text style={{ color: '#fff', flexShrink: 1 }}>{label}</Text>
+          </View>
+        ) : (
+          <Text style={{ color: '#fff' }}>{label}</Text>
+        )}
         {hint && <Text style={styles.dim}>{hint}</Text>}
       </View>
       <Switch value={settings[k]} disabled={disabled} onValueChange={(v) => setSetting(k, v)} />
@@ -134,7 +142,7 @@ export default function SettingsScreen() {
           <Text style={{ color: '#fff' }}>Beni kimler arayabilir? (ücretli sesli/görüntülü)</Text>
           <Chips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
           <Toggle k="cityDiscovery" label="Aynı şehirde keşfedilebilir ol" hint="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
-          <Toggle k="invisibleEntry" label="👻 Odalara gizli giriş" hint="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez." disabled={!GATES.invisibleEntry(nobleTier)} />
+          <Toggle k="invisibleEntry" label="Odalara gizli giriş" art="oda-gizli-giris" hint="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez." disabled={!GATES.invisibleEntry(nobleTier)} />
           <Text style={{ color: '#fff' }}>Beni odalara kimler davet edebilir?</Text>
           <Chips
             value={settings.invitesFrom}

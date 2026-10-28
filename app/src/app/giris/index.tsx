@@ -4,6 +4,8 @@ import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
 import { USERS } from '@/data/mock';
@@ -35,6 +37,7 @@ export default function WelcomeScreen() {
   return (
     <LinearGradient colors={['#0B3B4A', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
+        <Backdrop scene={SCENES.login} />
         <View style={styles.hero}>
           {BUBBLES.map(([i, size, top, left]) => (
             <View key={i} style={[styles.bubble, { top, left, width: size, height: size, borderRadius: size / 2 }]}>

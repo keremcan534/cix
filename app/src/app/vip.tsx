@@ -10,6 +10,9 @@ import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
+import { Art } from '@/components/Art';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
@@ -21,6 +24,7 @@ export default function PrivilegeCenter() {
   const [tab, setTab] = useState<Tab>(params.tab === 'vip' || params.tab === 'noble' ? params.tab : 'svip');
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0B0A0F' }}>
+      <Backdrop scene={SCENES.vip} />
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color="#fff" />
@@ -85,7 +89,7 @@ function Svip() {
                 {locked && <Text style={styles.lockChip}>🔒 Kilitli</Text>}
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={styles.svipTitle}>SVIP{l.level}</Text>
-                  <Text style={{ fontSize: 54, marginLeft: 'auto' }}>{l.emoji}</Text>
+                  {l.art ? <Art name={l.art} size={68} style={{ marginLeft: 'auto' }} /> : <Text style={{ fontSize: 54, marginLeft: 'auto' }}>{l.emoji}</Text>}
                 </View>
                 {isNext ? (
                   <>
@@ -111,9 +115,13 @@ function Svip() {
           );
         })}
       </ScrollView>
-      <Text style={styles.rightsTitle}>
-        ✦ SVIP{lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length} ✦
-      </Text>
+      <View style={styles.rightsTitleRow}>
+        <Art name="svip-svip-isareti" size={22} />
+        <Text style={[styles.rightsTitle, { marginVertical: 0 }]}>
+          SVIP{lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length}
+        </Text>
+        <Art name="svip-svip-isareti" size={22} />
+      </View>
       <View style={styles.grid}>
         {SVIP_RIGHTS.map((r, i) => {
           const on = i < lv.rights;
@@ -126,7 +134,7 @@ function Svip() {
                 showAlert(r.name, on ? `SVIP${lv.level} ile kullanılabilir.` : need ? `SVIP${need.level} ile açılır.` : 'Yakında.');
               }}>
               <View style={styles.rightIcon}>
-                <Text style={{ fontSize: 26 }}>{r.emoji}</Text>
+                {r.art ? <Art name={r.art} size={34} /> : <Text style={{ fontSize: 26 }}>{r.emoji}</Text>}
               </View>
               <Text style={styles.rightName} numberOfLines={2}>
                 {r.name}
@@ -219,7 +227,7 @@ function Noble() {
         </View>
         <View style={{ alignItems: 'center', paddingVertical: 18 }}>
           <LinearGradient colors={t.colors} style={styles.emblem}>
-            <Text style={{ fontSize: 86 }}>{t.emoji}</Text>
+            {t.art ? <Art name={t.art} size={112} /> : <Text style={{ fontSize: 86 }}>{t.emoji}</Text>}
           </LinearGradient>
           {owned && <Text style={[styles.cardText, { color: GOLD, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
         </View>
@@ -238,7 +246,7 @@ function Noble() {
                   showAlert(r.name, on ? `${t.name} ile kullanılabilir.` : need ? `${need.name} ile açılır.` : '');
                 }}>
                 <View>
-                  <Text style={{ fontSize: 34 }}>{r.emoji}</Text>
+                  {r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}
                   {r.isNew && <Text style={styles.newTag}>Yeni</Text>}
                 </View>
                 <Text style={[styles.rightName, { color: GOLD }]} numberOfLines={2}>
@@ -250,8 +258,9 @@ function Noble() {
         </View>
       </ScrollView>
       <View style={styles.bottomBar}>
+        {owned && <Art name={t.art} size={28} style={{ marginRight: -6 }} />}
         <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, flex: 1 }}>
-          {owned ? `${t.emoji} ${t.name} aktif` : nobleTier > 0 ? `Yükselt: ${t.name} · 🪙 ${fmt(t.price)}` : `Kilidi açılmadı · 🪙 ${fmt(t.price)} / ${NOBLE_DAYS} gün`}
+          {owned ? `${t.name} aktif` : nobleTier > 0 ? `Yükselt: ${t.name} · 🪙 ${fmt(t.price)}` : `Kilidi açılmadı · 🪙 ${fmt(t.price)} / ${NOBLE_DAYS} gün`}
         </Text>
         {!owned && (
           <Pressable onPress={buy} style={styles.alBtn} accessibilityLabel={`${t.name} al`}>
@@ -276,6 +285,7 @@ const styles = StyleSheet.create({
   track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
   loadBtn: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#FDE7C7', borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8 },
   rightsTitle: { color: GOLD, fontWeight: '900', fontSize: 18, textAlign: 'center', marginVertical: 18 },
+  rightsTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 18 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, rowGap: 12 },
   rightCell: { width: '31.3%', marginHorizontal: '1%', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(245,215,161,0.35)', backgroundColor: '#15120C' },
   rightIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E8B979', alignItems: 'center', justifyContent: 'center' },

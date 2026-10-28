@@ -1,17 +1,25 @@
-// Game visuals (docs/GORSEL_URETIM_LISTESI.md §6, 3D sheet): 192 px PNGs keyed by game id (data/games).
-// Games with no matching picture yet (Ludo, Renk Kartları, Domino, Jackaroo, XOX, Dört Taş, Doğru / Yanlış,
-// Dragon Tiger) keep their emoji.
+// Game visuals: each game's 3D cover from the app icon set (components/Art), keyed by game id (data/games).
+// Renk Kartları and Domino have no picture yet and keep their emoji.
 import { Image, Text } from 'react-native';
 
-const ART: Record<string, number> = {
-  pool: require('../../assets/games/oyun-8-top-bilardo.png'),
-  memory: require('../../assets/games/oyun-hafiza-eslestirme.png'),
-  quiz: require('../../assets/games/oyun-bilgi-yarismasi.png'),
-  words: require('../../assets/games/oyun-kelime-zinciri.png'),
-  wheel: require('../../assets/games/oyun-sans-carki.png'),
-  dice: require('../../assets/games/oyun-zar-casino.png'),
-  slot: require('../../assets/games/oyun-lucky-77.png'),
+import { artSource, type ArtName } from '@/components/Art';
+
+const COVER: Record<string, ArtName> = {
+  ludo: 'oyun-ludo',
+  pool: 'oyun-8-top-bilardo',
+  jackaroo: 'oyun-jackaroo',
+  xox: 'oyun-xox',
+  connect4: 'oyun-dort-tas',
+  words: 'oyun-kelime-zinciri',
+  quiz: 'oyun-bilgi-yarismasi',
+  truefalse: 'oyun-dogru-yanlis',
+  memory: 'oyun-hafiza-eslestirme',
+  wheel: 'oyun-sans-carki',
+  dice: 'oyun-zar-casino',
+  slot: 'oyun-lucky-77',
+  dragon: 'oyun-dragon-tiger',
 };
+const ART: Record<string, number> = Object.fromEntries(Object.entries(COVER).map(([id, name]) => [id, artSource(name)]));
 
 export const gameArtOf = (id: string): number | undefined => ART[id];
 
@@ -23,6 +31,7 @@ const HUE: Record<string, string> = {
   slot: '#F6BD60',
   dragon: '#4ADE80',
   ludo: '#60A5FA',
+  okey: '#F6BD60',
   cards: '#F472B6',
   domino: '#C4B5FD',
   pool: '#22C55E',

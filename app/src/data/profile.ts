@@ -1,5 +1,6 @@
 // Mock data for the user profile screen (kullanici/[id]).
 // Everything here is deterministic per user id so render stays pure.
+import type { ArtName } from '@/components/Art';
 import { COSMETICS } from '@/data/catalog';
 import { FAMILIES } from '@/data/economy';
 import { GIFTS, USERS, type Gift, type User } from '@/data/mock';
@@ -126,14 +127,14 @@ export const guardianOf = (id: string): { userId: string; points: number } | nul
 };
 
 // --- Honor (Onur) --------------------------------------------------------------
-export type Medal = { id: string; emoji: string; name: string; tier: 'gold' | 'silver' };
+export type Medal = { id: string; emoji: string; art?: ArtName; name: string; tier: 'gold' | 'silver' };
 export const MEDALS: Medal[] = [
-  { id: 'md1', emoji: '🏆', name: 'Haftanın Yıldızı', tier: 'gold' },
-  { id: 'md2', emoji: '🎤', name: 'Karaoke Ustası', tier: 'gold' },
-  { id: 'md3', emoji: '💬', name: 'Sohbet Kralı', tier: 'silver' },
-  { id: 'md4', emoji: '🎁', name: 'Cömert Kalp', tier: 'silver' },
-  { id: 'md5', emoji: '🔥', name: '30 Gün Seri', tier: 'gold' },
-  { id: 'md6', emoji: '🤝', name: 'Sosyal Kelebek', tier: 'silver' },
+  { id: 'md1', emoji: '🏆', art: 'rozet-haftanin-yildizi', name: 'Haftanın Yıldızı', tier: 'gold' },
+  { id: 'md2', emoji: '🎤', art: 'rozet-karaoke-ustasi', name: 'Karaoke Ustası', tier: 'gold' },
+  { id: 'md3', emoji: '💬', art: 'rozet-sohbet-krali', name: 'Sohbet Kralı', tier: 'silver' },
+  { id: 'md4', emoji: '🎁', art: 'rozet-comert-kalp', name: 'Cömert Kalp', tier: 'silver' },
+  { id: 'md5', emoji: '🔥', art: 'rozet-30-gun-seri', name: '30 Gün Seri', tier: 'gold' },
+  { id: 'md6', emoji: '🤝', art: 'rozet-sosyal-kelebek', name: 'Sosyal Kelebek', tier: 'silver' },
 ];
 export const medalsOf = (id: string) => (id === 'me' ? [] : MEDALS.filter((_, i) => (seedOf(id) >> i) % 3 === 0).slice(0, 4));
 

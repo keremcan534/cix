@@ -8,6 +8,9 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
+import { Art, type ArtName } from '@/components/Art';
 import { Avatar, CharmBadge, WealthBadge } from '@/components/ui';
 import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmBonusPct, charmTier } from '@/data/charm';
 import { SVIP_LEVELS, nobleInfo } from '@/data/status';
@@ -22,6 +25,7 @@ type Kind = 'wealth' | 'charm';
 
 type System = {
   title: string;
+  art: ArtName;
   point: string;
   table: number[];
   tiers: LevelTier[];
@@ -34,6 +38,7 @@ type System = {
 const SYSTEMS: Record<Kind, System> = {
   wealth: {
     title: 'Servet',
+    art: 'seviye-servet-seviyesi',
     point: 'Servet puanı',
     table: WEALTH_XP,
     tiers: WEALTH_TIERS,
@@ -45,6 +50,7 @@ const SYSTEMS: Record<Kind, System> = {
   },
   charm: {
     title: 'Cazibe',
+    art: 'seviye-cazibe-seviyesi',
     point: 'Cazibe puanı',
     table: CHARM_XP,
     tiers: CHARM_TIERS,
@@ -66,6 +72,7 @@ export default function LevelsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Backdrop scene={SCENES.level} />
       <View style={s.top}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color={colors.text} />
@@ -73,6 +80,7 @@ export default function LevelsScreen() {
         <View style={s.seg}>
           {(['wealth', 'charm'] as const).map((k) => (
             <Pressable key={k} onPress={() => setTab(k)} style={[s.segItem, tab === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === k }}>
+              <Art name={SYSTEMS[k].art} size={18} />
               <Text style={[s.segText, tab === k && { color: semantic.actionInk }]}>{SYSTEMS[k].title} Seviyesi</Text>
             </Pressable>
           ))}
@@ -156,7 +164,11 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
             <Text style={s.row}>
               SVIP: {svipLevel ? `SVIP${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · SVIP${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
             </Text>
-            <Text style={s.row}>Asil: {noble ? `${noble.emoji} ${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={s.row}>Asil:</Text>
+              {noble && <Art name={noble.art} size={18} />}
+              <Text style={s.row}>{noble ? `${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}</Text>
+            </View>
             <Text style={s.row}>VIP: {vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}</Text>
             <Text style={[s.row, { color: colors.gold }]}>Ayrıcalık merkezine git ›</Text>
           </Pressable>
@@ -199,7 +211,7 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
           {perks.map((p) => (
             <View key={p.key} style={s.perk} accessibilityLabel={`${p.title}${open ? '' : ', kilitli'}`}>
               <View style={s.perkArt}>
-                {p.key === 'badge' ? <Badge level={level} size="lg" /> : <Text style={{ fontSize: 28 }}>{p.emoji}</Text>}
+                {p.key === 'badge' ? <Badge level={level} size="lg" /> : p.art ? <Art name={p.art} size={36} /> : <Text style={{ fontSize: 28 }}>{p.emoji}</Text>}
                 {!open && (
                   <View style={s.lock}>
                     <Ionicons name="lock-closed" size={10} color="#fff" />
@@ -220,15 +232,15 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
   );
 }
 
-const GUIDE: Record<Kind, { title: string; body: string[] }[]> = {
+const GUIDE: Record<Kind, { title: string; art?: ArtName; body: string[] }[]> = {
   wealth: [
-    { title: '💰 Servet seviyesi nedir?', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça servet puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
+    { title: 'Servet seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça servet puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
     { title: '🎁 Ne işe yarar?', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Casino oyunları Servet Lv.2 ile açılır.'] },
     { title: '📈 Puan nasıl kazanılır?', body: ['Harcanan her 1 jeton 1 servet puanıdır. Sayılanlar: odada ve sohbette hediye, Lucky hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, kabile kurma ve kabile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
     { title: '⚠️ Sayılmayanlar', body: ['• Jetonla oynanan şans oyunları ve zar düellosu.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
   ],
   charm: [
-    { title: '🌹 Cazibe seviyesi nedir?', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir cazibe seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
+    { title: 'Cazibe seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir cazibe seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
     { title: '💎 Kazancını ve popülerliğini etkiler', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında cazibesi yüksek olan daha üstte gösterilir.'] },
     { title: '📈 Puan nasıl kazanılır?', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 cazibe puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
     { title: '⚠️ Dikkat', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
@@ -251,7 +263,14 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
           {GUIDE[kind].map((g) => (
             <View key={g.title} style={s.card}>
-              <Text style={s.cardTitle}>{g.title}</Text>
+              {g.art ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Art name={g.art} size={20} />
+                  <Text style={s.cardTitle}>{g.title}</Text>
+                </View>
+              ) : (
+                <Text style={s.cardTitle}>{g.title}</Text>
+              )}
               {g.body.map((b) => (
                 <Text key={b} style={s.body}>
                   {b}
@@ -291,7 +310,7 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
 const s = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
   seg: { flex: 1, flexDirection: 'row', backgroundColor: colors.card, borderRadius: 999, padding: 3 },
-  segItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 999 },
+  segItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 999 },
   segOn: { backgroundColor: semantic.action },
   segText: { color: colors.textDim, fontWeight: '800', fontSize: 13 },
   me: { flexDirection: 'row', alignItems: 'center', gap: 14, margin: 16, marginTop: 6, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.border },

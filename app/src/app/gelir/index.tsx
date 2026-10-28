@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { Card } from '@/components/ui';
 import { GIFTS, userById } from '@/data/mock';
 import { RULES, pct, usd } from '@/data/rules';
@@ -91,7 +92,7 @@ export default function IncomeScreen() {
         </LinearGradient>
 
         <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Coins Bank">
-          <Text style={{ fontSize: 20 }}>🏦</Text>
+          <Art name="finans-haftalik-odeme-banka" size={26} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>Coins Bank</Text>
             <Text style={styles.dim}>Cüzdan, kazançlar, ödemeler ve kurallar</Text>
@@ -110,7 +111,7 @@ export default function IncomeScreen() {
 
         {earnings.length === 0 ? (
           <Card style={{ alignItems: 'center', gap: 6, paddingVertical: 30 }}>
-            <Text style={{ fontSize: 40 }}>💤</Text>
+            <Art name="maskot-uyuyan-bakiye" size={52} />
             <Text style={styles.dim}>Veri yok</Text>
             <Text style={[styles.dim, { textAlign: 'center' }]}>Odanda hediye aldığında veya arama yaptığında elmas gelirin burada listelenir.</Text>
           </Card>
