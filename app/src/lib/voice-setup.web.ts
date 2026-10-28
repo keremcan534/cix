@@ -1,26 +1,21 @@
-// Web: plug the LiveKit engine into the room session when the server address is configured
-// (EXPO_PUBLIC_LIVEKIT_URL, e.g. in app/.env.local). Without it the simulated engine stays.
+// Web: plug the LiveKit engine into the room session when the server is configured (EXPO_PUBLIC_LIVEKIT_URL
+// and EXPO_PUBLIC_API_URL, e.g. in app/.env.local). Without them the simulated engine stays.
+import { apiEnabled, ensureSignedIn, voiceToken } from '@/lib/api';
 import { createLiveKitEngine } from '@/lib/livekit-engine';
 import { setEngine } from '@/lib/room-session';
 
-const KEY = 'similarclub:voice-id';
-
-/** A random id per browser, kept so a reload rejoins as the same participant. */
-function identity() {
-  try {
-    const saved = localStorage.getItem(KEY);
-    if (saved) return saved;
-    const id = `u-${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem(KEY, id);
-    return id;
-  } catch {
-    return `u-${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
-
-export function setupVoice() {
+export function setupVoice(name: () => string) {
   const url = process.env.EXPO_PUBLIC_LIVEKIT_URL;
-  if (!url) return;
-  const tokenUrl = process.env.EXPO_PUBLIC_LIVEKIT_TOKEN_URL ?? `${url.replace(/^ws/, 'http')}/token`;
-  setEngine(createLiveKitEngine({ url, tokenUrl, identity: identity(), onError: (m) => console.warn(`[ses] ${m}`) }));
+  if (!url || !apiEnabled()) return;
+  setEngine(
+    createLiveKitEngine({
+      url,
+      // Rooms are joined as the signed-in server user; the first room signs this device in if needed.
+      getToken: async (room) => {
+        await ensureSignedIn(name());
+        return voiceToken(room);
+      },
+      onError: (m) => console.warn(`[ses] ${m}`),
+    }),
+  );
 }

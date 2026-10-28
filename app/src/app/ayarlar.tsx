@@ -78,6 +78,9 @@ export default function SettingsScreen() {
           <Pressable onPress={() => router.push('/cuzdan')}>
             <Text style={styles.link}>İşlem geçmişi, satın almalar ve iadeler →</Text>
           </Pressable>
+          <Pressable onPress={() => router.push('/sunucu-hesabi')}>
+            <Text style={styles.link}>Sunucu hesabı (veritabanı, test) →</Text>
+          </Pressable>
         </Card>
 
         <Text style={styles.section}>Güvenlik</Text>

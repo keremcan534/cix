@@ -3,7 +3,7 @@
 // simulated engine (lib/voice-setup.ts).
 //
 // The AudioEngine calls are synchronous while joining is not: connect() updates the counters at once and joins
-// in the background (token from our token service, then the room). Every async step checks that the room is
+// in the background (token from our API, then the room). Every async step checks that the room is
 // still the current one, so leaving or switching rooms mid-join never leaves a second connection open.
 import { ConnectionState, Room, RoomEvent, Track } from 'livekit-client';
 
@@ -12,9 +12,8 @@ import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
 export type LiveKitConfig = {
   /** wss:// address of the LiveKit server. */
   url: string;
-  /** https:// address of the token service (GET ?room=&identity=&name=). */
-  tokenUrl: string;
-  identity: string;
+  /** Access token for a LiveKit room name, from our API (signed-in users only). */
+  getToken: (room: string) => Promise<string>;
   onError?: (message: string) => void;
 };
 
@@ -32,10 +31,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
 
   async function join(roomId: string, r: Room) {
     try {
-      const q = new URLSearchParams({ room: roomName(roomId), identity: cfg.identity, name: cfg.identity });
-      const res = await fetch(`${cfg.tokenUrl}?${q}`);
-      if (!res.ok) throw new Error(`token ${res.status}`);
-      const { token } = (await res.json()) as { token: string };
+      const token = await cfg.getToken(roomName(roomId));
       if (room !== r) return;
       await r.connect(cfg.url, token);
       if (room !== r) return void r.disconnect();

@@ -8,12 +8,14 @@ import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
 import { RoomHost } from '@/components/room/room-host';
+import { ME } from '@/data/mock';
 import { setupVoice } from '@/lib/voice-setup';
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
 
-// Real voice (LiveKit) on web when the server address is configured; the simulated engine otherwise.
-setupVoice();
+// Real voice (LiveKit) on web when the server is configured; the simulated engine otherwise. The profile name
+// (shared ME object, kept current by the store) names the server account on first sign-in.
+setupVoice(() => ME.name);
 
 // Keep the splash up until the saved state is loaded, so the app doesn't flash the login screen first.
 SplashScreen.preventAutoHideAsync().catch(() => {});
