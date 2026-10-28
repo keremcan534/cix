@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { EXCHANGE_FEE, hostLevel } from '@/data/economy';
+import { hostLevel } from '@/data/economy';
+import { diamondValueTl } from '@/lib/coins-bank';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { RULES, pct, settlement, usd } from '@/data/rules';
@@ -65,7 +66,7 @@ export default function HostCenter() {
 }
 
 function Dashboard() {
-  const { diamonds, totalDiamonds, weekly, earnings, exchangeDiamonds, agencyId, withdrawals } = useApp();
+  const { diamonds, totalDiamonds, weekly, earnings, agencyId, withdrawals } = useApp();
   const { current, next } = hostLevel(totalDiamonds);
   const progress = next ? (totalDiamonds - current.min) / (next.min - current.min) : 1;
   const max = Math.max(...weekly, 1);
@@ -73,9 +74,10 @@ function Dashboard() {
   const agency = AGENCIES.find((a) => a.id === agencyId);
 
   const exchange = () =>
-    showAlert('Jetona çevir', `${diamonds.toLocaleString('tr-TR')} elmas → ${Math.floor(diamonds * (1 - EXCHANGE_FEE)).toLocaleString('tr-TR')} jeton (%${EXCHANGE_FEE * 100} kesinti)`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Çevir', onPress: () => exchangeDiamonds(diamonds) },
+    // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
+    showAlert('Anında bozdur', `Coins Bank elmasını resmi değerinden hemen öder: ${diamonds.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(diamonds)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.`, [
+      { text: 'Kapat', style: 'cancel' },
+      { text: "Coins Bank'a git", onPress: () => router.push('/coins-bank') },
     ]);
 
   return (
@@ -92,8 +94,8 @@ function Dashboard() {
               <Text style={styles.balanceBtnText}>Para çek</Text>
             </Pressable>
             <Pressable style={styles.balanceBtn} onPress={exchange}>
-              <Ionicons name="swap-horizontal" size={18} color="#fff" />
-              <Text style={styles.balanceBtnText}>Jetona çevir</Text>
+              <Ionicons name="flash-outline" size={18} color="#fff" />
+              <Text style={styles.balanceBtnText}>Anında bozdur</Text>
             </Pressable>
           </View>
         </LinearGradient>

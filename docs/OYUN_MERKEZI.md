@@ -41,6 +41,25 @@ Her tur `GM-…` işlem numarasıyla Oyun Merkezi › Geçmiş'te ve cüzdan har
 
 **Servet Seviyesi kalıcıdır** (düşmez); bu yüzden oyun sırasında erişim kaybı olmaz.
 
+## Kasa kuralı: %60 kasa, %40 dağıtım
+
+Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Lucky 77, Dragon Tiger ve odadaki Zar Düellosu) oynanan jetonun %60'ı kasaya kalır, %40'ı kazananlara rastgele dağılır.
+
+- **Olasılıklar** (`app/src/lib/casino-odds.ts`): her oyun ve her seçimde beklenen geri ödeme %40'tır. Testler bütün sonuçları tek tek sayarak bunu kanıtlar (`tests/casino-odds.test.ts`). Dragon Tiger'da Ejder/Kaplan seçimi %39,94'tür (kart farkı kuralı tam %40'a bölünmüyor; kasa lehine yuvarlandı).
+- **Havuz** (`app/src/lib/games.ts`): her bahsin %60'ı anında kasaya yazılır, %40'ı ödül havuzuna girer; kazançlar yalnızca havuzdan ödenir. Havuz bir turun en yüksek ödülünü karşılayamıyorsa tur jeton düşülmeden reddedilir. Havuz 200.000 jetonluk başlangıç avansıyla açılır (ilk turların büyük ödülü karşılanabilsin diye). Yönetim ekranında "Kasa defteri" oynanan, kasa, dağıtılan ve havuz tutarlarını gösterir.
+
+| Oyun | Kazandıran sonuç | Çarpan | Olasılık |
+|---|---|---|---|
+| Şans Çarkı | 8 dilim: 0x, 0,5x, 1x, 2x, 3x, 5x, 10x, 20x | ağırlıklar 740/90/80/50/25/12/2/1 (binde) | — |
+| Zar | Büyük 10–12 veya Küçük 2–4 | 2,4x | 6/36 |
+| Lucky 77 | Üç 7 / üç aynı meyve | 30x / 5x | 1/125 / 4/125 |
+| Dragon Tiger | Seçilen taraf en az 4 yüksek / beraberlik | 1,5x / 5,2x | 45/169 / 13/169 |
+| Zar Düellosu (oda) | Rakipten en az 3 fazla | 2,4x | 6/36 |
+
+**Oyun bakiyesi:** kazançlar cüzdana değil ayrı oyun bakiyesine yazılır; bahisler önce oradan düşer. Oyun bakiyesi hediye edilemez, elmasa veya paraya çevrilemez (kazancın paraya dönüşmesi gerçek paralı kumar sayılır). Sağlayıcı hatasında bahis geldiği yere iade edilir. Testler: `tests/game-balance.test.ts`.
+
+Lucky hediye bu kurala dahil değildir; ayrı bir modüldür (`lib/lucky.ts`, beklenen geri ödeme %65).
+
 ## Erişim kuralı: Servet Seviyesi 2
 
 Ürün kararıyla (26.10) casino erişimi **VIP2 yerine Servet Seviyesi 2 ve üzeri** oldu. Servet seviyesi geçerli jeton harcamasından gelir ve kalıcıdır (bkz. `docs/SEVIYELER.md`). Casino ve zar düellosu bahisleri servet puanı kazandırmaz; yani oyun oynayarak seviye yükseltilemez. Yönetim panelinde oyun başına eşik Servet Lv.1 / 2 / 3 / 5 / 10 olarak seçilebilir.

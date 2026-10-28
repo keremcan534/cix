@@ -78,7 +78,7 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 ## Karar bekleyenler
 
 - **Ödül kaynağı:** Rezerv payı (%70) ve günlük limit.
-- **Alıcının geliri:** Hediyeyi alan kişinin normal gelir oranı Lucky hediyelerde de aynı mı kalacak?
+- **Alıcının geliri (karar verildi):** Lucky hediyede alıcıya hediye değerinin %20'si elmas olarak yazılır (`RULES.luckyHostShare`, aşağı yuvarlanır); kalan kısım ödülleri karşılar. Her gönderimin kaydında `hostDiamonds` alanı tutulur.
 - **Hukuk:** Mevzuat, mağaza kuralları ve yaş sınırı incelemesi.
   - Jetonlar nakde çevrilemez.
   - Gerçek para karşılığı ödül, hukuki onay olmadan eklenmeyecek.

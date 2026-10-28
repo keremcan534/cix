@@ -36,7 +36,7 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
-  lucky: 'Gönderdiğin hediyenin katları kadar jeton kazanma ihtimali. Ödül garanti değildir; olasılıklar aşağıda.',
+  lucky: 'Gönderdiğin hediyenin katları kadar jeton kazanma ihtimali. Ödül garanti değildir; olasılıklar aşağıda. Alıcıya hediye değerinin %20’si elmas olarak yazılır.',
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
   couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
   privilege: 'SVIP üyelerine özel hediyeler.',

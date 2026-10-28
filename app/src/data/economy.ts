@@ -2,8 +2,7 @@ import { USERS, type User } from '@/data/mock';
 
 // --- Rates -----------------------------------------------------------------
 // A gift worth N coins earns the receiver N diamonds. Diamond→USD and bonus rates live in rules.ts.
-// 1 diamond = 1 coin when exchanging (minus 10%).
-export const EXCHANGE_FEE = 0.1;
+// Diamonds turn into coins only in the main Coins Bank account, by value (lib/coins-bank).
 
 export const callPrice = (u: User) => (u.vip ? 120 : 60); // coins per minute
 

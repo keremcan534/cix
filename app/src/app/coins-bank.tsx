@@ -2,6 +2,8 @@
 // Coins (bought, spent on gifts), Diamonds (creator earnings) and Bonus Credits (promotions, not
 // withdrawable) are separate currencies. Creator earnings are never reduced by agency/BD commissions;
 // those are separate platform liabilities. Payout state lives in src/lib/bank.ts.
+// Finance administration (rules, payout approval, reconciliation) is not part of the app; it lives in
+// the separate Finance Control platform. Here users only see balances, request payouts and track them.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -29,20 +31,13 @@ import {
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import {
-  ENTRY_EFFECT,
   PROVIDERS,
-  approvePayout,
   blockedFor,
-  completePayout,
   createPayout,
-  failPayout,
-  getPayout,
   paidFor,
-  rejectPayout,
   rejectedFor,
   saveAccount,
   setBdView,
-  unlinkedWithdrawals,
   useBank,
   validatePayout,
   verifyAccount,
@@ -57,13 +52,12 @@ import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 
-type Tab = 'wallet' | 'creator' | 'agency' | 'bd' | 'rules';
+type Tab = 'wallet' | 'creator' | 'agency' | 'bd';
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'wallet', label: 'Cüzdanım', icon: 'wallet' },
   { key: 'creator', label: 'Yayıncı', icon: 'mic' },
   { key: 'agency', label: 'Ajans', icon: 'business' },
   { key: 'bd', label: 'BD', icon: 'git-network' },
-  { key: 'rules', label: 'Kurallar & Denetim', icon: 'shield-checkmark' },
 ];
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -101,7 +95,7 @@ function agencyNumbers(bank: BankState) {
   const blocked = blockedFor(bank, 'agency');
   const paid = sumD(AGENCY_PAYOUT_HISTORY.filter((p) => p.status === 'Ödendi')) + paidFor(bank, 'agency');
   const rejected = sumD(AGENCY_PAYOUT_HISTORY.filter((p) => p.status === 'Reddedildi')) + rejectedFor(bank, 'agency');
-  return { current, rows, total, pending, final, blocked, paid, rejected, available: Math.max(0, final - paid - blocked), unpaid: Math.max(0, total - paid) };
+  return { current, rows, total, pending, final, blocked, paid, rejected, available: Math.max(0, final - paid - blocked) };
 }
 
 function bdNumbers(bank: BankState) {
@@ -114,7 +108,7 @@ function bdNumbers(bank: BankState) {
   const paid = sumD(BD_PAYOUT_HISTORY.filter((p) => p.status === 'Ödendi')) + paidFor(bank, 'bd');
   const rejected = rejectedFor(bank, 'bd');
   const dupes = [...cur.blocked, ...BD_PAST.blocked];
-  return { rows, total, pending, final, blocked, paid, rejected, dupes, available: Math.max(0, final - paid - blocked), unpaid: Math.max(0, total - paid) };
+  return { rows, total, pending, final, blocked, paid, rejected, dupes, available: Math.max(0, final - paid - blocked) };
 }
 
 // --- screen -------------------------------------------------------------------------
@@ -147,7 +141,6 @@ export default function CoinsBankScreen() {
         {tab === 'creator' && <CreatorTab />}
         {tab === 'agency' && <AgencyTab />}
         {tab === 'bd' && <BdTab />}
-        {tab === 'rules' && <RulesTab />}
       </ScrollView>
     </SafeAreaView>
   );
@@ -229,7 +222,7 @@ function WalletTab() {
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <Text style={[styles.amount, { color: r.amount >= 0 ? colors.green : colors.red }]}>
                   {r.amount >= 0 ? '+' : ''}
-                  {fmt(r.amount)} {r.currency === 'coin' ? '🪙' : '💎'}
+                  {fmt(r.amount)} {r.currency === 'coin' ? '🪙' : r.currency === 'game' ? '🎮' : '💎'}
                 </Text>
                 <Badge text={r.status} />
               </View>
@@ -247,7 +240,7 @@ function WalletTab() {
 
 // --- 2) Creator earnings ---------------------------------------------------------------
 function CreatorTab() {
-  const { isHost, becomeHost, diamonds, totalDiamonds, earnings, withdrawals, requestWithdraw, rules } = useApp();
+  const { isHost, becomeHost, diamonds, totalDiamonds, earnings, withdrawals, rules } = useApp();
   const bank = useBank();
   if (!isHost)
     return (
@@ -261,25 +254,14 @@ function CreatorTab() {
     );
 
   const blocked = blockedFor(bank, 'creator');
-  const legacy = unlinkedWithdrawals(withdrawals, bank.payouts);
-  const legacySum = sumD(legacy);
+  // Classic withdrawals made on /yayinci/cek count towards completed payouts and the weekly limit.
+  const legacySum = sumD(withdrawals);
   // Demo split: this session's earnings are all from today, i.e. inside the pending window.
   const pending = Math.min(totalDiamonds, earnings.reduce((s, e) => s + e.amount, 0));
   const final = totalDiamonds - pending;
   const available = Math.max(0, diamonds - blocked);
   const completed = paidFor(bank, 'creator') + legacySum;
   const rejected = rejectedFor(bank, 'creator');
-
-  // Settles an approved payout through the app store's existing withdraw (deducts diamonds there).
-  const finalize = (p: Payout) => {
-    const err = requestWithdraw(p.diamonds, p.account.legacyRef);
-    if (err) {
-      failPayout(p.id, `Cüzdan reddetti: ${err}`);
-      return err;
-    }
-    completePayout(p.id, { diamonds: p.diamonds, iban: p.account.legacyRef });
-    return null;
-  };
 
   return (
     <>
@@ -297,8 +279,8 @@ function CreatorTab() {
 
       <PayoutAccountCard scope="creator" />
       <PayoutForm scope="creator" available={available} legacyWeekly={legacySum} />
-      <PayoutHistory scope="creator" finalize={finalize}>
-        {legacy.map((w) => (
+      <PayoutHistory scope="creator">
+        {withdrawals.map((w) => (
           <MockPayoutRow key={w.id} p={{ ref: `WD-${w.id.slice(-6).replace('.', '')}`, diamonds: w.diamonds, status: w.status === 'Onaylandı' ? 'Ödendi' : 'Beklemede', time: `Bugün ${w.time}`, account: `IBAN •••• ${w.iban.replace(/\s/g, '').slice(-4)}`, note: `Klasik çekim (/yayinci/cek) · ${w.status}` }} />
         ))}
       </PayoutHistory>
@@ -519,155 +501,6 @@ function BdTab() {
   );
 }
 
-// --- 5) Rules & audit -------------------------------------------------------------------
-const DB_TABLES: [string, string][] = [
-  ['wallets', 'Kullanıcı başına jeton / elmas / bonus bakiyesi'],
-  ['wallet_transactions', 'Her bakiye hareketi (benzersiz TX, kural sürümü)'],
-  ['payment_orders', 'Mağaza satın alma siparişleri ve doğrulama'],
-  ['gifts', 'Hediye kataloğu ve fiyatları'],
-  ['gift_transactions', 'Gönderilen hediyeler (jeton → elmas)'],
-  ['diamonds_ledger', 'Elmas giriş/çıkış defteri'],
-  ['creator_earnings_ledger', 'Yayıncı kazançları: bekleyen / kesinleşmiş'],
-  ['agency_earnings_ledger', 'Ajans komisyon satırları'],
-  ['agency_commission_rules', 'Ajans oranı, tabanı, geçerlilik dönemi'],
-  ['bd_commission_ledger', 'BD payları (earningId başına tek kayıt)'],
-  ['bonus_ledger', 'Kampanya bonusları, kullanım ve süre sonu'],
-  ['creator_payout_accounts', 'Yayıncı ödeme hesapları + doğrulama'],
-  ['agency_payout_accounts', 'Ajans ödeme hesapları + doğrulama'],
-  ['payout_requests', 'Çekim talepleri, idempotency anahtarı, blokaj'],
-  ['payout_transactions', 'Banka / sağlayıcı transfer sonuçları'],
-  ['financial_rules', 'Sürümlü finansal kurallar'],
-  ['audit_logs', 'Değiştirilemez denetim kayıtları'],
-];
-const SECURITY_NOTES = [
-  'Tüm tutar, limit ve yetki kontrolleri sunucuda yapılır; istemci yalnızca talep gönderir.',
-  'Her talep idempotency anahtarı taşır; tekrar eden istek ilk sonucu döndürür, ikinci kayıt oluşmaz.',
-  'Bakiye ve defter kaydı aynı veritabanı işleminde (atomik) güncellenir.',
-  'Hatalar silinmez; ters kayıt (reversal) veya düzeltme kaydıyla giderilir.',
-  'Olağandışı işlemler (ani yüksek çekim, yeni hesap + büyük tutar, çok sayıda iade) inceleme kuyruğuna düşer.',
-  'Görevler ayrılığı: finansal kuralları düzenleyen kişi ödeme onaylayamaz.',
-];
-
-function RulesTab() {
-  const { rules, ruleHistory, ledger, diamonds } = useApp();
-  const bank = useBank();
-  const a = agencyNumbers(bank);
-  const b = bdNumbers(bank);
-  const sold = ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.reason.startsWith('Yükleme')).reduce((s, r) => s + r.amount, 0);
-  const spent = ledger.filter((r) => r.currency === 'coin' && r.amount < 0).reduce((s, r) => s - r.amount, 0);
-  const creatorBlocked = blockedFor(bank, 'creator');
-  const liability = diamonds + a.unpaid + b.unpaid;
-  const items: [string, string][] = [
-    ['Yayıncı elmas / hediye jetonu', `${rules.creatorDiamondsPerCoin} 💎 / 🪙`],
-    ['Elmas → USD', `${fmt(rules.diamondsPerUsd)} 💎 = $1`],
-    ['Ajans komisyonu', `${pct(rules.agencyCommission)} (yayıncıdan kesilmez)`],
-    ['BD komisyonu', `${pct(rules.bdCommission)} · ajansın uygun yayıncı tabanı`],
-    ['Min. çekim / talep', `${dia(rules.minWithdrawDiamonds)} (${usd(rules.minWithdrawDiamonds)})`],
-    ['Maks. çekim / talep', `${dia(rules.maxWithdrawDiamonds)} (${usd(rules.maxWithdrawDiamonds)})`],
-    ['Haftalık çekim limiti', `${dia(rules.weeklyWithdrawLimitDiamonds)} (${usd(rules.weeklyWithdrawLimitDiamonds)})`],
-    ['Otomatik onay eşiği', `< ${dia(rules.autoApproveUnderDiamonds)} · üstü manuel inceleme`],
-    ['Bekleme süresi', `${rules.pendingDays} gün`],
-    ['Bonus nakde çevrilebilir', rules.bonusCashable === 0 ? 'Hayır (0)' : pct(rules.bonusCashable)],
-    ['Hesap dönemi', rules.period],
-  ];
-  return (
-    <>
-      <Card style={{ gap: 6 }}>
-        <View style={styles.rowBetween}>
-          <SectionTitle icon="document-text" title="Geçerli finansal kurallar" />
-          <View style={styles.versionPill}>
-            <Text style={styles.versionText}>v{rules.version}</Text>
-          </View>
-        </View>
-        {items.map(([k, v]) => (
-          <KV key={k} k={k} v={v} />
-        ))}
-        <Text style={styles.dim}>Salt okunur. Kurallar yönetim panelinde düzenlenir; her değişiklik yeni sürüm oluşturur ve yalnız ileriye dönük uygulanır.</Text>
-        <Pressable onPress={() => router.push('/yonetim')} style={styles.linkRow}>
-          <Text style={styles.link}>Yönetim paneline git</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.primaryText} />
-        </Pressable>
-        {ruleHistory.slice(0, 5).map((h) => (
-          <Text key={h.id} style={styles.mono}>
-            {h.time} · v{h.version} · {h.field}: {h.from} → {h.to}
-          </Text>
-        ))}
-      </Card>
-
-      <Card style={{ gap: 6 }}>
-        <SectionTitle icon="git-compare" title="Mutabakat (demo)" />
-        <KV k="Satılan jeton (oturum)" v={`🪙 ${fmt(sold)} · yayıncı karşılığı ${usd(sold * rules.creatorDiamondsPerCoin)}`} />
-        <KV k="Harcanan jeton (oturum)" v={`🪙 ${fmt(spent)}`} />
-        <KV k="Yayıncı elmas yükümlülüğü" v={`${dia(diamonds)} · ${usd(diamonds)} (bloke ${usd(creatorBlocked)})`} />
-        <KV k="Ajans komisyon yükümlülüğü" v={`${dia(a.unpaid)} · ${usd(a.unpaid)}`} />
-        <KV k="BD komisyon yükümlülüğü" v={`${dia(b.unpaid)} · ${usd(b.unpaid)}`} />
-        <KV k="Bonus kredi" v={rules.bonusCashable === 0 ? 'Nakit yükümlülüğü yok (çekilemez)' : `${usd(BONUS_BALANCE * rules.bonusCashable * rules.creatorDiamondsPerCoin)}`} />
-        <View style={styles.divider} />
-        <KV k="Toplam platform yükümlülüğü" v={`${usd(liability)}`} strong />
-        <Text style={styles.dim}>Ajans ve BD payları yayıncı kazancından düşülmez; platformun ayrı yükümlülükleridir.</Text>
-      </Card>
-
-      <Card style={{ gap: 4 }}>
-        <SectionTitle icon="finger-print" title={`Denetim kaydı (${bank.audit.length})`} />
-        {bank.audit.length === 0 ? (
-          <Text style={styles.dim}>Henüz banka işlemi yok. Ödeme hesabı eklediğinde veya talep oluşturduğunda her adım burada kalıcı olarak kaydedilir.</Text>
-        ) : (
-          bank.audit.slice(0, 40).map((r) => (
-            <View key={r.id} style={styles.auditRow}>
-              <Text style={styles.auditTime}>{r.time}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{r.action}</Text>
-                <Text style={styles.dim}>{r.detail}</Text>
-                <Text style={styles.mono}>
-                  {r.actor} · {r.ref} · v{r.ruleVersion}
-                </Text>
-              </View>
-            </View>
-          ))
-        )}
-      </Card>
-
-      <Card style={{ gap: 4 }}>
-        <SectionTitle icon="book" title="Banka defteri (blokaj / çözülme)" />
-        {bank.entries.length === 0 ? (
-          <Text style={styles.dim}>Kayıt yok.</Text>
-        ) : (
-          bank.entries.map((e) => (
-            <View key={e.id} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>
-                  {e.kind} · {e.payoutRef}
-                </Text>
-                <Text style={styles.mono}>
-                  {e.ref} · {e.time} · {ENTRY_EFFECT[e.kind]} · v{e.ruleVersion}
-                </Text>
-              </View>
-              <Text style={styles.amount}>{dia(e.amount)}</Text>
-            </View>
-          ))
-        )}
-      </Card>
-
-      <Card style={{ gap: 4 }}>
-        <SectionTitle icon="server" title="Önerilen veritabanı tabloları" />
-        {DB_TABLES.map(([t, d]) => (
-          <View key={t} style={{ paddingVertical: 3 }}>
-            <Text style={styles.tableName}>{t}</Text>
-            <Text style={styles.dim}>{d}</Text>
-          </View>
-        ))}
-      </Card>
-
-      <Card style={{ gap: 6 }}>
-        <SectionTitle icon="lock-closed" title="Güvenlik notları" />
-        {SECURITY_NOTES.map((n) => (
-          <Bullet key={n} text={n} />
-        ))}
-      </Card>
-    </>
-  );
-}
-
 // --- payout building blocks ----------------------------------------------------------------
 function PayoutAccountCard({ scope }: { scope: Scope }) {
   const bank = useBank();
@@ -815,72 +648,27 @@ function PayoutForm({ scope, available, legacyWeekly = 0 }: { scope: Scope; avai
   );
 }
 
-function PayoutHistory({ scope, finalize, children }: { scope: Scope; finalize?: (p: Payout) => string | null; children?: ReactNode }) {
-  const { ruleHistory } = useApp();
+// Read-only for the account owner: approval, rejection and transfer are done by the finance team
+// on the separate Finance Control platform; open requests simply wait here with a status note.
+function PayoutHistory({ scope, children }: { scope: Scope; children?: ReactNode }) {
   const bank = useBank();
   const [open, setOpen] = useState<string | null>(null);
   const list = bank.payouts.filter((p) => p.scope === scope);
-
-  const approve = (p: Payout) => {
-    // Separation of duties: whoever edited financial rules in this session can't approve payouts.
-    if (ruleHistory.length > 0)
-      return showAlert('Görevler ayrılığı', 'Bu oturumda finansal kuralları düzenledin. Kural düzenleyen kişi ödeme onaylayamaz; talebi başka bir finans yetkilisi onaylamalı.');
-    const err = approvePayout(p.id);
-    if (err) showAlert('İşlem yapılmadı', err);
-  };
-  const reject = (p: Payout) => {
-    const err = rejectPayout(p.id, 'Finans incelemesi: belge eksik (demo)');
-    if (err) showAlert('İşlem yapılmadı', err);
-  };
-  const complete = (p: Payout) => {
-    // A second tap after settlement must not withdraw twice: re-read the live status first.
-    if (getPayout(p.id)?.status !== 'Onaylandı') return;
-    const err = finalize ? finalize(p) : completePayout(p.id);
-    if (err) showAlert('Ödeme başarısız', `${err}\nBloke tutar serbest bırakıldı.`);
-  };
-  const fail = (p: Payout) => {
-    const err = failPayout(p.id, 'Banka transferi reddetti (demo)');
-    if (err) showAlert('İşlem yapılmadı', err);
-  };
 
   return (
     <Card style={{ gap: 6 }}>
       <SectionTitle icon="time" title="Ödeme geçmişi" />
       {list.length === 0 && !children && <Text style={styles.dim}>Henüz ödeme talebi yok.</Text>}
       {list.map((p) => (
-        <PayoutItem
-          key={p.id}
-          p={p}
-          open={open === p.id}
-          onToggle={() => setOpen(open === p.id ? null : p.id)}
-          onApprove={() => approve(p)}
-          onReject={() => reject(p)}
-          onComplete={() => complete(p)}
-          onFail={() => fail(p)}
-        />
+        <PayoutItem key={p.id} p={p} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />
       ))}
       {children}
     </Card>
   );
 }
 
-function PayoutItem({
-  p,
-  open,
-  onToggle,
-  onApprove,
-  onReject,
-  onComplete,
-  onFail,
-}: {
-  p: Payout;
-  open: boolean;
-  onToggle: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-  onComplete: () => void;
-  onFail: () => void;
-}) {
+function PayoutItem({ p, open, onToggle }: { p: Payout; open: boolean; onToggle: () => void }) {
+  const waiting = p.status === 'Manuel inceleme' ? 'Finans ekibi inceliyor. Sonuç burada görünür.' : p.status === 'Onaylandı' ? 'Onaylandı · ödeme transfer sırasında.' : null;
   return (
     <View style={styles.payout}>
       <Pressable onPress={onToggle} style={styles.row}>
@@ -912,24 +700,10 @@ function PayoutItem({
           ))}
         </View>
       )}
-      {p.status === 'Manuel inceleme' && (
-        <View style={styles.actions}>
-          <Pressable onPress={onApprove} style={[styles.actBtn, { borderColor: colors.green }]}>
-            <Text style={[styles.actText, { color: colors.green }]}>Finans onayı (demo)</Text>
-          </Pressable>
-          <Pressable onPress={onReject} style={[styles.actBtn, { borderColor: colors.red }]}>
-            <Text style={[styles.actText, { color: colors.red }]}>Reddet (demo)</Text>
-          </Pressable>
-        </View>
-      )}
-      {p.status === 'Onaylandı' && (
-        <View style={styles.actions}>
-          <Pressable onPress={onComplete} style={[styles.actBtn, { borderColor: colors.green }]}>
-            <Text style={[styles.actText, { color: colors.green }]}>Ödemeyi tamamla (demo)</Text>
-          </Pressable>
-          <Pressable onPress={onFail} style={[styles.actBtn, { borderColor: colors.red }]}>
-            <Text style={[styles.actText, { color: colors.red }]}>Başarısız simüle et</Text>
-          </Pressable>
+      {waiting && (
+        <View style={styles.waiting}>
+          <Ionicons name="hourglass-outline" size={14} color={colors.gold} />
+          <Text style={[styles.dim, { flex: 1 }]}>{waiting}</Text>
         </View>
       )}
     </View>
@@ -994,11 +768,11 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
   );
 }
 
-function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+function KV({ k, v }: { k: string; v: string }) {
   return (
     <View style={styles.kv}>
       <Text style={styles.kvKey}>{k}</Text>
-      <Text style={[styles.kvVal, strong && { fontWeight: '900', color: colors.gold }]}>{v}</Text>
+      <Text style={styles.kvVal}>{v}</Text>
     </View>
   );
 }
@@ -1060,7 +834,6 @@ const styles = StyleSheet.create({
   sectionText: { color: '#fff', fontSize: 15, fontWeight: '800', flexShrink: 1 },
   cardTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
   amount: { color: '#fff', fontWeight: '800', fontSize: 14 },
   mono: { color: colors.textDim, fontSize: 12, fontFamily: MONO },
@@ -1079,19 +852,11 @@ const styles = StyleSheet.create({
   kv: { flexDirection: 'row', gap: 10, paddingVertical: 3 },
   kvKey: { color: colors.textDim, fontSize: 12, width: 130 },
   kvVal: { color: '#fff', fontSize: 12, flex: 1, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
   note: { flexDirection: 'row', gap: 6, alignItems: 'flex-start', backgroundColor: 'rgba(56,189,248,0.08)', borderRadius: 12, padding: 10 },
-  versionPill: { backgroundColor: colors.cardAlt, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  versionText: { color: colors.gold, fontWeight: '800', fontSize: 12 },
-  auditRow: { flexDirection: 'row', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  auditTime: { color: colors.textDim, fontSize: 12, fontFamily: MONO, width: 58 },
-  tableName: { color: '#A5F3F5', fontFamily: MONO, fontSize: 13, fontWeight: '700' },
   payout: { backgroundColor: colors.cardAlt, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   step: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5 },
   stepText: { color: '#fff', fontSize: 12 },
-  actions: { flexDirection: 'row', gap: 8, paddingVertical: 8 },
-  actBtn: { flex: 1, borderWidth: 1, borderRadius: 999, paddingVertical: 7, alignItems: 'center' },
-  actText: { fontWeight: '800', fontSize: 12 },
+  waiting: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   lockIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
 });
