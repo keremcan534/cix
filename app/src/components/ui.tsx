@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -9,6 +8,7 @@ import { vipTier } from '@/data/economy';
 import { charmTier } from '@/data/charm';
 import { wealthTier, type LevelTier } from '@/data/wealth';
 import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames';
+import { goBack } from '@/lib/nav';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { useApp } from '@/store';
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
 export function Header({ title, right }: { title: string; right?: ReactNode }) {
   return (
     <View style={styles.header}>
-      <Pressable onPress={() => router.back()} hitSlop={10} style={{ width: 32 }} accessibilityLabel="Geri">
+      <Pressable onPress={() => goBack()} hitSlop={10} style={{ width: 32 }} accessibilityLabel="Geri">
         <Ionicons name="chevron-back" size={26} color="#fff" />
       </Pressable>
       <Text style={styles.headerTitle} numberOfLines={1}>

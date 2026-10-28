@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, gradient } from '@/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { goBack } from '@/lib/nav';
 
 const TOTAL_STEPS = 4;
 
@@ -11,7 +11,7 @@ export function AuthHeader({ step, title, subtitle }: { step: number; title: str
   return (
     <View style={{ gap: 18, paddingHorizontal: 20, paddingTop: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => goBack()} hitSlop={10}>
           <Ionicons name="chevron-back" size={26} color="#fff" />
         </Pressable>
         <View style={styles.track}>

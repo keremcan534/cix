@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +8,7 @@ import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
 import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { colors, semantic } from '@/theme';
 
@@ -78,7 +78,7 @@ export function PasswordGate({ title, password, onPass }: { title: string; passw
       {attempts > 0 && !locked && <Text style={{ color: colors.red }}>Şifre yanlış ({attempts}/3)</Text>}
       {locked && <Text style={{ color: colors.gold, textAlign: 'center' }}>Çok fazla deneme. {Math.ceil((lockedUntil - now) / 1000)} sn bekle. (Deneme denetim kaydına yazıldı)</Text>}
       <GradientButton title="Gir" icon="log-in" onPress={submit} style={{ alignSelf: 'stretch', opacity: locked ? 0.4 : 1 }} />
-      <Pressable onPress={() => router.back()}>
+      <Pressable onPress={() => goBack()}>
         <Text style={{ color: colors.textDim }}>Geri dön</Text>
       </Pressable>
     </SafeAreaView>

@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +7,7 @@ import { EarningRow } from '@/app/gelir/index';
 import { Card } from '@/components/ui';
 import { GIFTS, userById } from '@/data/mock';
 import { usd } from '@/data/rules';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp, type Earning, type EarningSource, type LedgerRow } from '@/store';
 import { colors } from '@/theme';
@@ -48,7 +48,7 @@ export default function EarningsDetail() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </Pressable>
         <Text style={styles.headerTitle}>Kazanç Detayları</Text>

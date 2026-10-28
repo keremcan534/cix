@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { GiftArt } from '@/components/GiftArt';
 import { CoinPill, VerifiedBadge } from '@/components/ui';
 import { callPrice } from '@/data/economy';
 import { GIFTS, userById, type Gift } from '@/data/mock';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
 import { beginCall, endCall } from '@/lib/media';
@@ -52,7 +53,7 @@ export default function CallScreen() {
       const allowed = checkInteraction(video ? 'video' : 'voice', user, { blocked, following, myAge: me.age });
       if (!allowed.ok) {
         setPhase('ended');
-        showAlert('Arama yapılamıyor', allowed.reason, [{ text: 'Tamam', onPress: () => router.back() }]);
+        showAlert('Arama yapılamıyor', allowed.reason, [{ text: 'Tamam', onPress: () => goBack() }]);
         return;
       }
       // One one-to-one call at a time (also blocks while a Hemen Tanış match is live); a room underneath
@@ -60,14 +61,14 @@ export default function CallScreen() {
       const claim = beginCall({ kind: 'direct', mode: video ? 'video' : 'voice', peerId: user.id });
       if (!claim.ok) {
         setPhase('ended');
-        showAlert('Meşgulsün', claim.reason, [{ text: 'Tamam', onPress: () => router.back() }]);
+        showAlert('Meşgulsün', claim.reason, [{ text: 'Tamam', onPress: () => goBack() }]);
         return;
       }
       claimedRef.current = true;
       if (!spendCoins(price)) {
         release();
         setPhase('ended');
-        showAlert('Yetersiz jeton', `Bu arama dakikada ${price} jeton. Jeton yükleyip tekrar dene.`, [{ text: 'Tamam', onPress: () => router.back() }]);
+        showAlert('Yetersiz jeton', `Bu arama dakikada ${price} jeton. Jeton yükleyip tekrar dene.`, [{ text: 'Tamam', onPress: () => goBack() }]);
         return;
       }
       spentRef.current = price;
@@ -104,14 +105,14 @@ export default function CallScreen() {
       setSpent(spentRef.current);
     } else {
       setPhase('ended');
-      showAlert('Jetonun bitti', 'Arama sonlandırıldı.', [{ text: 'Tamam', onPress: () => router.back() }]);
+      showAlert('Jetonun bitti', 'Arama sonlandırıldı.', [{ text: 'Tamam', onPress: () => goBack() }]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seconds]);
 
   const hangUp = () => {
     setPhase('ended');
-    showAlert('Arama bitti', `Süre: ${mmss(seconds)} · Harcanan: ${spentRef.current} jeton`, [{ text: 'Tamam', onPress: () => router.back() }]);
+    showAlert('Arama bitti', `Süre: ${mmss(seconds)} · Harcanan: ${spentRef.current} jeton`, [{ text: 'Tamam', onPress: () => goBack() }]);
   };
 
   const sendGift = () => {
