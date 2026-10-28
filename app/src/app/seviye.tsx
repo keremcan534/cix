@@ -14,6 +14,7 @@ import { SVIP_LEVELS, nobleInfo } from '@/data/status';
 import { WEALTH_ESTIMATED, WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
+import { goBack } from '@/lib/nav';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const TIER_W = 96;
@@ -66,7 +67,7 @@ export default function LevelsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={s.top}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
         <View style={s.seg}>

@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_PLANS } from '@/data/status';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
@@ -21,7 +22,7 @@ export default function PrivilegeCenter() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0B0A0F' }}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color="#fff" />
         </Pressable>
         <View style={styles.segment}>

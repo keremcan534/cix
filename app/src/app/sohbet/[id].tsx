@@ -7,6 +7,7 @@ import { ChatThread } from '@/components/chat-thread';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { colors } from '@/theme';
+import { goBack } from '@/lib/nav';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,7 +19,7 @@ export default function ChatScreen() {
         user={user}
         header={(typing) => (
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} hitSlop={10}>
+            <Pressable onPress={() => goBack()} hitSlop={10}>
               <Ionicons name="chevron-back" size={26} color="#fff" />
             </Pressable>
             <Pressable

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '@/components/ui';
 import { GIFTS, userById } from '@/data/mock';
 import { RULES, pct, usd } from '@/data/rules';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { diamondValueTl } from '@/lib/coins-bank';
 import { useApp, type Earning, type EarningSource } from '@/store';
@@ -60,7 +61,7 @@ export default function IncomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </Pressable>
         <Text style={styles.headerTitle}>Gelir</Text>

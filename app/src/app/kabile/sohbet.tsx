@@ -10,6 +10,7 @@ import { GradientButton } from '@/components/ui';
 import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { presenceOf } from '@/data/presence';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp, type GroupMsg } from '@/store';
 import { colors } from '@/theme';
@@ -75,7 +76,7 @@ export default function KabileChat() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color="#fff" />
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.profile)} accessibilityLabel="Kabile profili">

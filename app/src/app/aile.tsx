@@ -30,6 +30,7 @@ import {
 import { USERS, userById, type User } from '@/data/mock';
 import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
+import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
@@ -204,7 +205,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
       <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
         <LinearGradient colors={theme.colors} style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
           <View style={styles.topBar}>
-            <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Geri">
+            <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
               <Ionicons name="arrow-back" size={26} color="#fff" />
             </Pressable>
             <View style={{ flex: 1 }} />
