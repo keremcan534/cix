@@ -8,6 +8,8 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 import { Avatar, CharmBadge, WealthBadge } from '@/components/ui';
 import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmBonusPct, charmTier } from '@/data/charm';
 import { SVIP_LEVELS, nobleInfo } from '@/data/status';
@@ -66,6 +68,7 @@ export default function LevelsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Backdrop scene={SCENES.level} />
       <View style={s.top}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color={colors.text} />

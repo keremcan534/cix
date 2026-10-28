@@ -10,6 +10,8 @@ import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
@@ -21,6 +23,7 @@ export default function PrivilegeCenter() {
   const [tab, setTab] = useState<Tab>(params.tab === 'vip' || params.tab === 'noble' ? params.tab : 'svip');
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0B0A0F' }}>
+      <Backdrop scene={SCENES.vip} />
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color="#fff" />

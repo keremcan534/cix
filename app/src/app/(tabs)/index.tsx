@@ -8,7 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActionSheet } from '@/components/ActionSheet';
 import { FloatIcon } from '@/components/fx/float';
 import { gameArtOf } from '@/components/GameArt';
-import { Ambient, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
 import { Icon3D, icon3dSource, type Icon3DName } from '@/components/Icon3D';
 import { Avatar } from '@/components/ui';
 import { roomCode } from '@/data/catalog';
@@ -139,7 +140,7 @@ export default function RoomsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Ambient />
+      <Backdrop scene={SCENES.home} />
       <FlatList
         data={main === 'rec' ? recRooms : mineRooms}
         keyExtractor={(r) => r.id}
