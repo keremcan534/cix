@@ -44,7 +44,11 @@ jobs:
             a.expo.web = { ...a.expo.web, output: "single" };
             fs.writeFileSync("app.json", JSON.stringify(a, null, 2));
           '
+      # Real voice and the server account (docs/SUNUCU.md). Public addresses, not secrets.
       - run: npx expo export --platform web --output-dir dist
+        env:
+          EXPO_PUBLIC_API_URL: https://130-61-230-94.sslip.io
+          EXPO_PUBLIC_LIVEKIT_URL: wss://130-61-230-94.sslip.io
       # SPA fallback so deep links (e.g. /oda/r1) work on Pages.
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
       - uses: actions/configure-pages@v5
