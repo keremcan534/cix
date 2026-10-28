@@ -31,6 +31,7 @@ import {
 import { userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
@@ -560,7 +561,6 @@ type Picker =
   | 'theme'
   | 'mics'
   | 'layouts'
-  | 'micMode'
   | 'micPerm'
   | 'join'
   | 'manageMembers'
@@ -656,7 +656,11 @@ export function RoomSettingsScreen({
           <Section title="Mikrofon pozisyonu" />
           <Row label="Yayına Katılma Modu" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
-          <Row label="Mikrofon kontrolü" value={room.micMode === 'free' ? 'Serbest' : room.micMode === 'request' ? 'Mikrofon için başvur' : 'Sadece takipçiler'} onPress={() => setPicker('micMode')} />
+          <Row
+            label="Mikrofon kuyruğu"
+            hint={room.micQueue ? 'Açık: boş mikrofona çıkmak isteyenler kuyruğa girer, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
+            toggle={{ value: room.micQueue, onChange: (v) => update({ micQueue: v }) }}
+          />
           <Row
             label="Mikrofon izni"
             hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
@@ -702,7 +706,7 @@ export function RoomSettingsScreen({
         title="Oda tipi"
         options={ROOM_TYPES.map((t) => ({ value: t.id, label: t.name, sub: t.desc, art: ROOM_TYPE_ART[t.id] }))}
         value={room.roomType}
-        onPick={(v) => update({ roomType: v, micMode: v === 'free' ? 'free' : 'request' })}
+        onPick={(v) => update({ roomType: v, micQueue: defaultMicQueue(v) })}
         onClose={close}
       />
       <ChoiceSheet visible={picker === 'theme'} title="Oda teması" options={ROOM_THEMES.map((t) => ({ value: t.id, label: t.name, art: ROOM_THEME_ART[t.id] }))} value={room.theme} onPick={(v) => update({ theme: v })} onClose={close} />
@@ -716,18 +720,6 @@ export function RoomSettingsScreen({
           const r = onClassicMics(v);
           if (!r.ok) showAlert('Mikrofon sayısı değiştirilemedi', r.reason);
         }}
-        onClose={close}
-      />
-      <ChoiceSheet
-        visible={picker === 'micMode'}
-        title="Mikrofon kontrolü"
-        options={[
-          { value: 'free', label: 'Serbest', sub: 'Yetkili herkes boş mikrofona doğrudan oturur' },
-          { value: 'request', label: 'Mikrofon için başvur', sub: 'Konuşmacı kuyruğu; sahip/yönetici onaylar' },
-          { value: 'members', label: 'Sadece takipçiler', sub: level >= 5 ? 'Seni takip edenler oturabilir' : 'Lv.5 odada açılır', disabled: level < 5 },
-        ]}
-        value={room.micMode}
-        onPick={(v) => update({ micMode: v })}
         onClose={close}
       />
       <ChoiceSheet

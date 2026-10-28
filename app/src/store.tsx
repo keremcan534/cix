@@ -16,7 +16,7 @@ import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { setHapticsEnabled } from '@/lib/haptics';
-import { CONVERSATIONS, ME, type Conversation, type User } from '@/data/mock';
+import { CONVERSATIONS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
@@ -69,7 +69,9 @@ export type InviteReward = { id: string; inviteeId: string; ref: string; status:
 export type Session = { id: string; device: string; place: string; last: string; current?: boolean };
 export type FanClub = { points: number; history: { text: string; pts: number; time: string }[] };
 export type GroupMsg = { id: string; userId: string; text: string; time: string; system?: boolean; actionLabel?: string; actionHref?: string };
-export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[]; micMode: 'free' | 'request' | 'members'; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
+export type MyRoom = { title: string; announcement: string; cover: string; password: string; locked: boolean; limit: number; xp: number; adminIds: string[];
+  /** "Mikrofon kuyruğu": on = a member's tap on a free mic is a speak request the owner/admins approve. */
+  micQueue: boolean; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
   theme: RoomTheme; micCount: number; /** Selected mic layout (data/room-layouts); null = classic grid. */ layoutId: string | null; micPermission: 'everyone' | 'members'; bossSeat: boolean;
   joinMode: 'open' | 'apply' | 'closed'; manageMembers: 'owner' | 'admins'; manageFunctions: 'owner' | 'admins';
   autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[] };
@@ -216,7 +218,11 @@ type AppState = {
   submitAvatar: (uri: string) => void;
   requestDataExport: () => void;
   conversations: Conversation[];
-  sendMessage: (userId: string, text: string, fromMe?: boolean) => void;
+  /** `room` turns the message into a room invite card that opens the room. */
+  sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard) => void;
+  /** Last "invite all followers" per room id (ms); managers can send it once every 24 hours. */
+  followerInvites: Record<string, number>;
+  markFollowerInvite: (roomId: string, at: number) => void;
   markRead: (userId: string) => void;
   /** Mic effects (animation catalog, display_type mic_effect): owned ids and the one in use. */
   ownedAnims: Set<string>;
@@ -275,6 +281,7 @@ type Snapshot = {
   following: string[];
   blocked: string[];
   conversations: Conversation[];
+  followerInvites: Record<string, number>;
   starter: { claimed: boolean; hidden: boolean };
   safetyLog: SafetyLog[];
   ownedAnims: string[];
@@ -452,7 +459,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     limit: 50,
     xp: 600, // starts at Lv.4 so lock / mic permission / boss seat can be tried in the demo
     adminIds: [],
-    micMode: 'request',
+    // Saves from before the switch kept "Mikrofon kontrolü" (micMode); only "Serbest" meant no queue.
+    micQueue: (s.myRoom as { micMode?: string } | undefined)?.micMode !== 'free',
     roomType: 'stage',
     giftEffects: true,
     joinSounds: true,
@@ -493,6 +501,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [following, setFollowing] = useState<Set<string>>(new Set(s.following ?? ['u1']));
   const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
   const [conversations, setConversations] = useState(s.conversations ?? CONVERSATIONS);
+  const [followerInvites, setFollowerInvites] = useState<Record<string, number>>(s.followerInvites ?? {});
   const [starter, setStarter] = useState(s.starter ?? { claimed: false, hidden: false });
   const [safetyLog, setSafetyLog] = useState<SafetyLog[]>(s.safetyLog ?? []);
   const logSafety = (action: SafetyLog['action'], targetId?: string, detail?: string) =>
@@ -509,7 +518,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
-    following: [...following], blocked: [...blocked], conversations, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
+    following: [...following], blocked: [...blocked], conversations, followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -890,9 +899,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       notify({ kind: 'security', icon: '📦', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası 30 gün içinde kayıtlı e-postana gönderilir (KVKK md. 11).' });
     },
     conversations,
-    sendMessage: (userId, text, fromMe = true) =>
+    sendMessage: (userId, text, fromMe = true, room) =>
       setConversations((prev) => {
-        const msg = { id: uid(), fromMe, text, time: now() };
+        const msg = { id: uid(), fromMe, text, time: now(), ...(room ? { room } : {}) };
         const existing = prev.find((c) => c.userId === userId);
         if (!existing) return [{ id: `c-${userId}`, userId, unread: 0, messages: [msg] }, ...prev];
         return [
@@ -900,6 +909,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
           ...prev.filter((c) => c.userId !== userId),
         ];
       }),
+    followerInvites,
+    markFollowerInvite: (roomId, at) => setFollowerInvites((m) => ({ ...m, [roomId]: at })),
     markRead: (userId) =>
       setConversations((prev) => prev.map((c) => (c.userId === userId ? { ...c, unread: 0 } : c))),
     ownedAnims,

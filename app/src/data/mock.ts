@@ -50,6 +50,8 @@ export type Room = {
   theme?: RoomTheme;
   bossSeat?: boolean;
   micPermission?: 'everyone' | 'members';
+  /** "Mikrofon kuyruğu"; absent = on for every room type except "Serbest sohbet" (lib/room-invites). */
+  micQueue?: boolean;
   /** Mic layout (data/room-layouts); absent = classic grid. */
   layoutId?: string;
 };
@@ -80,10 +82,12 @@ export type Gift = {
   intimacy?: number;
 };
 
+/** A room invite sent in a chat: drawn as a card that opens the room. */
+export type RoomInviteCard = { roomId: string; title: string; cover: string };
 export type Conversation = {
   id: string;
   userId: string;
-  messages: { id: string; fromMe: boolean; text: string; time: string }[];
+  messages: { id: string; fromMe: boolean; text: string; time: string; room?: RoomInviteCard }[];
   unread: number;
 };
 

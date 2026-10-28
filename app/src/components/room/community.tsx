@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { ROOM_ICON_ART } from '@/components/RoomArt';
@@ -7,6 +7,7 @@ import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { followerInviteLeft, formatWait } from '@/lib/room-invites';
 import type { Settings } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -442,26 +443,88 @@ export function ModerationSheet({
 }
 
 // --- Invite friends ---------------------------------------------------------------------
-export function InviteSheet({ visible, onClose, friends, invited, onInvite }: { visible: boolean; onClose: () => void; friends: User[]; invited: Record<string, 'Davet edildi' | 'Katıldı'>; onInvite: (id: string) => void }) {
+/**
+ * "Paylaş": send the room to in-app friends as a chat invite card, or to other apps (system share sheet).
+ * Owner and admins also get "Odaya davet et", which invites every follower of the room's account, once a day.
+ */
+export function ShareRoomSheet({
+  visible,
+  onClose,
+  friends,
+  sent,
+  onSend,
+  onExternal,
+  followers,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  friends: User[];
+  /** Friends this room was already sent to during this visit. */
+  sent: Set<string>;
+  onSend: (id: string) => void;
+  onExternal: () => void;
+  /** Managers only: follower count of the room's account and when they were last invited (ms). */
+  followers: { count: number; lastAt: number | undefined; onSend: () => void } | null;
+}) {
+  const [query, setQuery] = useState('');
+  // Ticks while open so the follower invite's remaining time stays current.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!visible) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [visible, followers?.lastAt]);
+  const q = query.trim().toLocaleLowerCase('tr-TR');
+  const list = friends.filter((u) => !q || u.name.toLocaleLowerCase('tr-TR').includes(q));
+  const left = followers ? followerInviteLeft(followers.lastAt, now) : 0;
   return (
-    <Sheet visible={visible} onClose={onClose} title="📨 Arkadaşlarını davet et">
-      {friends.length === 0 && <Text style={styles.dim}>Takip ettiğin kimse yok. Keşfet&apos;ten takip etmeye başla.</Text>}
-      {friends.map((u) => (
+    <Sheet visible={visible} onClose={onClose} title="📨 Odayı paylaş">
+      {followers && (
+        <Pressable
+          onPress={followers.onSend}
+          disabled={left > 0}
+          style={[styles.followers, left > 0 && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: left > 0 }}
+          accessibilityLabel={left > 0 ? `Odaya davet et. Tekrar ${formatWait(left)} sonra gönderilebilir` : `Odaya davet et: ${followers.count} takipçiye gönder`}
+        >
+          <Ionicons name="megaphone-outline" size={22} color={colors.gold} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ color: '#fff', fontWeight: '800' }}>Odaya davet et</Text>
+            <Text style={styles.dim}>
+              {left > 0 ? `Gönderildi · tekrar ${formatWait(left)} sonra` : `Odanın tüm takipçilerine (${followers.count.toLocaleString('tr-TR')}) · 24 saatte bir`}
+            </Text>
+          </View>
+          {left > 0 ? <Ionicons name="time-outline" size={18} color={colors.textDim} /> : <Ionicons name="chevron-forward" size={18} color={colors.textDim} />}
+        </Pressable>
+      )}
+      <Text style={styles.label}>Arkadaşlarına gönder</Text>
+      {friends.length > 4 && <TextInput value={query} onChangeText={setQuery} placeholder="Arkadaş ara" placeholderTextColor={colors.textDim} style={styles.input} />}
+      {friends.length === 0 && <Text style={styles.dim}>Henüz arkadaşın yok. Keşfet&apos;ten takip etmeye veya mesajlaşmaya başla.</Text>}
+      {list.map((u) => (
         <View key={u.id} style={styles.row}>
           <Avatar uri={u.avatar} size={36} online={u.online} />
-          <Text style={{ color: '#fff', flex: 1 }}>
+          <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
             {u.name} <Text style={styles.dim}>{u.online ? '· çevrimiçi' : '· çevrimdışı'}</Text>
           </Text>
-          {invited[u.id] ? (
-            <Text style={{ color: invited[u.id] === 'Katıldı' ? colors.green : colors.gold, fontWeight: '700', fontSize: 12 }}>{invited[u.id]}</Text>
+          {sent.has(u.id) ? (
+            <Text style={{ color: colors.green, fontWeight: '700', fontSize: 12 }}>✓ Gönderildi</Text>
           ) : (
-            <Pressable onPress={() => onInvite(u.id)} style={styles.small}>
-              <Text style={styles.smallText}>Davet et</Text>
+            <Pressable onPress={() => onSend(u.id)} style={styles.small} accessibilityRole="button" accessibilityLabel={`${u.name} kişisine oda davetini gönder`}>
+              <Text style={styles.smallText}>Gönder</Text>
             </Pressable>
           )}
         </View>
       ))}
-      <Text style={styles.dim}>Kimin sana davet gönderebileceğini Ayarlar &gt; Gizlilik&apos;ten sınırlayabilirsin.</Text>
+      <Pressable onPress={onExternal} style={[styles.row, { paddingVertical: 8 }]} accessibilityRole="button" accessibilityLabel="Diğer uygulamalarla paylaş">
+        <Ionicons name="share-social-outline" size={20} color={colors.textDim} />
+        <Text style={{ color: colors.textDim, flex: 1 }}>Diğer uygulamalarla paylaş</Text>
+      </Pressable>
     </Sheet>
   );
 }
@@ -494,6 +557,7 @@ const styles = StyleSheet.create({
   chipText: { color: '#fff', fontWeight: '600', fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
   track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden' },
+  followers: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: 12 },
   small: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   smallText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   vol: { backgroundColor: colors.cardAlt, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5 },
