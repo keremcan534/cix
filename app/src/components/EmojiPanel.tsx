@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AssetView } from '@/components/fx/anim-player';
 import { Icon3D } from '@/components/Icon3D';
+import { REACTION_TAB_ANIMATED, REACTION_TAB_RECENT, ReactionArt } from '@/components/ReactionArt';
 import { DISPLAY_LABEL } from '@/data/animations';
 import { EMOJI_PACKS } from '@/data/catalog';
 import { isLive, useAnimations } from '@/lib/animations';
@@ -38,12 +39,22 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
     <View style={styles.wrap}>
       {hint && <Text style={styles.hint}>{hint}</Text>}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
-        {[...(onAnimate ? [{ id: 'animated', name: '✨ Hareketli' }] : []), { id: 'recent', name: '🕘' }, ...EMOJI_PACKS].map((p) => (
-          <Pressable key={p.id} onPress={() => setTab(p.id)} style={[styles.tab, tab === p.id && styles.tabActive]}>
-            <Text style={styles.tabText}>
-              {p.name}
-              {p.id !== 'recent' && p.id !== 'animated' && !unlocked(p.id) ? ' 🔒' : ''}
-            </Text>
+        {[...(onAnimate ? [{ id: 'animated', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []), { id: 'recent', name: '', icon: REACTION_TAB_RECENT }, ...EMOJI_PACKS].map((p) => (
+          <Pressable
+            key={p.id}
+            onPress={() => setTab(p.id)}
+            style={[styles.tab, tab === p.id && styles.tabActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === p.id }}
+            accessibilityLabel={p.id === 'recent' ? 'Son kullanılanlar' : p.name}
+          >
+            {'icon' in p && <Image source={p.icon} style={styles.tabIcon} />}
+            {!!p.name && (
+              <Text style={styles.tabText}>
+                {p.name}
+                {p.id !== 'recent' && p.id !== 'animated' && !unlocked(p.id) ? ' 🔒' : ''}
+              </Text>
+            )}
           </Pressable>
         ))}
       </ScrollView>
@@ -100,8 +111,8 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
         <View style={[styles.grid, locked && { opacity: 0.4 }]}>
           {list.length === 0 && <Text style={styles.empty}>Henüz emoji kullanmadın.</Text>}
           {list.map((e) => (
-            <Pressable key={e} onPress={() => pick(e)} style={styles.cell}>
-              <Text style={{ fontSize: 26 }}>{e}</Text>
+            <Pressable key={e} onPress={() => pick(e)} style={styles.cell} accessibilityLabel={e}>
+              <ReactionArt emoji={e} size={32} textStyle={{ fontSize: 26 }} />
             </Pressable>
           ))}
         </View>
@@ -125,7 +136,8 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
 const styles = StyleSheet.create({
   hint: { color: colors.textDim, fontSize: 12, paddingHorizontal: 12, paddingBottom: 6 },
   wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6 },
-  tab: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  tabIcon: { width: 18, height: 18 },
   tabActive: { backgroundColor: colors.cardAlt },
   tabText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 6, minHeight: 60 },

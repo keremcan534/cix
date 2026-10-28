@@ -10,7 +10,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Button } from '@/components/ui';
 import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
@@ -19,7 +19,7 @@ import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGif
 import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
-import { GiftArt } from '@/components/GiftArt';
+import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -336,7 +336,7 @@ export function GiftSheet({
         {/* How much + one action */}
         <View style={g.footer}>
           <View style={g.summary}>
-            {isLucky ? <Text style={g.summaryArt}>{lg.emoji}</Text> : <GiftArt giftId={gift.id} emoji={gift.emoji} size={36} textStyle={g.summaryArt} />}
+            <GiftArt giftId={isLucky ? lg.id : gift.id} emoji={isLucky ? lg.emoji : gift.emoji} size={36} textStyle={g.summaryArt} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={g.summaryName} numberOfLines={1}>
                 {isLucky ? `${lg.name} · Lucky` : gift.name}
@@ -443,7 +443,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
           return (
             <Pressable key={it.id} onPress={() => onPick(it.id)} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${it.name}, Lucky, ${fmt(it.price)} jeton, en yüksek ×${maxMult(it)}${off ? ', şu an kapalı' : ''}`}>
               <View style={[g.tile, on && g.tileOn]}>
-                <Text style={[g.tileArt, off && { opacity: 0.4 }]}>{it.emoji}</Text>
+                <GiftArt giftId={it.id} emoji={it.emoji} size={42} style={off && { opacity: 0.4 }} textStyle={[g.tileArt, off && { opacity: 0.4 }]} />
                 <Text style={g.tileName} numberOfLines={1}>
                   {it.name}
                 </Text>
@@ -483,7 +483,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
         <View style={g.odds}>
           {history.slice(0, 30).map((r) => (
             <View key={r.txId} style={g.histRow}>
-              <Text style={{ fontSize: 20 }}>{r.emoji}</Text>
+              <GiftArt giftId={r.giftId} emoji={r.emoji} size={26} textStyle={{ fontSize: 20 }} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={g.summaryName} numberOfLines={1}>
                   {r.giftName} → {userById(r.toId).name}
@@ -519,7 +519,7 @@ function GiftTile({
   onLongPress: () => void;
 }) {
   // At most one corner badge: a lock beats the effect type, so the important fact is never crowded out.
-  const badge = locked ? null : gift.badge === '3D' ? '3D' : gift.badge === 'music' ? '♪' : null;
+  const badge = locked ? null : gift.badge === '3D' || gift.badge === 'music' ? gift.badge : null;
   const a11y = `${gift.name}, ${stock !== undefined ? `ücretsiz, ${stock} adet` : `${fmt(gift.price)} jeton`}${locked ? `, SVIP ${gift.minSvip} gerekli` : ''}${favorite ? ', favori' : ''}`;
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
@@ -541,11 +541,13 @@ function GiftTile({
             <Text style={g.tilePrice}>{fmt(gift.price)}</Text>
           </View>
         )}
-        {badge && (
+        {badge === 'music' ? (
+          <Image source={MUSIC_BADGE} style={g.musicBadge} accessibilityIgnoresInvertColors />
+        ) : badge ? (
           <View style={g.badge}>
             <Text style={g.badgeText}>{badge}</Text>
           </View>
-        )}
+        ) : null}
         {favorite && <Ionicons name="star" size={12} color={colors.gold} style={g.favMark} />}
         {selected && <Ionicons name="checkmark-circle" size={18} color={colors.primaryText} style={g.check} />}
       </View>
@@ -609,6 +611,7 @@ const g = StyleSheet.create({
   lockText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
   badge: { position: 'absolute', top: 4, right: 4, minWidth: 20, height: 16, borderRadius: 5, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: colors.text, fontSize: 10, fontWeight: '900' },
+  musicBadge: { position: 'absolute', top: 3, right: 3, width: 20, height: 20 },
   favMark: { position: 'absolute', top: 5, left: 6 },
   check: { position: 'absolute', bottom: 34, right: 4 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: space.lg, paddingTop: space.md, gap: space.sm },

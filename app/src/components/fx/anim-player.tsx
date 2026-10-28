@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 
+import { AnimArt } from '@/components/fx/anim-art';
 import { Icon3D } from '@/components/Icon3D';
 import type { Animation, Asset } from '@/data/animations';
 import { semantic } from '@/theme';
@@ -16,6 +17,7 @@ export const playableAsset = (a: Animation): Asset => (NATIVE_FORMATS.includes(a
 
 export function AssetView({ asset, size }: { asset: Asset; size: number }) {
   if (asset.kind === 'icon') return <Icon3D name={asset.value} size={size} />;
+  if (asset.kind === 'art') return <AnimArt name={asset.value} size={size} />;
   if (asset.kind === 'url') return <Image source={{ uri: asset.value }} style={{ width: size, height: size }} resizeMode="contain" />;
   return <Text style={{ fontSize: size * 0.85, lineHeight: size }}>{asset.value}</Text>;
 }

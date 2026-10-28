@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
+import { GiftArt } from '@/components/GiftArt';
 import { Icon3D } from '@/components/Icon3D';
 import type { LuckyRecord } from '@/lib/lucky';
 import { colors, semantic } from '@/theme';
@@ -35,7 +36,7 @@ export function LuckyResult({ records, still, onDone }: { records: LuckyRecord[]
         style={[s.card, reward ? (big ? s.cardBig : s.cardWin) : s.cardNone, { opacity: v, transform: [{ scale }] }]}
         accessibilityLabel={reward ? `Lucky: en yüksek çarpan ${best.mult}, toplam ${reward} jeton kazandın` : 'Lucky: bu sefer ödül çıkmadı'}
       >
-        <Text style={s.emoji}>{best.emoji}</Text>
+        <GiftArt giftId={best.giftId} emoji={best.emoji} size={56} textStyle={s.emoji} />
         {reward ? (
           <>
             <Text style={[s.mult, big && { fontSize: 54 }]}>×{fmt(best.mult)}</Text>

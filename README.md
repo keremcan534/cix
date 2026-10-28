@@ -93,11 +93,15 @@ Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sö
 - **Yayına Katılma Modu ve ortak YouTube ekranı:** Oda Ayarları (veya oda menüsü) › Yayına Katılma Modu: Ses / Video / Sinema Salonu / Çift Odası sekmelerinde 34 mikrofon yerleşimi (katalog verisi), oda seviyesi kilidi, PK takım bölgeleri; Video ve Sinema Salonu'nda yalnızca YouTube bağlantısıyla ortak izleme. Yetki, seviye, kapasite ve bağlantı doğrulaması `lib/room-modes` içinde. Ayrıntı: [`docs/ODA_MODLARI.md`](docs/ODA_MODLARI.md).
 - **Maliyet hesabı:** uygulamadaki ekonomi kurallarıyla 24 aylık kâr-zarar, nakit ihtiyacı ve 100 TL'nin dağılımı; varsayımlar sayfada değiştirilebilir. Tarayıcıda açın: [`docs/maliyet-hesabi.html`](docs/maliyet-hesabi.html).
 
+## Görseller
+
+Emojilerin yerini alacak 536 görselin listesi ve teslim durumu: [`docs/GORSEL_URETIM_LISTESI.md`](docs/GORSEL_URETIM_LISTESI.md). Hediyeler (Lucky dahil), efekt hediyeleri/animasyonlar ve tepki çıkartmaları uygulamada; bölüm 4–12'nin taslakları kalite nedeniyle henüz bağlanmadı.
+
 ## Testler
 
 ```bash
 cd app
-npm test            # oda katılımcı modeli, oda oturumu, PK sunucusu ve sohbet filtreleri (Node yerleşik test koşucusu)
+npm test            # oda katılımcı modeli, oda oturumu, PK sunucusu, sohbet filtreleri ve görsel bağlantıları (Node yerleşik test koşucusu)
 npx tsc --noEmit    # tip denetimi
 npx expo lint
 ```

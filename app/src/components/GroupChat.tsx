@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { EmojiPanel } from '@/components/EmojiPanel';
+import { MessageText } from '@/components/ReactionArt';
 import { Avatar } from '@/components/ui';
 import { roomById, userById, type User } from '@/data/mock';
 import { followRoute, presenceLabel, presenceOf } from '@/data/presence';
@@ -190,7 +191,7 @@ function Message({ item }: { item: GroupMsg }) {
             <Text style={styles.name}>{u.name}</Text>
           </Pressable>
         )}
-        <Text style={{ color: '#fff' }}>{item.text}</Text>
+        <MessageText text={item.text} style={{ color: '#fff' }} />
         <Text style={styles.time}>{item.time}</Text>
       </View>
     </View>
