@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GameIcon } from '@/components/GameArt';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
@@ -56,7 +57,7 @@ export default function GameCenter() {
                 const access = casinoAccess(g, PROFILE, wealthLevel);
                 return (
                   <Card key={g.id} style={s.row}>
-                    <Text style={{ fontSize: 34 }}>{g.emoji}</Text>
+                    <GameIcon id={g.id} emoji={g.emoji} size={34} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.title}>{g.name}</Text>
                       <Text style={s.dim}>
@@ -87,7 +88,7 @@ export default function GameCenter() {
                   .filter((g) => g.phase === phase)
                   .map((g) => (
                     <Card key={g.id} style={[s.row, !g.active && { opacity: 0.5 }]}>
-                      <Text style={{ fontSize: 30 }}>{g.emoji}</Text>
+                      <GameIcon id={g.id} emoji={g.emoji} size={30} />
                       <View style={{ flex: 1 }}>
                         <Text style={s.title}>{g.name}</Text>
                         <Text style={s.dim}>

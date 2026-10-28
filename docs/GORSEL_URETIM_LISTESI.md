@@ -340,18 +340,18 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 7 | `oyun-penalti.png` | Penaltı | ⚽ | oyun kapak simgesi: Penaltı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 3 dosyada |
 | 8 | `oyun-balik-avi.png` | Balık Avı | 🦈 | oyun kapak simgesi: Balık Avı | P3 | Taslak teslim (parti 04–12) |
 | 9 | `oyun-kelime-avi.png` | Kelime Avı | 🔤 | oyun kapak simgesi: Kelime Avı | P3 | Taslak teslim (parti 04–12) |
-| 10 | `oyun-bilgi-yarismasi.png` | Bilgi Yarışması | 🧠 | oyun kapak simgesi: Bilgi Yarışması | P3 | Taslak teslim (parti 04–12) |
+| 10 | `oyun-bilgi-yarismasi.png` | Bilgi Yarışması | 🧠 | oyun kapak simgesi: Bilgi Yarışması | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 11 | `oyun-hizli-matematik.png` | Hızlı Matematik | ➗ | oyun kapak simgesi: Hızlı Matematik | P3 | Taslak teslim (parti 04–12) |
-| 12 | `oyun-8-top-bilardo.png` | 8 Top Bilardo | 🎱 | oyun kapak simgesi: 8 Top Bilardo | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
+| 12 | `oyun-8-top-bilardo.png` | 8 Top Bilardo | 🎱 | oyun kapak simgesi: 8 Top Bilardo | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 13 | `oyun-jackaroo.png` | Jackaroo | ♠️ | oyun kapak simgesi: Jackaroo | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 4 dosyada |
 | 14 | `oyun-xox.png` | XOX | ⭕ | oyun kapak simgesi: XOX | P3 | Taslak teslim (parti 04–12) |
 | 15 | `oyun-dort-tas.png` | Dört Taş | 🔴 | oyun kapak simgesi: Dört Taş | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 16 | `oyun-kelime-zinciri.png` | Kelime Zinciri | 🔤 | oyun kapak simgesi: Kelime Zinciri | P3 | Taslak teslim (parti 04–12) |
+| 16 | `oyun-kelime-zinciri.png` | Kelime Zinciri | 🔤 | oyun kapak simgesi: Kelime Zinciri | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü · yakın eşleşme: ABC harf taşları ve ampul |
 | 17 | `oyun-dogru-yanlis.png` | Doğru / Yanlış | ✅ | oyun kapak simgesi: Doğru / Yanlış | P3 | Taslak teslim (parti 04–12) |
-| 18 | `oyun-hafiza-eslestirme.png` | Hafıza Eşleştirme | 🧩 | oyun kapak simgesi: Hafıza Eşleştirme | P3 | Taslak teslim (parti 04–12) |
-| 19 | `oyun-sans-carki.png` | Şans Çarkı | 🎡 | oyun kapak simgesi: Şans Çarkı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 20 | `oyun-zar-casino.png` | Zar (casino) | 🎲 | oyun kapak simgesi: Zar (casino) | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 3 dosyada |
-| 21 | `oyun-lucky-77.png` | Lucky 77 | 🎰 | oyun kapak simgesi: Lucky 77 | P3 | Taslak teslim (parti 04–12) |
+| 18 | `oyun-hafiza-eslestirme.png` | Hafıza Eşleştirme | 🧩 | oyun kapak simgesi: Hafıza Eşleştirme | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 19 | `oyun-sans-carki.png` | Şans Çarkı | 🎡 | oyun kapak simgesi: Şans Çarkı | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 20 | `oyun-zar-casino.png` | Zar (casino) | 🎲 | oyun kapak simgesi: Zar (casino) | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 21 | `oyun-lucky-77.png` | Lucky 77 | 🎰 | oyun kapak simgesi: Lucky 77 | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 22 | `oyun-dragon-tiger.png` | Dragon Tiger | 🐉 | oyun kapak simgesi: Dragon Tiger | P3 | Taslak teslim (parti 04–12) |
 | 23 | `casino-kart-ejder.png` | Ejder | 🐉 | Dragon Tiger masası: Ejder tarafı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: ejderha yerine alev simgesi, aynı görsel 2 dosyada |
 | 24 | `casino-kart-kaplan.png` | Kaplan | 🐯 | Dragon Tiger masası: Kaplan tarafı | P3 | Taslak teslim (parti 04–12) |

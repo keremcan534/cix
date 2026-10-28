@@ -45,6 +45,7 @@ import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-m
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
+import { gameArtOf } from '@/components/GameArt';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
@@ -1370,7 +1371,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       note: 'Herkes oynayabilir · oyun açıkken mikrofonun ve koltuğun aynen kalır',
       items: gameCatalog.roomGames
         .filter((g) => g.active)
-        .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#0A8F95', '#13D9DF'] as [string, string], badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
+        .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), colors: ['#0A8F95', '#13D9DF'] as [string, string], badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
     },
     {
       title: 'Casino · Servet Lv.2',
@@ -1378,7 +1379,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       note: app.wealthLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `Servet Seviyesi 2 ve üzeri üyelere açık · şu an Lv.${app.wealthLevel}`,
       items: gameCatalog.casino
         .filter((g) => g.active && g.fromRoom)
-        .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, colors: ['#B7832E', '#F6BD60'] as [string, string], onPress: () => openCasino(g.id) })),
+        .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), colors: ['#B7832E', '#F6BD60'] as [string, string], onPress: () => openCasino(g.id) })),
     },
     {
       title: 'Oda Araçları',

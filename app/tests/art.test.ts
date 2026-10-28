@@ -9,13 +9,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ANIMATION_SEED } from '@/data/animations';
+import { CASINO_GAMES, ROOM_GAMES } from '@/data/games';
 import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, ROOM_LEVEL_ICONS, ROOM_THEMES, ROOM_TYPES } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { emojiKey, stickersOf } from '@/lib/stickers';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
 const read = (file: string) => readFileSync(resolve(SRC, file), 'utf8');
-const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/RoomArt.tsx', 'components/fx/anim-art.tsx'];
+const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/RoomArt.tsx', 'components/GameArt.tsx', 'components/fx/anim-art.tsx'];
 
 describe('Görsel dosyaları', () => {
   test('bağlanan her PNG diskte var', () => {
@@ -54,6 +55,12 @@ describe('Görsel dosyaları', () => {
     assert.deepEqual(keys('ROOM_THEME_ART'), ROOM_THEMES.map((t) => t.id).sort());
     const levels = block('ROOM_LEVEL_ART: number[]', '];').split(/\r?\n/).filter((l) => /^  \S/.test(l));
     assert.equal(levels.length, ROOM_LEVEL_ICONS.length);
+  });
+
+  test('oyun görselleri gerçek oyunlara bağlı', () => {
+    const ids = [...read('components/GameArt.tsx').matchAll(/^  (\w+): require/gm)].map((m) => m[1]);
+    assert.ok(ids.length > 0);
+    for (const id of ids) assert.ok([...ROOM_GAMES, ...CASINO_GAMES].some((g) => g.id === id), id);
   });
 
   test('yerleşik animasyonlar emoji değil görsel çizer', () => {
