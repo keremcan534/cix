@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
 import { MUSIC_CATALOG, type Track } from '@/data/catalog';
@@ -13,12 +14,13 @@ import { colors, semantic } from '@/theme';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-function Sheet({ visible, onClose, title, children, tall }: { visible: boolean; onClose: () => void; title: string; children: React.ReactNode; tall?: boolean }) {
+function Sheet({ visible, onClose, title, art, children, tall }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; tall?: boolean }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
       <View style={[roomStyles.sheet, { maxHeight: tall ? '85%' : '70%' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
           <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
             <Ionicons name="close" size={22} color={colors.textDim} />
@@ -156,7 +158,7 @@ export function MusicSheet({
     Linking.openURL(url);
   };
   return (
-    <Sheet visible={visible} onClose={onClose} title="🎵 Oda müziği" tall>
+    <Sheet visible={visible} onClose={onClose} title="Oda müziği" art={ROOM_ICON_ART.music} tall>
       <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
         {canControl && (
           <View style={styles.row}>
@@ -235,7 +237,7 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
   const [amount, setAmount] = useState(100);
   const [count, setCount] = useState(5);
   return (
-    <Sheet visible={visible} onClose={onClose} title="🧧 Oda zarfı dağıt">
+    <Sheet visible={visible} onClose={onClose} title="Oda zarfı dağıt" art={ROOM_ICON_ART.envelope}>
       <Text style={styles.dim}>Zarftaki jetonlar odadaki ilk {count} kişiye rastgele paylaştırılır. Tüm transferler cüzdan defterine yazılır.</Text>
       <Text style={styles.label}>Toplam</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -261,7 +263,7 @@ export function EnvelopeSendModal({ visible, onClose, onSend, coins }: { visible
 export function EnvelopeDrop({ from, seconds, onGrab }: { from: string; seconds: number; onGrab: () => void }) {
   return (
     <Pressable style={styles.envelope} onPress={onGrab} accessibilityLabel="Zarfı kap">
-      <Text style={{ fontSize: 34 }}>🧧</Text>
+      <Image source={ROOM_ICON_ART.envelope} style={{ width: 44, height: 44 }} />
       <Text style={styles.envelopeText}>{userById(from).name} zarf attı!</Text>
       <Text style={styles.envelopeTimer}>Kap · {seconds}s</Text>
     </Pressable>
@@ -274,7 +276,7 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
   const [bet, setBet] = useState(10);
   const [result, setResult] = useState<{ me: number; them: number; opponent: string } | null>(null);
   return (
-    <Sheet visible={visible} onClose={onClose} title="🎲 Zar Düellosu">
+    <Sheet visible={visible} onClose={onClose} title="Zar Düellosu" art={ROOM_ICON_ART.diceDuel}>
       <Text style={styles.dim}>Odadaki rastgele biriyle zar at; yüksek atan bahsi 2 katı alır, eşitlikte iade. 18+ · Günlük {playsLeft} hak kaldı. Sonuç sunucuda belirlenir (demo).</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
         {[10, 50, 100].map((n) => (

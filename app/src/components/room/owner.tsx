@@ -7,6 +7,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInpu
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GiftArt } from '@/components/GiftArt';
+import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
 import { Avatar } from '@/components/ui';
 import {
@@ -16,7 +17,6 @@ import {
   MIC_COUNT_OPTIONS,
   MIC_PERMISSION_MIN_LEVEL,
   ROOM_BACKGROUNDS,
-  ROOM_LEVEL_ICONS,
   ROOM_LEVEL_REWARDS,
   ROOM_LIMITS,
   ROOM_THEMES,
@@ -35,7 +35,7 @@ import type { MyRoom } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
-type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean };
+type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean; art?: number };
 
 const fmtMinutes = (m: number) => (m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${m % 60} dk`);
 const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m` : n >= 10_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString('tr-TR'));
@@ -98,8 +98,9 @@ export function ChoiceSheet<T extends string | number>({
                   onClose();
                 }}
                 style={[styles.choice, on && { backgroundColor: 'rgba(52,211,153,0.12)' }, o.disabled && { opacity: 0.45 }]}>
+                {o.art && <Image source={o.art} style={styles.choiceArt} />}
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, textAlign: o.sub ? 'left' : 'center' }}>{o.label}</Text>
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, textAlign: o.sub || o.art ? 'left' : 'center' }}>{o.label}</Text>
                   {o.sub && <Text style={styles.dim}>{o.sub}</Text>}
                 </View>
                 {on && <Ionicons name="checkmark" size={24} color={colors.green} />}
@@ -119,6 +120,7 @@ function Row({
   label,
   hint,
   value,
+  valueArt,
   onPress,
   toggle,
   locked,
@@ -126,6 +128,7 @@ function Row({
   label: string;
   hint?: string;
   value?: string;
+  valueArt?: number;
   onPress?: () => void;
   toggle?: { value: boolean; onChange: (v: boolean) => void };
   locked?: string;
@@ -146,6 +149,7 @@ function Row({
         />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '48%' }}>
+          {valueArt && <Image source={valueArt} style={{ width: 24, height: 24 }} />}
           {value !== undefined && <Text style={styles.rowValue}>{value}</Text>}
           <Ionicons name="chevron-forward" size={20} color="#fff" />
         </View>
@@ -169,9 +173,9 @@ export function LevelTable({ xp, level }: { xp: number; level: number }) {
       <Text style={[styles.dim, { fontWeight: '800', marginTop: 4 }]}>Seviye · oda limiti · üye · yönetici</Text>
       {ROOM_LEVEL_REWARDS.map((r, i) => (
         <View key={r} style={[styles.levelRow, i + 1 === level && { borderColor: colors.primaryText }]}>
-          <Text style={[styles.dim, i < level && { color: '#fff' }, { fontWeight: '800' }]}>
-            {i < level ? '✅' : '🔒'} {ROOM_LEVEL_ICONS[i]} LV{i + 1} · {ROOM_LIMITS[i].rooms.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].members.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].admins}
-          </Text>
+          <ArtText art={roomLevelArt(i + 1)} size={20} style={[styles.dim, i < level && { color: '#fff' }, { fontWeight: '800' }]}>
+            {i < level ? '✅' : '🔒'} LV{i + 1} · {ROOM_LIMITS[i].rooms.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].members.toLocaleString('tr-TR')} · {ROOM_LIMITS[i].admins}
+          </ArtText>
           <Text style={[styles.dim, i < level && { color: '#fff' }]}>{r}</Text>
         </View>
       ))}
@@ -218,7 +222,7 @@ export function RoomInfoSheet({
   level: number;
   xp: number | null;
   owner: boolean;
-  clan: { label: string; href: '/aile' | '/ajans' } | null;
+  clan: { label: string; href: '/aile' | '/ajans'; art?: number } | null;
   members: string[];
   memberTotal: number;
   applications: string[];
@@ -277,17 +281,23 @@ export function RoomInfoSheet({
             <Pressable style={{ flex: 1 }} onPress={() => setSub('level')} accessibilityLabel="Oda seviyesi">
               <LinearGradient colors={['#0E7490', '#155E75']} style={styles.card}>
                 <Text style={styles.cardLabel}>Oda seviyesi</Text>
-                <Text style={styles.cardValue}>
-                  {ROOM_LEVEL_ICONS[level - 1]} Lv.{level}
-                </Text>
+                <ArtText art={roomLevelArt(level)} size={26} style={styles.cardValue}>
+                  Lv.{level}
+                </ArtText>
               </LinearGradient>
             </Pressable>
             <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Kabile">
               <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
                 <Text style={styles.cardLabel}>Kabile</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
-                </Text>
+                {clan?.art ? (
+                  <ArtText art={clan.art} size={26} style={styles.cardValue}>
+                    {clan.label}
+                  </ArtText>
+                ) : (
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
+                  </Text>
+                )}
               </LinearGradient>
             </Pressable>
           </View>
@@ -317,7 +327,9 @@ export function RoomInfoSheet({
           </Pressable>
           {membership === 'none' && (
             <Pressable style={styles.joinBtn} onPress={onJoin}>
-              <Text style={{ color: '#fff', fontWeight: '800' }}>➕ Oda üyesi ol</Text>
+              <ArtText art={ROOM_ICON_ART.join} size={24} style={{ color: '#fff', fontWeight: '800' }}>
+                Oda üyesi ol
+              </ArtText>
             </Pressable>
           )}
           {membership === 'pending' && <Text style={[styles.dim, { textAlign: 'center' }]}>⏳ Üyelik başvurun oda sahibi/yöneticilerin onayını bekliyor</Text>}
@@ -604,8 +616,8 @@ export function RoomSettingsScreen({
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <Section title="Standart" />
-          <Row label="Oda tipi" value={`${typeInfo.emoji} ${typeInfo.name}`} onPress={() => setPicker('type')} />
-          <Row label="Oda teması" value={`${roomThemeInfo(room.theme).emoji} ${roomThemeInfo(room.theme).name}`} onPress={() => setPicker('theme')} />
+          <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} />
+          <Row label="Oda teması" value={roomThemeInfo(room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(room.theme).id]} onPress={() => setPicker('theme')} />
           <Row
             label="Oda kilitli"
             hint={`Oda seviyesi >=${LOCK_MIN_LEVEL} veya soyluluk açılarak kilit açılır`}
@@ -625,7 +637,7 @@ export function RoomSettingsScreen({
             </View>
           )}
           <Row label="Oda Günlüğü" onPress={() => setPicker('log')} />
-          <Row label={`Oda seviyesi`} value={`${ROOM_LEVEL_ICONS[level - 1]} Lv.${level}`} onPress={() => setPicker('level')} />
+          <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
           <Section title="Mikrofon pozisyonu" />
           <Row label="Yayına Katılma Modu" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />
@@ -673,12 +685,12 @@ export function RoomSettingsScreen({
       <ChoiceSheet
         visible={picker === 'type'}
         title="Oda tipi"
-        options={ROOM_TYPES.map((t) => ({ value: t.id, label: `${t.emoji} ${t.name}`, sub: t.desc }))}
+        options={ROOM_TYPES.map((t) => ({ value: t.id, label: t.name, sub: t.desc, art: ROOM_TYPE_ART[t.id] }))}
         value={room.roomType}
         onPick={(v) => update({ roomType: v, micMode: v === 'free' ? 'free' : 'request' })}
         onClose={close}
       />
-      <ChoiceSheet visible={picker === 'theme'} title="Oda teması" options={ROOM_THEMES.map((t) => ({ value: t.id, label: `${t.emoji} ${t.name}` }))} value={room.theme} onPick={(v) => update({ theme: v })} onClose={close} />
+      <ChoiceSheet visible={picker === 'theme'} title="Oda teması" options={ROOM_THEMES.map((t) => ({ value: t.id, label: t.name, art: ROOM_THEME_ART[t.id] }))} value={room.theme} onPick={(v) => update({ theme: v })} onClose={close} />
       <ChoiceSheet
         visible={picker === 'mics'}
         title="Yayına Katılma Modu"
@@ -832,7 +844,7 @@ export function BossSeat({ userId, speaking, onPress }: { userId: string | null;
           <Image source={{ uri: u.avatar }} style={{ width: 62, height: 62, borderRadius: 31 }} />
         ) : (
           <View style={styles.bossEmpty}>
-            <Text style={{ fontSize: 26 }}>👑</Text>
+            <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
       </LinearGradient>
@@ -879,6 +891,7 @@ const styles = StyleSheet.create({
   cardValue: { color: '#fff', fontSize: 16, fontWeight: '900' },
   bell: { backgroundColor: colors.red, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6 },
   joinBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
+  choiceArt: { width: 40, height: 40, marginRight: 12 },
   stat: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: 10, gap: 8, justifyContent: 'space-between' },
   statLabel: { color: colors.textDim, fontSize: 12 },
   statValue: { color: '#fff', fontWeight: '900', fontSize: 18 },

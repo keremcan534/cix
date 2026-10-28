@@ -1,7 +1,7 @@
 /// <reference types="node" />
-// Produced visuals (docs/GORSEL_URETIM_LISTESI.md §1–4): every bundled file exists, every catalog
-// gift, effect and emoji-pack emoji has its picture, store pictures belong to real store items, and
-// only reactions-only messages become stickers.
+// Produced visuals (docs/GORSEL_URETIM_LISTESI.md §1–5): every bundled file exists, every catalog
+// gift, effect and emoji-pack emoji has its picture, store pictures belong to real store items, every
+// room type, theme and level has its picture, and only reactions-only messages become stickers.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -9,13 +9,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ANIMATION_SEED } from '@/data/animations';
-import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS } from '@/data/catalog';
+import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, ROOM_LEVEL_ICONS, ROOM_THEMES, ROOM_TYPES } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { emojiKey, stickersOf } from '@/lib/stickers';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
 const read = (file: string) => readFileSync(resolve(SRC, file), 'utf8');
-const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/fx/anim-art.tsx'];
+const ART_FILES = ['components/GiftArt.tsx', 'components/ReactionArt.tsx', 'components/StoreArt.tsx', 'components/RoomArt.tsx', 'components/fx/anim-art.tsx'];
 
 describe('Görsel dosyaları', () => {
   test('bağlanan her PNG diskte var', () => {
@@ -44,6 +44,16 @@ describe('Görsel dosyaları', () => {
     assert.ok(items.length > 0 && tabs.length > 0);
     for (const id of items) assert.ok(COSMETICS.some((c) => c.id === id && c.kind !== 'frame'), id);
     for (const kind of tabs) assert.ok(COSMETIC_KINDS.some((k) => k.kind === kind), kind);
+  });
+
+  test('her oda tipinin, temasının ve seviyesinin görseli var', () => {
+    const roomArt = read('components/RoomArt.tsx');
+    const block = (name: string, end: string) => roomArt.slice(roomArt.indexOf(name), roomArt.indexOf(end, roomArt.indexOf(name)));
+    const keys = (name: string) => [...block(name, '};').matchAll(/^  (\w+): require/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(keys('ROOM_TYPE_ART'), ROOM_TYPES.map((t) => t.id).sort());
+    assert.deepEqual(keys('ROOM_THEME_ART'), ROOM_THEMES.map((t) => t.id).sort());
+    const levels = block('ROOM_LEVEL_ART: number[]', '];').split(/\r?\n/).filter((l) => /^  \S/.test(l));
+    assert.equal(levels.length, ROOM_LEVEL_ICONS.length);
   });
 
   test('yerleşik animasyonlar emoji değil görsel çizer', () => {

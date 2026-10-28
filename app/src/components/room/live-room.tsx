@@ -44,6 +44,7 @@ import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
+import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
@@ -1350,17 +1351,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items: [
         ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'PK', emoji: '⚔️', colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
-        { key: 'env', label: 'Şanslı çanta', emoji: '🧧', colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
+        { key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
-        { key: 'events', label: 'Aktivite', emoji: '🎉', colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
+        { key: 'events', label: 'Aktivite', emoji: '🎉', art: ROOM_ICON_ART.activity, colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
         ...(canFunctions
           ? [
-              { key: 'poll', label: 'Anket', emoji: '📊', colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
-              { key: 'goal', label: 'Topluluk hedefi', emoji: '🎯', colors: ['#16A34A', '#0D9488'] as [string, string], onPress: () => setPanel('goal') },
+              { key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
+              { key: 'goal', label: 'Topluluk hedefi', emoji: '🎯', art: ROOM_ICON_ART.goal, colors: ['#16A34A', '#0D9488'] as [string, string], onPress: () => setPanel('goal') },
             ]
           : []),
-        ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
-        { key: 'music', label: 'Müzik', emoji: '🎵', colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
+        ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
+        { key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
       ],
     },
     {
@@ -1419,10 +1420,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ? familyId
       ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : '🏰 Ailem', href: '/aile' as const }
       : ownAgencyName
-        ? { label: `🏢 ${ownAgencyName}`, href: '/ajans' as const }
+        ? { label: ownAgencyName, href: '/ajans' as const, art: ROOM_ICON_ART.agency }
         : null
     : base!.agency
-      ? { label: '🏢 Ajans odası', href: '/ajans' as const }
+      ? { label: 'Ajans odası', href: '/ajans' as const, art: ROOM_ICON_ART.agency }
       : level >= 5
         ? { label: `${otherFamily.emoji} ${otherFamily.name}`, href: '/aile' as const }
         : null;
@@ -1662,7 +1663,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Text style={styles.callBannerGo}>Dön</Text>
               </Pressable>
             )}
-            {settings.roomMuted && <Text style={styles.mutedChip}>🔇 Oda sesi senin için kapalı · Ses ayarlarından açabilirsin</Text>}
+            {settings.roomMuted && (
+              <View style={styles.mutedRow}>
+                <ArtText art={ROOM_ICON_ART.soundOff} size={18} style={styles.mutedChip}>
+                  Oda sesi senin için kapalı · Ses ayarlarından açabilirsin
+                </ArtText>
+              </View>
+            )}
             {myQueuePos !== null && <Text style={styles.queueChip}>🙋 Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>}
             {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
               <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
@@ -2082,7 +2089,8 @@ const styles = StyleSheet.create({
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center', marginTop: 4 },
+  mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
+  mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, paddingLeft: 10, height: 48 },
