@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { Avatar, FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
 import { USERS } from '@/data/mock';
@@ -75,7 +76,11 @@ export default function ProfileScreen() {
               </Text>
               {me.verified && <VerifiedBadge size={16} />}
             </View>
-            <LevelChips wealth={wealthLevel} charm={charmLevel} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <GenderChip user={me} owner />
+              <LevelChips wealth={wealthLevel} charm={charmLevel} />
+            </View>
+            <AffiliationPills user={me} />
             <Pressable onPress={() => showAlert('ID kopyalandı', specialId ? specialId.name : '10284731')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'}</Text>
               <Ionicons name="copy-outline" size={13} color={colors.textDim} />
