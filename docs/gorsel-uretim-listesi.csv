@@ -143,34 +143,34 @@
 3. Tepkiler ve emoji paketleri (çıkartma),tepki-sekme-hareketli.png,Hareketli,✨,"emoji panelinde ""hareketli"" sekmesi simgesi",P2,Teslim edildi
 3. Tepkiler ve emoji paketleri (çıkartma),tepki-sekme-son-kullanilanlar.png,Son kullanılanlar,🕘,"emoji panelinde ""son kullanılanlar"" sekmesi: saat",P2,Teslim edildi
 3. Tepkiler ve emoji paketleri (çıkartma),magaza-emoji-paketleri.png,Emoji paketleri,😀,mağazada emoji paketleri sekmesi simgesi,P2,Teslim edildi
-4. Mağaza ürünleri,magaza-sekme-cerceve.png,Çerçeve,🖼️,mağaza sekmesi: Çerçeve,P2,Taslak teslim (parti 04–12)
-4. Mağaza ürünleri,magaza-sekme-giris-efekti.png,Giriş efekti,✨,mağaza sekmesi: Giriş efekti,P2,Taslak teslim (parti 04–12)
-4. Mağaza ürünleri,magaza-sekme-binek.png,Binek,🏎️,mağaza sekmesi: Binek,P2,Taslak teslim (parti 04–12)
-4. Mağaza ürünleri,magaza-sekme-sohbet-balonu.png,Sohbet balonu,💬,mağaza sekmesi: Sohbet balonu,P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 6 dosyada · Mevcut 3D ikonla aynı anlam olabilir: assets/icons/chat.png
+4. Mağaza ürünleri,magaza-sekme-cerceve.png,Çerçeve,🖼️,mağaza sekmesi: Çerçeve,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
+4. Mağaza ürünleri,magaza-sekme-giris-efekti.png,Giriş efekti,✨,mağaza sekmesi: Giriş efekti,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
+4. Mağaza ürünleri,magaza-sekme-binek.png,Binek,🏎️,mağaza sekmesi: Binek,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
+4. Mağaza ürünleri,magaza-sekme-sohbet-balonu.png,Sohbet balonu,💬,mağaza sekmesi: Sohbet balonu,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
 4. Mağaza ürünleri,magaza-sekme-ozel-id.png,Özel ID,🔢,mağaza sekmesi: Özel ID,P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada
 4. Mağaza ürünleri,cerceve-ses-dalgasi.png,Ses Dalgası,🔊,"""Ses Dalgası"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada · Çerçeve kodla çiziliyor; yalnız mağaza simgesi
 4. Mağaza ürünleri,cerceve-yorunge.png,Yörünge,🪐,"""Yörünge"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada · Çerçeve kodla çiziliyor; yalnız mağaza simgesi
 4. Mağaza ürünleri,cerceve-aurora.png,Aurora,🌌,"""Aurora"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçeve kodla çiziliyor; yalnız mağaza simgesi
 4. Mağaza ürünleri,cerceve-ates.png,Ateş,🔥,"""Ateş"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçeve kodla çiziliyor; yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-altin-tac.png,Altın Taç,👑,"""Altın Taç"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçeve kodla çiziliyor; yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-gumus-kristal.png,Gümüş Kristal,💠,"""Gümüş Kristal"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-buz-kristali.png,Buz Kristali,❄️,"""Buz Kristali"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-gul-kalpler.png,Gül Kalpler,💗,"""Gül Kalpler"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-altin-defne.png,Altın Defne,🌿,"""Altın Defne"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-gumus-tac.png,Gümüş Taç,👑,"""Gümüş Taç"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-kraliyet-kanatlari.png,Kraliyet Kanatları,🪽,"""Kraliyet Kanatları"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-melek-kalp-mercan.png,Melek Kalp · Mercan,💞,"""Melek Kalp · Mercan"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,cerceve-melek-kalp-turkuaz.png,Melek Kalp · Turkuaz,💙,"""Melek Kalp · Turkuaz"" avatar çerçevesinin mağaza küçük resmi",P2,Taslak teslim (parti 04–12) · Çerçevenin kendi görseli var (assets/frames); yalnız mağaza simgesi
-4. Mağaza ürünleri,giris-efekti-isilti.png,Işıltı,✨,"""Işıltı"" odaya giriş efektinin simgesi",P2,Taslak teslim (parti 04–12) · Efekt kodla oynuyor; simge
-4. Mağaza ürünleri,giris-efekti-simsek.png,Şimşek,⚡,"""Şimşek"" odaya giriş efektinin simgesi",P2,Taslak teslim (parti 04–12) · Efekt kodla oynuyor; simge
-4. Mağaza ürünleri,giris-efekti-kuyruklu-yildiz.png,Kuyruklu Yıldız,☄️,"""Kuyruklu Yıldız"" odaya giriş efektinin simgesi",P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 19 dosyada · Efekt kodla oynuyor; simge
-4. Mağaza ürünleri,giris-efekti-ejderha.png,Ejderha,🐉,"""Ejderha"" odaya giriş efektinin simgesi",P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: ejderha yerine alev simgesi · Efekt kodla oynuyor; simge
+4. Mağaza ürünleri,cerceve-altin-tac.png,Altın Taç,👑,"""Altın Taç"" avatar çerçevesinin mağaza küçük resmi",P2,⚠️ yeniden üretilmeli: 3D teslimdeki dosya `cerceve-kraliyet-kanatlari.png` ile birebir aynı · Çerçeve kodla çiziliyor; yalnız mağaza simgesi
+4. Mağaza ürünleri,cerceve-gumus-kristal.png,Gümüş Kristal,💠,"""Gümüş Kristal"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-buz-kristali.png,Buz Kristali,❄️,"""Buz Kristali"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-gul-kalpler.png,Gül Kalpler,💗,"""Gül Kalpler"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-altin-defne.png,Altın Defne,🌿,"""Altın Defne"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-gumus-tac.png,Gümüş Taç,👑,"""Gümüş Taç"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-kraliyet-kanatlari.png,Kraliyet Kanatları,🪽,"""Kraliyet Kanatları"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-melek-kalp-mercan.png,Melek Kalp · Mercan,💞,"""Melek Kalp · Mercan"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-melek-kalp-turkuaz.png,Melek Kalp · Turkuaz,💙,"""Melek Kalp · Turkuaz"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,giris-efekti-isilti.png,Işıltı,✨,"""Işıltı"" odaya giriş efektinin simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
+4. Mağaza ürünleri,giris-efekti-simsek.png,Şimşek,⚡,"""Şimşek"" odaya giriş efektinin simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
+4. Mağaza ürünleri,giris-efekti-kuyruklu-yildiz.png,Kuyruklu Yıldız,☄️,"""Kuyruklu Yıldız"" odaya giriş efektinin simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) · yakın eşleşme: kuyruklu yıldız değil yörüngeli yıldız"
+4. Mağaza ürünleri,giris-efekti-ejderha.png,Ejderha,🐉,"""Ejderha"" odaya giriş efektinin simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
 4. Mağaza ürünleri,binek-scooter.png,Scooter,🛵,binek: Scooter,P2,Taslak teslim (parti 04–12)
-4. Mağaza ürünleri,binek-spor-araba.png,Spor Araba,🏎️,binek: Spor Araba,P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 4 dosyada
-4. Mağaza ürünleri,binek-ozel-jet.png,Özel Jet,🛩️,binek: Özel Jet,P2,Taslak teslim (parti 04–12)
+4. Mağaza ürünleri,binek-spor-araba.png,Spor Araba,🏎️,binek: Spor Araba,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
+4. Mağaza ürünleri,binek-ozel-jet.png,Özel Jet,🛩️,binek: Özel Jet,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`) · yakın eşleşme: özel jet değil kalpli yolcu uçağı (hediye görseli)"
 4. Mağaza ürünleri,balon-seker.png,Şeker,🍬,"""Şeker"" sohbet balonu simgesi",P2,Taslak teslim (parti 04–12)
 4. Mağaza ürünleri,balon-galaksi.png,Galaksi,🌌,"""Galaksi"" sohbet balonu simgesi",P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada
-4. Mağaza ürünleri,balon-altin.png,Altın,🏆,"""Altın"" sohbet balonu simgesi",P2,Taslak teslim (parti 04–12)
+4. Mağaza ürünleri,balon-altin.png,Altın,🏆,"""Altın"" sohbet balonu simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
 4. Mağaza ürünleri,ozel-id-ozel-id.png,Özel ID,🔢,parlak numara rozeti (özel kullanıcı numarası),P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada
 5. Oda,oda-turu-serbest-sohbet.png,Serbest sohbet,💬,oda türü: Serbest sohbet,P1,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 6 dosyada
 5. Oda,oda-turu-sahne.png,Sahne,🎭,oda türü: Sahne,P1,Taslak teslim (parti 04–12)

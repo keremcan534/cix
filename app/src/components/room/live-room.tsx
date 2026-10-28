@@ -43,6 +43,7 @@ import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
+import { storeArtOf } from '@/components/StoreArt';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
@@ -56,7 +57,7 @@ import { SessionBanner, SessionTestSheet, closeRoomScreen } from '@/components/r
 import { ChatFeed } from '@/components/room/chat-feed';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { RULES } from '@/data/rules';
@@ -129,6 +130,7 @@ const offlineBlocked = () => {
 
 const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
+const BOT_RIDES = COSMETICS.filter((c) => c.kind === 'ride');
 
 /** Short mic-button captions for a mic that is on but not sending (lib/room-session micBlock). */
 const HELD_CAPTION: Record<Exclude<MicBlock, null>, string> = {
@@ -193,7 +195,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya katıldı!`;
     const badge = [noble?.emoji, svipLevel ? `SVIP${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
     const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
-    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
+    const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
     return { text, show };
   }, [vipLevel, svipLevel, nobleTier, equipped.entry, equipped.ride, app.me.avatar]);
 
@@ -654,7 +656,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         const g = userById(guest);
         addMsg({ system: true, text: `${g.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         // Some joiners own an entry effect; show it if nothing else is playing.
-        if (visibleRef.current && !settings.effectsOff && Math.random() < 0.4) setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: Math.random() < 0.3 ? pick(['🏎️', '🛵', '🛩️']) : undefined, badge: g.vip ? 'VIP' : undefined });
+        if (visibleRef.current && !settings.effectsOff && Math.random() < 0.4) {
+          const ride = Math.random() < 0.3 ? pick(BOT_RIDES) : undefined;
+          setEntry((cur) => cur ?? { name: g.name, avatar: g.avatar, fx: pick(BOT_ENTRY_FX), ride: ride?.emoji, rideArt: storeArtOf(ride?.id), badge: g.vip ? 'VIP' : undefined });
+        }
         gainXp(5);
         setGoal((gl) => (gl && gl.kind === 'join' ? { ...gl, progress: gl.progress + 1 } : gl));
       } else if (r < 0.28) {

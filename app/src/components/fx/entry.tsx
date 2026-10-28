@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip';
-export type EntryShow = { name: string; avatar: string; fx: EntryFx; ride?: string; colors?: readonly [string, string]; badge?: string };
+/** `ride` is the ride's emoji (also used in the text); `rideArt` its picture, drawn instead when there is one. */
+export type EntryShow = { name: string; avatar: string; fx: EntryFx; ride?: string; rideArt?: number; colors?: readonly [string, string]; badge?: string };
 
 type Look = { colors: readonly [string, string, string]; particle: string[]; mark: string; creature?: string; flash?: boolean };
 export const ENTRY_LOOKS: Record<EntryFx, Look> = {
@@ -75,23 +76,22 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
   return (
     <View pointerEvents="none" style={[s.band, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${show.name} odaya katıldı`}>
       {/* Ride / creature crossing behind the banner */}
-      {traveller && !still && (
-        <Animated.Text
-          style={[
-            s.traveller,
-            {
-              transform: [
-                { translateX: travel.interpolate({ inputRange: [0, 1], outputRange: [-90, width + 40] }) },
-                { translateY: travel.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [6, -6, 4, -8, 0] }) },
-                { scaleX: show.fx === 'dragon' ? -1 : 1 },
-              ],
-              opacity: travel.interpolate({ inputRange: [0, 0.08, 0.9, 1], outputRange: [0, 1, 1, 0] }),
-            },
-          ]}
-        >
-          {traveller}
-        </Animated.Text>
-      )}
+      {traveller && !still && (() => {
+        const motion = {
+          transform: [
+            { translateX: travel.interpolate({ inputRange: [0, 1], outputRange: [-90, width + 40] }) },
+            { translateY: travel.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [6, -6, 4, -8, 0] }) },
+            // Ride pictures face left; flip them to face the way they travel.
+            { scaleX: show.rideArt || show.fx === 'dragon' ? -1 : 1 },
+          ],
+          opacity: travel.interpolate({ inputRange: [0, 0.08, 0.9, 1], outputRange: [0, 1, 1, 0] }),
+        };
+        return show.rideArt ? (
+          <Animated.Image source={show.rideArt} style={[s.travellerArt, motion]} resizeMode="contain" />
+        ) : (
+          <Animated.Text style={[s.traveller, motion]}>{traveller}</Animated.Text>
+        );
+      })()}
 
       <Animated.View
         style={{
@@ -159,6 +159,7 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
 const s = StyleSheet.create({
   band: { position: 'absolute', left: 0, right: 0, height: 96, alignItems: 'center', justifyContent: 'center', zIndex: 20 },
   traveller: { position: 'absolute', left: 0, top: -6, fontSize: 46 },
+  travellerArt: { position: 'absolute', left: 0, top: -12, width: 72, height: 72 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 60, borderRadius: 30, paddingLeft: 5, paddingRight: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
   shine: { position: 'absolute', top: -30, bottom: -30, width: 70 },
   avatarRing: { width: 50, height: 50, borderRadius: 25, padding: 2, backgroundColor: 'rgba(255,255,255,0.85)' },

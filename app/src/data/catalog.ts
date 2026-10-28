@@ -15,12 +15,12 @@ export type Cosmetic = {
   fx?: 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown' | 'sparkle' | 'thunder' | 'dragon' | 'comet';
 };
 
-export const COSMETIC_KINDS: { kind: CosmeticKind; label: string }[] = [
-  { kind: 'frame', label: '🖼️ Çerçeve' },
-  { kind: 'entry', label: '✨ Giriş efekti' },
-  { kind: 'ride', label: '🏎️ Binek' },
-  { kind: 'bubble', label: '💬 Sohbet balonu' },
-  { kind: 'specialId', label: '🔢 Özel ID' },
+export const COSMETIC_KINDS: { kind: CosmeticKind; label: string; emoji: string }[] = [
+  { kind: 'frame', label: 'Çerçeve', emoji: '🖼️' },
+  { kind: 'entry', label: 'Giriş efekti', emoji: '✨' },
+  { kind: 'ride', label: 'Binek', emoji: '🏎️' },
+  { kind: 'bubble', label: 'Sohbet balonu', emoji: '💬' },
+  { kind: 'specialId', label: 'Özel ID', emoji: '🔢' },
 ];
 
 export const COSMETICS: Cosmetic[] = [
