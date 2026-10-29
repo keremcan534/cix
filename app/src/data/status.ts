@@ -1,6 +1,5 @@
 // Status systems: SVIP (recharge experience), VIP (subscription), Asil/Noble (monthly title).
 import type { ArtName } from '@/components/Art';
-import { DM_PRICE } from '@/data/mock';
 
 // --- SVIP: 1 recharged coin = 1 experience point; levels never expire ---------------
 export const SVIP_LEVELS = [
@@ -95,24 +94,51 @@ export const hasNobleRight = (tier: number, name: string) => {
   return !!t && NOBLE_RIGHTS.findIndex((r) => r.name === name) < t.rights;
 };
 
-// --- VIP subscription ----------------------------------------------------------------
+// --- VIP subscription (store subscription, priced in TRY) -------------------------------
+// `tl` is the store price and `was` the struck-through list price; the badge shows the saving.
 export const VIP_PLANS = [
-  { days: 30, price: 14_000, label: '1 ay' },
-  { days: 90, price: 36_000, label: '3 ay', tag: 'Popüler' },
-  { days: 180, price: 66_000, label: '6 ay', tag: 'En avantajlı' },
+  { days: 7, tl: 145, was: 299, label: '7 Gün' },
+  { days: 30, tl: 285, was: 1_199, label: '1 Ay' },
+  { days: 90, tl: 599, was: 3_599, label: '3 Ay' },
+].map((p) => ({ ...p, save: Math.floor((1 - p.tl / p.was) * 100) }));
+/** Comparison table; `true` / `false` render as a check / cross. */
+export const VIP_COMPARE: [string, string | boolean, string | boolean][] = [
+  ['Sesli sohbet', '2.000 Jeton / dakika', '%20 indirim'],
+  ['Görüntülü sohbet', '3.000 Jeton / dakika', '%20 indirim'],
+  ['Ses eşleşmesi', '1.750 Jeton / dakika', 'Her gün ücretsiz 1 kez'],
+  ['Video eşleşmesi', '2.500 Jeton / dakika', 'Her gün ücretsiz 1 kez'],
+  ['Ziyaretçileri görüntüle', false, true],
+  ['Altın takma adı', false, true],
+  ['Premium madalya', false, true],
+  ['Ekstra ödül', false, true],
+  ['VIP hediye paketi', false, true],
+  ['Seviyeleri gizle', false, true],
 ];
-export const VIP_COMPARE: [string, string, string][] = [
-  ['Özel mesaj', `${DM_PRICE} jeton / mesaj`, '320 ücretsiz mesaj'],
-  ['Sesli sohbet', 'Dakika ücreti', '%20 indirim'],
-  ['Görüntülü sohbet', 'Dakika ücreti', '%20 indirim'],
-  ['Ses eşleşmesi', 'Dakika ücreti', 'Her gün ücretsiz 1 kez'],
-  ['Video eşleşmesi', 'Dakika ücreti', 'Her gün ücretsiz 1 kez'],
-  ['Ziyaretçileri görüntüle', '✕', '✓'],
-  ['Altın takma adı', '✕', '✓'],
-  ['Premium madalya', '✕', '✓'],
-  ['Ekstra ödül', '✕', '✓'],
-  ['VIP hediye paketi', '✕', '✓'],
-  ['Seviyeleri gizle', '✕', '✓'],
+/** "VIP Ayrıcalıkları" carousel (Ionicons names). */
+export const VIP_PERKS: { name: string; desc: string; icon: string }[] = [
+  { name: 'Çağrı İndirimi', desc: 'Özel indirimden yararlanarak her aramada %20 indirim kazanmak', icon: 'call' },
+  { name: 'Ziyaretçiler', desc: 'Sizi ziyaret eden kullanıcıları bulundurun', icon: 'eye' },
+  { name: 'Altın Takma Adı', desc: 'Gösterilen özel takma adı', icon: 'sparkles' },
+  { name: 'Ekstra ödül', desc: 'Ekstra check-in ödülü', icon: 'ribbon' },
+  { name: 'Eşleşme', desc: 'Her gün 1 ücretsiz ses ve video eşleşmesi', icon: 'shuffle' },
+  { name: 'Premium Madalya', desc: 'Profilde parlayan VIP madalyası', icon: 'medal' },
+  { name: 'Hediye Paketi', desc: 'Üyelik büyük hediye paketi', icon: 'gift' },
+  { name: 'Seviyeleri gizle', desc: 'Zenginlik ve cazibe seviyeni gizle', icon: 'eye-off' },
+];
+/** "Üyelik Büyük Hediye Paketi": granted with every plan. */
+export const VIP_GIFT_PACK: { name: string; emoji: string; days: number; qty: number }[] = [
+  { name: 'LOVE', emoji: '💝', days: 7, qty: 1 },
+  { name: 'vip', emoji: '🏷️', days: 7, qty: 1 },
+  { name: 'VIP Sohbet Balonu', emoji: '💬', days: 7, qty: 1 },
+  { name: 'VIP Giriş Efekti', emoji: '✨', days: 7, qty: 1 },
+];
+/** Masked "x***y N Gün pakete abone oldu" ticker lines. */
+export const VIP_TICKER: [string, number][] = [
+  ['s***n', 7],
+  ['N***0', 90],
+  ['Y***z', 30],
+  ['e***n', 90],
+  ['M***a', 7],
 ];
 
 // --- Gates used across the app (admin-configurable in the real product) -------------------

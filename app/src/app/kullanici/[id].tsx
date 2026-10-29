@@ -271,7 +271,7 @@ export default function UserProfile() {
               )}
               <View style={[styles.row, { flexWrap: 'wrap' }]}>
                 <GenderChip user={user} owner={isMe} />
-                <LevelChips wealth={levels.wealth} charm={levels.charm} />
+                <LevelChips wealth={levels.wealth} charm={levels.charm} hideWealth={isMe && vipDays > 0 && settings.hideWealth} hideCharm={isMe && vipDays > 0 && settings.hideCharm} />
                 {isMe ? <VipTitle level={vipLevel} /> : user.vip && <VipBadge />}
                 {staff && (
                   <View style={[styles.staffChip, staff === 'Moderatör' && { backgroundColor: '#1D4ED8' }]} accessibilityLabel={`Resmi ${staff}`}>

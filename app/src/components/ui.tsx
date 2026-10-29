@@ -259,11 +259,11 @@ function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: nu
 }
 
 /** Wealth / charm level chips (separate from VIP). */
-export function LevelChips({ wealth, charm }: { wealth: number; charm: number }) {
+export function LevelChips({ wealth, charm, hideWealth, hideCharm }: { wealth: number; charm: number; hideWealth?: boolean; hideCharm?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', gap: 6 }}>
-      <WealthBadge level={wealth} />
-      <CharmBadge level={charm} />
+      {!hideWealth && <WealthBadge level={wealth} />}
+      {!hideCharm && <CharmBadge level={charm} />}
     </View>
   );
 }
