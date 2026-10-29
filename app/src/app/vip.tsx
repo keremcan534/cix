@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_PLANS } from '@/data/status';
+import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_GIFT_PACK, VIP_PERKS, VIP_PLANS, VIP_TICKER } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
@@ -13,6 +13,7 @@ import { colors } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Art } from '@/components/Art';
+import { Avatar, LevelChips } from '@/components/ui';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
@@ -42,7 +43,7 @@ export default function PrivilegeCenter() {
             </Pressable>
           ))}
         </View>
-        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'SVIP: yüklenen her jeton 1 deneyim puanıdır, seviye düşmez.\nVIP: süreli abonelik.\nAsil: jetonla 30 günlük unvan.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
+        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'SVIP: yüklenen her jeton 1 deneyim puanıdır, seviye düşmez.\nVIP: 7 gün, 1 ay veya 3 aylık mağaza aboneliği.\nAsil: jetonla 30 günlük unvan.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
           <Ionicons name="help-circle-outline" size={26} color="#fff" />
         </Pressable>
       </View>
@@ -149,24 +150,95 @@ function Svip() {
 }
 
 function Vip() {
-  const { vipDays, buyVipPlan, coins } = useApp();
+  const { vipDays, buyVipPlan, me, wealthLevel, charmLevel, settings, setSetting } = useApp();
   const [plan, setPlan] = useState(VIP_PLANS[1].days);
+  const [perkPage, setPerkPage] = useState(0);
+  const [pageW, setPageW] = useState(0);
   const p = VIP_PLANS.find((x) => x.days === plan)!;
-  const buy = () => {
-    if (coins < p.price)
-      return showAlert('Yetersiz jeton', `VIP ${p.label} için 🪙 ${fmt(p.price)} gerekir.`, [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Yükle', onPress: () => router.push('/cuzdan') },
-      ]);
-    showAlert('VIP satın al', `VIP ${p.label} · 🪙 ${fmt(p.price)}. Onaylıyor musun?`, [
+  const store = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+  const perkPages = Math.ceil(VIP_PERKS.length / 4);
+  const buy = () =>
+    showAlert('VIP satın al', `VIP ${p.label} · ${p.tl} TL (${store}). Onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('VIP aktif 🎉', `${p.days} gün eklendi.`) },
     ]);
+  const toggleHide = (k: 'hideWealth' | 'hideCharm', v: boolean) => {
+    if (vipDays <= 0)
+      return showAlert('VIP ayrıcalığı', 'Seviyeleri gizlemek VIP ayrıcalığıdır.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'VIP Satın Al', onPress: buy },
+      ]);
+    setSetting(k, v);
   };
+  // A grid of 2x2 perks per page, swiped horizontally.
+  const pages = Array.from({ length: perkPages }, (_, i) => VIP_PERKS.slice(i * 4, i * 4 + 4));
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
       {vipDays > 0 && <Text style={[styles.cardText, { color: GOLD, textAlign: 'center' }]}>👑 VIP aktif · {vipDays} gün kaldı</Text>}
-      <Text style={styles.h1}>Ayrıcalık Karşılaştırması</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+        {VIP_PLANS.map((x) => (
+          <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && { borderColor: GOLD }]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
+            <Text style={styles.planTag}>%{x.save} KAYDET</Text>
+            <Text style={{ color: colors.textDim, fontSize: 15, marginTop: 10 }}>{x.label}</Text>
+            <Text style={{ color: plan === x.days ? '#fff' : '#D4D4D8', fontWeight: '900', fontSize: 26 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600' }}>TRY</Text>
+              {fmt(x.tl)}
+            </Text>
+            <Text style={{ color: colors.textDim, fontSize: 12, textDecorationLine: 'line-through' }}>TRY{fmt(x.was)}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <BuyButton onPress={buy} />
+
+      <Text style={[styles.h1, { marginTop: 8 }]}>VIP Ayrıcalıkları ({p.label})</Text>
+      <View style={styles.box}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onLayout={(e) => setPageW(e.nativeEvent.layout.width)}
+          onMomentumScrollEnd={(e) => setPerkPage(Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width))}>
+          {pages.map((page, i) => (
+            <View key={i} style={{ width: pageW, flexDirection: 'row', flexWrap: 'wrap', rowGap: 18 }}>
+              {page.map((r) => (
+                <View key={r.name} style={styles.perk}>
+                  <View style={styles.perkIcon}>
+                    <Ionicons name={r.icon as keyof typeof Ionicons.glyphMap} size={22} color={GOLD} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: GOLD, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                      {r.name}
+                    </Text>
+                    <Text style={{ color: colors.textDim, fontSize: 11, lineHeight: 15 }} numberOfLines={3}>
+                      {r.desc}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
+        <Dots count={perkPages} index={perkPage} />
+        <View style={styles.giftBox}>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
+            Üyelik Büyük Hediye Paketi <Text style={{ color: GOLD }}>({VIP_GIFT_PACK.length})</Text>
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18 }}>
+            {VIP_GIFT_PACK.map((g) => (
+              <View key={g.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 34 }}>{g.emoji}</Text>
+                <View>
+                  <Text style={{ color: GOLD, fontWeight: '700' }}>{g.name}</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 12 }}>Geçerlilik Süresi: {g.days} Gün</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 12 }}>Adet: {g.qty}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+
+      <Text style={[styles.h1, { marginTop: 8 }]}>Ayrıcalık Karşılaştırması</Text>
       <View style={styles.table}>
         <View style={styles.tr}>
           <Text style={[styles.th, { flex: 1.1 }]}>Ayrıcalıklar</Text>
@@ -176,26 +248,92 @@ function Vip() {
         {VIP_COMPARE.map(([name, free, vip]) => (
           <View key={name} style={styles.tr}>
             <Text style={[styles.td, { flex: 1.1 }]}>{name}</Text>
-            <Text style={[styles.td, styles.mid]}>{free}</Text>
-            <Text style={[styles.td, styles.vipCol, { color: GOLD, fontWeight: '700' }]}>{vip}</Text>
+            <CompareCell value={free} style={styles.mid} />
+            <CompareCell value={vip} style={styles.vipCol} vip />
           </View>
         ))}
       </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {VIP_PLANS.map((x) => (
-          <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && { borderColor: GOLD }]}>
-            {x.tag && <Text style={styles.planTag}>{x.tag}</Text>}
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{x.label}</Text>
-            <Text style={{ color: GOLD, fontWeight: '700' }}>🪙 {fmt(x.price)}</Text>
-          </Pressable>
-        ))}
+
+      <View style={styles.box}>
+        <Text style={[styles.rightsTitle, { color: '#fff', marginVertical: 4 }]}>
+          <Text style={{ color: GOLD }}>◆ </Text>Seviyeyi Gizle<Text style={{ color: GOLD }}> ◆</Text>
+        </Text>
+        <View style={{ alignItems: 'center', gap: 8 }}>
+          <Avatar uri={me.avatar} size={76} />
+          <Text style={{ color: GOLD, fontWeight: '800', fontSize: 17 }}>{me.name}</Text>
+          <LevelChips wealth={wealthLevel} charm={charmLevel} hideWealth={vipDays > 0 && settings.hideWealth} hideCharm={vipDays > 0 && settings.hideCharm} />
+        </View>
+        <View style={styles.toggles}>
+          {(
+            [
+              ['hideWealth', 'Zenginlik seviyesini gizle'],
+              ['hideCharm', 'Cazibe seviyesini gizle'],
+            ] as const
+          ).map(([k, l], i) => (
+            <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' }]}>
+              <Text style={{ color: colors.textDim, fontSize: 15, flex: 1 }}>{l}</Text>
+              <Switch value={vipDays > 0 && settings[k]} onValueChange={(v) => toggleHide(k, v)} trackColor={{ true: '#E8B979' }} thumbColor="#fff" accessibilityLabel={l} />
+            </View>
+          ))}
+        </View>
       </View>
-      <Text style={[styles.note, { textAlign: 'center' }]}>👤 e***n 90 Gün pakete abone oldu</Text>
-      <Pressable onPress={buy} style={styles.buyBtn}>
-        <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>VIP Satın Al</Text>
-      </Pressable>
-      <Text style={styles.note}>Abonelik süresi dolunca ayrıcalıklar durur; otomatik yenileme yok. Kalan süre iade edilmez.</Text>
+
+      <Text style={[styles.note, { textAlign: 'center' }]}>
+        Abonelik ücreti {store} hesabı üzerinden tahsil edilecek ve ücret, {store} hesabında ayarlanan ödeme yöntemindeki yerel para birimine göre düşülecektir (farklı ülke
+        politikaları, özel ödeme koşulları nedeniyle ek vergi ve ücretler gerekli olabilir; fiyat {store} ödeme sayfasına tabidir). Abonelik, sona ermeden 24 saat önce
+        yenileme için otomatik olarak ücretlendirilecektir. Aboneliği istediğiniz zaman {store}{"'"}da iptal edebilirsiniz. Etkinleştirerek şunu kabul etmiş olursunuz:{' '}
+        <Text style={{ color: '#fff' }}>Yinelenen abonelik koşulları, Gizlilik Politikası</Text>
+      </Text>
+      <BuyButton onPress={buy} />
     </ScrollView>
+  );
+}
+
+function CompareCell({ value, style, vip }: { value: string | boolean; style: object; vip?: boolean }) {
+  if (typeof value === 'boolean')
+    return (
+      <View style={[styles.tdBox, style]}>
+        <Ionicons name={value ? 'checkmark-sharp' : 'close-sharp'} size={26} color={value ? '#F5B94A' : '#D4D4D8'} accessibilityLabel={value ? 'Var' : 'Yok'} />
+      </View>
+    );
+  return <Text style={[styles.td, style, vip && { color: GOLD, fontWeight: '700' }]}>{value}</Text>;
+}
+
+function BuyButton({ onPress }: { onPress: () => void }) {
+  return (
+    <>
+      <Ticker />
+      <Pressable onPress={onPress} accessibilityRole="button">
+        <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.buyBtn}>
+          <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>VIP Satın Al</Text>
+        </LinearGradient>
+      </Pressable>
+    </>
+  );
+}
+
+/** Rotating "x***y N Gün pakete abone oldu" line above the buy button. */
+function Ticker() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((n) => (n + 1) % VIP_TICKER.length), 3000);
+    return () => clearInterval(t);
+  }, []);
+  const [name, days] = VIP_TICKER[i];
+  return (
+    <Text style={{ color: '#fff', textAlign: 'center', fontSize: 14 }}>
+      👤 {name} <Text style={{ color: GOLD }}>{days} Gün pakete abone oldu</Text>
+    </Text>
+  );
+}
+
+function Dots({ count, index }: { count: number; index: number }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: 14 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ width: i === index ? 28 : 14, height: 4, borderRadius: 2, backgroundColor: i === index ? '#D4D4D8' : 'rgba(255,255,255,0.15)' }} />
+      ))}
+    </View>
   );
 }
 
@@ -296,11 +434,18 @@ const styles = StyleSheet.create({
   tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
   th: { color: colors.textDim, padding: 12, textAlign: 'center', fontSize: 13 },
   td: { color: '#D4D4D8', padding: 12, textAlign: 'center', fontSize: 13 },
+  tdBox: { padding: 10, alignItems: 'center', justifyContent: 'center' },
   mid: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
   vipCol: { flex: 1, backgroundColor: 'rgba(245,215,161,0.06)' },
-  plan: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#17151D' },
-  planTag: { position: 'absolute', top: -10, backgroundColor: colors.primary, color: '#fff', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
-  buyBtn: { backgroundColor: GOLD, borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
+  plan: { flex: 1, alignItems: 'center', gap: 4, paddingTop: 18, paddingBottom: 14, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', backgroundColor: '#1E1C22' },
+  planTag: { position: 'absolute', top: -2, left: -2, backgroundColor: '#E5484D', color: '#fff', fontSize: 11, fontWeight: '800', borderTopLeftRadius: 12, borderBottomRightRadius: 10, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
+  buyBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
+  box: { borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#1A181E', padding: 16, gap: 12, overflow: 'hidden' },
+  perk: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 10 },
+  perkIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
+  giftBox: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, gap: 12 },
+  toggles: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, paddingHorizontal: 14 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
   nobleTab: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700', paddingVertical: 6 },
   nobleTabOn: { color: '#fff', borderBottomWidth: 3, borderBottomColor: '#fff' },

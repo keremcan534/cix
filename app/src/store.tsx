@@ -62,6 +62,9 @@ export type Settings = {
   bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
   luckyAnnounce: boolean;
+  /** VIP "Seviyeyi Gizle": hide my Servet / Cazibe badges from others while VIP is active. */
+  hideWealth: boolean;
+  hideCharm: boolean;
 };
 /** Block, unblock, report and data requests are kept as a record (spec: profile §5). */
 export type SafetyLog = { id: string; action: 'Engelledi' | 'Engeli kaldırdı' | 'Şikâyet etti' | 'Veri dökümü istedi' | 'Fotoğraf incelemeye gönderildi' | 'Fotoğraf onaylandı'; targetId?: string; detail?: string; time: string };
@@ -435,6 +438,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     dailySpendLimit: 0,
     bigSpendConfirm: 0,
     luckyAnnounce: true,
+    hideWealth: false,
+    hideCharm: false,
     ...s.settings,
   }));
   const settingsRef = useRef(settings);
@@ -749,8 +754,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     updateRbac: (fn) => setRbac((s) => fn(s)),
     vipDays,
     buyVipPlan: (days) => {
+      // Paid through the store (TRY), so no coins are spent; the receipt is verified on the server.
       const plan = VIP_PLANS.find((p) => p.days === days);
-      if (!plan || !spend(plan.price, `VIP ${plan.label}`)) return false;
+      if (!plan) return false;
       setVipDays((d) => d + days);
       return true;
     },
