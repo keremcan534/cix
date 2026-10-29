@@ -8,7 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameArtOf } from '@/components/GameArt';
 import { CasinoPlayer } from '@/components/games/casino';
+import { FishPlayer } from '@/components/games/fish';
 import { FortunePlayer } from '@/components/games/fortune';
+import { Lucky77Player } from '@/components/games/lucky77';
+import { MegaJackpotPlayer } from '@/components/games/mega-jackpot';
+import { OlympusPlayer } from '@/components/games/olympus';
 import { OkeyTable } from '@/components/games/okey';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
@@ -18,6 +22,17 @@ import { colors, semantic } from '@/theme';
 
 export type OpenGame = { kind: 'room'; id: string } | { kind: 'casino'; id: CasinoGame['id'] };
 export type VoiceState = { seated: boolean; micOn: boolean; onToggleMic: () => void };
+
+/** Casino games with their own full screen; the rest use the shared CasinoPlayer. */
+const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => React.JSX.Element>> = {
+  fortune: FortunePlayer,
+  slot: Lucky77Player,
+  jackpot: MegaJackpotPlayer,
+  olympus: OlympusPlayer,
+  fish: FishPlayer,
+};
+/** Games that need most of the screen in a room; the top row of seats stays visible. */
+const TALL = new Set(['okey', 'slot', 'jackpot', 'olympus', 'fish']);
 
 const VOLUMES: [number, string][] = [
   [0, 'Kapalı'],
@@ -63,7 +78,7 @@ export function GamePanel({
   const titleArt = gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && open.id === 'okey' && p.tall, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && TALL.has(open.id) && p.tall, hidden && { display: 'none' }]}>
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
         <Text style={p.title} numberOfLines={1}>
@@ -126,7 +141,10 @@ export function GamePanel({
           ) : (
             <Text style={p.dim}>{roomGame.name} için sağlayıcı entegrasyonu bekleniyor. Katalogda görünür, sağlayıcı bağlanınca bu alanda açılır.</Text>
           ))}
-        {casinoGame && (casinoGame.id === 'fortune' ? <FortunePlayer entry={entry} /> : <CasinoPlayer key={casinoGame.id} gameId={casinoGame.id} entry={entry} />)}
+        {casinoGame && (() => {
+          const Screen = CASINO_SCREENS[casinoGame.id];
+          return Screen ? <Screen key={casinoGame.id} entry={entry} /> : <CasinoPlayer key={casinoGame.id} gameId={casinoGame.id} entry={entry} />;
+        })()}
         <View style={p.volume}>
           <Text style={p.dim}>Oyun sesi</Text>
           {VOLUMES.map(([v, l]) => (
@@ -145,7 +163,7 @@ export function GamePanel({
 const p = StyleSheet.create({
   panel: { backgroundColor: colors.card, padding: 14, gap: 8 },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, top: '34%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, zIndex: 40 },
-  // Okey needs the table and the rack on screen together; the top row of seats stays visible.
+  // Okey and the launch casino games need most of the screen; the top row of seats stays visible.
   tall: { top: '22%' },
   full: { flex: 1, backgroundColor: colors.bg },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },

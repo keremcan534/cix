@@ -16,6 +16,7 @@ import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data
 import { ME } from '@/data/mock';
 import { announceWin } from '@/lib/broadcast';
 import { CASINO_HOUSE_SHARE, DUEL_MULT, PICKS, duelMultiplier, maxMultiplier, outcomeOf, splitStake, type Outcome } from '@/lib/casino-odds';
+import { JACKPOT_SHARE } from '@/lib/mega-jackpot';
 import { today } from '@/lib/persist';
 
 export type Entry = { from: 'profile' } | { from: 'room'; roomId: string; roomTitle: string };
@@ -51,12 +52,19 @@ export const setGameDeps = (d: GameDeps) => {
   deps = d;
 };
 
-/** House book of all coin games: coins played, the house's 60 %, the payout pool and what it paid. */
-export type CasinoBank = { wagered: number; house: number; pool: number; paid: number; seed: number };
+/**
+ * House book of all coin games: coins played, the house's 60 %, the payout pool and what it paid. `jackpot` is the
+ * Mega Jackpot fund: JACKPOT_SHARE of each Mega Jackpot stake moves into it from the pool (it is part of the 40 %).
+ */
+export type CasinoBank = { wagered: number; house: number; pool: number; paid: number; seed: number; jackpot: number };
 /** Opening pool: a house advance so the first rounds can pay their top prize. */
 export const POOL_SEED = 200_000;
+/** Opening JACKPOT, also a house advance. */
+export const JACKPOT_SEED = 100_000;
+/** Small wins of these games are not announced in every room (a shot in Balık Avı is a round of its own). */
+const ANNOUNCE_MIN: Partial<Record<CasinoGame['id'], number>> = { fish: 20 };
 type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number>; bank: CasinoBank };
-const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED });
+const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED, jackpot: JACKPOT_SEED });
 let state: State = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank() };
 const listeners = new Set<() => void>();
 const emit = (patch: Partial<State>) => {
@@ -167,13 +175,27 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
   }
   book(bet);
   const outcome = outcomeOf(game.id, pick, rnd);
-  const payout = Math.floor(bet * outcome.multiplier);
+  let payout = Math.floor(bet * outcome.multiplier);
   if (payout > 0) {
     payFromPool(payout);
     deps.creditGame(payout, `${game.name} · kazanç ${id}`);
   }
+  if (game.id === 'jackpot') {
+    // The stake's JACKPOT share moves from the pool into the fund; five 77s win bet / max bet of the fund.
+    const b = state.bank;
+    let jackpot = b.jackpot + bet * JACKPOT_SHARE;
+    let won = 0;
+    if (outcome.mega?.jackpotLines.length) {
+      won = Math.floor((jackpot * bet) / Math.max(...game.bets));
+      jackpot -= won;
+      deps.creditGame(won, `${game.name} · JACKPOT ${id}`);
+      outcome.detail += ` · JACKPOT +${won.toLocaleString('tr-TR')}`;
+    }
+    emit({ bank: { ...b, pool: b.pool - bet * JACKPOT_SHARE, jackpot, paid: b.paid + won } });
+    payout += won;
+  }
   // A real win (more back than the stake) is announced in every room.
-  if (payout > bet) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout }, { mine: true });
+  if (payout > bet * Math.max(1, ANNOUNCE_MIN[game.id] ?? 1)) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout }, { mine: true });
   return finish({ ok: true, outcome, replay: false, row: { ...base, txId: id, payout, status: 'Tamamlandı', detail: outcome.detail } });
 }
 

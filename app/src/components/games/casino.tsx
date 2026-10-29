@@ -23,11 +23,9 @@ const PICKS: Partial<Record<CasinoGame['id'], [key: string, label: string, art?:
     ['tiger', 'Kaplan · 1.5x', 'casino-kart-kaplan'],
   ],
 };
-/** Lucky 77 reel symbols (lib/casino-odds SLOT) drawn as pictures; "7" stays a glyph. */
-const SLOT_ART: Record<string, ArtName> = { '🍒': 'slot-kiraz', '🍋': 'slot-limon', '🍇': 'slot-uzum', '🔔': 'slot-can' };
 const DIE_ART: ArtName[] = ['zar-zar-yuzu-1', 'zar-zar-yuzu-2', 'zar-zar-yuzu-3', 'zar-zar-yuzu-4', 'zar-zar-yuzu-5', 'zar-zar-yuzu-6'];
-/** The picture for one face of the stage (a slot symbol or a die), if there is one. */
-const faceArt = (gameId: CasinoGame['id'], f: string): ArtName | undefined => (gameId === 'slot' ? SLOT_ART[f] : gameId === 'dice' ? DIE_ART[Number(f) - 1] : undefined);
+/** The picture for one face of the stage (a die), if there is one. */
+const faceArt = (gameId: CasinoGame['id'], f: string): ArtName | undefined => (gameId === 'dice' ? DIE_ART[Number(f) - 1] : undefined);
 const WHEEL_LABELS = WHEEL.map((s) => `${s.mult}x`);
 /** Prize picture per wheel slice, by its multiplier: empty slice "tekrar dene", then growing coin prizes. */
 const wheelArt = (mult: number): ArtName =>
@@ -153,7 +151,7 @@ function Stage({ gameId, outcome, spin, busy }: { gameId: CasinoGame['id']; outc
       </View>
     );
   }
-  const faces = outcome?.display ?? (gameId === 'slot' ? ['7', '7', '7'] : gameId === 'dragon' ? ['?', '?'] : ['?', '?']);
+  const faces = outcome?.display ?? ['?', '?'];
   return (
     <Animated.View style={[c.row, { transform: [{ scale: spin.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.9, 1] }) }] }]}>
       {faces.map((f, i) => {

@@ -27,7 +27,7 @@ export type RoomGame = {
 };
 
 export type CasinoGame = {
-  id: 'wheel' | 'dice' | 'slot' | 'dragon' | 'fortune';
+  id: 'wheel' | 'dice' | 'slot' | 'dragon' | 'fortune' | 'jackpot' | 'olympus' | 'fish';
   name: string;
   emoji: string;
   provider: string;
@@ -93,13 +93,75 @@ export const ROOM_GAMES: RoomGame[] = [
   { id: 'memory', name: 'Hafıza Eşleştirme', emoji: '🧩', provider: 'Yerleşik', version: '—', active: false, phase: 2, minPlayers: 1, maxPlayers: 4, startBy: 'anyone', joinAfterStart: false, roundSeconds: 180, vipRequired: false, playable: false, leaderboard: true },
 ];
 
+// Casino launch set (client: "3–4 oyun yeterli"): Lucky 77, Mega Jackpot, Olympus Slot and Balık Avı. The older games
+// stay in the catalog switched off; the admin screen can turn them back on.
 export const CASINO_GAMES: CasinoGame[] = [
+  {
+    id: 'slot',
+    name: 'Lucky 77',
+    emoji: '🎰',
+    provider: 'Yerleşik (sunucu RNG)',
+    active: true,
+    minWealth: 2,
+    fromProfile: true,
+    fromRoom: true,
+    bets: [10, 50, 100, 500, 1000],
+    dailyLimit: 10_000,
+    rules: 'Meyve çarkı 20 dilimli: 4 Karpuz, 4 Elma, 1 77, 6 Limon, 5 Üzüm. Karpuz veya Elma 2x, 77 8x öder; Limon ve Üzüm kimseye ödemez. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    providerStatus: 'online',
+    license: 'Yerleşik · hukuki inceleme bekliyor',
+  },
+  {
+    id: 'jackpot',
+    name: 'Mega Jackpot',
+    emoji: '💰',
+    provider: 'Yerleşik (sunucu RNG)',
+    active: true,
+    minWealth: 2,
+    fromProfile: true,
+    fromRoom: true,
+    bets: [10, 20, 50, 90, 100, 200],
+    dailyLimit: 10_000,
+    rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 77 her sembolün yerine geçer. Bir çizgide beş 77 JACKPOT kazandırır: bahsin / en yüksek bahis kadar JACKPOT payı. Her bahsin %2’si JACKPOT’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    providerStatus: 'online',
+    license: 'Yerleşik · hukuki inceleme bekliyor',
+  },
+  {
+    id: 'olympus',
+    name: 'Olympus Slot',
+    emoji: '⚡',
+    provider: 'Yerleşik (sunucu RNG)',
+    active: true,
+    minWealth: 2,
+    fromProfile: true,
+    fromRoom: true,
+    bets: [10, 20, 50, 100],
+    dailyLimit: 10_000,
+    rules: '6 makara, 5 sıra; semboller ekranın her yerinde öder: aynı sembolden 8 veya daha fazla kazandırır. Çarpan küreleri toplanır ve dönüşün kazancını çarpar. 4 veya daha fazla ⚡ Zeus 10 bedava dönüş verir. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    providerStatus: 'online',
+    license: 'Yerleşik · hukuki inceleme bekliyor',
+  },
+  {
+    id: 'fish',
+    name: 'Balık Avı',
+    emoji: '🐟',
+    provider: 'Yerleşik (sunucu RNG)',
+    active: true,
+    minWealth: 2,
+    fromProfile: true,
+    fromRoom: true,
+    bets: [10, 20, 50, 100, 200],
+    dailyLimit: 20_000,
+    rules: 'Bir balığa dokun, top ateş eder: her atış bir turdur ve bahis kadar jeton düşer. Balık yakalanırsa üstündeki çarpan kadar öder (2x–100x); büyük balık daha zor yakalanır. Boşa giden atış ücretsizdir. Dondurma ve kilit kartları yalnızca nişanı kolaylaştırır, şansı değiştirmez. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    providerStatus: 'online',
+    license: 'Yerleşik · hukuki inceleme bekliyor',
+  },
   {
     id: 'wheel',
     name: 'Şans Çarkı',
     emoji: '🎡',
     provider: 'Yerleşik (sunucu RNG)',
-    active: true,
+    active: false,
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
@@ -109,15 +171,14 @@ export const CASINO_GAMES: CasinoGame[] = [
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
-  { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: true, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 10–12 "Büyük", 2–4 "Küçük" kazandırır (2.4x); 5–9 gelirse kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
-  { id: 'slot', name: 'Lucky 77', emoji: '🎰', provider: 'Sağlayıcı (araştırılıyor)', active: true, minWealth: 2, fromProfile: true, fromRoom: false, bets: [10, 50, 100], dailyLimit: 3000, rules: '3 makara. Üç 7 = 30x, üç aynı meyve = 5x. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
-  { id: 'dragon', name: 'Dragon Tiger', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: true, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
+  { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 10–12 "Büyük", 2–4 "Küçük" kazandırır (2.4x); 5–9 gelirse kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
+  { id: 'dragon', name: 'Dragon Tiger', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
   {
     id: 'fortune',
     name: 'Altın Kasa',
     emoji: '🏦',
     provider: 'Yerleşik (sunucu RNG)',
-    active: true,
+    active: false,
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
