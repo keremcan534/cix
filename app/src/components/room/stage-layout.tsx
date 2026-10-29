@@ -37,7 +37,10 @@ export function StageLayout({
   const stage = s.slots.filter((x) => x.area === 'stage');
   const side = s.slots.filter((x) => x.area === 'side');
   const micCols = Math.max(4, ...[...Array(s.rows).keys()].map((r) => stage.filter((x) => x.row === r && x.kind === 'mic').length));
-  const micW = Math.floor(clamp(inner / micCols, 56, 84));
+  // The widest mic row must fit on one line together with the gaps between its seats, or its last seat wraps
+  // onto a line of its own (5 mics on a 412 px phone were 4 + 1). Six across get a narrower gap.
+  const micGap = micCols >= 6 ? space.xs : space.sm;
+  const micW = Math.floor(clamp((inner - (micCols - 1) * micGap) / micCols, 48, 84));
   const micSlot: ArenaSlot = { width: micW, size: clamp(micW - 24, 32, 56) };
   const paired = new Set(s.pairs.flat());
 
@@ -75,7 +78,7 @@ export function StageLayout({
       );
     }
     return (
-      <View key={r} style={st.row}>
+      <View key={r} style={[st.row, { columnGap: micGap }]}>
         {xs.map((x, k) => {
           const next = xs[k + 1];
           const linked = paired.has(x.index) && next && s.pairs.some(([a, b]) => a === x.index && b === next.index);
