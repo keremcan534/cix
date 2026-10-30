@@ -18,6 +18,7 @@ const COVER: Record<string, ArtName> = {
   dice: 'oyun-zar-casino',
   slot: 'oyun-lucky-77',
   dragon: 'oyun-dragon-tiger',
+  fish: 'oyun-balik-avi',
 };
 const ART: Record<string, number> = Object.fromEntries(Object.entries(COVER).map(([id, name]) => [id, artSource(name)]));
 
@@ -31,6 +32,18 @@ const HUE: Record<string, string> = {
   slot: '#F6BD60',
   dragon: '#4ADE80',
   fortune: '#FACC15',
+  jackpot: '#F472B6',
+  olympus: '#F59E0B',
+  fish: '#38BDF8',
+  rocket: '#818CF8',
+  super777: '#DC2626',
+  jungle: '#65A30D',
+  goldtree: '#16A34A',
+  foodwheel: '#C026D3',
+  magiccard: '#7C3AED',
+  pinata: '#F472B6',
+  spellbook: '#6D28D9',
+  neon: '#38BDF8',
   ludo: '#60A5FA',
   okey: '#F6BD60',
   cards: '#F472B6',

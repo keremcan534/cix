@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getGames, playCasino, playDuel, resetGames, setGameDeps, setProviderStatus } from '@/lib/games';
+import { getGames, playCasino, playDuel, resetGames, setGameDeps, setProviderStatus, updateCasino } from '@/lib/games';
 
 let wallet = 0;
 let game = 0;
@@ -26,7 +26,11 @@ const profile = { from: 'profile' as const };
 /** Wheel draw 999 of 1000 = the 20x slice; 0 = the 0x slice. */
 const forceRandom = (v: number) => mock.method(Math, 'random', () => v);
 
-beforeEach(() => resetGames());
+// Şans Çarkı is switched off in the launch catalog; these tests use it for its fixed slices.
+beforeEach(() => {
+  resetGames();
+  updateCasino('wheel', { active: true });
+});
 afterEach(() => mock.restoreAll());
 
 describe('Oyun bakiyesi', () => {

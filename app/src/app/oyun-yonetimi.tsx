@@ -133,7 +133,7 @@ export default function GameAdmin() {
               <Text style={s.title}>Kasa defteri</Text>
               <Text style={s.dim}>Kural: oynanan jetonun %60’ı kasaya kalır, %40’ı ödül havuzuna girer ve kazananlara rastgele dağılır. Ödüller yalnızca havuzdan ödenir.</Text>
               <Text style={s.dim}>
-                Oynanan {bank.wagered.toLocaleString('tr-TR')} · Kasa {bank.house.toLocaleString('tr-TR')} · Dağıtılan {bank.paid.toLocaleString('tr-TR')} · Havuz {bank.pool.toLocaleString('tr-TR')} (başlangıç avansı {bank.seed.toLocaleString('tr-TR')})
+                Oynanan {bank.wagered.toLocaleString('tr-TR')} · Kasa {bank.house.toLocaleString('tr-TR')} · Dağıtılan {bank.paid.toLocaleString('tr-TR')} · Havuz {Math.floor(bank.pool).toLocaleString('tr-TR')} (başlangıç avansı {bank.seed.toLocaleString('tr-TR')}) · JACKPOT fonları {Object.values(bank.jackpots).reduce((a, b) => a + Math.floor(b), 0).toLocaleString('tr-TR')}
               </Text>
             </Card>
             <Card style={{ gap: 4 }}>
