@@ -23,16 +23,39 @@
 | `GET /api/ledger` | Son 50 işlem, her satırda işlem sonrası bakiye |
 | `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 jeton, günde en fazla 50.000. Gerçek ödeme geldiğinde kapatılacak. |
 | `POST /api/wallet/gift` `{to, amount, ref}` | Gönderenin jetonu alıcıya bire bir elmas olur, tek işlemde (iki satır kilitlenir, id sırasıyla) |
-| `GET /token?room=` | Giriş yapmış kullanıcıya 2 saatlik LiveKit token'ı (kimlik = hesap kimliği, ad = hesap adı) |
+| `GET /token?room=&password=` | Giriş yapmış kullanıcıya 2 saatlik LiveKit token'ı (kimlik = hesap kimliği, ad = hesap adı). Sunucudaki odalarda (`oda-<uuid>`) kapanmış oda, odadan atılma, kara liste, oda sahibiyle karşılıklı engel ve şifre kontrol edilir; prototip odaları (`oda-r1` …) eskisi gibi geçer. |
+
+**Profil ve sosyal (`social.mjs`)**
+| Çağrı | Ne yapar |
+|---|---|
+| `PATCH /api/me` | Ad, kullanıcı adı (benzersiz, küçük harf), cinsiyet, doğum tarihi (18 yaş altı reddedilir; bir kez girilir), şehir, hakkında, ilgi alanları (uygulamadaki listeden, en fazla 5), fotoğraf adresi (https) |
+| `DELETE /api/me` | Hesap silme: kişisel alanlar, giriş anahtarı, oturumlar, takipler, engeller, mesajlar ve kendi odaları gider; hesap kimliği ve işlem kaydı (mali kayıt) saklanır. Aynı cihaz yeniden girerse yeni, boş bir hesap açılır. |
+| `GET /api/user?id=` | Herkese açık profil (bakiye, doğum tarihi ve rol yok; yalnız yaş), takipçi/takip sayısı, takip ediyor muyum, engelledim mi. Seni engelleyen kişi için 404. |
+| `POST /api/follow` `{to, follow}` · `GET /api/following` | Takip et / bırak; engel varsa takip edilemez |
+| `POST /api/block` `{to, block}` · `GET /api/blocks` | Engelle / kaldır; engel iki yöndeki takipleri bitirir |
+| `POST /api/report` `{type, id, reason, note}` | Şikâyet (kullanıcı, oda, mesaj, an); aynı kişinin aynı hedefe ikinci şikâyeti tek sayılır |
+
+**Mesajlar (`messages.mjs`)**: `POST /api/messages` `{to, text, ref}` (aynı `ref` bir kez kaydedilir; engelde reddedilir) · `GET /api/messages?with=&before=` (en yeniden eskiye, 50'şer) · `GET /api/conversations` (son mesaj ve okunmamış sayısı) · `POST /api/messages/read` `{with}`. Açık uygulamaya iletim şimdilik yoklama ile; anlık iletim push adımıyla gelecek.
+
+**Odalar (`rooms.mjs`)**: `POST /api/rooms` `{title, announcement, roomType, password}` (herkesin en fazla bir açık odası) · `GET /api/rooms` (açık odalar; sahibiyle engelleştiğin odalar hariç) · `GET /api/room?id=` · `POST /api/rooms/close` (yalnız sahip) · `POST /api/rooms/admin` `{room, user, admin}` (yalnız sahip) · `POST /api/rooms/ban` `{room, user, minutes}` (sahip veya yönetici; `minutes: null` kara liste; yönetici sahibi ya da başka yöneticiyi çıkaramaz) · `POST /api/rooms/unban`.
+
+**Moderasyon (`admin.mjs`, yalnız `role` = `moderator` / `admin`)**: `GET /api/admin/reports?status=open` · `POST /api/admin/reports/handle` `{id, status, banDays}` · `POST /api/admin/ban` `{user, days}` (`null` kaldırır). Askıdaki hesabın her çağrısı 403 döner. Yetkili hesabı şimdilik veritabanından atanır: `UPDATE users SET role = 'moderator' WHERE id = '…'`.
 
 Giriş dışındaki her çağrı `Authorization: Bearer <oturum>` ister. Cüzdan değişikliklerinde `ref` istek kimliğidir: aynı istek iki kez gelirse (tekrar deneme, çift dokunma, aynı anda iki kopya) bir kez uygulanır. Sınırlar: IP başına dakikada 10 giriş, 120 diğer istek; web'den yalnızca localhost ve `*.github.io` kaynakları.
 
-## Veritabanı (`server/api/migrations/001_users_wallet.sql`)
+## Veritabanı (`server/api/migrations/`)
 - **users**: ad, cihaz anahtarı özeti, `coins`, `diamonds`, `game_coins`. Bakiyelerde `CHECK (>= 0)`: kod hatalı olsa bile eksiye düşemez.
 - **sessions**: oturum anahtarının özeti, kullanıcı, bitiş zamanı.
 - **ledger**: her bakiye değişikliği bir satır (para birimi, miktar, sonraki bakiye, neden, `ref`, karşı taraf). `UNIQUE (user_id, currency, ref)` aynı isteğin iki kez işlenmesini engeller.
 
 Bakiye yalnızca aynı veritabanı işleminde ledger satırıyla birlikte değişir, yani işlem kaydı bakiyeyi her zaman açıklar. SMS ve Google/Apple girişi sonradan `users` tablosuna sütun olarak eklenecek.
+- **002_profiles_social**: `users` tablosuna profil alanları, `role`, `banned_until`, `deleted_at`; `follows`, `blocks`, `reports` (şikâyet kuyruğu).
+- **003_messages_rooms**: `messages` (gönderen + `ref` benzersiz, sohbet çifti dizini), `rooms` (sahip başına tek açık oda), `room_admins`, `room_bans`.
+
+## Testler ve kurulum
+- `server/api/test/api.test.mjs`: her çalıştırmada boş bir veritabanı açar, API'yi ayrı bir süreç olarak başlatır, HTTP üzerinden giriş, cüzdan, profil, takip/engel, mesaj, oda/ses token'ı, şikâyet/moderasyon ve hesap silmeyi dener, sonra veritabanını siler. Yerelde: `cd server/api && PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test`.
+- `.github/workflows/server.yml`: `server/**` değişince testler Postgres 17 ile çalışır. Ana dala birleşince API sunucuya kurulur (`/opt/similar/api` + `docker compose up -d --build api`), ardından canlı API'nin cevap verdiği kontrol edilir. **Bunun için bir kez** GitHub → Settings → Secrets and variables → Actions → `DEPLOY_SSH_KEY` olarak `~/.ssh/oracle.key` içeriği eklenmeli (adres değişirse `DEPLOY_HOST` değişkeni). Anahtar yoksa kurulum adımı atlanır ve elle kurulum (aşağıda) geçerlidir.
+- Yeni ayarlar (isteğe bağlı, sunucudaki `.env`): `ALLOWED_ORIGINS` (alan adı alınınca web adresi, virgülle), `RATE_AUTH` / `RATE_ALL` (IP başına dakikalık sınır, varsayılan 10 / 120).
 
 Kod değişince: `scp -r -i ~/.ssh/oracle.key server/api ubuntu@130.61.230.94:/opt/similar/` ve sunucuda `sudo docker compose up -d --build api`. Uçtan uca kontrol: `node server/api/smoke-test.mjs` (iki atılabilir test hesabı açar).
 
