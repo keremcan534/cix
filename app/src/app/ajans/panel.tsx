@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, Card, GradientButton, Header } from '@/components/ui';
+import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
 import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
@@ -61,7 +61,7 @@ export default function OwnerPanel() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         {!allowed ? (
           <Card style={{ alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 36 }}>🔒</Text>
+            <StateIcon name="lock-closed" size={56} />
             <Text style={styles.title}>Bu bölüme erişim yetkin yok</Text>
             <Text style={[styles.dim, { textAlign: 'center' }]}>
               {ROLE_LABEL[role]} rolünde &quot;{current.perm}&quot; izni bulunmuyor. Yetki sunucu tarafında da kontrol edilir; buton gizlemek tek başına yeterli değildir.

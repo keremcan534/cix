@@ -43,6 +43,7 @@ import { AffiliationPills, GenderChip, useAffiliations, type Affiliation } from 
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
+import { Art } from '@/components/Art';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -576,8 +577,7 @@ export default function UserProfile() {
               moments.map((m) => <MomentItem key={m.id} moment={m} user={user} />)
             ) : (
               <View style={styles.empty}>
-                <Text style={{ fontSize: 64 }}>🦭</Text>
-                <Text style={styles.zzz}>z z Z</Text>
+                <Art name="maskot-bos-durum-maskotu" size={88} />
                 <Text style={styles.meta}>{isMe ? 'Henüz bir an paylaşmadın.' : 'Henüz paylaşım yok.'}</Text>
               </View>
             )}
@@ -1489,7 +1489,6 @@ const styles = StyleSheet.create({
   editChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
   editChipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.18)' },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 4 },
-  zzz: { color: colors.textDim, fontSize: 16, fontWeight: '900', marginTop: -6 },
   moment: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10 },
   momentImg: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: colors.cardAlt },
   wall: { borderRadius: 14, padding: 12, paddingTop: 0, borderWidth: 1, borderColor: 'rgba(254,243,199,0.5)', overflow: 'hidden' },

@@ -7,7 +7,7 @@ import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, Scro
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Art } from '@/components/Art';
-import { FramedAvatar, GradientButton, VerifiedBadge } from '@/components/ui';
+import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
 import {
   AUTHOR_SVIP,
@@ -133,7 +133,7 @@ export default function MomentsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={{ fontSize: 38 }}>{tab === 'Arkadaşlar' ? '👥' : '🌙'}</Text>
+            <StateIcon name={tab === 'Arkadaşlar' ? 'people-outline' : 'moon-outline'} />
             <Text style={{ color: colors.textDim, textAlign: 'center' }}>
               {tab === 'Arkadaşlar' ? 'Takip ettiklerinin anları burada görünür.' : 'Bu konuda henüz an yok. İlk paylaşan sen ol!'}
             </Text>

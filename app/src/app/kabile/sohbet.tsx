@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
 import { GroupChat, type QuickAction } from '@/components/GroupChat';
-import { GradientButton } from '@/components/ui';
+import { GradientButton, StateIcon } from '@/components/ui';
 import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { presenceOf } from '@/data/presence';
@@ -34,7 +34,7 @@ export default function KabileChat() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.locked}>
-          <Text style={{ fontSize: 40 }}>🔒</Text>
+          <StateIcon name="lock-closed" />
           <Text style={styles.title}>Kabile sohbetine sadece kabile üyeleri erişebilir</Text>
           <GradientButton title="Kabile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>

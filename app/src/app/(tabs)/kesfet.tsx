@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Art } from '@/components/Art';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
-import { CharmBadge, VerifiedBadge, VipBadge } from '@/components/ui';
+import { CharmBadge, StateIcon, VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { charmRankBoost } from '@/data/charm';
@@ -133,7 +133,7 @@ export default function DiscoverScreen() {
         ListEmptyComponent={
           needsOptIn ? (
             <View style={styles.optIn}>
-              <Text style={{ fontSize: 40 }}>📍</Text>
+              <StateIcon name="location-outline" tone="social" />
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Yakındakileri görmek için şehir bazlı keşfi aç</Text>
               <Text style={{ color: colors.textDim, textAlign: 'center', fontSize: 13 }}>
                 Kesin konumun paylaşılmaz; sadece şehrin kullanılır. Ayarlardan istediğin zaman kapatabilirsin.
@@ -147,7 +147,7 @@ export default function DiscoverScreen() {
             </View>
           ) : (
             <View style={styles.optIn}>
-              <Text style={{ fontSize: 36 }}>🔍</Text>
+              <StateIcon name="search-outline" size={56} />
               <Text style={{ color: colors.textDim, textAlign: 'center' }}>Bu filtrelerle şu an kimse yok. Filtreleri değiştirmeyi dene.</Text>
             </View>
           )

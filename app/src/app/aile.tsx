@@ -10,7 +10,7 @@ import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Art } from '@/components/Art';
 import { goToMember } from '@/components/GroupChat';
-import { Avatar, Card, GradientButton, Header } from '@/components/ui';
+import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { FAMILIES } from '@/data/economy';
 import {
   KABILE_CHESTS,
@@ -263,7 +263,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                   </Text>
                 </View>
                 <View style={{ alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 44 }}>🛡️</Text>
+                  <StateIcon name="shield-checkmark-outline" />
                   <Text style={styles.lvChip}>
                     LV{lvl} · {pct(RULES.familyRates[lvl - 1])}
                   </Text>

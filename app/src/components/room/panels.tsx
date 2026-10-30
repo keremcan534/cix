@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Art, artSource, type ArtName } from '@/components/Art';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
 import { roomStyles } from '@/components/room/parts';
-import { Avatar, GradientButton } from '@/components/ui';
+import { Avatar, GradientButton, StateIcon } from '@/components/ui';
 import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
 import { goBack } from '@/lib/nav';
@@ -63,7 +63,7 @@ export function PasswordGate({ title, password, onPass }: { title: string; passw
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
-      <Text style={{ fontSize: 56 }}>🔒</Text>
+      <StateIcon name="lock-closed" size={72} />
       <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', textAlign: 'center' }}>{title}</Text>
       <Text style={{ color: colors.textDim, textAlign: 'center' }}>Bu oda şifreli. Girmek için oda şifresini yaz.</Text>
       <TextInput

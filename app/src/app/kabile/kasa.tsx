@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, Card, GradientButton, Header } from '@/components/ui';
+import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { KABILE_ROUTES, KASA_GOAL, KASA_HISTORY_MOCK, ensureFresh, findKabile, fmt, kabileMemberIds, kabileMeta, memberPower, useKabileProgress } from '@/data/kabile';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -57,7 +57,7 @@ export default function KabileKasa() {
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <LinearGradient colors={['#78350F', '#0B3B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-          <Text style={{ fontSize: 56 }}>🧰</Text>
+          <StateIcon name="wallet-outline" size={72} tone="money" />
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={styles.heroText}>Sandık Değeri {fmt(meta.chestValue)} 🪙</Text>
             <View style={styles.bar}>

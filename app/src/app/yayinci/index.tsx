@@ -14,6 +14,7 @@ import { showAlert } from '@/lib/alert';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { colors, gradient, gradientDeep } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
 
@@ -35,7 +36,7 @@ export default function HostCenter() {
         <Header title="Yayıncı Merkezi" />
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
           <LinearGradient colors={gradientDeep} style={styles.hero}>
-            <Text style={{ fontSize: 48 }}>🎙️</Text>
+            <Icon3D name="mic" size={64} />
             <Text style={styles.heroTitle}>Yayıncı ol, kazanmaya başla</Text>
             <Text style={styles.heroText}>Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.</Text>
           </LinearGradient>

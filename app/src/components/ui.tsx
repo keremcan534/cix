@@ -45,6 +45,20 @@ export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: n
   );
 }
 
+/** Icon for empty, locked and permission states: a line icon in a soft tinted disc, never a big emoji. */
+export function StateIcon({ name, size = 64, tone = 'action' }: { name: keyof typeof Ionicons.glyphMap; size?: number; tone?: 'action' | 'money' | 'social' }) {
+  const c = tone === 'money' ? semantic.money : tone === 'social' ? semantic.social : semantic.action;
+  return (
+    <View
+      style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: `${c}1A`, borderWidth: 1, borderColor: `${c}4D` }}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Ionicons name={name} size={Math.round(size * 0.44)} color={c} />
+    </View>
+  );
+}
+
 export function VerifiedBadge({ size = 14 }: { size?: number }) {
   return <Ionicons name="checkmark-circle" size={size} color="#38BDF8" />;
 }

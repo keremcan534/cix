@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 
 import { GroupChat } from '@/components/GroupChat';
-import { GradientButton, Header } from '@/components/ui';
+import { GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { USERS } from '@/data/mock';
 import { useApp } from '@/store';
@@ -35,7 +35,7 @@ export default function AgencyChat() {
       ) : (
         // Access is checked here and (in the real product) on the server for every message read.
         <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 40 }}>🔒</Text>
+          <StateIcon name="lock-closed" />
           <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>Ajans grubuna sadece ajans üyeleri erişebilir</Text>
           <GradientButton title="Ajansları gör" onPress={() => router.replace('/ajans')} style={{ marginTop: 8, alignSelf: 'stretch' }} />
         </View>

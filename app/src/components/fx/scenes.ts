@@ -1,13 +1,20 @@
-// One sea photo per screen, drawn by <Backdrop scene>. Unsplash photos (free Unsplash License), cropped to 900x1600.
+// Each screen's backdrop, drawn by <Backdrop scene>: the app's own night sky (no stock photos), lit from the
+// top by the screen's accent and, faintly, from the lower side by a second one. Accents follow the color
+// meanings in docs/TASARIM_YONU.md: turquoise for live/social spaces, gold for money and status, coral for
+// people.
+import { semantic } from '@/theme';
+
+export type Scene = { light: string; second: string };
+
 export const SCENES = {
-  home: require('../../../assets/bg/sahne-ana-sayfa.jpg'),
-  games: require('../../../assets/bg/sahne-oyun-merkezi.jpg'),
-  store: require('../../../assets/bg/sahne-magaza.jpg'),
-  discover: require('../../../assets/bg/sahne-kesfet.jpg'),
-  messages: require('../../../assets/bg/sahne-mesajlar.jpg'),
-  wallet: require('../../../assets/bg/sahne-cuzdan.jpg'),
-  vip: require('../../../assets/bg/sahne-vip.jpg'),
-  family: require('../../../assets/bg/sahne-aile.jpg'),
-  level: require('../../../assets/bg/sahne-seviye.jpg'),
-  login: require('../../../assets/bg/sahne-giris.jpg'),
-} as const;
+  home: { light: semantic.action, second: semantic.social },
+  games: { light: semantic.action, second: semantic.money },
+  store: { light: semantic.money, second: semantic.action },
+  discover: { light: semantic.social, second: semantic.action },
+  messages: { light: semantic.action, second: semantic.action },
+  wallet: { light: semantic.money, second: semantic.money },
+  vip: { light: semantic.money, second: semantic.social },
+  family: { light: semantic.social, second: semantic.money },
+  level: { light: semantic.money, second: semantic.action },
+  login: { light: semantic.action, second: semantic.social },
+} as const satisfies Record<string, Scene>;

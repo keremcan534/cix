@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, Card, GradientButton, Header } from '@/components/ui';
+import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import {
   CHEST_MIN_CONTRIBUTION,
   KABILE_CHESTS,
@@ -135,7 +135,7 @@ export default function KabileMerkez() {
 
         <Card style={{ gap: 12 }}>
           <View style={styles.row}>
-            <Text style={{ fontSize: 40 }}>🛡️</Text>
+            <StateIcon name="shield-checkmark-outline" />
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#A5F3F5', fontWeight: '600' }}>Kabile haftalık savaş gücü</Text>
               <Text style={styles.bigPower}>⚔ {fmtK(weekly)}</Text>

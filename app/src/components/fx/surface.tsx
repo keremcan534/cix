@@ -1,5 +1,5 @@
 // Depth and light: the shared building blocks that make flat panels feel physical. Ambient color glow
-// behind a screen, frosted glass for surfaces floating over content, glossy cards lit from the top edge,
+// behind a screen, frosted glass for surfaces floating over content, cards lit softly from the top edge,
 // a light sweep for valuable items and a spring press. Cheap by design: blur only on floating bars,
 // one image per glow, transform-only animations; the light sweep stops with Settings.reduceMotion.
 import { BlurView } from 'expo-blur';
@@ -9,6 +9,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View, type GestureRespo
 
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
+import type { Scene } from '@/components/fx/scenes';
 import { semantic } from '@/theme';
 
 const GLOW = require('../../../assets/fx/glow.png');
@@ -25,7 +26,7 @@ export function Ambient() {
 }
 
 /** A thin highlight along the top edge, as if lit from above. */
-export function EdgeLight({ inset = 14, strength = 0.32 }: { inset?: number; strength?: number }) {
+export function EdgeLight({ inset = 14, strength = 0.16 }: { inset?: number; strength?: number }) {
   return (
     <LinearGradient
       colors={['rgba(255,255,255,0)', `rgba(255,255,255,${strength})`, 'rgba(255,255,255,0)']}
@@ -47,20 +48,16 @@ export function Gloss({ radius = 999, strength = 0.4 }: { radius?: number; stren
 }
 
 /**
- * The screen's own picture (fx/scenes) covering it under a navy veil, with the ambient glows on top. The veil
- * is darkest at the top and bottom, where headers and tab bars sit, so the art shows mostly between cards.
- * `strength` is the picture's opacity.
+ * The screen's night sky (fx/scenes): a wash of the screen's accent from the top, a soft glow of it behind the
+ * header and a fainter second accent low on the side. No photos: every screen shares one look and text sits on
+ * a calm, dark surface. `strength` scales the light (0–1).
  */
-export function Backdrop({ scene, strength = 0.9 }: { scene: number; strength?: number }) {
+export function Backdrop({ scene, strength = 1 }: { scene: Scene; strength?: number }) {
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden' }]}>
-      <Image source={scene} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength }]} />
-      <LinearGradient
-        colors={['rgba(8,15,30,0.62)', 'rgba(8,15,30,0.12)', 'rgba(8,15,30,0.22)', 'rgba(8,15,30,0.78)']}
-        locations={[0, 0.3, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <Ambient />
+      <LinearGradient colors={[`${scene.light}2E`, `${scene.light}0A`, 'rgba(8,15,30,0)']} locations={[0, 0.32, 0.6]} style={StyleSheet.absoluteFill} />
+      <Image source={GLOW} style={[s.glow, { alignSelf: 'center', top: -300, opacity: 0.3 * strength, tintColor: scene.light }]} />
+      <Image source={GLOW} style={[s.glow, { right: -260, bottom: 40, opacity: 0.1 * strength, tintColor: scene.second }]} />
     </View>
   );
 }
@@ -90,7 +87,7 @@ export function DepthCard({ children, style, tint = DEPTH }: { children?: ReactN
 }
 
 /** A diagonal light sweep across the parent every few seconds; for valuable things (ranks, top rooms). */
-export function Shine({ radius = 16, every = 4200, delay = 0 }: { radius?: number; every?: number; delay?: number }) {
+export function Shine({ radius = 16, every = 9000, delay = 0 }: { radius?: number; every?: number; delay?: number }) {
   const { settings } = useApp();
   const [t] = useState(() => new Animated.Value(0));
   const [w, setW] = useState(0);
@@ -111,7 +108,7 @@ export function Shine({ radius = 16, every = 4200, delay = 0 }: { radius?: numbe
   return (
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden', pointerEvents: 'none' }]}>
       <Animated.View style={[s.shine, { transform: [{ translateX }, { rotate: '18deg' }] }]}>
-        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ flex: 1 }} />
+        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ flex: 1 }} />
       </Animated.View>
     </View>
   );

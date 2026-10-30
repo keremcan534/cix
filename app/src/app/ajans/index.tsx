@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, GradientButton, Header } from '@/components/ui';
+import { Button, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency';
 import { agenciesOwnedBy, myApplications, useAgencyApps } from '@/lib/agency-apps';
 import { showAlert } from '@/lib/alert';
@@ -153,7 +153,7 @@ function OwnerEntry() {
       <Header title="Ajans" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <Card style={{ alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 44 }}>🏢</Text>
+          <StateIcon name="business-outline" />
           <Text style={[styles.title, { fontSize: 20 }]}>{ownedAgency?.name}</Text>
           <Text style={styles.dim}>
             {ROLE_LABEL[agencyRole!]} · Davet kodu: {ownedAgency?.code}
