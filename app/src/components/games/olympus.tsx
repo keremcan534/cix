@@ -1,4 +1,4 @@
-// Olympus Slot: the 6×5 "pays anywhere" slot (lib/olympus-slot). playCasino (lib/games) settles the whole round, free
+// Şimşek Dağı: the 6×5 "pays anywhere" slot (lib/olympus-slot). playCasino (lib/games) settles the whole round, free
 // spins included, before anything moves; the grid only replays outcome.olympus. Oto stops at free spins, a big win,
 // the loss limit or any refusal.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -174,7 +174,7 @@ export function OlympusPlayer({ entry }: { entry: Entry }) {
           </Pressable>
           <View style={{ alignItems: 'center', flex: 1 }}>
             <Text style={o.zeus}>🏛️⚡🏛️</Text>
-            <Text style={o.title}>OLYMPUS</Text>
+            <Text style={o.title}>ŞİMŞEK DAĞI</Text>
             <Text style={[o.title, o.title2]}>SLOT</Text>
           </View>
           <Pressable style={o.icon} onPress={() => setShowPays((v) => !v)} accessibilityLabel="Ödeme tablosu">

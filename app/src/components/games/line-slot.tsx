@@ -1,5 +1,5 @@
-// Screen for every payline slot (lib/line-slot + lib/slot-configs): Mega Jackpot, Süper 777, Orman Avı, Piñata,
-// Büyü Kitabı, Neon Jackpot. Each game only brings its theme below. playCasino (lib/games) settles the round before
+// Screen for every payline slot (lib/line-slot + lib/slot-configs): Hazine Kulesi, Kızıl Yedi, Vahşi Patika, Konfeti Kutusu,
+// Kayıp Parşömen, Neon Bulvar. Each game only brings its theme below. playCasino (lib/games) settles the round before
 // the reels move; the reels only replay outcome.slot. Oto is repeated rounds from this screen and stops at the
 // JACKPOT, a big win, the loss limit or any refusal (daily limit, balance, pool).
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -40,7 +40,7 @@ type Theme = {
 };
 const THEMES: Record<LineSlotId, Theme> = {
   jackpot: {
-    title: 'MEGA JACKPOT',
+    title: 'HAZİNE KULESİ',
     colors: ['#F472B6', '#C026D3', '#7E22CE'],
     reels: '#F0ABFC',
     reel: '#6B21A8',
@@ -53,7 +53,7 @@ const THEMES: Record<LineSlotId, Theme> = {
     letters: { seven: '#EF4444', wild: '#F97316', dollar: '#FACC15' },
   },
   super777: {
-    title: 'Süper 777',
+    title: 'Kızıl Yedi',
     colors: ['#14532D', '#166534', '#052E16'],
     reels: '#B45309',
     reel: '#FEF3C7',
@@ -66,7 +66,7 @@ const THEMES: Record<LineSlotId, Theme> = {
     letters: { seven: '#DC2626' },
   },
   jungle: {
-    title: 'Orman Avı',
+    title: 'Vahşi Patika',
     colors: ['#4D7C0F', '#365314', '#422006'],
     reels: '#78350F',
     reel: '#451A03',
@@ -78,7 +78,7 @@ const THEMES: Record<LineSlotId, Theme> = {
     letters: { ten: '#F59E0B', j: '#2DD4BF', q: '#E879F9', k: '#F87171', a: '#FB923C' },
   },
   pinata: {
-    title: 'Piñata',
+    title: 'Konfeti Kutusu',
     colors: ['#38BDF8', '#F472B6', '#7C2D12'],
     reels: '#9A3412',
     reel: '#4C1D95',
@@ -90,7 +90,7 @@ const THEMES: Record<LineSlotId, Theme> = {
     letters: { j: '#A78BFA', q: '#FB923C', k: '#2DD4BF', a: '#F87171' },
   },
   spellbook: {
-    title: 'Büyü Kitabı',
+    title: 'Kayıp Parşömen',
     colors: ['#312E81', '#4C1D95', '#1E1B4B'],
     reels: '#6D28D9',
     reel: '#0B0A1A',
@@ -101,7 +101,7 @@ const THEMES: Record<LineSlotId, Theme> = {
     spin: ['#4ADE80', '#15803D'],
   },
   neon: {
-    title: 'NEON JACKPOT',
+    title: 'NEON BULVAR',
     colors: ['#4C1D95', '#6D28D9', '#312E81'],
     reels: '#F59E0B',
     reel: '#7C2D12',

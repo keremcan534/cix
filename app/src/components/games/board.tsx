@@ -1,4 +1,4 @@
-// Screen for the bet boards (lib/board-games): Lucky 77 fruit wheel, Lezzet Çarkı and Büyücü Kartı. Pick a chip, tap
+// Screen for the bet boards (lib/board-games): Gece Yarısı Çarkı fruit wheel, Tatlı Tezgâh and Sihir Destesi. Pick a chip, tap
 // options to stack it on them (several options per round), then start: playBoard (lib/games) draws one result and
 // settles every bet before anything moves; the wheel or the light only lands on that result. Tekrar puts the last
 // round's bets back. Every option returns at most 40 % on its own (house rule).
@@ -22,9 +22,9 @@ const SLICE = 360 / LUCKY_WHEEL.length;
 
 type Look = { title: string; colors: [string, string, string]; card: string; cardOn: string; ink: string };
 const LOOKS: Record<BoardId, Look> = {
-  slot: { title: 'Lucky 77', colors: ['#2B1065', '#4C1D95', '#1E0B45'], card: '#86198F', cardOn: '#C026D3', ink: '#FDE68A' },
-  foodwheel: { title: 'Lezzet Çarkı', colors: ['#4C1D95', '#7E22CE', '#312E81'], card: '#5B21B6', cardOn: '#DB2777', ink: '#FDE68A' },
-  magiccard: { title: 'Büyücü Kartı', colors: ['#3B0764', '#581C87', '#1E1B4B'], card: '#2E1065', cardOn: '#A16207', ink: '#FDE68A' },
+  slot: { title: 'Gece Yarısı Çarkı', colors: ['#2B1065', '#4C1D95', '#1E0B45'], card: '#86198F', cardOn: '#C026D3', ink: '#FDE68A' },
+  foodwheel: { title: 'Tatlı Tezgâh', colors: ['#4C1D95', '#7E22CE', '#312E81'], card: '#5B21B6', cardOn: '#DB2777', ink: '#FDE68A' },
+  magiccard: { title: 'Sihir Destesi', colors: ['#3B0764', '#581C87', '#1E1B4B'], card: '#2E1065', cardOn: '#A16207', ink: '#FDE68A' },
 };
 
 export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
@@ -63,7 +63,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     setBets((b) => ({ ...b, [opt]: (b[opt] ?? 0) + chip }));
   };
 
-  /** Lucky 77 turns the wheel; the others run a light around the options and stop on the result. */
+  /** Gece Yarısı Çarkı turns the wheel; the others run a light around the options and stop on the result. */
   const land = async (r: BoardResult) => {
     if (id === 'slot') {
       const slices = LUCKY_WHEEL.map((x, i) => (x === r.id ? i : -1)).filter((i) => i >= 0);

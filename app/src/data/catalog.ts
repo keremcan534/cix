@@ -349,11 +349,11 @@ export const COIN_GAME_TILES: { id: string; name: string; emoji: string; colors:
   { id: 'g3', name: 'Ludo', emoji: '🎲', colors: ['#F59E0B', '#B45309'], badge: 'HOT' },
   { id: 'g4', name: 'Çizim Tahmin', emoji: '🎨', colors: ['#06B6D4', '#0E7490'] },
   { id: 'g6', name: 'Bilgi Turnuvası', emoji: '🏆', colors: ['#8B5CF6', '#5B21B6'], badge: 'NEW' },
-  { id: 'c1', name: 'Roket', emoji: '🚀', colors: ['#1D4ED8', '#7C3AED'] },
-  { id: 'c2', name: 'Meyve Partisi', emoji: '🍓', colors: ['#16A34A', '#DB2777'] },
+  { id: 'c1', name: 'Yörünge', emoji: '🚀', colors: ['#1D4ED8', '#7C3AED'] },
+  { id: 'c2', name: 'Meyve Bahçesi', emoji: '🍓', colors: ['#16A34A', '#DB2777'] },
   { id: 'c3', name: 'Hazine Sandığı', emoji: '💰', colors: ['#CA8A04', '#7C2D12'] },
   { id: 'c4', name: 'Penaltı', emoji: '⚽', colors: ['#0EA5E9', '#1E3A8A'] },
-  { id: 'c5', name: 'Balık Avı', emoji: '🦈', colors: ['#0891B2', '#164E63'] },
+  { id: 'c5', name: 'Mercan Avı', emoji: '🦈', colors: ['#0891B2', '#164E63'] },
 ];
 
 export const GAMES: Game[] = [

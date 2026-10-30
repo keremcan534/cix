@@ -165,10 +165,10 @@ export default function ProfileScreen() {
           <View style={styles.gameRow}>
             {(
               [
-                ['slot', '🎰', 'Lucky 77'],
-                ['jackpot', '💰', 'Mega Jackpot'],
+                ['slot', '🎰', 'Gece Yarısı Çarkı'],
+                ['jackpot', '💰', 'Hazine Kulesi'],
                 ['olympus', '⚡', 'Olympus'],
-                ['fish', '🐟', 'Balık Avı'],
+                ['fish', '🐟', 'Mercan Avı'],
               ] as const
             ).map(([id, e, l]) => (
               <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>

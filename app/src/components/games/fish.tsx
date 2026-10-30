@@ -1,4 +1,4 @@
-// Balık Avı: fish swim across the scene; tap one and the cannon fires. Every shot at a fish is one casino round
+// Mercan Avı: fish swim across the scene; tap one and the cannon fires. Every shot at a fish is one casino round
 // (playCasino, pick = the fish), settled before the bullet lands; a shot that hits no fish is free and is not a round.
 // Freeze stops the fish for a moment and lock-on keeps Oto on one fish; neither changes the odds (lib/fish-hunt).
 import Ionicons from '@expo/vector-icons/Ionicons';

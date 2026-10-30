@@ -62,7 +62,7 @@ const FAKE_SOURCES: { source: string; price: number; mults: number[] }[] = [
   { source: 'Lucky › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
   { source: 'Lucky › Altın Nal', price: 500, mults: [2, 5, 10, 20] },
   { source: 'Oyun Merkezi › Şans Çarkı', price: 100, mults: [2, 3, 5, 10] },
-  { source: 'Oyun Merkezi › Dragon Tiger', price: 500, mults: [2, 8] },
+  { source: 'Oyun Merkezi › Ejder ile Kaplan', price: 500, mults: [2, 8] },
 ];
 let feed: ReturnType<typeof setTimeout> | undefined;
 export function startWinFeed() {

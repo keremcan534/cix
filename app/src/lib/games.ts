@@ -63,7 +63,7 @@ export type CasinoBank = { wagered: number; house: number; pool: number; paid: n
 export const POOL_SEED = 2_000_000;
 /** Opening JACKPOT of each game, also house advances. */
 export const JACKPOT_SEEDS: Record<string, number> = { jackpot: 100_000, jungle: 1_000_000, pinata: 500_000, spellbook: 800_000, neon: 2_000_000 };
-/** Small wins of these games are not announced in every room (a shot in Balık Avı is a round of its own). */
+/** Small wins of these games are not announced in every room (a shot in Mercan Avı is a round of its own). */
 const ANNOUNCE_MIN: Partial<Record<CasinoGame['id'], number>> = { fish: 20, rocket: 10 };
 type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number>; bank: CasinoBank };
 const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED, jackpots: { ...JACKPOT_SEEDS } });
@@ -155,7 +155,7 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
 }
 
 /**
- * One round of a bet board (Lucky 77, Lezzet Çarkı, Büyücü Kartı): several bets (option → coins, each a multiple of the
+ * One round of a bet board (Gece Yarısı Çarkı, Tatlı Tezgâh, Sihir Destesi): several bets (option → coins, each a multiple of the
  * smallest chip) settled against one drawn result. Same checks, stake, pool and history as playCasino.
  */
 export function playBoard(gameId: CasinoGame['id'], bets: Record<string, number>, entry: Entry, requestId: string): PlayResult {

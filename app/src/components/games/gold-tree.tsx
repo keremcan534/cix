@@ -1,4 +1,4 @@
-// Altın Ağacı: 3 reels, the middle row pays by combination (lib/gold-tree). playCasino (lib/games) settles the round
+// Bereket Ağacı: 3 reels, the middle row pays by combination (lib/gold-tree). playCasino (lib/games) settles the round
 // before the reels move; they only replay outcome.tree. Oto stops at a big win, the loss limit or any refusal.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -135,7 +135,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     <View style={{ gap: 10 }}>
       <LinearGradient colors={['#FBCFE8', '#FDE68A', '#166534']} style={t.stage}>
         <Text style={t.tree}>🌳</Text>
-        <Text style={t.title}>ALTIN AĞACI</Text>
+        <Text style={t.title}>BEREKET AĞACI</Text>
         <View style={t.paytable}>
           {TREE_PAYS.map((p) => (
             <View key={p.name} style={[t.pay, hit === p.name && t.payOn]}>

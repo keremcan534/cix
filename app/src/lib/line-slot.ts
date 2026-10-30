@@ -1,4 +1,4 @@
-// Generic payline slot (Mega Jackpot, Süper 777, Orman Avı, Piñata, Büyü Kitabı, Neon Jackpot): one engine, one data
+// Generic payline slot (Hazine Kulesi, Kızıl Yedi, Vahşi Patika, Konfeti Kutusu, Kayıp Parşömen, Neon Bulvar): one engine, one data
 // object per game (lib/slot-configs). Same house rule as every coin game: the expected return of a round is at most
 // 40 % of the stake, computed exactly (slotReturn) and checked by tests.
 //

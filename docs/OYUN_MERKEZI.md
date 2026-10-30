@@ -10,7 +10,7 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 | `src/lib/games.ts` | Ortak oyun platformu. Tek cüzdan (uygulamanın jeton bakiyesi), tek geçmiş. Casino turları sunucu mantığıyla işlenir. |
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
 | `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları (UNO benzeri, özgün ad), XOX. |
-| `src/components/games/casino.tsx` | Şans Çarkı, Zar, Lucky 77, Dragon Tiger. |
+| `src/components/games/casino.tsx` | Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan. |
 | `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |
 | `src/lib/fortune-slot.ts` | Altın Kasa matematiği: makara şeritleri, ödeme tablosu, 10 çizgi, tam beklenen geri ödeme hesabı. |
 | `src/app/oyunlar.tsx` | Profildeki **Oyun Merkezi**: Casino · Oda oyunları · Geçmiş. |
@@ -45,17 +45,17 @@ Her tur `GM-…` işlem numarasıyla Oyun Merkezi › Geçmiş'te ve cüzdan har
 
 ## Kasa kuralı: %60 kasa, %40 dağıtım
 
-Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Lucky 77, Dragon Tiger, Altın Kasa ve odadaki Zar Düellosu) oynanan jetonun %60'ı kasaya kalır, %40'ı kazananlara rastgele dağılır.
+Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan, Altın Kasa ve odadaki Zar Düellosu) oynanan jetonun %60'ı kasaya kalır, %40'ı kazananlara rastgele dağılır.
 
-- **Olasılıklar** (`app/src/lib/casino-odds.ts`): her oyun ve her seçimde beklenen geri ödeme %40'tır. Testler bütün sonuçları tek tek sayarak bunu kanıtlar (`tests/casino-odds.test.ts`). Dragon Tiger'da Ejder/Kaplan seçimi %39,94'tür (kart farkı kuralı tam %40'a bölünmüyor; kasa lehine yuvarlandı).
+- **Olasılıklar** (`app/src/lib/casino-odds.ts`): her oyun ve her seçimde beklenen geri ödeme %40'tır. Testler bütün sonuçları tek tek sayarak bunu kanıtlar (`tests/casino-odds.test.ts`). Ejder ile Kaplan'da Ejder/Kaplan seçimi %39,94'tür (kart farkı kuralı tam %40'a bölünmüyor; kasa lehine yuvarlandı).
 - **Havuz** (`app/src/lib/games.ts`): her bahsin %60'ı anında kasaya yazılır, %40'ı ödül havuzuna girer; kazançlar yalnızca havuzdan ödenir. Havuz bir turun en yüksek ödülünü karşılayamıyorsa tur jeton düşülmeden reddedilir. Havuz 200.000 jetonluk başlangıç avansıyla açılır (ilk turların büyük ödülü karşılanabilsin diye). Yönetim ekranında "Kasa defteri" oynanan, kasa, dağıtılan ve havuz tutarlarını gösterir.
 
 | Oyun | Kazandıran sonuç | Çarpan | Olasılık |
 |---|---|---|---|
 | Şans Çarkı | 8 dilim: 0x, 0,5x, 1x, 2x, 3x, 5x, 10x, 20x | ağırlıklar 740/90/80/50/25/12/2/1 (binde) | — |
 | Zar | Büyük 10–12 veya Küçük 2–4 | 2,4x | 6/36 |
-| Lucky 77 | Üç 7 / üç aynı meyve | 30x / 5x | 1/125 / 4/125 |
-| Dragon Tiger | Seçilen taraf en az 4 yüksek / beraberlik | 1,5x / 5,2x | 45/169 / 13/169 |
+| Gece Yarısı Çarkı | Üç 7 / üç aynı meyve | 30x / 5x | 1/125 / 4/125 |
+| Ejder ile Kaplan | Seçilen taraf en az 4 yüksek / beraberlik | 1,5x / 5,2x | 45/169 / 13/169 |
 | Zar Düellosu (oda) | Rakipten en az 3 fazla | 2,4x | 6/36 |
 | Altın Kasa | 10 çizgide soldan 3/4/5 aynı; 3+ Kasa → 8 bedava dönüş ×2 | çizgi bahsinin 3–50 katı; tur başına en fazla 850x | kazanç her ~2,3 dönüşte bir, bedava dönüş ~1/117 |
 
@@ -117,3 +117,22 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 2. Ludo'nun gerçek sağlayıcı entegrasyonu ve gerçek cihazda mikrofon sürekliliği testi.
 3. Sunucu: `game_sessions`, `game_rounds` (benzersiz `request_id`), `wallet_transactions` bağlantısı, sağlayıcı geri çağrısının imza doğrulaması.
 4. Oyun geçmişinin kalıcı hâle getirilmesi (şu an oturum boyunca tutuluyor; jeton hareketleri cüzdanda kalıcı).
+
+## Oyun adları
+
+Şans oyunlarının adları özgündür; bilinen ürünleri (ör. "Gates of Olympus", "Book of Ra", "Fruit Party") çağrıştıran ve jenerik adlar değiştirildi. Kimlikler (`id`) ve görsel dosya adları aynı kaldı.
+
+| Kimlik | Eski ad | Yeni ad |
+|---|---|---|
+| `slot` | Lucky 77 | Gece Yarısı Çarkı |
+| `jackpot` | Mega Jackpot | Hazine Kulesi |
+| `olympus` | Olympus Slot | Şimşek Dağı |
+| `fish` | Balık Avı | Mercan Avı |
+| `rocket` | Roket | Yörünge |
+| `super777` · `jungle` · `goldtree` | Süper 777 · Orman Avı · Altın Ağacı | Kızıl Yedi · Vahşi Patika · Bereket Ağacı |
+| `foodwheel` · `magiccard` | Lezzet Çarkı · Büyücü Kartı | Tatlı Tezgâh · Sihir Destesi |
+| `pinata` · `spellbook` · `neon` | Piñata · Büyü Kitabı · Neon Jackpot | Konfeti Kutusu · Kayıp Parşömen · Neon Bulvar |
+| `dragon` | Dragon Tiger | Ejder ile Kaplan |
+| oda menüsü `c2` | Meyve Partisi | Meyve Bahçesi |
+
+Yayından önce bu adlar için TÜRKPATENT'te marka taraması yapılmalı.
