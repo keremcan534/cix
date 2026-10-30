@@ -9,6 +9,8 @@ import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
 import { RoomHost } from '@/components/room/room-host';
 import { ME } from '@/data/mock';
+// Registers the Anlık Kulüp rooms (built from their id) before any room is opened, deep links included.
+import '@/lib/club';
 import { setupVoice } from '@/lib/voice-setup';
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
@@ -61,6 +63,7 @@ function RootStack() {
           <Stack.Screen name="kullanici/[id]" />
           <Stack.Screen name="arama/[id]" options={{ animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="eslesme" />
+          <Stack.Screen name="kulup" options={{ animation: 'fade' }} />
           <Stack.Screen name="tanis" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
           <Stack.Screen name="yayinci/index" />
           <Stack.Screen name="yayinci/cek" />

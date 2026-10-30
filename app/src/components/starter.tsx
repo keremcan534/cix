@@ -24,7 +24,7 @@ export function StarterPath() {
 
   const steps: Step[] = [
     { key: 'interests', icon: 'heart', title: 'İlgi alanlarını seç', done: (me.interests?.length ?? 0) >= 2, href: '/kullanici/me' },
-    { key: 'room', icon: 'mic', title: 'Bir odaya katıl', done: recentRooms.length > 0, href: '/oda/r1' },
+    { key: 'room', icon: 'mic', title: 'Anlık kulübüne katıl', done: recentRooms.length > 0, href: '/kulup' },
     { key: 'greet', icon: 'chat', title: 'Birine selam ver', done: stats.greetings > 0, href: '/(tabs)/kesfet' },
     { key: 'follow', icon: 'crown', title: 'Birini takip et', done: following.size >= 2, href: '/(tabs)/kesfet' },
     { key: 'gift', icon: 'gift', title: 'İlk hediyeni gönder', done: stats.giftsSent > 0, href: '/oda/r1' },

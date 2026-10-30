@@ -636,6 +636,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botOn]);
 
+  // Rooms with a welcome (Anlık Kulüp, lib/club): its lines arrive once, a moment apart, as you walk in.
+  useEffect(() => {
+    const script = base?.script;
+    if (!script?.length) return;
+    const timers = script.map((l) => setTimeout(() => addMsg({ userId: l.userId, text: l.text }), l.delayMs));
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   // --- Animated reactions / effect gifts (central catalog, lib/animations) ----------------------------
   // Seat position for an animation; listeners send from the bottom of the room.
   const originOf = (uid: string) =>
