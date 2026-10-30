@@ -22,7 +22,9 @@ import type { CallsFrom, DmFrom } from '@/data/privacy';
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
-export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string };
+/** The gift behind a gift earning, stored with it (a price can belong to several gifts; Lucky pays a share). */
+export type EarningGift = { id: string; name: string; emoji: string; count: number; lucky?: boolean };
+export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string; gift?: EarningGift };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
 export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond' | 'game'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
 export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: string; title: string; body: string; time: string; read: boolean; href?: string };
@@ -105,6 +107,8 @@ type AppState = {
   coins: number;
   addCoins: (n: number, reason?: string) => void;
   spendCoins: (n: number, reason?: string) => boolean;
+  /** Why `n` coins can't be spent right now (balance or daily limit), or null when they can. */
+  spendBlock: (n: number) => string | null;
   /** Casino winnings: playable only in the games; never gifted, exchanged or withdrawn. */
   gameCoins: number;
   addGameCoins: (n: number, reason?: string) => void;
@@ -149,7 +153,7 @@ type AppState = {
   charmLevel: number;
   weekly: number[];
   earnings: Earning[];
-  receiveDiamonds: (n: number, source: EarningSource, fromId?: string) => void;
+  receiveDiamonds: (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => void;
   withdrawals: Withdrawal[];
   requestWithdraw: (diamonds: number, iban: string) => string | null;
   // tasks & check-in
@@ -530,15 +534,15 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     saveState(() => snapshot);
   });
 
-  const creditDiamonds = (n: number, source: EarningSource, fromId?: string) => {
+  const creditDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
     setDiamonds((d) => d + n);
     setTotalDiamonds((d) => d + n);
     setWeekly((w) => [...w.slice(0, 6), w[6] + n]);
-    setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now() }, ...e].slice(0, 100));
+    setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now(), ...(gift && { gift }) }, ...e].slice(0, 100));
     log('diamond', n, source);
   };
-  const receiveDiamonds = (n: number, source: EarningSource, fromId?: string) => {
-    creditDiamonds(n, source, fromId);
+  const receiveDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
+    creditDiamonds(n, source, fromId, gift);
     if (source !== 'Hediye' && source !== 'Arama') return;
     // Cazibe: gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
     const before = charmLevelOf(charmRef.current);
@@ -557,11 +561,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setNotifications((l) => [{ ...n, id: uid(), time: now(), read: false }, ...l].slice(0, 100));
   };
 
+  const limitBlock = (n: number) => {
+    const limit = settingsRef.current.dailySpendLimit;
+    if (!limit || spentTodayRef.current + n <= limit) return null;
+    return `Günlük harcama limitin ${limit.toLocaleString('tr-TR')} jeton (Ayarlar > Harcama kontrolü). Bugün kalan: ${Math.max(0, limit - spentTodayRef.current).toLocaleString('tr-TR')} jeton.`;
+  };
+  const spendBlock = (n: number) => (coinsRef.current < n ? 'Yetersiz bakiye.' : limitBlock(n));
   const spend = (n: number, reason = 'Harcama') => {
     if (coinsRef.current < n) return false;
-    const limit = settingsRef.current.dailySpendLimit;
-    if (limit && spentTodayRef.current + n > limit) {
-      showAlert('Günlük harcama limiti', `Bugün en fazla ${limit.toLocaleString('tr-TR')} jeton harcayabilirsin (Ayarlar > Harcama kontrolü). Kalan: ${Math.max(0, limit - spentTodayRef.current)}`);
+    const limited = limitBlock(n);
+    if (limited) {
+      showAlert('Günlük harcama limiti', limited);
       return false;
     }
     spentTodayRef.current += n;
@@ -598,6 +608,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       log('coin', n, reason);
     },
     spendCoins: spend,
+    spendBlock,
     gameCoins,
     addGameCoins: (n, reason = 'Oyun kazancı') => {
       setGameCoins((c) => c + n);

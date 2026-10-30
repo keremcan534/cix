@@ -61,7 +61,7 @@ const TAB_H = 48;
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
-    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory,
+    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, bump, settings, vipLevel, svipLevel, equipped, inventory,
     rbac, coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   const isMe = id === 'me';
@@ -138,6 +138,8 @@ export default function UserProfile() {
     });
 
   const deliverGift = (g: Gift) => {
+    // Same SVIP lock as the room's gift sheet.
+    if ((g.minSvip ?? 0) > svipLevel) return showAlert('SVIP hediyesi', `${g.name}, SVIP ${g.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`);
     if (!spendCoins(g.price, `Hediye: ${g.name} → ${user.name}`)) {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
@@ -674,7 +676,7 @@ export default function UserProfile() {
         visible={sheet === 'gift'}
         title={`${user.name} kişisine hediye gönder`}
         onClose={() => setSheet('none')}
-        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}`, onPress: () => sendGift(g) }))}
+        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}${(g.minSvip ?? 0) > svipLevel ? ` · 🔒 SVIP ${g.minSvip}` : ''}`, onPress: () => sendGift(g) }))}
       />
 
       {editOpen && (

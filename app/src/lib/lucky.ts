@@ -144,7 +144,8 @@ export function unavailable(g: LuckyGift): string | null {
 }
 
 export type SendResult = { ok: true; record: LuckyRecord; replay: boolean } | { ok: false; reason: string };
-export type Wallet = { spend: (n: number, reason: string) => boolean; credit: (n: number, reason: string) => void };
+/** `blocked` (optional) says why `n` coins can't be spent (balance, daily limit), so the error is the real one. */
+export type Wallet = { spend: (n: number, reason: string) => boolean; credit: (n: number, reason: string) => void; blocked?: (n: number) => string | null };
 
 function draw(t: LuckyTier[]): number {
   if (state.forceNext !== null && t.some((x) => x.mult === state.forceNext && x.weight > 0)) {
@@ -181,6 +182,8 @@ export function sendLucky(
   const closed = unavailable(g);
   if (closed) return { ok: false, reason: closed };
   if (state.day !== today()) emit({ day: today(), paidToday: 0 });
+  const blocked = wallet.blocked?.(g.price);
+  if (blocked) return { ok: false, reason: blocked };
   if (!wallet.spend(g.price, `Lucky hediye: ${g.name} → ${req.toName}`)) return { ok: false, reason: 'Yetersiz bakiye.' };
 
   const odds = g.tiers.map((t) => ({ ...t }));
@@ -213,6 +216,49 @@ export function sendLucky(
   });
   if (mult >= 100) log('Sistem', `Yüksek çarpan ×${fmt(mult)}`, req.userId, `${g.name} · ödül ${fmt(reward)} jeton · ${req.txId}`);
   return { ok: true, record, replay: false };
+}
+
+/**
+ * `count` Lucky gifts to each of `to`. Every gift is still its own draw and record (sendLucky), but the
+ * wallet sees one charge for the whole send, one credit for all rewards and one refund for gifts that
+ * could not go out, so a ×1314 send writes 2–3 ledger rows instead of thousands and never pushes the
+ * user's coin history out. Nothing is charged when the whole send can't be paid.
+ */
+export function sendLuckyBatch(
+  req: { userId: string; userAge: number; roomId: string; giftId: string; to: { id: string; name: string }[]; count: number },
+  wallet: Wallet,
+): { records: LuckyRecord[]; error: string | null } {
+  const g = luckyGift(req.giftId);
+  if (!g) return { records: [], error: 'Hediye bulunamadı.' };
+  const n = req.to.length * req.count;
+  if (!n) return { records: [], error: null };
+  const label = n > 1 ? `${g.name} x${fmt(n)}` : g.name;
+  const blocked = wallet.blocked?.(g.price * n);
+  if (blocked) return { records: [], error: blocked };
+  // Checks that don't depend on the wallet (age, self, closed package) fail before anything is charged.
+  const first = req.to[0];
+  if (req.userAge < LUCKY_MIN_AGE) return { records: [], error: `Lucky hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` };
+  const closed = unavailable(g);
+  if (closed) return { records: [], error: closed };
+  if (!wallet.spend(g.price * n, `Lucky hediye: ${label}${req.to.length === 1 ? ` → ${first.name}` : ` → ${req.to.length} kişi`}`)) return { records: [], error: 'Yetersiz bakiye.' };
+
+  let prepaid = n;
+  let won = 0;
+  const inner: Wallet = { spend: () => prepaid-- > 0, credit: (r) => (won += r) };
+  const records: LuckyRecord[] = [];
+  let error: string | null = null;
+  for (const t of req.to.flatMap((x) => Array<typeof x>(req.count).fill(x))) {
+    const r = sendLucky({ txId: newLuckyTxId(), userId: req.userId, userAge: req.userAge, roomId: req.roomId, giftId: g.id, toId: t.id, toName: t.name }, inner);
+    if (!r.ok) {
+      error = r.reason;
+      break;
+    }
+    records.push(r.record);
+  }
+  const unsent = n - records.length;
+  if (unsent) wallet.credit(g.price * unsent, `Lucky iade: ${g.name} x${fmt(unsent)} gönderilemedi`);
+  if (won) wallet.credit(won, `Lucky ödülü: ${label}`);
+  return { records, error };
 }
 
 // --- Admin ------------------------------------------------------------------------------------------
