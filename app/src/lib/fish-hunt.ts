@@ -1,4 +1,4 @@
-// Balık Avı: shoot the fish swimming across the screen. Each shot is one casino round aimed at one fish: the stake
+// Mercan Avı: shoot the fish swimming across the screen. Each shot is one casino round aimed at one fish: the stake
 // is the shot, and the fish is caught with a chance that makes its expected return exactly the house rule's 40 %:
 // a fish worth m× is caught when the server's draw (0…10m−1) is below FISH_HIT, so P = 4 / 10m and m × P = 0.4.
 // Shots that hit no fish are not rounds and cost nothing. Freeze and lock-on only change aiming, never the odds.

@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Art } from '@/components/Art';
 import { Card } from '@/components/ui';
-import { GIFTS, userById } from '@/data/mock';
-import { RULES, pct, usd } from '@/data/rules';
+import { userById } from '@/data/mock';
+import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { diamondValueTl } from '@/lib/coins-bank';
@@ -26,11 +26,12 @@ export const INCOME_LABEL: Record<EarningSource, string> = {
   'Arama bonusu': 'Arama bonusu',
 };
 
-/** Right-hand detail line: gift name for gift income (gift price = diamonds earned), else the rule behind it. */
+/** Right-hand detail line: the stored gift for gift income, else the rule behind it. */
 export const incomeDetail = (e: Earning) => {
   if (e.source === 'Hediye') {
-    const g = GIFTS.find((x) => x.price === e.amount);
-    return g ? `${g.emoji} ${g.name} x1` : 'Hediye x1';
+    // Older rows have no gift stored; the price alone can't tell which gift it was.
+    const g = e.gift;
+    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Lucky (${pct(LUCKY_RECIPIENT_SHARE)})` : ''}` : '🎁 Hediye';
   }
   if (e.source === 'Oda sahibi bonusu') return `Bonus ${pct(RULES.roomOwnerBonus)}`;
   if (e.source === 'Arama') return 'Görüntülü arama';

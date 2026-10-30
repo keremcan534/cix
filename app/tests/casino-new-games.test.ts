@@ -1,7 +1,7 @@
 /// <reference types="node" />
 // The casino games from the client's reference screens: the payline slots (lib/line-slot + lib/slot-configs), Olympus
-// Slot (6×5, pays anywhere), Balık Avı (one round per shot), the bet boards (Lucky 77, Lezzet Çarkı, Büyücü Kartı),
-// Roket (crash) and Altın Ağacı. Each keeps the house rule; JACKPOT funds are part of the 40 %.
+// Slot (6×5, pays anywhere), Mercan Avı (one round per shot), the bet boards (Gece Yarısı Çarkı, Tatlı Tezgâh, Sihir Destesi),
+// Roket (crash) and Bereket Ağacı. Each keeps the house rule; JACKPOT funds are part of the 40 %.
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -50,7 +50,7 @@ describe('Çizgili slotlar', () => {
     assert.ok(slotSpin(MEGA, mid).jackpotLines.includes(0), 'orta çizgi');
   });
 
-  test('Süper 777: 3 makara, 5 çizgi, üç aynı sembol', () => {
+  test('Kızıl Yedi: 3 makara, 5 çizgi, üç aynı sembol', () => {
     assert.equal(SUPER777.lines.length, 5);
     assert.deepEqual(linePay(SUPER777, ['seven', 'seven', 'seven']), { sym: 'seven', count: 3, pay: SUPER777.paytable.seven[0] });
     assert.equal(linePay(SUPER777, ['seven', 'seven', 'cherry']), null);
@@ -83,7 +83,7 @@ describe('Çizgili slotlar', () => {
   });
 });
 
-describe('Olympus Slot', () => {
+describe('Şimşek Dağı', () => {
   const grid = (cells: OSym[], orbs: number[] = []): OCell[][] => {
     let o = 0;
     const flat = Array.from({ length: CELLS }, (_, i) => {
@@ -134,7 +134,7 @@ describe('Olympus Slot', () => {
   });
 });
 
-describe('Balık Avı', () => {
+describe('Mercan Avı', () => {
   test('her balıkta beklenen geri ödeme tam %40; büyük balık daha zor yakalanır', () => {
     for (const f of FISH) assert.ok(Math.abs(fishReturn(f) - 0.4) < 1e-12, f.id);
     assert.equal(shootFish(FISH[0], FISH_HIT - 1).caught, true);
@@ -153,7 +153,7 @@ describe('Bahis tahtaları', () => {
     assert.equal(boardTotal(MAGIC_CARD), 3000);
   });
 
-  test('Lezzet Çarkı: Salata bütün sebzeleri, Pizza bütün et ve deniz ürünlerini öder; Boş Tabak kimseyi', () => {
+  test('Tatlı Tezgâh: Salata bütün sebzeleri, Pizza bütün et ve deniz ürünlerini öder; Boş Tabak kimseyi', () => {
     const salad = FOOD_WHEEL.results.find((r) => r.id === 'salad')!;
     const pizza = FOOD_WHEEL.results.find((r) => r.id === 'pizza')!;
     const empty = FOOD_WHEEL.results.find((r) => r.id === 'empty')!;
@@ -204,7 +204,7 @@ describe('Roket', () => {
   });
 });
 
-describe('Altın Ağacı', () => {
+describe('Bereket Ağacı', () => {
   test('kombinasyonlar ve kasa kuralı', () => {
     assert.equal(treePay(['tree', 'tree', 'tree'])!.pay, 188);
     assert.equal(treePay(['tree', 'red', 'blue'])!.pay, 8);

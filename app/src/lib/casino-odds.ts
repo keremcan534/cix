@@ -59,7 +59,7 @@ const WHEEL_TOTAL = WHEEL.reduce((n, s) => n + s.weight, 0);
 export const CARD = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 /** Dice: 10–12 "Büyük", 2–4 "Küçük", each 6/36 → 2.4x. */
 export const DICE_MULT = 2.4;
-/** Dragon Tiger: your side wins with a card at least 4 higher (45/169) → 1.5x; tie (13/169) → 5.2x. */
+/** Ejder ile Kaplan: your side wins with a card at least 4 higher (45/169) → 1.5x; tie (13/169) → 5.2x. */
 export const DT_GAP = 4;
 export const DT_MULT = 1.5;
 export const DT_TIE = 5.2;

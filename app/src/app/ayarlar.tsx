@@ -10,6 +10,7 @@ import { GATES } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
 import { colors } from '@/theme';
+import { IS_DEMO } from '@/lib/build';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 
@@ -78,9 +79,11 @@ export default function SettingsScreen() {
           <Pressable onPress={() => router.push('/cuzdan')}>
             <Text style={styles.link}>İşlem geçmişi, satın almalar ve iadeler →</Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/sunucu-hesabi')}>
-            <Text style={styles.link}>Sunucu hesabı (veritabanı, test) →</Text>
-          </Pressable>
+          {IS_DEMO && (
+            <Pressable onPress={() => router.push('/sunucu-hesabi')}>
+              <Text style={styles.link}>Sunucu hesabı (veritabanı, test) →</Text>
+            </Pressable>
+          )}
         </Card>
 
         <Text style={styles.section}>Güvenlik</Text>
@@ -253,16 +256,18 @@ export default function SettingsScreen() {
           <Pressable onPress={logout}>
             <Text style={{ color: '#fff', fontWeight: '700' }}>Çıkış yap</Text>
           </Pressable>
-          <Pressable
-            onPress={() =>
-              showAlert('Demo verilerini sıfırla', 'Bakiye, satın alımlar, ayarlar ve sohbetler bu cihazda ilk günkü haline döner. Test için kullanılır.', [
-                { text: 'Vazgeç', style: 'cancel' },
-                { text: 'Sıfırla', style: 'destructive', onPress: resetAll },
-              ])
-            }
-          >
-            <Text style={{ color: colors.textDim, fontWeight: '700' }}>Demo verilerini sıfırla</Text>
-          </Pressable>
+          {IS_DEMO && (
+            <Pressable
+              onPress={() =>
+                showAlert('Demo verilerini sıfırla', 'Bakiye, satın alımlar, ayarlar ve sohbetler bu cihazda ilk günkü haline döner. Test için kullanılır.', [
+                  { text: 'Vazgeç', style: 'cancel' },
+                  { text: 'Sıfırla', style: 'destructive', onPress: resetAll },
+                ])
+              }
+            >
+              <Text style={{ color: colors.textDim, fontWeight: '700' }}>Demo verilerini sıfırla</Text>
+            </Pressable>
+          )}
           {deletionRequested ? (
             <Text style={{ color: colors.gold }}>Hesap silme talebin alındı. 30 gün içinde tamamlanacak; bu sürede giriş yaparak iptal edebilirsin. Yasal olarak saklanması gereken kayıtlar saklama süresi kadar tutulur.</Text>
           ) : (

@@ -94,12 +94,12 @@ export const ROOM_GAMES: RoomGame[] = [
   { id: 'memory', name: 'Hafıza Eşleştirme', emoji: '🧩', provider: 'Yerleşik', version: '—', active: false, phase: 2, minPlayers: 1, maxPlayers: 4, startBy: 'anyone', joinAfterStart: false, roundSeconds: 180, vipRequired: false, playable: false, leaderboard: true },
 ];
 
-// Casino catalog from the client's reference screens. The older games (Şans Çarkı, Zar, Dragon Tiger, Altın Kasa) stay
+// Casino catalog from the client's reference screens. The older games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın Kasa) stay
 // in the catalog switched off; the admin screen can turn them back on.
 export const CASINO_GAMES: CasinoGame[] = [
   {
     id: 'slot',
-    name: 'Lucky 77',
+    name: 'Gece Yarısı Çarkı',
     emoji: '🎰',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -114,7 +114,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'jackpot',
-    name: 'Mega Jackpot',
+    name: 'Hazine Kulesi',
     emoji: '💰',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -129,7 +129,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'olympus',
-    name: 'Olympus Slot',
+    name: 'Şimşek Dağı',
     emoji: '⚡',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -144,7 +144,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'fish',
-    name: 'Balık Avı',
+    name: 'Mercan Avı',
     emoji: '🐟',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -159,7 +159,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'rocket',
-    name: 'Roket',
+    name: 'Yörünge',
     emoji: '🚀',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -174,7 +174,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'super777',
-    name: 'Süper 777',
+    name: 'Kızıl Yedi',
     emoji: '7️⃣',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -189,7 +189,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'jungle',
-    name: 'Orman Avı',
+    name: 'Vahşi Patika',
     emoji: '🦍',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -204,7 +204,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'goldtree',
-    name: 'Altın Ağacı',
+    name: 'Bereket Ağacı',
     emoji: '🌳',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -219,7 +219,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'foodwheel',
-    name: 'Lezzet Çarkı',
+    name: 'Tatlı Tezgâh',
     emoji: '🎡',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -234,7 +234,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'magiccard',
-    name: 'Büyücü Kartı',
+    name: 'Sihir Destesi',
     emoji: '🔮',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -249,7 +249,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'pinata',
-    name: 'Piñata',
+    name: 'Konfeti Kutusu',
     emoji: '🪅',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -264,8 +264,8 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'spellbook',
-    name: 'Büyü Kitabı',
-    emoji: '📖',
+    name: 'Kayıp Parşömen',
+    emoji: '📜',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
     minWealth: 2,
@@ -273,13 +273,13 @@ export const CASINO_GAMES: CasinoGame[] = [
     fromRoom: true,
     bets: [20, 50, 100, 200, 500],
     dailyLimit: 50_000,
-    rules: '5 makara, 3 sıra, 20 çizgi; 🧙‍♀️ Cadı her sembolün yerine geçer. 📖 Büyü Kitabı ekranın her yerinde öder: 3 kitap MINI (bahsin 5 katı), 4 kitap MINOR (20 katı), 5 kitap MAJOR (100 katı). Bir çizgide beş Cadı GRAND JACKPOT kazandırır: bahsin / en yüksek bahis kadar pay. Her bahsin %2’si GRAND’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    rules: '5 makara, 3 sıra, 20 çizgi; 🧙‍♀️ Cadı her sembolün yerine geçer. 📜 Parşömen ekranın her yerinde öder: 3 kitap MINI (bahsin 5 katı), 4 kitap MINOR (20 katı), 5 kitap MAJOR (100 katı). Bir çizgide beş Cadı GRAND JACKPOT kazandırır: bahsin / en yüksek bahis kadar pay. Her bahsin %2’si GRAND’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
   {
     id: 'neon',
-    name: 'Neon Jackpot',
+    name: 'Neon Bulvar',
     emoji: '💎',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -308,7 +308,7 @@ export const CASINO_GAMES: CasinoGame[] = [
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
   { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 10–12 "Büyük", 2–4 "Küçük" kazandırır (2.4x); 5–9 gelirse kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
-  { id: 'dragon', name: 'Dragon Tiger', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
+  { id: 'dragon', name: 'Ejder ile Kaplan', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
   {
     id: 'fortune',
     name: 'Altın Kasa',

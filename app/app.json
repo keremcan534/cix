@@ -8,7 +8,11 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.similarclub.app"
+      "bundleIdentifier": "com.similarclub.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +22,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.similarclub.app"
+      "package": "com.similarclub.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,7 +35,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Profil fotoğrafı seçmek için galerine erişmemiz gerekiyor.",
-          "cameraPermission": "Gerçek kişi doğrulaması için selfie çekmen gerekiyor."
+          "cameraPermission": "Gerçek kişi doğrulaması için selfie çekmen gerekiyor.",
+          "microphonePermission": "Sesli odalarda konuşabilmen ve sesli/görüntülü arama yapabilmen için mikrofonuna erişmemiz gerekiyor."
         }
       ],
       [

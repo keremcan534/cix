@@ -1,4 +1,4 @@
-// Bet-board games (Lucky 77 çarkı, Lezzet Çarkı, Büyücü Kartı): place chips on any of the options, one result is
+// Bet-board games (Gece Yarısı Çarkı çarkı, Tatlı Tezgâh, Sihir Destesi): place chips on any of the options, one result is
 // drawn for the whole round and every bet on an option that the result pays wins its multiplier. Each option's
 // expected return is at most the house rule's 40 % on its own (weight of every result that pays it × multiplier),
 // so any mix of bets in a round returns at most 40 % too. Results that pay nobody hold the house share.
@@ -10,7 +10,7 @@ export type BoardResult = { id: string; name: string; label: string; weight: num
 export type Board = { id: string; options: BoardOption[]; results: BoardResult[] };
 
 /**
- * Lucky 77: a 20-slice fruit wheel. Karpuz and Elma pay 2x, 77 pays 8x; Limon and Üzüm slices pay nobody.
+ * Gece Yarısı Çarkı: a 20-slice fruit wheel. Karpuz and Elma pay 2x, 77 pays 8x; Limon and Üzüm slices pay nobody.
  * Each pick: 4/20 × 2 = 1/20 × 8 = 0.4.
  */
 export const LUCKY77: Board = {
@@ -28,11 +28,11 @@ export const LUCKY77: Board = {
     { id: 'grape', name: 'Üzüm', label: '🍇', weight: 5, pays: [] },
   ],
 };
-/** Order of the Lucky 77 wheel's 20 slices, by result id (spread so equal fruit don't sit together). */
+/** Order of the Gece Yarısı Çarkı wheel's 20 slices, by result id (spread so equal fruit don't sit together). */
 export const LUCKY_WHEEL = ['seven', 'apple', 'lemon', 'melon', 'grape', 'apple', 'lemon', 'melon', 'grape', 'lemon', 'apple', 'melon', 'grape', 'lemon', 'apple', 'melon', 'grape', 'lemon', 'grape', 'lemon'];
 
 /**
- * Lezzet Çarkı: eight dishes on a Ferris wheel. Salata pays every vegetable bet, Pizza every meat and sea bet; Boş
+ * Tatlı Tezgâh: eight dishes on a Ferris wheel. Salata pays every vegetable bet, Pizza every meat and sea bet; Boş
  * Tabak pays nobody. Weights out of 9000: (540 + 180) × 5 = (324 + 36) × 10 = (204 + 36) × 15 = (108 + 36) × 25 =
  * (44 + 36) × 45 = 3600 → each option returns exactly 0.4.
  */
@@ -63,7 +63,7 @@ export const FOOD_WHEEL: Board = {
 };
 
 /**
- * Büyücü Kartı: eight zodiac cards. Weights out of 3000 are 1200 / multiplier, so each card returns exactly 0.4; the
+ * Sihir Destesi: eight zodiac cards. Weights out of 3000 are 1200 / multiplier, so each card returns exactly 0.4; the
  * Joker result pays nobody.
  */
 export const MAGIC_CARD: Board = {

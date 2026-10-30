@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ActionSheet';
-import { Avatar, Card, Header } from '@/components/ui';
+import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { COMMISSIONS, SAMPLE_RATES, networkChildren, type CommissionRow, type NetNode } from '@/data/agency';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -31,8 +32,9 @@ export default function NetworkScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
         <Header title="Üye ağım" />
         <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 40 }}>🔒</Text>
+          <StateIcon name="lock-closed" />
           <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>Üye ağı ve komisyonlar yalnızca aktif ajans üyeliği olan kullanıcılara açıktır.</Text>
+          <GradientButton title="Ajansları gör" onPress={() => router.replace('/ajans')} style={{ marginTop: 8, alignSelf: 'stretch' }} />
         </View>
       </SafeAreaView>
     );

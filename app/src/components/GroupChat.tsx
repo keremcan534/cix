@@ -6,6 +6,7 @@ import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView,
 import { Art, type ArtName } from '@/components/Art';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
+import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { roomById, userById, type User } from '@/data/mock';
 import { followRoute, presenceLabel, presenceOf } from '@/data/presence';
@@ -146,12 +147,21 @@ export function GroupChat({
               ))}
             </ScrollView>
           )}
-          {emoji && <EmojiPanel onPick={(e) => setDraft((d) => d + e)} />}
+          {emoji && (
+            <EmojiPanel
+              onPick={(e) => {
+                // A sticker goes out on its own; an emoji is typed into the draft.
+                if (!stickerIdOf(e)) return setDraft((d) => d + e);
+                onSend(e);
+                setEmoji(false);
+              }}
+            />
+          )}
           <View style={styles.inputRow}>
             <Pressable onPress={() => setEmoji((v) => !v)} accessibilityLabel="Emoji">
               <Ionicons name={emoji ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
             </Pressable>
-            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Bir şey söyle..." placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
+            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Mesaj yaz…" placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
             {onGift && (
               <Pressable onPress={onGift} accessibilityLabel="Hediye">
                 <Text style={{ fontSize: 24 }}>🎁</Text>

@@ -1,4 +1,4 @@
-// Altın Ağacı: three reels, one line. The middle row pays by its combination, in multiples of the stake:
+// Bereket Ağacı: three reels, one line. The middle row pays by its combination, in multiples of the stake:
 //   🌳🌳🌳 188 · three red coins 58 · three blue coins 28 · three green coins 18 · 🌳 on reel 1 with any two coins 8 ·
 //   any three coins 2. Blanks pay nothing. The best combination pays.
 // Every stop combination is listed (small strips), so the expected return is exact and at most 40 % (house rule).

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETICS, FREE_PACK_IDS, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -22,7 +22,9 @@ import type { CallsFrom, DmFrom } from '@/data/privacy';
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
-export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string };
+/** The gift behind a gift earning, stored with it (a price can belong to several gifts; Lucky pays a share). */
+export type EarningGift = { id: string; name: string; emoji: string; count: number; lucky?: boolean };
+export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string; gift?: EarningGift };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
 export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond' | 'game'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
 export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: string; title: string; body: string; time: string; read: boolean; href?: string };
@@ -59,7 +61,6 @@ export type Settings = {
   micDenoise: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
-  bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
   luckyAnnounce: boolean;
   /** VIP "Seviyeyi Gizle": hide my Servet / Cazibe badges from others while VIP is active. */
@@ -105,6 +106,8 @@ type AppState = {
   coins: number;
   addCoins: (n: number, reason?: string) => void;
   spendCoins: (n: number, reason?: string) => boolean;
+  /** Why `n` coins can't be spent right now (balance or daily limit), or null when they can. */
+  spendBlock: (n: number) => string | null;
   /** Casino winnings: playable only in the games; never gifted, exchanged or withdrawn. */
   gameCoins: number;
   addGameCoins: (n: number, reason?: string) => void;
@@ -119,7 +122,10 @@ type AppState = {
   equipped: Partial<Record<CosmeticKind, string>>;
   buyCosmetic: (id: string) => string | null;
   equip: (id: string | null, kind: CosmeticKind) => void;
+  /** Bought sticker pack ids (persisted under the old name, so earlier purchases carry over). */
   emojiPacks: Set<string>;
+  /** Owned, free, or opened by the user's VIP level. */
+  packUnlocked: (id: string) => boolean;
   buyEmojiPack: (id: string) => string | null;
   recentEmojis: string[];
   rememberEmoji: (e: string) => void;
@@ -149,12 +155,16 @@ type AppState = {
   charmLevel: number;
   weekly: number[];
   earnings: Earning[];
-  receiveDiamonds: (n: number, source: EarningSource, fromId?: string) => void;
+  receiveDiamonds: (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => void;
   withdrawals: Withdrawal[];
   requestWithdraw: (diamonds: number, iban: string) => string | null;
   // tasks & check-in
   stats: Record<TaskKey, number>;
   bump: (key: TaskKey, n?: number) => void;
+  /** Gifts each user has received through this app (userId → giftId → count); 'me' is my own gift wall. */
+  giftWall: Record<string, Record<string, number>>;
+  /** Puts `count` of a gift on `toId`'s gift wall. */
+  recordGift: (toId: string, giftId: string, count: number) => void;
   claimedTasks: Set<string>;
   claimTask: (taskId: string) => void;
   checkInDay: number;
@@ -266,6 +276,7 @@ type Snapshot = {
   earnings: Earning[];
   withdrawals: Withdrawal[];
   stats: Record<TaskKey, number>;
+  giftWall?: Record<string, Record<string, number>>;
   claimedTasks: string[];
   checkInDay: number;
   checkInDate: string;
@@ -365,6 +376,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
 
   const [stats, setStats] = useState<Record<TaskKey, number>>(s.stats ?? { roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 });
+  const [giftWall, setGiftWall] = useState<Record<string, Record<string, number>>>(s.giftWall ?? {});
+  const recordGift = (toId: string, giftId: string, count: number) =>
+    setGiftWall((w) => ({ ...w, [toId]: { ...w[toId], [giftId]: (w[toId]?.[giftId] ?? 0) + count } }));
   const [claimedTasks, setClaimedTasks] = useState<Set<string>>(new Set(s.claimedTasks));
   const [checkInDay, setCheckInDay] = useState(s.checkInDay ?? 2); // demo: user already has a 2-day streak
   const [checkInDate, setCheckInDate] = useState(s.checkInDate ?? '');
@@ -407,7 +421,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   const [inventory, setInventory] = useState<Set<string>>(new Set(s.inventory));
   const [equipped, setEquipped] = useState<Partial<Record<CosmeticKind, string>>>(s.equipped ?? {});
-  const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set(s.emojiPacks ?? ['basic']));
+  const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set([...FREE_PACK_IDS, ...(s.emojiPacks ?? [])]));
   const [recentEmojis, setRecentEmojis] = useState<string[]>(s.recentEmojis ?? []);
 
   const [settings, setSettings] = useState<Settings>(() => ({
@@ -436,7 +450,6 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     bigGiftsOnly: false, micDenoise: true,
     invitesFrom: 'everyone',
     dailySpendLimit: 0,
-    bigSpendConfirm: 0,
     luckyAnnounce: true,
     hideWealth: false,
     hideCharm: false,
@@ -520,7 +533,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const snapshot: Snapshot = {
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
-    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
+    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     following: [...following], blocked: [...blocked], conversations, followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
@@ -530,15 +543,16 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     saveState(() => snapshot);
   });
 
-  const creditDiamonds = (n: number, source: EarningSource, fromId?: string) => {
+  const creditDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
     setDiamonds((d) => d + n);
     setTotalDiamonds((d) => d + n);
     setWeekly((w) => [...w.slice(0, 6), w[6] + n]);
-    setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now() }, ...e].slice(0, 100));
+    setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now(), ...(gift && { gift }) }, ...e].slice(0, 100));
     log('diamond', n, source);
   };
-  const receiveDiamonds = (n: number, source: EarningSource, fromId?: string) => {
-    creditDiamonds(n, source, fromId);
+  const receiveDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
+    creditDiamonds(n, source, fromId, gift);
+    if (source === 'Hediye' && gift) recordGift('me', gift.id, gift.count);
     if (source !== 'Hediye' && source !== 'Arama') return;
     // Cazibe: gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
     const before = charmLevelOf(charmRef.current);
@@ -557,11 +571,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setNotifications((l) => [{ ...n, id: uid(), time: now(), read: false }, ...l].slice(0, 100));
   };
 
+  const limitBlock = (n: number) => {
+    const limit = settingsRef.current.dailySpendLimit;
+    if (!limit || spentTodayRef.current + n <= limit) return null;
+    return `Günlük harcama limitin ${limit.toLocaleString('tr-TR')} jeton (Ayarlar > Harcama kontrolü). Bugün kalan: ${Math.max(0, limit - spentTodayRef.current).toLocaleString('tr-TR')} jeton.`;
+  };
+  const spendBlock = (n: number) => (coinsRef.current < n ? 'Yetersiz bakiye.' : limitBlock(n));
   const spend = (n: number, reason = 'Harcama') => {
     if (coinsRef.current < n) return false;
-    const limit = settingsRef.current.dailySpendLimit;
-    if (limit && spentTodayRef.current + n > limit) {
-      showAlert('Günlük harcama limiti', `Bugün en fazla ${limit.toLocaleString('tr-TR')} jeton harcayabilirsin (Ayarlar > Harcama kontrolü). Kalan: ${Math.max(0, limit - spentTodayRef.current)}`);
+    const limited = limitBlock(n);
+    if (limited) {
+      showAlert('Günlük harcama limiti', limited);
       return false;
     }
     spentTodayRef.current += n;
@@ -598,6 +618,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       log('coin', n, reason);
     },
     spendCoins: spend,
+    spendBlock,
     gameCoins,
     addGameCoins: (n, reason = 'Oyun kazancı') => {
       setGameCoins((c) => c + n);
@@ -628,11 +649,16 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     equip: (id, kind) => setEquipped((e) => ({ ...e, [kind]: id ?? undefined })),
     emojiPacks,
+    packUnlocked: (id) => {
+      const pack = STICKER_PACKS.find((p) => p.id === id);
+      return !!pack && (emojiPacks.has(id) || (!pack.price && !pack.minVip) || (!!pack.minVip && vipLevel >= pack.minVip));
+    },
     buyEmojiPack: (id) => {
-      const pack = EMOJI_PACKS.find((p) => p.id === id);
+      const pack = STICKER_PACKS.find((p) => p.id === id);
       if (!pack) return 'Paket bulunamadı';
+      if (emojiPacks.has(id)) return 'Zaten sahipsin';
       if (pack.minVip && vipLevel < pack.minVip) return `VIP ${pack.minVip} ile açılır`;
-      if (!spend(pack.price, `Emoji paketi: ${pack.name}`)) return 'Yetersiz jeton';
+      if (!spend(pack.price, `Çıkartma paketi: ${pack.name}`)) return 'Yetersiz jeton';
       setEmojiPacks((s) => new Set(s).add(id));
       return null;
     },
@@ -705,6 +731,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
     stats,
     bump: (key, n = 1) => setStats((s) => ({ ...s, [key]: s[key] + n })),
+    giftWall,
+    recordGift,
     claimedTasks,
     claimTask: (taskId) => {
       const task = TASKS.find((t) => t.id === taskId);

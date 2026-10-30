@@ -26,7 +26,7 @@ import { colors, semantic } from '@/theme';
 export type OpenGame = { kind: 'room'; id: string } | { kind: 'casino'; id: CasinoGame['id'] };
 export type VoiceState = { seated: boolean; micOn: boolean; onToggleMic: () => void };
 
-/** Casino games with their own screen; the old ones (wheel, dice, Dragon Tiger) use the shared CasinoPlayer. */
+/** Casino games with their own screen; the old ones (wheel, dice, Ejder ile Kaplan) use the shared CasinoPlayer. */
 const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => React.JSX.Element>> = {
   fortune: FortunePlayer,
   olympus: OlympusPlayer,

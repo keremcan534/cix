@@ -7,7 +7,7 @@ const scaled = (table: Record<string, number[]>, k: number) =>
   Object.fromEntries(Object.entries(table).map(([s, pays]) => [s, pays.map((p) => Math.floor(p * k * 100) / 100)]));
 const same = <T,>(n: number, x: T) => Array.from({ length: n }, () => x);
 
-/** Mega Jackpot: classic fruit machine, 77 wild, JACKPOT for five 77s. */
+/** Hazine Kulesi: classic fruit machine, 77 wild, JACKPOT for five 77s. */
 export const MEGA: SlotConfig = {
   id: 'jackpot',
   rows: 3,
@@ -30,7 +30,7 @@ export const MEGA: SlotConfig = {
   lines: LINES_10,
 };
 
-/** Süper 777: 3×3 fruit machine, 5 lines, three of a kind. */
+/** Kızıl Yedi: 3×3 fruit machine, 5 lines, three of a kind. */
 export const SUPER777: SlotConfig = {
   id: 'super777',
   rows: 3,
@@ -49,7 +49,7 @@ export const SUPER777: SlotConfig = {
 
 const CARDS = { ten: { name: '10', label: '10' }, j: { name: 'J', label: 'J' }, q: { name: 'Q', label: 'Q' }, k: { name: 'K', label: 'K' }, a: { name: 'A', label: 'A' } };
 
-/** Orman Avı: jungle animals, 15 lines, lion wild, JACKPOT for five lions. */
+/** Vahşi Patika: jungle animals, 15 lines, lion wild, JACKPOT for five lions. */
 export const JUNGLE: SlotConfig = {
   id: 'jungle',
   rows: 3,
@@ -68,7 +68,7 @@ export const JUNGLE: SlotConfig = {
   lines: LINES_15,
 };
 
-/** Piñata: fiesta symbols, 20 lines, piñata wild, JACKPOT for five piñatas. */
+/** Konfeti Kutusu: fiesta symbols, 20 lines, piñata wild, JACKPOT for five piñatas. */
 export const PINATA: SlotConfig = {
   id: 'pinata',
   rows: 3,
@@ -92,7 +92,7 @@ export const PINATA: SlotConfig = {
 };
 
 /**
- * Büyü Kitabı: wizard symbols, 20 lines, witch wild. Books pay anywhere: 3 = MINI, 4 = MINOR, 5+ = MAJOR (fixed
+ * Kayıp Parşömen: wizard symbols, 20 lines, witch wild. Books pay anywhere: 3 = MINI, 4 = MINOR, 5+ = MAJOR (fixed
  * multiples of the stake); five witches on a line win the GRAND (the jackpot fund).
  */
 export const SPELL_PRIZES = { MINI: 5, MINOR: 20, MAJOR: 100 } as const;
@@ -108,7 +108,7 @@ export const SPELLBOOK: SlotConfig = {
     amulet: { name: 'Muska', label: '🧿' },
     cat: { name: 'Kara Kedi', label: '🐈‍⬛' },
     wild: { name: 'Cadı (Wild)', label: '🧙‍♀️' },
-    book: { name: 'Büyü Kitabı', label: '📖' },
+    book: { name: 'Parşömen', label: '📜' },
   },
   wild: 'wild',
   scatter: 'book',
@@ -119,7 +119,7 @@ export const SPELLBOOK: SlotConfig = {
   lines: LINES_20,
 };
 
-/** Neon Jackpot: neon fruit machine, 10 lines, WILD, JACKPOT for five wilds. */
+/** Neon Bulvar: neon fruit machine, 10 lines, WILD, JACKPOT for five wilds. */
 export const NEON: SlotConfig = {
   id: 'neon',
   rows: 3,

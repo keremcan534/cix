@@ -42,6 +42,10 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
 - **Bildirim satırı (notice).** Tek satır ikon + metin; `info` gri, `warn` altın zemin, `lock` kilit ikonu. Renk tek başına anlam taşımaz, her zaman ikon da vardır.
 - **Durum etiketi.** Kısa metin + ton (bilgi / uyarı / başarılı / hata / nötr).
 - **İkonlar.** Ionicons; pasif durumda çizgi (`outline`), aktif durumda dolu.
+- **Emoji ikon değildir.** Emoji yalnız içerikte (mesaj, tepki, kullanıcı metni) kullanılır. Boş, kilitli ve izin durumlarında `StateIcon` (tonlu daire içinde çizgi ikon), maskot ya da 3D görsel kullanılır. Oda sahibi tacı ve yönetici rozeti de ikondur.
+- **Arka plan (`Backdrop`).** Stok fotoğraf yok: lacivert zemin, üstten ekranın anlam rengiyle (turkuaz / altın / mercan) gelen yumuşak ışık (`fx/scenes`). Odada `StageBackdrop`: oda temasının renkleri, ev sahibi koltuğuna düşen iki spot, sohbetin altında koyulaşan zemin.
+- **Efekt ölçüsü.** Parlama (`Gloss`), kenar ışığı (`EdgeLight`) ve ışık süpürmesi (`Shine`) yalnız değerli öğelerde (sıralama, en iyi odalar, ana buton); sıradan kartlar düzdür.
+- **Oda sohbeti.** Kullanıcı mesajı: avatar + üstte ad + ayrı balon. Oda olayları ve bot sessiz haplar; kişilerin mesajlarının önüne geçmez.
 - **Hareket.** Basma geri bildirimi 90 ms; geçişler ≤ 250 ms. "Hareketi azalt" ve "efektleri kapat" ayarları hediye animasyonlarını ve titreşimi kapatır.
 
 ---

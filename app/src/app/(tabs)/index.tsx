@@ -265,14 +265,17 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
 function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTab; onCat: (c: RoomTab) => void; countryFlag: string | null; onCountry: () => void }) {
   return (
     <View style={styles.catBar}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 20, paddingLeft: 16, paddingRight: 8 }}>
-        {ROOM_TABS.map((c) => (
-          <Pressable key={c} onPress={() => onCat(c)} style={{ alignItems: 'center' }}>
-            <Text style={[styles.catText, c === cat && styles.catTextActive]}>{c}</Text>
-            <View style={[styles.underlineSm, c !== cat && { opacity: 0 }]} />
-          </Pressable>
-        ))}
-      </ScrollView>
+      <View style={{ flex: 1 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingLeft: 16, paddingRight: 28 }}>
+          {ROOM_TABS.map((c) => (
+            <Pressable key={c} onPress={() => onCat(c)} style={{ alignItems: 'center' }}>
+              <Text style={[styles.catText, c === cat && styles.catTextActive]}>{c}</Text>
+              <View style={[styles.underlineSm, c !== cat && { opacity: 0 }]} />
+            </Pressable>
+          ))}
+        </ScrollView>
+        <LinearGradient colors={['rgba(8,15,30,0)', 'rgba(8,15,30,0.95)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.catFade} />
+      </View>
       <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
         <LinearGradient colors={gradientDeep} style={styles.catIcon}>
           <Ionicons name="people" size={18} color="#fff" />
@@ -409,9 +412,9 @@ function RoomRow({ room }: { room: Room }) {
   const content = (
     <>
       {top > 0 && (
-        <View style={[styles.watermark, { pointerEvents: 'none' }]}>
-          <Text style={styles.watermarkSmall}>Haftalık</Text>
-          <Text style={styles.watermarkBig}>TOP{top}</Text>
+        <View style={styles.rankPill} accessibilityLabel={`Haftalık ${top}. oda`}>
+          <Icon3D name="trophy" size={12} />
+          <Text style={styles.rankPillText}>TOP {top}</Text>
         </View>
       )}
       <View style={styles.coverFrame}>
@@ -442,9 +445,11 @@ function RoomRow({ room }: { room: Room }) {
           <View style={styles.lvChip}>
             <Text style={styles.lvText}>Lv.{room.level ?? 1}</Text>
           </View>
-          <View style={styles.tagChip}>
-            <Text style={styles.tagText}>{roomTagLabel(room)}</Text>
-          </View>
+          {!badge && (
+            <View style={styles.tagChip}>
+              <Text style={styles.tagText}>{roomTagLabel(room)}</Text>
+            </View>
+          )}
           {x.pk && (
             <LinearGradient colors={['#FF6576', '#0E7C9A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
               <Gloss strength={0.35} />
@@ -567,6 +572,7 @@ const styles = StyleSheet.create({
   shelfText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  catFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 32, pointerEvents: 'none' },
   catText: { color: colors.textDim, fontSize: 17, lineHeight: 24, fontFamily: fonts.displayBold },
   catTextActive: { color: colors.text, fontSize: 19, lineHeight: 26, fontFamily: fonts.display },
   catIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
@@ -610,7 +616,7 @@ const styles = StyleSheet.create({
   roomTitle: { color: colors.text, fontWeight: '800', fontSize: 15, flexShrink: 1 },
   announce: { color: colors.textDim, fontSize: 12 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 92, overflow: 'hidden' },
+  badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 128, overflow: 'hidden' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
   lvChip: { backgroundColor: 'rgba(251,191,36,0.18)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   lvText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
@@ -620,9 +626,8 @@ const styles = StyleSheet.create({
   pkText: { color: '#fff', fontSize: 11, fontWeight: '900', fontStyle: 'italic' },
   listeners: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   listenerText: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  watermark: { position: 'absolute', right: 14, top: 4, alignItems: 'flex-end' },
-  watermarkSmall: { color: 'rgba(255,255,255,0.08)', fontSize: 26, fontWeight: '900', fontStyle: 'italic' },
-  watermarkBig: { color: 'rgba(255,255,255,0.08)', fontSize: 40, fontWeight: '900', fontStyle: 'italic', marginTop: -8 },
+  rankPill: { position: 'absolute', right: 10, top: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(246,189,96,0.16)', borderColor: 'rgba(246,189,96,0.45)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, zIndex: 2 },
+  rankPillText: { color: colors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   empty: { color: colors.textDim, textAlign: 'center', paddingVertical: 28, paddingHorizontal: 16 },
   // Benim tab
   myRoom: { flexDirection: 'row', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border },

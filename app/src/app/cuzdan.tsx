@@ -14,6 +14,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
+import { IS_DEMO } from '@/lib/build';
 
 export default function WalletScreen() {
   const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp, addCoins } = useApp();
@@ -42,7 +43,7 @@ export default function WalletScreen() {
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </Pressable>
-        <Text style={[styles.title, { flex: 1, marginLeft: 12 }]}>{tab === 'buy' ? 'Yüklemek' : 'Hareketler'}</Text>
+        <Text style={[styles.title, { flex: 1, marginLeft: 12 }]}>{tab === 'buy' ? 'Jeton Yükle' : 'Hareketler'}</Text>
         <Pressable onPress={() => setTab(tab === 'buy' ? 'history' : 'buy')} hitSlop={8} accessibilityLabel="Hareketler" style={{ marginRight: 16 }}>
           <Ionicons name={tab === 'buy' ? 'document-text-outline' : 'wallet-outline'} size={24} color="#fff" />
         </Pressable>
@@ -93,20 +94,22 @@ export default function WalletScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
           <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
-            <Text style={{ color: colors.textDim, fontSize: 16 }}>Coinsim ⓘ</Text>
+            <Text style={{ color: colors.textDim, fontSize: 16 }}>Jeton bakiyem ⓘ</Text>
             <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
-            <Pressable
-              onPress={() => {
-                addCoins(1_000_000, 'Demo test bakiyesi');
-                showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, SVIP puanı vermez)');
-              }}
-              style={styles.testBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Demo: 1.000.000 test jetonu ekle"
-            >
-              <Ionicons name="flask-outline" size={14} color={colors.primaryText} />
-              <Text style={styles.testText}>Demo: +1.000.000 test jetonu</Text>
-            </Pressable>
+            {IS_DEMO && (
+              <Pressable
+                onPress={() => {
+                  addCoins(1_000_000, 'Demo test bakiyesi');
+                  showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, SVIP puanı vermez)');
+                }}
+                style={styles.testBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Demo: 1.000.000 test jetonu ekle"
+              >
+                <Ionicons name="flask-outline" size={14} color={colors.primaryText} />
+                <Text style={styles.testText}>Demo: +1.000.000 test jetonu</Text>
+              </Pressable>
+            )}
           </View>
           <Pressable onPress={() => router.push('/vip')} accessibilityLabel="SVIP Sistemi">
             <LinearGradient colors={['#78350F', '#0B3B4A', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
@@ -116,7 +119,7 @@ export default function WalletScreen() {
             </LinearGradient>
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
-            <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Coins Yükle</Text>
+            <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
             <Text style={styles.flag}>🇹🇷 ▾</Text>
           </View>
           <View style={styles.grid}>
@@ -141,7 +144,7 @@ export default function WalletScreen() {
               );
             })}
           </View>
-          <Text style={styles.note}>Şarj etmeye devam etmek, Kullanım Koşulları ve Ödeme Sözleşmesi&apos;ni okuduğunuz ve kabul ettiğiniz anlamına gelir. Prototip: ödeme simüle edilir; iade/itiraz için Destek.</Text>
+          <Text style={styles.note}>Yüklemeye devam ederek Kullanım Koşulları ve Ödeme Sözleşmesi&apos;ni okuduğunu ve kabul ettiğini onaylarsın. Prototip: ödeme simüle edilir; iade/itiraz için Destek.</Text>
         </ScrollView>
       )}
     </SafeAreaView>

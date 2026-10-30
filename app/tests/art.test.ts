@@ -1,7 +1,7 @@
 /// <reference types="node" />
 // Produced visuals (docs/GORSEL_URETIM_LISTESI.md §1–5): every bundled file exists, every catalog
-// gift, effect and emoji-pack emoji has its picture, store pictures belong to real store items, every
-// room type, theme and level has its picture, and only reactions-only messages become stickers.
+// gift, effect and sticker has its picture, store pictures belong to real store items, every
+// room type, theme and level has its picture, and only sticker tokens (never standard emoji) become stickers.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -10,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 import { ANIMATION_SEED } from '@/data/animations';
 import { CASINO_GAMES, ROOM_GAMES } from '@/data/games';
-import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, ROOM_LEVEL_ICONS, ROOM_THEMES, ROOM_TYPES } from '@/data/catalog';
+import { ALL_STICKERS, COSMETICS, COSMETIC_KINDS, FREE_PACK_IDS, ROOM_LEVEL_ICONS, ROOM_THEMES, ROOM_TYPES, STANDARD_EMOJI, STICKER_PACKS } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
-import { emojiKey, stickersOf } from '@/lib/stickers';
+import { stickerIdOf, stickersOf, stickerText, stickerToken } from '@/lib/stickers';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
 const read = (file: string) => readFileSync(resolve(SRC, file), 'utf8');
@@ -33,9 +33,12 @@ describe('Görsel dosyaları', () => {
     for (const id of ['lk1', 'lk2', 'lk3', 'lk4']) assert.match(giftArt, new RegExp(`^  ${id}: \\{ sm:`, 'm'), id);
   });
 
-  test('emoji paketlerindeki her emojinin çıkartması var', () => {
-    const keys = new Set([...read('components/ReactionArt.tsx').matchAll(/^  '([^']+)': require/gm)].map((m) => emojiKey(m[1])));
-    for (const p of EMOJI_PACKS) for (const e of p.emojis) assert.ok(keys.has(emojiKey(e)), `${p.name}: ${e}`);
+  test('her çıkartmanın görseli var, görseller birbirinin kopyası değil', () => {
+    const reactionArt = read('components/ReactionArt.tsx');
+    const files = new Map([...reactionArt.matchAll(/^  '([^']+)': require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
+    assert.deepEqual([...files.keys()].sort(), ALL_STICKERS.map((x) => x.id).sort());
+    const bytes = new Set([...files.values()].map((f) => readFileSync(resolve(SRC, 'components', f)).toString('base64')));
+    assert.equal(bytes.size, files.size, 'aynı görsel iki çıkartmada');
   });
 
   test('mağaza görselleri gerçek ürünlere ve sekmelere bağlı', () => {
@@ -72,19 +75,42 @@ describe('Görsel dosyaları', () => {
   });
 });
 
-describe('Çıkartma mesajı', () => {
-  const keys = ['😂', '❤', '👍', '🔥'];
-  test('yalnız tepki emojisinden oluşan mesaj çıkartma olur', () => {
-    assert.deepEqual(stickersOf('😂', keys), ['😂']);
-    assert.deepEqual(stickersOf(' 😂 🔥 ', keys), ['😂', '🔥']);
-    assert.deepEqual(stickersOf('❤️', keys), ['❤'], 'VS16 olan ve olmayan kalp aynı');
+describe('Emoji ve çıkartma paketleri', () => {
+  test('eski paket kimlikleri korunuyor, satın alınanlar kaybolmuyor', () => {
+    assert.deepEqual(
+      STICKER_PACKS.map((p) => p.id),
+      ['basic', 'fun', 'love', 'animals', 'vip', 'anim'],
+    );
+    assert.deepEqual(FREE_PACK_IDS, ['basic']);
   });
-  test('metin, bilinmeyen emoji veya fazlası düz metin kalır', () => {
-    assert.equal(stickersOf('selam 😂', keys), null);
-    assert.equal(stickersOf('😂🦖', keys), null);
-    assert.equal(stickersOf('👍🏽', keys), null, 'ten rengi ayrı bir emoji');
-    assert.equal(stickersOf('❤️‍🔥', keys), null, 'ZWJ dizisi parçalanmaz');
-    assert.equal(stickersOf('😂😂😂😂', keys), null);
-    assert.equal(stickersOf('', keys), null);
+  test('ücretli paketler yalnız özel çizim çıkartma, standart emojiler ücretsiz ve ayrı', () => {
+    for (const p of STICKER_PACKS) for (const x of p.stickers) assert.match(x.id, /^[a-z0-9-]+$/, `${p.name}: ${x.id}`);
+    const all = STANDARD_EMOJI.flatMap((g) => g.emojis);
+    assert.ok(all.length > 300, `${all.length} emoji`);
+    assert.equal(new Set(all).size, all.length, 'tekrar eden emoji');
+    // Every emoji the old paid packs sold is now in the free standard set.
+    for (const x of ALL_STICKERS) assert.ok(all.includes(x.emoji), `${x.name}: ${x.emoji}`);
+  });
+});
+
+describe('Çıkartma mesajı', () => {
+  const known = (id: string) => ['temel-kahkaha', 'ask-kalp', 'vip-ates'].includes(id);
+  const k = stickerToken('temel-kahkaha');
+  test('yalnız çıkartma token\'ından oluşan mesaj çıkartma olur', () => {
+    assert.deepEqual(stickersOf(k, known), ['temel-kahkaha']);
+    assert.deepEqual(stickersOf(` ${k} ${stickerToken('vip-ates')} `, known), ['temel-kahkaha', 'vip-ates']);
+    assert.equal(stickerIdOf(k), 'temel-kahkaha');
+  });
+  test('standart emoji, metin, bilinmeyen veya fazlası çıkartma olmaz', () => {
+    assert.equal(stickersOf('😂', known), null, 'emoji yazmak ücretli çıkartmayı açmaz');
+    assert.equal(stickerIdOf('😂'), null);
+    assert.equal(stickersOf(`selam ${k}`, known), null);
+    assert.equal(stickersOf(stickerToken('yok'), known), null);
+    assert.equal(stickersOf(k.repeat(4), known), null);
+    assert.equal(stickersOf('', known), null);
+  });
+  test('önizlemede token adıyla yazılır', () => {
+    assert.equal(stickerText(`selam ${k}`, (id) => (id === 'temel-kahkaha' ? 'Kahkaha' : undefined)), 'selam [Kahkaha]');
+    assert.equal(stickerText(stickerToken('yok'), () => undefined), stickerToken('yok'));
   });
 });

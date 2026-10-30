@@ -9,6 +9,7 @@ import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet,
 
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
+import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -44,15 +45,16 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   // Index of the other person's latest message: everything I sent before it counts as read.
   const lastTheirs = messages.map((m) => m.fromMe).lastIndexOf(false);
 
-  const send = (checked = false) => {
-    const text = draft.trim();
+  // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
+  const send = (checked = false, sticker?: string) => {
+    const text = sticker ?? draft.trim();
     if (!text || isBlocked) return;
     if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
     const warning = checked ? null : outgoingWarning(scanMessage(text));
     if (warning) {
       showAlert('Kişisel bilgi paylaşıyorsun', warning, [
         { text: 'Düzenle', style: 'cancel' },
-        { text: 'Yine de gönder', onPress: () => send(true) },
+        { text: 'Yine de gönder', onPress: () => send(true, sticker) },
       ]);
       return;
     }
@@ -66,7 +68,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
     }
     sendMessage(user.id, text);
     setEmojiOpen(false);
-    setDraft('');
+    if (!sticker) setDraft('');
     // Fake reply so the prototype feels real.
     setTyping(true);
     replyTimer.current = setTimeout(() => {
@@ -138,7 +140,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
             </Pressable>
           )
         )}
-        {emojiOpen && <EmojiPanel onPick={(e) => setDraft((d) => d + e)} />}
+        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(false, e) : setDraft((d) => d + e))} />}
         <View style={styles.inputRow}>
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />

@@ -15,7 +15,7 @@ describe('Kasa kuralı: %60 kasa, %40 dağıtım', () => {
     assert.equal(CASINO_HOUSE_SHARE + CASINO_RETURN_SHARE, 1);
   });
 
-  test('her oyun ve her seçimde beklenen geri ödeme %40 (slotlar en fazla 0,1, Altın Ağacı en fazla 0,5 puan altında)', () => {
+  test('her oyun ve her seçimde beklenen geri ödeme %40 (slotlar en fazla 0,1, Bereket Ağacı en fazla 0,5 puan altında)', () => {
     for (const g of GAMES)
       for (const p of PICKS[g]) {
         const r = expectedReturn(g, p);
@@ -42,7 +42,7 @@ describe('Kasa kuralı: %60 kasa, %40 dağıtım', () => {
     assert.deepEqual(PICKS.slot, ['melon', 'seven', 'apple']);
   });
 
-  test('sonuçlar: zar 5–9 kasa, Lucky 77 çarkının dilimleri, Dragon Tiger fark 4’ten azsa kasa', () => {
+  test('sonuçlar: zar 5–9 kasa, Gece Yarısı Çarkı çarkının dilimleri, Ejder ile Kaplan fark 4’ten azsa kasa', () => {
     assert.equal(evaluate('dice', 'big', [3, 4]).multiplier, 0, '4+5=9');
     assert.equal(evaluate('dice', 'big', [4, 4]).multiplier, 2.4, '5+5=10');
     assert.equal(evaluate('dice', 'small', [0, 2]).multiplier, 2.4, '1+3=4');

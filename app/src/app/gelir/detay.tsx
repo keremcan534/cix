@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EarningRow } from '@/app/gelir/index';
 import { Art } from '@/components/Art';
 import { Card } from '@/components/ui';
-import { GIFTS, userById } from '@/data/mock';
+import { userById } from '@/data/mock';
 import { usd } from '@/data/rules';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
@@ -155,13 +155,13 @@ function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () 
         <Empty onRetry={onRetry} />
       </View>
     );
-  // Group by gift (gift price = diamonds earned) and list the top senders for each.
+  // Group by the gift stored with each earning (Lucky apart) and list the top senders for each.
   const groups = new Map<string, { label: string; count: number; total: number; senders: Map<string, number> }>();
   gifts.forEach((e) => {
-    const g = GIFTS.find((x) => x.price === e.amount);
-    const key = g?.id ?? `p${e.amount}`;
-    const cur = groups.get(key) ?? { label: g ? `${g.emoji} ${g.name}` : `🎁 Hediye (${e.amount})`, count: 0, total: 0, senders: new Map<string, number>() };
-    cur.count += 1;
+    const g = e.gift;
+    const key = g ? `${g.id}${g.lucky ? ':lucky' : ''}` : 'unknown';
+    const cur = groups.get(key) ?? { label: g ? `${g.emoji} ${g.name}${g.lucky ? ' (Lucky)' : ''}` : '🎁 Hediye (eski kayıt)', count: 0, total: 0, senders: new Map<string, number>() };
+    cur.count += g?.count ?? 1;
     cur.total += e.amount;
     if (e.fromId) cur.senders.set(e.fromId, (cur.senders.get(e.fromId) ?? 0) + 1);
     groups.set(key, cur);
@@ -196,10 +196,10 @@ function Empty({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.empty}>
       <Art name="maskot-bos-durum-maskotu" size={72} />
-      <Text style={[styles.dim, { fontSize: 15 }]}>Veri yok</Text>
-      <Text style={[styles.dim, { textAlign: 'center' }]}>Lütfen Yeniden Dene butonuna tıklayın{'\n'}veya listeyi aşağı çekerek yenileyin</Text>
+      <Text style={[styles.dim, { fontSize: 15 }]}>Henüz kayıt yok</Text>
+      <Text style={[styles.dim, { textAlign: 'center' }]}>Yeni kazançlar geldikçe burada listelenir.</Text>
       <Pressable onPress={onRetry} style={styles.retry}>
-        <Text style={{ color: '#5EEAF0', fontWeight: '800', fontSize: 16 }}>Yeniden dene</Text>
+        <Text style={{ color: '#5EEAF0', fontWeight: '800', fontSize: 16 }}>Yenile</Text>
       </Pressable>
     </View>
   );

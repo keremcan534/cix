@@ -11,6 +11,7 @@ import { WHEEL } from '@/lib/casino-odds';
 import { casinoAccess, newRequestId, playCasino, useGames, type Entry, type Outcome, type PlayResult } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
+import { StateIcon } from '@/components/ui';
 
 const PICKS: Partial<Record<CasinoGame['id'], [key: string, label: string, art?: ArtName][]>> = {
   dice: [
@@ -120,7 +121,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
 export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?: number }) {
   return (
     <View style={c.lock}>
-      <Text style={{ fontSize: 44 }}>🔒</Text>
+      <StateIcon name="lock-closed" />
       <Text style={c.lockText}>{reason}</Text>
       {needWealth && (
         <Pressable style={c.btn} onPress={() => router.push('/seviye')}>

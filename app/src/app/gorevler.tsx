@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CoinPill, Header } from '@/components/ui';
+import { CoinPill, Header, StateIcon } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { useApp } from '@/store';
@@ -143,7 +143,7 @@ export default function TaskCenter() {
 
         <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
           <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
-            <Text style={{ fontSize: 34 }}>🤝</Text>
+            <StateIcon name="people-outline" size={56} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }}>Ödüllü Davet</Text>
               <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Arkadaşlarını davet et, kayıt ve gelir görevlerinden ödül kazan</Text>
