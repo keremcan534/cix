@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { Avatar, Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';

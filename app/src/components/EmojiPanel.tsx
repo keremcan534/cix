@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { AssetView } from '@/components/fx/anim-player';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, REACTION_TAB_ANIMATED, REACTION_TAB_RECENT, ReactionArt, StickerArt } from '@/components/ReactionArt';

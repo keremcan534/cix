@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import {
@@ -592,7 +593,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addRoomXp(n);
     if (after > before) addMsg({ system: true, text: `🎉 Oda seviyesi Lv.${after} oldu! Açılan: ${ROOM_LEVEL_REWARDS[after - 1]}` });
   };
-
 
   // Announce a new boss once per change (deferred so it isn't a synchronous effect update).
   const lastBoss = useRef<string | null>(null);

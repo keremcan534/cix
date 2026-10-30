@@ -5,8 +5,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
 import { stickerIdOf } from '@/lib/stickers';

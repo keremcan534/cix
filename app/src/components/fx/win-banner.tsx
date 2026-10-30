@@ -3,8 +3,9 @@
 // Visual only (pointerEvents none): it never covers controls for long and never touches the mic or seats.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { NEWS_TTL_MS, shiftWinNews, useWinNews, type WinNews } from '@/lib/broadcast';
 import { colors, semantic } from '@/theme';
 

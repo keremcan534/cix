@@ -4,8 +4,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { VerifiedBadge } from '@/components/ui';
 import { MATCH_ACCEPT_SECONDS, MATCH_GRACE_SECONDS } from '@/data/economy';
 import { userById } from '@/data/mock';

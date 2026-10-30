@@ -4,8 +4,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { ChatThread } from '@/components/chat-thread';
 import { messagePreview } from '@/components/ReactionArt';
 import { Avatar, VerifiedBadge } from '@/components/ui';

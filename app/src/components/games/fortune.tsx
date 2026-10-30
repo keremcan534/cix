@@ -4,8 +4,9 @@
 // any refusal (daily limit, balance, pool). It never touches the room or the microphone.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { Icon3D } from '@/components/Icon3D';
 import { FREE_MULT, FREE_SPINS, LINES, PAYTABLE, REELS, ROWS, SCATTER, STRIPS, SYMBOLS, WILD, reelWindow, type Spin, type Sym } from '@/lib/fortune-slot';

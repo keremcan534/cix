@@ -3,8 +3,9 @@
 // gets its own hue, so a grid reads as a set of different things instead of one repeated tile.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Text } from '@/components/text';
 import { EdgeLight, Gloss, PressableScale } from '@/components/fx/surface';
 import { useApp } from '@/store';
 import { fonts } from '@/theme';
@@ -109,7 +110,7 @@ export function GlossButton({ label, tone = 'money', small, icon }: { label: str
   const look = TONES[tone];
   return (
     <LinearGradient colors={look.colors} style={[s.btn, small && s.btnSmall, tone !== 'locked' && { boxShadow: `0 4px 14px ${look.glow}` }]}>
-      {tone !== 'locked' && <Gloss strength={0.45} />}
+      {tone !== 'locked' && <Gloss strength={0.2} />}
       {icon}
       <Text style={[s.btnText, small && { fontSize: 14 }, { color: look.ink }]}>{label}</Text>
     </LinearGradient>
@@ -129,5 +130,5 @@ const s = StyleSheet.create({
   icon: { position: 'absolute', pointerEvents: 'none' },
   btn: { flexDirection: 'row', gap: 4, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', alignSelf: 'flex-start' },
   btnSmall: { paddingHorizontal: 14, paddingVertical: 5 },
-  btnText: { fontFamily: fonts.display, fontSize: 16, lineHeight: 22 },
+  btnText: { fontFamily: fonts.displayBold, fontSize: 15, lineHeight: 21 },
 });

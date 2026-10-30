@@ -1,8 +1,9 @@
 // Shared building blocks for the agency application screens (applicant form, BD/Admin panel, agency account).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, type KeyboardTypeOptions } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { STATUS_TONE, personName, setViewer, useViewer, type AppStatus, type StatusChange } from '@/lib/agency-apps';
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';

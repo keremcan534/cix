@@ -4,8 +4,9 @@
 // avatar → foreground ornaments (orbit lights, sparkles, crown).
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Text, View } from 'react-native';
+import { Animated, Easing, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { colors } from '@/theme';
 
 export type FrameFx = 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown';

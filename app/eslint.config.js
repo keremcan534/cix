@@ -7,4 +7,23 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    // Text and TextInput come from components/text, which applies the brand typeface by weight.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/components/text.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react-native',
+              importNames: ['Text', 'TextInput'],
+              message: "Text ve TextInput'u '@/components/text' içinden al: marka yazı tipi orada kalınlığa göre uygulanır.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

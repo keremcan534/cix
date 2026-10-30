@@ -2,8 +2,9 @@
 // themes, level badges and the room's own tools. Emoji inside chat lines and system messages stay text.
 // Not delivered or not approved yet (Ailem, speaker queue, room bot, hidden entry) keep their emoji; the
 // camera button keeps its Ionicons on/off glyph.
-import { Image, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Image, View, type StyleProp, type TextStyle } from 'react-native';
 
+import { Text } from '@/components/text';
 import type { RoomTheme, RoomType } from '@/data/catalog';
 
 export const ROOM_TYPE_ART: Record<RoomType, number> = {

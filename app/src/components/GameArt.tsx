@@ -1,7 +1,8 @@
 // Game visuals: each game's 3D cover from the app icon set (components/Art), keyed by game id (data/games).
 // Renk Kartları and Domino have no picture yet and keep their emoji.
-import { Image, Text } from 'react-native';
+import { Image } from 'react-native';
 
+import { Text } from '@/components/text';
 import { artSource, type ArtName } from '@/components/Art';
 
 const COVER: Record<string, ArtName> = {

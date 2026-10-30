@@ -3,8 +3,9 @@
 // else can only mute or pause for themselves, which never changes the room.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Image, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { YouTubePlayer } from '@/components/room/youtube-player';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';

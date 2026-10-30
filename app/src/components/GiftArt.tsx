@@ -2,7 +2,9 @@
 // 192 px for lists, chat and flights, 512 px for the full-screen send animation. Keyed by gift id
 // (GIFTS and the Lucky packages), so an admin renaming a gift or editing its emoji keeps its image.
 // A gift with no image (a new catalog entry) keeps its emoji until one is delivered.
-import { Image, Text, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
+import { Image, type ImageStyle, type StyleProp, type TextStyle } from 'react-native';
+
+import { Text } from '@/components/text';
 
 type Art = { sm: number; lg: number };
 const ART: Record<string, Art> = {

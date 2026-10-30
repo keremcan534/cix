@@ -5,8 +5,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import { BOARDS, LUCKY_WHEEL, type BoardResult } from '@/lib/board-games';

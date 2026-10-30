@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
 import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';

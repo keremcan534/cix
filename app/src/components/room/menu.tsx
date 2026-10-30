@@ -2,8 +2,9 @@
 // own colored light (fx/float) instead of sitting in boxes; game tiles break out of a lit plate.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { FloatIcon, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';

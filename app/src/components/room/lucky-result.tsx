@@ -2,8 +2,9 @@
 // One send can go to several people (one draw each); the card shows the best multiplier and the total.
 // Purely visual (pointerEvents none): it never touches seats, the mic or the voice connection.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { GiftArt } from '@/components/GiftArt';
 import { Icon3D } from '@/components/Icon3D';
 import type { LuckyRecord } from '@/lib/lucky';

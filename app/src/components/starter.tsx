@@ -4,8 +4,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { RewardBurst } from '@/components/fx/reward';
 import { DepthCard } from '@/components/fx/surface';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';

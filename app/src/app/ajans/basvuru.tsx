@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Check, Chips, Field, KV, Note, Section, StatusBadge, Timeline, s } from '@/components/agency-apps';
 import { Button, Header } from '@/components/ui';
 import { showAlert } from '@/lib/alert';

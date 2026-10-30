@@ -3,9 +3,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';

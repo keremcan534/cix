@@ -3,8 +3,9 @@
 // and restarts the line, so the user doesn't reopen the gift panel every time. When the line closes,
 // the wheel goes away. Visual only: it never touches seats, the mic or the voice connection.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { GiftArt } from '@/components/GiftArt';
 import { colors, semantic } from '@/theme';
 

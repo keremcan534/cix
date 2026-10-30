@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
 import { ReactionArt, StickerArt, messagePreview, stickersOf } from '@/components/ReactionArt';

@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { CoinPill, Header, StateIcon } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';

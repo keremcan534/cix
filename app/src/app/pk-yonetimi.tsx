@@ -1,9 +1,10 @@
 // Admin: PK settings (Normal, Takım and cross-room PK), live PKs, history and integrity records. A running PK
 // keeps the settings and scoring it started with; changes here apply to new PKs only.
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { GIFTS, userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';

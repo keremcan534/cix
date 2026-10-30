@@ -2,8 +2,9 @@
 // room entry; this component only shows the result. It never touches the room or the microphone.
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import type { CasinoGame } from '@/data/games';

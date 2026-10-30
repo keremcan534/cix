@@ -2,8 +2,9 @@
 // with a turning light ring and a coin burst, the amount counts up, then it clears itself (~2 s).
 // Tap anywhere to close early. With reduced motion it just fades in and out.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Icon3D, icon3dFor, type Icon3DName } from '@/components/Icon3D';
 import { successHaptic } from '@/lib/haptics';
 import { colors, semantic } from '@/theme';

@@ -2,9 +2,10 @@
 // gifts that go through the real API. The rest of the app still runs on local prototype state; this screen is
 // where the server wallet can be seen and tried until the wallet screens move over.
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { apiEnabled, ensureSignedIn, gift, ledger, newRef, testTopup, type ServerLedgerRow, type ServerUser } from '@/lib/api';
 import { useApp } from '@/store';

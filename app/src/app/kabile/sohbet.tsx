@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { GroupChat, type QuickAction } from '@/components/GroupChat';
 import { GradientButton, StateIcon } from '@/components/ui';

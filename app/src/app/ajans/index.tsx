@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Button, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency';
 import { agenciesOwnedBy, myApplications, useAgencyApps } from '@/lib/agency-apps';
