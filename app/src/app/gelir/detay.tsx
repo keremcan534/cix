@@ -196,10 +196,10 @@ function Empty({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.empty}>
       <Art name="maskot-bos-durum-maskotu" size={72} />
-      <Text style={[styles.dim, { fontSize: 15 }]}>Veri yok</Text>
-      <Text style={[styles.dim, { textAlign: 'center' }]}>Lütfen Yeniden Dene butonuna tıklayın{'\n'}veya listeyi aşağı çekerek yenileyin</Text>
+      <Text style={[styles.dim, { fontSize: 15 }]}>Henüz kayıt yok</Text>
+      <Text style={[styles.dim, { textAlign: 'center' }]}>Yeni kazançlar geldikçe burada listelenir.</Text>
       <Pressable onPress={onRetry} style={styles.retry}>
-        <Text style={{ color: '#5EEAF0', fontWeight: '800', fontSize: 16 }}>Yeniden dene</Text>
+        <Text style={{ color: '#5EEAF0', fontWeight: '800', fontSize: 16 }}>Yenile</Text>
       </Pressable>
     </View>
   );

@@ -15,6 +15,7 @@ import { useMedia } from '@/lib/media';
 import { PHASE_LABEL, cancelMatch, modeLabel, priceOf, resetMatch, setScenario, startMatch, useMatch, type MatchFilter, type MatchMode, type Scenario } from '@/lib/match';
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
+import { IS_DEMO } from '@/lib/build';
 
 const FILTERS: MatchFilter[] = ['Herkes', 'Kadın', 'Erkek'];
 const SCENARIOS: [Scenario, string][] = [
@@ -115,10 +116,12 @@ export default function HemenTanis() {
           {media.call && <Text style={[s.line, { color: colors.gold }]}>• Şu an bire bir görüşmedesin; bitene kadar yeni eşleşme başlatılamaz.</Text>}
         </View>
 
-        <Pressable onPress={() => setShowTest((v) => !v)} accessibilityLabel="Test senaryoları">
-          <Text style={s.testToggle}>{showTest ? '▾' : '▸'} Test senaryosu (demo)</Text>
-        </Pressable>
-        {showTest && (
+        {IS_DEMO && (
+          <Pressable onPress={() => setShowTest((v) => !v)} accessibilityLabel="Test senaryoları">
+            <Text style={s.testToggle}>{showTest ? '▾' : '▸'} Test senaryosu (demo)</Text>
+          </Pressable>
+        )}
+        {IS_DEMO && showTest && (
           <View style={s.card}>
             <View style={s.chips}>
               {SCENARIOS.map(([k, l]) => (

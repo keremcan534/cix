@@ -161,7 +161,7 @@ export function GroupChat({
             <Pressable onPress={() => setEmoji((v) => !v)} accessibilityLabel="Emoji">
               <Ionicons name={emoji ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
             </Pressable>
-            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Bir şey söyle..." placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
+            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Mesaj yaz…" placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
             {onGift && (
               <Pressable onPress={onGift} accessibilityLabel="Hediye">
                 <Text style={{ fontSize: 24 }}>🎁</Text>

@@ -13,9 +13,10 @@ import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { IS_DEMO } from '@/lib/build';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; tag?: string; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean };
+type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; tag?: string; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean };
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
@@ -26,12 +27,12 @@ const GROWTH: Item[] = [
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
   { icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
-  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi') },
-  { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi') },
-  { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi') },
-  { icon: 'leaf-outline', label: 'Lucky hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi') },
-  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki') },
-  { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim') },
+  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true },
+  { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true },
+  { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true },
+  { icon: 'leaf-outline', label: 'Lucky hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true },
+  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true },
+  { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true },
 ];
 const SUPPORT: Item[] = [
   { icon: 'headset-outline', label: 'Müşteri hizmetleri', onPress: () => router.push('/destek') },
@@ -60,7 +61,7 @@ export default function ProfileScreen() {
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
     { icon: 'ribbon-outline', img: 'crown', label: 'Servet ve Cazibe Seviyesi', onPress: () => router.push('/seviye') },
   ];
-  const visible = (m: Item) => (m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
+  const visible = (m: Item) => (m.demoOnly && !IS_DEMO ? false : m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -96,7 +97,7 @@ export default function ProfileScreen() {
 
         <View style={styles.stats}>
           <Stat n={128} label="Takipçiler" />
-          <Stat n={following.size} label="Takip etmek" />
+          <Stat n={following.size} label="Takip" />
           <Pressable style={{ flex: 1, alignItems: 'center', gap: 4 }} onPress={() => router.push('/(tabs)/mesajlar')}>
             {friends[0] ? <Avatar uri={friends[0].avatar} size={30} /> : <Text style={styles.statN}>0</Text>}
             <Text style={styles.statL}>Arkadaşlarım</Text>
@@ -118,9 +119,9 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'SVIP Değil'} colors={['#0A8F95', '#0B3B4A']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
-            <StatusCard title="VIP" sub={vipDays > 0 ? `${vipDays} gün · VIP${vipLevel}` : vipLevel ? `Seviye VIP${vipLevel}` : 'VIP değil'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
-            <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz Alınmadı'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
+            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="VIP" sub={vipLevel ? `VIP${vipLevel}` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
+            <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
         </View>
 
@@ -210,6 +211,7 @@ function Group({ items }: { items: Item[] }) {
   );
 }
 
+/** Status tile; `sub` stays short (the crown art sits in the bottom-right corner). */
 function StatusCard({ title, sub, colors: c, tag, dot, onPress }: { title: string; sub: string; colors: [string, string]; tag?: string; dot?: boolean; onPress: () => void }) {
   return (
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={title}>

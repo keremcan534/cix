@@ -49,7 +49,7 @@ const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', '
 type Tab = 'profil' | 'dinamik' | 'onur' | 'iliski';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'profil', label: 'Profil' },
-  { id: 'dinamik', label: 'dinamik' },
+  { id: 'dinamik', label: 'Dinamik' },
   { id: 'onur', label: 'Onur' },
   { id: 'iliski', label: 'İlişki' },
 ];
