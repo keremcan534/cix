@@ -10,8 +10,12 @@ import { userById } from '@/data/mock';
 import { RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+
+// Inviting is social, so the page leads with coral; reward amounts stay gold (theme: color = meaning).
+const ACCENT = semantic.social;
+const HERO = [semantic.socialFill, '#6E2440'] as const;
 
 // --- Campaign config (demo values; reward amounts are diamond-equivalents shown in USD via usd()) ----
 const DAY = 86_400_000;
@@ -118,7 +122,7 @@ export default function InviteScreen() {
         }
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 110 }}>
-        <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={HERO} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.ticker}>
             <Ionicons name="volume-medium-outline" size={18} color="#fff" />
             <Text style={styles.tickerText} numberOfLines={2}>
@@ -127,7 +131,9 @@ export default function InviteScreen() {
           </View>
           <View style={styles.codeRow}>
             <Text style={styles.codeLabel}>Davet Kodum</Text>
-            <Text style={styles.code}>{inviteCode}</Text>
+            <Text style={styles.code} numberOfLines={1}>
+              {inviteCode}
+            </Text>
             <Pressable onPress={copy} style={styles.copyBtn}>
               <Text style={styles.copyText}>Kopyala</Text>
             </Pressable>
@@ -141,7 +147,7 @@ export default function InviteScreen() {
             onPress={() => showAlert('Kayıt ödülü', 'Şimdi arkadaşlarını davet et ve ilgili görevleri tamamlayarak kayıt ödülü kazan!')}
             style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
           >
-            <LinearGradient colors={['#EA580C', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.signup}>
+            <LinearGradient colors={['rgba(246,189,96,0.22)', 'rgba(22,37,60,0.6)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.signup}>
               <Icon3D name="coin" size={44} />
               <Text style={styles.signupAmount}>{usd(SIGNUP_REWARD)}</Text>
               <Text style={styles.signupText}>
@@ -157,13 +163,13 @@ export default function InviteScreen() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {INCOME_TASKS.map((x) => (
               <View key={x.days} style={styles.taskCard}>
-                <LinearGradient colors={['#F97316', '#C93C4F']} style={styles.taskTop}>
+                <LinearGradient colors={['rgba(246,189,96,0.30)', 'rgba(246,189,96,0.06)']} style={styles.taskTop}>
                   <Text style={styles.taskAmount}>{usd(x.reward)}</Text>
-                  <Text style={{ fontSize: 30 }}>💰</Text>
+                  <Icon3D name="coin" size={30} />
                 </LinearGradient>
                 <Text style={styles.taskGoal}>
-                  {x.days} gün içinde kazanç{'\n'}
-                  {x.goal.toLocaleString('tr-TR')} 💎 ulaştı
+                  {x.days} gün içinde{'\n'}
+                  {x.goal.toLocaleString('tr-TR')} elmas kazanç
                 </Text>
               </View>
             ))}
@@ -211,8 +217,11 @@ export default function InviteScreen() {
             </View>
           </View>
 
-          <LinearGradient colors={['#DC2626', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.countdown}>
-            <Text style={styles.countTitle}>⏰ Sınırlı Süreli Etkinlik Ödülleri</Text>
+          <LinearGradient colors={HERO} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.countdown}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons name="time-outline" size={15} color={colors.gold} />
+              <Text style={styles.countTitle}>Sınırlı süreli etkinlik ödülleri</Text>
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
               <TimeBox value={dd} label="Gün" />
               <Text style={styles.colon}>:</Text>
@@ -237,16 +246,15 @@ export default function InviteScreen() {
                       </View>
                     )}
                   </View>
-                  <LinearGradient colors={done || current ? ['#FBBF24', '#F97316'] : [colors.cardAlt, colors.border]} style={styles.medal}>
+                  <LinearGradient colors={done || current ? semantic.status : [colors.cardAlt, colors.border]} style={styles.medal}>
                     <Text style={[styles.medalText, !(done || current) && { color: colors.textDim }]}>{usd(m.reward)}</Text>
                   </LinearGradient>
-                  <View style={[styles.dot, (done || current) && { borderColor: '#F97316', backgroundColor: done ? '#F97316' : colors.card }]} />
+                  <View style={[styles.dot, (done || current) && { borderColor: colors.gold, backgroundColor: done ? colors.gold : colors.card }]} />
                   <Text style={styles.mileN}>{m.invites}</Text>
                   <Text style={[styles.dim, { textAlign: 'center', fontSize: 12 }]}>Kümülatif{'\n'}davetiyeler</Text>
                   <View style={[styles.mileChip, done ? { backgroundColor: 'rgba(34,197,94,0.18)' } : current ? { backgroundColor: 'rgba(251,191,36,0.18)' } : null]}>
-                    <Text style={[styles.mileChipText, { color: done ? colors.green : current ? colors.gold : colors.textDim }]}>
-                      {done ? '✓ Kazanıldı' : current ? 'Devam Ediyor' : '🔒 Kilidi Açılacak'}
-                    </Text>
+                    <Ionicons name={done ? 'checkmark' : current ? 'hourglass-outline' : 'lock-closed'} size={11} color={done ? colors.green : current ? colors.gold : colors.textDim} />
+                    <Text style={[styles.mileChipText, { color: done ? colors.green : current ? colors.gold : colors.textDim }]}>{done ? 'Kazanıldı' : current ? 'Devam ediyor' : 'Kilitli'}</Text>
                   </View>
                 </View>
               );
@@ -267,11 +275,11 @@ export default function InviteScreen() {
           </View>
           {next ? (
             <Text style={styles.unlock}>
-              🔥 <Text style={{ color: '#F97316', fontWeight: '800' }}>{next.invites - invited}</Text> arkadaş daha davet ederek{' '}
+              <Text style={{ color: ACCENT, fontWeight: '800' }}>{next.invites - invited}</Text> arkadaş daha davet ederek{' '}
               <Text style={{ color: colors.gold, fontWeight: '800' }}>{usd(next.reward)}</Text> ödülünü açın
             </Text>
           ) : (
-            <Text style={styles.unlock}>🎉 Tüm ek bonus ödüllerini açtın!</Text>
+            <Text style={styles.unlock}>Tüm ek bonus ödüllerini açtın!</Text>
           )}
 
           <View style={{ gap: 6 }}>
@@ -281,7 +289,7 @@ export default function InviteScreen() {
               </Text>
             </View>
             <View style={styles.capTrack}>
-              <LinearGradient colors={['#FBBF24', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.capFill, { width: `${(Math.min(invited, INVITE_CAP) / INVITE_CAP) * 100}%` }]} />
+              <LinearGradient colors={semantic.status} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.capFill, { width: `${(Math.min(invited, INVITE_CAP) / INVITE_CAP) * 100}%` }]} />
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={styles.dim}>0</Text>
@@ -293,8 +301,8 @@ export default function InviteScreen() {
         {/* How a successful invite is counted */}
         <Card style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="shield-checkmark-outline" size={20} color="#F97316" />
-            <Text style={[styles.bonusTitle, { fontSize: 17, color: '#F97316' }]}>Başarılı davet nasıl sayılır?</Text>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.primaryText} />
+            <Text style={[styles.bonusTitle, { fontSize: 17 }]}>Başarılı davet nasıl sayılır?</Text>
           </View>
           <Text style={styles.dim}>• Arkadaşın davet kodunla veya davet bağlantınla kayıt olmalıdır.</Text>
           <Text style={styles.dim}>• Kayıttan sonra Gerçek Kişi Doğrulamasını tamamlamalıdır.</Text>
@@ -331,8 +339,9 @@ export default function InviteScreen() {
 
       <View style={styles.sticky}>
         <Pressable onPress={shareInvite} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}>
-          <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.stickyBtn}>
-            <Text style={styles.stickyText}>Arkadaşlarını Davet Et</Text>
+          <LinearGradient colors={['#E2475B', semantic.socialFill]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.stickyBtn}>
+            <Ionicons name="share-social" size={18} color="#fff" />
+            <Text style={styles.stickyText}>Arkadaşlarını davet et</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -343,9 +352,7 @@ export default function InviteScreen() {
 function SectionTitle({ title }: { title: string }) {
   return (
     <View style={styles.sectionTitle}>
-      <Text style={{ color: '#F97316' }}>◆</Text>
       <Text style={styles.sectionTitleText}>{title}</Text>
-      <Text style={{ color: '#F97316' }}>◆</Text>
     </View>
   );
 }
@@ -379,7 +386,7 @@ function Ring({ value, max, label, sub }: { value: number; max: number; label: s
   const r = RING / 2 - 4;
   return (
     <View style={{ width: RING, height: RING }}>
-      <View style={[styles.ring, p >= 1 && { borderColor: '#F97316' }]} />
+      <View style={[styles.ring, p >= 1 && { borderColor: ACCENT }]} />
       <View style={[styles.ringDot, { left: RING / 2 + r * Math.cos(angle) - 6, top: RING / 2 + r * Math.sin(angle) - 6 }]} />
       <View style={styles.ringCenter}>
         <Text style={[styles.bigOrange, { fontSize: 34 }]}>{label}</Text>
@@ -398,18 +405,18 @@ const styles = StyleSheet.create({
   tickerText: { color: '#fff', fontSize: 13, flex: 1 },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
   codeLabel: { color: '#fff', fontSize: 15 },
-  code: { color: '#FB7185', fontWeight: '900', fontSize: 16, flex: 1, letterSpacing: 1 },
-  copyBtn: { backgroundColor: '#F97316', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
-  copyText: { color: '#fff', fontWeight: '800' },
+  code: { color: colors.text, fontWeight: '800', fontSize: 16, flex: 1, letterSpacing: 0.5 },
+  copyBtn: { backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
+  copyText: { color: '#fff', fontWeight: '700' },
   section: { gap: 12 },
-  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: colors.cardAlt, borderRadius: 999, paddingVertical: 8, alignSelf: 'center', paddingHorizontal: 26 },
-  sectionTitleText: { color: '#FDBA74', fontWeight: '900', fontSize: 18 },
-  signup: { borderRadius: 16, padding: 18, alignItems: 'center', gap: 8 },
+  sectionTitle: { flexDirection: 'row', alignItems: 'center' },
+  sectionTitleText: { color: colors.text, fontWeight: '800', fontSize: 18 },
+  signup: { borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(246,189,96,0.45)' },
   signupAmount: { color: colors.gold, fontSize: 44, fontWeight: '900' },
   signupText: { color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 13, lineHeight: 19 },
   taskCard: { flex: 1, backgroundColor: colors.cardAlt, borderRadius: 16, overflow: 'hidden' },
   taskTop: { alignItems: 'center', paddingVertical: 12, gap: 4, borderTopLeftRadius: 60, borderTopRightRadius: 60 },
-  taskAmount: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  taskAmount: { color: colors.gold, fontWeight: '800', fontSize: 16 },
   taskGoal: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', padding: 8, lineHeight: 16 },
   link: { color: colors.gold, fontWeight: '800', textDecorationLine: 'underline' },
   shareCard: { flex: 1, alignItems: 'center', gap: 4, borderTopWidth: 4 },
@@ -418,29 +425,29 @@ const styles = StyleSheet.create({
   shareSub: { color: '#fff', fontWeight: '800', fontSize: 15 },
   bonusTitle: { color: '#fff', fontSize: 22, fontWeight: '900' },
   countdown: { borderRadius: 16, padding: 12, alignItems: 'center', gap: 8 },
-  countTitle: { color: colors.gold, fontWeight: '900', fontSize: 13 },
-  timeBox: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, minWidth: 44, alignItems: 'center', borderWidth: 2, borderColor: '#B91C1C' },
-  timeText: { color: '#B91C1C', fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
+  countTitle: { color: colors.gold, fontWeight: '700', fontSize: 13 },
+  timeBox: { backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, minWidth: 46, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  timeText: { color: colors.text, fontWeight: '800', fontSize: 22, fontVariant: ['tabular-nums'] },
   timeLabel: { color: '#fff', fontSize: 12, fontWeight: '600' },
   colon: { color: '#fff', fontWeight: '900', fontSize: 22, marginTop: 6 },
   milestones: { flexDirection: 'row', backgroundColor: colors.cardAlt, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 4 },
   milestone: { flex: 1, alignItems: 'center', gap: 4, zIndex: 1 },
-  here: { backgroundColor: '#F97316', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  here: { backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   hereText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   medal: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
   medalText: { color: '#3B2300', fontWeight: '900', fontSize: 13 },
   dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3, borderColor: colors.border, backgroundColor: colors.card, marginTop: 4 },
   mileTrack: { position: 'absolute', left: 16, right: 16, top: 10 + 22 + 4 + 62 + 4 + 4 + 6, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mileN: { color: '#fff', fontWeight: '900', fontSize: 16 },
-  mileChip: { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: colors.card, marginTop: 2 },
+  mileChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: colors.card, marginTop: 2 },
   mileChipText: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
   ringRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  ring: { position: 'absolute', left: 4, top: 4, right: 4, bottom: 4, borderRadius: RING, borderWidth: 6, borderColor: 'rgba(249,115,22,0.22)' },
-  ringDot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#F97316' },
+  ring: { position: 'absolute', left: 4, top: 4, right: 4, bottom: 4, borderRadius: RING, borderWidth: 6, borderColor: 'rgba(255,101,118,0.22)' },
+  ringDot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: ACCENT },
   ringCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  bigOrange: { color: '#F97316', fontSize: 30, fontWeight: '900' },
+  bigOrange: { color: ACCENT, fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'] },
   unlock: { color: '#fff', textAlign: 'center', fontSize: 14 },
-  capBubble: { alignSelf: 'flex-start', backgroundColor: '#F97316', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
+  capBubble: { alignSelf: 'flex-start', backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
   capText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   capTrack: { height: 8, borderRadius: 4, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   capFill: { height: 8 },
@@ -448,6 +455,6 @@ const styles = StyleSheet.create({
   cardTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 18 },
   sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, backgroundColor: 'rgba(8,15,30,0.92)' },
-  stickyBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
-  stickyText: { color: '#fff', fontWeight: '900', fontSize: 18 },
+  stickyBtn: { flexDirection: 'row', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
+  stickyText: { color: '#fff', fontWeight: '700', fontSize: 17 },
 });

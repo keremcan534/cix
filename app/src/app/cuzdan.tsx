@@ -10,7 +10,7 @@ import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, fonts, semantic } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
@@ -95,7 +95,10 @@ export default function WalletScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
           <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
-            <Text style={{ color: colors.textDim, fontSize: 16 }}>Jeton bakiyem ⓘ</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={{ color: colors.textDim, fontSize: 15, fontWeight: '500' }}>Jeton bakiyem</Text>
+              <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
+            </View>
             <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
             {IS_DEMO && (
               <Pressable
@@ -121,7 +124,10 @@ export default function WalletScreen() {
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
-            <Text style={styles.flag}>🇹🇷 ▾</Text>
+            <View style={styles.flag}>
+              <Text style={{ fontSize: 14 }}>🇹🇷</Text>
+              <Ionicons name="chevron-down" size={14} color={colors.textDim} />
+            </View>
           </View>
           <View style={styles.grid}>
             {RECHARGE_PACKS.map((p: RechargePack) => {
@@ -129,17 +135,19 @@ export default function WalletScreen() {
               const bonus = first ? p.firstBonus : p.bonus;
               return (
                 <Pressable key={p.id} onPress={() => buy(p)} accessibilityLabel={`${p.coins} jeton paketi`} style={{ width: '31.3%', margin: '1%' }}>
-                  <LinearGradient colors={first ? ['#FB923C', '#F97316'] : ['#2A2433', '#1E1A26']} style={[styles.pack, processing === p.id && { opacity: 0.5 }]}>
+                  <LinearGradient
+                    colors={first ? ['rgba(246,189,96,0.30)', 'rgba(22,37,60,0.96)'] : [colors.cardAlt, colors.card]}
+                    style={[styles.pack, first && styles.packFirst, processing === p.id && { opacity: 0.5 }]}
+                  >
                     {first && (
                       <View style={styles.firstTag}>
-                        <Art name="finans-ilk-alim-firsati" size={14} />
-                        <Text style={styles.firstTagText}>Sadece İlk Defa</Text>
+                        <Text style={styles.firstTagText}>İlk alıma özel</Text>
                       </View>
                     )}
                     <Icon3D name="coin" size={40} />
                     <Text style={styles.packCoins}>{p.coins.toLocaleString('tr-TR')}</Text>
-                    {bonus ? <Text style={[styles.packBonus, first && { color: '#FFF7ED' }]}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
-                    <Text style={[styles.packPrice, first && { color: '#FFF7ED' }]}>{processing === p.id ? 'Bekleniyor…' : p.price}</Text>
+                    {bonus ? <Text style={styles.packBonus}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
+                    <Text style={[styles.packPrice, first && { color: colors.text }]}>{processing === p.id ? 'Bekleniyor…' : p.price}</Text>
                   </LinearGradient>
                 </Pressable>
               );
@@ -168,12 +176,13 @@ const styles = StyleSheet.create({
   balanceN: { color: '#fff', fontSize: 32, fontWeight: '800' },
   section: { color: '#fff', fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
-  pack: { alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130 },
+  pack: { alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  packFirst: { borderColor: 'rgba(246,189,96,0.75)' },
   banner: { marginHorizontal: 16, borderRadius: 14, padding: 16, gap: 4, overflow: 'hidden' },
-  bannerTitle: { color: '#FDE68A', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
-  flag: { color: '#fff', backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, overflow: 'hidden' },
-  firstTag: { position: 'absolute', top: -8, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#DC2626', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
-  firstTagText: { color: '#FDE68A', fontSize: 11, fontWeight: '800' },
+  bannerTitle: { color: '#FDE68A', fontSize: 21, fontFamily: fonts.display, letterSpacing: -0.3 },
+  flag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  firstTag: { position: 'absolute', top: -9, alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  firstTagText: { color: semantic.moneyInk, fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
   packSelected: { borderColor: colors.primaryText },
   bonus: {

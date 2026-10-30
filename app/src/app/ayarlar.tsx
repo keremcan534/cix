@@ -1,64 +1,45 @@
+import type Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { Art, type ArtName } from '@/components/Art';
-import { Avatar, Card, Header } from '@/components/ui';
+import { Art } from '@/components/Art';
+import { Icon3D } from '@/components/Icon3D';
+import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
+import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
 import { GATES } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
+type IconName = keyof typeof Ionicons.glyphMap;
 
-function Toggle({ k, label, art, hint, disabled }: { k: BoolKey; label: string; art?: ArtName; hint?: string; disabled?: boolean }) {
+/** A settings switch bound to one boolean in the store. */
+function Toggle({ k, ...row }: { k: BoolKey; title: string; subtitle?: string; icon?: IconName; leading?: ReactNode; disabled?: boolean }) {
   const { settings, setSetting } = useApp();
-  return (
-    <View style={[styles.row, disabled && { opacity: 0.45 }]}>
-      <View style={{ flex: 1 }}>
-        {art ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Art name={art} size={20} />
-            <Text style={{ color: '#fff', flexShrink: 1 }}>{label}</Text>
-          </View>
-        ) : (
-          <Text style={{ color: '#fff' }}>{label}</Text>
-        )}
-        {hint && <Text style={styles.dim}>{hint}</Text>}
-      </View>
-      <Switch value={settings[k]} disabled={disabled} onValueChange={(v) => setSetting(k, v)} />
-    </View>
-  );
+  return <ListSwitch {...row} value={settings[k]} onChange={(v) => setSetting(k, v)} />;
 }
 
-const NOTIFY_LABELS: [NotifyType, string][] = [
-  ['live', '🔴 Takip ettiklerin canlı yayında'],
-  ['invite', '✉️ Oda ve arkadaş davetleri'],
-  ['event', '📅 Etkinlik hatırlatmaları'],
-  ['agency', '🏢 Ajans duyuruları'],
-  ['fanclub', '💜 Hayran kulübü'],
-  ['game', '🎮 Oyun ve turnuva'],
-  ['payment', '💳 Ödeme ve hak ediş'],
-  ['system', '⚙️ Sistem'],
+const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
+  ['live', 'Takip ettiklerin canlı yayında', 'radio-outline'],
+  ['invite', 'Oda ve arkadaş davetleri', 'mail-outline'],
+  ['event', 'Etkinlik hatırlatmaları', 'calendar-outline'],
+  ['agency', 'Ajans duyuruları', 'business-outline'],
+  ['fanclub', 'Hayran kulübü', 'heart-outline'],
+  ['game', 'Oyun ve turnuva', 'game-controller-outline'],
+  ['payment', 'Ödeme ve hak ediş', 'card-outline'],
+  ['system', 'Sistem', 'settings-outline'],
 ];
 const LOCKED_NOTIFY: NotifyType[] = ['payment', 'system'];
 const nowMs = () => Date.now();
 
-function Chips<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-      {options.map(([v, l]) => (
-        <Pressable key={String(v)} onPress={() => onChange(v)} style={[styles.chip, value === v && { backgroundColor: colors.primary }]}>
-          <Text style={styles.chipText}>{l}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
+const coin = <Icon3D name="coin" size={14} />;
 
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
@@ -67,234 +48,248 @@ export default function SettingsScreen() {
     setSetting('snoozeUntil', h ? nowMs() + h * 3_600_000 : 0);
     if (h) showAlert('Bildirimler ertelendi', `${h} saat boyunca bildirim gelmez. Güvenlik ve ödeme bildirimleri ertelenmez.`);
   };
+  const snoozedUntil = new Date(settings.snoozeUntil).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Ayarlar" />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-        <Text style={styles.section}>Hesap</Text>
-        <Card style={{ gap: 8 }}>
-          <Text style={{ color: '#fff' }}>
-            {me.name} · {phone || 'Telefon bağlı değil'}
-          </Text>
-          <Pressable onPress={() => router.push('/cuzdan')}>
-            <Text style={styles.link}>İşlem geçmişi, satın almalar ve iadeler →</Text>
-          </Pressable>
-          {IS_DEMO && (
-            <Pressable onPress={() => router.push('/sunucu-hesabi')}>
-              <Text style={styles.link}>Sunucu hesabı (veritabanı, test) →</Text>
-            </Pressable>
-          )}
-        </Card>
+      <ScrollView contentContainerStyle={styles.page}>
+        <ListGroup label="Hesap">
+          <ListRow
+            leading={<Avatar uri={me.avatar} size={40} />}
+            title={me.name}
+            subtitle={phone ? `Telefon · ${phone}` : 'Telefon bağlı değil'}
+            onPress={() => router.push('/kullanici/me')}
+          />
+          <ListRow icon="receipt-outline" tone="money" title="İşlem geçmişi" subtitle="Satın almalar ve iadeler" onPress={() => router.push('/cuzdan')} />
+          {IS_DEMO && <ListRow icon="server-outline" tone="neutral" title="Sunucu hesabı" subtitle="Veritabanı bağlantısı ve test" onPress={() => router.push('/sunucu-hesabi')} />}
+        </ListGroup>
 
-        <Text style={styles.section}>Güvenlik</Text>
-        <Card style={{ gap: 10 }}>
-          <Text style={styles.title}>Aktif oturumlar</Text>
+        <ListGroup
+          label="Aktif oturumlar"
+          footer="Yeni cihaz veya alışılmadık konumdan girişte bildirim gönderilir ve SMS doğrulaması istenir. Para çekme, IBAN değişikliği ve ajans transferi gibi hassas işlemlerde yeniden doğrulama yapılır. Kişi başına tek hesap kuralı: aynı cihaz, telefon veya IBAN ile açılmış birden fazla hesap risk incelemesine alınır; ödüller ve hak edişler inceleme bitene kadar bekletilir."
+        >
           {sessions.map((x) => (
-            <View key={x.id} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#fff' }}>
-                  {x.device}
-                  {x.current ? ' · bu cihaz' : ''}
-                </Text>
-                <Text style={styles.dim}>
-                  {x.place} · {x.last}
-                </Text>
-              </View>
-              {!x.current && (
-                <Pressable
-                  style={[styles.chip, { backgroundColor: colors.red }]}
-                  onPress={() => {
-                    endSession(x.id);
-                    notify({ kind: 'security', icon: '🔐', title: 'Oturum sonlandırıldı', body: `${x.device} · ${x.place} oturumu kapatıldı.` });
-                  }}>
-                  <Text style={styles.chipText}>Sonlandır</Text>
-                </Pressable>
-              )}
-            </View>
+            <ListRow
+              key={x.id}
+              icon={/Web/.test(x.device) ? 'desktop-outline' : 'phone-portrait-outline'}
+              tone={x.current ? 'success' : 'neutral'}
+              title={x.device}
+              subtitle={`${x.place} · ${x.current ? 'Şu an aktif' : x.last}`}
+              right={
+                x.current ? (
+                  <View style={styles.liveDot} accessibilityLabel="Şu an kullandığın cihaz" />
+                ) : (
+                  <Pressable
+                    style={styles.endBtn}
+                    accessibilityLabel={`${x.device} oturumunu sonlandır`}
+                    onPress={() => {
+                      endSession(x.id);
+                      notify({ kind: 'security', icon: 'lock-closed', title: 'Oturum sonlandırıldı', body: `${x.device} · ${x.place} oturumu kapatıldı.` });
+                    }}
+                  >
+                    <Text style={styles.endText}>Sonlandır</Text>
+                  </Pressable>
+                )
+              }
+            />
           ))}
-          <Text style={styles.dim}>
-            Yeni cihaz veya alışılmadık konumdan girişte bildirim gönderilir ve SMS doğrulaması istenir. Para çekme, IBAN değişikliği ve ajans transferi gibi hassas işlemlerde yeniden doğrulama yapılır.
-          </Text>
-          <Text style={styles.dim}>
-            Kişi başına tek hesap kuralı: aynı cihaz, telefon veya IBAN ile açılmış birden fazla hesap risk incelemesine alınır; ödüller ve hak edişler inceleme bitene kadar bekletilir.
-          </Text>
-        </Card>
+        </ListGroup>
 
-        <Text style={styles.section}>Harcama</Text>
-        <Card style={{ gap: 10 }}>
-          <Text style={{ color: '#fff' }}>Günlük harcama limiti</Text>
-          <Chips
-            value={settings.dailySpendLimit}
-            options={[
-              [0, 'Limitsiz'],
-              [500, '🪙 500'],
-              [2000, '🪙 2.000'],
-              [10000, '🪙 10.000'],
-            ]}
-            onChange={(v) => setSetting('dailySpendLimit', v)}
+        <ListGroup label="Harcama" footer="Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.">
+          <ListBlock title="Günlük harcama limiti">
+            <ChoiceChips
+              value={settings.dailySpendLimit}
+              options={[
+                [0, 'Limitsiz'],
+                [500, '500', coin],
+                [2000, '2.000', coin],
+                [10000, '10.000', coin],
+              ]}
+              onChange={(v) => setSetting('dailySpendLimit', v)}
+            />
+          </ListBlock>
+        </ListGroup>
+
+        <ListGroup label="Gizlilik">
+          <Toggle k="profilePublic" icon="globe-outline" title="Profilim herkese açık" />
+          <Toggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" />
+          <Toggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
+          <Toggle k="showCurrentRoom" icon="mic-outline" title="Bulunduğum odayı profilimde göster" subtitle="Kapalıyken profilinden odana 'Git' ile gelinemez." />
+          <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Lucky ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
+          <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
+          <Toggle
+            k="invisibleEntry"
+            leading={<Art name="oda-gizli-giris" size={32} />}
+            title="Odalara gizli giriş"
+            subtitle="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez."
+            disabled={!GATES.invisibleEntry(nobleTier)}
           />
-          <Text style={styles.dim}>Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.</Text>
-        </Card>
+        </ListGroup>
 
-        <Text style={styles.section}>Gizlilik</Text>
-        <Card style={{ gap: 12 }}>
-          <Toggle k="profilePublic" label="Profilim herkese açık" />
-          <Toggle k="showOnline" label="Çevrimiçi durumumu göster" />
-          <Toggle k="showLastSeen" label="Son görülme bilgimi göster" hint="Kapatırsan başkalarının son görülmesini de göremezsin." />
-          <Toggle k="showCurrentRoom" label="Bulunduğum odayı profilimde göster" hint="Kapalıyken profilinden odana 'Git' ile gelinemez." />
-          <Toggle k="luckyAnnounce" label="Kazançlarımda adım tüm odalarda görünsün" hint="Lucky ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
-          <Text style={{ color: '#fff' }}>Bana kimler mesaj gönderebilir?</Text>
-          <Chips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
-          <Text style={{ color: '#fff' }}>Beni kimler arayabilir? (ücretli sesli/görüntülü)</Text>
-          <Chips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
-          <Toggle k="cityDiscovery" label="Aynı şehirde keşfedilebilir ol" hint="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
-          <Toggle k="invisibleEntry" label="Odalara gizli giriş" art="oda-gizli-giris" hint="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez." disabled={!GATES.invisibleEntry(nobleTier)} />
-          <Text style={{ color: '#fff' }}>Beni odalara kimler davet edebilir?</Text>
-          <Chips
-            value={settings.invitesFrom}
-            options={[
-              ['everyone', 'Herkes'],
-              ['following', 'Takip ettiklerim'],
-              ['nobody', 'Kimse'],
-            ]}
-            onChange={(v) => setSetting('invitesFrom', v)}
-          />
-        </Card>
+        <ListGroup label="Kimler ulaşabilir">
+          <ListBlock title="Bana kimler mesaj gönderebilir?">
+            <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
+          </ListBlock>
+          <ListBlock title="Beni kimler arayabilir?">
+            <Text style={styles.blockHint}>Ücretli sesli ve görüntülü aramalar</Text>
+            <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
+          </ListBlock>
+          <ListBlock title="Beni odalara kimler davet edebilir?">
+            <ChoiceChips
+              value={settings.invitesFrom}
+              options={[
+                ['everyone', 'Herkes'],
+                ['following', 'Takip ettiklerim'],
+                ['nobody', 'Kimse'],
+              ]}
+              onChange={(v) => setSetting('invitesFrom', v)}
+            />
+          </ListBlock>
+        </ListGroup>
 
-        <Text style={styles.section}>Engellenenler · {blocked.size}</Text>
-        <Card style={{ gap: 10 }}>
+        <ListGroup label={`Engellenenler · ${blocked.size}`} footer="Engellediğin kişiler sana mesaj atamaz, seni arayamaz, hediye veya oda daveti gönderemez.">
           {blocked.size === 0 ? (
-            <Text style={styles.dim}>Kimseyi engellemedin. Engellediğin kişiler sana mesaj atamaz, seni arayamaz, hediye veya oda daveti gönderemez.</Text>
+            <ListRow icon="shield-checkmark-outline" tone="neutral" title="Kimseyi engellemedin" />
           ) : (
             [...blocked].map((id) => {
               const u = userById(id);
               return (
-                <View key={id} style={styles.row}>
-                  <Avatar uri={u.avatar} size={36} />
-                  <Pressable style={{ flex: 1 }} onPress={() => router.push(`/kullanici/${id}`)}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{u.name}</Text>
-                    <Text style={styles.dim}>@{u.username}</Text>
-                  </Pressable>
-                  <Pressable style={styles.chip} onPress={() => toggleBlock(id)} accessibilityLabel={`${u.name} engelini kaldır`}>
-                    <Text style={styles.chipText}>Engeli kaldır</Text>
-                  </Pressable>
-                </View>
+                <ListRow
+                  key={id}
+                  leading={<Avatar uri={u.avatar} size={36} />}
+                  title={u.name}
+                  subtitle={`@${u.username}`}
+                  onPress={() => router.push(`/kullanici/${id}`)}
+                  chevron={false}
+                  right={
+                    <Pressable style={styles.chip} onPress={() => toggleBlock(id)} accessibilityLabel={`${u.name} engelini kaldır`}>
+                      <Text style={styles.chipText}>Engeli kaldır</Text>
+                    </Pressable>
+                  }
+                />
               );
             })
           )}
-        </Card>
+        </ListGroup>
 
-        <Text style={styles.section}>Güvenlik kayıtları</Text>
-        <Card style={{ gap: 6 }}>
+        <ListGroup label="Güvenlik kayıtları">
           {safetyLog.length === 0 ? (
-            <Text style={styles.dim}>Engelleme, şikâyet ve veri talepleri burada tarihleriyle listelenir.</Text>
+            <ListRow icon="document-text-outline" tone="neutral" title="Kayıt yok" subtitle="Engelleme, şikâyet ve veri talepleri burada tarihleriyle listelenir." />
           ) : (
             safetyLog.slice(0, 12).map((l) => (
-              <Text key={l.id} style={styles.dim}>
-                {l.time} · {l.action}
-                {l.targetId ? ` · ${userById(l.targetId).name}` : ''}
-                {l.detail ? ` · ${l.detail}` : ''}
-              </Text>
+              <ListRow
+                key={l.id}
+                icon="document-text-outline"
+                tone="neutral"
+                title={l.action + (l.targetId ? ` · ${userById(l.targetId).name}` : '')}
+                subtitle={l.time + (l.detail ? ` · ${l.detail}` : '')}
+              />
             ))
           )}
-        </Card>
+        </ListGroup>
 
-        <Text style={styles.section}>Görünüm ve erişilebilirlik</Text>
-        <Card style={{ gap: 12 }}>
-          <Toggle k="effectsOff" label="Animasyon ve giriş efektlerini kapat" hint="Hediye animasyonları ve giriş efektleri gösterilmez; oda işlevleri devam eder." />
-          <Toggle k="haptics" label="Dokunuş titreşimi" hint="Butona basınca, mikrofonu açınca ve hediye gönderince telefon hafifçe titrer." />
-          <Toggle k="reduceMotion" label="Hareketi azalt" hint="Geçişler ve titreşimli efektler sadeleştirilir." />
-          <Toggle k="lowData" label="📶 Düşük veri modu" hint="Kapak görselleri düşük çözünürlükte, otomatik oynatma kapalı, ses kalitesi bağlantıya göre düşürülür." />
-        </Card>
+        <ListGroup label="Görünüm ve erişilebilirlik">
+          <Toggle k="effectsOff" icon="sparkles-outline" title="Animasyon ve giriş efektlerini kapat" subtitle="Hediye animasyonları ve giriş efektleri gösterilmez; oda işlevleri devam eder." />
+          <Toggle k="haptics" icon="pulse-outline" title="Dokunuş titreşimi" subtitle="Butona basınca, mikrofonu açınca ve hediye gönderince telefon hafifçe titrer." />
+          <Toggle k="reduceMotion" icon="contrast-outline" title="Hareketi azalt" subtitle="Geçişler ve titreşimli efektler sadeleştirilir." />
+          <Toggle k="lowData" icon="cellular-outline" title="Düşük veri modu" subtitle="Kapak görselleri düşük çözünürlükte, otomatik oynatma kapalı, ses kalitesi bağlantıya göre düşürülür." />
+        </ListGroup>
 
-        <Text style={styles.section}>Bildirimler</Text>
-        <Card style={{ gap: 12 }}>
-          <Toggle k="notifySocial" label="Sosyal (mesaj, takip)" />
-          {NOTIFY_LABELS.map(([k, l]) => (
-            <View key={k} style={styles.row}>
-              <Text style={{ color: '#fff', flex: 1 }}>{l}</Text>
-              <Switch
-                value={settings.notifyTypes[k]}
-                disabled={LOCKED_NOTIFY.includes(k)}
-                onValueChange={(v) => setSetting('notifyTypes', { ...settings.notifyTypes, [k]: v })}
-              />
-            </View>
+        <ListGroup label="Bildirimler" footer="Güvenlik ve ödeme bildirimleri kapatılamaz ve ertelenmez.">
+          <Toggle k="notifySocial" icon="chatbubbles-outline" title="Sosyal" subtitle="Mesajlar ve yeni takipçiler" />
+          {NOTIFY_ROWS.map(([k, title, icon]) => (
+            <ListSwitch
+              key={k}
+              icon={icon}
+              title={title}
+              subtitle={LOCKED_NOTIFY.includes(k) ? 'Her zaman açık' : undefined}
+              value={settings.notifyTypes[k]}
+              disabled={LOCKED_NOTIFY.includes(k)}
+              onChange={(v) => setSetting('notifyTypes', { ...settings.notifyTypes, [k]: v })}
+            />
           ))}
-          <Text style={{ color: '#fff', marginTop: 4 }}>{snoozed ? `🔕 Ertelendi · ${new Date(settings.snoozeUntil).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} saatine kadar` : 'Bildirimleri ertele'}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {[1, 8, 24].map((h) => (
-              <Pressable key={h} onPress={() => snooze(h)} style={styles.chip}>
-                <Text style={styles.chipText}>{h} saat</Text>
-              </Pressable>
-            ))}
-            {snoozed && (
-              <Pressable onPress={() => snooze(0)} style={[styles.chip, { backgroundColor: colors.primary }]}>
-                <Text style={styles.chipText}>Ertelemeyi kaldır</Text>
-              </Pressable>
-            )}
-          </View>
-          <Text style={styles.dim}>Güvenlik ve ödeme bildirimleri kapatılamaz ve ertelenmez.</Text>
-        </Card>
+          <ListBlock title={snoozed ? `Ertelendi · ${snoozedUntil} saatine kadar` : 'Bildirimleri ertele'}>
+            <View style={styles.snoozeRow}>
+              {[1, 8, 24].map((h) => (
+                <Pressable key={h} onPress={() => snooze(h)} style={styles.chip}>
+                  <Text style={styles.chipText}>{h} saat</Text>
+                </Pressable>
+              ))}
+              {snoozed && (
+                <Pressable onPress={() => snooze(0)} style={[styles.chip, styles.chipOn]}>
+                  <Text style={styles.chipText}>Ertelemeyi kaldır</Text>
+                </Pressable>
+              )}
+            </View>
+          </ListBlock>
+        </ListGroup>
 
-        <Text style={styles.section}>Destek</Text>
-        <Card style={{ gap: 10 }}>
-          <Pressable onPress={() => router.push('/destek')}>
-            <Text style={styles.link}>🛟 Destek merkezi ve taleplerim</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Moderasyon kararı' } })}>
-            <Text style={styles.link}>⚖️ Bir karara itiraz et (moderasyon, kısıtlama, transfer, oyun)</Text>
-          </Pressable>
-          <Pressable onPress={() => showAlert('Kullanım Koşulları', 'Demo metni.')}>
-            <Text style={styles.link}>📄 Kullanım koşulları ve gizlilik politikası</Text>
-          </Pressable>
-        </Card>
+        <ListGroup label="Destek">
+          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle="Taleplerin ve yanıtlar" onPress={() => router.push('/destek')} />
+          <ListRow
+            icon="scale-outline"
+            title="Bir karara itiraz et"
+            subtitle="Moderasyon, kısıtlama, transfer veya oyun kararı"
+            onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Moderasyon kararı' } })}
+          />
+          <ListRow icon="document-text-outline" title="Kullanım koşulları ve gizlilik" onPress={() => showAlert('Kullanım Koşulları', 'Demo metni.')} />
+        </ListGroup>
 
-        <Card style={{ gap: 10 }}>
-          <Pressable onPress={requestDataExport}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>📦 Verilerimin kopyasını iste (KVKK)</Text>
-          </Pressable>
-          <Pressable onPress={logout}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Çıkış yap</Text>
-          </Pressable>
+        <ListGroup
+          footer={
+            deletionRequested ? (
+              <Text style={[styles.footnote, { color: semantic.money }]}>
+                Hesap silme talebin alındı. 30 gün içinde tamamlanacak; bu sürede giriş yaparak iptal edebilirsin. Yasal olarak saklanması gereken kayıtlar saklama süresi kadar tutulur.
+              </Text>
+            ) : undefined
+          }
+        >
+          <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="KVKK kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
+          <ListRow icon="log-out-outline" tone="neutral" title="Çıkış yap" onPress={logout} chevron={false} />
           {IS_DEMO && (
-            <Pressable
+            <ListRow
+              icon="refresh-outline"
+              tone="neutral"
+              title="Demo verilerini sıfırla"
+              chevron={false}
               onPress={() =>
                 showAlert('Demo verilerini sıfırla', 'Bakiye, satın alımlar, ayarlar ve sohbetler bu cihazda ilk günkü haline döner. Test için kullanılır.', [
                   { text: 'Vazgeç', style: 'cancel' },
                   { text: 'Sıfırla', style: 'destructive', onPress: resetAll },
                 ])
               }
-            >
-              <Text style={{ color: colors.textDim, fontWeight: '700' }}>Demo verilerini sıfırla</Text>
-            </Pressable>
+            />
           )}
-          {deletionRequested ? (
-            <Text style={{ color: colors.gold }}>Hesap silme talebin alındı. 30 gün içinde tamamlanacak; bu sürede giriş yaparak iptal edebilirsin. Yasal olarak saklanması gereken kayıtlar saklama süresi kadar tutulur.</Text>
-          ) : (
-            <Pressable
+          {!deletionRequested && (
+            <ListRow
+              icon="trash-outline"
+              destructive
+              title="Hesabı sil"
+              chevron={false}
               onPress={() =>
                 showAlert('Hesabı sil', 'Hesabın ve kişisel verilerin silinecek. Aktif abonelikleri mağazadan ayrıca iptal etmen gerekir. Devam edilsin mi?', [
                   { text: 'Vazgeç', style: 'cancel' },
                   { text: 'Silme talebi oluştur', style: 'destructive', onPress: requestDeletion },
                 ])
               }
-            >
-              <Text style={{ color: colors.red, fontWeight: '700' }}>Hesabı sil</Text>
-            </Pressable>
+            />
           )}
-        </Card>
+        </ListGroup>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { color: colors.textDim, fontWeight: '800', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
-  link: { color: '#fff', fontWeight: '600' },
-  title: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  page: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 48, gap: 22 },
+  blockHint: { color: colors.textDim, fontSize: 12, marginTop: -6 },
+  footnote: { fontSize: 12, lineHeight: 17, paddingHorizontal: 4 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: semantic.success, marginRight: 4 },
+  endBtn: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,122,130,0.5)', backgroundColor: 'rgba(255,122,130,0.1)' },
+  endText: { color: semantic.danger, fontWeight: '700', fontSize: 12 },
+  snoozeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chipOn: { backgroundColor: colors.primary },
   chipText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 });

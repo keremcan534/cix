@@ -136,7 +136,7 @@ export default function UserProfile() {
     guard('invite', () => {
       if (sentInvites.includes(`room:${user.id}`)) return showAlert('Davet zaten gönderildi', `${user.name} henüz yanıt vermedi.`);
       setSentInvites((l) => [...l, `room:${user.id}`]);
-      notify({ kind: 'social', icon: '🎙️', title: 'Oda daveti gönderildi', body: `${user.name} kişisini "${myRoom.title}" odana davet ettin.`, href: '/oda/yeni' });
+      notify({ kind: 'social', icon: 'mic', title: 'Oda daveti gönderildi', body: `${user.name} kişisini "${myRoom.title}" odana davet ettin.`, href: '/oda/yeni' });
       showAlert('Davet gönderildi', `${user.name} kabul ederse odana katılır.`);
     });
 
@@ -167,9 +167,9 @@ export default function UserProfile() {
     if (sentInvites.includes(key)) return showAlert('Davet zaten gönderildi', `${target.name} henüz yanıt vermedi.`);
     setSentInvites((l) => [...l, key]);
     const copy = {
-      cp: { icon: '💞', title: 'CP daveti gönderildi', body: `${target.name} kişisine CP oluşturma daveti gönderdin. Kabul ederse ilişki sekmesinde görünecek.` },
-      dost: { icon: '🤝', title: 'Dost daveti gönderildi', body: `${target.name} kişisine dostluk daveti gönderdin.` },
-      meet: { icon: '🏠', title: 'Buluşma odası daveti', body: `${target.name} kişisini buluşma odana davet ettin.` },
+      cp: { icon: 'heart' as const, title: 'CP daveti gönderildi', body: `${target.name} kişisine CP oluşturma daveti gönderdin. Kabul ederse ilişki sekmesinde görünecek.` },
+      dost: { icon: 'people' as const, title: 'Dost daveti gönderildi', body: `${target.name} kişisine dostluk daveti gönderdin.` },
+      meet: { icon: 'home' as const, title: 'Buluşma odası daveti', body: `${target.name} kişisini buluşma odana davet ettin.` },
     }[kind];
     notify({ kind: 'social', ...copy });
     showAlert(copy.title, copy.body);
@@ -733,7 +733,8 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
         </View>
       )}
       <LinearGradient colors={['#FDE68A', '#F59E0B', '#B45309']} style={styles.guardianLabel}>
-        <Text style={styles.guardianText}>👑 KORUMA</Text>
+        <Ionicons name="shield" size={10} color="#5B2A00" />
+        <Text style={styles.guardianText}>KORUMA</Text>
       </LinearGradient>
       {g && guardian && (
         <Text style={[styles.meta, { fontSize: 12, marginTop: 4 }]} numberOfLines={1}>
@@ -874,7 +875,8 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
   return (
     <View style={styles.fanCard}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }}>💜 {name} hayran kulübü</Text>
+        <Ionicons name="heart" size={15} color={colors.pink} style={{ marginRight: 6 }} />
+        <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }}>{name} hayran kulübü</Text>
         <Text style={{ color: colors.gold, fontWeight: '800' }}>
           Lv.{fan.index + 1} · {points} puan
         </Text>
@@ -1436,7 +1438,7 @@ const styles = StyleSheet.create({
   guardian: { width: 96, alignItems: 'center', paddingTop: 14 },
   guardianRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: colors.gold, overflow: 'hidden' },
   guardianImg: { width: '100%', height: '100%' },
-  guardianLabel: { marginTop: -12, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FEF3C7' },
+  guardianLabel: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -12, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FEF3C7' },
   guardianText: { color: '#5B2A00', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
   tabBar: { flexDirection: 'row', justifyContent: 'center', gap: 26, height: TAB_H, backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabItem: { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4, gap: 5 },

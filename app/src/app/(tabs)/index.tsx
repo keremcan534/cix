@@ -46,7 +46,7 @@ const MINE_TABS: { key: MineTab; label: string }[] = [
   { key: 'joined', label: 'Katıl' },
   { key: 'following', label: 'Takip Et' },
 ];
-type Suggestion = { r: Room; reason: string };
+type Suggestion = { r: Room; reason: string; why: keyof typeof Ionicons.glyphMap };
 
 export default function RoomsScreen() {
   const { coins, checkedInToday, notifications, following, recentRooms, blocked, me, myRoom, agencyId, familyId } = useApp();
@@ -75,7 +75,9 @@ export default function RoomsScreen() {
               ? 'Şu an çok hareketli'
               : '';
       const score = (following.has(r.hostId) ? 3 : 0) + (recentRooms.includes(r.id) ? 2 : 0) + (reason.startsWith('İlgi') ? 1 : 0) + r.listeners / 1000;
-      return { r, reason, score };
+      // The icon says which kind of reason it is, so the line reads at a glance.
+      const why: Suggestion['why'] = following.has(r.hostId) ? 'person' : recentRooms.includes(r.id) ? 'time' : reason.startsWith('İlgi') ? 'sparkles' : 'flame';
+      return { r, reason, why, score };
     })
     .filter((x) => x.reason)
     .sort((a, b) => b.score - a.score)
@@ -331,7 +333,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
         <Text style={[styles.section, { paddingHorizontal: 0 }]}>Senin için</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
-        {items.map(({ r, reason }) => (
+        {items.map(({ r, reason, why }) => (
           <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
             <View style={styles.suggestFrame}>
               <Image source={{ uri: r.cover }} style={styles.suggestImg} />
@@ -346,7 +348,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
               {r.title}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Art name="ana-ipucu" size={15} />
+              <Ionicons name={why} size={12} color={why === 'person' ? colors.pink : why === 'flame' ? colors.gold : colors.primaryText} />
               <Text style={[styles.suggestWhy, { flexShrink: 1 }]} numberOfLines={1}>
                 {reason}
               </Text>

@@ -95,7 +95,7 @@ export default function ApplicationDetail() {
   const usable = shown.filter((a) => allowedFor(a.perm));
 
   const tellApplicant = (title: string, body: string) => {
-    if (app.applicantId === 'me') notify({ kind: 'system', icon: '🏢', title, body, href: '/ajans/basvuru' });
+    if (app.applicantId === 'me') notify({ kind: 'system', icon: 'business', title, body, href: '/ajans/basvuru' });
   };
   const done = (err: string | null, ok: string) => {
     if (err) {

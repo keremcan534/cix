@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { Button, Card, GradientButton, Header, StateIcon } from '@/components/ui';
+import { Button, Card, GradientButton, Header, StateIcon, TextLink } from '@/components/ui';
 import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency';
 import { agenciesOwnedBy, myApplications, useAgencyApps } from '@/lib/agency-apps';
 import { showAlert } from '@/lib/alert';
@@ -276,9 +276,7 @@ function MemberView() {
                 </Text>
               )}
               <Text style={styles.dim}>Geçmiş kazançların, eski ve yeni ajansın komisyon dönemleri ayrı korunur. Reddedilirse gerekçe gösterilir; itiraz edebilirsin.</Text>
-              <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'İtiraz' } })}>
-                <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Transfer kararına itiraz et →</Text>
-              </Pressable>
+              <TextLink title="Transfer kararına itiraz et" onPress={() => router.push({ pathname: '/destek', params: { kategori: 'İtiraz' } })} />
             </>
           ) : showTransfer ? (
             <>
@@ -296,9 +294,7 @@ function MemberView() {
               </View>
             </>
           ) : (
-            <Pressable onPress={() => setShowTransfer(true)}>
-              <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Talep oluştur →</Text>
-            </Pressable>
+            <TextLink title="Talep oluştur" onPress={() => setShowTransfer(true)} />
           )}
         </Card>
 

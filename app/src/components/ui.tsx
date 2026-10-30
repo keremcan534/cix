@@ -191,8 +191,19 @@ const styles = StyleSheet.create({
   wealthNum: { fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
+  textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   headerTitle: { color: '#fff', fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flex: 1, textAlign: 'center' },
 });
+
+/** Secondary action inside a card: colored text with a chevron instead of a typed arrow. */
+export function TextLink({ title, onPress, color = colors.primaryText }: { title: string; onPress: () => void; color?: string }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={styles.textLink}>
+      <Text style={{ color, fontWeight: '700' }}>{title}</Text>
+      <Ionicons name="chevron-forward" size={14} color={color} />
+    </Pressable>
+  );
+}
 
 export function Header({ title, right }: { title: string; right?: ReactNode }) {
   return (

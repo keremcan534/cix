@@ -285,7 +285,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Entry effects on screen: mine when I join, then other people's (one at a time).
   const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || settings.effectsOff || !entryInfo ? null : entryInfo.show));
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
-    { id: 'w', system: true, text: 'Odaya hoş geldin! Saygılı ol, iyi eğlenceler 💜' },
+    { id: 'w', system: true, text: 'Odaya hoş geldin! Saygılı ol, iyi eğlenceler.' },
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
     ...(botOn ? [{ id: 'bot0', bot: true, text: `Merhaba ${ME.name}! ${BOT_TIPS[0]}` }] : []),
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
@@ -995,7 +995,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setTimeout(() => {
       setMembership('member');
       addMsg({ system: true, text: `✅ ${title} odasının üyesi oldun` });
-      notify({ kind: 'social', icon: '🏠', title: 'Oda üyeliğin onaylandı', body: title, href: `/oda/${id}` });
+      notify({ kind: 'social', icon: 'home', title: 'Oda üyeliğin onaylandı', body: title, href: `/oda/${id}` });
     }, 2000);
   };
 
@@ -1789,21 +1789,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
             <View style={{ flex: 1 }}>
               <Pressable onPress={() => setPanel('info')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                {!!password && <Ionicons name="lock-closed" size={13} color={colors.textDim} />}
                 <Text style={styles.title} numberOfLines={1}>
-                  {password ? '🔒 ' : ''}
                   {title}
                 </Text>
                 <View style={styles.levelBadge}>
                   <Text style={styles.levelText}>Lv.{level}</Text>
                 </View>
               </Pressable>
-              <Pressable onPress={() => setPeopleOpen(true)} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
-                <Text style={styles.sub} numberOfLines={1}>
-                  {typeInfo.emoji} {typeInfo.name} · 👥 {listeners} · 🎙️ {capacity}
+              <Pressable onPress={() => setPeopleOpen(true)} style={styles.subRow} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
+                <Ionicons name="people" size={11} color={colors.textDim} />
+                <Text style={styles.sub}>{listeners}</Text>
+                <Ionicons name="mic" size={11} color={colors.textDim} style={{ marginLeft: 4 }} />
+                <Text style={styles.sub}>{capacity}</Text>
+                {invisible && <Ionicons name="eye-off" size={11} color={colors.textDim} style={{ marginLeft: 4 }} accessibilityLabel="Gizli giriş" />}
+                <Text style={[styles.sub, { flexShrink: 1, marginLeft: 2 }]} numberOfLines={1}>
+                  {' · '}
+                  {typeInfo.name}
                   {layout ? ` · ${modeById(layout.modeId).name}` : ''}
-                  {agencyRoom ? ' · 🏢 Ajans odası' : ''}
-                  {myRole === 'owner' ? ' · Sahibi' : myRole === 'admin' ? ' · 🛡️ Yönetici' : ''}
-                  {invisible ? ' · 👻' : ''}
+                  {agencyRoom ? ' · Ajans odası' : ''}
+                  {myRole === 'owner' ? ' · Sahibi' : myRole === 'admin' ? ' · Yönetici' : ''}
                 </Text>
               </Pressable>
             </View>
@@ -2159,7 +2164,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           const e = events.find((x) => x.id === eid);
           setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
           // One reminder per event (no duplicates); respects the user's notification choices.
-          if (e && !e.reminder) notify({ kind: 'social', icon: '⏰', title: `Hatırlatma kuruldu: ${e.title}`, body: `${e.when} · ${title}`, href: `/oda/${id}` });
+          if (e && !e.reminder) notify({ kind: 'social', icon: 'alarm', title: `Hatırlatma kuruldu: ${e.title}`, body: `${e.when} · ${title}`, href: `/oda/${id}` });
         }}
         onCancel={(eid) => {
           const e = events.find((x) => x.id === eid);
@@ -2295,6 +2300,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   title: { color: '#fff', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12 },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   levelBadge: { backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(165,243,245,0.35)', boxShadow: '0 0 8px rgba(19,217,223,0.35)' },
   levelText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reqBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.red, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },

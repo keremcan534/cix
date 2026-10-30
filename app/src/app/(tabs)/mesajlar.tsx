@@ -144,7 +144,7 @@ export default function MessagesScreen() {
           <SystemRow
             icon={<Icon3D name="coin" size={30} />}
             iconColors={['#F59E0B', '#FBBF24']}
-            title="Jeton kazan Kabile'sine Katıl"
+            title="Kabileye katıl, jeton kazan"
             subtitle="Haydi birlikte ücretsiz sohbet edelim!"
             onPress={() => router.push('/aile')}
           />
@@ -152,15 +152,13 @@ export default function MessagesScreen() {
           <SystemRow
             icon={<Ionicons name="eye" size={22} color="#fff" />}
             iconColors={['#FF8A97', '#FF6576']}
-            title="Profilimi Kimler Ziyaret Etti"
-            subtitle="O çok utangaç, sık sık seni gizlice ziyaret ediyor"
+            title="Profil ziyaretçilerin"
+            subtitle="Biri seni sık sık gizlice ziyaret ediyor"
             onPress={openVisitors}
             right={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 {!visitorsSeen && visitors.length > 0 && <CountBadge n={visitors.length} />}
-                <Pressable style={styles.viewBtn} onPress={openVisitors}>
-                  <Text style={styles.viewBtnText}>Görüntüle</Text>
-                </Pressable>
+                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
               </View>
             }
           />
@@ -241,7 +239,7 @@ export default function MessagesScreen() {
 function TabButton({ label, active, badge, onPress }: { label: string; active: boolean; badge: number; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={styles.tabBtn} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-      <View>
+      <View style={styles.tabLabel}>
         <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
         {badge > 0 && (
           <View style={styles.tabBadge}>
@@ -477,10 +475,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'transparent',
   },
+  tabLabel: { flexDirection: 'row', alignItems: 'flex-start', gap: 3 },
+  // Inline beside the label so it takes its own space instead of covering the next tab.
   tabBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -16,
     backgroundColor: colors.red,
     borderRadius: 9,
     minWidth: 18,
@@ -539,15 +536,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.cardAlt,
   },
-  viewBtn: {
-    backgroundColor: colors.cardAlt,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: colors.primaryText,
-  },
-  viewBtnText: { color: colors.primaryText, fontSize: 12, fontWeight: '700' },
   empty: {
     color: colors.textDim,
     textAlign: 'center',

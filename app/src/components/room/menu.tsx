@@ -108,7 +108,7 @@ function Badge({ badge }: { badge: MenuItem['badge'] }) {
         <Ionicons name={badge === 'on' ? 'checkmark' : 'close'} size={12} color={badge === 'on' ? semantic.successInk : '#fff'} />
       </View>
     );
-  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : '#2563EB' }]}>{badge}</Text>;
+  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : colors.primary }]}>{badge === 'NEW' ? 'YENİ' : badge}</Text>;
   if (typeof badge === 'number' && badge > 0) return <Text style={[styles.ribbon, { backgroundColor: colors.red, left: undefined, right: -4 }]}>{badge}</Text>;
   return null;
 }

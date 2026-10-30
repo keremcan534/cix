@@ -1,3 +1,4 @@
+import type Ionicons from '@expo/vector-icons/Ionicons';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
@@ -27,7 +28,8 @@ export type EarningGift = { id: string; name: string; emoji: string; count: numb
 export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string; gift?: EarningGift };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
 export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond' | 'game'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
-export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: string; title: string; body: string; time: string; read: boolean; href?: string };
+/** `icon` is an Ionicons glyph; notices saved before that held an emoji, and the list falls back to the kind's icon for them. */
+export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: keyof typeof Ionicons.glyphMap; title: string; body: string; time: string; read: boolean; href?: string };
 export type Ticket = { id: string; number: string; category: TicketCategory; text: string; status: 'Açık' | 'Yanıtlandı' | 'Çözüldü' | 'Yeniden açıldı'; time: string; replies: { from: 'me' | 'support'; text: string; time: string }[] };
 export type NotifyType = 'live' | 'invite' | 'event' | 'agency' | 'fanclub' | 'game' | 'payment' | 'system';
 export type Settings = {
@@ -461,9 +463,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setHapticsEnabled(settings.haptics);
   }, [settings]);
   const [notifications, setNotifications] = useState<Notice[]>(s.notifications ?? [
-    { id: 'n1', kind: 'social', icon: '👋', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
-    { id: 'n2', kind: 'system', icon: '🎉', title: "Similar Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
-    { id: 'n3', kind: 'social', icon: '🎤', title: 'Karaoke Akşamı başladı', body: 'Melis seni odaya davet ediyor.', time: '18:30', read: true, href: '/oda/r2' },
+    { id: 'n1', kind: 'social', icon: 'hand-left', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
+    { id: 'n2', kind: 'system', icon: 'sparkles', title: "Similar Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
+    { id: 'n3', kind: 'social', icon: 'mic', title: 'Karaoke Akşamı başladı', body: 'Melis seni odaya davet ediyor.', time: '18:30', read: true, href: '/oda/r2' },
   ]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [deletionRequested, setDeletionRequested] = useState(false);
@@ -561,7 +563,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     charmRef.current += n;
     setCharmXp(charmRef.current);
     const after = charmLevelOf(charmRef.current);
-    if (after > before) notify({ kind: 'system', icon: '🌹', title: `Cazibe seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
+    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Cazibe seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
   };
 
   const notify = (n: Omit<Notice, 'id' | 'time' | 'read'>) => {
@@ -594,7 +596,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       wealthRef.current += n;
       setWealthXp(wealthRef.current);
       const after = wealthLevelOf(wealthRef.current);
-      if (after > before) notify({ kind: 'system', icon: '💰', title: `Servet seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Servet Seviyesi sayfasında gör.', href: '/seviye' });
+      if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Servet seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Servet Seviyesi sayfasında gör.', href: '/seviye' });
     }
     return true;
   };
@@ -684,7 +686,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
               : x,
           ),
         );
-        notify({ kind: 'system', icon: '🛟', title: `Destek yanıtı · #${number}`, body: 'Talebine yanıt geldi.', href: '/destek' });
+        notify({ kind: 'system', icon: 'help-buoy', title: `Destek yanıtı · #${number}`, body: 'Talebine yanıt geldi.', href: '/destek' });
       }, 4000);
       return number;
     },
@@ -724,7 +726,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       log('diamond', -amount, 'Para çekme talebi', 'Beklemede');
       setTimeout(() => {
         setWithdrawals((w) => w.map((x) => (x.id === id ? { ...x, status: 'Onaylandı' } : x)));
-        notify({ kind: 'finance', icon: '🏦', title: 'Para çekme onaylandı', body: `${amount.toLocaleString('tr-TR')} elmas hesabına aktarılıyor.`, href: '/yayinci/cek' });
+        notify({ kind: 'finance', icon: 'card', title: 'Para çekme onaylandı', body: `${amount.toLocaleString('tr-TR')} elmas hesabına aktarılıyor.`, href: '/yayinci/cek' });
       }, 5000);
       return null;
     },
@@ -804,7 +806,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         setPendingAgency(null);
         setAgencyId(a.id);
         setAgencyRole('member');
-        notify({ kind: 'system', icon: '🏢', title: `${a.name} başvurunu kabul etti`, body: 'Artık ajans yayıncısısın.', href: '/ajans' });
+        notify({ kind: 'system', icon: 'business', title: `${a.name} başvurunu kabul etti`, body: 'Artık ajans yayıncısısın.', href: '/ajans' });
       }, 3000);
       return null;
     },
@@ -848,7 +850,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         ],
       };
       setTransfer(base);
-      notify({ kind: 'system', icon: '📨', title: 'Transfer talebin mevcut ajansa iletildi', body: 'Ajans sahibine bildirim gitti.', href: '/ajans' });
+      notify({ kind: 'system', icon: 'paper-plane', title: 'Transfer talebin mevcut ajansa iletildi', body: 'Ajans sahibine bildirim gitti.', href: '/ajans' });
       // Demo timeline: owner approves (paid if moving to another agency), target accepts, link switches.
       setTimeout(() => {
         setTransfer((t) =>
@@ -859,7 +861,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
             steps: t.steps.map((st, i) => (i === 1 ? { ...st, status: 'Onaylandı', time: now(), note: to ? `Ücretli transfer · ${fee.toLocaleString('tr-TR')} 💎` : 'Ücretsiz ayrılma' } : st)),
           },
         );
-        notify({ kind: 'system', icon: '✅', title: 'Mevcut ajans transferi onayladı', body: to ? `Ücretli transfer · ${fee.toLocaleString('tr-TR')} elmas (hedef ajans öder)` : 'Ayrılma onaylandı', href: '/ajans' });
+        notify({ kind: 'system', icon: 'checkmark-circle', title: 'Mevcut ajans transferi onayladı', body: to ? `Ücretli transfer · ${fee.toLocaleString('tr-TR')} elmas (hedef ajans öder)` : 'Ayrılma onaylandı', href: '/ajans' });
       }, 2500);
       setTimeout(() => {
         setTransfer((t) => t && { ...t, status: 'Tamamlandı', steps: t.steps.map((st) => (st.status === 'Bekliyor' ? { ...st, status: 'Tamamlandı', time: now() } : st)) });
@@ -870,7 +872,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
           setAgencyId(null);
           setAgencyRole(null);
         }
-        notify({ kind: 'system', icon: '🏢', title: to ? `${to.name} ajansına geçişin tamamlandı` : 'Ajanstan ayrıldın', body: 'Geçmiş kazançların ve komisyon dönemlerin ayrı ayrı korunuyor.', href: '/ajans' });
+        notify({ kind: 'system', icon: 'business', title: to ? `${to.name} ajansına geçişin tamamlandı` : 'Ajanstan ayrıldın', body: 'Geçmiş kazançların ve komisyon dönemlerin ayrı ayrı korunuyor.', href: '/ajans' });
       }, 6000);
       return null;
     },
@@ -925,12 +927,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         setMe({ ...ME });
         setPendingAvatar((p) => (p === uri ? null : p));
         logSafety('Fotoğraf onaylandı');
-        notify({ kind: 'system', icon: '🖼️', title: 'Profil fotoğrafın onaylandı', body: 'Yeni fotoğrafın artık herkese görünüyor.', href: '/kullanici/me' });
+        notify({ kind: 'system', icon: 'image', title: 'Profil fotoğrafın onaylandı', body: 'Yeni fotoğrafın artık herkese görünüyor.', href: '/kullanici/me' });
       }, 4000);
     },
     requestDataExport: () => {
       logSafety('Veri dökümü istedi');
-      notify({ kind: 'security', icon: '📦', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası 30 gün içinde kayıtlı e-postana gönderilir (KVKK md. 11).' });
+      notify({ kind: 'security', icon: 'archive', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası 30 gün içinde kayıtlı e-postana gönderilir (KVKK md. 11).' });
     },
     conversations,
     sendMessage: (userId, text, fromMe = true, room) =>

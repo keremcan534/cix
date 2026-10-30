@@ -60,7 +60,12 @@ export function StarterPath() {
           <Text style={[s.stepText, x.done && s.stepDone]} numberOfLines={1}>
             {x.title}
           </Text>
-          {x.done ? <Ionicons name="checkmark-circle" size={22} color={semantic.success} /> : <Text style={s.go}>Git →</Text>}
+          {x.done ? <Ionicons name="checkmark-circle" size={22} color={semantic.success} /> : (
+            <View style={s.goPill}>
+              <Text style={s.go}>Git</Text>
+              <Ionicons name="chevron-forward" size={13} color={semantic.action} />
+            </View>
+          )}
         </Pressable>
       ))}
 
@@ -77,7 +82,13 @@ export function StarterPath() {
           <Text style={s.claimText}>Hepsi tamam! {REWARD} jetonu al</Text>
         </Pressable>
       )}
-      {next && <Text style={s.hint}>Hepsini bitirince 🪙 {REWARD} hediye</Text>}
+      {next && (
+        <View style={s.hintRow}>
+          <Text style={s.hint}>Hepsini bitirince</Text>
+          <Icon3D name="coin" size={14} />
+          <Text style={s.hint}>{REWARD} hediye</Text>
+        </View>
+      )}
 
       <Modal visible={celebrate} transparent animationType="fade" onRequestClose={() => setCelebrate(false)}>
         {celebrate && <RewardBurst reward={{ icon: 'trophy', title: 'İlk adımları tamamladın!', amount: REWARD }} still={settings.reduceMotion} onDone={() => setCelebrate(false)} />}
@@ -97,7 +108,9 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   stepText: { color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 },
   stepDone: { color: colors.textDim, textDecorationLine: 'line-through' },
-  go: { color: semantic.action, fontWeight: '800', fontSize: 13 },
+  goPill: { flexDirection: 'row', alignItems: 'center', gap: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(19,217,223,0.12)' },
+  go: { color: semantic.action, fontWeight: '700', fontSize: 13 },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   hint: { color: colors.textDim, fontSize: 12 },
   claim: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: semantic.money, borderRadius: 999, paddingVertical: 11 },
   claimText: { color: semantic.moneyInk, fontWeight: '900', fontSize: 15 },
