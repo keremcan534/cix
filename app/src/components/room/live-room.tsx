@@ -1303,7 +1303,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     successHaptic();
     const total = each * delivered.length;
-    delivered.forEach((r) => logGift('me', r.userId, gift, count));
+    delivered.forEach((r) => {
+      logGift('me', r.userId, gift, count);
+      app.recordGift(r.userId, gift.id, count);
+    });
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
@@ -1363,6 +1366,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     successHaptic();
     records.forEach((r) => {
       logGift('me', r.toId, { id: r.giftId, name: r.giftName, emoji: r.emoji, price: r.price }, 1);
+      app.recordGift(r.toId, r.giftId, 1);
       // PK scores the recipient's 20 % share of the gift value, never the reward.
       scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r));
     });

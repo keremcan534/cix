@@ -25,7 +25,7 @@ export default function CallScreen() {
   const user = userById(id);
   const video = mode !== 'sesli';
   const price = video ? callPrice(user) : Math.round(callPrice(user) / 2);
-  const { coins, spendCoins, bump, me, blocked, following } = useApp();
+  const { coins, spendCoins, bump, recordGift, me, blocked, following } = useApp();
 
   const [phase, setPhase] = useState<Phase>('ringing');
   const [seconds, setSeconds] = useState(0);
@@ -117,8 +117,9 @@ export default function CallScreen() {
 
   const sendGift = () => {
     const gift = GIFTS[2];
-    if (!spendCoins(gift.price)) return showAlert('Yetersiz jeton');
+    if (!spendCoins(gift.price, `Hediye: ${gift.name} → ${user.name}`)) return showAlert('Yetersiz jeton');
     bump('giftsSent');
+    recordGift(user.id, gift.id, 1);
     setFloating(gift);
     setTimeout(() => setFloating(null), 1200);
   };

@@ -61,7 +61,6 @@ export type Settings = {
   micDenoise: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
-  bigSpendConfirm: number; // coins; extra confirmation above this (0 = off, the default)
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
   luckyAnnounce: boolean;
   /** VIP "Seviyeyi Gizle": hide my Servet / Cazibe badges from others while VIP is active. */
@@ -159,6 +158,10 @@ type AppState = {
   // tasks & check-in
   stats: Record<TaskKey, number>;
   bump: (key: TaskKey, n?: number) => void;
+  /** Gifts each user has received through this app (userId → giftId → count); 'me' is my own gift wall. */
+  giftWall: Record<string, Record<string, number>>;
+  /** Puts `count` of a gift on `toId`'s gift wall. */
+  recordGift: (toId: string, giftId: string, count: number) => void;
   claimedTasks: Set<string>;
   claimTask: (taskId: string) => void;
   checkInDay: number;
@@ -270,6 +273,7 @@ type Snapshot = {
   earnings: Earning[];
   withdrawals: Withdrawal[];
   stats: Record<TaskKey, number>;
+  giftWall?: Record<string, Record<string, number>>;
   claimedTasks: string[];
   checkInDay: number;
   checkInDate: string;
@@ -369,6 +373,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
 
   const [stats, setStats] = useState<Record<TaskKey, number>>(s.stats ?? { roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 });
+  const [giftWall, setGiftWall] = useState<Record<string, Record<string, number>>>(s.giftWall ?? {});
+  const recordGift = (toId: string, giftId: string, count: number) =>
+    setGiftWall((w) => ({ ...w, [toId]: { ...w[toId], [giftId]: (w[toId]?.[giftId] ?? 0) + count } }));
   const [claimedTasks, setClaimedTasks] = useState<Set<string>>(new Set(s.claimedTasks));
   const [checkInDay, setCheckInDay] = useState(s.checkInDay ?? 2); // demo: user already has a 2-day streak
   const [checkInDate, setCheckInDate] = useState(s.checkInDate ?? '');
@@ -440,7 +447,6 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     bigGiftsOnly: false, micDenoise: true,
     invitesFrom: 'everyone',
     dailySpendLimit: 0,
-    bigSpendConfirm: 0,
     luckyAnnounce: true,
     hideWealth: false,
     hideCharm: false,
@@ -524,7 +530,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const snapshot: Snapshot = {
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
-    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats,
+    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     following: [...following], blocked: [...blocked], conversations, followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
@@ -543,6 +549,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   };
   const receiveDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
     creditDiamonds(n, source, fromId, gift);
+    if (source === 'Hediye' && gift) recordGift('me', gift.id, gift.count);
     if (source !== 'Hediye' && source !== 'Arama') return;
     // Cazibe: gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
     const before = charmLevelOf(charmRef.current);
@@ -716,6 +723,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
     stats,
     bump: (key, n = 1) => setStats((s) => ({ ...s, [key]: s[key] + n })),
+    giftWall,
+    recordGift,
     claimedTasks,
     claimTask: (taskId) => {
       const task = TASKS.find((t) => t.id === taskId);
