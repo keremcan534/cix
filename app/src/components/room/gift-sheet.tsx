@@ -86,11 +86,12 @@ export function GiftSheet({
   listeners: string[];
   initialTo?: string | null;
   coins: number;
-  onSend: (g: Gift, to: string[], count: number) => void;
+  /** False when nothing was delivered (offline, no balance); the backpack is only charged on true. */
+  onSend: (g: Gift, to: string[], count: number) => boolean;
   /** `count` Lucky gifts to each person picked (one draw per gift). */
   onSendLucky: (giftId: string, toIds: string[], count: number) => void;
 }) {
-  const { svipLevel, spentTotal, me } = useApp();
+  const { svipLevel, spentTotal, me, spendBlock } = useApp();
   const lucky = useLucky();
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
@@ -118,12 +119,16 @@ export function GiftSheet({
   const isLucky = shelf === 'lucky' && !!lg;
   const list = shelfGifts(shelf, sort, favs, bag);
   const gift = GIFTS.find((g) => g.id === sel.id) ?? GIFTS[0];
+  // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
+  const onShelf = shelf === 'lucky' ? !!lg : list.some((it) => it.id === sel.id && sel.bag === (shelf === 'bag'));
   const fromBag = sel.bag;
   const locked = !fromBag && isLocked(gift, svipLevel);
   const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * count * targets.length;
   const short = fromBag ? 0 : total - coins;
   const bagNeed = count * targets.length;
   const bagShort = fromBag && bagNeed > (bag[gift.id] ?? 0);
+  // The daily spending limit (Ayarlar > Harcama kontrolü) is shown here, before the tap, like the balance.
+  const overLimit = total > 0 && total <= coins ? spendBlock(total) : null;
 
   const level = levelOf(spentTotal);
   const nextXp = LEVEL_XP[level];
@@ -165,23 +170,26 @@ export function GiftSheet({
 
   const luckyBlock = isLucky ? (me.age < LUCKY_MIN_AGE ? `Lucky hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` : unavailable(lg)) : null;
   const sendLucky = () => {
-    if (!targets.length || luckyBlock) return;
+    if (!targets.length || luckyBlock || overLimit) return;
     if (total > coins) return goWallet();
     pressHaptic();
     onSendLucky(lg.id, targets, count);
   };
 
   const send = () => {
+    if (!onShelf) return;
     if (isLucky) return sendLucky();
     if (!targets.length || locked || bagShort) return;
     if (fromBag) {
+      // Stock goes down only after the gift really went out (offline sends nothing).
+      if (!onSend({ ...gift, price: 0 }, targets, count)) return;
       const next = { ...bag, [gift.id]: (bag[gift.id] ?? 0) - bagNeed };
       Object.assign(backpackStock, next);
       setBag(next);
-      onSend({ ...gift, price: 0 }, targets, count);
       return;
     }
     if (short > 0) return goWallet();
+    if (overLimit) return;
     pressHaptic();
     onSend(gift, targets, count);
   };
@@ -191,11 +199,15 @@ export function GiftSheet({
   // Footer state: exactly one message and one primary action at a time.
   const footer = !targets.length
     ? { tone: 'info' as const, text: roomIds.length ? 'Hediyeyi kime göndereceğini yukarıdan seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
+    : !onShelf
+      ? { tone: 'info' as const, text: shelf === 'lucky' ? 'Şu an gönderilebilecek Lucky hediye yok.' : 'Bu rafta gönderilecek hediye yok. Başka bir raftan seç.', cta: 'Önce hediye seç', disabled: true }
     : isLucky
       ? luckyBlock
         ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
         : total > coins
           ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
+          : overLimit
+            ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
           : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : locked
       ? { tone: 'lock' as const, text: `${gift.name}, SVIP ${gift.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`, cta: 'SVIP ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
@@ -205,6 +217,8 @@ export function GiftSheet({
           ? { tone: 'info' as const, text: `${BACKPACK_SOURCES[gift.id] ?? 'Çanta'} · jeton harcanmaz.`, cta: 'Ücretsiz gönder', variant: 'hero' as const }
           : short > 0
             ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
+            : overLimit
+              ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
             : { tone: 'info' as const, text: `Gönderimden sonra kalan bakiye: ${fmt(coins - total)} jeton`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const };
 
   return (

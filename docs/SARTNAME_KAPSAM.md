@@ -30,7 +30,7 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | M20 Destek merkezi: SSS, kategori, talep no, yanıt, yeniden açma | ✅ | `destek` |
 | M22 Görevler, günlük giriş serisi, davet | ✅ | `gorevler` |
 | M23 Gizlilik, efektleri kapatma (VIP-01), hesap silme | ✅ | `ayarlar` |
-| 31.2 Hediye duvarı | ✅ | kullanıcı profili |
+| 31.2 Hediye duvarı | ✅ | kullanıcı profili › Onur; oda, profil ve aramadan gönderilen ve alınan hediyeler kalıcı olarak duvara yazılır |
 | 31.2 Şans çarkı (açık olasılıklar) | ✅ | `cark` |
 | 31.9 Kozmetik mağaza: çerçeve, giriş efekti, binek, sohbet balonu, özel ID | ✅ | `magaza` |
 | Emoji marketi (ücretsiz temel, ücretli paket, VIP paketi, son kullanılanlar, kilitli önizleme) | ✅ | `magaza` › Emoji, oda & sohbet emoji paneli |
@@ -77,7 +77,7 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Anket, topluluk hedefi, etkinlik takvimi, soru-cevap, şarkı isteği kuyruğu | ✅ |
 | Kişisel ses ayarları (oda sesi, müzik/ses seviyesi, hediye sesleri, büyük hediyeler) | ✅ |
 | Moderasyon: geçici yasak, yavaş mod, kelime filtresi, şikayetler, moderasyon kaydı | ✅ |
-| Toplu hediye "Hepsini seç", alıcı bazlı sonuç, büyük harcama onayı, günlük harcama limiti | ✅ |
+| Toplu hediye "Hepsini seç", alıcı bazlı sonuç, günlük harcama limiti (gönderimden önce panelde gösterilir) | ✅ Ürün kararı: hediyeler onay sormaz, tek dokunuşla gider; toplam tutar gönderimden önce görünür |
 | Arkadaş daveti; davet ödülü = davet edilenin her başarılı jeton alımında 1 birim | ✅ Görevler > Davet ödüllerim |
 | Kişisel oda önerileri ("Senin için", gerekçeli) | ✅ |
 | Hayran kulübü (seviye, puan geçmişi, ücretsiz kazanım yolları) | ✅ |

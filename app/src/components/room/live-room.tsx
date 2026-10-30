@@ -74,7 +74,7 @@ import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
-import { getLucky, luckyGift, luckyPkPoints, newLuckyTxId, sendLucky, type LuckyRecord } from '@/lib/lucky';
+import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
@@ -165,7 +165,7 @@ const HELD_CAPTION: Record<Exclude<MicBlock, null>, string> = {
 export function LiveRoom({ id, via, full }: { id: string; via?: string; full: boolean }) {
   const isOwn = id === 'yeni';
   const app = useApp();
-  const { coins, spendCoins, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency, conversations, sendMessage, followerInvites, markFollowerInvite } = app;
+  const { coins, spendCoins, spendBlock, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency, conversations, sendMessage, followerInvites, markFollowerInvite } = app;
 
   const base = isOwn ? null : roomById(id);
   const hostId = isOwn ? 'me' : base!.hostId;
@@ -342,7 +342,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Friends I sent the room to during this visit (Paylaş).
   const [sharedTo, setSharedTo] = useState<Set<string>>(() => new Set());
   const [myQueuePos, setMyQueuePos] = useState<number | null>(null);
-  const [giftResults, setGiftResults] = useState<{ userId: string; ok: boolean }[]>([]);
+  const [giftResults, setGiftResults] = useState<{ rows: { userId: string; ok: boolean }[]; reason: string | null }>({ rows: [], reason: null });
   const [musicRequests, setMusicRequests] = useState<{ track: Track; by: string }[]>([]);
   // PK (lib/pk is the PK server: clock, score and result live there). While the connection is down the
   // room keeps showing the last PK state it received, like the presence data.
@@ -799,7 +799,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const lk = Math.random() < 0.25 ? pick(getLucky().config.gifts.filter((g) => g.enabled && g.price <= 100)) : undefined;
       if (lk) {
         const earned = luckyHostDiamonds(lk.price);
-        receiveDiamonds(earned, 'Hediye', from.id);
+        receiveDiamonds(earned, 'Hediye', from.id, { id: lk.id, name: lk.name, emoji: lk.emoji, count: 1, lucky: true });
         gainXp(lk.price);
         addContrib(from.id, lk.price);
         logGift(from.id, 'me', { id: lk.id, name: lk.name, emoji: lk.emoji, price: lk.price }, 1);
@@ -809,7 +809,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         return;
       }
       const gift = GIFTS.find((g) => g.price === pick(INCOMING_GIFT_POOL)) ?? GIFTS[0];
-      receiveDiamonds(gift.price, 'Hediye', from.id);
+      receiveDiamonds(gift.price, 'Hediye', from.id, { id: gift.id, name: gift.name, emoji: gift.emoji, count: 1 });
       // Owner bonus is calculated separately and never reduces the streamer's earnings.
       const ownerBonus = Math.round(gift.price * RULES.roomOwnerBonus);
       if (ownerBonus > 0) receiveDiamonds(ownerBonus, 'Oda sahibi bonusu', from.id);
@@ -1282,22 +1282,34 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, []);
   const renderChat = useCallback(({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} onRetry={retrySend} />, [equipped.bubble, retrySend]);
 
-  const deliverGifts = (gift: Gift, toIds: string[], count: number) => {
+  /** True when at least one recipient got the gift. */
+  const deliverGifts = (gift: Gift, toIds: string[], count: number): boolean => {
     const each = gift.price * count;
-    // Each recipient is a separate, individually recorded transaction; stop charging once the balance runs out.
-    const results = toIds.map((uid) => ({ userId: uid, ok: spendCoins(each, `Hediye: ${gift.name} x${count} → ${userById(uid).name}`) }));
+    // Each recipient is a separate, individually recorded transaction; stop charging once the balance
+    // or the daily spending limit runs out, and remember which of the two it was.
+    let reason: string | null = null;
+    const results = toIds.map((uid) => {
+      const why = each > 0 ? spendBlock(each) : null;
+      if (why) reason = why;
+      return { userId: uid, ok: !why && spendCoins(each, `Hediye: ${gift.name} x${count} → ${userById(uid).name}`) };
+    });
     const delivered = results.filter((r) => r.ok);
     if (delivered.length === 0) {
       errorHaptic();
-      showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
-      ]);
-      return;
+      if (reason && reason !== 'Yetersiz bakiye.') showAlert('Günlük harcama limiti', reason);
+      else
+        showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+        ]);
+      return false;
     }
     successHaptic();
     const total = each * delivered.length;
-    delivered.forEach((r) => logGift('me', r.userId, gift, count));
+    delivered.forEach((r) => {
+      logGift('me', r.userId, gift, count);
+      app.recordGift(r.userId, gift.id, count);
+    });
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
@@ -1314,33 +1326,36 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     });
     // Only a partial delivery opens the results panel; a normal send shows no extra message.
     if (delivered.length < toIds.length) {
-      setGiftResults(results);
+      setGiftResults({ rows: results, reason });
       setPanel('results');
     }
+    return true;
   };
 
   // Product rule: gifts never ask for confirmation; one tap sends.
   const sendGift = (gift: Gift, toIds: string[], count: number) => {
     setGiftOpen(false);
-    if (offlineBlocked()) return;
-    deliverGifts(gift, toIds, count);
+    if (offlineBlocked()) return false;
+    return deliverGifts(gift, toIds, count);
   };
 
   // Lucky: `count` gifts to each person picked, one server draw per gift; no send cap beyond the balance.
   // The room only records the gift for each recipient and shows the stored results; wins go out to every room.
-  const sendLuckyGift = (giftId: string, toIds: string[], count = 1) => {
+  const sendLuckyGift = (giftId: string, picked: string[], count = 1) => {
     setGiftOpen(false);
     if (offlineBlocked()) return;
-    const records: LuckyRecord[] = [];
-    let error: string | null = null;
-    for (const toId of toIds.flatMap((t) => Array<string>(count).fill(t))) {
-      const r = sendLucky({ txId: newLuckyTxId(), userId: 'me', userAge: app.me.age, roomId: id, giftId, toId, toName: userById(toId).name }, { spend: spendCoins, credit: addCoins });
-      if (!r.ok) {
-        error = r.reason;
-        break;
-      }
-      records.push(r.record);
+    // The combo wheel repeats a stored list: drop anyone who has left the room since (never charge for them).
+    const inRoom = new Set([...seatedOthers, ...audience.map((u) => u.id)]);
+    const toIds = picked.filter((t) => inRoom.has(t));
+    if (!toIds.length) {
+      setCombo(null);
+      return showAlert('Lucky gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
     }
+    // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
+    const { records, error } = sendLuckyBatch(
+      { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
+      { spend: spendCoins, credit: addCoins, blocked: spendBlock },
+    );
     if (!records.length) {
       errorHaptic();
       return showAlert('Lucky gönderilemedi', error ?? 'Gönderilemedi.');
@@ -1354,6 +1369,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     successHaptic();
     records.forEach((r) => {
       logGift('me', r.toId, { id: r.giftId, name: r.giftName, emoji: r.emoji, price: r.price }, 1);
+      app.recordGift(r.toId, r.giftId, 1);
       // PK scores the recipient's 20 % share of the gift value, never the reward.
       scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r));
     });
@@ -1370,7 +1386,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Lucky) gönderdi`,
         gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count, lucky: true, giftId: first.giftId },
       });
-    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Lucky hediye gönderilemedi: ${error}` });
+    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Lucky hediye gönderilemedi (jetonu iade edildi): ${error}` });
     // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
     if (reward > 0) {
       const wins = records.filter((r) => r.reward > 0).length;
@@ -1383,7 +1399,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
-    const at = Date.now();
+    // Restarts the combo wheel's timer: the time of this send's last draw.
+    const at = records[records.length - 1].ts;
     setCombo((c) => (c && c.giftId === giftId && c.to.join() === toIds.join() && c.each === count ? { ...c, count: c.count + 1, key: at } : { giftId, to: toIds, each: count, count: 1, key: at }));
   };
   const comboGift = combo ? luckyGift(combo.giftId) : undefined;
@@ -2197,7 +2214,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           { label: `${msgFilter.bot ? '✅' : '⬜'} Bot mesajlarını göster`, onPress: () => setMsgFilter((f) => ({ ...f, bot: !f.bot })) },
         ]}
       />
-      <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults} />
+      <GiftResults visible={panel === 'results'} onClose={() => setPanel(null)} results={giftResults.rows} reason={giftResults.reason} />
       {visible && (
         <AnimLayer
           roomId={id}

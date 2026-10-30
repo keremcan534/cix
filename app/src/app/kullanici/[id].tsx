@@ -61,7 +61,7 @@ const TAB_H = 48;
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
-    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, bump, settings, vipLevel, equipped, inventory,
+    me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, bump, settings, vipLevel, svipLevel, equipped, inventory, giftWall: wallOf, recordGift,
     rbac, coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   const isMe = id === 'me';
@@ -115,12 +115,13 @@ export default function UserProfile() {
   const [editOpen, setEditOpen] = useState(false);
   const [pickerKind, setPickerKind] = useState<InviteKind | null>(null);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
-  const [sentGifts, setSentGifts] = useState<Record<string, number>>({});
   const [tabY, setTabY] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Gift wall: stable mock per user + gifts sent from this screen.
-  const giftWall = giftWallOf(user.id).map((g) => ({ ...g, count: g.count + (sentGifts[g.id] ?? 0) }));
+  // Gift wall: my own wall is only what I really received; another user's wall is their simulated
+  // history plus every gift I sent them (room, profile, call).
+  const received = wallOf[user.id] ?? {};
+  const giftWall = giftWallOf(user.id).map((g) => ({ ...g, count: (isMe ? 0 : g.count) + (received[g.id] ?? 0) }));
   const giftTotal = giftWall.reduce((s, g) => s + g.count, 0);
 
   const follow = () => {
@@ -138,6 +139,8 @@ export default function UserProfile() {
     });
 
   const deliverGift = (g: Gift) => {
+    // Same SVIP lock as the room's gift sheet.
+    if ((g.minSvip ?? 0) > svipLevel) return showAlert('SVIP hediyesi', `${g.name}, SVIP ${g.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`);
     if (!spendCoins(g.price, `Hediye: ${g.name} → ${user.name}`)) {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
@@ -145,7 +148,7 @@ export default function UserProfile() {
       ]);
       return;
     }
-    setSentGifts((m) => ({ ...m, [g.id]: (m[g.id] ?? 0) + 1 }));
+    recordGift(user.id, g.id, 1);
     bump('giftsSent', 1);
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
     successHaptic();
@@ -674,7 +677,7 @@ export default function UserProfile() {
         visible={sheet === 'gift'}
         title={`${user.name} kişisine hediye gönder`}
         onClose={() => setSheet('none')}
-        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}`, onPress: () => sendGift(g) }))}
+        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}${(g.minSvip ?? 0) > svipLevel ? ` · 🔒 SVIP ${g.minSvip}` : ''}`, onPress: () => sendGift(g) }))}
       />
 
       {editOpen && (

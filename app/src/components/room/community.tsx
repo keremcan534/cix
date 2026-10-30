@@ -530,11 +530,12 @@ export function ShareRoomSheet({
 }
 
 // --- Bulk gift results ----------------------------------------------------------------------
-export function GiftResults({ visible, onClose, results }: { visible: boolean; onClose: () => void; results: { userId: string; ok: boolean }[] }) {
+export function GiftResults({ visible, onClose, results, reason }: { visible: boolean; onClose: () => void; results: { userId: string; ok: boolean }[]; reason?: string | null }) {
   const ok = results.filter((r) => r.ok).length;
+  const why = reason && reason !== 'Yetersiz bakiye.' ? reason : 'Bakiye yetmedi.';
   return (
     <Sheet visible={visible} onClose={onClose} title={`🎁 Gönderim sonucu (${ok}/${results.length})`}>
-      {ok < results.length && <Text style={{ color: colors.gold }}>Bakiye yetmediği için bazı hediyeler gönderilmedi; sadece teslim edilenler ücretlendirildi.</Text>}
+      {ok < results.length && <Text style={{ color: colors.gold }}>Bazı hediyeler gönderilmedi: {why} Sadece teslim edilenler ücretlendirildi.</Text>}
       {results.map((r) => (
         <View key={r.userId} style={styles.row}>
           <Avatar uri={userById(r.userId).avatar} size={30} />
