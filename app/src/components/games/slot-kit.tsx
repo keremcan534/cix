@@ -9,6 +9,8 @@ import { useApp } from '@/store';
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
+/** Balance for tight spots: 99.950, 999K, 1,2M. */
+const compact = (n: number) => (n >= 1_000_000 ? `${(Math.floor(n / 100_000) / 10).toLocaleString('tr-TR')}M` : n >= 100_000 ? `${Math.floor(n / 1_000)}K` : fmt(n));
 
 /** Avatar, coins you can play with (wallet + game balance) and a + that opens the wallet. */
 export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
@@ -21,7 +23,7 @@ export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
           {me.name}
         </Text>
         <Text style={k.coins} numberOfLines={1}>
-          🪙 {fmt(coins + gameCoins)}
+          🪙 {compact(coins + gameCoins)}
         </Text>
       </View>
       <Pressable onPress={() => router.push('/cuzdan')} hitSlop={8} accessibilityLabel="Jeton yükle">
@@ -67,10 +69,10 @@ export function GameBalanceNote({ rules }: { rules: string }) {
 }
 
 const k = StyleSheet.create({
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 8, paddingVertical: 6, flex: 1, borderWidth: 1, borderColor: 'rgba(250,204,21,0.35)' },
-  avatar: { width: 34, height: 34, borderRadius: 8 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 6, flex: 1, borderWidth: 1, borderColor: 'rgba(250,204,21,0.35)' },
+  avatar: { width: 28, height: 28, borderRadius: 7 },
   name: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  coins: { color: '#FDE68A', fontWeight: '800', fontSize: 13 },
+  coins: { color: '#FDE68A', fontWeight: '800', fontSize: 12 },
   stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' },
   stepBtn: { width: 42, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   bet: { color: '#FDE68A', fontWeight: '900', fontSize: 20, minWidth: 64, textAlign: 'center' },

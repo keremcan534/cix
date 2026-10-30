@@ -10,12 +10,15 @@ import { gameArtOf } from '@/components/GameArt';
 import { CasinoPlayer } from '@/components/games/casino';
 import { FishPlayer } from '@/components/games/fish';
 import { FortunePlayer } from '@/components/games/fortune';
-import { Lucky77Player } from '@/components/games/lucky77';
-import { MegaJackpotPlayer } from '@/components/games/mega-jackpot';
+import { GoldTreePlayer } from '@/components/games/gold-tree';
+import { BoardPlayer } from '@/components/games/board';
+import { LineSlotPlayer } from '@/components/games/line-slot';
 import { OlympusPlayer } from '@/components/games/olympus';
+import { RocketPlayer } from '@/components/games/rocket';
 import { OkeyTable } from '@/components/games/okey';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
+import { isBoard, isLineSlot } from '@/lib/casino-odds';
 import { useGames, type Entry } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
@@ -23,16 +26,22 @@ import { colors, semantic } from '@/theme';
 export type OpenGame = { kind: 'room'; id: string } | { kind: 'casino'; id: CasinoGame['id'] };
 export type VoiceState = { seated: boolean; micOn: boolean; onToggleMic: () => void };
 
-/** Casino games with their own full screen; the rest use the shared CasinoPlayer. */
+/** Casino games with their own screen; the old ones (wheel, dice, Dragon Tiger) use the shared CasinoPlayer. */
 const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => React.JSX.Element>> = {
   fortune: FortunePlayer,
-  slot: Lucky77Player,
-  jackpot: MegaJackpotPlayer,
   olympus: OlympusPlayer,
   fish: FishPlayer,
+  rocket: RocketPlayer,
+  goldtree: GoldTreePlayer,
 };
-/** Games that need most of the screen in a room; the top row of seats stays visible. */
-const TALL = new Set(['okey', 'slot', 'jackpot', 'olympus', 'fish']);
+function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
+  if (isLineSlot(id)) return <LineSlotPlayer id={id} entry={entry} />;
+  if (isBoard(id)) return <BoardPlayer id={id} entry={entry} />;
+  const Screen = CASINO_SCREENS[id];
+  return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
+}
+/** Games that need most of the screen in a room (Okey and every casino game with its own screen); the top row of seats stays visible. */
+const isTall = (id: string) => id === 'okey' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
 
 const VOLUMES: [number, string][] = [
   [0, 'Kapalı'],
@@ -78,7 +87,7 @@ export function GamePanel({
   const titleArt = gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && TALL.has(open.id) && p.tall, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(open.id) && p.tall, hidden && { display: 'none' }]}>
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
         <Text style={p.title} numberOfLines={1}>
@@ -141,10 +150,7 @@ export function GamePanel({
           ) : (
             <Text style={p.dim}>{roomGame.name} için sağlayıcı entegrasyonu bekleniyor. Katalogda görünür, sağlayıcı bağlanınca bu alanda açılır.</Text>
           ))}
-        {casinoGame && (() => {
-          const Screen = CASINO_SCREENS[casinoGame.id];
-          return Screen ? <Screen key={casinoGame.id} entry={entry} /> : <CasinoPlayer key={casinoGame.id} gameId={casinoGame.id} entry={entry} />;
-        })()}
+        {casinoGame && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
         <View style={p.volume}>
           <Text style={p.dim}>Oyun sesi</Text>
           {VOLUMES.map(([v, l]) => (

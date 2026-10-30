@@ -15,8 +15,9 @@ import { useSyncExternalStore } from 'react';
 import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data/games';
 import { ME } from '@/data/mock';
 import { announceWin } from '@/lib/broadcast';
-import { CASINO_HOUSE_SHARE, DUEL_MULT, PICKS, duelMultiplier, maxMultiplier, outcomeOf, splitStake, type Outcome } from '@/lib/casino-odds';
-import { JACKPOT_SHARE } from '@/lib/mega-jackpot';
+import { BOARDS, boardMaxPayout, boardPayout } from '@/lib/board-games';
+import { CASINO_HOUSE_SHARE, DUEL_MULT, PICKS, duelMultiplier, isLineSlot, maxMultiplier, outcomeOf, splitStake, type Outcome } from '@/lib/casino-odds';
+import { SLOT_CONFIGS } from '@/lib/slot-configs';
 import { today } from '@/lib/persist';
 
 export type Entry = { from: 'profile' } | { from: 'room'; roomId: string; roomTitle: string };
@@ -53,18 +54,19 @@ export const setGameDeps = (d: GameDeps) => {
 };
 
 /**
- * House book of all coin games: coins played, the house's 60 %, the payout pool and what it paid. `jackpot` is the
- * Mega Jackpot fund: JACKPOT_SHARE of each Mega Jackpot stake moves into it from the pool (it is part of the 40 %).
+ * House book of all coin games: coins played, the house's 60 %, the payout pool and what it paid. `jackpots` are the
+ * JACKPOT funds of the slots that have one: the game's jackpotShare of each stake moves into its fund from the pool
+ * (it is part of the 40 %), and a line of wilds wins bet / max bet of the fund.
  */
-export type CasinoBank = { wagered: number; house: number; pool: number; paid: number; seed: number; jackpot: number };
+export type CasinoBank = { wagered: number; house: number; pool: number; paid: number; seed: number; jackpots: Record<string, number> };
 /** Opening pool: a house advance so the first rounds can pay their top prize. */
-export const POOL_SEED = 200_000;
-/** Opening JACKPOT, also a house advance. */
-export const JACKPOT_SEED = 100_000;
+export const POOL_SEED = 2_000_000;
+/** Opening JACKPOT of each game, also house advances. */
+export const JACKPOT_SEEDS: Record<string, number> = { jackpot: 100_000, jungle: 1_000_000, pinata: 500_000, spellbook: 800_000, neon: 2_000_000 };
 /** Small wins of these games are not announced in every room (a shot in Balık Avı is a round of its own). */
-const ANNOUNCE_MIN: Partial<Record<CasinoGame['id'], number>> = { fish: 20 };
+const ANNOUNCE_MIN: Partial<Record<CasinoGame['id'], number>> = { fish: 20, rocket: 10 };
 type State = { roomGames: RoomGame[]; casino: CasinoGame[]; history: HistoryRow[]; spentByDay: Record<string, number>; bank: CasinoBank };
-const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED, jackpot: JACKPOT_SEED });
+const freshBank = (): CasinoBank => ({ wagered: 0, house: 0, pool: POOL_SEED, paid: 0, seed: POOL_SEED, jackpots: { ...JACKPOT_SEEDS } });
 let state: State = { roomGames: ROOM_GAMES, casino: CASINO_GAMES, history: [], spentByDay: {}, bank: freshBank() };
 const listeners = new Set<() => void>();
 const emit = (patch: Partial<State>) => {
@@ -142,12 +144,55 @@ const POOL_LOW = 'Ödül havuzu şu an bu bahsin en yüksek ödülünü karşıl
  * → bet and daily limit → take stake (one ledger row) → provider → pay out or refund.
  */
 export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPick, entry: Entry, requestId: string): PlayResult {
+  return settle(gameId, bet, entry, requestId, {
+    check: (game) => (!game.bets.includes(bet) ? 'Geçersiz bahis tutarı.' : !PICKS[game.id].includes(pick) ? 'Geçersiz seçim.' : null),
+    maxPayout: () => bet * maxMultiplier(gameId, pick),
+    resolve: () => {
+      const outcome = outcomeOf(gameId, pick, rnd);
+      return { outcome, payout: Math.floor(bet * outcome.multiplier) };
+    },
+  });
+}
+
+/**
+ * One round of a bet board (Lucky 77, Lezzet Çarkı, Büyücü Kartı): several bets (option → coins, each a multiple of the
+ * smallest chip) settled against one drawn result. Same checks, stake, pool and history as playCasino.
+ */
+export function playBoard(gameId: CasinoGame['id'], bets: Record<string, number>, entry: Entry, requestId: string): PlayResult {
+  const board = BOARDS[gameId];
+  const placed = Object.fromEntries(Object.entries(bets).filter(([, n]) => n > 0));
+  const total = Object.values(placed).reduce((a, b) => a + b, 0);
+  return settle(gameId, total, entry, requestId, {
+    check: (game) => {
+      if (!board) return 'Bu oyun bahis tahtası değil.';
+      if (!total) return 'Önce bir seçeneğe jeton koy.';
+      const chip = Math.min(...game.bets);
+      if (Object.entries(placed).some(([id, n]) => !board.options.some((o) => o.id === id) || !Number.isInteger(n / chip))) return 'Geçersiz bahis.';
+      return null;
+    },
+    maxPayout: () => boardMaxPayout(board, placed),
+    resolve: () => {
+      const outcome = outcomeOf(gameId, '', rnd);
+      const payout = boardPayout(board, placed, outcome.board!);
+      return { outcome: { ...outcome, multiplier: payout / total }, payout };
+    },
+  });
+}
+
+/** The server's round: shared by every casino game. */
+function settle(
+  gameId: CasinoGame['id'],
+  bet: number,
+  entry: Entry,
+  requestId: string,
+  r: { check: (game: CasinoGame) => string | null; maxPayout: () => number; resolve: () => { outcome: Outcome; payout: number } },
+): PlayResult {
   const seen = results.get(requestId);
   if (seen) return seen.ok ? { ...seen, replay: true } : seen;
-  const finish = (r: PlayResult) => {
-    results.set(requestId, r);
-    if (r.ok || r.row) emit({ history: [(r.ok ? r.row : r.row)!, ...state.history].slice(0, 200) });
-    return r;
+  const finish = (res: PlayResult) => {
+    results.set(requestId, res);
+    if (res.ok || res.row) emit({ history: [(res.ok ? res.row : res.row)!, ...state.history].slice(0, 200) });
+    return res;
   };
   const game = state.casino.find((g) => g.id === gameId);
   if (!game || !deps) return { ok: false, reason: 'Oyun bulunamadı.' };
@@ -155,9 +200,9 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
   const base = { requestId, gameId, gameName: game.name, entry: where, bet, time: clock() };
   const access = casinoAccess(game, entry, deps.wealthLevel());
   if (!access.ok) return finish({ ok: false, reason: access.reason, row: { ...base, txId: txId(), payout: 0, status: 'Reddedildi', detail: access.reason } });
-  if (!game.bets.includes(bet)) return { ok: false, reason: 'Geçersiz bahis tutarı.' };
-  if (!PICKS[game.id].includes(pick)) return { ok: false, reason: 'Geçersiz seçim.' };
-  if (state.bank.pool < bet * maxMultiplier(game.id, pick)) return { ok: false, reason: POOL_LOW };
+  const invalid = r.check(game);
+  if (invalid) return { ok: false, reason: invalid };
+  if (state.bank.pool < r.maxPayout()) return { ok: false, reason: POOL_LOW };
   const day = today();
   const spent = state.spentByDay[`${gameId}:${day}`] ?? 0;
   if (spent + bet > game.dailyLimit) return { ok: false, reason: `${game.name} için günlük limit ${game.dailyLimit.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, game.dailyLimit - spent)}.` };
@@ -174,24 +219,26 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
     return finish({ ok: false, reason: 'Sağlayıcı yanıt vermedi; jetonun iade edildi. Oda ve sesli sohbetin etkilenmedi.', row: { ...base, txId: id, payout: bet, status: 'İade edildi', detail: 'Sağlayıcı hatası' } });
   }
   book(bet);
-  const outcome = outcomeOf(game.id, pick, rnd);
-  let payout = Math.floor(bet * outcome.multiplier);
+  const resolved = r.resolve();
+  const outcome = resolved.outcome;
+  let payout = resolved.payout;
   if (payout > 0) {
     payFromPool(payout);
     deps.creditGame(payout, `${game.name} · kazanç ${id}`);
   }
-  if (game.id === 'jackpot') {
-    // The stake's JACKPOT share moves from the pool into the fund; five 77s win bet / max bet of the fund.
+  const share = isLineSlot(gameId) ? SLOT_CONFIGS[gameId].jackpotShare : undefined;
+  if (share) {
+    // The stake's JACKPOT share moves from the pool into the game's fund; a line of wilds wins bet / max bet of it.
     const b = state.bank;
-    let jackpot = b.jackpot + bet * JACKPOT_SHARE;
+    let fund = (b.jackpots[gameId] ?? 0) + bet * share;
     let won = 0;
-    if (outcome.mega?.jackpotLines.length) {
-      won = Math.floor((jackpot * bet) / Math.max(...game.bets));
-      jackpot -= won;
+    if (outcome.slot?.jackpotLines.length) {
+      won = Math.floor((fund * bet) / Math.max(...game.bets));
+      fund -= won;
       deps.creditGame(won, `${game.name} · JACKPOT ${id}`);
       outcome.detail += ` · JACKPOT +${won.toLocaleString('tr-TR')}`;
     }
-    emit({ bank: { ...b, pool: b.pool - bet * JACKPOT_SHARE, jackpot, paid: b.paid + won } });
+    emit({ bank: { ...b, pool: b.pool - bet * share, jackpots: { ...b.jackpots, [gameId]: fund }, paid: b.paid + won } });
     payout += won;
   }
   // A real win (more back than the stake) is announced in every room.

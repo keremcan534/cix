@@ -4,7 +4,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CASINO_HOUSE_SHARE, CASINO_RETURN_SHARE, DRAWS, LUCKY_WHEEL, PICKS, WHEEL, duelMultiplier, evaluate, expectedReturn, maxMultiplier, type CasinoId } from '@/lib/casino-odds';
+import { LUCKY_WHEEL } from '@/lib/board-games';
+import { CASINO_HOUSE_SHARE, CASINO_RETURN_SHARE, DRAWS, PICKS, WHEEL, duelMultiplier, evaluate, expectedReturn, maxMultiplier, type CasinoId } from '@/lib/casino-odds';
 
 const GAMES = Object.keys(PICKS) as CasinoId[];
 const close = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
@@ -14,12 +15,12 @@ describe('Kasa kuralı: %60 kasa, %40 dağıtım', () => {
     assert.equal(CASINO_HOUSE_SHARE + CASINO_RETURN_SHARE, 1);
   });
 
-  test('her oyun ve her seçimde beklenen geri ödeme %40 (Dragon Tiger kenarları, Altın Kasa, Mega Jackpot ve Olympus en fazla 0,1 puan altında)', () => {
+  test('her oyun ve her seçimde beklenen geri ödeme %40 (slotlar en fazla 0,1, Altın Ağacı en fazla 0,5 puan altında)', () => {
     for (const g of GAMES)
       for (const p of PICKS[g]) {
         const r = expectedReturn(g, p);
         assert.ok(r <= CASINO_RETURN_SHARE + 1e-12, `${g}/${p}: ${r} %40'ı aşıyor`);
-        assert.ok(close(r, CASINO_RETURN_SHARE, 0.001), `${g}/${p}: ${r}`);
+        assert.ok(close(r, CASINO_RETURN_SHARE, g === 'goldtree' ? 0.005 : 0.001), `${g}/${p}: ${r}`);
       }
     assert.equal(expectedReturn('wheel'), 0.4);
     for (const p of ['apple', 'melon', 'seven']) assert.ok(close(expectedReturn('slot', p), 0.4, 1e-12), `slot/${p}`);
@@ -41,15 +42,11 @@ describe('Kasa kuralı: %60 kasa, %40 dağıtım', () => {
     assert.deepEqual(PICKS.slot, ['melon', 'seven', 'apple']);
   });
 
-  test('sonuçlar: zar 5–9 kasa, Lucky 77 yalnız seçilen dilime öder, Dragon Tiger fark 4’ten azsa kasa', () => {
+  test('sonuçlar: zar 5–9 kasa, Lucky 77 çarkının dilimleri, Dragon Tiger fark 4’ten azsa kasa', () => {
     assert.equal(evaluate('dice', 'big', [3, 4]).multiplier, 0, '4+5=9');
     assert.equal(evaluate('dice', 'big', [4, 4]).multiplier, 2.4, '5+5=10');
     assert.equal(evaluate('dice', 'small', [0, 2]).multiplier, 2.4, '1+3=4');
     assert.equal(LUCKY_WHEEL[0], 'seven');
-    assert.equal(evaluate('slot', 'seven', [0]).multiplier, 8);
-    assert.equal(evaluate('slot', 'apple', [0]).multiplier, 0, '77 geldi, elma kaybeder');
-    assert.equal(evaluate('slot', 'apple', [1]).multiplier, 2);
-    assert.equal(evaluate('slot', 'melon', [2]).multiplier, 0, 'limon kimseye ödemez');
     assert.deepEqual(['seven', 'apple', 'melon', 'lemon', 'grape'].map((x) => LUCKY_WHEEL.filter((y) => y === x).length), [1, 4, 4, 6, 5]);
     assert.equal(evaluate('dragon', 'dragon', [5, 2]).multiplier, 0, 'fark 3');
     assert.equal(evaluate('dragon', 'dragon', [6, 2]).multiplier, 1.5, 'fark 4');
