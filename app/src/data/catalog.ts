@@ -1,4 +1,4 @@
-// Catalogs for the prototype: cosmetics, emoji packs, room levels, music, support.
+// Catalogs for the prototype: cosmetics, emoji and sticker packs, room levels, music, support.
 
 // --- Cosmetics store ---------------------------------------------------------
 export type CosmeticKind = 'frame' | 'entry' | 'ride' | 'bubble' | 'specialId';
@@ -54,16 +54,164 @@ export const COSMETICS: Cosmetic[] = [
 ];
 export const cosmeticById = (id?: string | null) => COSMETICS.find((c) => c.id === id);
 
-// --- Emoji market -------------------------------------------------------------
-export type EmojiPack = { id: string; name: string; emojis: string[]; price: number; minVip?: number; animated?: boolean };
-export const EMOJI_PACKS: EmojiPack[] = [
-  { id: 'basic', name: 'Temel', price: 0, emojis: ['😀', '😂', '😍', '🥹', '😊', '😢', '😡', '👍', '🙏', '👋', '🤔', '😴'] },
-  { id: 'fun', name: 'Eğlence', price: 50, emojis: ['🤣', '🤪', '😎', '🥳', '🤡', '👻', '🙃', '🤯'] },
-  { id: 'love', name: 'Aşk', price: 80, emojis: ['❤️', '💕', '💋', '🫶', '💘', '😘', '🌹', '💞'] },
-  { id: 'animals', name: 'Hayvanlar', price: 60, emojis: ['🐶', '🐱', '🦊', '🐼', '🐸', '🦄', '🐧', '🐝'] },
-  { id: 'vip', name: 'VIP', price: 0, minVip: 5, emojis: ['👑', '💎', '🔥', '✨', '🏆', '🦁', '⚜️', '💠'] },
-  { id: 'anim', name: 'Animasyonlu', price: 150, animated: true, emojis: ['🎆', '🎇', '🌈', '💥', '🎉', '🪩'] },
+// --- Emoji & sticker market --------------------------------------------------
+// Standard Unicode emoji are free for everyone; only custom-drawn stickers (assets/reactions,
+// components/ReactionArt) are sold. A sticker travels in a message as a token (lib/stickers), never
+// as a Unicode emoji, so typing 🦊 does not draw the paid fox sticker.
+
+const list = (emojis: string) => emojis.split(' ');
+/** Free standard Unicode emoji, grouped for the picker. The device keyboard offers the rest. */
+export const STANDARD_EMOJI: { id: string; name: string; emojis: string[] }[] = [
+  {
+    id: 'faces',
+    name: 'Yüzler',
+    emojis: list('😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 🫠 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 🥲 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🫢 🤫 🤔 🫡 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 🥸 😎 🤓 🧐 😕 🫤 😟 🙁 😮 😯 😲 😳 🥺 🥹 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 🤡 👹 👺 👻 👽 🤖 💩'),
+  },
+  {
+    id: 'hands',
+    name: 'Eller',
+    emojis: list('👋 🤚 🖐️ ✋ 🖖 🫱 🫲 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 🫵 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪'),
+  },
+  {
+    id: 'hearts',
+    name: 'Kalpler',
+    emojis: list('❤️ 🧡 💛 💚 💙 🩵 💜 🤎 🖤 🩶 🤍 🩷 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 💋 🌹 💐'),
+  },
+  {
+    id: 'nature',
+    name: 'Hayvanlar',
+    emojis: list('🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐢 🐍 🦖 🐙 🦑 🦀 🐬 🐳 🦈 🐊 🦓 🦒 🐘 🐪 🐿️ 🌵 🌲 🌴 🌱 🍀 🍁 🌸 🌻 🌈 ⭐ 🌙 ☀️ ⛅ 🌧️ ❄️ 🔥 💧 🌊'),
+  },
+  {
+    id: 'food',
+    name: 'Yiyecek',
+    emojis: list('🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🥑 🌽 🥕 🥐 🍞 🧀 🥚 🍳 🥞 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🥙 🍝 🍜 🍣 🍤 🍦 🍩 🍪 🎂 🍰 🧁 🍫 🍬 🍭 ☕ 🍵 🧃 🥤 🧋 🍺 🍷 🥂 🍾'),
+  },
+  {
+    id: 'activity',
+    name: 'Etkinlik',
+    emojis: list('⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🥊 🎮 🕹️ 🎲 🧩 ♟️ 🎯 🎳 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎬 🎨 🎭 🎉 🎊 🎈 🎁 🎆 🎇 ✨ 🏆 🥇 🥈 🥉 🏅 🎖️'),
+  },
+  {
+    id: 'objects',
+    name: 'Nesneler',
+    emojis: list('📱 💻 ⌚ 📷 🎥 📺 📻 ⏰ 💡 🔦 💸 💵 💰 💎 👑 💍 🔑 🔒 🔓 🛒 🎒 👓 🕶️ 👗 👠 🧢 📚 ✏️ 📌 📎 ✂️ 🚗 🏎️ 🛵 ✈️ 🚀 🛸 🏠 🏝️ 🗽 🇹🇷'),
+  },
+  {
+    id: 'symbols',
+    name: 'Semboller',
+    emojis: list('⚜️ 💠 🪩 💯 ✅ ❌ ❓ ❗ ‼️ ⁉️ ⚠️ 🚫 💤 💢 💥 💫 💦 💨 🕳️ 💬 💭 🗯️ 🔔 🔕 🎵 🎶 ➕ ➖ ✖️ ➗ ♾️ 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🆗 🆒 🆕 🆓 🔝'),
+  },
 ];
+
+/** A custom-drawn sticker; `emoji` is the closest Unicode emoji, used only as a text fallback. */
+export type Sticker = { id: string; name: string; emoji: string };
+/** A sticker pack. Pack ids are the ids users bought before (the store keeps them as `emojiPacks`). */
+export type StickerPack = { id: string; name: string; stickers: Sticker[]; price: number; minVip?: number; animated?: boolean };
+const st = (id: string, name: string, emoji: string): Sticker => ({ id, name, emoji });
+export const STICKER_PACKS: StickerPack[] = [
+  {
+    id: 'basic',
+    name: 'Temel',
+    price: 0,
+    stickers: [
+      st('temel-gulumseme', 'Gülümseme', '😀'),
+      st('temel-kahkaha', 'Kahkaha', '😂'),
+      st('temel-asik', 'Aşık', '😍'),
+      st('temel-duygulandim', 'Duygulandım', '🥹'),
+      st('temel-mutlu', 'Mutlu', '😊'),
+      st('temel-uzgun', 'Üzgün', '😢'),
+      st('temel-kizgin', 'Kızgın', '😡'),
+      st('temel-begendim', 'Beğendim', '👍'),
+      st('temel-tesekkurler', 'Teşekkürler', '🙏'),
+      st('temel-selam', 'Selam', '👋'),
+      st('temel-dusunuyorum', 'Düşünüyorum', '🤔'),
+      st('temel-uykulu', 'Uykulu', '😴'),
+      st('oda-alkis', 'Alkış', '👏'),
+      st('oda-saskin', 'Şaşkın', '😮'),
+    ],
+  },
+  {
+    id: 'fun',
+    name: 'Eğlence',
+    price: 50,
+    // "Yerlere Yattım" is left out until it is redrawn: its file is the same picture as Temel's Kahkaha.
+    stickers: [
+      st('eglence-cilgin', 'Çılgın', '🤪'),
+      st('eglence-havali', 'Havalı', '😎'),
+      st('eglence-parti', 'Parti', '🥳'),
+      st('eglence-palyaco', 'Palyaço', '🤡'),
+      st('eglence-hayalet', 'Hayalet', '👻'),
+      st('eglence-ters-gulus', 'Ters Gülüş', '🙃'),
+      st('eglence-beynim-yandi', 'Beynim Yandı', '🤯'),
+    ],
+  },
+  {
+    id: 'love',
+    name: 'Aşk',
+    price: 80,
+    stickers: [
+      st('ask-kalp', 'Kalp', '❤️'),
+      st('ask-iki-kalp', 'İki Kalp', '💕'),
+      st('ask-opucuk', 'Öpücük', '💋'),
+      st('ask-kalp-eller', 'Kalp Eller', '🫶'),
+      st('ask-oklu-kalp', 'Oklu Kalp', '💘'),
+      st('ask-opucuk-at', 'Öpücük At', '😘'),
+      st('ask-gul', 'Gül', '🌹'),
+      st('ask-donen-kalpler', 'Dönen Kalpler', '💞'),
+    ],
+  },
+  {
+    id: 'animals',
+    name: 'Hayvanlar',
+    price: 60,
+    stickers: [
+      st('hayvanlar-kopek', 'Köpek', '🐶'),
+      st('hayvanlar-kedi', 'Kedi', '🐱'),
+      st('hayvanlar-tilki', 'Tilki', '🦊'),
+      st('hayvanlar-panda', 'Panda', '🐼'),
+      st('hayvanlar-kurbaga', 'Kurbağa', '🐸'),
+      st('hayvanlar-tek-boynuzlu-at', 'Tek Boynuzlu At', '🦄'),
+      st('hayvanlar-penguen', 'Penguen', '🐧'),
+      st('hayvanlar-ari', 'Arı', '🐝'),
+    ],
+  },
+  {
+    id: 'vip',
+    name: 'VIP',
+    price: 0,
+    minVip: 5,
+    // "Kristal" is left out until it is redrawn: its file is the same picture as "Elmas".
+    stickers: [
+      st('vip-tac', 'Taç', '👑'),
+      st('vip-elmas', 'Elmas', '💎'),
+      st('vip-ates', 'Ateş', '🔥'),
+      st('vip-isilti', 'Işıltı', '✨'),
+      st('vip-kupa', 'Kupa', '🏆'),
+      st('vip-aslan', 'Aslan', '🦁'),
+      st('vip-zambak-armasi', 'Zambak Arması', '⚜️'),
+    ],
+  },
+  {
+    id: 'anim',
+    name: 'Animasyonlu',
+    price: 150,
+    animated: true,
+    stickers: [
+      st('animasyonlu-havai-fisek', 'Havai Fişek', '🎆'),
+      st('animasyonlu-maytap', 'Maytap', '🎇'),
+      st('animasyonlu-gokkusagi', 'Gökkuşağı', '🌈'),
+      st('animasyonlu-patlama', 'Patlama', '💥'),
+      st('animasyonlu-konfeti', 'Konfeti', '🎉'),
+      st('animasyonlu-disko-topu', 'Disko Topu', '🪩'),
+    ],
+  },
+];
+export const ALL_STICKERS: Sticker[] = STICKER_PACKS.flatMap((p) => p.stickers);
+export const stickerById = (id: string) => ALL_STICKERS.find((s) => s.id === id);
+export const packOfSticker = (id: string) => STICKER_PACKS.find((p) => p.stickers.some((s) => s.id === id));
+/** Packs every user has without buying (free and not VIP-gated). */
+export const FREE_PACK_IDS = STICKER_PACKS.filter((p) => !p.price && !p.minVip).map((p) => p.id);
 
 // --- Rooms: levels 1–15 ------------------------------------------------------
 export const STANDARD_MICS = 10;

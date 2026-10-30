@@ -15,6 +15,7 @@ import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
+import { messagePreview } from '@/components/ReactionArt';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
@@ -334,7 +335,7 @@ function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntim
           )}
         </View>
         <Text style={[styles.last, conv.unread > 0 && { color: '#fff' }]} numberOfLines={1}>
-          {last ? `${last.fromMe ? 'Sen: ' : ''}${last.text}` : ''}
+          {last ? `${last.fromMe ? 'Sen: ' : ''}${messagePreview(last.text)}` : ''}
         </Text>
       </View>
       <Text style={styles.time}>{last?.time ?? ''}</Text>

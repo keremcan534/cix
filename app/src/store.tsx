@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, EMOJI_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETICS, FREE_PACK_IDS, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -119,7 +119,10 @@ type AppState = {
   equipped: Partial<Record<CosmeticKind, string>>;
   buyCosmetic: (id: string) => string | null;
   equip: (id: string | null, kind: CosmeticKind) => void;
+  /** Bought sticker pack ids (persisted under the old name, so earlier purchases carry over). */
   emojiPacks: Set<string>;
+  /** Owned, free, or opened by the user's VIP level. */
+  packUnlocked: (id: string) => boolean;
   buyEmojiPack: (id: string) => string | null;
   recentEmojis: string[];
   rememberEmoji: (e: string) => void;
@@ -407,7 +410,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   const [inventory, setInventory] = useState<Set<string>>(new Set(s.inventory));
   const [equipped, setEquipped] = useState<Partial<Record<CosmeticKind, string>>>(s.equipped ?? {});
-  const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set(s.emojiPacks ?? ['basic']));
+  const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set([...FREE_PACK_IDS, ...(s.emojiPacks ?? [])]));
   const [recentEmojis, setRecentEmojis] = useState<string[]>(s.recentEmojis ?? []);
 
   const [settings, setSettings] = useState<Settings>(() => ({
@@ -628,11 +631,16 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     equip: (id, kind) => setEquipped((e) => ({ ...e, [kind]: id ?? undefined })),
     emojiPacks,
+    packUnlocked: (id) => {
+      const pack = STICKER_PACKS.find((p) => p.id === id);
+      return !!pack && (emojiPacks.has(id) || (!pack.price && !pack.minVip) || (!!pack.minVip && vipLevel >= pack.minVip));
+    },
     buyEmojiPack: (id) => {
-      const pack = EMOJI_PACKS.find((p) => p.id === id);
+      const pack = STICKER_PACKS.find((p) => p.id === id);
       if (!pack) return 'Paket bulunamadı';
+      if (emojiPacks.has(id)) return 'Zaten sahipsin';
       if (pack.minVip && vipLevel < pack.minVip) return `VIP ${pack.minVip} ile açılır`;
-      if (!spend(pack.price, `Emoji paketi: ${pack.name}`)) return 'Yetersiz jeton';
+      if (!spend(pack.price, `Çıkartma paketi: ${pack.name}`)) return 'Yetersiz jeton';
       setEmojiPacks((s) => new Set(s).add(id));
       return null;
     },

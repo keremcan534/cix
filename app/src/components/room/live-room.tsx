@@ -114,6 +114,7 @@ import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
+import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 
@@ -139,7 +140,8 @@ const offlineBlocked = () => {
   return true;
 };
 
-const BOT_REACTIONS = ['😂', '😍', '👏', '🔥', '😎', '🥳', '❤️', '👍', '😮', '🤣'];
+// Bots mix free Temel stickers with standard emoji.
+const BOT_REACTIONS = [stickerToken('temel-kahkaha'), stickerToken('temel-asik'), stickerToken('oda-alkis'), '🔥', '😎', '🥳', '❤️', stickerToken('temel-begendim'), stickerToken('oda-saskin'), '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const BOT_RIDES = COSMETICS.filter((c) => c.kind === 'ride');
 
@@ -1259,16 +1261,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
 
   // --- Chat, gifts, games ---------------------------------------------------------
-  const send = () => {
-    if (!draft.trim()) return;
+  // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
+  const send = (sticker?: string) => {
+    const text = sticker ?? draft.trim();
+    if (!text) return;
+    if (!sticker) setDraft('');
     if (!isOnline()) {
       // Not sent: kept on my screen only, marked as failed with a retry.
-      setMessages((list) => mergeFeed(list, [{ id: msgId(), userId: 'me', text: mask(draft.trim()), status: 'failed', at: Date.now() }]));
-      setDraft('');
+      setMessages((list) => mergeFeed(list, [{ id: msgId(), userId: 'me', text: mask(text), status: 'failed', at: Date.now() }]));
       return;
     }
-    addMsg({ userId: 'me', text: draft.trim() });
-    setDraft('');
+    addMsg({ userId: 'me', text });
     setEmojiOpen(false);
     gainXp(2);
   };
@@ -1934,7 +1937,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   tapHaptic();
                   react('me', e);
                   setEmojiOpen(false);
-                } else setDraft((d) => d + e);
+                } else if (stickerIdOf(e)) send(e);
+                else setDraft((d) => d + e);
               }}
             />
           )}
@@ -1947,7 +1951,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
-                onSubmitEditing={send}
+                onSubmitEditing={() => send()}
                 placeholder="Bir şey söyle..."
                 placeholderTextColor={colors.textDim}
                 style={styles.input}

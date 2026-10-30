@@ -12,18 +12,18 @@ import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
-import { COSMETICS, COSMETIC_KINDS, EMOJI_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
+import { COSMETICS, COSMETIC_KINDS, STICKER_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
-import { EMOJI_PACKS_ICON, ReactionArt } from '@/components/ReactionArt';
+import { EMOJI_PACKS_ICON, StickerArt } from '@/components/ReactionArt';
 import { SPECIAL_ID_ART, STORE_TAB_ART, frameBadgeArtOf, storeArtOf } from '@/components/StoreArt';
 
 type Tab = CosmeticKind | 'emoji';
 
 export default function StoreScreen() {
-  const { coins, inventory, equipped, buyCosmetic, equip, emojiPacks, buyEmojiPack, vipLevel, settings, me } = useApp();
+  const { coins, inventory, equipped, buyCosmetic, equip, packUnlocked, buyEmojiPack, vipLevel, settings, me } = useApp();
   const [tab, setTab] = useState<Tab>('frame');
   const [preview, setPreview] = useState<EntryShow | null>(null);
   const playPreview = (c: Cosmetic) =>
@@ -55,7 +55,7 @@ export default function StoreScreen() {
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
       <View style={styles.tabTrack}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, padding: 4 }}>
-          {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Emoji paketleri', emoji: '' }].map((k) => {
+          {[...COSMETIC_KINDS, { kind: 'emoji' as const, label: 'Çıkartma paketleri', emoji: '' }].map((k) => {
             const art = k.kind === 'emoji' ? EMOJI_PACKS_ICON : STORE_TAB_ART[k.kind];
             return (
               <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
@@ -72,19 +72,22 @@ export default function StoreScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.grid}>
+        {tab === 'emoji' && <Text style={styles.freeNote}>Standart emojiler herkese ücretsiz. Buradaki paketler özel çizim çıkartmalardır.</Text>}
         {tab === 'emoji'
-          ? EMOJI_PACKS.map((p, i) => {
-              const owned = emojiPacks.has(p.id) || (p.minVip ? vipLevel >= p.minVip : false);
+          ? STICKER_PACKS.map((p, i) => {
+              const owned = packUnlocked(p.id);
               const hue = hueAt(i + 2);
               return (
                 <Shelf key={p.id} hue={hue}>
-                  <View style={styles.packPreview} accessibilityLabel={p.emojis.slice(0, 4).join(' ')}>
-                    {p.emojis.slice(0, 4).map((e) => (
-                      <ReactionArt key={e} emoji={e} size={30} textStyle={styles.emojiPreview} />
+                  <View style={styles.packPreview} accessibilityLabel={p.stickers.slice(0, 4).map((x) => x.name).join(', ')}>
+                    {p.stickers.slice(0, 4).map((x) => (
+                      <StickerArt key={x.id} id={x.id} size={30} />
                     ))}
                   </View>
                   <Text style={styles.name}>{p.name}</Text>
-                  <Text style={styles.meta}>{p.animated ? 'Animasyonlu · kalıcı' : 'Kalıcı koleksiyon'}</Text>
+                  <Text style={styles.meta}>
+                    {p.stickers.length} çıkartma · {p.animated ? 'animasyonlu · kalıcı' : p.price || p.minVip ? 'kalıcı' : 'ücretsiz'}
+                  </Text>
                   {owned ? (
                     <Text style={styles.owned}>✓ Açık</Text>
                   ) : p.minVip && !p.price ? (
@@ -261,7 +264,7 @@ const styles = StyleSheet.create({
   halo: { position: 'absolute', top: 14, alignSelf: 'center', width: 90, height: 90 },
   onTag: { position: 'absolute', top: 8, right: 8, color: semantic.actionInk, backgroundColor: colors.primaryText, fontSize: 10, fontWeight: '800', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', zIndex: 1 },
   packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
-  emojiPreview: { fontSize: 22 },
+  freeNote: { width: '100%', color: colors.textDim, fontSize: 12, textAlign: 'center' },
   name: { color: '#fff', fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
   meta: { color: colors.textDim, fontSize: 12 },
   owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },

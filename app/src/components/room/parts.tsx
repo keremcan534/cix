@@ -5,7 +5,7 @@ import { Animated, Image, Pressable, StyleSheet, Text, View, type HostInstance }
 
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
-import { ReactionArt, stickersOf } from '@/components/ReactionArt';
+import { ReactionArt, StickerArt, messagePreview, stickersOf } from '@/components/ReactionArt';
 import { cosmeticById } from '@/data/catalog';
 import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
@@ -291,16 +291,16 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
   const nameStyle = { color: msg.userId === 'me' ? colors.gold : '#A5F3F5', fontWeight: '700' } as const;
   const stickers = stickersOf(msg.text);
   const content = stickers ? (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }} accessibilityLabel={`${u.name}: ${msg.text}`}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }} accessibilityLabel={`${u.name}: ${messagePreview(msg.text)}`}>
       <Text style={[styles.chatText, nameStyle]}>{u.name}: </Text>
-      {stickers.map((e, i) => (
-        <ReactionArt key={i} emoji={e} size={30} />
+      {stickers.map((id, i) => (
+        <StickerArt key={i} id={id} size={30} />
       ))}
     </View>
   ) : (
     <Text style={styles.chatText}>
       <Text style={nameStyle}>{u.name}: </Text>
-      {msg.text}
+      {messagePreview(msg.text)}
     </Text>
   );
   const line = bubble?.color ? (

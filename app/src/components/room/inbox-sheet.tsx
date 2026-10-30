@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChatThread } from '@/components/chat-thread';
+import { messagePreview } from '@/components/ReactionArt';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { useApp } from '@/store';
@@ -104,7 +105,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
                         {last && <Text style={s.time}>{last.time}</Text>}
                       </View>
                       <Text style={[s.dim, item.unread > 0 && { color: '#fff' }]} numberOfLines={1}>
-                        {last ? `${last.fromMe ? 'Sen: ' : ''}${last.text}` : 'Sohbete başla'}
+                        {last ? `${last.fromMe ? 'Sen: ' : ''}${messagePreview(last.text)}` : 'Sohbete başla'}
                       </Text>
                     </View>
                   </Pressable>
