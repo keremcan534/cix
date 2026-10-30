@@ -10,6 +10,7 @@ import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
 import { USERS } from '@/data/mock';
 import { colors, gradient, semantic } from '@/theme';
+import { IS_DEMO } from '@/lib/build';
 
 // Avatars floating around the logo: [user index, size, top %, left %]
 const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
@@ -57,9 +58,11 @@ export default function WelcomeScreen() {
           <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
           <SocialButton icon="logo-google" title="Google ile devam et" />
           <SocialButton icon="logo-apple" title="Apple ile devam et" />
-          <Pressable onPress={demoLogin} style={{ alignItems: 'center', paddingVertical: 4 }}>
-            <Text style={styles.link}>⚡ Demo hesabıyla hızlı giriş</Text>
-          </Pressable>
+          {IS_DEMO && (
+            <Pressable onPress={demoLogin} style={{ alignItems: 'center', paddingVertical: 4 }}>
+              <Text style={styles.link}>⚡ Demo hesabıyla hızlı giriş</Text>
+            </Pressable>
+          )}
           <Text style={styles.terms}>
             Devam ederek <Text style={styles.link}>Kullanım Koşulları</Text> ve{' '}
             <Text style={styles.link}>Gizlilik Politikası</Text>&apos;nı kabul etmiş olursun. 18 yaşından büyük olmalısın.
@@ -86,7 +89,8 @@ const styles = StyleSheet.create({
   center: { position: 'absolute', top: '22%', left: 0, right: 0, alignItems: 'center', gap: 12 },
   logoMark: { width: 96, height: 96, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   logo: { color: '#fff', fontSize: 38, fontWeight: '900', letterSpacing: -1 },
-  tagline: { color: colors.textDim, fontSize: 16, textAlign: 'center', lineHeight: 23 },
+  // White with a soft shadow: the hero photo behind it is a bright sky.
+  tagline: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: 'rgba(8,15,30,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   actions: { paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
   social: {
     flexDirection: 'row',

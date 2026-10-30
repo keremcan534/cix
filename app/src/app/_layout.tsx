@@ -52,6 +52,8 @@ function RootStack() {
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right' }}
         screenLayout={({ children }) => <ScreenEnter>{children}</ScreenEnter>}
       >
+        {/* Every screen must be listed in one of these groups: a route left out is added unprotected
+            and opens from a deep link without signing in (tests/routes.test.ts checks this). */}
         <Stack.Protected guard={loggedIn}>
           <Stack.Screen name="(tabs)" />
           {/* The route only marks where the room is shown full screen; RoomHost renders the room itself. */}
@@ -93,6 +95,11 @@ function RootStack() {
           <Stack.Screen name="animasyon-yonetimi" />
           <Stack.Screen name="pk-yonetimi" />
           <Stack.Screen name="lucky-yonetimi" />
+          <Stack.Screen name="sunucu-hesabi" />
+          <Stack.Screen name="ajans/basvuru" />
+          <Stack.Screen name="ajans/hesap/[id]" />
+          <Stack.Screen name="ajans/yonetim/index" />
+          <Stack.Screen name="ajans/yonetim/[id]" />
         </Stack.Protected>
         <Stack.Protected guard={!loggedIn}>
           <Stack.Screen name="giris" />

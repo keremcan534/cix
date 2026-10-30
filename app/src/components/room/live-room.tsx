@@ -116,6 +116,7 @@ import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/m
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
+import { IS_DEMO } from '@/lib/build';
 
 const DAILY_DICE = 20;
 const BOT_TIPS = [
@@ -1560,7 +1561,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: () => setMyQueuePos(null) }] : []),
         { key: 'report', label: 'Odayı şikâyet et', icon: 'flag-outline', onPress: report },
         // Test: plays phone and server events (background, network, call, Bluetooth, permission, kick) on the session.
-        { key: 'session', label: 'Ses ve bağlantı testi', icon: 'pulse-outline', onPress: () => setPanel('session') },
+        ...(IS_DEMO ? [{ key: 'session', label: 'Ses ve bağlantı testi', icon: 'pulse-outline' as const, onPress: () => setPanel('session') }] : []),
       ],
     },
     {
@@ -1948,7 +1949,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 value={draft}
                 onChangeText={setDraft}
                 onSubmitEditing={send}
-                placeholder="Bir şey söyle..."
+                placeholder="Yaz…"
                 placeholderTextColor={colors.textDim}
                 style={styles.input}
                 returnKeyType="send"
@@ -2290,7 +2291,7 @@ const styles = StyleSheet.create({
   topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
-  bottom: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },

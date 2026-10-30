@@ -10,7 +10,7 @@ import { TAB_BAR_HEIGHT, colors } from '@/theme';
 type IconName = keyof typeof Ionicons.glyphMap;
 
 // Rooms stay the landing tab even though "Senin İçin" is first in the bar.
-export const unstable_settings = { initialRouteName: 'index' };
+export const unstable_settings = { anchor: 'index' };
 
 function icon(name: IconName, active: IconName) {
   return function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
@@ -50,6 +50,8 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      // Back from any tab returns to Odalar (the anchor), not to the first tab in the bar.
+      backBehavior="initialRoute"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#fff',

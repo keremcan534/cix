@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthHeader } from '@/components/AuthHeader';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { IS_DEMO } from '@/lib/build';
 
 const LENGTH = 6;
 
@@ -71,7 +72,7 @@ export default function CodeScreen() {
             <Text style={styles.link}>Kodu tekrar gönder</Text>
           </Pressable>
         )}
-        <Text style={styles.hint}>Demo: herhangi 6 haneli bir kod gir</Text>
+        {IS_DEMO && <Text style={styles.hint}>Demo: herhangi 6 haneli bir kod gir</Text>}
       </View>
     </SafeAreaView>
   );

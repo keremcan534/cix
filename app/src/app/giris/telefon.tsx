@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 28 },
   prefix: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 14 },
   prefixText: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  input: { flex: 1, backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 20, fontWeight: '600', paddingHorizontal: 16, paddingVertical: 14, letterSpacing: 1 },
+  // minWidth 0: on web an input won't shrink below its content width and pushed the row off screen.
+  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 20, fontWeight: '600', paddingHorizontal: 16, paddingVertical: 14, letterSpacing: 1 },
   error: { color: colors.red, paddingHorizontal: 20, marginTop: 8 },
 });

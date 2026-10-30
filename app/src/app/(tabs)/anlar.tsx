@@ -25,7 +25,7 @@ import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
-const TABS = ['arkadaş', 'Tavsiye et', 'Son'] as const;
+const TABS = ['Arkadaşlar', 'Önerilen', 'Son'] as const;
 type Tab = (typeof TABS)[number];
 type FeedMoment = Moment & { topicId?: string };
 
@@ -33,7 +33,7 @@ const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m,
 
 export default function MomentsScreen() {
   const { bump, blocked, following, me, notifications, sendMessage, settings, vipLevel, equipped } = useApp();
-  const [tab, setTab] = useState<Tab>('Tavsiye et');
+  const [tab, setTab] = useState<Tab>('Önerilen');
   const [topic, setTopic] = useState<string | null>(null);
   const [moments, setMoments] = useState<FeedMoment[]>(INITIAL);
   const [liked, setLiked] = useState<Set<string>>(new Set());
@@ -44,7 +44,7 @@ export default function MomentsScreen() {
   const unread = notifications.filter((n) => !n.read).length;
 
   let feed = moments.filter((m) => !blocked.has(m.userId));
-  if (tab === 'arkadaş') feed = feed.filter((m) => m.userId === 'me' || following.has(m.userId));
+  if (tab === 'Arkadaşlar') feed = feed.filter((m) => m.userId === 'me' || following.has(m.userId));
   if (topic) feed = feed.filter((m) => m.topicId === topic);
   if (tab === 'Son') feed = [...feed].sort((a, b) => agoMinutes(a.time) - agoMinutes(b.time));
 
@@ -133,11 +133,11 @@ export default function MomentsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={{ fontSize: 38 }}>{tab === 'arkadaş' ? '👥' : '🌙'}</Text>
+            <Text style={{ fontSize: 38 }}>{tab === 'Arkadaşlar' ? '👥' : '🌙'}</Text>
             <Text style={{ color: colors.textDim, textAlign: 'center' }}>
-              {tab === 'arkadaş' ? 'Takip ettiklerinin anları burada görünür.' : 'Bu konuda henüz an yok. İlk paylaşan sen ol!'}
+              {tab === 'Arkadaşlar' ? 'Takip ettiklerinin anları burada görünür.' : 'Bu konuda henüz an yok. İlk paylaşan sen ol!'}
             </Text>
-            {tab === 'arkadaş' && (
+            {tab === 'Arkadaşlar' && (
               <Pressable style={styles.emptyBtn} onPress={() => router.push('/(tabs)/kesfet')}>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>Yeni insanlar keşfet</Text>
               </Pressable>

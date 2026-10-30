@@ -169,7 +169,8 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <Backdrop scene={SCENES.messages} />
+      {/* Dimmer than other scenes: this list is mostly small grey text. */}
+      <Backdrop scene={SCENES.messages} strength={0.45} />
       <View style={styles.topBar}>
         <View style={styles.tabs}>
           {TABS.map((t) => (
