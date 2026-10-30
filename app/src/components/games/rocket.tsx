@@ -4,8 +4,9 @@
 // loss limit or any refusal.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import { ROCKET_TARGETS } from '@/lib/crash-rocket';

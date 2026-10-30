@@ -4,8 +4,9 @@
 // the room, which calls the presence server where they are validated.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { FlatList, Image, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { ROLE_RANK, type RoomRole } from '@/components/room/parts';

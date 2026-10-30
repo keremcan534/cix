@@ -2,8 +2,9 @@
 // point (a mic seat) or the screen. Transform/opacity only, native driver. Overlays never take touches,
 // so names, mic controls and safety buttons stay usable underneath.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { AnimArt } from '@/components/fx/anim-art';
 import { Icon3D } from '@/components/Icon3D';
 import type { Animation, Asset } from '@/data/animations';

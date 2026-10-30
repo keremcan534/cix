@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';

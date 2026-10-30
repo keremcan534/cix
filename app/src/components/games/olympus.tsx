@@ -4,8 +4,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, BetStepper, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import { casinoAccess, newRequestId, playCasino, useGames, type Entry } from '@/lib/games';

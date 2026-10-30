@@ -4,9 +4,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { BreakoutCard, FloatIcon, GlossButton } from '@/components/fx/float';
 import { SCENES } from '@/components/fx/scenes';

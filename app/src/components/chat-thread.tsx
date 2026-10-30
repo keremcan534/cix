@@ -5,12 +5,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
 import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
+import { Icon3D } from '@/components/Icon3D';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
@@ -133,9 +135,17 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
           <Text style={[styles.notice, { color: colors.gold, textAlign: 'center' }]}>{allowed.reason}</Text>
         ) : (
           !mutual && (
-            <Pressable style={styles.notice} onPress={() => toggleFollow(user.id)}>
-              <Text style={{ color: colors.gold, fontSize: 12, textAlign: 'center' }}>
-                Karşılıklı takip değilsiniz · mesaj başı 🪙 {DM_PRICE}. {following.has(user.id) ? `${user.name} seni takip etmiyor.` : 'Takip et → karşılıklıysa ücretsiz.'}
+            // Tapping follows; once you follow, it only explains (tapping again must not unfollow).
+            <Pressable
+              style={styles.paywall}
+              onPress={() => toggleFollow(user.id)}
+              disabled={following.has(user.id)}
+              accessibilityRole="button"
+              accessibilityLabel={following.has(user.id) ? undefined : `${user.name} kişisini takip et`}
+            >
+              <Icon3D name="coin" size={16} />
+              <Text style={styles.paywallText}>
+                Mesaj başı {DM_PRICE} jeton · {following.has(user.id) ? `${user.name} seni takip etmiyor` : 'Takip et, karşılıklıysa ücretsiz'}
               </Text>
             </Pressable>
           )
@@ -212,6 +222,8 @@ const styles = StyleSheet.create({
   roomTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
   roomJoin: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
   notice: { paddingHorizontal: 16, paddingVertical: 6, color: colors.textDim, textAlign: 'center', fontSize: 12 },
+  paywall: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, marginHorizontal: 16, marginVertical: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(246,189,96,0.1)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.3)' },
+  paywallText: { color: colors.gold, fontSize: 12, fontWeight: '600', flexShrink: 1 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   input: {
     flex: 1,

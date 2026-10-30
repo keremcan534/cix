@@ -3,8 +3,9 @@
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
 // (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
-import { Image, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Image, View, type StyleProp, type TextStyle } from 'react-native';
 
+import { Text } from '@/components/text';
 import { stickerById } from '@/data/catalog';
 import { stickerIdOf, stickersOf as matchStickers, stickerText } from '@/lib/stickers';
 

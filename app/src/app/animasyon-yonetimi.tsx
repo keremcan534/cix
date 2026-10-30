@@ -2,9 +2,10 @@
 // an app update, because rooms read the catalog live (lib/animations). Going live needs an approved
 // licence; price, activity and licence changes are written to the audit log.
 import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { ANIM_ART_NAMES, ANIM_CATEGORY_ART, type AnimArtName } from '@/components/fx/anim-art';
 import { AnimPlay, AssetView } from '@/components/fx/anim-player';
 import { Card, Header } from '@/components/ui';

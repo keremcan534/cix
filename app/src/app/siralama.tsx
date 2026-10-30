@@ -1,10 +1,13 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
+import { Icon3D } from '@/components/Icon3D';
 import { Avatar, Header } from '@/components/ui';
 import { LEADERBOARDS } from '@/data/economy';
 import { AGENCIES } from '@/data/agency';
@@ -12,12 +15,13 @@ import { ROOMS, USERS, type User } from '@/data/mock';
 import { colors } from '@/theme';
 
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
-const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: string; how: string }[] = [
-  { key: 'zengin', label: 'Zenginler', emoji: '💰', art: 'siralama-zenginler', unit: '🪙', how: 'Geçerli hediye harcaması' },
-  { key: 'yayinci', label: 'Yayıncılar', emoji: '🎙️', art: 'siralama-yayincilar', unit: '💎', how: 'Alınan geçerli hediyeler (elmas)' },
-  { key: 'oda', label: 'Odalar', emoji: '🔥', art: 'siralama-odalar', unit: '👥', how: 'Tekil katılımcı' },
-  { key: 'ajans', label: 'Ajanslar', emoji: '🏢', art: 'siralama-ajanslar', unit: '💎', how: 'Ajans yayıncılarının toplam geçerli kazancı' },
-  { key: 'odaxp', label: 'Oda XP', emoji: '⭐', art: 'siralama-oda-xp', unit: 'XP', how: 'Doğrulanmış oda deneyim puanı' },
+type Unit = 'coin' | 'diamond' | 'people' | 'xp';
+const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: Unit; how: string }[] = [
+  { key: 'zengin', label: 'Zenginler', emoji: '💰', art: 'siralama-zenginler', unit: 'coin', how: 'Geçerli hediye harcaması' },
+  { key: 'yayinci', label: 'Yayıncılar', emoji: '🎙️', art: 'siralama-yayincilar', unit: 'diamond', how: 'Alınan geçerli hediyeler (elmas)' },
+  { key: 'oda', label: 'Odalar', emoji: '🔥', art: 'siralama-odalar', unit: 'people', how: 'Tekil katılımcı' },
+  { key: 'ajans', label: 'Ajanslar', emoji: '🏢', art: 'siralama-ajanslar', unit: 'diamond', how: 'Ajans yayıncılarının toplam geçerli kazancı' },
+  { key: 'odaxp', label: 'Oda XP', emoji: '⭐', art: 'siralama-oda-xp', unit: 'xp', how: 'Doğrulanmış oda deneyim puanı' },
 ];
 const PERIOD_RANGE = { daily: '24 Ekim 2026', weekly: '19–25 Ekim 2026', monthly: '1–31 Ekim 2026' } as const;
 
@@ -86,9 +90,7 @@ export default function Leaderboard() {
             <Text style={styles.name} numberOfLines={1}>
               {item.name}
             </Text>
-            <Text style={styles.score}>
-              {unit} {item.score.toLocaleString('tr-TR')}
-            </Text>
+            <Score unit={unit} n={item.score} />
           </Pressable>
         )}
       />
@@ -102,7 +104,23 @@ const MEDAL = {
   3: { emoji: '🥉', art: 'derece-3', color: '#F59E0B', size: 68 },
 } as const satisfies Record<1 | 2 | 3, { emoji: string; art: ArtName; color: string; size: number }>;
 
-function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; unit: string; onPress: () => void }) {
+/** A board's number with its unit drawn as an icon (coins, diamonds, people) or as an XP suffix. */
+function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
+  const size = small ? 14 : 16;
+  return (
+    <View style={styles.scoreRow}>
+      {unit === 'coin' && <Icon3D name="coin" size={size} />}
+      {unit === 'diamond' && <Icon3D name="diamond" size={size} />}
+      {unit === 'people' && <Ionicons name="people" size={size - 2} color={colors.textDim} />}
+      <Text style={[styles.score, small && { fontSize: 12 }]}>
+        {n.toLocaleString('tr-TR')}
+        {unit === 'xp' ? ' XP' : ''}
+      </Text>
+    </View>
+  );
+}
+
+function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; unit: Unit; onPress: () => void }) {
   const m = MEDAL[place];
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1, gap: 4, marginTop: place === 1 ? 0 : 28 }}>
@@ -111,9 +129,7 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
       <Text style={styles.podiumName} numberOfLines={1}>
         {row.name}
       </Text>
-      <Text style={[styles.score, { fontSize: 12 }]}>
-        {unit} {row.score.toLocaleString('tr-TR')}
-      </Text>
+      <Score unit={unit} n={row.score} small />
     </Pressable>
   );
 }
@@ -133,4 +149,5 @@ const styles = StyleSheet.create({
   rank: { color: colors.textDim, fontWeight: '800', width: 22, textAlign: 'center' },
   name: { color: '#fff', fontWeight: '600', flex: 1 },
   score: { color: colors.gold, fontWeight: '700' },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

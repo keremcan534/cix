@@ -6,9 +6,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Keyboard, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Keyboard, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { micHaptic, tapHaptic } from '@/lib/haptics';
 import { setConnection, useOnline, useRoomLive } from '@/lib/room-presence';
 import {

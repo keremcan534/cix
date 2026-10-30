@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_GIFT_PACK, VIP_PERKS, VIP_PLANS, VIP_TICKER } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';

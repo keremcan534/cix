@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import {
   CHEST_MIN_CONTRIBUTION,
@@ -86,7 +87,7 @@ export default function KabileMerkez() {
     const prog = taskProgress(t, p, counters);
     if (t.kind === 'count') {
       if (!prog.claimable || !kabile.claimCount(t)) return;
-      return showAlert(t.source === 'checkIn' ? 'Check-in tamam ✅' : 'Ödül alındı', `⚔ +${t.power} Güç Puanı · 🔮 +${t.treasure} Hazine`);
+      return showAlert(t.source === 'checkIn' ? 'Yoklama alındı' : 'Ödül alındı', `⚔ +${t.power} Güç Puanı · 🔮 +${t.treasure} Hazine`);
     }
     const n = kabile.claimSteps(t, prog.steps);
     if (n) showAlert('Ödül alındı', `⚔ +${t.power * n} Güç Puanı · 🔮 +${t.treasure * n} Hazine`);
@@ -109,8 +110,8 @@ export default function KabileMerkez() {
       <Header
         title="Görev Merkezi"
         right={
-          <Pressable style={[styles.pill, checkedIn && { opacity: 0.6 }]} onPress={() => !checkedIn && claim(CHECKIN)} accessibilityLabel="Check-in">
-            <Text style={styles.pillText}>{checkedIn ? 'Giriş başarılı' : 'Check-in'}</Text>
+          <Pressable style={[styles.pill, checkedIn && { opacity: 0.6 }]} onPress={() => !checkedIn && claim(CHECKIN)} accessibilityLabel="Kabile yoklaması">
+            <Text style={styles.pillText}>{checkedIn ? 'Yoklama alındı' : 'Yoklama ver'}</Text>
           </Pressable>
         }
       />
@@ -198,7 +199,7 @@ function TaskRow({ task, p, counters, onGo, onClaim, meAvatar }: { task: KabileT
   const measured = task.source === 'roomMinutes' || task.source === 'giftsSent' || task.source === 'roomGiftCoins';
   const waiting = measured && p.baselines[task.source] === undefined;
   const mineDone = prog.claimed || prog.steps > 0;
-  const label = prog.claimed ? 'Tamamlandı' : task.source === 'checkIn' ? 'Check-in' : prog.claimable ? (task.kind === 'rate' ? `Al +${prog.newSteps * task.power}` : 'Al') : 'Git';
+  const label = prog.claimed ? 'Tamamlandı' : task.source === 'checkIn' ? 'Yoklama ver' : prog.claimable ? (task.kind === 'rate' ? `Al +${prog.newSteps * task.power}` : 'Al') : 'Git';
   return (
     <View style={styles.task}>
       <View style={styles.row}>

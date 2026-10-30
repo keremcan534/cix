@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Chips, Note, StatusBadge, ViewerBar, s } from '@/components/agency-apps';
 import { Header } from '@/components/ui';
 import {

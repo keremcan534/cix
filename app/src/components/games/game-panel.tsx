@@ -3,9 +3,10 @@
 // mic button only mirrors and toggles the user's own mic (an explicit user action), and opening,
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { gameArtOf } from '@/components/GameArt';
 import { CasinoPlayer } from '@/components/games/casino';
 import { FishPlayer } from '@/components/games/fish';

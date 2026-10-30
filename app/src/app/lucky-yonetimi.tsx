@@ -1,9 +1,10 @@
 // Admin: Lucky gift packages, odds, reward reserve, records (spec §8). Every change bumps the
 // config version; each send keeps the odds it was drawn with, so past results stay auditable.
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';

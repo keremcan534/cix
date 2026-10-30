@@ -1,8 +1,9 @@
 // Game visuals: each game's 3D cover from the app icon set (components/Art), keyed by game id (data/games).
 // Renk Kartları and Domino have no picture yet and keep their emoji.
-import { Image, Text } from 'react-native';
+import { Image } from 'react-native';
 
 import { artSource, type ArtName } from '@/components/Art';
+import { EmojiIcon } from '@/components/Icon3D';
 
 const COVER: Record<string, ArtName> = {
   ludo: 'oyun-ludo',
@@ -17,6 +18,7 @@ const COVER: Record<string, ArtName> = {
   wheel: 'oyun-sans-carki',
   dice: 'oyun-zar-casino',
   slot: 'oyun-lucky-77',
+  jackpot: 'oyun-hazine-sandigi',
   dragon: 'oyun-dragon-tiger',
   fish: 'oyun-balik-avi',
 };
@@ -59,8 +61,8 @@ const HUE: Record<string, string> = {
 };
 export const gameHueOf = (id: string): string => HUE[id] ?? '#13D9DF';
 
-/** The game's picture when it has one, otherwise its emoji. */
+/** The game's picture when it has one, otherwise its emoji (as a 3D icon when the set has one). */
 export function GameIcon({ id, emoji, size }: { id: string; emoji: string; size: number }) {
   const art = ART[id];
-  return art ? <Image source={art} style={{ width: size * 1.3, height: size * 1.3 }} accessibilityIgnoresInvertColors /> : <Text style={{ fontSize: size }}>{emoji}</Text>;
+  return art ? <Image source={art} style={{ width: size * 1.3, height: size * 1.3 }} accessibilityIgnoresInvertColors /> : <EmojiIcon emoji={emoji} size={size} />;
 }

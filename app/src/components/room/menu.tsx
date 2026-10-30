@@ -2,8 +2,9 @@
 // own colored light (fx/float) instead of sitting in boxes; game tiles break out of a lit plate.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { FloatIcon, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
@@ -107,7 +108,7 @@ function Badge({ badge }: { badge: MenuItem['badge'] }) {
         <Ionicons name={badge === 'on' ? 'checkmark' : 'close'} size={12} color={badge === 'on' ? semantic.successInk : '#fff'} />
       </View>
     );
-  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : '#2563EB' }]}>{badge}</Text>;
+  if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : colors.primary }]}>{badge === 'NEW' ? 'YENİ' : badge}</Text>;
   if (typeof badge === 'number' && badge > 0) return <Text style={[styles.ribbon, { backgroundColor: colors.red, left: undefined, right: -4 }]}>{badge}</Text>;
   return null;
 }

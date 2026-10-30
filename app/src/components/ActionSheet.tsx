@@ -1,5 +1,6 @@
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { colors } from '@/theme';
 
 export type SheetOption = { label: string; onPress: () => void; destructive?: boolean };

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Card, GradientButton, Header } from '@/components/ui';
 import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';

@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { GradientButton } from '@/components/ui';

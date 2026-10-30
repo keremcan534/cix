@@ -30,6 +30,7 @@ SimilarClub'ın vaadi: *benzer insanlarla aynı anda, sesle buluşmak.* Görsel 
 | Boşluk (`space`, 4 pt) | 4 · 8 · 12 · 16 · 24 · 32 |
 | Köşe (`radius`) | 8 küçük · 12 kart içi · 16 kart · 24 alt panel · 999 hap/çip |
 | Yazı ölçeği (`type`) | 12 açıklama (en küçük) · 14 gövde · 16 büyük gövde · 18 başlık · 22 ekran başlığı · 24 tutar. Tutarlar `tabular-nums` |
+| Yazı tipi | **Plus Jakarta Sans**, her metinde (400 · 500 · 600 · 700 · 800). `Text` ve `TextInput` `@/components/text` içinden alınır; kalınlık (`fontWeight`) doğru font dosyasını seçer, iç içe metin üsttekinin kalınlığını alır. Başlıklar `fonts.display` (800) ve `fonts.displayBold` (700). Lint, `react-native`ten doğrudan `Text` alınmasını engeller. |
 
 Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğrudan yazılmış ~150 renk kodu var. Açık tema, ekranlar bu tokenlara taşındıkça açılacak (varsayım: lansmanda yalnız koyu tema).
 
@@ -42,6 +43,11 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
 - **Bildirim satırı (notice).** Tek satır ikon + metin; `info` gri, `warn` altın zemin, `lock` kilit ikonu. Renk tek başına anlam taşımaz, her zaman ikon da vardır.
 - **Durum etiketi.** Kısa metin + ton (bilgi / uyarı / başarılı / hata / nötr).
 - **İkonlar.** Ionicons; pasif durumda çizgi (`outline`), aktif durumda dolu.
+- **Alt sekme çubuğu.** Beş sekme eşit; aktif sekme dolu ikon + yumuşak turkuaz hap ve turkuaz etiket. Kabarık orta düğme yok.
+- **Renkli kartlar.** Yüzey lacivert kalır; anlam rengi (mercan / altın / turkuaz) kartı bir köşeden aydınlatan hafif bir ışık olarak girer, kartı doldurmaz.
+- **Gruplu liste (`components/list`).** Ayar tarzı ekranlarda küçük büyük harfli etiket, yuvarlak kart içinde ince çizgiyle ayrılmış satırlar, altta dipnot. Satır: tonlu ikon karosu, başlık, isteğe bağlı alt yazı ve tek aksesuar (bir yere gidiyorsa chevron, anahtar ya da değer). Kısa seçenekler `ChoiceChips` ile.
+- **Metin bağlantısı (`TextLink`).** Kart içindeki ikincil eylem: renkli yazı ve chevron ikonu. Bağlantı metnine "→" yazılmaz.
+- **Arayüz dili Türkçe.** "NEW", "Large", "Hi", "Check-in" gibi İngilizce etiketler ve "2h 48m" gibi birimler yok; geri sayım `02:48:23` biçiminde.
 - **Emoji ikon değildir.** Emoji yalnız içerikte (mesaj, tepki, kullanıcı metni) kullanılır. Boş, kilitli ve izin durumlarında `StateIcon` (tonlu daire içinde çizgi ikon), maskot ya da 3D görsel kullanılır. Oda sahibi tacı ve yönetici rozeti de ikondur.
 - **Arka plan (`Backdrop`).** Stok fotoğraf yok: lacivert zemin, üstten ekranın anlam rengiyle (turkuaz / altın / mercan) gelen yumuşak ışık (`fx/scenes`). Odada `StageBackdrop`: oda temasının renkleri, ev sahibi koltuğuna düşen iki spot, sohbetin altında koyulaşan zemin.
 - **Efekt ölçüsü.** Parlama (`Gloss`), kenar ışığı (`EdgeLight`) ve ışık süpürmesi (`Shine`) yalnız değerli öğelerde (sıralama, en iyi odalar, ana buton); sıradan kartlar düzdür.
@@ -162,7 +168,7 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 | --- | --- |
 | Alt navigasyon: A (5 eşit) mı B (4 + ortada oda aç) mı | Bugünkü yapı B'ye yakın; iki seçenek prototiplenip görev süresi ve hata oranıyla test edilecek |
 | Açık tema | Lansmanda yalnız koyu tema; tokenlar hazır |
-| Marka yazı tipi | Sistem yazı tipi (performans, Türkçe karakter). Özel yazı tipi ayrı karar |
+| Marka yazı tipi | Karar verildi: Plus Jakarta Sans (bkz. tasarım tokenları) |
 | Hediye animasyon formatı | Küçükler Lottie, büyükler şeffaf video; ayrı iş |
 | Yüksek tutar onayı | Varsayılan kapalı (ürün kararı); kullanıcı Ayarlar'dan açabilir |
 | Şans / jackpot hediyeleri | Yok. Hukuki görüş olmadan eklenmeyecek |

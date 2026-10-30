@@ -3,8 +3,9 @@
 // state from lib/pk; seats, microphones and membership stay with the room.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { roomById, userById } from '@/data/mock';
 import {

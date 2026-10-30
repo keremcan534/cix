@@ -1,8 +1,9 @@
 // Gender chip and agency / kabile pills shared by the Profil tab and the user profile screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { AGENCIES, ROLE_LABEL, agencyOf, type AgencyRole } from '@/data/agency';
 import { findKabile, KABILE_ROUTES } from '@/data/kabile';
 import type { User } from '@/data/mock';

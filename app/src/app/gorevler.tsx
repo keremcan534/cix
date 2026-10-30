@@ -2,15 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CoinPill, Header, StateIcon } from '@/components/ui';
+import { Text } from '@/components/text';
+import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
-import { Icon3D } from '@/components/Icon3D';
+import { colors, fonts, semantic } from '@/theme';
+import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 
 const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
@@ -21,16 +22,17 @@ const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
   calls: { desc: 'Bir arkadaşınla görüntülü sohbet et', go: () => router.push('/(tabs)/mesajlar') },
 };
 // Tomorrow's check-in reward bundle (cards + coins), mirrors the 7-day cycle.
-const TOMORROW = (coins: number) => [
-  { emoji: '💬', name: 'PM kartı', n: '+2' },
-  { emoji: '❤️', name: 'Merhaba kartı', n: '+2' },
-  { emoji: '🪙', name: 'Jeton', n: `+${coins}` },
+const TOMORROW = (coins: number): { icon: Icon3DName; name: string; n: string }[] => [
+  { icon: 'chat', name: 'Mesaj kartı', n: '+2' },
+  { icon: 'heart', name: 'Merhaba kartı', n: '+2' },
+  { icon: 'coin', name: 'Jeton', n: `+${coins}` },
 ];
 const secsToMidnight = () => {
   const d = new Date();
   return Math.max(0, Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - d.getTime()) / 1000));
 };
-const hms = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ${s % 60}s`;
+const pad = (n: number) => String(n).padStart(2, '0');
+const hms = (s: number) => `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 
 export default function TaskCenter() {
   const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask, settings } = useApp();
@@ -47,7 +49,7 @@ export default function TaskCenter() {
   const doCheckIn = () => {
     const r = checkIn();
     if (r) {
-      setReward({ icon: 'gift', title: `Check-in tamam · ${checkInDay + 1}. gün`, amount: r });
+      setReward({ icon: 'gift', title: `Giriş ödülü alındı · ${checkInDay + 1}. gün`, amount: r });
       setSelected((todayIndex + 1) % 7);
     }
   };
@@ -58,21 +60,26 @@ export default function TaskCenter() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: 40 }}>
         <View style={styles.card}>
           <View style={styles.rowBetween}>
-            <Text style={styles.checkTitle}>Günlük Check-in</Text>
-            <Pressable onPress={doCheckIn} disabled={checkedInToday} style={[styles.checkBtn, checkedInToday && { backgroundColor: '#52525B' }]} accessibilityLabel="Check-in">
-              <Text style={{ color: '#fff', fontWeight: '800' }}>{checkedInToday ? 'Bugün tamamlandı' : `Check-in yap +${CHECKIN_REWARDS[todayIndex]}`}</Text>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.checkTitle}>Günlük giriş</Text>
+              <Text style={styles.dim}>7 gün üst üste gel, büyük ödülü kap</Text>
+            </View>
+            <Pressable onPress={doCheckIn} disabled={checkedInToday} style={[styles.checkBtn, checkedInToday && styles.checkBtnDone]} accessibilityLabel="Günlük giriş ödülünü al">
+              {checkedInToday ? <Ionicons name="checkmark" size={16} color={colors.textDim} /> : <Icon3D name="coin" size={16} />}
+              <Text style={[styles.checkBtnText, checkedInToday && { color: colors.textDim }]}>{checkedInToday ? 'Alındı' : `+${CHECKIN_REWARDS[todayIndex]} al`}</Text>
             </Pressable>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {/* Top padding leaves room for the BÜYÜK ribbon, which sits above its tile. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
             {CHECKIN_REWARDS.map((r, i) => {
               const done = i < todayIndex || (i === todayIndex && checkedInToday);
               const big = i === 1 || i === 6;
               return (
-                <Pressable key={`d${i}`} onPress={() => setSelected(i)} style={[styles.day, selected === i && styles.daySel]} accessibilityLabel={`Gün ${i + 1}`}>
-                  {big && <Text style={styles.large}>Large</Text>}
-                  <Icon3D name={big ? 'gift' : i === 3 ? 'coin' : 'envelope'} size={32} />
-                  {done ? <Ionicons name="checkmark" size={22} color={colors.textDim} /> : <Text style={[styles.dayLabel, selected === i && { color: '#3B2A12' }]}>Gün {i + 1}</Text>}
-                  <Text style={[styles.dayCoins, selected === i && { color: '#92400E' }]}>+{r}</Text>
+                <Pressable key={`d${i}`} onPress={() => setSelected(i)} style={[styles.day, done && styles.dayDone, selected === i && styles.daySel]} accessibilityLabel={`Gün ${i + 1}${done ? ', alındı' : ''}`}>
+                  {big && <Text style={styles.large}>BÜYÜK</Text>}
+                  <Icon3D name={big ? 'gift' : i === 3 ? 'coin' : 'envelope'} size={32} style={done ? { opacity: 0.5 } : undefined} />
+                  {done ? <Ionicons name="checkmark-circle" size={18} color={semantic.success} /> : <Text style={[styles.dayLabel, selected === i && { color: colors.text }]}>Gün {i + 1}</Text>}
+                  <Text style={styles.dayCoins}>+{r}</Text>
                 </Pressable>
               );
             })}
@@ -82,20 +89,23 @@ export default function TaskCenter() {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {TOMORROW(CHECKIN_REWARDS[selected]).map((x) => (
                 <View key={x.name} style={styles.rewardBox}>
-                  <Text style={{ fontSize: 30 }}>{x.emoji}</Text>
+                  <Icon3D name={x.icon} size={34} />
                   <Text style={styles.dim} numberOfLines={1}>
                     {x.name}
                   </Text>
-                  <Text style={{ color: colors.primaryText, fontWeight: '800', fontSize: 16 }}>{x.n}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>{x.n}</Text>
                 </View>
               ))}
             </View>
           </View>
         </View>
 
-        <View style={{ gap: 6 }}>
-          <Text style={styles.h1}>Günlük Görevler</Text>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>⏰ {hms(left)}</Text>
+        <View style={styles.rowBetween}>
+          <Text style={styles.h1}>Günlük görevler</Text>
+          <View style={styles.timer} accessibilityLabel={`Görevlerin yenilenmesine ${hms(left)}`}>
+            <Ionicons name="time-outline" size={14} color={colors.textDim} />
+            <Text style={styles.timerText}>{hms(left)}</Text>
+          </View>
         </View>
         <View style={[styles.card, { paddingVertical: 4 }]}>
           {TASKS.map((t, i) => {
@@ -116,9 +126,18 @@ export default function TaskCenter() {
                 )}
                 <Text style={styles.dim}>{TASK_INFO[t.key].desc}</Text>
                 <View style={styles.rowBetween}>
-                  <Text style={{ color: '#A5F3F5', fontSize: 15 }}>
-                    🪙 x{t.reward} <Text style={styles.dim}>({progress}/{t.goal})</Text>
-                  </Text>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Icon3D name="coin" size={16} />
+                      <Text style={styles.taskReward}>{t.reward}</Text>
+                      <Text style={[styles.dim, { marginLeft: 'auto' }]}>
+                        {progress}/{t.goal}
+                      </Text>
+                    </View>
+                    <View style={styles.track}>
+                      <View style={[styles.fill, { width: `${(progress / t.goal) * 100}%` }, complete && { backgroundColor: semantic.success }]} />
+                    </View>
+                  </View>
                   {claimed ? (
                     <View style={[styles.goBtn, { opacity: 0.45 }]}>
                       <Ionicons name="checkmark" size={20} color="#fff" />
@@ -142,10 +161,10 @@ export default function TaskCenter() {
         </View>
 
         <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
-          <LinearGradient colors={['#F97316', '#FF6576']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
-            <StateIcon name="people-outline" size={56} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }}>Ödüllü Davet</Text>
+          <LinearGradient colors={[semantic.socialFill, '#6E2440']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
+            <Icon3D name="envelope" size={48} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 17 }}>Ödüllü davet</Text>
               <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Arkadaşlarını davet et, kayıt ve gelir görevlerinden ödül kazan</Text>
             </View>
             <Ionicons name="chevron-forward" size={22} color="#fff" />
@@ -161,22 +180,30 @@ export default function TaskCenter() {
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, gap: 14 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  checkTitle: { color: '#A5F3F5', fontSize: 22, fontWeight: '900' },
-  checkBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
-  day: { width: 64, alignItems: 'center', gap: 4, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.cardAlt },
-  daySel: { backgroundColor: '#FDE68A' },
-  large: { position: 'absolute', top: 2, color: '#F59E0B', fontSize: 9, fontWeight: '900' },
+  checkTitle: { color: colors.text, fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
+  checkBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  checkBtnDone: { backgroundColor: colors.cardAlt },
+  checkBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  day: { width: 64, alignItems: 'center', gap: 4, paddingTop: 12, paddingBottom: 10, borderRadius: 14, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
+  dayDone: { backgroundColor: 'rgba(31,48,80,0.5)' },
+  daySel: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.14)' },
+  large: { position: 'absolute', top: -7, backgroundColor: colors.gold, color: semantic.moneyInk, fontSize: 8, fontWeight: '800', letterSpacing: 0.4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
   tomorrow: { backgroundColor: 'rgba(19,217,223,0.12)', borderRadius: 16, padding: 14, gap: 12 },
-  tomorrowTitle: { color: '#A5F3F5', fontWeight: '800', fontSize: 16 },
-  rewardBox: { width: 88, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
-  h1: { color: '#fff', fontWeight: '900', fontSize: 22 },
+  tomorrowTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
+  rewardBox: { flex: 1, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
+  h1: { color: '#fff', fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
+  timer: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  timerText: { color: colors.text, fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] },
+  taskReward: { color: colors.gold, fontWeight: '700', fontSize: 14 },
+  track: { height: 4, borderRadius: 2, backgroundColor: colors.cardAlt, overflow: 'hidden' },
+  fill: { height: 4, borderRadius: 2, backgroundColor: semantic.action },
   task: { gap: 6, paddingVertical: 14 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  taskTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  taskTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
-  goBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
-  goText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  goBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8, minWidth: 76, alignItems: 'center' },
+  goText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   invite: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 16 },
 });

@@ -5,8 +5,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
+import { Text } from '@/components/text';
 import { EdgeLight, Gloss, PressableScale, glow } from '@/components/fx/surface';
 import type { Player } from '@/components/games/room-games';
 import {

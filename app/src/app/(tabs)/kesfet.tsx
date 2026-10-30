@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
@@ -77,7 +78,8 @@ export default function DiscoverScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
               {DISCOVER_SHORTCUTS.map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
-                  <LinearGradient colors={s.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
+                  {/* The shortcut's color lights a navy card from the top instead of filling it. */}
+                  <LinearGradient colors={[`${s.colors[1]}5C`, 'rgba(22,37,60,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
                     <ShortcutArt id={s.id} emoji={s.emoji} />
                     <Text style={[styles.shortcutTitle, !s.wide && { textAlign: 'center' }]} numberOfLines={1}>
                       {s.title}
@@ -242,9 +244,8 @@ function UserRow({
             {user.name}
           </Text>
           {REAL_PERSON.has(user.id) ? (
-            <View style={styles.realBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.green} />
-              <Text style={styles.realText}>Gerçek</Text>
+            <View accessibilityLabel="Gerçek kişi, doğrulandı">
+              <Ionicons name="checkmark-circle" size={16} color={colors.green} />
             </View>
           ) : (
             user.verified && <VerifiedBadge size={16} />
@@ -270,16 +271,10 @@ function UserRow({
       </View>
       <View style={{ alignItems: 'center', gap: 8 }}>
         <Pressable onPress={onGreet} hitSlop={6}>
-          <LinearGradient colors={greeted ? [colors.cardAlt, colors.cardAlt] : [semantic.socialFill, '#A82F42']} style={styles.hiBtn}>
-            {greeted ? (
-              <>
-                <Ionicons name="chatbubble-ellipses" size={13} color="#fff" />
-                <Text style={styles.hiText}>Sohbet</Text>
-              </>
-            ) : (
-              <Text style={styles.hiText}>Hi ❤</Text>
-            )}
-          </LinearGradient>
+          <View style={[styles.hiBtn, { backgroundColor: greeted ? colors.cardAlt : semantic.socialFill }]} accessibilityRole="button" accessibilityLabel={greeted ? `${user.name} ile sohbet` : `${user.name} kişisine selam ver`}>
+            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color="#fff" />
+            <Text style={styles.hiText}>{greeted ? 'Sohbet' : 'Selam'}</Text>
+          </View>
         </Pressable>
         <Pressable onPress={onToggleFollow} hitSlop={6} style={styles.followBtn}>
           <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={14} color={isFollowing ? colors.pink : colors.textDim} />
@@ -299,7 +294,7 @@ function PromoCard() {
           <Image source={{ uri: room.cover }} style={styles.promoCover} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.promoTitle} numberOfLines={1}>
-              👑 {room.title} 👑
+              {room.title}
             </Text>
             <Text style={styles.promoSub}>{DISCOVER_PROMO.waiting} kişi seni bekliyor</Text>
           </View>
@@ -379,7 +374,7 @@ function FilterSheet({
 
 const styles = StyleSheet.create({
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
-  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2 },
+  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   shortcutWide: { width: 150 },
   shortcutTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
   shortcutSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
@@ -405,14 +400,12 @@ const styles = StyleSheet.create({
   onlineDot: { position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: semantic.live, borderWidth: 2, borderColor: colors.bg },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   name: { color: '#fff', fontWeight: '800', fontSize: 17, maxWidth: 140 },
-  realBadge: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(34,197,94,0.14)', borderRadius: 6, paddingLeft: 2, paddingRight: 6, paddingVertical: 1 },
-  realText: { color: colors.green, fontSize: 12, fontWeight: '700' },
   chips: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 2, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   chipText: { color: '#fff', fontSize: 12 },
   bio: { color: colors.textDim, fontSize: 13 },
-  hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minWidth: 74, justifyContent: 'center' },
-  hiText: { color: '#fff', fontWeight: '900', fontSize: 13, fontStyle: 'italic' },
+  hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, minWidth: 76, justifyContent: 'center' },
+  hiText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   followBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   followText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   promoWrap: { marginHorizontal: 16, marginVertical: 10 },

@@ -10,8 +10,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';

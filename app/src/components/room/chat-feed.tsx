@@ -2,8 +2,9 @@
 // tab stays mounted, so switching tabs keeps each tab's own reading position and never reloads, rebuilds or
 // replays anything. A reader scrolled up is never pulled down by new events; a pill offers to jump instead.
 import { useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
+import { Text } from '@/components/text';
 import { filterFeed, type FeedMsg, type FeedTab } from '@/lib/chat-feed';
 import { colors, semantic } from '@/theme';
 

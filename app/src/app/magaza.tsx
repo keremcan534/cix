@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { EntryEffect, ENTRY_LOOKS, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';

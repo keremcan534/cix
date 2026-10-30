@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
+import { Text, TextInput } from '@/components/text';
+import { Avatar, Card, GradientButton, Header, StateIcon, TextLink } from '@/components/ui';
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
 import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
@@ -349,9 +350,7 @@ function Earnings() {
           </View>
         </Card>
       ))}
-      <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })}>
-        <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Finans itirazı / mutabakat talebi →</Text>
-      </Pressable>
+      <TextLink title="Finans itirazı / mutabakat talebi" onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} />
     </>
   );
 }

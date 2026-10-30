@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Header } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { ROOMS, USERS } from '@/data/mock';

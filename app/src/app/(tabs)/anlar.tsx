@@ -3,9 +3,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
@@ -259,10 +260,15 @@ function MomentCard({
           <Text style={styles.meta}>{meta}</Text>
         </Pressable>
         {!isMe && (
-          <Pressable onPress={onGreet} hitSlop={6}>
-            <LinearGradient colors={greeted ? [colors.cardAlt, colors.cardAlt] : ['rgba(255,138,151,0.25)', 'rgba(255,101,118,0.4)']} style={styles.hiBtn}>
-              <Text style={styles.hiText}>{greeted ? 'Sohbet' : 'Hi ❤'}</Text>
-            </LinearGradient>
+          <Pressable
+            onPress={onGreet}
+            hitSlop={6}
+            style={[styles.hiBtn, greeted && styles.hiBtnDone]}
+            accessibilityRole="button"
+            accessibilityLabel={greeted ? `${author.name} ile sohbet` : `${author.name} kişisine selam ver`}
+          >
+            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color={greeted ? '#fff' : colors.pink} />
+            <Text style={[styles.hiText, greeted && { color: '#fff' }]}>{greeted ? 'Sohbet' : 'Selam'}</Text>
           </Pressable>
         )}
       </View>
@@ -450,8 +456,9 @@ const styles = StyleSheet.create({
   name: { color: '#fff', fontWeight: '800', fontSize: 15, maxWidth: 150 },
   genderChip: { flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   meta: { color: colors.textDim, fontSize: 12 },
-  hiBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.5)' },
-  hiText: { color: colors.pink, fontWeight: '900', fontStyle: 'italic', fontSize: 14 },
+  hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.45)', backgroundColor: 'rgba(255,101,118,0.12)' },
+  hiBtnDone: { borderColor: 'transparent', backgroundColor: colors.cardAlt },
+  hiText: { color: colors.pink, fontWeight: '700', fontSize: 13 },
   body: { paddingLeft: 60, gap: 10 },
   text: { color: '#fff', fontSize: 15, lineHeight: 21 },
   image: { width: '78%', aspectRatio: 0.78, borderRadius: 12, backgroundColor: colors.card },

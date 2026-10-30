@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { GroupChat } from '@/components/GroupChat';
 import { GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';

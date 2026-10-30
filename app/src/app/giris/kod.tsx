@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { AuthHeader } from '@/components/AuthHeader';
 import { useApp } from '@/store';
 import { colors } from '@/theme';

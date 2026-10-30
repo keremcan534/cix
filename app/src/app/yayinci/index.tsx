@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
-import { Card, GradientButton, Header } from '@/components/ui';
+import { Card, GradientButton, Header, TextLink } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { hostLevel } from '@/data/economy';
 import { diamondValueTl } from '@/lib/coins-bank';
@@ -120,9 +121,7 @@ function Dashboard() {
               : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. Kalan süre: ${Math.max(0, RULES.hostAgencyJoinDays - 1)} gün.`}
           </Text>
           {!agency && (
-            <Pressable onPress={() => router.push('/ajans')}>
-              <Text style={{ color: colors.gold, fontWeight: '800' }}>Ajansa katıl →</Text>
-            </Pressable>
+            <TextLink title="Ajansa katıl" color={colors.gold} onPress={() => router.push('/ajans')} />
           )}
         </View>
 

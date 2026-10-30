@@ -1,4 +1,10 @@
-import { Baloo2_700Bold, Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -29,8 +35,15 @@ const theme = {
 };
 
 export default function RootLayout() {
-  // The display face (theme `fonts`); a failed load falls back to the system font instead of blocking the app.
-  const [fontsLoaded, fontError] = useFonts({ Display: Baloo2_800ExtraBold, DisplayBold: Baloo2_700Bold });
+  // The brand typeface, one file per weight (components/text picks it from fontWeight). A failed load falls back
+  // to the system font instead of blocking the app.
+  const [fontsLoaded, fontError] = useFonts({
+    Jakarta: PlusJakartaSans_400Regular,
+    JakartaMedium: PlusJakartaSans_500Medium,
+    JakartaSemiBold: PlusJakartaSans_600SemiBold,
+    JakartaBold: PlusJakartaSans_700Bold,
+    JakartaExtraBold: PlusJakartaSans_800ExtraBold,
+  });
   if (!fontsLoaded && !fontError) return null;
   return (
     <AppProvider onReady={hideSplash}>

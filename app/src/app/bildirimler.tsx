@@ -1,11 +1,13 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Header } from '@/components/ui';
+import { Text } from '@/components/text';
+import { Header, StateIcon } from '@/components/ui';
 import { useApp, type Notice } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 // Security/finance notices are kept apart from social ones (spec §10.3).
 const TABS: { key: 'all' | 'social' | 'important'; label: string }[] = [
@@ -13,6 +15,15 @@ const TABS: { key: 'all' | 'social' | 'important'; label: string }[] = [
   { key: 'social', label: 'Sosyal' },
   { key: 'important', label: 'Finans & Güvenlik' },
 ];
+
+const KIND: Record<Notice['kind'], { icon: keyof typeof Ionicons.glyphMap; tone: 'action' | 'money' | 'social' }> = {
+  social: { icon: 'chatbubble', tone: 'social' },
+  finance: { icon: 'wallet', tone: 'money' },
+  security: { icon: 'shield-checkmark', tone: 'action' },
+  system: { icon: 'notifications', tone: 'action' },
+};
+/** Notices saved before icons were glyph names hold an emoji; those show their kind's icon. */
+const iconOf = (n: Notice) => (n.icon in Ionicons.glyphMap ? n.icon : KIND[n.kind].icon);
 
 export default function NotificationsScreen() {
   const { notifications, markNotificationsRead } = useApp();
@@ -41,20 +52,36 @@ export default function NotificationsScreen() {
       <FlatList
         data={list}
         keyExtractor={(n) => n.id}
-        ListEmptyComponent={<Text style={styles.empty}>Bildirim yok.</Text>}
+        contentContainerStyle={{ paddingBottom: 12 }}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <StateIcon name="notifications-outline" />
+            <Text style={styles.emptyTitle}>Henüz bildirim yok</Text>
+            <Text style={styles.dim}>Selamlar, davetler ve ödemeler burada görünür.</Text>
+          </View>
+        }
         renderItem={({ item }) => (
-          <Pressable style={[styles.row, !item.read && { backgroundColor: 'rgba(19,217,223,0.12)' }]} onPress={() => open(item)}>
-            <Text style={{ fontSize: 24 }}>{item.icon}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontWeight: item.read ? '500' : '800' }}>{item.title}</Text>
-              <Text style={styles.dim}>{item.body}</Text>
+          <Pressable style={({ pressed }) => [styles.row, !item.read && styles.unread, pressed && styles.pressed]} onPress={() => open(item)}>
+            <StateIcon name={iconOf(item)} size={42} tone={KIND[item.kind].tone} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.title, item.read && { fontWeight: '600' }]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <Text style={styles.body} numberOfLines={2}>
+                {item.body}
+              </Text>
             </View>
-            <Text style={styles.dim}>{item.time}</Text>
+            <View style={styles.meta}>
+              <Text style={styles.time}>{item.time}</Text>
+              {!item.read && <View style={styles.dot} accessibilityLabel="Okunmadı" />}
+            </View>
           </Pressable>
         )}
       />
-      <Pressable onPress={() => router.push('/ayarlar')} style={{ alignItems: 'center', padding: 12 }}>
-        <Text style={styles.dim}>Bildirim tercihleri →</Text>
+      <Pressable onPress={() => router.push('/ayarlar')} style={styles.prefs} accessibilityRole="button">
+        <Ionicons name="options-outline" size={16} color={colors.textDim} />
+        <Text style={styles.prefsText}>Bildirim tercihleri</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.textDim} />
       </Pressable>
     </SafeAreaView>
   );
@@ -64,7 +91,17 @@ const styles = StyleSheet.create({
   tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.card },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  dim: { color: colors.textDim, fontSize: 12 },
-  empty: { color: colors.textDim, textAlign: 'center', marginTop: 40 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 12, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 16 },
+  unread: { backgroundColor: 'rgba(19,217,223,0.07)' },
+  pressed: { backgroundColor: 'rgba(255,255,255,0.05)' },
+  title: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  body: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
+  meta: { alignItems: 'flex-end', gap: 8, alignSelf: 'flex-start', paddingTop: 2 },
+  time: { color: colors.textDim, fontSize: 12, fontVariant: ['tabular-nums'] },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: semantic.action },
+  dim: { color: colors.textDim, fontSize: 13, textAlign: 'center' },
+  empty: { alignItems: 'center', gap: 10, marginTop: 80, paddingHorizontal: 32 },
+  emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  prefs: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14 },
+  prefsText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
 });

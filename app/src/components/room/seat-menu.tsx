@@ -1,8 +1,9 @@
 // Seat action menu that opens right next to the tapped seat (not a bottom sheet), so it's clear which
 // seat it acts on. Placed below the seat when there is room, otherwise above, and kept on screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
+import { Text } from '@/components/text';
 import { colors } from '@/theme';
 
 export type SeatMenuItem = { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void; destructive?: boolean; dividerBefore?: boolean };

@@ -157,7 +157,7 @@ export const KABILE_TASKS: KabileTask[] = [
   { id: 'k-chat', emoji: '💬', title: 'Kabile sohbet grubuna mesaj at', source: 'chatMsgs', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u1', 'u5', 'u7', 'u11', 'u2'], doneCount: 21 },
   { id: 'k-room', emoji: '🎙️', title: 'Kabile odasında 15 dakika kal', source: 'roomMinutes', kind: 'count', goal: 15, per: 0, power: 1, treasure: 1, doneBy: ['u2', 'u4', 'u9', 'u7', 'u12'], doneCount: 18 },
   { id: 'k-newbie', emoji: '🎁', title: 'Kabileye yeni katılan üyeye hediye gönder', source: 'giftsSent', kind: 'count', goal: 1, per: 0, power: 3, treasure: 3, doneBy: ['u5', 'u11', 'u1', 'u9'], doneCount: 10 },
-  { id: 'k-checkin', emoji: '📅', title: 'Kabileye check-in yap', source: 'checkIn', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u4', 'u7', 'u1', 'u2', 'u11'], doneCount: 17 },
+  { id: 'k-checkin', emoji: '📅', title: 'Kabile yoklamasına katıl', source: 'checkIn', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u4', 'u7', 'u1', 'u2', 'u11'], doneCount: 17 },
   { id: 'k-roomgift', emoji: '🎉', title: 'Kabile odasında hediye gönder', source: 'roomGiftCoins', kind: 'rate', goal: 0, per: 500, power: 2, treasure: 2, doneBy: ['u1', 'u11'], doneCount: 6 },
   { id: 'k-cp', emoji: '💞', title: 'Kabile üyeleriyle çift (CP) kur ve CP hediyesi gönder', source: 'cpGiftCoins', kind: 'rate', goal: 0, per: 350, power: 2, treasure: 2, doneBy: ['u5', 'u9'], doneCount: 4 },
   { id: 'k-chatgift', emoji: '💌', title: 'Kabile sohbetinde hediye gönder', source: 'chatGiftCoins', kind: 'rate', goal: 0, per: 400, power: 2, treasure: 2, doneBy: ['u7'], doneCount: 3 },
@@ -197,7 +197,7 @@ export const KABILE_THEMES: { id: string; name: string; colors: readonly [string
 export const memberPower = (id: string, i: number) => (id === 'me' ? 0 : Math.max(40, Math.round(((i * 7_919) % 97) * 61 + 300 - i * 37)));
 export const KASA_HISTORY_MOCK = [
   { id: 'h1', userId: 'u1', text: 'Kabile odasında hediye', power: 24, treasure: 24, time: 'Bugün 14:20' },
-  { id: 'h2', userId: 'u5', text: 'Check-in', power: 1, treasure: 1, time: 'Bugün 12:05' },
+  { id: 'h2', userId: 'u5', text: 'Yoklama', power: 1, treasure: 1, time: 'Bugün 12:05' },
   { id: 'h3', userId: 'u11', text: 'CP hediyesi', power: 12, treasure: 12, time: 'Dün 23:41' },
   { id: 'h4', userId: 'u2', text: 'Kabile odasında 15 dakika', power: 1, treasure: 1, time: 'Dün 22:10' },
 ];

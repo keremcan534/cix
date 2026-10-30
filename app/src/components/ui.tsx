@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Text } from '@/components/text';
 import { cosmeticById } from '@/data/catalog';
 import { vipTier } from '@/data/economy';
 import { charmTier } from '@/data/charm';
@@ -95,7 +96,8 @@ export function Button({
   disabled?: boolean;
 }) {
   const raised = variant === 'hero' || variant === 'money';
-  const edge = small ? 3 : 4;
+  // A thin key edge: enough to feel pressable, not a toy.
+  const edge = 2;
   const fg = variant === 'money' ? semantic.moneyInk : variant === 'tonal' ? semantic.tonalText : variant === 'ghost' ? colors.primaryText : variant === 'danger' ? semantic.danger : semantic.actionInk;
   const body = [styles.btn, small && styles.btnSmall, !raised && { backgroundColor: variant === 'tonal' ? semantic.tonal : 'transparent' }, variant === 'danger' && styles.btnDanger];
   const label = (
@@ -172,7 +174,7 @@ const styles = StyleSheet.create({
   },
   btnSmall: { paddingVertical: 7, paddingHorizontal: 14 },
   btnDanger: { borderWidth: 1.5, borderColor: semantic.danger },
-  btnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.1 },
   coin: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -183,14 +185,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   coinText: { color: colors.gold, fontWeight: '700' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, minHeight: 52 },
   wealthBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 20, paddingLeft: 2, paddingRight: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   wealthDot: { width: 15, height: 15, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
   wealthNum: { fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
-  headerTitle: { color: '#fff', fontSize: 20, fontFamily: fonts.display, flex: 1, textAlign: 'center' },
+  textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  headerTitle: { color: '#fff', fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flex: 1, textAlign: 'center' },
 });
+
+/** Secondary action inside a card: colored text with a chevron instead of a typed arrow. */
+export function TextLink({ title, onPress, color = colors.primaryText }: { title: string; onPress: () => void; color?: string }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={styles.textLink}>
+      <Text style={{ color, fontWeight: '700' }}>{title}</Text>
+      <Ionicons name="chevron-forward" size={14} color={color} />
+    </Pressable>
+  );
+}
 
 export function Header({ title, right }: { title: string; right?: ReactNode }) {
   return (

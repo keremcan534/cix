@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
@@ -11,8 +12,9 @@ import { USERS } from '@/data/mock';
 import { nobleInfo } from '@/data/status';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -110,13 +112,16 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Pressable style={styles.rechargeRow} onPress={() => router.push('/cuzdan')} accessibilityLabel="Yükleme">
             <Text style={styles.h2}>Yükleme</Text>
-            <Text style={styles.rewardTag}>🎁 Ödül</Text>
+            <View style={styles.rewardTag}>
+              <Ionicons name="gift" size={11} color={semantic.money} />
+              <Text style={styles.rewardText}>Ödül</Text>
+            </View>
             <Icon3D name="coin" size={20} />
             <Text style={styles.coinN}>{coins.toLocaleString('tr-TR')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} tag="NEW" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} tag="YENİ" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
             <StatusCard title="VIP" sub={vipLevel ? `VIP${vipLevel}` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
             <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
@@ -125,7 +130,7 @@ export default function ProfileScreen() {
         <View style={[styles.card, { flexDirection: 'row' }]}>
           <Shortcut emoji="🎁" label="Bedava Para" onPress={() => router.push('/gorevler')} />
           <Shortcut emoji="⛺" label="Kabile" onPress={() => router.push('/aile')} />
-          <Shortcut emoji="✉️" label="Davet" tag="Para Kazan" onPress={() => router.push('/davet')} />
+          <Shortcut emoji="✉️" label="Davet" tag="Kazan" onPress={() => router.push('/davet')} />
         </View>
 
         {myRoom.profileVisible && (
@@ -169,11 +174,11 @@ export default function ProfileScreen() {
               ] as const
             ).map(([id, e, l]) => (
               <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
-                <Text style={{ fontSize: 26 }}>{e}</Text>
+                <GameIcon id={id} emoji={e} size={26} />
                 <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
                   {l}
                 </Text>
-                {vipLevel < 2 && <Text style={styles.gameLock}>🔒</Text>}
+                {vipLevel < 2 && <Ionicons name="lock-closed" size={11} color={colors.textDim} style={styles.gameLock} />}
               </Pressable>
             ))}
           </View>
@@ -261,14 +266,15 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 18, marginHorizontal: 16, padding: 14, gap: 12 },
   rechargeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   h2: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  rewardTag: { color: '#FF8A97', backgroundColor: 'rgba(255,138,151,0.15)', fontWeight: '800', fontSize: 12, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  rewardTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(246,189,96,0.14)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  rewardText: { color: semantic.money, fontWeight: '700', fontSize: 12 },
   coinN: { color: colors.gold, fontWeight: '800', fontSize: 18, marginLeft: 'auto' },
   status: { borderRadius: 14, padding: 12, minHeight: 74, justifyContent: 'center', gap: 4 },
   statusTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
   statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
-  newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: '#F97316', color: '#fff', fontSize: 11, fontWeight: '800', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden' },
+  newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: semantic.social, color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.4, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  earnTag: { position: 'absolute', top: -10, right: 4, color: '#FDE047', fontWeight: '900', fontStyle: 'italic', fontSize: 12, zIndex: 1 },
+  earnTag: { position: 'absolute', top: -6, right: 8, zIndex: 1, color: semantic.moneyInk, backgroundColor: semantic.money, fontWeight: '800', fontSize: 10, letterSpacing: 0.3, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)' },
   gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   gameRow: { flexDirection: 'row', gap: 8 },

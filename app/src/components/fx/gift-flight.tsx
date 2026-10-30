@@ -2,8 +2,9 @@
 // and a "×count" tag. Window coordinates come from measureInWindow on the seat avatars.
 // Transform/opacity only, on the native driver; callers skip it when effects are off or motion is reduced.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Icon3D, icon3dFor } from '@/components/Icon3D';
 import { GiftArt, giftArtOf } from '@/components/GiftArt';
 import { colors, semantic } from '@/theme';

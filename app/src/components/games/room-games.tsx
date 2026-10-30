@@ -1,8 +1,9 @@
 // Free room games, playable in the prototype with room participants (other players are simulated).
 // Pure game state: these components never touch the room, seats or microphones.
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import type { User } from '@/data/mock';
 import { colors, semantic } from '@/theme';

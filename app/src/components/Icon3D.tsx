@@ -1,6 +1,8 @@
 // SimilarClub 3D glass icon set (assets/icons, 192 px PNG). Use for value, social and feature
 // symbols shown at 16–64 pt. Navigation and small UI glyphs stay vector (Ionicons).
-import { Image, Text, type ImageStyle, type StyleProp } from 'react-native';
+import { Image, type ImageStyle, type StyleProp } from 'react-native';
+
+import { Text } from '@/components/text';
 
 const SRC = {
   coin: require('../../assets/icons/coin.png'),

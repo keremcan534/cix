@@ -5,12 +5,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { IncomingCard } from '@/components/match-layer';
-import { VerifiedBadge } from '@/components/ui';
+import { StateIcon, VerifiedBadge } from '@/components/ui';
 import { MATCH_GRACE_SECONDS } from '@/data/economy';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -77,6 +78,9 @@ export default function MatchCall() {
             <IncomingCard inline />
           ) : m.phase === 'searching' ? (
             <>
+              <Animated.View style={{ transform: [{ scale: pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.08, 1] }) }] }}>
+                <StateIcon name={video ? 'videocam' : 'mic'} size={96} />
+              </Animated.View>
               <Text style={s.state}>{PHASE_LABEL.searching}…</Text>
               <Pressable style={s.secondary} onPress={cancelMatch}>
                 <Text style={s.secondaryText}>Aramayı iptal et</Text>
@@ -84,22 +88,33 @@ export default function MatchCall() {
             </>
           ) : (
             <View style={s.summary}>
-              <Text style={s.state}>{PHASE_LABEL[m.phase]}</Text>
+              {m.phase === 'idle' ? (
+                // First visit: say what happens before the first tap.
+                <View style={s.hero}>
+                  <StateIcon name={video ? 'videocam' : 'mic'} size={96} />
+                  <Text style={s.state}>Yeni biriyle tanış</Text>
+                  <Text style={s.dim}>
+                    Rastgele biriyle kısa bir {video ? 'görüntülü' : 'sesli'} görüşme başlar; dakikası {priceOf(m.mode)} jeton. Beğenmezsen tek dokunuşla sonrakine geçersin. İlk {MATCH_GRACE_SECONDS} saniyede kapanan görüşmenin ücreti iade edilir.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={s.state}>{PHASE_LABEL[m.phase]}</Text>
+              )}
               {!!m.message && <Text style={s.dim}>{m.message}</Text>}
               {last && peer && (
                 <View style={s.summaryCard}>
                   <Image source={{ uri: peer.avatar }} style={s.summaryAvatar} />
                   <Text style={s.summaryName}>{peer.name}</Text>
                   <Text style={s.dim}>
-                    Süre {mmss(last.seconds)} · Ücret 🪙 {last.charged}
-                    {last.refunded ? ` · İade 🪙 ${last.refunded} (${MATCH_GRACE_SECONDS} sn altı)` : ''}
+                    Süre {mmss(last.seconds)} · Ücret {last.charged} jeton
+                    {last.refunded ? ` · İade ${last.refunded} jeton (${MATCH_GRACE_SECONDS} sn altı)` : ''}
                   </Text>
                 </View>
               )}
-              {media.room && <Text style={s.roomLine}>🎙️ “{media.room.title}” odasındasın · dinleyici olarak devam ediyorsun. Mikrofon istemek veya kameranı açmak sana kalmış.</Text>}
+              {media.room && <Text style={s.roomLine}>“{media.room.title}” odasındasın · dinleyici olarak devam ediyorsun. Mikrofon istemek veya kameranı açmak sana kalmış.</Text>}
               <Pressable style={s.primary} onPress={() => (resetMatch(), startMatch(m.mode, m.filter))}>
                 <Ionicons name="flash" size={18} color={semantic.actionInk} />
-                <Text style={s.primaryText}>Sonraki eşleşme</Text>
+                <Text style={s.primaryText}>{m.phase === 'idle' ? 'Eşleşme başlat' : 'Sonraki eşleşme'}</Text>
               </Pressable>
               <Pressable style={s.secondary} onPress={leave}>
                 <Text style={s.secondaryText}>{media.room ? 'Odaya dön' : 'Kapat'}</Text>
@@ -240,6 +255,7 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, gap: 14 },
   state: { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' },
   summary: { alignItems: 'center', gap: 12, alignSelf: 'stretch' },
+  hero: { alignItems: 'center', gap: 10, paddingHorizontal: 12, marginBottom: 12 },
   summaryCard: { alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 18, padding: 16, alignSelf: 'stretch' },
   summaryAvatar: { width: 72, height: 72, borderRadius: 36 },
   summaryName: { color: '#fff', fontWeight: '800', fontSize: 16 },

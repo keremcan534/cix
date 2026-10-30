@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/text';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { KABILE_ROUTES, KASA_GOAL, KASA_HISTORY_MOCK, ensureFresh, findKabile, fmt, kabileMemberIds, kabileMeta, memberPower, useKabileProgress } from '@/data/kabile';
 import { userById } from '@/data/mock';

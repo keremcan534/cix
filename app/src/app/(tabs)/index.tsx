@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Text, TextInput } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Art, artSource } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
@@ -45,7 +46,7 @@ const MINE_TABS: { key: MineTab; label: string }[] = [
   { key: 'joined', label: 'Katıl' },
   { key: 'following', label: 'Takip Et' },
 ];
-type Suggestion = { r: Room; reason: string };
+type Suggestion = { r: Room; reason: string; why: keyof typeof Ionicons.glyphMap };
 
 export default function RoomsScreen() {
   const { coins, checkedInToday, notifications, following, recentRooms, blocked, me, myRoom, agencyId, familyId } = useApp();
@@ -74,7 +75,9 @@ export default function RoomsScreen() {
               ? 'Şu an çok hareketli'
               : '';
       const score = (following.has(r.hostId) ? 3 : 0) + (recentRooms.includes(r.id) ? 2 : 0) + (reason.startsWith('İlgi') ? 1 : 0) + r.listeners / 1000;
-      return { r, reason, score };
+      // The icon says which kind of reason it is, so the line reads at a glance.
+      const why: Suggestion['why'] = following.has(r.hostId) ? 'person' : recentRooms.includes(r.id) ? 'time' : reason.startsWith('İlgi') ? 'sparkles' : 'flame';
+      return { r, reason, why, score };
     })
     .filter((x) => x.reason)
     .sort((a, b) => b.score - a.score)
@@ -207,16 +210,19 @@ export default function RoomsScreen() {
 }
 
 const RANK_ICON: Record<string, Icon3DName> = { cazibe: 'heart', zengin: 'crown', oda: 'trophy', dost: 'group' };
+/** Meaning colors (docs/TASARIM_YONU.md): charm is social (coral), wealth is money (gold), rooms and friends are live (turquoise). */
+const RANK_ACCENT: Record<string, string> = { cazibe: semantic.social, zengin: semantic.money, oda: semantic.action, dost: semantic.action };
 
 function RankCards() {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
       {RANK_CARDS.map((c, i) => (
         <PressableScale key={c.key} onPress={() => router.push({ pathname: '/siralama', params: { board: c.board } })}>
-          <LinearGradient colors={c.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.rankCard, glow(`${c.colors[0]}99`, 12, 4)]}>
-            <EdgeLight strength={0.4} />
+          {/* Navy card lit by the board's meaning color from one corner: the color is an accent, not the surface. */}
+          <LinearGradient colors={[`${RANK_ACCENT[c.key] ?? semantic.action}42`, 'rgba(22,37,60,0.92)']} start={{ x: 0, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.rankCard}>
+            <EdgeLight strength={0.22} />
             <Icon3D name={RANK_ICON[c.key] ?? 'trophy'} size={44} style={styles.rankIcon} />
-            <Shine radius={14} delay={i * 700} />
+            <Shine radius={14} delay={i * 1500} />
             <Text style={styles.rankTitle} numberOfLines={1}>
               {c.title}
             </Text>
@@ -327,7 +333,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
         <Text style={[styles.section, { paddingHorizontal: 0 }]}>Senin için</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
-        {items.map(({ r, reason }) => (
+        {items.map(({ r, reason, why }) => (
           <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
             <View style={styles.suggestFrame}>
               <Image source={{ uri: r.cover }} style={styles.suggestImg} />
@@ -342,7 +348,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
               {r.title}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Art name="ana-ipucu" size={15} />
+              <Ionicons name={why} size={12} color={why === 'person' ? colors.pink : why === 'flame' ? colors.gold : colors.primaryText} />
               <Text style={[styles.suggestWhy, { flexShrink: 1 }]} numberOfLines={1}>
                 {reason}
               </Text>
@@ -553,7 +559,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
   mainTabs: { flexDirection: 'row', alignItems: 'flex-end', gap: 22 },
   mainTab: { color: colors.textDim, fontSize: 20, lineHeight: 28, fontFamily: fonts.displayBold },
-  mainTabActive: { color: colors.text, fontSize: 25, lineHeight: 32, fontFamily: fonts.display, textShadowColor: 'rgba(19,217,223,0.45)', textShadowRadius: 12 },
+  mainTabActive: { color: colors.text, fontSize: 24, lineHeight: 32, fontFamily: fonts.display, letterSpacing: -0.4 },
   // Active tab marker: bright turquoise with a soft glow, like a lit LED.
   underline: { width: 18, height: 4, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 8px rgba(19,217,223,0.9)' },
   underlineSm: { width: 14, height: 3, borderRadius: 2, backgroundColor: semantic.action, marginTop: 3, boxShadow: '0 0 6px rgba(19,217,223,0.9)' },
@@ -562,8 +568,8 @@ const styles = StyleSheet.create({
   dot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
   section: { color: colors.text, fontSize: 18, lineHeight: 24, fontFamily: fonts.display, paddingHorizontal: 16 },
   // ranking cards
-  rankCard: { width: 148, height: 80, borderRadius: 14, padding: 10, justifyContent: 'space-between', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
-  rankTitle: { color: '#fff', fontFamily: fonts.display, fontSize: 15, lineHeight: 20, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  rankCard: { width: 148, height: 80, borderRadius: 16, padding: 11, justifyContent: 'space-between', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  rankTitle: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 19 },
   rankIcon: { position: 'absolute', right: -4, bottom: -6, transform: [{ rotate: '-12deg' }] },
   rankAvatar: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: colors.cardAlt },
   // quick strip

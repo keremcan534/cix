@@ -4,8 +4,9 @@
 // phone it wraps and the room's stage area scrolls.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import type { LayoutSlot, RoomLayout } from '@/data/room-layouts';
 import { Art } from '@/components/Art';
 import type { ArenaSlot } from '@/components/room/pk';
