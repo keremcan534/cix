@@ -34,6 +34,7 @@ import {
   type CountryId,
   type RoomTab,
 } from '@/data/rooms-ui';
+import { ClubHero } from '@/components/club-hero';
 import { StarterPath } from '@/components/starter';
 import { useApp } from '@/store';
 import { TAB_BAR_HEIGHT, colors, fonts, gradient, gradientDeep, semantic } from '@/theme';
@@ -150,6 +151,7 @@ export default function RoomsScreen() {
         ListHeaderComponent={
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
+              <ClubHero />
               <StarterPath />
               <RankCards />
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />

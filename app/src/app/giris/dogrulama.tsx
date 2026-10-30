@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
-import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors, gradient } from '@/theme';
 
@@ -39,10 +39,12 @@ export default function VerifyScreen() {
     }, 2000);
   };
 
+  // First impression: straight from sign-up into the people most like you (Anlık Kulüp), which also
+  // tells about the welcome coins. Pushed after the sign-in guard has switched to the app screens.
   const finish = () => {
     addCoins(100);
     login();
-    showAlert('Hoş geldin! 🎉', 'Hoş geldin hediyesi olarak 100 jeton hesabına eklendi.');
+    setTimeout(() => router.push({ pathname: '/kulup', params: { welcome: '1' } }), 0);
   };
 
   return (
