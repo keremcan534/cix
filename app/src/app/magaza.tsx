@@ -181,7 +181,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
   if (item.kind === 'frame' && item.fx) {
     const badge = frameBadgeArtOf(item.id);
     return (
-      <View style={{ height: 76, justifyContent: 'center' }}>
+      <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }}>
         <AnimatedFrame fx={item.fx as FrameFx} size={64} still={still}>
           <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>

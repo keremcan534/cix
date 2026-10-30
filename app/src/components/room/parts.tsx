@@ -117,10 +117,10 @@ export function Seat({
         ) : (
           // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
           <LinearGradient
-            colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.03)']}
+            colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)']}
             style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
           >
-            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 18 : 22} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.72)'} />
+            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 16 : 19} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
           </LinearGradient>
         )}
         {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
@@ -135,8 +135,8 @@ export function Seat({
           </View>
         )}
         {role === 'admin' && (
-          <View style={styles.roleBadge}>
-            <Text style={{ fontSize: 9 }}>🛡️</Text>
+          <View style={styles.roleBadge} accessibilityLabel="Oda yöneticisi">
+            <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
           </View>
         )}
         {silenced && user && (
@@ -147,8 +147,8 @@ export function Seat({
         {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-        {host && <Text style={{ fontSize: 12 }}>👑</Text>}
-        <Text style={[styles.seatName, small && { fontSize: 12 }]} numberOfLines={1}>
+        {host && <Icon3D name="crown" size={14} />}
+        <Text style={[styles.seatName, small && { fontSize: 12 }, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
           {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
         </Text>
         {user?.verified && !small && <VerifiedBadge size={11} />}
@@ -288,34 +288,48 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
   }
   const u = userById(msg.userId!);
   const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : undefined;
-  const nameStyle = { color: msg.userId === 'me' ? colors.gold : '#A5F3F5', fontWeight: '700' } as const;
+  const nameColor = msg.userId === 'me' ? colors.gold : '#A5F3F5';
   const stickers = stickersOf(msg.text);
-  const content = stickers ? (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }} accessibilityLabel={`${u.name}: ${messagePreview(msg.text)}`}>
-      <Text style={[styles.chatText, nameStyle]}>{u.name}: </Text>
+  // Avatar, name above, text in its own bubble: who said what reads at a glance, like a group chat.
+  const body = stickers ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       {stickers.map((id, i) => (
-        <StickerArt key={i} id={id} size={30} />
+        <StickerArt key={i} id={id} size={34} />
       ))}
     </View>
   ) : (
-    <Text style={styles.chatText}>
-      <Text style={nameStyle}>{u.name}: </Text>
-      {messagePreview(msg.text)}
-    </Text>
+    <Text style={styles.chatText}>{messagePreview(msg.text)}</Text>
   );
-  const line = bubble?.color ? (
-    <LinearGradient colors={bubble.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chatLine}>
-      {content}
+  const bubbleView = stickers ? (
+    body
+  ) : bubble?.color ? (
+    <LinearGradient colors={bubble.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chatBubble}>
+      {body}
     </LinearGradient>
   ) : (
-    <View style={[styles.chatLine, styles.chatGlass]}>{content}</View>
+    <View style={[styles.chatBubble, styles.chatGlass]}>{body}</View>
+  );
+  const line = (
+    <View style={styles.chatLine} accessibilityLabel={`${u.name}: ${messagePreview(msg.text)}`}>
+      <Avatar uri={u.avatar} size={28} />
+      <View style={{ flexShrink: 1, gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={[styles.chatName, { color: nameColor }]} numberOfLines={1}>
+            {u.name}
+          </Text>
+          {u.vip && <Text style={styles.chatVip}>VIP</Text>}
+        </View>
+        {bubbleView}
+      </View>
+    </View>
   );
   if (msg.status !== 'failed') return line;
   return (
     <View style={{ alignSelf: 'flex-start', gap: 3, maxWidth: '85%' }}>
       <View style={{ opacity: 0.6 }}>{line}</View>
-      <Pressable onPress={() => onRetry?.(msg)} accessibilityRole="button" accessibilityLabel="Mesaj gönderilemedi, tekrar dene" hitSlop={6}>
-        <Text style={styles.failed}>⚠️ Gönderilemedi · tekrar dene</Text>
+      <Pressable onPress={() => onRetry?.(msg)} accessibilityRole="button" accessibilityLabel="Mesaj gönderilemedi, tekrar dene" hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 36 }}>
+        <Ionicons name="alert-circle" size={13} color="#FF9AA1" />
+        <Text style={styles.failed}>Gönderilemedi · tekrar dene</Text>
       </Pressable>
     </View>
   );
@@ -451,8 +465,8 @@ const styles = StyleSheet.create({
   speakingGlow: { boxShadow: '0 0 18px rgba(19,217,223,0.65)' },
   emptySeat: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderTopColor: 'rgba(255,255,255,0.32)',
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: 'inset 0 -6px 12px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.25)',
@@ -462,7 +476,7 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
-  roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: colors.bg, borderRadius: 10, padding: 2 },
+  roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.action, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: colors.bg },
   silencedBadge: { position: 'absolute', right: 0, top: 0, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: colors.border },
   pkWrap: { alignItems: 'center', marginTop: -1 },
   pkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 76 },
@@ -473,16 +487,20 @@ const styles = StyleSheet.create({
   giftText: { color: '#FDE7C2', fontSize: 13, flexShrink: 1 },
   giftName: { color: '#fff', fontWeight: '800' },
   failed: { color: '#FF9AA1', fontSize: 12, fontWeight: '700' },
-  seatName: { color: '#fff', fontSize: 12, maxWidth: 64 },
-  systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(19,217,223,0.2)', borderWidth: 1, borderColor: 'rgba(19,217,223,0.3)', borderTopColor: 'rgba(165,243,245,0.45)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  systemText: { color: '#CFFAFE', fontSize: 12 },
-  botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.15)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.28)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
+  seatName: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 64 },
+  // Room events stay in the background of the conversation: no box shouting over people's messages.
+  systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, maxWidth: '92%' },
+  systemText: { color: '#B9C7DE', fontSize: 12 },
+  botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.1)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
   botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },
-  chatLine: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, maxWidth: '85%' },
-  chatText: { color: '#fff', fontSize: 14 },
-  // Dark glass: keeps white text readable over any room cover, with a lit top edge.
-  chatGlass: { backgroundColor: 'rgba(12,22,40,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.18)' },
+  chatLine: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'flex-start', gap: 8, maxWidth: '88%' },
+  chatName: { fontSize: 12, fontWeight: '800', maxWidth: 160 },
+  chatVip: { color: colors.bg, backgroundColor: colors.gold, fontSize: 9, fontWeight: '900', borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
+  chatBubble: { alignSelf: 'flex-start', borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 11, paddingVertical: 7 },
+  chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
+  // Dark glass: keeps white text readable over the stage, with a lit top edge.
+  chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },
   round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   giftRound: { backgroundColor: 'rgba(246,189,96,0.16)', borderWidth: 2, borderColor: semantic.money, overflow: 'hidden', boxShadow: '0 0 16px rgba(246,189,96,0.45)' },
   glassRound: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },

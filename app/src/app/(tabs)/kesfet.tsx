@@ -380,8 +380,8 @@ function FilterSheet({
 const styles = StyleSheet.create({
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
   shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2 },
-  shortcutWide: { width: 138 },
-  shortcutTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  shortcutWide: { width: 150 },
+  shortcutTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
   shortcutSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   artRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   artCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },

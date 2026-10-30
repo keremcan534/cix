@@ -1,9 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
@@ -50,7 +49,6 @@ import { Art, artSource } from '@/components/Art';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
-import { Ambient } from '@/components/fx/surface';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
@@ -62,6 +60,7 @@ import { ChatFeed } from '@/components/room/chat-feed';
 import { InboxSheet, useInboxUnread } from '@/components/room/inbox-sheet';
 import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
+import { StageBackdrop } from '@/components/room/stage-backdrop';
 import { StageLayout } from '@/components/room/stage-layout';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
@@ -1780,9 +1779,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   if (!unlocked) return full ? <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} /> : null;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} blurRadius={25} />
-      <LinearGradient colors={['rgba(8,15,30,0.55)', 'rgba(8,15,30,0.97)']} style={StyleSheet.absoluteFill} />
-      <Ambient />
+      <StageBackdrop theme={theme} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

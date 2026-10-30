@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
-import { Avatar, FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
+import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
 import { USERS } from '@/data/mock';
 import { nobleInfo } from '@/data/status';
@@ -98,10 +98,7 @@ export default function ProfileScreen() {
         <View style={styles.stats}>
           <Stat n={128} label="Takipçiler" />
           <Stat n={following.size} label="Takip" />
-          <Pressable style={{ flex: 1, alignItems: 'center', gap: 4 }} onPress={() => router.push('/(tabs)/mesajlar')}>
-            {friends[0] ? <Avatar uri={friends[0].avatar} size={30} /> : <Text style={styles.statN}>0</Text>}
-            <Text style={styles.statL}>Arkadaşlarım</Text>
-          </Pressable>
+          <Stat n={friends.length} label="Arkadaşlar" onPress={() => router.push('/(tabs)/mesajlar')} />
           <Stat
             n={VISITORS}
             label="Ziyaretçiler"
@@ -167,7 +164,7 @@ export default function ProfileScreen() {
               [
                 ['slot', '🎰', 'Gece Yarısı Çarkı'],
                 ['jackpot', '💰', 'Hazine Kulesi'],
-                ['olympus', '⚡', 'Olympus'],
+                ['olympus', '⚡', 'Şimşek Dağı'],
                 ['fish', '🐟', 'Mercan Avı'],
               ] as const
             ).map(([id, e, l]) => (
