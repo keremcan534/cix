@@ -1,0 +1,85 @@
+name: Server
+
+# server/api: tests on every change against a real Postgres; on the default branch, deploy to the server
+# (docs/SUNUCU.md) once the DEPLOY_SSH_KEY secret exists. Without the secret the deploy job only says so.
+on:
+  push:
+    branches: [ccr-0c79d9d5-0hfb46, main]
+    paths: ['server/**', '.github/workflows/server.yml']
+  pull_request:
+    paths: ['server/**', '.github/workflows/server.yml']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: server/api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/api/package-lock.json
+      - run: npm ci
+      - run: npm test
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # One deploy at a time; a newer push waits for the running one instead of cutting it off mid-build.
+    concurrency:
+      group: server-deploy
+      cancel-in-progress: false
+    env:
+      HOST: ${{ vars.DEPLOY_HOST || '130.61.230.94' }}
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the deploy key
+        id: key
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "DEPLOY_SSH_KEY secret is not set: skipping the deploy (see docs/SUNUCU.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Copy the API and rebuild it on the server
+        if: steps.key.outputs.ready == 'true'
+        working-directory: .
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i ~/.ssh/deploy ubuntu@$HOST"
+          tar -C server -czf - --exclude=node_modules --exclude=test api | $SSH 'tar -C /opt/similar -xzf -'
+          $SSH 'cd /opt/similar && sudo docker compose up -d --build api'
+      - name: Check the live API
+        if: steps.key.outputs.ready == 'true'
+        working-directory: .
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://${HOST//./-}.sslip.io/api/me" || true)
+            # 401 = the API is up and asks for a session.
+            if [ "$code" = "401" ]; then echo "API is up"; exit 0; fi
+            sleep 3
+          done
+          echo "API did not answer (last status $code)"; exit 1
