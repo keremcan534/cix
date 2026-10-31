@@ -171,14 +171,14 @@ function WalletTab() {
 
       <View style={styles.grid}>
         <Stat label="Bonus Kredi" art="finans-bonus-kredi" value={fmt(BONUS_BALANCE)} sub={cashable ? `${pct(rules.bonusCashable)} çekilebilir` : 'Çekilemez · yalnız uygulama içi'} color={colors.primaryText} />
-        <Stat label="Elmas (ayrı birim)" value={dia(diamonds)} sub={`≈ ${usd(diamonds)} · Yayıncı sekmesi`} color="#7DD3FC" />
+        <Stat label="Elmas (ayrı birim)" icon={<Icon3D name="diamond" size={22} />} value={fmt(diamonds)} sub={`≈ ${usd(diamonds)} · Yayıncı sekmesi`} color="#7DD3FC" />
       </View>
 
       <Card style={{ gap: 8 }}>
         <SectionTitle icon="information-circle" title="Para birimleri" />
         <Bullet text="🪙 Jeton: satın alınır, hediye ve mağazada harcanır. Para çekmeye konu olmaz." />
         <Bullet text={`💎 Elmas: yayıncının kazanç ölçüsü; jetondan ayrıdır. Hediye jetonu başına ${rules.creatorDiamondsPerCoin} 💎, ${fmt(rules.diamondsPerUsd)} 💎 = $1.`} />
-        <Bullet text={`🎟️ Bonus Kredi: kampanya bakiyesi. ${cashable ? `En fazla ${pct(rules.bonusCashable)} nakde çevrilebilir.` : 'Varsayılan olarak çekilemez (bonusCashable = 0).'}`} />
+        <Bullet text={`🎟️ Bonus Kredi: kampanya bakiyesi. ${cashable ? `En fazla ${pct(rules.bonusCashable)} nakde çevrilebilir.` : 'Nakde çevrilemez; yalnız uygulama içinde harcanır.'}`} />
       </Card>
 
       <Card style={{ gap: 4 }}>
@@ -612,7 +612,7 @@ function PayoutForm({ scope, available, legacyWeekly = 0 }: { scope: Scope; avai
     setAmount('');
     const p = res.payout;
     showAlert(
-      p.review === 'Otomatik onay' ? 'Talep otomatik onaylandı ✅' : 'Manuel incelemeye alındı 🕵️',
+      p.review === 'Otomatik onay' ? 'Talep otomatik onaylandı' : 'Manuel incelemeye alındı',
       `${p.ref} · ${dia(p.diamonds)} (${usd(p.diamonds)}) bloke edildi ve tekrar kullanılamaz.\nHesap: ${p.account.label}\n(Demo – gerçek ödeme yapılmaz)`,
     );
   };
@@ -732,24 +732,25 @@ function MockPayoutRow({ p }: { p: Pick<MockPayout, 'ref' | 'diamonds' | 'time' 
 }
 
 // --- small UI pieces ---------------------------------------------------------------------
-function Stat({ label, value, sub, color, art }: { label: string; value: string; sub?: string; color: string; art?: ArtName }) {
+function Stat({ label, value, sub, color, art, icon }: { label: string; value: string; sub?: string; color: string; art?: ArtName; icon?: ReactNode }) {
+  const lead = art ? <Art name={art} size={22} /> : icon;
   const text = (
-    <Text style={[styles.statValue, { color }, art && { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
+    <Text style={[styles.statValue, { color }, !!lead && { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
       {value}
     </Text>
   );
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      {art ? (
+      {lead ? (
         <View style={styles.statRow}>
-          <Art name={art} size={22} />
+          {lead}
           {text}
         </View>
       ) : (
         text
       )}
-      {sub && <Text style={styles.statSub}>{sub}</Text>}
+      {!!sub && <Text style={styles.statSub}>{sub}</Text>}
     </View>
   );
 }

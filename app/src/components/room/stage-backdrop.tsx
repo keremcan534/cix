@@ -1,22 +1,23 @@
-// The room's stage, drawn in code instead of a blurred stock photo: a night gradient in the room theme's
-// colors, two soft spotlights falling on the host seat, a glow behind the mics, a few out-of-focus lights,
-// and a darker floor so the chat stays readable. Colors follow docs/TASARIM_YONU.md (no purple).
+// The room's stage: a sea photo chosen by the room theme (the same set as the screens' backdrops) under a
+// navy veil tinted in the theme's colors, two soft spotlights falling on the host seat, a glow behind the
+// mics, a few out-of-focus lights, and a darker floor so the chat stays readable. When the room art from
+// docs/ODA_GORSEL_LISTESI.md arrives it replaces the photo here. Colors follow docs/TASARIM_YONU.md.
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 
 import type { RoomTheme } from '@/data/catalog';
 import { colors, semantic } from '@/theme';
 
 const GLOW = require('../../../assets/fx/glow.png');
 
-type Look = { top: string; mid: string; light: string; second: string };
+type Look = { photo: ImageSourcePropType; top: string; mid: string; light: string; second: string };
 const LOOKS: Record<RoomTheme, Look> = {
-  chat: { top: '#0C3445', mid: '#0A1C2E', light: semantic.action, second: semantic.social },
-  music: { top: '#0B2D52', mid: '#0A1830', light: semantic.social, second: semantic.action },
-  game: { top: '#073A3E', mid: '#081C26', light: semantic.action, second: semantic.money },
-  party: { top: '#3A1F2A', mid: '#160F1E', light: semantic.social, second: semantic.money },
-  pk: { top: '#2E1A26', mid: '#0E1424', light: semantic.social, second: semantic.action },
-  friends: { top: '#33202A', mid: '#111526', light: semantic.social, second: semantic.action },
+  chat: { photo: require('../../../assets/bg/sahne-mesajlar.jpg'), top: '#0C3445', mid: '#0A1C2E', light: semantic.action, second: semantic.social },
+  music: { photo: require('../../../assets/bg/sahne-oyun-merkezi.jpg'), top: '#0B2D52', mid: '#0A1830', light: semantic.social, second: semantic.action },
+  game: { photo: require('../../../assets/bg/sahne-kesfet.jpg'), top: '#073A3E', mid: '#081C26', light: semantic.action, second: semantic.money },
+  party: { photo: require('../../../assets/bg/sahne-vip.jpg'), top: '#3A1F2A', mid: '#160F1E', light: semantic.social, second: semantic.money },
+  pk: { photo: require('../../../assets/bg/sahne-aile.jpg'), top: '#2E1A26', mid: '#0E1424', light: semantic.social, second: semantic.action },
+  friends: { photo: require('../../../assets/bg/sahne-giris.jpg'), top: '#33202A', mid: '#111526', light: semantic.social, second: semantic.action },
 };
 
 // Out-of-focus lights: fixed spots (left %, top %, size, which color), so the stage never jumps.
@@ -34,7 +35,9 @@ export function StageBackdrop({ theme }: { theme: RoomTheme }) {
   const look = LOOKS[theme] ?? LOOKS.chat;
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden', backgroundColor: colors.bg }]}>
-      <LinearGradient colors={[look.top, look.mid, colors.bg]} locations={[0, 0.45, 0.85]} style={StyleSheet.absoluteFill} />
+      <Image source={look.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
+      {/* Theme tint over the photo: light at the top so the scene shows behind the mics, solid toward the chat. */}
+      <LinearGradient colors={[`${look.top}99`, `${look.mid}8C`, `${look.mid}E6`, colors.bg]} locations={[0, 0.4, 0.68, 0.9]} style={StyleSheet.absoluteFill} />
       {/* Glow behind the mic grid. */}
       <Image source={GLOW} style={[s.glow, { top: -120, opacity: 0.35, tintColor: look.light }]} />
       <Image source={GLOW} style={[s.glowSmall, { top: 180, right: -180, opacity: 0.14, tintColor: look.second }]} />

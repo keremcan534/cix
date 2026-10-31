@@ -62,6 +62,18 @@ export const DISPLAY_LABEL: Record<DisplayType, string> = {
   fullscreen: 'Tam ekran',
   entry: 'Giriş animasyonu',
 };
+/** Short Turkish name of a file format for admin lists; player formats keep their product names. */
+export const FORMAT_LABEL: Record<AnimFormat, string> = {
+  emoji: 'Emoji',
+  image: 'Görsel',
+  code: 'Kod animasyonu',
+  lottie: 'Lottie',
+  rive: 'Rive',
+  svga: 'SVGA',
+  pag: 'PAG',
+  vap: 'VAP',
+  video: 'Video',
+};
 export const MOTION_LABEL: Record<Motion, string> = {
   rise: 'Koltuktan yüksel',
   orbit: 'Mikrofon çevresinde dön',

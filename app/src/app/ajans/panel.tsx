@@ -51,10 +51,8 @@ export default function OwnerPanel() {
           const ok = !t.perm || can(role, t.perm);
           return (
             <Pressable key={t.key} onPress={() => setTab(t.key)} style={[styles.tab, tab === t.key && styles.tabActive]}>
-              <Text style={[styles.tabText, tab === t.key && { color: '#fff' }]}>
-                {ok ? '' : '🔒 '}
-                {t.label}
-              </Text>
+              {!ok && <Ionicons name="lock-closed" size={12} color={tab === t.key ? '#fff' : colors.textDim} />}
+              <Text style={[styles.tabText, tab === t.key && { color: '#fff' }]}>{t.label}</Text>
             </Pressable>
           );
         })}
@@ -119,9 +117,10 @@ function Overview() {
   return (
     <>
       <Card style={{ gap: 10, borderWidth: 1, borderColor: st.status === 'Aktif ajans' ? colors.green : colors.gold }}>
-        <Text style={styles.title}>
-          {st.status === 'Aktif ajans' ? '✅' : '⏳'} Statü: {st.status}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name={st.status === 'Aktif ajans' ? 'checkmark-circle' : 'hourglass-outline'} size={18} color={st.status === 'Aktif ajans' ? colors.green : colors.gold} />
+          <Text style={styles.title}>Statü: {st.status}</Text>
+        </View>
         <Bar label={`Getirilen yayıncı`} value={AGENCY_MEMBERS.length} target={RULES.agencyActivationHosts} />
         <Bar label={`${RULES.agencyActivationEarnUsd} USD kazanan yayıncı`} value={earners} target={RULES.agencyActivationEarners} />
         <Bar label="Bu ay eklenen yayıncı" value={newThisMonth} target={RULES.agencyMonthlyNewHosts} />
@@ -406,7 +405,10 @@ function Team() {
       ))}
       <View style={styles.row}>
         <Text style={{ color: colors.textDim, flex: 1 }}>Gelir raporları</Text>
-        <Text style={styles.dim}>🔒 Verilemez</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="lock-closed" size={12} color={colors.textDim} />
+          <Text style={styles.dim}>Verilemez</Text>
+        </View>
       </View>
       <Text style={styles.dim}>Sahiplik devri ve finansal düzeltmeler ayrı yetki ve ikinci onay gerektirir. Tüm değişiklikler denetim kaydına yazılır.</Text>
     </Card>
@@ -454,7 +456,7 @@ function Kpi({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   roleBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
   roleChip: { backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  tab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   title: { color: '#fff', fontWeight: '700', fontSize: 16 },

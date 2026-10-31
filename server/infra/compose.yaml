@@ -1,0 +1,70 @@
+# /opt/similar/compose.yaml: the four services of the server (docs/SUNUCU.md). setup.sh copies it to a new
+# server; on the running server compare it with the live file before replacing that one.
+#
+# Everything except Postgres runs on the host network: Caddy reaches LiveKit (7880) and the API (7890) on
+# 127.0.0.1, LiveKit needs its UDP ports directly, and LiveKit calls the API's webhook on 127.0.0.1.
+name: similar
+
+x-logging: &logging
+  # Without a cap, container logs grow until the disk is full.
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: '5'
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    env_file: .env
+    ports: ['127.0.0.1:5432:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    shm_size: 256mb
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB:-$${POSTGRES_USER}}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    environment:
+      PGHOST: 127.0.0.1
+      LIVEKIT_API_URL: http://127.0.0.1:7880
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The API finishes the requests in flight on SIGTERM (up to 10 s) before it exits.
+    stop_grace_period: 15s
+    logging: *logging
+
+  livekit:
+    image: livekit/livekit-server:v1.9.1
+    restart: unless-stopped
+    network_mode: host
+    # LIVEKIT_KEYS ("key: secret") comes from .env, the same pair the API signs tokens with.
+    env_file: .env
+    command: ['--config', '/etc/livekit.yaml']
+    volumes: ['./livekit.yaml:/etc/livekit.yaml:ro']
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    network_mode: host
+    # DOMAIN for the Caddyfile.
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
