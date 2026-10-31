@@ -1,0 +1,32 @@
+# /opt/similar/livekit.yaml: voice rooms. setup.sh fills in __DOMAIN__ and __LIVEKIT_KEY__ (the key name
+# from LIVEKIT_KEYS in .env; the secret stays in .env). Ports must also be open in the firewall (setup.sh)
+# and, on Oracle, in the VCN security list.
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 54999
+  use_external_ip: true
+
+# For phones on networks that block UDP media: TURN over UDP 3478, relays on 55000–60000.
+turn:
+  enabled: true
+  domain: __DOMAIN__
+  udp_port: 3478
+  relay_range_start: 55000
+  relay_range_end: 60000
+
+# Who is in which room: the API counts listeners from these (server/api/live.mjs).
+webhook:
+  api_key: __LIVEKIT_KEY__
+  urls:
+    - http://127.0.0.1:7890/api/livekit/webhook
+
+room:
+  # An empty room closes after 5 minutes (then "room_finished" clears its listeners).
+  empty_timeout: 300
+  departure_timeout: 20
+
+logging:
+  level: info

@@ -1,0 +1,30 @@
+# /opt/similar/Caddyfile: HTTPS with an automatic Let's Encrypt certificate for DOMAIN (.env).
+#   /api/* and /token → the API (127.0.0.1:7890)
+#   everything else   → LiveKit (127.0.0.1:7880, WebSocket signalling at /rtc; "/" answers OK)
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# LiveKit calls the webhook on 127.0.0.1 directly; from outside it doesn't exist. (handle blocks are
+	# exclusive and tried in this order, so this one must stay first.)
+	@internal path /api/livekit/webhook
+	handle @internal {
+		respond 404
+	}
+
+	@api path /api/* /token
+	handle @api {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy 127.0.0.1:7890
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:7880
+	}
+}

@@ -70,16 +70,18 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           SSH="ssh -i ~/.ssh/deploy ubuntu@$HOST"
+          # /api/health reports this commit, so the check below knows the new version is the one answering.
+          echo "$GITHUB_SHA" > server/api/version.txt
           tar -C server -czf - --exclude=node_modules --exclude=test api | $SSH 'tar -C /opt/similar -xzf -'
           $SSH 'cd /opt/similar && sudo docker compose up -d --build api'
       - name: Check the live API
         if: steps.key.outputs.ready == 'true'
         working-directory: .
         run: |
-          for i in $(seq 1 20); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://${HOST//./-}.sslip.io/api/me" || true)
-            # 401 = the API is up and asks for a session.
-            if [ "$code" = "401" ]; then echo "API is up"; exit 0; fi
+          url="https://${HOST//./-}.sslip.io/api/health"
+          for i in $(seq 1 30); do
+            body=$(curl -s --max-time 5 "$url" || true)
+            if echo "$body" | grep -q "\"version\":\"$GITHUB_SHA\""; then echo "API is up: $body"; exit 0; fi
             sleep 3
           done
-          echo "API did not answer (last status $code)"; exit 1
+          echo "The new API did not answer (last answer: ${body:-none})"; exit 1

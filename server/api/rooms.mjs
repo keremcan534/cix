@@ -2,7 +2,7 @@
 // (GET /token) checks this, so a kick is enforced by LiveKit, not only hidden in the app.
 //
 //   POST /api/rooms        { title, announcement?, roomType?, password? }  → { room }
-//   GET  /api/rooms                                                         → { rooms }   (open, newest first)
+//   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
@@ -23,8 +23,12 @@ const out = (r) => ({
   hasPassword: !!r.password_hash,
   createdAt: r.created_at,
   closed: !!r.closed_at,
+  listeners: Number(r.listeners ?? 0),
 });
-const SELECT = 'SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar FROM rooms r JOIN users u ON u.id = r.owner';
+/** Listeners come from LiveKit's webhooks (live.mjs room_presence). */
+const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar,
+                       (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners
+                  FROM rooms r JOIN users u ON u.id = r.owner`;
 
 async function roomRow(id) {
   if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(400, 'Geçersiz oda');
@@ -73,13 +77,13 @@ export const roomRoutes = {
     }
   },
 
-  /** Open rooms, without the ones whose owner and you have blocked each other. */
+  /** Open rooms, fullest first, without the ones whose owner and you have blocked each other. */
   async 'GET /api/rooms'(req) {
     const me = await auth(req);
     const r = await db.query(
       `${SELECT} WHERE r.closed_at IS NULL AND u.deleted_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = r.owner AND b.blocked = $1) OR (b.blocker = $1 AND b.blocked = r.owner))
-       ORDER BY r.created_at DESC LIMIT 100`,
+       ORDER BY listeners DESC, r.created_at DESC LIMIT 100`,
       [me.id],
     );
     return { rooms: r.rows.map(out) };

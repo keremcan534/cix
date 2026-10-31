@@ -8,7 +8,8 @@
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true }
-import { HttpError, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId, ageOf } from './core.mjs';
+import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { notify } from './push.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -70,18 +71,21 @@ export const socialRoutes = {
   },
 
   /**
-   * Account deletion (Play and Apple require it in the app). Personal data goes: profile fields, sign-in key,
-   * sessions, follows, blocks, messages, own rooms. The id and ledger stay, because financial records must be
-   * kept; they no longer point to anything personal.
+   * Account deletion (Play and Apple require it in the app). Personal data goes: profile fields, phone number,
+   * sign-in key, sessions, push tokens, follows, blocks, messages, own rooms. The id, ledger, gifts and
+   * purchases stay, because financial records must be kept; they no longer point to anything personal. The
+   * phone number is free again for a new account.
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
     await tx(async (c) => {
       await c.query(
         `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
-           interests = '{}', avatar_url = NULL, device_key_hash = NULL, deleted_at = now() WHERE id = $1`,
+           interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, deleted_at = now() WHERE id = $1`,
         [u.id],
       );
+      if (u.phone) await c.query('DELETE FROM otp_codes WHERE phone = $1', [u.phone]);
+      await c.query('DELETE FROM push_tokens WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM sessions WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [u.id]);
       await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [u.id]);
@@ -123,7 +127,11 @@ export const socialRoutes = {
     }
     await liveUser(to);
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiyi takip edemezsin');
-    await db.query('INSERT INTO follows (follower, followee) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
+    const r = await db.query('INSERT INTO follows (follower, followee) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
+    // Told when the follow is new; unfollowing and following again in the same minute doesn't ring twice.
+    if (r.rowCount && allow(`follow-notify:${me.id}:${to}`, 1)) {
+      notify([to], { title: 'Yeni takipçi', body: `${me.name} seni takip etmeye başladı`, data: { type: 'follow', from: me.id } });
+    }
     return { following: true };
   },
 
