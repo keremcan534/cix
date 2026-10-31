@@ -88,7 +88,12 @@ function Svip() {
           return (
             <Pressable key={l.level} onPress={() => setIndex(i)} style={{ width: cardW }} accessibilityLabel={`SVIP${l.level} kartı`}>
               <LinearGradient colors={l.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.svipCard, index === i && { borderColor: GOLD }]}>
-                {locked && <Text style={styles.lockChip}>🔒 Kilitli</Text>}
+                {locked && (
+                  <View style={styles.lockChip}>
+                    <Ionicons name="lock-closed" size={11} color="#fff" />
+                    <Text style={styles.lockText}>Kilitli</Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={styles.svipTitle}>SVIP{l.level}</Text>
                   {l.art ? <Art name={l.art} size={68} style={{ marginLeft: 'auto' }} /> : <Text style={{ fontSize: 54, marginLeft: 'auto' }}>{l.emoji}</Text>}
@@ -418,7 +423,8 @@ const styles = StyleSheet.create({
   segActive: { backgroundColor: GOLD },
   segText: { color: colors.textDim, fontWeight: '800' },
   svipCard: { borderRadius: 16, padding: 16, minHeight: 170, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  lockChip: { alignSelf: 'flex-start', backgroundColor: '#FDE7C7', color: '#7C2D12', fontWeight: '800', fontSize: 12, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  lockText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   svipTitle: { color: GOLD, fontSize: 40, fontWeight: '900', fontStyle: 'italic' },
   cardText: { color: '#fff', fontSize: 14 },
   track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },

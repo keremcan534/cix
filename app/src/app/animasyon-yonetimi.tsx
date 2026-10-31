@@ -10,7 +10,7 @@ import { ANIM_ART_NAMES, ANIM_CATEGORY_ART, type AnimArtName } from '@/component
 import { AnimPlay, AssetView } from '@/components/fx/anim-player';
 import { Card, Header } from '@/components/ui';
 import type { Icon3DName } from '@/components/Icon3D';
-import { ANIM_CATEGORIES, DISPLAY_LABEL, MOTION_LABEL, type Animation, type Asset, type DisplayType, type LicenseStatus, type Motion } from '@/data/animations';
+import { ANIM_CATEGORIES, DISPLAY_LABEL, FORMAT_LABEL, MOTION_LABEL, type Animation, type Asset, type DisplayType, type LicenseStatus, type Motion } from '@/data/animations';
 import { resolve } from '@/data/rbac';
 import { showAlert } from '@/lib/alert';
 import { addAnimation, importItem, isLive, listProvider, setBusOnline, setProviderOnline, updateAnimation, useAnimations, type ProviderItem } from '@/lib/animations';
@@ -18,7 +18,7 @@ import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
 type Tab = 'catalog' | 'providers' | 'new' | 'audit';
-const LICENSE_LABEL: Record<LicenseStatus, string> = { approved: '✅ Onaylı', pending: '⏳ Beklemede', rejected: '⛔ Uygun değil', expired: '⌛ Süresi dolmuş' };
+const LICENSE_LABEL: Record<LicenseStatus, string> = { approved: 'Onaylı', pending: 'Beklemede', rejected: 'Uygun değil', expired: 'Süresi dolmuş' };
 const ICONS: Icon3DName[] = ['heart', 'crown', 'coin', 'diamond', 'gift', 'trophy', 'mic', 'bolt'];
 
 function Chips<T extends string | number>({ value, options, onChange, icons }: { value: T; options: [T, string][]; onChange: (v: T) => void; icons?: Record<string, number> }) {
@@ -83,8 +83,8 @@ export default function AnimationAdmin() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.title}>{a.name}</Text>
                     <Text style={s.dim}>
-                      {DISPLAY_LABEL[a.display_type]} · {a.is_free ? 'Ücretsiz' : `${a.coin_price.toLocaleString('tr-TR')} jeton`} · {a.format} · {a.provider}
-                      {a.provider_id ? `:${a.provider_id}` : ''}
+                      {DISPLAY_LABEL[a.display_type]} · {a.is_free ? 'Ücretsiz' : `${a.coin_price.toLocaleString('tr-TR')} jeton`} · {FORMAT_LABEL[a.format]}
+                      {a.provider === 'builtin' ? ' · Yerleşik' : ` · ${a.provider}${a.provider_id ? `:${a.provider_id}` : ''}`}
                     </Text>
                   </View>
                   <Text style={[s.badge, { color: isLive(a) ? colors.green : colors.textDim }]}>{isLive(a) ? 'Yayında' : a.starts_at && a.is_active ? 'Kampanya' : 'Kapalı'}</Text>
@@ -228,7 +228,7 @@ function ProviderCard({ id }: { id: string }) {
             <AssetView asset={it.preview} size={28} />
             <View style={{ flex: 1 }}>
               <Text style={s.label}>
-                {it.name} · {it.format}
+                {it.name} · {FORMAT_LABEL[it.format]}
               </Text>
               <Text style={s.dim}>
                 {LICENSE_LABEL[it.license]} · {it.terms}

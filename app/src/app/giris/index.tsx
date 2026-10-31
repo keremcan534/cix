@@ -60,8 +60,9 @@ export default function WelcomeScreen() {
           <SocialButton icon="logo-google" title="Google ile devam et" />
           <SocialButton icon="logo-apple" title="Apple ile devam et" />
           {IS_DEMO && (
-            <Pressable onPress={demoLogin} style={{ alignItems: 'center', paddingVertical: 4 }}>
-              <Text style={styles.link}>⚡ Demo hesabıyla hızlı giriş</Text>
+            <Pressable onPress={demoLogin} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 4 }}>
+              <Ionicons name="flash" size={14} color="#A5F3F5" />
+              <Text style={styles.link}>Demo hesabıyla hızlı giriş</Text>
             </Pressable>
           )}
           <Text style={styles.terms}>

@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
@@ -44,8 +45,10 @@ export default function KabileMerkez() {
     return (
       <SafeAreaView style={styles.safe}>
         <Header title="Görev Merkezi" />
-        <View style={{ padding: 24, gap: 12, alignItems: 'center' }}>
-          <Text style={styles.title}>Görevler kabile üyelerine açıktır</Text>
+        <View style={{ paddingTop: 96, paddingHorizontal: 32, gap: 12, alignItems: 'center' }}>
+          <StateIcon name="lock-closed" />
+          <Text style={[styles.title, { textAlign: 'center' }]}>Görevler kabile üyelerine açıktır</Text>
+          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>Bir kabileye katıldığında günlük yoklama ve kabile görevleri burada açılır.</Text>
           <GradientButton title="Kabile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>
       </SafeAreaView>
@@ -159,7 +162,7 @@ export default function KabileMerkez() {
                     {chestRewardText(c.reward)}
                   </Text>
                   <View style={[styles.alBtn, !ready && { backgroundColor: colors.cardAlt }, claimed && { backgroundColor: colors.border }]}>
-                    <Text style={styles.btnText}>{claimed ? 'Alındı' : ready ? 'Al' : '🔒'}</Text>
+                    {claimed || ready ? <Text style={styles.btnText}>{claimed ? 'Alındı' : 'Al'}</Text> : <Ionicons name="lock-closed" size={14} color={colors.textDim} accessibilityLabel="Kilitli" />}
                   </View>
                 </Pressable>
               );

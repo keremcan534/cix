@@ -113,7 +113,7 @@ export default function SupportScreen() {
 
             <Card style={{ paddingVertical: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
-                <Text style={{ fontSize: 18 }}>🔥</Text>
+                <Ionicons name="help-circle" size={18} color={colors.primaryText} />
                 <Text style={styles.cardTitle}>SSS</Text>
                 <View style={{ flex: 1 }} />
                 {FAQ.length > FAQ_PREVIEW && (
@@ -125,7 +125,7 @@ export default function SupportScreen() {
               {FAQ.slice(0, FAQ_PREVIEW).map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}
             </Card>
 
-            <ServiceRow icon="headset" tint={['#F59E0B', '#F97316']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
+            <ServiceRow icon="headset" tint={['#13D9DF', '#0A8F95']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
             <ServiceRow icon="create" tint={['#3B82F6', '#0E7C9A']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
             <ServiceRow
               icon="chatbubbles"
@@ -134,7 +134,7 @@ export default function SupportScreen() {
               sub={tickets.length ? `${tickets.length} talep · ${tickets.filter((t) => t.status === 'Yanıtlandı').length} yanıtlandı` : undefined}
               onPress={() => setTab('list')}
             />
-            <ServiceRow icon="mail" tint={['#D946EF', '#FF6576']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={email} />
+            <ServiceRow icon="mail" tint={['#5B7BA6', '#34507A']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={email} />
           </>
         )}
 

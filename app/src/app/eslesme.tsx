@@ -86,7 +86,7 @@ export default function HemenTanis() {
             </View>
           )}
           <Text style={s.status} accessibilityLiveRegion="polite">
-            {searching ? `${modeLabel(m.mode)} · ${PHASE_LABEL.searching}…` : terminal ? (m.message ?? PHASE_LABEL[m.phase]) : pending ? '' : `${USERS.filter((u) => u.online).length * 1_287} kişi çevrimiçi`}
+            {searching ? `${modeLabel(m.mode)} · ${PHASE_LABEL.searching}…` : terminal ? (m.message ?? PHASE_LABEL[m.phase]) : pending ? '' : `${(USERS.filter((u) => u.online).length * 1_287).toLocaleString('tr-TR')} kişi çevrimiçi`}
           </Text>
         </View>
 

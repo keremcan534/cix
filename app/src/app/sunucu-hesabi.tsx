@@ -1,17 +1,19 @@
 // Server account (docs/SUNUCU.md): the account, balances and ledger kept in our database, with test top-ups and
 // gifts that go through the real API. The rest of the app still runs on local prototype state; this screen is
 // where the server wallet can be seen and tried until the wallet screens move over.
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Icon3D } from '@/components/Icon3D';
 import { Text, TextInput } from '@/components/text';
-import { Card, Header } from '@/components/ui';
+import { Card, Header, StateIcon } from '@/components/ui';
 import { apiEnabled, ensureSignedIn, gift, ledger, newRef, testTopup, type ServerLedgerRow, type ServerUser } from '@/lib/api';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
-const CURRENCY = { coin: '🪙 jeton', diamond: '💎 elmas', game: '🎮 oyun' } as const;
+const CURRENCY = { coin: 'jeton', diamond: 'elmas', game: 'oyun jetonu' } as const;
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function ServerAccount() {
@@ -67,7 +69,11 @@ export default function ServerAccount() {
     return (
       <SafeAreaView style={s.page}>
         <Header title="Sunucu hesabı" />
-        <Text style={[s.dim, { padding: 16 }]}>Sunucu adresi ayarlı değil (EXPO_PUBLIC_API_URL). Uygulama yerel prototip verisiyle çalışıyor.</Text>
+        <View style={s.empty}>
+          <StateIcon name="cloud-offline-outline" size={64} />
+          <Text style={s.emptyTitle}>Sunucuya bağlı değil</Text>
+          <Text style={[s.dim, { textAlign: 'center', fontSize: 13, lineHeight: 19 }]}>Uygulama şu an cihazdaki deneme verisiyle çalışıyor. Sunucu adresi tanımlanınca hesap ve bakiyeler burada görünür.</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -92,9 +98,18 @@ export default function ServerAccount() {
                 Hesap kimliği: {user.id}
               </Text>
               <View style={s.balances}>
-                <Text style={s.balance}>🪙 {fmt(user.coins)}</Text>
-                <Text style={s.balance}>💎 {fmt(user.diamonds)}</Text>
-                <Text style={s.balance}>🎮 {fmt(user.gameCoins)}</Text>
+                <View style={s.balanceItem} accessibilityLabel={`${fmt(user.coins)} jeton`}>
+                  <Icon3D name="coin" size={22} />
+                  <Text style={s.balance}>{fmt(user.coins)}</Text>
+                </View>
+                <View style={s.balanceItem} accessibilityLabel={`${fmt(user.diamonds)} elmas`}>
+                  <Icon3D name="diamond" size={22} />
+                  <Text style={s.balance}>{fmt(user.diamonds)}</Text>
+                </View>
+                <View style={s.balanceItem} accessibilityLabel={`${fmt(user.gameCoins)} oyun jetonu`}>
+                  <Ionicons name="game-controller" size={20} color={colors.primaryText} />
+                  <Text style={s.balance}>{fmt(user.gameCoins)}</Text>
+                </View>
               </View>
             </>
           )}
@@ -163,7 +178,10 @@ const s = StyleSheet.create({
   title: { color: '#fff', fontWeight: '700', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   msg: { color: semantic.money, fontWeight: '700', textAlign: 'center' },
-  balances: { flexDirection: 'row', gap: 18, marginVertical: 4 },
+  empty: { alignItems: 'center', gap: 10, paddingTop: 96, paddingHorizontal: 32 },
+  emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  balances: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginVertical: 4 },
+  balanceItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   balance: { color: '#fff', fontWeight: '900', fontSize: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: colors.border },
