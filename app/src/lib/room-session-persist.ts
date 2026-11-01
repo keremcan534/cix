@@ -25,12 +25,15 @@ async function readSaved(now: number): Promise<SavedRoom | null> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return null;
-    const saved = JSON.parse(raw) as SavedRoom;
-    if (!saved.roomId || now - saved.at > RECOVERY_MAX_AGE_MS) {
+    const saved = JSON.parse(raw) as Partial<SavedRoom> | null;
+    const { roomId, title, at } = saved ?? {};
+    // Anything but the shape this file writes (an older build, a damaged value) is dropped, never shown.
+    const valid = typeof roomId === 'string' && roomId !== '' && typeof title === 'string' && typeof at === 'number';
+    if (!valid || !(now - at <= RECOVERY_MAX_AGE_MS)) {
       await AsyncStorage.removeItem(KEY);
       return null;
     }
-    return saved;
+    return { roomId, title, at };
   } catch {
     return null;
   }

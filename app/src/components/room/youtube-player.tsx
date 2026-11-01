@@ -65,6 +65,7 @@ export function YouTubePlayer(props: YouTubePlayerProps) {
     } catch {
       return;
     }
+    if (!m || typeof m !== 'object') return;
     const { playback: room, hold, onReport, onUserState, onBlocked, onLoadError } = latest.current;
     if (typeof m.d === 'number' && m.d > 0) onReport({ duration: m.d });
     if (m.t === 'ready') {
