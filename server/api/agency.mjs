@@ -781,7 +781,8 @@ export const agencyRoutes = {
     const x = await ctx(db, req);
     const a = await agencyFor(db, x, url.searchParams.get('id'), 'streamers.view');
     const r = await db.query('SELECT * FROM agency_transfers WHERE $1 IN (agency_id, from_agency_id, to_agency_id) ORDER BY status = \'pending\' DESC, id DESC LIMIT 100', [a.id]);
-    return { transfers: r.rows.map((t) => ({ ...transferView(t, {}), myParty: t.needs.filter((p) => (p === 'from' && t.from_agency_id === a.id) || (p === 'to' && t.to_agency_id === a.id)) })), names: await namesFor(db, r.rows) };
+    const names = await namesFor(db, r.rows);
+    return { transfers: r.rows.map((t) => ({ ...transferView(t, names), myParty: t.needs.filter((p) => (p === 'from' && t.from_agency_id === a.id) || (p === 'to' && t.to_agency_id === a.id)) })), names };
   },
 
   async 'POST /api/agency/transfers/approve'(req) {

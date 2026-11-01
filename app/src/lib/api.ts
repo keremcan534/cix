@@ -47,6 +47,9 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: object): Pro
   return data as T;
 }
 
+/** Any route of the API with this session (the agency panels go through lib/agency-net). */
+export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
+
 /** Signs in with this device (creating the account with `name` the first time). */
 export async function signIn(name: string): Promise<ServerUser> {
   let key = await AsyncStorage.getItem(DEVICE_KEY);

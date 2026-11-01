@@ -59,6 +59,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | Test (staging) ortamı | ⏳ | |
 | Yasal metin sayfaları ve kayıtta onay kutusu | ⛔ | Madde 7 |
 | Lucky, casino, Coins Bank | ⛔ | Madde 1; karara göre kapatılır veya ayrı bakiyeye alınır |
+| Ajans ağı: üst ve alt ajans, performansa bağlı komisyon, transfer, ödeme onayı, merkez paneli | 🟡 | Sunucu ve ekranlar hazır, testli (`docs/AJANS_HIYERARSI.md`). Komisyonun nakde dönmesi madde 1'deki hukuk kararına bağlı. Canlı sunucuya madde 9'daki anahtarla kurulur; o zamana kadar ekranlar "Örnek veri" etiketiyle açılır |
 
 ---
 

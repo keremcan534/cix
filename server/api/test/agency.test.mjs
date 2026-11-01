@@ -316,6 +316,12 @@ describe('Performans ve dinamik komisyon', () => {
     const move = ok(await sC.post('/api/agency/transfer', { toCode: codeT, reason: 'Üst ajansa geçiyorum', ref: ref() })).transfer;
     assert.equal(move.fee, 0, 'düşük performans: ücretsiz');
     assert.deepEqual(move.needs, ['from', 'to']);
+    // The parties' lists carry the names the panels show, and which approval is theirs.
+    const listed = ok(await sOwner.get(`/api/agency/transfers?id=${S.id}`)).transfers.find((t) => t.id === move.id);
+    assert.equal(listed.streamer.name, sC.name);
+    assert.equal(listed.from.name, 'Ay Ajans');
+    assert.equal(listed.to.name, 'Yıldız Ajans');
+    assert.deepEqual(listed.myParty, ['from']);
     ok(await sOwner.post('/api/agency/transfers/approve', { id: S.id, transferId: move.id, approve: true }));
     assert.equal(ok(await tOwner.post('/api/agency/transfers/approve', { id: T.id, transferId: move.id, approve: true })).transfer.status, 'completed');
     const links = await q('SELECT agency_id, ended_at, end_reason, method FROM agency_streamers WHERE streamer_id = $1 ORDER BY joined_at', [sC.id]);

@@ -10,10 +10,18 @@ import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency
 import { agenciesOwnedBy, myApplications, useAgencyApps } from '@/lib/agency-apps';
 import { showAlert } from '@/lib/alert';
 import { RULES, pct, usd } from '@/data/rules';
+import { NetworkHub } from '@/components/agency-net-hub';
+import { apiEnabled } from '@/lib/api';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
 export default function AgencyHub() {
+  // With our server the agency network is the server's (hierarchy, commission, approvals); the local prototype
+  // below stays for builds without a server address.
+  return apiEnabled() ? <NetworkHub /> : <LocalAgencyHub />;
+}
+
+function LocalAgencyHub() {
   const { agencyId, agencyRole, ownedAgency, pendingAgency } = useApp();
   if (agencyRole === 'owner' || agencyRole === 'assistant') return <OwnerEntry />;
   if (agencyId) return <MemberView />;
