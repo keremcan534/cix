@@ -341,10 +341,10 @@ export default function UserProfile() {
               disabled={presence.kind !== 'room'}
               onPress={() => presence.kind === 'room' && router.push(followRoute(presence.roomId, user.id))}
               accessibilityLabel="Bulunduğu yere git">
-              <Text style={{ fontSize: 20 }}>{presence.kind === 'room' ? '🎙️' : '📞'}</Text>
+              {presence.kind === 'room' ? <Icon3D name="mic" size={26} /> : <Ionicons name="call" size={20} color={colors.gold} />}
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#fff', fontWeight: '800' }} numberOfLines={1}>
-                  {presence.kind === 'room' ? `Şu an odada: ${presence.locked ? '🔒 ' : ''}${presence.title}` : `Şu an ${presence.mode} görüşmede`}
+                  {presence.kind === 'room' ? `Şu an odada: ${presence.title}` : `Şu an ${presence.mode} görüşmede`}
                 </Text>
                 <Text style={styles.meta}>{presence.kind === 'room' ? (presence.locked ? 'Şifreli oda · girişte şifre sorulur' : 'Dokun, yanına git') : 'Özel görüşmeye katılınamaz'}</Text>
               </View>

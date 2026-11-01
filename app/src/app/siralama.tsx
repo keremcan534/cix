@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -53,14 +53,14 @@ export default function Leaderboard() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Sıralama" />
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.tabs}>
         {BOARDS.map((b) => (
           <Pressable key={b.key} onPress={() => setBoard(b.key)} style={[styles.tab, board === b.key && styles.tabActive]} accessibilityLabel={b.label}>
             {b.art && <Art name={b.art} size={17} />}
             <Text style={[styles.tabText, board === b.key && { color: '#fff' }]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
       <View style={styles.periods}>
         {(['daily', 'weekly', 'monthly'] as const).map((p) => (
           <Pressable key={p} onPress={() => setPeriod(p)}>
@@ -136,8 +136,8 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
 
 const styles = StyleSheet.create({
   how: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
-  tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, flexWrap: 'wrap' },
-  tab: { flexGrow: 1, flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 9, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
+  tabs: { gap: 6, paddingHorizontal: 16 },
+  tab: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   periods: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingVertical: 12 },

@@ -1,0 +1,39 @@
+name: Uptime
+
+# Every 15 minutes: is the live API answering with its database, and is LiveKit up? A failed run is
+# e-mailed by GitHub to whoever last changed this schedule. Address: the API_BASE_URL repository variable
+# once the domain exists, the sslip.io address until then.
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE: ${{ vars.API_BASE_URL || 'https://130-61-230-94.sslip.io' }}
+    steps:
+      - name: API and database
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o health.json -w '%{http_code}' --max-time 15 "$BASE/api/health" || true)
+            if [ "$code" = 200 ]; then echo "API: $(cat health.json)"; exit 0; fi
+            # A server still running the API from before /api/health: a 401 from /api/me means it is up.
+            if [ "$code" = 404 ] && [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/api/me" || true)" = 401 ]; then
+              echo "API is up (no /api/health on this version yet)"; exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::API is not answering (last status $code: $(cat health.json 2>/dev/null))"; exit 1
+      - name: LiveKit
+        if: always()
+        run: |
+          for i in 1 2 3; do
+            if [ "$(curl -s --max-time 15 "$BASE/" || true)" = OK ]; then echo "LiveKit: OK"; exit 0; fi
+            sleep 20
+          done
+          echo "::error::LiveKit is not answering at $BASE/"; exit 1

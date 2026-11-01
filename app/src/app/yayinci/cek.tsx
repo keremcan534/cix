@@ -27,7 +27,7 @@ export default function Withdraw() {
     if (name.trim().length < 3) return showAlert('Hata', 'Hesap sahibinin adını gir.');
     const err = requestWithdraw(n, iban);
     if (err) return showAlert('Hata', err);
-    showAlert('Talep alındı ✅', `${usd(n)} en geç 3 iş günü içinde hesabına yatırılacak. (Demo)`);
+    showAlert('Talep alındı', `${usd(n)} en geç 3 iş günü içinde hesabına yatırılacak. (Demo)`);
   };
 
   return (

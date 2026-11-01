@@ -258,7 +258,11 @@ function MemberView() {
               </Text>
               {transfer.steps.map((st, i) => (
                 <View key={i} style={styles.step}>
-                  <Text style={{ fontSize: 14 }}>{st.status === 'Bekliyor' ? '⏳' : st.status === 'Reddedildi' ? '❌' : '✅'}</Text>
+                  <Ionicons
+                    name={st.status === 'Bekliyor' ? 'hourglass-outline' : st.status === 'Reddedildi' ? 'close-circle' : 'checkmark-circle'}
+                    size={18}
+                    color={st.status === 'Bekliyor' ? colors.gold : st.status === 'Reddedildi' ? colors.textDim : colors.green}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontWeight: '600' }}>{st.label}</Text>
                     <Text style={styles.dim}>

@@ -412,7 +412,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                           <Text style={{ color: '#fff', fontWeight: '700' }} numberOfLines={1}>
                             {id === 'me' ? `${me.name} (sen)` : u.name}
                           </Text>
-                          {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: '#0E7490' }]}>{ROLE_LABEL[r]}</Text>}
+                          {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: 'rgba(19,217,223,0.16)', color: colors.primaryText }]}>{ROLE_LABEL[r]}</Text>}
                         </View>
                         <Text style={[styles.dim, p?.kind === 'room' && { color: colors.gold }]} numberOfLines={1}>
                           {id === 'me' ? 'Çevrimiçi' : presenceLabel(p, u.online)}
@@ -550,9 +550,12 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               <Card style={{ gap: 6 }}>
                 <Text style={styles.title}>Seviye ayrıcalıkları</Text>
                 {FAMILY_PERKS.map((p) => (
-                  <Text key={p.from} style={[styles.dim, lvl >= p.from && { color: '#fff' }]}>
-                    {lvl >= p.from ? '✅' : '🔒'} LV{p.from}–{p.to}: {p.text}
-                  </Text>
+                  <View key={p.from} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                    <Ionicons name={lvl >= p.from ? 'checkmark-circle' : 'lock-closed'} size={14} color={lvl >= p.from ? colors.green : colors.textDim} style={{ marginTop: 2 }} />
+                    <Text style={[styles.dim, { flex: 1 }, lvl >= p.from && { color: '#fff' }]}>
+                      LV{p.from}–{p.to}: {p.text}
+                    </Text>
+                  </View>
                 ))}
                 <Text style={styles.dim}>Oranlar merkezi yönetim panelinden değiştirilebilir; geçmiş haftalar değişmez.</Text>
               </Card>
@@ -568,7 +571,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
 
       <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
         <Pressable style={{ flex: 1 }} onPress={() => setShareOpen(true)} accessibilityLabel="Paylaş">
-          <LinearGradient colors={['#F97316', '#FBBF24']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bottomBtn}>
+          <LinearGradient colors={['#FF8A96', semantic.social]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bottomBtn}>
             <Ionicons name="arrow-redo" size={20} color="#fff" />
             <Text style={styles.bottomText}>Paylaş</Text>
           </LinearGradient>
@@ -729,7 +732,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
                 {t.title}
               </Text>
               <Text style={[styles.dim, prog.claimable && { color: colors.green, fontWeight: '800' }]}>
-                {prog.claimed ? '✅' : prog.claimable ? 'Al' : t.kind === 'rate' ? `⚔+${t.power}/${t.per}🪙` : `⚔+${t.power}`}
+                {prog.claimed ? 'Alındı' : prog.claimable ? 'Al' : t.kind === 'rate' ? `⚔+${t.power}/${t.per}🪙` : `⚔+${t.power}`}
               </Text>
             </View>
           );
@@ -897,7 +900,7 @@ const styles = StyleSheet.create({
   tabLine: { width: 22, height: 4, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4 },
   chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 66 },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10 },
-  roleBadge: { color: '#fff', fontSize: 11, fontWeight: '800', backgroundColor: '#EA580C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  roleBadge: { color: colors.gold, fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(246,189,96,0.18)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: 'rgba(8,15,30,0.92)' },
   bottomBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },

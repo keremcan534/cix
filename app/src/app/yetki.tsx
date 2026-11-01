@@ -151,9 +151,10 @@ function Roles({ rbac, update, actor }: Props) {
           <Pressable key={r.id} style={styles.optRow} onPress={() => pick(r.id)} accessibilityLabel={`Rol ${r.name}`}>
             <Ionicons name={sel === r.id ? 'radio-button-on' : 'radio-button-off'} size={24} color={sel === r.id ? '#fff' : colors.textDim} />
             <Text style={styles.optText}>{r.name}</Text>
-            <Text style={styles.dim}>
-              {r.protected ? '🔒 ' : ''}öncelik {r.priority}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {r.protected && <Ionicons name="lock-closed" size={12} color={colors.textDim} accessibilityLabel="Korumalı" />}
+              <Text style={styles.dim}>öncelik {r.priority}</Text>
+            </View>
           </Pressable>
         ))}
         <View style={styles.optRow}>
@@ -214,7 +215,8 @@ function Roles({ rbac, update, actor }: Props) {
             <Text style={styles.dim}>Bu, panel davranışını gösteren bir prototiptir; değişiklikler gerçek sunucuya kaydedilmez.</Text>
           </View>
           <Pressable style={styles.primaryBtn} onPress={save} accessibilityLabel="Rolü kaydet">
-            <Text style={styles.primaryText}>{draft.protected ? '🔒 Korumalı rol' : 'Kaydet'}</Text>
+            {draft.protected && <Ionicons name="lock-closed" size={14} color="#fff" />}
+            <Text style={styles.primaryText}>{draft.protected ? 'Korumalı rol' : 'Kaydet'}</Text>
           </Pressable>
           <Pressable style={[styles.primaryBtn, { backgroundColor: '#fff' }]} onPress={() => setSpec(roleSpec(draft))} accessibilityLabel="Teknik şartname">
             <Text style={[styles.primaryText, { color: '#111' }]}>Seçimi teknik şartnameye dönüştür</Text>
@@ -511,7 +513,7 @@ const styles = StyleSheet.create({
   smallBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   summary: { backgroundColor: colors.cardAlt, borderRadius: 16, padding: 14, gap: 6 },
   sumText: { color: '#fff', fontSize: 14 },
-  primaryBtn: { backgroundColor: '#18181B', borderRadius: 999, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  primaryBtn: { backgroundColor: '#18181B', borderRadius: 999, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   assignRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 8 },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10, paddingBottom: 30 },

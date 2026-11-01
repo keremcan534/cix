@@ -1,56 +1,13 @@
-// API tests against a real Postgres: each run creates an empty database, starts the API on it as a separate
-// process and talks to it over HTTP, then drops the database.
+// API tests against a real Postgres (harness.mjs): sign-in, wallet, profiles, follows, messages, rooms,
+// moderation and account deletion. Launch features (phone sign-in, gifts, purchases, push…): launch.test.mjs.
 //   PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test
-import { after, before, describe, test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import crypto from 'node:crypto';
-import path from 'node:path';
-import pg from 'pg';
 
-const PG = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.PGPORT ?? 5432), user: process.env.POSTGRES_USER ?? 'postgres', password: process.env.POSTGRES_PASSWORD ?? '' };
-const DB = `similar_test_${process.pid}`;
-const PORT = 17000 + (process.pid % 2000);
-const B = `http://127.0.0.1:${PORT}`;
-let api;
-let sql;
+import { rnd, startApi, tokenOf } from './harness.mjs';
 
-before(async () => {
-  const root = new pg.Client({ ...PG, database: 'postgres' });
-  await root.connect();
-  await root.query(`CREATE DATABASE ${DB}`);
-  await root.end();
-  sql = new pg.Pool({ ...PG, database: DB });
-  api = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'index.mjs')], {
-    env: { ...process.env, PGHOST: PG.host, PGPORT: String(PG.port), POSTGRES_USER: PG.user, POSTGRES_PASSWORD: PG.password, POSTGRES_DB: DB, LIVEKIT_KEYS: 'testkey: testsecret', API_PORT: String(PORT), ALLOW_TEST_TOPUP: '1', RATE_AUTH: '100000', RATE_ALL: '100000' },
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
-  await new Promise((resolve, reject) => {
-    api.stdout.on('data', (d) => String(d).includes('api on') && resolve());
-    api.on('exit', (code) => reject(new Error(`api exited ${code}`)));
-  });
-});
-
-after(async () => {
-  api?.kill();
-  await sql?.end();
-  const root = new pg.Client({ ...PG, database: 'postgres' });
-  await root.connect();
-  await root.query(`DROP DATABASE IF EXISTS ${DB} WITH (FORCE)`);
-  await root.end();
-});
-
-const rnd = (n = 12) => crypto.randomBytes(n).toString('hex');
-async function call(method, p, body, session) {
-  const r = await fetch(B + p, { method, headers: { 'content-type': 'application/json', ...(session ? { authorization: `Bearer ${session}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
-  return [r.status, await r.json()];
-}
-async function signUp(name = `Test ${rnd(2)}`, deviceKey = rnd(24)) {
-  const [st, j] = await call('POST', '/api/auth/dev', { deviceKey, name });
-  assert.equal(st, 200, j.error);
-  return { ...j, deviceKey };
-}
-const tokenOf = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url'));
+const h = startApi();
+const { call, signUp } = h;
 
 describe('Giriş ve cüzdan', () => {
   test('kayıt, tekrar giriş, test yüklemesi tek kez, hediye ve yetersiz bakiye', async () => {
@@ -208,15 +165,15 @@ describe('Şikâyet ve moderasyon', () => {
     assert.equal((await call('POST', '/api/report', { type: 'kedi', id: 'x', reason: 'a' }, reporter.session))[0], 400);
 
     assert.equal((await call('GET', '/api/admin/reports', null, reporter.session))[0], 403, 'kullanıcı kuyruğu göremez');
-    await sql.query("UPDATE users SET role = 'moderator' WHERE id = $1", [mod.user.id]);
+    await h.sql.query("UPDATE users SET role = 'moderator' WHERE id = $1", [mod.user.id]);
     const [, q] = await call('GET', '/api/admin/reports', null, mod.session);
     const mine = q.reports.filter((r) => r.target.id === bad.user.id);
     assert.equal(mine.length, 1, 'aynı kişi aynı hedefi bir kez şikâyet eder');
     assert.equal((await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 0 }, mod.session))[0], 400);
     assert.equal((await call('GET', '/api/admin/reports', null, mod.session))[1].reports.some((r) => r.id === mine[0].id), true, 'geçersiz istek şikâyeti açık bırakır');
-    const [st, h] = await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 7 }, mod.session);
-    assert.equal(st, 200, h.error);
-    assert.ok(h.bannedUntil);
+    const [st, handled] = await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 7 }, mod.session);
+    assert.equal(st, 200, handled.error);
+    assert.ok(handled.bannedUntil);
     const [code, err] = await call('GET', '/api/me', null, bad.session);
     assert.equal(code, 403);
     assert.match(err.error, /askıya alındı/);
@@ -241,9 +198,9 @@ describe('Hesap silme', () => {
     assert.equal((await call('GET', `/api/user?id=${a.user.id}`, null, b.session))[0], 404);
     assert.equal((await call('GET', '/api/conversations', null, b.session))[1].conversations.length, 0, 'mesajlar silindi');
     assert.equal((await call('GET', `/api/room?id=${r.room.id}`, null, b.session))[1].room.closed, true);
-    const row = (await sql.query('SELECT name, username, bio, birth_date, device_key_hash FROM users WHERE id = $1', [a.user.id])).rows[0];
+    const row = (await h.sql.query('SELECT name, username, bio, birth_date, device_key_hash FROM users WHERE id = $1', [a.user.id])).rows[0];
     assert.deepEqual(row, { name: 'Silinmiş hesap', username: null, bio: '', birth_date: null, device_key_hash: null });
-    assert.equal((await sql.query('SELECT count(*)::int AS n FROM ledger WHERE user_id = $1', [a.user.id])).rows[0].n, 1, 'mali kayıt saklanır');
+    assert.equal((await h.sql.query('SELECT count(*)::int AS n FROM ledger WHERE user_id = $1', [a.user.id])).rows[0].n, 1, 'mali kayıt saklanır');
     const again = await signUp('Yeni', a.deviceKey);
     assert.notEqual(again.user.id, a.user.id, 'aynı cihaz yeni ve boş hesap');
     assert.equal(again.user.coins, 0);

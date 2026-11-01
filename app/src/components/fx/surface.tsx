@@ -48,16 +48,21 @@ export function Gloss({ radius = 999, strength = 0.4 }: { radius?: number; stren
 }
 
 /**
- * The screen's night sky (fx/scenes): a wash of the screen's accent from the top, a soft glow of it behind the
- * header and a fainter second accent low on the side. No photos: every screen shares one look and text sits on
- * a calm, dark surface. `strength` scales the light (0–1).
+ * The screen's own sea photo (fx/scenes) under a navy veil, with a soft glow of the screen's accent behind the
+ * header. The veil is darkest at the top and bottom, where headers and tab bars sit, so the photo shows mostly
+ * between cards; bright photos carry a stronger `veil`. `strength` is the photo's opacity (0–1).
  */
-export function Backdrop({ scene, strength = 1 }: { scene: Scene; strength?: number }) {
+export function Backdrop({ scene, strength = 0.9 }: { scene: Scene; strength?: number }) {
+  const v = scene.veil ?? 0.18;
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden' }]}>
-      <LinearGradient colors={[`${scene.light}2E`, `${scene.light}0A`, 'rgba(8,15,30,0)']} locations={[0, 0.32, 0.6]} style={StyleSheet.absoluteFill} />
-      <Image source={GLOW} style={[s.glow, { alignSelf: 'center', top: -300, opacity: 0.3 * strength, tintColor: scene.light }]} />
-      <Image source={GLOW} style={[s.glow, { right: -260, bottom: 40, opacity: 0.1 * strength, tintColor: scene.second }]} />
+      <Image source={scene.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength }]} />
+      <LinearGradient
+        colors={['rgba(8,15,30,0.7)', `rgba(8,15,30,${v})`, `rgba(8,15,30,${Math.min(v + 0.12, 0.9)})`, 'rgba(8,15,30,0.86)']}
+        locations={[0, 0.3, 0.66, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <Image source={GLOW} style={[s.glow, { alignSelf: 'center', top: -320, opacity: 0.22, tintColor: scene.light }]} />
     </View>
   );
 }

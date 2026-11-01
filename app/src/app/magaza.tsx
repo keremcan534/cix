@@ -93,7 +93,7 @@ export default function StoreScreen() {
                     <Text style={styles.owned}>✓ Açık</Text>
                   ) : p.minVip && !p.price ? (
                     <View>
-                      <GlossButton label={`🔒 VIP ${p.minVip}`} tone="locked" small />
+                      <GlossButton label={`VIP ${p.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
                     </View>
                   ) : (
                     <PressableScale
@@ -131,7 +131,7 @@ export default function StoreScreen() {
                     </PressableScale>
                   ) : c.minVip && vipLevel < c.minVip ? (
                     <PressableScale onPress={() => router.push('/vip')}>
-                      <GlossButton label={`🔒 VIP ${c.minVip}`} tone="locked" small />
+                      <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
                     </PressableScale>
                   ) : (
                     <PressableScale onPress={() => buy(c)}>

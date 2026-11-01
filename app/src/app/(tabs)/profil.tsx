@@ -58,7 +58,7 @@ export default function ProfileScreen() {
       icon: 'checkmark-circle-outline',
       label: 'Kimlik Doğrulamam',
       dot: !me.verified,
-      onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı ✅' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
+      onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
     },
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
     { icon: 'ribbon-outline', img: 'crown', label: 'Servet ve Cazibe Seviyesi', onPress: () => router.push('/seviye') },

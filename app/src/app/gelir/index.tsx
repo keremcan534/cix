@@ -6,14 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
-import { Card } from '@/components/ui';
+import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
-import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { diamondValueTl } from '@/lib/coins-bank';
 import { useApp, type Earning, type EarningSource } from '@/store';
 import { colors } from '@/theme';
+import { Icon3D } from '@/components/Icon3D';
 
 // Income labels for each store earning source.
 export const INCOME_LABEL: Record<EarningSource, string> = {
@@ -63,18 +63,19 @@ export default function IncomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="arrow-back" size={26} color="#fff" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Gelir</Text>
-        <Pressable onPress={() => router.push('/davet')} hitSlop={8} accessibilityLabel="Ödüllü davet">
-          <Text style={{ fontSize: 26 }}>🎁</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
-          <Ionicons name="headset" size={20} color={colors.primaryText} />
-        </Pressable>
-      </View>
+      <Header
+        title="Gelir"
+        right={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Ödüllü davet">
+              <Ionicons name="gift" size={18} color={colors.gold} />
+            </Pressable>
+            <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
+              <Ionicons name="headset" size={18} color={colors.primaryText} />
+            </Pressable>
+          </View>
+        }
+      />
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
         <LinearGradient colors={['#1F3050', '#16253C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
@@ -103,7 +104,7 @@ export default function IncomeScreen() {
         </Pressable>
 
         <View style={styles.sectionHead}>
-          <Text style={{ fontSize: 22 }}>💎</Text>
+          <Icon3D name="diamond" size={22} />
           <Text style={styles.sectionTitle}>Elmas Detayları</Text>
           <Pressable onPress={() => router.push('/gelir/detay')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.dim}>Daha fazla</Text>
@@ -149,9 +150,7 @@ export function EarningRow({ e }: { e: Earning }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', flex: 1 },
-  headIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  headIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   balance: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.border },
   balanceLabel: { color: 'rgba(255,255,255,0.92)', fontSize: 15 },
   balanceN: { color: '#fff', fontSize: 40, fontWeight: '900', marginTop: 4 },

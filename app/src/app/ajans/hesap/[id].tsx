@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Check, Chips, KV, Note, Section, StatusBadge, ViewerBar, s } from '@/components/agency-apps';
-import { Button, Header } from '@/components/ui';
+import { Button, Header, StateIcon } from '@/components/ui';
 import { USERS } from '@/data/mock';
 import { resolve, type PermissionKey } from '@/data/rbac';
 import { RULES } from '@/data/rules';
@@ -56,8 +56,10 @@ export default function AgencyAccountScreen() {
     return (
       <SafeAreaView style={s.safe}>
         <Header title="Ajans hesabı" />
-        <View style={s.scroll}>
-          <Note tone="bad" text="Ajans bulunamadı." />
+        <View style={{ alignItems: 'center', gap: 10, paddingTop: 96, paddingHorizontal: 32 }}>
+          <StateIcon name="business-outline" size={64} />
+          <Text style={{ color: colors.text, fontSize: 17, fontWeight: '700' }}>Ajans bulunamadı</Text>
+          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center' }}>Bu ajans kapatılmış ya da bağlantı hatalı olabilir.</Text>
         </View>
       </SafeAreaView>
     );
@@ -320,7 +322,7 @@ function CoinsBankCard({ ag, ctx, isOwner, can, r }: { ag: AgencyAccount; ctx: C
           <Stat label="Toplam hak ediş" value={dia(n.total)} sub={usd(n.total)} />
           <Stat label="Bekleyen" value={dia(n.pending)} sub={`${RULES.pendingDays} gün iade süresi`} />
           <Stat label="Kesinleşmiş" value={dia(n.settled)} />
-          <Stat label="Çekilebilir" value={ag.payoutEnabled ? dia(n.withdrawable) : '🔒 Kapalı'} sub={ag.payoutEnabled ? usd(n.withdrawable) : 'Ödeme yetkisi kapalı'} color={ag.payoutEnabled ? semantic.success : colors.textDim} />
+          <Stat label="Çekilebilir" value={ag.payoutEnabled ? dia(n.withdrawable) : 'Kapalı'} sub={ag.payoutEnabled ? usd(n.withdrawable) : 'Ödeme yetkisi kapalı'} color={ag.payoutEnabled ? semantic.success : colors.textDim} />
           <Stat label="Ödeme sürecinde" value={dia(n.inPayout)} />
           <Stat label="Tamamlanan" value={dia(n.paid)} />
           <Stat label="Reddedilen / başarısız" value={dia(n.rejected)} />

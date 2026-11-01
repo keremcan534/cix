@@ -6,10 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { EarningRow } from '@/app/gelir/index';
 import { Art } from '@/components/Art';
-import { Card } from '@/components/ui';
+import { Card, Header } from '@/components/ui';
+import { Icon3D } from '@/components/Icon3D';
 import { userById } from '@/data/mock';
 import { usd } from '@/data/rules';
-import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp, type Earning, type EarningSource, type LedgerRow } from '@/store';
 import { colors } from '@/theme';
@@ -49,12 +49,7 @@ export default function EarningsDetail() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="arrow-back" size={26} color="#fff" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Kazanç Detayları</Text>
-      </View>
+      <Header title="Kazanç Detayları" />
 
       <View style={styles.tabs}>
         {(
@@ -116,7 +111,7 @@ export default function EarningsDetail() {
 function SummaryRow({ label, value, hint, onInfo }: { label: string; value: string; hint?: string; onInfo?: () => void }) {
   return (
     <View style={styles.sumRow}>
-      <Text style={{ fontSize: 16 }}>💎</Text>
+      <Icon3D name="diamond" size={18} />
       <Text style={styles.sumLabel}>{label}</Text>
       {onInfo && (
         <Pressable onPress={onInfo} hitSlop={8}>
@@ -208,8 +203,6 @@ function Empty({ onRetry }: { onRetry: () => void }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 3, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: colors.primary },

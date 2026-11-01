@@ -50,9 +50,15 @@ export default function HostCenter() {
               </View>
             </Card>
           ))}
-          <Text style={[styles.dim, { textAlign: 'center' }]}>
-            Şartlar: 18+, gerçek kişi doğrulaması {me.verified ? '✅' : '❌'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Text style={styles.dim}>Şartlar: 18+, gerçek kişi doğrulaması</Text>
+            <Ionicons
+              name={me.verified ? 'checkmark-circle' : 'close-circle'}
+              size={16}
+              color={me.verified ? colors.green : colors.textDim}
+              accessibilityLabel={me.verified ? 'Doğrulandı' : 'Doğrulanmadı'}
+            />
+          </View>
           <GradientButton
             title="Yayıncı başvurusu yap"
             icon="mic"

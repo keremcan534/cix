@@ -14,7 +14,7 @@ export type Provider = { id: string; name: string; hasApi: boolean; online: bool
 export type ProviderItem = { provider_id: string; name: string; category_id: string; format: Animation['format']; preview: Asset; license: LicenseStatus; terms: string; duration_ms: number };
 
 const PROVIDERS0: Provider[] = [
-  { id: 'builtin', name: 'Similarclup yerleşik', hasApi: false, online: true, terms: 'Kendi içeriğimiz; kısıt yok.' },
+  { id: 'builtin', name: 'Similar Club yerleşik', hasApi: false, online: true, terms: 'Kendi içeriğimiz; kısıt yok.' },
   {
     id: 'demo-store',
     name: 'Örnek mağaza (API simülasyonu)',

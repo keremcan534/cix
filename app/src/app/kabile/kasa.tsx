@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
@@ -22,8 +23,10 @@ export default function KabileKasa() {
     return (
       <SafeAreaView style={styles.safe}>
         <Header title="Kabile Kasası" />
-        <View style={{ padding: 24, gap: 12, alignItems: 'center' }}>
-          <Text style={styles.title}>Kasa kabile üyelerine açıktır</Text>
+        <View style={{ paddingTop: 96, paddingHorizontal: 32, gap: 12, alignItems: 'center' }}>
+          <StateIcon name="lock-closed" />
+          <Text style={[styles.title, { textAlign: 'center' }]}>Kasa kabile üyelerine açıktır</Text>
+          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>Bir kabileye katıldığında bağışlar, kasa ödülleri ve harcamalar burada görünür.</Text>
           <GradientButton title="Kabile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>
       </SafeAreaView>
@@ -81,7 +84,10 @@ export default function KabileKasa() {
         </LinearGradient>
 
         <Card style={{ gap: 6 }}>
-          <Text style={styles.title}>{reached ? '✅ Bu haftanın hedefi aşıldı' : `Hedefe ⚔ ${fmt(KASA_GOAL - weekly)} kaldı`}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {reached && <Ionicons name="checkmark-circle" size={18} color={colors.green} />}
+            <Text style={[styles.title, { flexShrink: 1 }]}>{reached ? 'Bu haftanın hedefi aşıldı' : `Hedefe ⚔ ${fmt(KASA_GOAL - weekly)} kaldı`}</Text>
+          </View>
           <Text style={styles.dim}>
             Tahmini payın: <Text style={{ color: colors.gold, fontWeight: '800' }}>{fmt(myShare)} 🪙</Text>
             {p.myPower ? '' : ' · pay almak için bu hafta görev yaparak katkı ver'}
