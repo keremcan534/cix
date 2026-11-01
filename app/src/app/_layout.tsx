@@ -10,11 +10,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 
+import { RootCrashScreen, ScreenCrashScreen } from '@/components/crash-screen';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
 import { RoomHost } from '@/components/room/room-host';
 import { ME } from '@/data/mock';
+import { installCrashGuard, markStarted } from '@/lib/crash-guard';
 import { setupVoice } from '@/lib/voice-setup';
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
@@ -23,11 +25,18 @@ import { colors } from '@/theme';
 // (shared ME object, kept current by the store) names the server account on first sign-in.
 setupVoice(() => ME.name);
 
+// A stray error in a timer or a button handler no longer closes the app once it is up (lib/crash-guard).
+installCrashGuard();
+
 // Keep the splash up until the saved state is loaded, so the app doesn't flash the login screen first.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 const hideSplash = () => {
   SplashScreen.hideAsync().catch(() => {});
+  markStarted();
 };
+
+// An error anywhere above the screens (store, saved state, room layer) shows a way out instead of a closed app.
+export const ErrorBoundary = RootCrashScreen;
 
 const theme = {
   ...DarkTheme,
@@ -64,6 +73,8 @@ function RootStack() {
         // Pushed screens slide in from the right on both platforms; screens with their own animation keep it.
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right' }}
         screenLayout={({ children }) => <ScreenEnter>{children}</ScreenEnter>}
+        // A screen that fails to draw is replaced by its own error screen; tabs and the rest keep working.
+        unstable_screenErrorBoundary={ScreenCrashScreen}
       >
         {/* Every screen must be listed in one of these groups: a route left out is added unprotected
             and opens from a deep link without signing in (tests/routes.test.ts checks this). */}

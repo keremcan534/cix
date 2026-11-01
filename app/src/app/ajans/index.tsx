@@ -16,7 +16,8 @@ import { colors } from '@/theme';
 export default function AgencyHub() {
   const { agencyId, agencyRole, ownedAgency, pendingAgency } = useApp();
   if (agencyRole === 'owner' || agencyRole === 'assistant') return <OwnerEntry />;
-  if (agencyId) return <MemberView />;
+  // An agency id the app doesn't know (an old save) shows the join screen instead of an empty member view.
+  if (agencyId && AGENCIES.some((x) => x.id === agencyId)) return <MemberView />;
   if (pendingAgency || ownedAgency?.status === 'İnceleniyor') return <Pending />;
   return <JoinOrCreate />;
 }

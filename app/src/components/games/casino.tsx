@@ -124,11 +124,11 @@ export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?
     <View style={c.lock}>
       <StateIcon name="lock-closed" />
       <Text style={c.lockText}>{reason}</Text>
-      {needWealth && (
+      {needWealth !== undefined ? (
         <Pressable style={c.btn} onPress={() => router.push('/seviye')}>
           <Text style={c.btnText}>Servet Seviyemi gör</Text>
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
