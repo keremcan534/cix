@@ -193,6 +193,8 @@ Merkez tarafı (`agency-admin.mjs`): `tree`, `overview`, `list`, `create`, `deci
 - Askıdaki ajans komisyon kazanmaya devam ediyor (yeni yayıncı ve alt ajans alamıyor).
 - Geçiş komisyonu bağımsız ajansın payından düşüyor; ayrı bir platform bütçesi yok.
 - Kapanmış döneme düşen geç gelir, içinde bulunulan döneme yazılıyor.
+- Paneldeki haftalık ve "bu ay" kazanç toplamları gelirin tarihine değil, defter satırının yazıldığı ana göre
+  gruplanıyor (dönem ve ödeme hesabı gelir tarihine göre doğru).
 - Ekibe yalnızca ajansın kendi yayıncılarından biri eklenebiliyor (arayüz; API kullanıcı kimliği istiyor).
 - Merkezin bağımsızlık onayında geçiş komisyonu süresi ve kapsamı arayüzde sabit (180 gün, mevcut yayıncılar);
   API ikisini de parametre olarak alıyor.
