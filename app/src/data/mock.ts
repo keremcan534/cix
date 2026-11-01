@@ -195,7 +195,15 @@ export const ROOMS: Room[] = [
   { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', theme: 'pk', bossSeat: true, micPermission: 'members', layoutId: 'audio-9-team', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
 ];
 
-export const roomById = (id: string) => ROOMS.find((r) => r.id === id) ?? ROOMS[0];
+// Rooms built at run time from their id (Anlık Kulüp, lib/club). Registered from outside so this file
+// keeps no imports from lib/.
+let roomSource: ((id: string) => (Room & { script?: RoomScriptLine[] }) | undefined) | null = null;
+export const setRoomSource = (fn: typeof roomSource) => {
+  roomSource = fn;
+};
+/** A chat line a room plays once when you enter (e.g. the club welcoming you by name). */
+export type RoomScriptLine = { userId: string; text: string; delayMs: number };
+export const roomById = (id: string): Room & { script?: RoomScriptLine[] } => roomSource?.(id) ?? ROOMS.find((r) => r.id === id) ?? ROOMS[0];
 
 export const MOMENTS: Moment[] = [
   { id: 'm1', userId: 'u5', text: 'Kapadokya sabahı 🎈 Burayı herkes bir kez görmeli!', image: photo('cappadocia', 600, 600), likes: 342, comments: 28, time: '12 dk' },
