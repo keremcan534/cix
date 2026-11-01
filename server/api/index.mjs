@@ -8,11 +8,16 @@
 // Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
 // purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
+// Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
+// agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
 import fs from 'node:fs';
 import http from 'node:http';
 
 import { adminRoutes } from './admin.mjs';
+import { agencyRoutes } from './agency.mjs';
+import { agencyAdminRoutes } from './agency-admin.mjs';
+import { recordIncome } from './agency-lib.mjs';
 import { authRoutes } from './auth.mjs';
 import { HttpError, allow, auth, db, env, int, migrate, move, once, readJson, selfUser, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
@@ -111,6 +116,7 @@ const walletRoutes = {
       if (locked.rowCount < 2) throw new HttpError(404, 'Alıcı bulunamadı');
       await move(c, u.id, 'coin', -n, 'Hediye gönderildi', ref, to);
       await move(c, to, 'diamond', n, 'Hediye alındı', `${ref}-in`, u.id);
+      await recordIncome(c, to, 'gift', `test-gift:${u.id}:${ref}`, n);
     });
   },
 };
@@ -127,6 +133,8 @@ const routes = {
   ...messageRoutes,
   ...roomRoutes,
   ...adminRoutes,
+  ...agencyRoutes,
+  ...agencyAdminRoutes,
 };
 
 // --- Server: CORS, security headers, rate limits, JSON errors, one log line per request ---------------------
