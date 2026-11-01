@@ -15,7 +15,7 @@ export const markStarted = () => {
   started = true;
 };
 
-/** The last error the guard kept from closing the app (for the support screen and tests). */
+/** The last error the guard kept from closing the app (kept for diagnostics; the tests read it). */
 export const lastCaughtError = () => last;
 
 export const errorMessage = (error: unknown) => (error instanceof Error ? error.message : typeof error === 'string' ? error : 'Bilinmeyen hata');
