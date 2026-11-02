@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -25,7 +25,7 @@ import {
 import { showAlert } from '@/lib/alert';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
 const TABS = ['Arkadaşlar', 'Önerilen', 'Son'] as const;
@@ -33,6 +33,9 @@ type Tab = (typeof TABS)[number];
 type FeedMoment = Moment & { topicId?: string };
 
 const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m, topicId: MOMENT_TOPIC_OF[m.id] }));
+
+// Privileged name colors are drawn for the night background; on light paper each takes a deeper shade of its hue.
+const LIGHT_NAME_COLOR: Record<string, string> = { '#FBBF24': '#9A6408', '#FF8A97': '#C8304A', '#FB923C': '#C2410C', '#A5F3F5': '#00757B' };
 
 export default function MomentsScreen() {
   const { bump, blocked, following, me, notifications, settings, vipLevel, equipped } = useApp();
@@ -45,6 +48,8 @@ export default function MomentsScreen() {
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const unread = notifications.filter((n) => !n.read).length;
+  const { colors } = useTheme();
+  const styles = useStyles();
 
   let feed = moments.filter((m) => !blocked.has(m.userId));
   if (tab === 'Arkadaşlar') feed = feed.filter((m) => m.userId === 'me' || following.has(m.userId));
@@ -81,7 +86,7 @@ export default function MomentsScreen() {
         ))}
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => router.push('/bildirimler')} hitSlop={10}>
-          <Ionicons name="notifications-outline" size={25} color="#fff" />
+          <Ionicons name="notifications-outline" size={25} color={colors.text} />
           {unread > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text>
@@ -119,7 +124,7 @@ export default function MomentsScreen() {
             </ScrollView>
             {topic && (
               <View style={styles.topicFilter}>
-                <Text style={{ color: '#fff', fontWeight: '700', flex: 1 }}># {MOMENT_TOPICS.find((t) => t.id === topic)?.title}</Text>
+                <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}># {MOMENT_TOPICS.find((t) => t.id === topic)?.title}</Text>
                 <Pressable onPress={() => setTopic(null)} hitSlop={8}>
                   <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Tümünü göster</Text>
                 </Pressable>
@@ -192,6 +197,7 @@ export default function MomentsScreen() {
 }
 
 function Separator() {
+  const { colors } = useTheme();
   return <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 16 }} />;
 }
 
@@ -224,7 +230,10 @@ function MomentCard({
   onShare: () => void;
   onGreet: () => void;
 }) {
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
   const female = author.gender === 'Kadın';
+  const nameColor = NAME_COLORS[author.id] ? (dark ? NAME_COLORS[author.id] : (LIGHT_NAME_COLOR[NAME_COLORS[author.id]] ?? NAME_COLORS[author.id])) : null;
   const meta = [agoLabel(moment.time), !isMe && showDistance ? distanceLabel(author.distanceKm) : null].filter(Boolean).join('  |  ');
   const openProfile = () => (isMe ? router.push('/(tabs)/profil') : router.push(`/kullanici/${author.id}`));
 
@@ -241,13 +250,13 @@ function MomentCard({
         </Pressable>
         <Pressable style={{ flex: 1, gap: 3 }} onPress={openProfile}>
           <View style={styles.nameRow}>
-            <Text style={[styles.name, NAME_COLORS[author.id] ? { color: NAME_COLORS[author.id] } : null]} numberOfLines={1}>
+            <Text style={[styles.name, nameColor ? { color: nameColor } : null]} numberOfLines={1}>
               {author.name}
             </Text>
             {author.gender && (
               <View style={[styles.genderChip, { backgroundColor: female ? 'rgba(255,101,118,0.18)' : 'rgba(56,189,248,0.18)' }]}>
                 <Art name={female ? 'cinsiyet-kadin' : 'cinsiyet-erkek'} size={14} />
-                <Text style={{ color: female ? colors.pink : '#38BDF8', fontSize: 12, fontWeight: '700' }}>{author.age}</Text>
+                <Text style={{ color: female ? colors.pink : dark ? '#38BDF8' : '#0369A1', fontSize: 12, fontWeight: '700' }}>{author.age}</Text>
               </View>
             )}
             {author.verified && <VerifiedBadge size={15} />}
@@ -262,8 +271,8 @@ function MomentCard({
             accessibilityRole="button"
             accessibilityLabel={greeted ? `${author.name} ile sohbet` : `${author.name} kişisine selam ver`}
           >
-            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color={greeted ? '#fff' : colors.pink} />
-            <Text style={[styles.hiText, greeted && { color: '#fff' }]}>{greeted ? 'Sohbet' : 'Selam'}</Text>
+            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color={greeted ? colors.text : colors.pink} />
+            <Text style={[styles.hiText, greeted && { color: colors.text }]}>{greeted ? 'Sohbet' : 'Selam'}</Text>
           </Pressable>
         )}
       </View>
@@ -294,6 +303,8 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
   const [draft, setDraft] = useState('');
   const [image, setImage] = useState<string | undefined>();
   const [topicId, setTopicId] = useState<string | undefined>();
+  const { colors } = useTheme();
+  const styles = useStyles();
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -334,7 +345,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {MOMENT_TOPICS.map((t) => (
               <Pressable key={t.id} onPress={() => setTopicId((cur) => (cur === t.id ? undefined : t.id))} style={[styles.topicChip, topicId === t.id && styles.topicChipActive]}>
-                <Text style={[styles.topicChipText, topicId === t.id && { color: '#fff' }]}># {t.title}</Text>
+                <Text style={[styles.topicChipText, topicId === t.id && { color: colors.text }]}># {t.title}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -370,6 +381,8 @@ function CommentsSheet({
   onSend: (text: string) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const { colors } = useTheme();
+  const styles = useStyles();
   const send = () => {
     if (!draft.trim()) return;
     onSend(draft.trim());
@@ -401,7 +414,7 @@ function CommentsSheet({
                     <Text style={{ color: colors.textDim, fontSize: 12, fontWeight: '700' }}>
                       {u.name} · <Text style={{ fontWeight: '400' }}>{c.time}</Text>
                     </Text>
-                    <Text style={{ color: '#fff', fontSize: 14 }}>{c.text}</Text>
+                    <Text style={{ color: colors.text, fontSize: 14 }}>{c.text}</Text>
                   </View>
                 </Pressable>
               );
@@ -427,20 +440,20 @@ function CommentsSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, lift, dark }) => ({
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
   tab: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
-  tabActive: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  tabActive: { color: colors.text, fontSize: 20, fontWeight: '800' },
   underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
   badge: { position: 'absolute', top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   topics: { gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
   topic: { width: 168, height: 66, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  topicActive: { borderColor: '#fff' },
+  topicActive: { borderColor: colors.text },
   topicTitle: { color: '#fff', fontWeight: '800', fontSize: 14, maxWidth: 148 },
   topicViews: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   topicEmoji: { position: 'absolute', right: 8, bottom: 4, fontSize: 28, opacity: 0.85 },
-  topicFilter: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  topicFilter: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   empty: { alignItems: 'center', gap: 10, padding: 32 },
   emptyBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },
   card: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
@@ -448,14 +461,14 @@ const styles = StyleSheet.create({
   svipTag: { position: 'absolute', bottom: -6, left: 5, right: 5, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
   svipText: { color: '#fff', fontSize: 8, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  name: { color: '#fff', fontWeight: '800', fontSize: 15, maxWidth: 150 },
+  name: { color: colors.text, fontWeight: '800', fontSize: 15, maxWidth: 150 },
   genderChip: { flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   meta: { color: colors.textDim, fontSize: 12 },
   hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,101,118,0.45)', backgroundColor: 'rgba(255,101,118,0.12)' },
   hiBtnDone: { borderColor: 'transparent', backgroundColor: colors.cardAlt },
   hiText: { color: colors.pink, fontWeight: '700', fontSize: 13 },
   body: { paddingLeft: 60, gap: 10 },
-  text: { color: '#fff', fontSize: 15, lineHeight: 21 },
+  text: { color: colors.text, fontSize: 15, lineHeight: 21 },
   image: { width: '78%', aspectRatio: 0.78, borderRadius: 12, backgroundColor: colors.card },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 22, paddingTop: 2 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -478,16 +491,16 @@ const styles = StyleSheet.create({
   },
   sheetWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { backgroundColor: colors.card, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 12, paddingBottom: 34 },
-  sheetTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  composeInput: { color: '#fff', minHeight: 90, fontSize: 16, textAlignVertical: 'top' },
+  sheetTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  composeInput: { color: colors.text, minHeight: 90, fontSize: 16, textAlignVertical: 'top' },
   preview: { width: 110, height: 110, borderRadius: 12, backgroundColor: colors.cardAlt },
   removeImage: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, padding: 3 },
   topicChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'transparent' },
-  topicChipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
+  topicChipActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 999, paddingLeft: 14, paddingRight: 4, paddingVertical: 4 },
-  commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
+  commentInput: { flex: 1, color: colors.text, fontSize: 14, paddingVertical: 8 },
   sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-});
+}));

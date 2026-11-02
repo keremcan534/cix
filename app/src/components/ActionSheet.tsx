@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 /** `icon` is an Ionicons glyph. When any option has one, the sheet becomes a left-aligned list with an icon column. */
@@ -10,6 +10,8 @@ export type SheetOption = { label: string; onPress: () => void; destructive?: bo
 
 /** Cross-platform bottom sheet menu (Alert with many buttons doesn't work on web). */
 export function ActionSheet({ visible, title, titleArt, options, onClose }: { visible: boolean; title?: string; /** 3D picture before the title. */ titleArt?: number; options: SheetOption[]; onClose: () => void }) {
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const listed = options.some((o) => o.icon);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -48,14 +50,14 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 12, paddingBottom: 34 },
   title: { color: colors.textDim, textAlign: 'center', paddingVertical: 10, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   option: { paddingVertical: 15, alignItems: 'center', borderRadius: 14 },
-  optionText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  optionText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   listed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14, paddingHorizontal: 14 },
   listedText: { flex: 1, textAlign: 'left' },
   iconBox: { width: 24, alignItems: 'center' },
-});
+}));
