@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -12,7 +12,7 @@ import { Avatar } from '@/components/ui';
 import { roomById, userById, type User } from '@/data/mock';
 import { followRoute, presenceLabel, presenceOf } from '@/data/presence';
 import type { GroupMsg } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type QuickAction = { key: string; label: string; emoji: string; art?: ArtName; tag?: string; onPress: () => void };
@@ -45,6 +45,8 @@ export function GroupChat({
   quickActions?: QuickAction[];
   onGift?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [tab, setTab] = useState<'chat' | 'members'>('chat');
   const [draft, setDraft] = useState('');
   const [emoji, setEmoji] = useState(false);
@@ -72,7 +74,7 @@ export function GroupChat({
           ] as const
         ).map(([k, l]) => (
           <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
-            <Text style={styles.segText}>{l}</Text>
+            <Text style={[styles.segText, tab === k && styles.segTextOn]}>{l}</Text>
           </Pressable>
         ))}
       </View>
@@ -95,7 +97,7 @@ export function GroupChat({
               {pinned && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={{ fontSize: 14 }}>📣</Text>
-                  <Text style={{ color: '#fff', fontSize: 13, flex: 1 }} numberOfLines={2}>
+                  <Text style={{ color: colors.text, fontSize: 13, flex: 1 }} numberOfLines={2}>
                     {pinned}
                   </Text>
                   <Pressable onPress={() => setPinOpen(false)} hitSlop={8} accessibilityLabel="Duyuruyu gizle">
@@ -107,7 +109,7 @@ export function GroupChat({
                 <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${room.id}`)} accessibilityLabel="Grup odası">
                   <Photo uri={room.cover} kind="cover" seed={room.id} style={{ width: 40, height: 40, borderRadius: 8 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '800' }} numberOfLines={1}>
+                    <Text style={{ color: colors.text, fontWeight: '800' }} numberOfLines={1}>
                       {room.password ? '🔒 ' : ''}
                       {room.title}
                     </Text>
@@ -144,7 +146,7 @@ export function GroupChat({
                 <Pressable key={a.key} style={styles.quick} onPress={a.onPress} accessibilityLabel={a.label}>
                   {a.tag && <Text style={styles.quickTag}>{a.tag}</Text>}
                   {a.art ? <Art name={a.art} size={19} /> : <Text style={{ fontSize: 15 }}>{a.emoji}</Text>}
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{a.label}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>{a.label}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -180,13 +182,15 @@ export function GroupChat({
 }
 
 function Message({ item }: { item: GroupMsg }) {
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   if (item.system)
     return (
       <View style={styles.system}>
         <Text style={styles.systemText}>{item.text}</Text>
         {item.actionLabel && item.actionHref && (
           <Pressable onPress={() => router.push(item.actionHref as Href)}>
-            <Text style={{ color: '#A5F3F5', fontWeight: '800', marginTop: 4 }}>{item.actionLabel}</Text>
+            <Text style={{ color: semantic.tonalText, fontWeight: '800', marginTop: 4 }}>{item.actionLabel}</Text>
           </Pressable>
         )}
       </View>
@@ -204,20 +208,22 @@ function Message({ item }: { item: GroupMsg }) {
             <Text style={styles.name}>{u.name}</Text>
           </Pressable>
         )}
-        <MessageText text={item.text} style={{ color: '#fff' }} />
-        <Text style={styles.time}>{item.time}</Text>
+        <MessageText text={item.text} style={{ color: mine ? '#fff' : colors.text }} />
+        <Text style={[styles.time, mine && styles.timeMine]}>{item.time}</Text>
       </View>
     </View>
   );
 }
 
 function MemberRow({ u, note }: { u: User; note: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const p = presenceOf(u.id);
   return (
     <Pressable style={styles.member} onPress={() => router.push(`/kullanici/${u.id}`)}>
       <Avatar uri={u.avatar} size={38} online={u.online} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#fff', fontWeight: '600' }}>{u.name}</Text>
+        <Text style={{ color: colors.text, fontWeight: '600' }}>{u.name}</Text>
         <Text style={[styles.dim, p?.kind === 'room' && { color: colors.gold }]}>
           {p?.kind === 'room' && p.locked ? '🔒 ' : ''}
           {note}
@@ -234,30 +240,33 @@ function MemberRow({ u, note }: { u: User; note: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, marginBottom: 4 },
+const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
+  segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, marginBottom: 4, ...lift },
   segBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   segActive: { backgroundColor: colors.primary },
-  segText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  segText: { color: colors.text, fontWeight: '700', fontSize: 13 },
+  segTextOn: { color: '#fff' },
   section: { color: colors.textDim, fontWeight: '800', fontSize: 12 },
   dim: { color: colors.textDim, fontSize: 12 },
   member: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  pinBox: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(19,217,223,0.15)', borderRadius: 12, padding: 10, gap: 8 },
-  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: 'rgba(19,217,223,0.5)' },
+  pinBox: { marginHorizontal: 12, marginTop: 6, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)', borderRadius: 12, padding: 10, gap: 8 },
+  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: 10, padding: 8, borderWidth: 1, borderColor: dark ? 'rgba(19,217,223,0.5)' : 'rgba(0,117,123,0.35)' },
   strip: { gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
   chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 64 },
   chipParty: { backgroundColor: '#0FB8BE' },
   chipBusy: { backgroundColor: '#F59E0B' },
-  system: { alignSelf: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 12, maxWidth: '90%', alignItems: 'center' },
+  system: { alignSelf: 'center', backgroundColor: colors.card, borderRadius: 14, padding: 12, maxWidth: '90%', alignItems: 'center', ...lift },
   systemText: { color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  bubble: { backgroundColor: colors.cardAlt, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, maxWidth: '75%', gap: 2 },
-  name: { color: '#A5F3F5', fontWeight: '700', fontSize: 12 },
-  time: { color: 'rgba(255,255,255,0.55)', fontSize: 11, alignSelf: 'flex-end' },
-  quick: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  // Others' bubbles: the raised card color on the night background, a white card with a soft lift on paper.
+  bubble: { backgroundColor: dark ? colors.cardAlt : colors.card, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, maxWidth: '75%', gap: 2, ...lift },
+  name: { color: semantic.tonalText, fontWeight: '700', fontSize: 12 },
+  time: { color: ink(0.55), fontSize: 11, alignSelf: 'flex-end' },
+  timeMine: { color: 'rgba(255,255,255,0.55)' },
+  quick: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, ...lift },
   quickTag: { position: 'absolute', top: -9, right: 8, color: colors.gold, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, color: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, color: colors.text, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, ...lift },
   send: { backgroundColor: colors.primary, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
-});
+}));

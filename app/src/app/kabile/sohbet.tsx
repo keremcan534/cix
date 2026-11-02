@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -14,7 +14,7 @@ import { presenceOf } from '@/data/presence';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp, type GroupMsg } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 const LAST_ACTIVE = ['5 dk önce', '40 dk önce', 'Dün 21:15', '2 gün önce', '6 gün önce'];
 const CHAT_GIFTS = CHAT_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
@@ -27,6 +27,8 @@ const QUICK: QuickAction[] = [
 
 export default function KabileChat() {
   const { familyId, me, familyChat, sendFamilyMessage, familyMuted, setFamilyMuted, spendCoins } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [menu, setMenu] = useState(false);
   const [gifts, setGifts] = useState(false);
   const family = findKabile(familyId);
@@ -78,7 +80,7 @@ export default function KabileChat() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="chevron-back" size={26} color="#fff" />
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.profile)} accessibilityLabel="Tayfa profili">
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -92,7 +94,7 @@ export default function KabileChat() {
           <Text style={{ fontSize: 20 }}>💰</Text>
         </Pressable>
         <Pressable onPress={() => setMenu(true)} style={styles.iconBtn} accessibilityLabel="Menü">
-          <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+          <Ionicons name="ellipsis-vertical" size={18} color={colors.text} />
         </Pressable>
       </View>
       <GroupChat
@@ -127,12 +129,12 @@ export default function KabileChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, lift }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  headerSub: { color: '#A5F3F5', fontSize: 12, fontWeight: '600', marginTop: 1 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  headerSub: { color: semantic.tonalText, fontSize: 12, fontWeight: '600', marginTop: 1 },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...lift },
   locked: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  title: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center' },
-});
+  title: { color: colors.text, fontWeight: '700', fontSize: 16, textAlign: 'center' },
+}));

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -12,10 +12,12 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
 export default function KabileKasa() {
   const { familyId, me } = useApp();
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const p = useKabileProgress();
   useFocusEffect(useCallback(() => ensureFresh(), []));
   const family = findKabile(familyId);
@@ -56,11 +58,13 @@ export default function KabileKasa() {
               )
             }
             accessibilityLabel="Kasa kuralları">
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>?</Text>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>?</Text>
           </Pressable>
         }
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
+        {/* Brand banner: a dark amber-to-teal gradient in both schemes, so what sits on it keeps the dark look. */}
+        <ThemeScope scheme="dark">
         <LinearGradient colors={['#78350F', '#0B3B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <StateIcon name="wallet-outline" size={72} tone="money" />
           <View style={{ flex: 1, gap: 6 }}>
@@ -79,10 +83,11 @@ export default function KabileKasa() {
             </View>
           </View>
           <View style={styles.mine}>
-            <Text style={styles.dim}>Benim Katkım</Text>
+            <Text style={[styles.dim, styles.heroDim]}>Benim Katkım</Text>
             <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{fmt(p.myPower)} puan</Text>
           </View>
         </LinearGradient>
+        </ThemeScope>
 
         <Card style={{ gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -105,8 +110,8 @@ export default function KabileKasa() {
               <Pressable key={r.id} style={[styles.row, { paddingVertical: 5 }]} onPress={() => r.id !== 'me' && router.push(`/kullanici/${r.id}`)}>
                 <Text style={[styles.rank, i < 3 && { color: colors.gold }]}>{i + 1}</Text>
                 <Avatar uri={u.avatar} size={34} />
-                <Text style={{ color: '#fff', flex: 1 }}>{r.id === 'me' ? youLabel(me.name) : u.name}</Text>
-                <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>{fmt(r.power)} puan</Text>
+                <Text style={{ color: colors.text, flex: 1 }}>{r.id === 'me' ? youLabel(me.name) : u.name}</Text>
+                <Text style={{ color: semantic.tonalText, fontWeight: '800' }}>{fmt(r.power)} puan</Text>
               </Pressable>
             );
           })}
@@ -138,32 +143,36 @@ export default function KabileKasa() {
 }
 
 function HistoryRow({ avatar, name, text, power, treasure, time }: { avatar: string; name: string; text: string; power: number; treasure: number; time: string }) {
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   return (
     <View style={[styles.row, { paddingVertical: 6 }]}>
       <Avatar uri={avatar} size={30} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#fff', fontSize: 13 }} numberOfLines={1}>
+        <Text style={{ color: colors.text, fontSize: 13 }} numberOfLines={1}>
           <Text style={{ fontWeight: '700' }}>{name}</Text> · {text}
         </Text>
         <Text style={styles.dim}>{time}</Text>
       </View>
-      <Text style={{ color: '#A5F3F5', fontWeight: '700', fontSize: 12 }}>
+      <Text style={{ color: semantic.tonalText, fontWeight: '700', fontSize: 12 }}>
         +{power} puan · 🔮+{treasure}
       </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
-  title: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  title: { color: colors.text, fontWeight: '800', fontSize: 16 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rank: { color: colors.textDim, fontWeight: '800', width: 20 },
   hero: { borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // The banner stays dark in both schemes: its type keeps the dark scheme's colors.
   heroText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  heroDim: { color: '#A3B1CF' },
   bar: { height: 18, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 9, overflow: 'hidden', justifyContent: 'center' },
   barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.primary, borderRadius: 9 },
   barText: { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   mine: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
-});
+}));

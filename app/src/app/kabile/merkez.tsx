@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -30,13 +30,15 @@ import {
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type Counters = { roomMinutes: number; giftsSent: number; spentTotal: number };
 const CHECKIN = KABILE_TASKS.find((t) => t.source === 'checkIn') ?? KABILE_TASKS[0];
 
 export default function KabileMerkez() {
   const { familyId, me, stats, spentTotal, addCoins } = useApp();
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const p = useKabileProgress();
   useFocusEffect(useCallback(() => ensureFresh(), []));
   const family = findKabile(familyId);
@@ -129,7 +131,7 @@ export default function KabileMerkez() {
               <Text style={styles.small}>
                 {tl.next ? `Seviye ${tl.lvl + 1} altın sandığının kilidini açmak için 🔮 ${fmt(tl.next - treasure)} sandık puanı daha kazanın` : 'Sandık en yüksek seviyede'}
               </Text>
-              <View style={styles.bar}>
+              <View style={[styles.bar, styles.barHero]}>
                 <View style={[styles.barFill, { width: `${tl.next ? Math.min(100, Math.round((treasure / tl.next) * 100)) : 100}%` }]} />
               </View>
               <Text style={styles.small}>Toplam katkı puanı {fmt(totalPower)}</Text>
@@ -141,12 +143,12 @@ export default function KabileMerkez() {
           <View style={styles.row}>
             <StateIcon name="shield-checkmark-outline" />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: '#A5F3F5', fontWeight: '600' }}>Tayfanın haftalık katkı puanı</Text>
+              <Text style={{ color: semantic.tonalText, fontWeight: '600' }}>Tayfanın haftalık katkı puanı</Text>
               <Text style={styles.bigPower}>{fmtK(weekly)}</Text>
             </View>
             <View style={styles.mineBox}>
               <Text style={styles.dim}>Katkım</Text>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{fmt(p.myPower)}</Text>
+              <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>{fmt(p.myPower)}</Text>
             </View>
           </View>
           <View style={styles.chests}>
@@ -162,7 +164,7 @@ export default function KabileMerkez() {
                     {chestRewardText(c.reward)}
                   </Text>
                   <View style={[styles.alBtn, !ready && { backgroundColor: colors.cardAlt }, claimed && { backgroundColor: colors.border }]}>
-                    {claimed || ready ? <Text style={styles.btnText}>{claimed ? 'Alındı' : 'Al'}</Text> : <Ionicons name="lock-closed" size={14} color={colors.textDim} accessibilityLabel="Kilitli" />}
+                    {claimed || ready ? <Text style={[styles.btnText, claimed && styles.btnTextOff]}>{claimed ? 'Alındı' : 'Al'}</Text> : <Ionicons name="lock-closed" size={14} color={colors.textDim} accessibilityLabel="Kilitli" />}
                   </View>
                 </Pressable>
               );
@@ -179,7 +181,7 @@ export default function KabileMerkez() {
               <Text style={{ color: colors.green, fontWeight: '700' }}>{contrib.cur.name}</Text>
             </View>
             <View style={styles.bar}>
-              <View style={[styles.barFill, { backgroundColor: colors.green, width: `${contrib.next ? Math.round(((p.myPower - contrib.cur.min) / (contrib.next.min - contrib.cur.min)) * 100) : 100}%` }]} />
+              <View style={[styles.barFill, { backgroundColor: semantic.success, width: `${contrib.next ? Math.round(((p.myPower - contrib.cur.min) / (contrib.next.min - contrib.cur.min)) * 100) : 100}%` }]} />
             </View>
             <Text style={styles.dim}>{contrib.next ? `Lv.${contrib.next.lv} ${contrib.next.name} için ${contrib.next.min - p.myPower} katkı puanı daha` : 'En yüksek katkı seviyesi'}</Text>
           </View>
@@ -198,6 +200,8 @@ export default function KabileMerkez() {
 }
 
 function TaskRow({ task, p, counters, onGo, onClaim, meAvatar }: { task: KabileTask; p: KabileProgress; counters: Counters; onGo: () => void; onClaim: () => void; meAvatar: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const prog = taskProgress(task, p, counters);
   const measured = task.source === 'roomMinutes' || task.source === 'giftsSent' || task.source === 'roomGiftCoins';
   const waiting = measured && p.baselines[task.source] === undefined;
@@ -231,7 +235,7 @@ function TaskRow({ task, p, counters, onGo, onClaim, meAvatar }: { task: KabileT
           onPress={prog.claimable ? onClaim : onGo}
           style={[styles.taskBtn, prog.claimable && { backgroundColor: colors.primary }, prog.claimed && { backgroundColor: colors.border }]}
           accessibilityLabel={`${task.title}: ${label}`}>
-          <Text style={styles.btnText}>{label}</Text>
+          <Text style={[styles.btnText, prog.claimed && styles.btnTextOff]}>{label}</Text>
         </Pressable>
       </View>
       <View style={styles.doneRow}>
@@ -246,37 +250,50 @@ function TaskRow({ task, p, counters, onGo, onClaim, meAvatar }: { task: KabileT
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
-  title: { color: '#fff', fontWeight: '800', fontSize: 17 },
+  title: { color: colors.text, fontWeight: '800', fontSize: 17 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
+  // Treasury banner text: the banner is a dark brand gradient in both schemes.
   small: { color: '#fff', fontSize: 12, lineHeight: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pill: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   treasury: { borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  treasureBadge: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.gold },
-  treasureLabel: { color: colors.gold, fontSize: 12, fontWeight: '800' },
+  treasureBadge: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: semantic.money },
+  treasureLabel: { color: semantic.money, fontSize: 12, fontWeight: '800' },
   treasureValue: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  bar: { height: 8, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 4, overflow: 'hidden' },
+  bar: { height: 8, backgroundColor: ink(0.12), borderRadius: 4, overflow: 'hidden' },
+  barHero: { backgroundColor: 'rgba(255,255,255,0.12)' },
   barFill: { height: 8, backgroundColor: colors.primary, borderRadius: 4 },
-  bigPower: { color: '#fff', fontSize: 26, fontWeight: '900' },
+  bigPower: { color: colors.text, fontSize: 26, fontWeight: '900' },
   mineBox: { backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
   chests: { flexDirection: 'row', gap: 8 },
   chest: { flex: 1, alignItems: 'center', backgroundColor: colors.cardAlt, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4, gap: 4 },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border },
-  chestNeed: { color: '#A5F3F5', fontSize: 12, fontWeight: '800' },
+  chestNeed: { color: semantic.tonalText, fontSize: 12, fontWeight: '800' },
   chestReward: { color: colors.textDim, fontSize: 11, textAlign: 'center', minHeight: 26 },
   alBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5, minWidth: 54, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  lvChip: { color: '#fff', fontWeight: '800', fontSize: 12, backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  // A claimed button sits on the border color, which is pale in the light scheme.
+  btnTextOff: { color: dark ? '#fff' : colors.textDim },
+  lvChip: {
+    color: dark ? '#fff' : colors.text,
+    fontWeight: '800',
+    fontSize: 12,
+    backgroundColor: dark ? '#334155' : colors.cardAlt,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
   task: { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 12, gap: 8, marginTop: 6 },
-  taskIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(19,217,223,0.2)', alignItems: 'center', justifyContent: 'center' },
-  taskTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  reward: { color: '#A5F3F5', fontWeight: '700', fontSize: 13 },
-  rateText: { color: '#A5F3F5', fontSize: 12, lineHeight: 17 },
+  taskIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: dark ? 'rgba(19,217,223,0.2)' : 'rgba(0,140,148,0.12)', alignItems: 'center', justifyContent: 'center' },
+  taskTitle: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  reward: { color: semantic.tonalText, fontWeight: '700', fontSize: 13 },
+  rateText: { color: semantic.tonalText, fontSize: 12, lineHeight: 17 },
   hint: { color: colors.textDim, fontSize: 12, fontStyle: 'italic' },
   taskBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minWidth: 74, alignItems: 'center' },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
   doneCount: { color: colors.textDim, fontWeight: '800', fontSize: 12, marginLeft: 4 },
-});
+}));
