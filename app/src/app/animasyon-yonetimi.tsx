@@ -2,7 +2,7 @@
 // an app update, because rooms read the catalog live (lib/animations). Going live needs an approved
 // licence; price, activity and licence changes are written to the audit log.
 import { useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -15,13 +15,14 @@ import { resolve } from '@/data/rbac';
 import { showAlert } from '@/lib/alert';
 import { addAnimation, importItem, isLive, listProvider, setBusOnline, setProviderOnline, updateAnimation, useAnimations, type ProviderItem } from '@/lib/animations';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
 type Tab = 'catalog' | 'providers' | 'new' | 'audit';
 const LICENSE_LABEL: Record<LicenseStatus, string> = { approved: 'Onaylı', pending: 'Beklemede', rejected: 'Uygun değil', expired: 'Süresi dolmuş' };
 const ICONS: Icon3DName[] = ['heart', 'crown', 'coin', 'diamond', 'gift', 'trophy', 'mic', 'bolt'];
 
 function Chips<T extends string | number>({ value, options, onChange, icons }: { value: T; options: [T, string][]; onChange: (v: T) => void; icons?: Record<string, number> }) {
+  const s = useStyles();
   return (
     <View style={s.chips}>
       {options.map(([v, l]) => (
@@ -42,6 +43,8 @@ export default function AnimationAdmin() {
   const [open, setOpen] = useState<string | null>(null);
   const [preview, setPreview] = useState<Animation | null>(null);
   const can = resolve(rbac, 'me', 'animations.manage', { type: 'platform' });
+  const { colors } = useTheme();
+  const s = useStyles();
 
   if (!can.allowed)
     return (
@@ -154,7 +157,10 @@ export default function AnimationAdmin() {
           ))}
       </ScrollView>
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
-        <PreviewStage anim={preview} onClose={() => setPreview(null)} />
+        {/* The stage stands in for a room, and rooms are dark in both schemes. */}
+        <ThemeScope scheme="dark">
+          <PreviewStage anim={preview} onClose={() => setPreview(null)} />
+        </ThemeScope>
       </Modal>
     </SafeAreaView>
   );
@@ -162,6 +168,7 @@ export default function AnimationAdmin() {
 
 function PriceInput({ value, onSave }: { value: number; onSave: (n: number) => void }) {
   const [text, setText] = useState(String(value));
+  const s = useStyles();
   return (
     <View style={s.row}>
       <Text style={s.label}>Jeton fiyatı</Text>
@@ -176,6 +183,7 @@ function PriceInput({ value, onSave }: { value: number; onSave: (n: number) => v
 function PreviewStage({ anim, onClose }: { anim: Animation | null; onClose: () => void }) {
   const screen = useWindowDimensions();
   const [run, setRun] = useState(0);
+  const s = useStyles();
   if (!anim) return null;
   const origin = { x: screen.width / 2, y: screen.height * 0.7 };
   return (
@@ -192,6 +200,7 @@ function ProviderCard({ id }: { id: string }) {
   const p = providers.find((x) => x.id === id)!;
   const [items, setItems] = useState<ProviderItem[] | null>(null);
   const [msg, setMsg] = useState('');
+  const s = useStyles();
   const fetchItems = () => {
     const r = listProvider(id);
     if (r.ok) {
@@ -261,6 +270,8 @@ function NewForm({ onCreated }: { onCreated: () => void }) {
   const [category, setCategory] = useState('cute');
   const [free, setFree] = useState(true);
   const [price, setPrice] = useState('100');
+  const { colors } = useTheme();
+  const s = useStyles();
   const asset = (kind === 'icon' ? { kind, value: value as Icon3DName } : kind === 'art' ? { kind, value: value as AnimArtName } : { kind, value }) as Asset;
   const create = () => {
     if (!name.trim()) return showAlert('Ad gerekli');
@@ -335,8 +346,9 @@ function NewForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-const s = StyleSheet.create({
-  title: { color: '#fff', fontWeight: '800', fontSize: 15 },
+// stage, seat and stageText are read inside the preview's dark ThemeScope, so they always get the dark values.
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
+  title: { color: colors.text, fontWeight: '800', fontSize: 15 },
   label: { color: colors.text, fontSize: 13, flex: 1 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   warn: { color: colors.gold, fontSize: 12, lineHeight: 17 },
@@ -344,16 +356,16 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
-  chipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.15)' },
+  chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipIcon: { width: 18, height: 18 },
   small: { borderRadius: 999, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start' },
   btn: { backgroundColor: semantic.action, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   btnText: { color: semantic.actionInk, fontWeight: '900' },
-  input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, width: 90 },
-  inputWide: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, width: 90 },
+  inputWide: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   stage: { flex: 1, backgroundColor: 'rgba(8,15,30,0.92)' },
   seat: { position: 'absolute', width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.card },
   stageText: { position: 'absolute', bottom: 40, left: 0, right: 0, textAlign: 'center', color: colors.textDim },
-});
+}));

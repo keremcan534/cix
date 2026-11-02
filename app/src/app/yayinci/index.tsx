@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -16,7 +16,7 @@ import { showAlert } from '@/lib/alert';
 import { IS_DEMO } from '@/lib/build';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
-import { colors, gradient, gradientDeep } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Bugün'];
@@ -32,6 +32,8 @@ const EARNING_ART: Partial<Record<string, ArtName>> = { Hediye: 'finans-hediyele
 
 export default function HostCenter() {
   const { isHost, becomeHost, me } = useApp();
+  const { colors, gradientDeep } = useTheme();
+  const styles = useStyles();
 
   if (!isHost) {
     return (
@@ -94,6 +96,8 @@ function Dashboard() {
   const max = Math.max(...weekly, 1);
   const weekTotal = weekly.reduce((a, b) => a + b, 0);
   const agency = AGENCIES.find((a) => a.id === agencyId);
+  const { colors, semantic, gradient } = useTheme();
+  const styles = useStyles();
 
   const exchange = () =>
     // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
@@ -124,11 +128,11 @@ function Dashboard() {
 
         <View style={[styles.affil, { borderColor: agency ? colors.green : colors.gold }]}>
           {agency ? (
-            <Text style={{ color: '#fff', fontWeight: '800' }}>{`🏢 Ajans: ${agency.name}`}</Text>
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{`🏢 Ajans: ${agency.name}`}</Text>
           ) : (
             <View style={styles.titleRow}>
               <Art name="finans-ajanssiz-yayinci" size={20} />
-              <Text style={{ color: '#fff', fontWeight: '800' }}>Ajanssız yayıncı</Text>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>Ajanssız yayıncı</Text>
             </View>
           )}
           <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
@@ -159,13 +163,13 @@ function Dashboard() {
         <Card style={{ gap: 12 }}>
           <View style={styles.rowBetween}>
             <Text style={styles.cardTitle}>Bu hafta</Text>
-            <Text style={{ color: '#7DD3FC', fontWeight: '700' }}>💎 {weekTotal.toLocaleString('tr-TR')}</Text>
+            <Text style={{ color: semantic.diamondText, fontWeight: '700' }}>💎 {weekTotal.toLocaleString('tr-TR')}</Text>
           </View>
           <View style={styles.chart}>
             {weekly.map((v, i) => (
               <View key={i} style={styles.barCol}>
                 <Text style={styles.barValue}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</Text>
-                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: colors.primaryText }]} />
+                <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: semantic.action }]} />
                 <Text style={styles.barLabel}>{DAYS[i]}</Text>
               </View>
             ))}
@@ -198,12 +202,12 @@ function Dashboard() {
             earnings.slice(0, 15).map((e) => (
               <View key={e.id} style={styles.earning}>
                 {EARNING_ART[e.source] ? <Art name={EARNING_ART[e.source]!} size={23} /> : <Text style={{ fontSize: 18 }}>⭐</Text>}
-                <Text style={{ color: '#fff', flex: 1 }}>
+                <Text style={{ color: colors.text, flex: 1 }}>
                   {e.source}
                   {e.fromId ? ` · ${userById(e.fromId).name}` : ''}
                 </Text>
                 <Text style={styles.dim}>{e.time}</Text>
-                <Text style={{ color: '#7DD3FC', fontWeight: '700', width: 70, textAlign: 'right' }}>+{e.amount}</Text>
+                <Text style={{ color: semantic.diamondText, fontWeight: '700', width: 70, textAlign: 'right' }}>+{e.amount}</Text>
               </View>
             ))
           )}
@@ -217,6 +221,8 @@ function Dashboard() {
 
 function Analytics() {
   const { earnings, agencyId, weekly } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const sum = (src: string) => earnings.filter((e) => e.source === src).reduce((x, e) => x + e.amount, 0);
   const gifts = sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0);
   const ownerBonus = sum('Oda sahibi bonusu');
@@ -252,7 +258,7 @@ function Analytics() {
         {metrics.map(([l, v]) => (
           <View key={l} style={styles.metric}>
             <Text style={styles.dim}>{l}</Text>
-            <Text style={{ color: '#fff', fontWeight: '800' }}>{v}</Text>
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{v}</Text>
           </View>
         ))}
       </View>
@@ -271,30 +277,35 @@ function Analytics() {
 }
 
 function Line({ label, value, bold, dim }: { label: string; value: string; bold?: boolean; dim?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.rowBetween}>
-      <Text style={[styles.dim, bold && { color: '#fff', fontWeight: '800' }]}>{label}</Text>
-      <Text style={{ color: dim ? colors.textDim : bold ? colors.green : '#fff', fontWeight: bold ? '800' : '600' }}>{value}</Text>
+      <Text style={[styles.dim, bold && { color: colors.text, fontWeight: '800' }]}>{label}</Text>
+      <Text style={{ color: dim ? colors.textDim : bold ? colors.green : colors.text, fontWeight: bold ? '800' : '600' }}>{value}</Text>
     </View>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Card style={{ flex: 1, gap: 4 }}>
       <Text style={styles.dim}>{label}</Text>
-      <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>{value}</Text>
+      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>{value}</Text>
     </Card>
   );
 }
 
-const styles = StyleSheet.create({
+// The hero and balance cards are colored gradients in both schemes, so the white on them stays.
+const useStyles = makeStyles(({ colors, lift }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   hero: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 8 },
   heroTitle: { color: '#fff', fontSize: 22, fontWeight: '800', textAlign: 'center' },
   heroText: { color: 'rgba(255,255,255,0.9)', textAlign: 'center' },
   perk: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  perkTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  perkTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 13 },
   balance: { borderRadius: 20, padding: 20, gap: 2 },
   balanceLabel: { color: 'rgba(255,255,255,0.85)' },
@@ -302,7 +313,7 @@ const styles = StyleSheet.create({
   balanceBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingVertical: 10 },
   balanceBtnText: { color: '#fff', fontWeight: '700' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  cardTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   track: { height: 8, borderRadius: 4, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4 },
@@ -313,5 +324,6 @@ const styles = StyleSheet.create({
   barLabel: { color: colors.textDim, fontSize: 11 },
   metric: { flexBasis: '30%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 8, gap: 2 },
   earning: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  affil: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1 },
-});
+  // The colored rim (green with an agency, gold without) replaces lift's hairline; its shadow stays.
+  affil: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, ...lift, borderWidth: 1 },
+}));
