@@ -86,9 +86,20 @@ export const PACK_BY_PRODUCT = new Map(PACKS.map((p) => [p.productId, p]));
  * best pack, no fee, coins rounded down. The same sum as app/src/lib/coins-bank.ts exchangeOwnDiamonds with
  * the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift.
  */
-export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 49.8, minDiamonds: 100 };
+export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 49.8, minDiamonds: 100, bankFee: 0.03, wholesaleFee: 0.02 };
 const BEST = PACKS.at(-1);
-export const exchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * (BEST.coins / BEST.tl)));
+const COINS_PER_TL = BEST.coins / BEST.tl;
+export const exchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * COINS_PER_TL));
+
+/** What diamonds are worth in TL (5.000 💎 = 1 USD at USD_TRY): what a Jeton Noktası pays a host for them. */
+export const diamondValueTl = (diamonds) => Math.round((diamonds / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * 100) / 100;
+/**
+ * A host sells diamonds to a Jeton Noktası: the bank gets coins worth their value plus its fee (3 %), rounded
+ * down. Same sum as app/src/lib/coins-bank.ts convertDiamonds.
+ */
+export const bankExchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * COINS_PER_TL * (1 + EXCHANGE.bankFee)));
+/** What a Jeton Noktası pays management for coins: the best pack's price minus its fee (2 %). app wholesaleQuote. */
+export const wholesaleTl = (coins) => Math.round((coins / COINS_PER_TL) * (1 - EXCHANGE.wholesaleFee) * 100) / 100;
 
 /** SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point). */
 export const SVIP_XP = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
