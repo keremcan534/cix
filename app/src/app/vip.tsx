@@ -11,7 +11,7 @@ import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { openLegal } from '@/lib/legal';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Art } from '@/components/Art';
@@ -19,18 +19,25 @@ import { Avatar, LevelChips } from '@/components/ui';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
+/** The champagne gold as text on the screen or a card: GOLD on the night screen, dark gold on light cards. */
+const useGold = () => {
+  const { dark, colors } = useTheme();
+  return dark ? GOLD : colors.gold;
+};
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const short = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}k` : String(n));
 
 export default function PrivilegeCenter() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<Tab>(params.tab === 'vip' || params.tab === 'noble' ? params.tab : 'svip');
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0B0A0F' }}>
+    <SafeAreaView style={styles.safe}>
       <Backdrop scene={SCENES.vip} />
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="chevron-back" size={26} color="#fff" />
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
         <View style={styles.segment}>
           {(
@@ -46,7 +53,7 @@ export default function PrivilegeCenter() {
           ))}
         </View>
         <Pressable onPress={() => showAlert('Ayrıcalıklar', 'İnci: yüklediğin her jeton 1 puan, seviyen hiç düşmez.\nVIP: 7 günlük, 1 aylık ya da 3 aylık abonelik.\nRütbe: jetonla alınır, 30 gün geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
-          <Ionicons name="help-circle-outline" size={26} color="#fff" />
+          <Ionicons name="help-circle-outline" size={26} color={colors.text} />
         </Pressable>
       </View>
       {tab === 'svip' ? <Svip /> : tab === 'vip' ? <Vip /> : <Noble />}
@@ -56,6 +63,7 @@ export default function PrivilegeCenter() {
 
 function Svip() {
   const { svipXp, svipLevel } = useApp();
+  const styles = useStyles();
   const { width } = useWindowDimensions();
   const cardW = Math.min(width, 520) - 48;
   const [index, setIndex] = useState(Math.max(0, svipLevel - 1));
@@ -174,6 +182,11 @@ function Svip() {
 
 function Vip() {
   const { vipDays, buyVipPlan, me, wealthLevel, charmLevel, settings, setSetting } = useApp();
+  const { colors, ink, dark } = useTheme();
+  const styles = useStyles();
+  const gold = useGold();
+  // Plan prices that are not selected: zinc on the night screen, slate on white cards.
+  const soft = dark ? '#D4D4D8' : '#33425A';
   const [plan, setPlan] = useState(VIP_PLANS[1].days);
   const [perkPage, setPerkPage] = useState(0);
   const [pageW, setPageW] = useState(0);
@@ -197,13 +210,13 @@ function Vip() {
   const pages = Array.from({ length: perkPages }, (_, i) => VIP_PERKS.slice(i * 4, i * 4 + 4));
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-      {vipDays > 0 && <Text style={[styles.cardText, { color: GOLD, textAlign: 'center' }]}>👑 VIP aktif · {vipDays} gün kaldı</Text>}
+      {vipDays > 0 && <Text style={[styles.cardText, { color: gold, textAlign: 'center' }]}>👑 VIP aktif · {vipDays} gün kaldı</Text>}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
         {VIP_PLANS.map((x) => (
-          <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && { borderColor: GOLD }]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
+          <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && styles.planOn]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
             <Text style={styles.planTag}>%{x.save} daha uygun</Text>
             <Text style={{ color: colors.textDim, fontSize: 15, marginTop: 10 }}>{x.label}</Text>
-            <Text style={{ color: plan === x.days ? '#fff' : '#D4D4D8', fontWeight: '900', fontSize: 26 }}>
+            <Text style={{ color: plan === x.days ? colors.text : soft, fontWeight: '900', fontSize: 26 }}>
               <Text style={{ fontSize: 11, fontWeight: '600' }}>TRY</Text>
               {fmt(x.tl)}
             </Text>
@@ -226,10 +239,10 @@ function Vip() {
               {page.map((r) => (
                 <View key={r.name} style={styles.perk}>
                   <View style={styles.perkIcon}>
-                    <Ionicons name={r.icon as keyof typeof Ionicons.glyphMap} size={22} color={GOLD} />
+                    <Ionicons name={r.icon as keyof typeof Ionicons.glyphMap} size={22} color={gold} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: GOLD, fontSize: 14, fontWeight: '700' }} numberOfLines={2}>
+                    <Text style={{ color: gold, fontSize: 14, fontWeight: '700' }} numberOfLines={2}>
                       {r.name}
                     </Text>
                     <Text style={{ color: colors.textDim, fontSize: 11, lineHeight: 15 }} numberOfLines={3}>
@@ -243,8 +256,8 @@ function Vip() {
         </ScrollView>
         <Dots count={perkPages} index={perkPage} />
         <View style={styles.giftBox}>
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
-            Hoş Geldin Kutusu <Text style={{ color: GOLD }}>({VIP_GIFT_PACK.length})</Text>
+          <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>
+            Hoş Geldin Kutusu <Text style={{ color: gold }}>({VIP_GIFT_PACK.length})</Text>
           </Text>
           {/* Two per row, so nothing hides off the card's edge. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 12 }}>
@@ -252,7 +265,7 @@ function Vip() {
               <View key={g.name} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 8 }}>
                 <Art name={g.art} size={40} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: GOLD, fontWeight: '700' }} numberOfLines={2}>
+                  <Text style={{ color: gold, fontWeight: '700' }} numberOfLines={2}>
                     {g.name}
                   </Text>
                   <Text style={{ color: colors.textDim, fontSize: 12 }}>{`${g.days} gün · ${g.qty} adet`}</Text>
@@ -268,7 +281,7 @@ function Vip() {
         <View style={styles.tr}>
           <Text style={[styles.th, { flex: 1.1 }]}>Ayrıcalıklar</Text>
           <Text style={[styles.th, styles.mid]}>VIP olmayan</Text>
-          <Text style={[styles.th, styles.vipCol, { color: GOLD, fontSize: 20, fontStyle: 'italic', fontWeight: '900' }]}>VIP</Text>
+          <Text style={[styles.th, styles.vipCol, { color: gold, fontSize: 20, fontStyle: 'italic', fontWeight: '900' }]}>VIP</Text>
         </View>
         {VIP_COMPARE.map(([name, free, vip]) => (
           <View key={name} style={styles.tr}>
@@ -280,12 +293,12 @@ function Vip() {
       </View>
 
       <View style={styles.box}>
-        <Text style={[styles.rightsTitle, { color: '#fff', marginVertical: 4 }]}>
-          <Text style={{ color: GOLD }}>◆ </Text>Seviyeyi Gizle<Text style={{ color: GOLD }}> ◆</Text>
+        <Text style={[styles.rightsTitle, { color: colors.text, marginVertical: 4 }]}>
+          <Text style={{ color: gold }}>◆ </Text>Seviyeyi Gizle<Text style={{ color: gold }}> ◆</Text>
         </Text>
         <View style={{ alignItems: 'center', gap: 8 }}>
           <Avatar uri={me.avatar} size={76} />
-          <Text style={{ color: GOLD, fontWeight: '800', fontSize: 17 }}>{me.name}</Text>
+          <Text style={{ color: gold, fontWeight: '800', fontSize: 17 }}>{me.name}</Text>
           <LevelChips wealth={wealthLevel} charm={charmLevel} hideWealth={vipDays > 0 && settings.hideWealth} hideCharm={vipDays > 0 && settings.hideCharm} />
         </View>
         <View style={styles.toggles}>
@@ -295,7 +308,7 @@ function Vip() {
               ['hideCharm', 'Yankı seviyesini gizle'],
             ] as const
           ).map(([k, l], i) => (
-            <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' }]}>
+            <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ink(0.1) }]}>
               <Text style={{ color: colors.textDim, fontSize: 15, flex: 1 }}>{l}</Text>
               <Switch value={vipDays > 0 && settings[k]} onValueChange={(v) => toggleHide(k, v)} trackColor={{ true: '#E8B979' }} thumbColor="#fff" accessibilityLabel={l} />
             </View>
@@ -322,16 +335,20 @@ function Vip() {
 }
 
 function CompareCell({ value, style, vip }: { value: string | boolean; style: object; vip?: boolean }) {
+  const { dark } = useTheme();
+  const styles = useStyles();
+  const gold = useGold();
   if (typeof value === 'boolean')
     return (
       <View style={[styles.tdBox, style]}>
-        <Ionicons name={value ? 'checkmark-sharp' : 'close-sharp'} size={26} color={value ? '#F5B94A' : '#D4D4D8'} accessibilityLabel={value ? 'Var' : 'Yok'} />
+        <Ionicons name={value ? 'checkmark-sharp' : 'close-sharp'} size={26} color={value ? (dark ? '#F5B94A' : '#C98A1E') : dark ? '#D4D4D8' : '#8A96A8'} accessibilityLabel={value ? 'Var' : 'Yok'} />
       </View>
     );
-  return <Text style={[styles.td, style, vip && { color: GOLD, fontWeight: '700' }]}>{value}</Text>;
+  return <Text style={[styles.td, style, vip && { color: gold, fontWeight: '700' }]}>{value}</Text>;
 }
 
 function BuyButton({ onPress }: { onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} accessibilityRole="button">
       <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.buyBtn}>
@@ -342,10 +359,11 @@ function BuyButton({ onPress }: { onPress: () => void }) {
 }
 
 function Dots({ count, index }: { count: number; index: number }) {
+  const { ink, dark } = useTheme();
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: 14 }}>
       {Array.from({ length: count }, (_, i) => (
-        <View key={i} style={{ width: i === index ? 28 : 14, height: 4, borderRadius: 2, backgroundColor: i === index ? '#D4D4D8' : 'rgba(255,255,255,0.15)' }} />
+        <View key={i} style={{ width: i === index ? 28 : 14, height: 4, borderRadius: 2, backgroundColor: i === index ? (dark ? '#D4D4D8' : '#8A96A8') : ink(0.15) }} />
       ))}
     </View>
   );
@@ -353,6 +371,9 @@ function Dots({ count, index }: { count: number; index: number }) {
 
 function Noble() {
   const { nobleTier, nobleDays, buyNoble, coins } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const gold = useGold();
   const [sel, setSel] = useState(Math.max(1, nobleTier));
   const t = NOBLE_TIERS[sel - 1];
   const owned = nobleTier >= sel;
@@ -368,7 +389,7 @@ function Noble() {
     ]);
   };
   return (
-    <View style={{ flex: 1, backgroundColor: '#0F2A30' }}>
+    <View style={styles.noble}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.nobleTabs}>
           {NOBLE_TIERS.map((x) => (
@@ -381,9 +402,9 @@ function Noble() {
           <LinearGradient colors={t.colors} style={styles.emblem}>
             {t.art ? <Art name={t.art} size={112} /> : <Text style={{ fontSize: 86 }}>{t.emoji}</Text>}
           </LinearGradient>
-          {owned && <Text style={[styles.cardText, { color: GOLD, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
+          {owned && <Text style={[styles.cardText, { color: gold, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
         </View>
-        <Text style={[styles.rightsTitle, { color: GOLD }]}>
+        <Text style={[styles.rightsTitle, { color: gold }]}>
           Rütbe hakları {t.rights}/{NOBLE_RIGHTS.length}
         </Text>
         <View style={styles.grid}>
@@ -398,7 +419,7 @@ function Noble() {
                   showAlert(r.name, on ? `${t.name} ile kullanabilirsin.` : need ? `${need.name} rütbesiyle açılır.` : '');
                 }}>
                 <View>{r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}</View>
-                <Text style={[styles.rightName, { color: GOLD }]} numberOfLines={2}>
+                <Text style={[styles.rightName, { color: gold }]} numberOfLines={2}>
                   {r.name}
                 </Text>
               </Pressable>
@@ -408,7 +429,7 @@ function Noble() {
       </ScrollView>
       <View style={styles.bottomBar}>
         {owned && <Art name={t.art} size={28} style={{ marginRight: -6 }} />}
-        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, flex: 1 }}>
+        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, flex: 1 }}>
           {owned ? `${t.name} aktif` : nobleTier > 0 ? `Yükselt: ${t.name} · 🪙 ${fmt(t.price)}` : `Kilidi açılmadı · 🪙 ${fmt(t.price)} / ${NOBLE_DAYS} gün`}
         </Text>
         {!owned && (
@@ -421,48 +442,60 @@ function Noble() {
   );
 }
 
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
-  segment: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: 3 },
-  segBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
-  segActive: { backgroundColor: GOLD },
-  segText: { color: colors.textDim, fontWeight: '800' },
-  svipCard: { borderRadius: 16, padding: 16, minHeight: 170, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  lockText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  svipTitle: { color: GOLD, fontSize: 40, fontWeight: '900', fontStyle: 'italic' },
-  cardText: { color: '#fff', fontSize: 14 },
-  track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
-  loadBtn: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#FDE7C7', borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8 },
-  rightsTitle: { color: GOLD, fontWeight: '900', fontSize: 18, textAlign: 'center', marginVertical: 18 },
-  rightsTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 18 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, rowGap: 12 },
-  rightCell: { width: '31.3%', marginHorizontal: '1%', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(245,215,161,0.35)', backgroundColor: '#15120C' },
-  rightIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E8B979', alignItems: 'center', justifyContent: 'center' },
-  rightName: { color: GOLD, fontSize: 12, textAlign: 'center', paddingHorizontal: 4 },
-  note: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, marginTop: 12 },
-  legalLink: { color: GOLD, fontWeight: '700', textDecorationLine: 'underline' },
-  h1: { color: '#fff', fontWeight: '900', fontSize: 20 },
-  table: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  th: { color: colors.textDim, padding: 12, textAlign: 'center', fontSize: 13 },
-  td: { color: '#D4D4D8', padding: 12, textAlign: 'center', fontSize: 13 },
-  tdBox: { padding: 10, alignItems: 'center', justifyContent: 'center' },
-  mid: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
-  vipCol: { flex: 1, backgroundColor: 'rgba(245,215,161,0.06)' },
-  plan: { flex: 1, alignItems: 'center', gap: 4, paddingTop: 18, paddingBottom: 14, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', backgroundColor: '#1E1C22' },
-  planTag: { position: 'absolute', top: -2, left: -2, backgroundColor: '#E5484D', color: '#fff', fontSize: 11, fontWeight: '800', borderTopLeftRadius: 12, borderBottomRightRadius: 10, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
-  buyBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
-  box: { borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#1A181E', padding: 16, gap: 12, overflow: 'hidden' },
-  perk: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 10 },
-  perkIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  giftBox: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, gap: 12 },
-  toggles: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, paddingHorizontal: 14 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-  nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
-  nobleTab: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700', paddingVertical: 6 },
-  nobleTabOn: { color: '#fff', borderBottomWidth: 3, borderBottomColor: '#fff' },
-  emblem: { width: 170, height: 170, borderRadius: 85, alignItems: 'center', justifyContent: 'center' },
-  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: '#1B1A17', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 2, borderColor: '#B8955A' },
-  alBtn: { backgroundColor: GOLD, borderRadius: 999, paddingHorizontal: 34, paddingVertical: 12 },
+// Light scheme only: the soft card shadow (the night screen's cards stand out by color).
+const LIGHT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
+
+// The privilege center keeps its warm night palette in the dark scheme. In the light one the screen, the plan cards,
+// boxes and table become white cards with dark-gold text; the İnci level cards, emblems and gold fills stay as they are.
+const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
+  const gold = dark ? GOLD : colors.gold;
+  const shadow = dark ? {} : { boxShadow: LIGHT_SHADOW };
+  return {
+    safe: { flex: 1, backgroundColor: dark ? '#0B0A0F' : colors.bg },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
+    segment: { flexDirection: 'row', backgroundColor: ink(0.08), borderRadius: 999, padding: 3 },
+    segBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
+    segActive: { backgroundColor: GOLD },
+    segText: { color: colors.textDim, fontWeight: '800' },
+    svipCard: { borderRadius: 16, padding: 16, minHeight: 170, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+    lockChip: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+    lockText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+    svipTitle: { color: GOLD, fontSize: 40, fontWeight: '900', fontStyle: 'italic' },
+    cardText: { color: '#fff', fontSize: 14 },
+    track: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
+    loadBtn: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#FDE7C7', borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8 },
+    rightsTitle: { color: gold, fontWeight: '900', fontSize: 18, textAlign: 'center', marginVertical: 18 },
+    rightsTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 18 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, rowGap: 12 },
+    rightCell: { width: '31.3%', marginHorizontal: '1%', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: dark ? 'rgba(245,215,161,0.35)' : 'rgba(183,131,46,0.28)', backgroundColor: dark ? '#15120C' : colors.card, ...shadow },
+    rightIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E8B979', alignItems: 'center', justifyContent: 'center' },
+    rightName: { color: gold, fontSize: 12, textAlign: 'center', paddingHorizontal: 4 },
+    note: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, marginTop: 12 },
+    legalLink: { color: gold, fontWeight: '700', textDecorationLine: 'underline' },
+    h1: { color: colors.text, fontWeight: '900', fontSize: 20 },
+    table: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: ink(0.1), ...(dark ? {} : { backgroundColor: colors.card, boxShadow: LIGHT_SHADOW }) },
+    tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: surface.hairline },
+    th: { color: colors.textDim, padding: 12, textAlign: 'center', fontSize: 13 },
+    td: { color: dark ? '#D4D4D8' : '#33425A', padding: 12, textAlign: 'center', fontSize: 13 },
+    tdBox: { padding: 10, alignItems: 'center', justifyContent: 'center' },
+    mid: { flex: 1, backgroundColor: surface.pressed },
+    vipCol: { flex: 1, backgroundColor: dark ? 'rgba(245,215,161,0.06)' : 'rgba(232,185,121,0.12)' },
+    plan: { flex: 1, alignItems: 'center', gap: 4, paddingTop: 18, paddingBottom: 14, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', backgroundColor: dark ? '#1E1C22' : colors.card, ...shadow },
+    planOn: { borderColor: dark ? GOLD : '#D9A24A' },
+    planTag: { position: 'absolute', top: -2, left: -2, backgroundColor: '#E5484D', color: '#fff', fontSize: 11, fontWeight: '800', borderTopLeftRadius: 12, borderBottomRightRadius: 10, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
+    buyBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
+    box: { borderRadius: 18, borderWidth: 1, borderColor: ink(0.1), backgroundColor: dark ? '#1A181E' : colors.card, padding: 16, gap: 12, overflow: 'hidden', ...shadow },
+    perk: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 10 },
+    perkIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(232,185,121,0.16)', alignItems: 'center', justifyContent: 'center' },
+    giftBox: { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'rgba(232,185,121,0.10)', borderRadius: 14, padding: 14, gap: 12 },
+    toggles: { backgroundColor: surface.pressed, borderRadius: 14, paddingHorizontal: 14 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+    noble: { flex: 1, backgroundColor: dark ? '#0F2A30' : '#E6F2F2' },
+    nobleTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10 },
+    nobleTab: { color: ink(0.5), fontSize: 16, fontWeight: '700', paddingVertical: 6 },
+    nobleTabOn: { color: colors.text, borderBottomWidth: 3, borderBottomColor: colors.text },
+    emblem: { width: 170, height: 170, borderRadius: 85, alignItems: 'center', justifyContent: 'center' },
+    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: dark ? '#1B1A17' : colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 2, borderColor: '#B8955A', ...(dark ? {} : { boxShadow: '0 -4px 16px rgba(16,36,64,0.08)' }) },
+    alBtn: { backgroundColor: GOLD, borderRadius: 999, paddingHorizontal: 34, paddingVertical: 12 },
+  };
 });

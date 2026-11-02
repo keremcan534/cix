@@ -8,7 +8,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -50,7 +50,7 @@ import {
   type Scope,
 } from '@/lib/bank';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art, type ArtName } from '@/components/Art';
 
@@ -67,14 +67,15 @@ const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 const dia = (n: number) => `${fmt(n)} 💎`;
 const sumD = (xs: { diamonds: number }[]) => xs.reduce((s, x) => s + x.diamonds, 0);
 
-const STATUS_COLOR: Record<string, string> = {
+// Status as badge text and outline on a card, in the active scheme.
+const statusColors = ({ colors, dark }: Theme): Record<string, string> => ({
   'Manuel inceleme': colors.gold,
-  Onaylandı: '#38BDF8',
+  Onaylandı: dark ? '#38BDF8' : '#0369A1',
   Ödendi: colors.green,
   Başarısız: colors.red,
   Reddedildi: colors.red,
   Bekliyor: colors.gold,
-  Kesinleşti: '#38BDF8',
+  Kesinleşti: dark ? '#38BDF8' : '#0369A1',
   Düzeltme: colors.primaryText,
   Başarılı: colors.green,
   Beklemede: colors.gold,
@@ -85,7 +86,7 @@ const STATUS_COLOR: Record<string, string> = {
   Doğrulandı: colors.green,
   Doğrulanıyor: colors.gold,
   Doğrulanmadı: colors.red,
-};
+});
 
 // --- derived balances (pure) --------------------------------------------------------
 function agencyNumbers(bank: BankState) {
@@ -116,6 +117,8 @@ function bdNumbers(bank: BankState) {
 // --- screen -------------------------------------------------------------------------
 export default function CoinsBankScreen() {
   const [tab, setTab] = useState<Tab>('wallet');
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <SafeAreaView style={styles.safe}>
       <Header
@@ -154,9 +157,11 @@ function WalletTab() {
   const [filter, setFilter] = useState<'all' | 'coin' | 'diamond'>('all');
   const rows = ledger.filter((r) => filter === 'all' || r.currency === filter).slice(0, 25);
   const cashable = rules.bonusCashable > 0;
+  const { colors, semantic, dark } = useTheme();
+  const styles = useStyles();
   return (
     <>
-      <LinearGradient colors={['#1F3050', '#16253C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={[colors.cardAlt, colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <Text style={styles.heroLabel}>Jeton bakiyesi</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon3D name="coin" size={40} />
@@ -164,14 +169,14 @@ function WalletTab() {
         </View>
         <Text style={styles.heroSub}>Jetonlar satın alınır ve hediyelerde harcanır. Nakde çevrilmez.</Text>
         <Pressable style={styles.heroBtn} onPress={() => router.push('/cuzdan')} accessibilityLabel="Jeton yükle">
-          <Ionicons name="add-circle" size={18} color="#fff" />
+          <Ionicons name="add-circle" size={18} color={dark ? colors.text : semantic.tonalText} />
           <Text style={styles.heroBtnText}>Jeton yükle</Text>
         </Pressable>
       </LinearGradient>
 
       <View style={styles.grid}>
         <Stat label="Bonus Kredi" art="finans-bonus-kredi" value={fmt(BONUS_BALANCE)} sub={cashable ? `${pct(rules.bonusCashable)} çekilebilir` : 'Çekilemez · yalnız uygulama içi'} color={colors.primaryText} />
-        <Stat label="Elmas (ayrı birim)" icon={<Icon3D name="diamond" size={22} />} value={fmt(diamonds)} sub={`≈ ${usd(diamonds)} · Yayıncı sekmesi`} color="#7DD3FC" />
+        <Stat label="Elmas (ayrı birim)" icon={<Icon3D name="diamond" size={22} />} value={fmt(diamonds)} sub={`≈ ${usd(diamonds)} · Yayıncı sekmesi`} color={semantic.diamondText} />
       </View>
 
       <Card style={{ gap: 8 }}>
@@ -244,6 +249,8 @@ function WalletTab() {
 function CreatorTab() {
   const { isHost, becomeHost, diamonds, totalDiamonds, earnings, withdrawals, rules } = useApp();
   const bank = useBank();
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   if (!isHost)
     return (
       <LockedCard
@@ -269,10 +276,10 @@ function CreatorTab() {
     <>
       <SectionTitle icon="stats-chart" title="Kazançlarım" />
       <View style={styles.grid}>
-        <Stat label="Toplam kazanç" value={dia(totalDiamonds)} sub={usd(totalDiamonds)} color="#7DD3FC" />
+        <Stat label="Toplam kazanç" value={dia(totalDiamonds)} sub={usd(totalDiamonds)} color={semantic.diamondText} />
         <Stat label="Bekleyen kazanç" value={dia(pending)} sub={`Son ${rules.pendingDays} gün · ${usd(pending)}`} color={colors.gold} />
         <Stat label="Kesinleşmiş kazanç" value={dia(final)} sub={usd(final)} color={colors.green} />
-        <Stat label="Çekilebilir bakiye" value={dia(available)} sub={usd(available)} color="#fff" />
+        <Stat label="Çekilebilir bakiye" value={dia(available)} sub={usd(available)} color={colors.text} />
         <Stat label="Ödeme sürecinde" value={dia(blocked)} sub={`Bloke · ${usd(blocked)}`} color={colors.gold} />
         <Stat label="Tamamlanan ödemeler" value={dia(completed)} sub={usd(completed)} color={colors.green} />
         <Stat label="Reddedilen / başarısız" value={dia(rejected)} sub="Blokajı çözüldü" color={colors.red} />
@@ -294,6 +301,8 @@ function CreatorTab() {
 function AgencyTab() {
   const { agencyRole, ownedAgency, rules } = useApp();
   const bank = useBank();
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const isOwner = agencyRole === 'owner' || ownedAgency?.status === 'Onaylandı';
   if (!isOwner)
     return (
@@ -315,10 +324,10 @@ function AgencyTab() {
         <Text style={styles.dim}>Kapsam: yalnızca kendi ajansın{ownedAgency?.code ? ` · Kod ${ownedAgency.code}` : ''}</Text>
       </Card>
       <View style={styles.grid}>
-        <Stat label="Toplam komisyon" value={dia(a.total)} sub={usd(a.total)} color="#7DD3FC" />
+        <Stat label="Toplam komisyon" value={dia(a.total)} sub={usd(a.total)} color={semantic.diamondText} />
         <Stat label="Kesinleşmiş" value={dia(a.final)} sub={usd(a.final)} color={colors.green} />
         <Stat label="Bekleyen" value={dia(a.pending)} sub={`${CURRENT_PERIOD} · ${usd(a.pending)}`} color={colors.gold} />
-        <Stat label="Çekilebilir" value={dia(a.available)} sub={usd(a.available)} color="#fff" />
+        <Stat label="Çekilebilir" value={dia(a.available)} sub={usd(a.available)} color={colors.text} />
         <Stat label="Ödeme sürecinde" value={dia(a.blocked)} sub="Bloke" color={colors.gold} />
         <Stat label="Ödenen" value={dia(a.paid)} sub={usd(a.paid)} color={colors.green} />
       </View>
@@ -388,13 +397,16 @@ function AgencyTab() {
 function BdTab() {
   const { rules } = useApp();
   const bank = useBank();
+  const { colors, semantic, dark } = useTheme();
+  const styles = useStyles();
   const toggle = (
     <Card style={[styles.row, { paddingVertical: 12 }]}>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle}>BD görünümü (demo)</Text>
         <Text style={styles.dim}>Gerçekte yalnızca BD rolüne sahip hesaplar görür.</Text>
       </View>
-      <Switch value={bank.bdView} onValueChange={setBdView} trackColor={{ false: colors.cardAlt, true: colors.primary }} thumbColor="#fff" />
+      {/* The off track is a step darker than the card in the light scheme, where cardAlt would vanish on white. */}
+      <Switch value={bank.bdView} onValueChange={setBdView} trackColor={{ false: dark ? colors.cardAlt : colors.border, true: colors.primary }} thumbColor="#fff" />
     </Card>
   );
   if (!bank.bdView)
@@ -414,10 +426,10 @@ function BdTab() {
     <>
       {toggle}
       <View style={styles.grid}>
-        <Stat label="Toplam BD payı" value={dia(b.total)} sub={usd(b.total)} color="#7DD3FC" />
+        <Stat label="Toplam BD payı" value={dia(b.total)} sub={usd(b.total)} color={semantic.diamondText} />
         <Stat label="Kesinleşmiş" value={dia(b.final)} sub={usd(b.final)} color={colors.green} />
         <Stat label="Bekleyen" value={dia(b.pending)} sub={CURRENT_PERIOD} color={colors.gold} />
-        <Stat label="Çekilebilir" value={dia(b.available)} sub={usd(b.available)} color="#fff" />
+        <Stat label="Çekilebilir" value={dia(b.available)} sub={usd(b.available)} color={colors.text} />
         <Stat label="Ödeme sürecinde" value={dia(b.blocked)} sub="Bloke" color={colors.gold} />
         <Stat label="Ödenen" value={dia(b.paid)} sub={usd(b.paid)} color={colors.green} />
       </View>
@@ -506,6 +518,8 @@ function BdTab() {
 // --- payout building blocks ----------------------------------------------------------------
 function PayoutAccountCard({ scope }: { scope: Scope }) {
   const bank = useBank();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const acc = bank.accounts[scope];
   const [editing, setEditing] = useState(false);
   const [kind, setKind] = useState<AccountKind>('bank');
@@ -593,6 +607,8 @@ function PayoutAccountCard({ scope }: { scope: Scope }) {
 
 function PayoutForm({ scope, available, legacyWeekly = 0 }: { scope: Scope; available: number; legacyWeekly?: number }) {
   const bank = useBank();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [amount, setAmount] = useState('');
   const [nonce, setNonce] = useState(1);
   const n = Number(amount) || 0;
@@ -654,6 +670,7 @@ function PayoutForm({ scope, available, legacyWeekly = 0 }: { scope: Scope; avai
 // on the separate Finance Control platform; open requests simply wait here with a status note.
 function PayoutHistory({ scope, children }: { scope: Scope; children?: ReactNode }) {
   const bank = useBank();
+  const styles = useStyles();
   const [open, setOpen] = useState<string | null>(null);
   const list = bank.payouts.filter((p) => p.scope === scope);
 
@@ -671,6 +688,8 @@ function PayoutHistory({ scope, children }: { scope: Scope; children?: ReactNode
 
 function PayoutItem({ p, open, onToggle }: { p: Payout; open: boolean; onToggle: () => void }) {
   const waiting = p.status === 'Manuel inceleme' ? 'Finans ekibi inceliyor. Sonuç burada görünür.' : p.status === 'Onaylandı' ? 'Onaylandı · ödeme transfer sırasında.' : null;
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.payout}>
       <Pressable onPress={onToggle} style={styles.row}>
@@ -713,6 +732,7 @@ function PayoutItem({ p, open, onToggle }: { p: Payout; open: boolean; onToggle:
 }
 
 function MockPayoutRow({ p }: { p: Pick<MockPayout, 'ref' | 'diamonds' | 'time' | 'account' | 'note'> & { status: string } }) {
+  const styles = useStyles();
   return (
     <View style={styles.payout}>
       <View style={styles.row}>
@@ -733,6 +753,7 @@ function MockPayoutRow({ p }: { p: Pick<MockPayout, 'ref' | 'diamonds' | 'time' 
 
 // --- small UI pieces ---------------------------------------------------------------------
 function Stat({ label, value, sub, color, art, icon }: { label: string; value: string; sub?: string; color: string; art?: ArtName; icon?: ReactNode }) {
+  const styles = useStyles();
   const lead = art ? <Art name={art} size={22} /> : icon;
   const text = (
     <Text style={[styles.statValue, { color }, !!lead && { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
@@ -756,6 +777,8 @@ function Stat({ label, value, sub, color, art, icon }: { label: string; value: s
 }
 
 function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.sectionTitle}>
       <Ionicons name={icon} size={16} color={colors.primaryText} />
@@ -765,7 +788,9 @@ function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; t
 }
 
 function Badge({ text }: { text: string }) {
-  const c = STATUS_COLOR[text] ?? colors.textDim;
+  const t = useTheme();
+  const styles = useStyles();
+  const c = statusColors(t)[text] ?? t.colors.textDim;
   return (
     <View style={[styles.badge, { borderColor: c }]}>
       <Text style={[styles.badgeText, { color: c }]}>{text}</Text>
@@ -774,6 +799,7 @@ function Badge({ text }: { text: string }) {
 }
 
 function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
       <Text style={[styles.chipText, on && { color: '#fff' }]}>{label}</Text>
@@ -782,6 +808,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 }
 
 function KV({ k, v }: { k: string; v: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.kv}>
       <Text style={styles.kvKey}>{k}</Text>
@@ -791,6 +818,7 @@ function KV({ k, v }: { k: string; v: string }) {
 }
 
 function Bullet({ text }: { text: string }) {
+  const styles = useStyles();
   return (
     <View style={{ flexDirection: 'row', gap: 6 }}>
       <Text style={styles.dim}>•</Text>
@@ -800,15 +828,19 @@ function Bullet({ text }: { text: string }) {
 }
 
 function Note({ text }: { text: string }) {
+  const { semantic } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.note}>
-      <Ionicons name="information-circle" size={16} color="#7DD3FC" />
+      <Ionicons name="information-circle" size={16} color={semantic.diamondText} />
       <Text style={[styles.dim, { flex: 1 }]}>{text}</Text>
     </View>
   );
 }
 
 function LockedCard({ icon, title, text, action, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; text: string; action?: string; onPress?: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Card style={{ alignItems: 'center', gap: 10, paddingVertical: 28 }}>
       <View style={styles.lockIcon}>
@@ -821,7 +853,10 @@ function LockedCard({ icon, title, text, action, onPress }: { icon: keyof typeof
   );
 }
 
-const styles = StyleSheet.create({
+// Light scheme only: the soft card shadow (dark cards stand out by color).
+const LIGHT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
+
+const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   protoPill: { backgroundColor: 'rgba(251,191,36,0.18)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   protoPillText: { color: colors.gold, fontSize: 11, fontWeight: '800' },
@@ -832,24 +867,24 @@ const styles = StyleSheet.create({
   body: { padding: 16, gap: 12, paddingBottom: 48 },
   banner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', backgroundColor: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.35)', borderWidth: 1, borderRadius: 14, padding: 10 },
   bannerText: { color: colors.gold, fontSize: 12, flex: 1, lineHeight: 17 },
-  hero: { borderRadius: 24, padding: 20, gap: 4, borderWidth: 1, borderColor: colors.border },
-  heroLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
-  heroN: { color: '#fff', fontSize: 36, fontWeight: '900' },
-  heroSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  heroBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', borderRadius: 999, paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
-  heroBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  hero: { borderRadius: 24, padding: 20, gap: 4, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: LIGHT_SHADOW }) },
+  heroLabel: { color: ink(0.9), fontSize: 14 },
+  heroN: { color: colors.text, fontSize: 36, fontWeight: '900' },
+  heroSub: { color: ink(0.8), fontSize: 12 },
+  heroBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: dark ? ink(0.85) : 'rgba(0,117,123,0.45)', borderRadius: 999, paddingVertical: 10, backgroundColor: dark ? ink(0.12) : semantic.tonal },
+  heroBtnText: { color: dark ? colors.text : semantic.tonalText, fontWeight: '800', fontSize: 15 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  stat: { flexGrow: 1, flexBasis: '45%', backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 2, borderWidth: 1, borderColor: colors.border },
+  stat: { flexGrow: 1, flexBasis: '45%', backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 2, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: LIGHT_SHADOW }) },
   statLabel: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   statValue: { fontSize: 17, fontWeight: '900' },
   statRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statSub: { color: colors.textDim, fontSize: 12 },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  sectionText: { color: '#fff', fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  cardTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  sectionText: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
+  cardTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  rowTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  amount: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  rowTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  amount: { color: colors.text, fontWeight: '800', fontSize: 14 },
   mono: { color: colors.textDim, fontSize: 12, fontFamily: MONO },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
@@ -858,19 +893,19 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 12 },
-  input: { backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#fff', fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  input: { backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: colors.text, fontSize: 14, borderWidth: 1, borderColor: colors.border },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 6 },
   link: { color: colors.primaryText, fontWeight: '700' },
   ghostBtn: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingVertical: 7 },
   ghostText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   kv: { flexDirection: 'row', gap: 10, paddingVertical: 3 },
   kvKey: { color: colors.textDim, fontSize: 12, width: 130 },
-  kvVal: { color: '#fff', fontSize: 12, flex: 1, fontWeight: '600' },
+  kvVal: { color: colors.text, fontSize: 12, flex: 1, fontWeight: '600' },
   note: { flexDirection: 'row', gap: 6, alignItems: 'flex-start', backgroundColor: 'rgba(56,189,248,0.08)', borderRadius: 12, padding: 10 },
   payout: { backgroundColor: colors.cardAlt, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   step: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5 },
-  stepText: { color: '#fff', fontSize: 12 },
+  stepText: { color: colors.text, fontSize: 12 },
   waiting: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   lockIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-});
+}));
