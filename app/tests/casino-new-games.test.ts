@@ -171,14 +171,14 @@ describe('Bahis tahtaları', () => {
     deps(wallet, game);
     // Draw 0 of 20 → the 77 slice.
     mock.method(Math, 'random', () => 0);
-    const r = playBoard('slot', { seven: 100, apple: 200 }, { from: 'profile' }, 'req-board-1');
+    const r = playBoard('slot', { seven: 250, apple: 500 }, { from: 'profile' }, 'req-board-1');
     mock.restoreAll();
     assert.ok(r.ok);
-    assert.equal(r.row.bet, 300);
-    assert.equal(r.row.payout, 800);
-    assert.deepEqual([wallet.n, game.n], [9_700, 800]);
+    assert.equal(r.row.bet, 750);
+    assert.equal(r.row.payout, 2_000);
+    assert.deepEqual([wallet.n, game.n], [9_250, 2_000]);
     assert.equal(boardResult(LUCKY77, 0).id, 'seven');
-    assert.equal(playBoard('slot', { seven: 150 }, { from: 'profile' }, 'req-board-2').ok, false, 'fişin katı olmalı');
+    assert.equal(playBoard('slot', { seven: 300 }, { from: 'profile' }, 'req-board-2').ok, false, 'fişin katı olmalı');
     assert.equal(playBoard('slot', {}, { from: 'profile' }, 'req-board-3').ok, false, 'boş tur yok');
   });
 });
@@ -231,11 +231,11 @@ describe('JACKPOT fonları', () => {
   test('her bahsin %2’si havuzdan oyunun JACKPOT fonuna geçer', () => {
     mock.method(Math, 'random', () => 0.5);
     const before = getGames().bank;
-    playCasino('jackpot', 100, '', { from: 'profile' }, 'req-jp-1');
+    playCasino('jackpot', 250, '', { from: 'profile' }, 'req-jp-1');
     const b = getGames().bank;
-    assert.equal(b.jackpots.jackpot, JACKPOT_SEEDS.jackpot + 2);
+    assert.equal(b.jackpots.jackpot, JACKPOT_SEEDS.jackpot + 5);
     assert.equal(b.jackpots.jungle, JACKPOT_SEEDS.jungle, 'başka oyunun fonu değişmez');
-    assert.equal(b.house, before.house + 60);
+    assert.equal(b.house, before.house + 150);
   });
 
   test('beş 77 bahis / en yüksek bahis kadar JACKPOT öder', () => {
@@ -247,10 +247,10 @@ describe('JACKPOT fonları', () => {
       const k = i++ % 5;
       return (stops[k] + 0.5) / lens[k];
     });
-    const r = playCasino('jackpot', 100, '', { from: 'profile' }, 'req-jp-2');
+    const r = playCasino('jackpot', 250, '', { from: 'profile' }, 'req-jp-2');
     assert.ok(r.ok);
-    const fund = JACKPOT_SEEDS.jackpot + 2;
-    const won = Math.floor((fund * 100) / 200);
+    const fund = JACKPOT_SEEDS.jackpot + 5;
+    const won = Math.floor((fund * 250) / 25_000);
     assert.ok(r.row.payout >= won);
     assert.equal(getGames().bank.jackpots.jackpot, fund - won);
     assert.match(r.row.detail, /JACKPOT/);

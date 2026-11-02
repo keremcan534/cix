@@ -273,7 +273,7 @@ export function FortunePlayer({ entry }: { entry: Entry }) {
             accessibilityLabel={`Bahis ${b}`}
           >
             <Icon3D name="coin" size={14} />
-            <Text style={f.chipText}>{b}</Text>
+            <Text style={f.chipText}>{fmt(b)}</Text>
           </Pressable>
         ))}
       </View>

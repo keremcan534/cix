@@ -82,7 +82,7 @@ export default function GameCenter() {
                           {g.name}
                         </Text>
                         <Text style={s.dim} numberOfLines={2}>
-                          {g.bets[0]}–{g.bets[g.bets.length - 1]} jeton · {g.fromRoom ? 'odada da açılır' : 'yalnızca buradan'}
+                          {g.bets[0].toLocaleString('tr-TR')}–{g.bets[g.bets.length - 1].toLocaleString('tr-TR')} jeton · {g.fromRoom ? 'odada da açılır' : 'yalnızca buradan'}
                           {g.providerStatus !== 'online' ? ' · sağlayıcı sorunlu' : ''}
                         </Text>
                         <GlossButton label={access.ok ? 'Oyna' : `Servet Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />

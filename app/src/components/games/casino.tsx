@@ -96,7 +96,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
         {game.bets.map((b) => (
           <Pressable key={b} onPress={() => setBet(b)} style={[c.chip, bet === b && c.chipOn]} accessibilityLabel={`Bahis ${b}`}>
             <Icon3D name="coin" size={14} />
-            <Text style={c.chipText}>{b}</Text>
+            <Text style={c.chipText}>{b.toLocaleString('tr-TR')}</Text>
           </Pressable>
         ))}
       </View>

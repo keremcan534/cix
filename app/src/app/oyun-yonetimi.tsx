@@ -113,7 +113,7 @@ export default function GameAdmin() {
                 <Row label="Profildeki Oyun Merkezi'nden" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />
                 <Row label="Oda içinden" value={g.fromRoom} onChange={(v) => updateCasino(g.id, { fromRoom: v })} />
                 <Text style={s.label}>Günlük limit (kullanıcı başına)</Text>
-                <Chips value={g.dailyLimit} options={[1000, 3000, 5000, 20000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />
+                <Chips value={g.dailyLimit} options={[40_000, 200_000, 400_000, 1_000_000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />
                 <Text style={s.label}>Sağlayıcı bağlantısı</Text>
                 <Chips<CasinoGame['providerStatus']>
                   value={g.providerStatus}
@@ -125,7 +125,7 @@ export default function GameAdmin() {
                   onChange={(v) => updateCasino(g.id, { providerStatus: v })}
                 />
                 <Text style={s.dim}>
-                  Bahisler: {g.bets.join(' / ')} jeton · {g.rules}
+                  Bahisler: {g.bets.map((b) => b.toLocaleString('tr-TR')).join(' / ')} jeton · {g.rules}
                 </Text>
                 <Text style={s.dim}>Lisans: {g.license}</Text>
               </Card>
