@@ -122,7 +122,7 @@ export default function SettingsScreen() {
             k="invisibleEntry"
             leading={<Art name="oda-gizli-giris" size={32} />}
             title="Odalara gizli giriş"
-            subtitle="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez."
+            subtitle="Rütbe: Amiral ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
             disabled={!GATES.invisibleEntry(nobleTier)}
           />
         </ListGroup>
