@@ -8,7 +8,7 @@ import { TAB_BAR_HEIGHT, colors } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-// Rooms stay the landing tab even though "Senin İçin" is first in the bar.
+// Rooms stay the landing tab even though "Benzerler" is first in the bar.
 export const unstable_settings = { anchor: 'index' };
 
 /** Every tab the same: line icon at rest, filled icon on a soft turquoise pill when active. */
@@ -51,7 +51,7 @@ export default function TabLayout() {
         animation: 'shift',
       }}
     >
-      <Tabs.Screen name="kesfet" options={{ title: 'Senin İçin', tabBarIcon: icon('heart-outline', 'heart') }} />
+      <Tabs.Screen name="kesfet" options={{ title: 'Benzerler', tabBarIcon: icon('heart-outline', 'heart') }} />
       <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture') }} />
       <Tabs.Screen
         name="index"

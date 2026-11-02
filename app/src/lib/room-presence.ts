@@ -1,5 +1,5 @@
 // Room presence server stand-in ("oda katılımcı durumu"). One model per room: who is in the room (unique
-// user ids, join order) and who sits on which mic. Mic users, Balkon users and the total are all derived
+// user ids, join order) and who sits on which mic. Mic users, Güverte users and the total are all derived
 // from this single model, so the counters can never disagree. Joins and leaves carry event ids and are
 // applied once. Moderation (kick, mic mute, take off mic) and mic invites are validated here against the
 // room roles, never only in the UI.
@@ -20,10 +20,10 @@ export type RoomLive = {
   roomId: string;
   /** Unique user ids in the room, in join order (mic users included). */
   members: string[];
-  /** Invisible entry: not listed or counted while on the Balkon (still listed once on a mic). */
+  /** Invisible entry: not listed or counted while on the Güverte (still listed once on a mic). */
   hidden: string[];
   seats: (string | null)[];
-  /** Boss seat ("Patron koltuğu"): a speaking seat outside the numbered mics; counts as being on a mic. */
+  /** Boss seat ("Dümen koltuğu"): a speaking seat outside the numbered mics; counts as being on a mic. */
   boss: string | null;
   locked: number[];
   /** Mic switched off by a moderator (different from someone's own mic toggle). */
@@ -163,7 +163,7 @@ export function setBoss(roomId: string, uid: string | null) {
   if (!r || r.boss === uid) return;
   put({ ...r, boss: uid });
 }
-/** Mic count changed: people on removed mics go to the Balkon (they stay in the room). */
+/** Mic count changed: people on removed mics go to the Güverte (they stay in the room). */
 export function resize(roomId: string, capacity: number) {
   const r = state.rooms[roomId];
   if (!r || r.seats.length === capacity) return;
@@ -298,7 +298,7 @@ export function setMicMute(roomId: string, actorId: string, targetId: string, mu
   if (!r) return fail('Oda bulunamadı.');
   const why = outranks(r, actorId, targetId);
   if (why) return denied(r, actorId, muted ? 'Mikrofon susturma' : 'Mikrofon açma', targetId, why);
-  if (muted && !isOnMic(r, targetId)) return fail('Bu kişi Balkon’da; susturulacak açık bir mikrofonu yok.');
+  if (muted && !isOnMic(r, targetId)) return fail('Bu kişi güvertede; susturulacak açık bir mikrofonu yok.');
   const micMuted = muted ? [...new Set([...r.micMuted, targetId])] : r.micMuted.filter((m) => m !== targetId);
   put({ ...r, micMuted });
   log(roomId, actorId, muted ? 'Mikrofonunu susturdu' : 'Mikrofonunu açtı', targetId);

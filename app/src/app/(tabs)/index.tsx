@@ -113,8 +113,8 @@ export default function RoomsScreen() {
         <View style={styles.mainTabs}>
           {(
             [
-              ['mine', 'Benim'],
-              ['rec', 'Önerilen'],
+              ['rec', 'Sana Uygun'],
+              ['mine', 'Odalarım'],
             ] as const
           ).map(([key, label]) => (
             <Pressable key={key} onPress={() => setMain(key)} hitSlop={6} style={{ alignItems: 'center' }}>
@@ -330,7 +330,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
     <View style={{ gap: 10 }}>
       <View style={styles.sectionRow}>
         <Art name="ana-senin-icin" size={24} />
-        <Text style={[styles.section, { paddingHorizontal: 0 }]}>Senin için</Text>
+        <Text style={[styles.section, { paddingHorizontal: 0 }]}>Sana göre</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.glowRoom} contentContainerStyle={[{ gap: 10, paddingHorizontal: 16 }, styles.glowRoomInner]}>
         {items.map(({ r, reason, why }) => (

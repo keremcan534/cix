@@ -487,10 +487,10 @@ export function TeamArena({
                 </View>
                 <View style={st.halfSeats}>{onMic.map((m) => <View key={m}>{renderSeat(seats.indexOf(m), { width: slotW, size })}</View>)}</View>
                 {onBoss && (
-                  <View style={st.awayRow} accessibilityLabel={`${nameOf(onBoss)} patron koltuğunda, ${fmt(pk.points[onBoss] ?? 0)} puan`}>
+                  <View style={st.awayRow} accessibilityLabel={`${nameOf(onBoss)} dümen koltuğunda, ${fmt(pk.points[onBoss] ?? 0)} puan`}>
                     <Image source={{ uri: userById(onBoss).avatar }} style={st.mini} />
                     <Text style={[st.awayText, { color: colors.gold }]} numberOfLines={1}>
-                      👑 {nameOf(onBoss)} · {fmt(pk.points[onBoss] ?? 0)}
+                      Dümen · {nameOf(onBoss)} · {fmt(pk.points[onBoss] ?? 0)}
                     </Text>
                   </View>
                 )}

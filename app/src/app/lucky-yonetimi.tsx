@@ -58,8 +58,8 @@ export default function LuckyAdmin() {
   if (!can.allowed)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Header title="Lucky hediye yönetimi" />
-        <Text style={[s.dim, { padding: 16 }]}>Bu ekran için Lucky yönetimi yetkisi gerekiyor. {can.reason}</Text>
+        <Header title="Uğurlu hediye yönetimi" />
+        <Text style={[s.dim, { padding: 16 }]}>Bu ekran için Uğurlu hediye yönetimi yetkisi gerekiyor. {can.reason}</Text>
       </SafeAreaView>
     );
   const { config } = lucky;
@@ -67,7 +67,7 @@ export default function LuckyAdmin() {
   // Replays the latest send with the same transaction id: must return the first result, no new charge.
   const replayLast = () => {
     const last = lucky.records[0];
-    if (!last) return showAlert('Kayıt yok', 'Önce odada bir Lucky hediye gönder.');
+    if (!last) return showAlert('Kayıt yok', 'Önce odada bir Uğurlu hediye gönder.');
     const before = getLucky().spentTotal;
     const r = sendLucky({ txId: last.txId, userId: last.userId, userAge: 99, roomId: last.roomId, giftId: last.giftId, toId: last.toId, toName: userById(last.toId).name }, { spend: spendCoins, credit: addCoins });
     showAlert('Tekrar gönderim testi', r.ok && r.replay && getLucky().spentTotal === before ? `İlk sonuç döndü (×${r.record.mult}). İkinci kez jeton düşülmedi, ödül verilmedi.` : 'Beklenmeyen sonuç.');
@@ -75,7 +75,7 @@ export default function LuckyAdmin() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title="Lucky hediye yönetimi" />
+      <Header title="Uğurlu hediye yönetimi" />
       <View style={{ paddingHorizontal: 16 }}>
         <Chips
           value={tab}
@@ -120,7 +120,7 @@ export default function LuckyAdmin() {
               );
             })}
             <Pressable style={s.small} onPress={() => setEditing(newGiftDraft())}>
-              <Text style={s.chipText}>+ Yeni Lucky paketi</Text>
+              <Text style={s.chipText}>+ Yeni Uğurlu paketi</Text>
             </Pressable>
           </>
         )}

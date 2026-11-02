@@ -97,7 +97,7 @@ export function casinoAccess(game: CasinoGame, entry: Entry, wealthLevel: number
   if (game.providerStatus === 'down') return { ok: false, reason: `${game.name} sağlayıcısı bakımda. Bakiyen etkilenmez; oda ve sesli sohbetin devam eder.` };
   if (entry.from === 'profile' && !game.fromProfile) return { ok: false, reason: `${game.name} yalnızca oda içinden açılabilir.` };
   if (entry.from === 'room' && !game.fromRoom) return { ok: false, reason: `${game.name} oda içinden açılamaz; profilindeki Oyun Merkezi'nden oynayabilirsin.` };
-  if (wealthLevel < game.minWealth) return { ok: false, reason: `${game.name}, Servet Seviyesi ${game.minWealth} ve üzeri üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`, needWealth: game.minWealth };
+  if (wealthLevel < game.minWealth) return { ok: false, reason: `${game.name}, Cömertlik Seviyesi ${game.minWealth} ve üstü üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`, needWealth: game.minWealth };
   return { ok: true };
 }
 
@@ -155,7 +155,7 @@ export function playCasino(gameId: CasinoGame['id'], bet: number, pick: CasinoPi
 }
 
 /**
- * One round of a bet board (Gece Yarısı Çarkı, Tatlı Tezgâh, Sihir Destesi): several bets (option → coins, each a multiple of the
+ * One round of a bet board (Gece Yarısı Çarkı, Liman Pazarı, Sihir Destesi): several bets (option → coins, each a multiple of the
  * smallest chip) settled against one drawn result. Same checks, stake, pool and history as playCasino.
  */
 export function playBoard(gameId: CasinoGame['id'], bets: Record<string, number>, entry: Entry, requestId: string): PlayResult {

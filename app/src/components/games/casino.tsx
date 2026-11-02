@@ -118,7 +118,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
   );
 }
 
-/** Shown instead of a casino game when access is refused (e.g. Servet Seviyesi too low). */
+/** Shown instead of a casino game when access is refused (e.g. Cömertlik level too low). */
 export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?: number }) {
   return (
     <View style={c.lock}>
@@ -126,7 +126,7 @@ export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?
       <Text style={c.lockText}>{reason}</Text>
       {needWealth !== undefined ? (
         <Pressable style={c.btn} onPress={() => router.push('/seviye')}>
-          <Text style={c.btnText}>Servet Seviyemi gör</Text>
+          <Text style={c.btnText}>Cömertlik Seviyemi gör</Text>
         </Pressable>
       ) : null}
     </View>

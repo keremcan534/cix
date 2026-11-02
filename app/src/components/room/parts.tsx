@@ -270,7 +270,7 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
               <Text style={{ color: colors.textDim }}> → </Text>
               <Text style={styles.giftName}>{to}</Text>
               {giftArtOf(g.giftId) ? `  ${g.name}` : `  ${g.emoji} ${g.name}`}
-              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Lucky' : ''}`}
+              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Uğurlu' : ''}`}
             </Text>
             {giftArtOf(g.giftId) && <GiftArt giftId={g.giftId} emoji={g.emoji} size={24} />}
           </>

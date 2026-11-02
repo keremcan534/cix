@@ -161,7 +161,7 @@ describe('Hediyeler ve sıralama', () => {
     assert.equal((await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g2', count: 7, ref: rnd(6) }, a.session))[0], 400, 'adet listeden');
     assert.equal((await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'yok', count: 1, ref: rnd(6) }, a.session))[0], 400);
     assert.equal((await call('POST', '/api/gifts/send', { to: a.user.id, giftId: 'g1', count: 1, ref: rnd(6) }, a.session))[0], 400, 'kendine');
-    assert.equal((await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g2', count: 1314, ref: rnd(6) }, a.session))[0], 409, 'bakiye yetmez');
+    assert.equal((await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g2', count: 250, ref: rnd(6) }, a.session))[0], 409, 'bakiye yetmez');
     assert.equal((await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'v2', count: 1, ref: rnd(6) }, a.session))[0], 403, 'SVIP2 hediyesi');
     await h.sql.query('UPDATE users SET svip_xp = 1250000 WHERE id = $1', [a.user.id]);
     assert.equal((await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'v2', count: 1, room: 'oda-r1', ref: rnd(6) }, a.session))[0], 200, 'SVIP2 olunca');

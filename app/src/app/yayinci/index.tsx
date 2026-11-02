@@ -87,9 +87,9 @@ function Dashboard() {
 
   const exchange = () =>
     // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
-    showAlert('Anında bozdur', `Coins Bank elmasını resmi değerinden hemen öder: ${diamonds.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(diamonds)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.`, [
+    showAlert('Anında bozdur', `Jeton Noktası elmasını resmi değerinden hemen öder: ${diamonds.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(diamonds)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.`, [
       { text: 'Kapat', style: 'cancel' },
-      { text: "Coins Bank'a git", onPress: () => router.push('/coins-bank') },
+      { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },
     ]);
 
   return (
@@ -240,7 +240,7 @@ function Analytics() {
       <Text style={[styles.cardTitle, { fontSize: 14, marginTop: 4 }]}>Kazanç dökümü</Text>
       <Line label="Brüt hediye değeri" value={`💎 ${gifts.toLocaleString('tr-TR')}`} />
       <Line label={`Oda sahibi bonusu (${pct(RULES.roomOwnerBonus)})`} value={`+ ${ownerBonus.toLocaleString('tr-TR')}`} />
-      <Line label="Aile bonusu" value={`+ ${familyBonus.toLocaleString('tr-TR')}`} />
+      <Line label="Tayfa bonusu" value={`+ ${familyBonus.toLocaleString('tr-TR')}`} />
       <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />
       <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />
       {agencyId && <Line label={`Ajans komisyonu (${pct(RULES.agencyCommission)}, ayrıca ödenir)`} value={`${commission.toLocaleString('tr-TR')} · ${usd(commission)}`} dim />}

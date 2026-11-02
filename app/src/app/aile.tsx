@@ -48,7 +48,7 @@ const ROLE_ORDER: Record<Role, number> = { owner: 0, helper: 1, member: 2 };
 const TABS = [
   ['oda', 'Oda'],
   ['gorev', 'Görev'],
-  ['cift', 'Çift'],
+  ['cift', 'İkili'],
   ['durum', 'Durum'],
   ['tema', 'Tema'],
 ] as const;
@@ -71,18 +71,18 @@ export default function FamilyScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <Backdrop scene={SCENES.family} />
-      <Header title="Kabileler" />
+      <Header title="Tayfalar" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
         {creating ? (
           <Card style={{ gap: 10 }}>
-            <Text style={styles.title}>Kabile kur · 🪙 {CREATE_COST}</Text>
-            <TextInput value={newName} onChangeText={setNewName} placeholder="Kabile adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
-            <Text style={styles.dim}>Kabileyi kuran kişi kabile lideri olur; yardımcı atayabilir, üye davet edebilir ve başvuruları onaylayabilir.</Text>
+            <Text style={styles.title}>Tayfa kur · 🪙 {CREATE_COST}</Text>
+            <TextInput value={newName} onChangeText={setNewName} placeholder="Tayfa adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
+            <Text style={styles.dim}>Tayfayı kuran kişi tayfa lideri olur; yardımcı atayabilir, üye davet edebilir ve başvuruları onaylayabilir.</Text>
             <GradientButton
               title="Kur"
               onPress={() => {
-                if (newName.trim().length < 3) return showAlert('Kabile adı en az 3 karakter olmalı');
-                if (!spendCoins(CREATE_COST)) return showAlert('Yetersiz jeton', `Kabile kurmak ${CREATE_COST} jeton.`);
+                if (newName.trim().length < 3) return showAlert('Tayfa adı en az 3 karakter olmalı');
+                if (!spendCoins(CREATE_COST)) return showAlert('Yetersiz jeton', `Tayfa kurmak ${CREATE_COST} jeton.`);
                 const id = `custom-${Date.now()}`;
                 registerKabile({ id, name: newName.trim(), emoji: '🏰', xp: 0, weekly: 0, members: 1, leaderId: 'me', memberIds: ['me'] });
                 setFamily(id);
@@ -91,9 +91,9 @@ export default function FamilyScreen() {
             />
           </Card>
         ) : (
-          <GradientButton title="Kendi kabileni kur" icon="add" onPress={() => setCreating(true)} />
+          <GradientButton title="Kendi tayfanı kur" icon="add" onPress={() => setCreating(true)} />
         )}
-        <Text style={[styles.title, { marginTop: 6 }]}>Haftalık kabile sıralaması</Text>
+        <Text style={[styles.title, { marginTop: 6 }]}>Haftalık tayfa sıralaması</Text>
         {ranked.map((f, i) => {
           const lvl = familyLevel(f.xp);
           return (
@@ -118,14 +118,14 @@ export default function FamilyScreen() {
                 onPress={() => {
                   setFamily(f.id);
                   setFamilyRole('member');
-                  showAlert('Başvurun onaylandı', `${f.name} kabilesine katıldın. (Demo: başvuru lider/yardımcı tarafından anında onaylandı.)`);
+                  showAlert('Başvurun onaylandı', `${f.name} tayfasına katıldın. (Demo: başvuru lider/yardımcı tarafından anında onaylandı.)`);
                 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Katıl</Text>
               </Pressable>
             </Card>
           );
         })}
-        <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kullanıcı aynı anda yalnızca bir kabileye üye olabilir.</Text>
+        <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kullanıcı aynı anda yalnızca bir tayfaya üye olabilir.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -175,8 +175,8 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
   const featured = rows.find((r) => r.id !== 'me') ?? rows[0];
 
   const leave = () => {
-    if (role === 'owner') return showAlert('Önce liderliği devret', 'Kabile lideri ayrılmadan önce liderliği bir yardımcıya devretmelidir.');
-    showAlert('Kabileden ayrıl', 'Ayrılırsan bu haftaki kabile bonusu payını kaybedersin.', [
+    if (role === 'owner') return showAlert('Önce liderliği devret', 'Tayfa lideri ayrılmadan önce liderliği bir yardımcıya devretmelidir.');
+    showAlert('Tayfadan ayrıl', 'Ayrılırsan bu haftaki tayfa bonusu payını kaybedersin.', [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Ayrıl', style: 'destructive', onPress: onLeave },
     ]);
@@ -193,7 +193,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         ...(role === 'owner' && roleOf(menuFor) === 'member' ? [{ label: '🛡️ Yardımcı yap', onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'helper' })) }] : []),
         ...(role === 'owner' && roleOf(menuFor) === 'helper' ? [{ label: 'Yardımcılığı kaldır', onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'member' })) }] : []),
         ...(canManage && roleOf(menuFor) === 'member'
-          ? [{ label: 'Kabileden çıkar', destructive: true, onPress: () => setMemberIds((m) => m.filter((x) => x !== menuFor)) }]
+          ? [{ label: 'Tayfadan çıkar', destructive: true, onPress: () => setMemberIds((m) => m.filter((x) => x !== menuFor)) }]
           : []),
         { label: '🚫 Engelle', destructive: true, onPress: () => toggleBlock(menuFor) },
         { label: '⚠️ Şikayet et', onPress: () => showAlert('Şikayet alındı', 'Moderasyon ekibi inceleyecek.') },
@@ -201,7 +201,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
     : [];
 
   const report = () => {
-    const number = createTicket('Şikâyet', `Kabile şikayeti: ${family.name} (ID ${meta.tagId})`);
+    const number = createTicket('Şikâyet', `Tayfa şikayeti: ${family.name} (ID ${meta.tagId})`);
     showAlert('Şikayet alındı', `Talep #${number} oluşturuldu. Moderasyon ekibi inceleyecek.`);
   };
 
@@ -214,7 +214,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               <Ionicons name="arrow-back" size={26} color="#fff" />
             </Pressable>
             <View style={{ flex: 1 }} />
-            <Pressable style={styles.topBtn} onPress={() => setSheet('rules')} accessibilityLabel="Kabile kuralları">
+            <Pressable style={styles.topBtn} onPress={() => setSheet('rules')} accessibilityLabel="Tayfa kuralları">
               <Ionicons name="document-text-outline" size={20} color="#fff" />
             </Pressable>
             <Pressable style={[styles.topBtn, { flexDirection: 'row', gap: 6, paddingHorizontal: 12 }]} onPress={() => setSheet('stats')} accessibilityLabel="Veri Merkezi">
@@ -253,13 +253,13 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             </View>
           </View>
 
-          <Pressable onPress={() => setTab('durum')} accessibilityLabel="Kabile seviyesi">
+          <Pressable onPress={() => setTab('durum')} accessibilityLabel="Tayfa seviyesi">
             <LinearGradient colors={['#047857', '#14532D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.levelCard}>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tier}>{tier.name}</Text>
                   <Text style={{ color: '#fff', marginTop: 4 }}>
-                    <Text style={{ fontWeight: '900', fontSize: 20 }}>⚔ {fmt(power)}</Text>
+                    <Text style={{ fontWeight: '900', fontSize: 20 }}>{fmt(power)}</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.7)' }}>{nextTier ? `/${fmt(nextTier.min)}` : ''}</Text>
                   </Text>
                 </View>
@@ -275,10 +275,10 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               </View>
               <Pressable
                 style={[styles.row, { marginTop: 8, gap: 6 }]}
-                onPress={() => showAlert('Seviyeyi koruma', `Kabilenin ${tier.name} kademesinde kalması için her hafta toplam ⚔ ${fmt(KEEP_GOAL)} güç puanı kazanması gerekir. Hedefe ulaşılamazsa haftalık kapanışta bir kademe düşer.`)}>
+                onPress={() => showAlert('Seviyeyi koruma', `Tayfanın ${tier.name} kademesinde kalması için her hafta toplam ${fmt(KEEP_GOAL)} katkı puanı toplaması gerekir. Hedefe ulaşılamazsa haftalık kapanışta bir kademe düşer.`)}>
                 <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>Seviyeyi koruma ilerlemesi ⓘ</Text>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>
-                  ⚔ {fmt(keep)}/{fmt(KEEP_GOAL)}
+                  {fmt(keep)}/{fmt(KEEP_GOAL)}
                 </Text>
               </Pressable>
             </LinearGradient>
@@ -287,7 +287,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
 
         <View style={styles.body}>
           <View style={styles.row}>
-            <Text style={[styles.sectionTitle, { flex: 1 }]}>Kabile Duyurusu</Text>
+            <Text style={[styles.sectionTitle, { flex: 1 }]}>Tayfa Duyurusu</Text>
             {canManage && annDraft === null && (
               <Pressable onPress={() => setAnnDraft(announcement)} hitSlop={8} accessibilityLabel="Duyuruyu düzenle">
                 <Ionicons name="create-outline" size={18} color={colors.textDim} />
@@ -316,8 +316,8 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           )}
 
           <View style={[styles.row, { marginTop: 16 }]}>
-            <Text style={styles.sectionTitle}>Kabile Etiketi</Text>
-            <Pressable style={[styles.row, { gap: 4 }]} onPress={() => showAlert('Kabile ID kopyalandı', String(meta.tagId))} accessibilityLabel="Kabile ID kopyala">
+            <Text style={styles.sectionTitle}>Tayfa Etiketi</Text>
+            <Pressable style={[styles.row, { gap: 4 }]} onPress={() => showAlert('Tayfa ID kopyalandı', String(meta.tagId))} accessibilityLabel="Tayfa ID kopyala">
               <Text style={styles.dim}>ID:{meta.tagId}</Text>
               <Ionicons name="copy-outline" size={14} color={colors.textDim} />
             </Pressable>
@@ -349,10 +349,10 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             </Pressable>
             <Pressable style={[styles.miniCard, { backgroundColor: '#065A60' }]} onPress={() => setSheet('ranking')}>
               <Text style={styles.miniTitle} numberOfLines={1}>
-                Haftalık Kabile Sıralaması
+                Haftalık Tayfa Sıralaması
               </Text>
               <Text style={{ color: '#fff', fontSize: 13 }}>{meta.weeklyRank ? `No.${meta.weeklyRank}` : 'Sırasız'}</Text>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>⚔{fmtK(weeklyPower)}</Text>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{fmtK(weeklyPower)} puan</Text>
             </Pressable>
             <Pressable style={[styles.miniCard, { backgroundColor: '#B45309' }]} onPress={() => setSheet('highlights')}>
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }} numberOfLines={2}>
@@ -386,11 +386,11 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                     ))}
                   </ScrollView>
                 )}
-                <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Kabile odası">
+                <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Tayfa odası">
                   <Text style={{ fontSize: 22 }}>🎙️</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '800' }}>Kabile odası</Text>
-                    <Text style={styles.dim}>Kabile odasında 15 dakika kal görevi buradan sayılır</Text>
+                    <Text style={{ color: '#fff', fontWeight: '800' }}>Tayfa odası</Text>
+                    <Text style={styles.dim}>Tayfa odasında 15 dakika kal görevi buradan sayılır</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
                 </Pressable>
@@ -437,7 +437,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           {tab === 'durum' && (
             <>
               <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Kabile seviyesi · LV{lvl}</Text>
+                <Text style={styles.title}>Tayfa seviyesi · LV{lvl}</Text>
                 <Text style={styles.dim}>
                   {totalMembers}/{familyCapacity(lvl)} üye · {activeRows.length} aktif · Lider: {userOf(family.leaderId).name} · Rolün: {ROLE_LABEL[role]}
                 </Text>
@@ -447,9 +447,9 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <Text style={styles.dim}>{next ? `${fmt(family.xp)} / ${fmt(next)} XP → LV${lvl + 1}` : 'En yüksek seviye'}</Text>
               </Card>
               <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Bu haftaki kabile bonusu</Text>
+                <Text style={styles.title}>Bu haftaki tayfa bonusu</Text>
                 <Text style={styles.dim}>
-                  Uygun kabile kazancı 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = <Text style={{ color: colors.gold, fontWeight: '800' }}>💎 {fmt(pool)}</Text>
+                  Uygun tayfa kazancı 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = <Text style={{ color: colors.gold, fontWeight: '800' }}>💎 {fmt(pool)}</Text>
                 </Text>
                 <Text style={styles.dim}>
                   Senin tahmini payın: <Text style={{ color: '#fff', fontWeight: '700' }}>💎 {fmt(myShare)}</Text>
@@ -491,7 +491,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                         <Pressable
                           style={[styles.small, { backgroundColor: semantic.successFill }]}
                           onPress={() => {
-                            if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `LV${lvl} kabile en fazla ${familyCapacity(lvl)} üye alabilir.`);
+                            if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `LV${lvl} tayfa en fazla ${familyCapacity(lvl)} üye alabilir.`);
                             setPending((p) => p.filter((x) => x !== id));
                             setMemberIds((m) => [...m, id]);
                           }}>
@@ -507,9 +507,9 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               )}
               <Card style={{ gap: 4 }}>
                 <Text style={styles.title}>Roller</Text>
-                <Text style={styles.dim}>👑 Lider: yardımcı atar/kaldırır, üye çıkarır, kabile ayarlarını ve duyuruyu yönetir, liderliği devreder.</Text>
+                <Text style={styles.dim}>👑 Lider: yardımcı atar/kaldırır, üye çıkarır, tayfa ayarlarını ve duyuruyu yönetir, liderliği devreder.</Text>
                 <Text style={styles.dim}>🛡️ Yardımcı: üye davet eder, başvuruları onaylar, sohbeti ve duyuruyu yönetir, normal üyeleri çıkarabilir.</Text>
-                <Text style={styles.dim}>Üye: sohbete katılır, kabile odalarına girer, katkı verir ve aktifse bonus payı alır.</Text>
+                <Text style={styles.dim}>Üye: sohbete katılır, tayfa odalarına girer, katkı verir ve aktifse bonus payı alır.</Text>
                 <Text style={[styles.dim, { marginTop: 4 }]}>Üye yönetimi için Oda sekmesindeki üyeye dokun.</Text>
               </Card>
               <Card style={{ gap: 6 }}>
@@ -518,10 +518,10 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               </Card>
               <Card style={{ gap: 6 }}>
                 <Text style={styles.title}>Haftalık bonus hesaplama</Text>
-                <Text style={styles.dim}>Kabile bonusu = haftalık uygun kabile kazancı × seviye oranı</Text>
+                <Text style={styles.dim}>Tayfa bonusu = haftalık uygun tayfa kazancı × seviye oranı</Text>
                 <Text style={styles.dim}>Örnek: 💎 100.000 × %3,25 = 💎 {fmt(Math.round(100_000 * 0.0325))}</Text>
                 <Text style={styles.dim}>
-                  Bu kabile: 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = 💎 {fmt(pool)} → {activeRows.length} aktif üyeye katkıya göre
+                  Bu tayfa: 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = 💎 {fmt(pool)} → {activeRows.length} aktif üyeye katkıya göre
                 </Text>
                 {activeRows.slice(0, 5).map((r) => (
                   <Text key={r.id} style={styles.dim}>
@@ -560,7 +560,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <Text style={styles.dim}>Oranlar merkezi yönetim panelinden değiştirilebilir; geçmiş haftalar değişmez.</Text>
               </Card>
               <Pressable onPress={leave} style={{ alignItems: 'center', padding: 8 }}>
-                <Text style={{ color: colors.red, fontWeight: '600' }}>Kabileden ayrıl</Text>
+                <Text style={{ color: colors.red, fontWeight: '600' }}>Tayfadan ayrıl</Text>
               </Pressable>
             </>
           )}
@@ -587,11 +587,11 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
       <ActionSheet visible={!!menuFor} title={target?.name ?? ''} onClose={() => setMenuFor(null)} options={memberOptions} />
       <ActionSheet
         visible={inviteOpen}
-        title="Kabileye davet et"
+        title="Tayfaya davet et"
         onClose={() => setInviteOpen(false)}
         options={USERS.filter((u) => !memberIds.includes(u.id) && !pending.includes(u.id))
           .slice(0, 6)
-          .map((u) => ({ label: u.name, onPress: () => showAlert('Davet gönderildi', `${u.name} kabul ederse kabileye katılır.`) }))}
+          .map((u) => ({ label: u.name, onPress: () => showAlert('Davet gönderildi', `${u.name} kabul ederse tayfaya katılır.`) }))}
       />
       <ActionSheet
         visible={moreOpen}
@@ -599,37 +599,37 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         onClose={() => setMoreOpen(false)}
         options={[
           { label: '📊 Veri Merkezi', onPress: () => setSheet('stats') },
-          { label: '📜 Kabile kuralları', onPress: () => setSheet('rules') },
+          { label: '📜 Tayfa kuralları', onPress: () => setSheet('rules') },
           { label: familyMuted ? '🔔 Sohbet bildirimlerini aç' : '🔕 Sohbeti sessize al', onPress: () => setFamilyMuted(!familyMuted) },
           ...(canManage ? [{ label: '👥 Üye davet et', onPress: () => setInviteOpen(true) }] : []),
-          { label: '⚠️ Kabileyi şikayet et', onPress: report },
-          { label: 'Kabileden ayrıl', destructive: true, onPress: leave },
+          { label: '⚠️ Tayfayı şikayet et', onPress: report },
+          { label: 'Tayfadan ayrıl', destructive: true, onPress: leave },
         ]}
       />
       <ActionSheet
         visible={shareOpen}
-        title="Kabileyi paylaş"
+        title="Tayfayı paylaş"
         onClose={() => setShareOpen(false)}
         options={[
-          { label: '🔗 Bağlantıyı paylaş', onPress: () => Share.share({ message: `${family.emoji} ${family.name} kabilesine katıl! Kabile ID: ${meta.tagId}` }).catch(() => {}) },
-          { label: '👥 Arkadaşlarını davet et', onPress: () => (canManage ? setInviteOpen(true) : showAlert('Davet bağlantısı kopyalandı', `Kabile ID: ${meta.tagId}`)) },
+          { label: '🔗 Bağlantıyı paylaş', onPress: () => Share.share({ message: `${family.emoji} ${family.name} tayfasına katıl! Tayfa ID: ${meta.tagId}` }).catch(() => {}) },
+          { label: '👥 Arkadaşlarını davet et', onPress: () => (canManage ? setInviteOpen(true) : showAlert('Davet bağlantısı kopyalandı', `Tayfa ID: ${meta.tagId}`)) },
         ]}
       />
 
       <InfoSheet visible={sheet === 'stats'} title="📊 Veri Merkezi" onClose={() => setSheet(null)}>
         <View style={styles.statGrid}>
-          <Stat label="Haftalık savaş gücü" value={`⚔ ${fmt(weeklyPower)}`} />
-          <Stat label="Toplam güç" value={`⚔ ${fmt(power)}`} />
+          <Stat label="Haftalık katkı puanı" value={fmt(weeklyPower)} />
+          <Stat label="Toplam katkı puanı" value={fmt(power)} />
           <Stat label="Haftalık sıra" value={meta.weeklyRank ? `No.${meta.weeklyRank}` : '—'} />
           <Stat label="Üyeler" value={`${totalMembers}/${familyCapacity(lvl)}`} />
           <Stat label="Aktif üye" value={String(activeRows.length)} />
-          <Stat label="Kabile hazinesi" value={`🔮 ${fmt(meta.treasure + progress.addedTreasure)}`} />
+          <Stat label="Tayfa Sandığı" value={`🔮 ${fmt(meta.treasure + progress.addedTreasure)}`} />
           <Stat label="Haftalık uygun kazanç" value={`💎 ${fmt(family.weekly)}`} />
           <Stat label="Bonus havuzu" value={`💎 ${fmt(pool)}`} />
           <Stat label="Tahmini payın" value={`💎 ${fmt(myShare)}`} />
-          <Stat label="Katkım (güç)" value={`⚔ ${fmt(progress.myPower)}`} />
+          <Stat label="Katkım" value={fmt(progress.myPower)} />
         </View>
-        <Text style={[styles.title, { marginTop: 12, marginBottom: 8 }]}>Bu hafta günlük güç</Text>
+        <Text style={[styles.title, { marginTop: 12, marginBottom: 8 }]}>Bu hafta günlük katkı</Text>
         <View style={styles.chart}>
           {WEEK_DAYS.map((d, i) => (
             <View key={d} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
@@ -641,16 +641,16 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         <Text style={[styles.dim, { marginTop: 8 }]}>Günlük dağılım örnek veridir (demo).</Text>
       </InfoSheet>
 
-      <InfoSheet visible={sheet === 'rules'} title="📜 Kabile kuralları" onClose={() => setSheet(null)}>
-        <Text style={styles.dim}>• Bir kullanıcı aynı anda yalnızca bir kabileye üye olabilir.</Text>
+      <InfoSheet visible={sheet === 'rules'} title="📜 Tayfa kuralları" onClose={() => setSheet(null)}>
+        <Text style={styles.dim}>• Bir kullanıcı aynı anda yalnızca bir tayfaya üye olabilir.</Text>
         <Text style={styles.dim}>• Aktif üye: hafta içinde en az 3 gün aktif ve en az 1.000 geçerli katkı puanı.</Text>
-        <Text style={styles.dim}>• Haftalık kabile bonusu = uygun kabile kazancı × seviye oranı ({pct(RULES.familyRates[lvl - 1])}); aktif üyelere katkı oranına göre dağıtılır.</Text>
-        <Text style={styles.dim}>• Kademe korumak için haftalık ⚔ {fmt(KEEP_GOAL)} güç puanı gerekir.</Text>
+        <Text style={styles.dim}>• Haftalık tayfa bonusu = uygun tayfa kazancı × seviye oranı ({pct(RULES.familyRates[lvl - 1])}); aktif üyelere katkı oranına göre dağıtılır.</Text>
+        <Text style={styles.dim}>• Kademeyi korumak için haftalık {fmt(KEEP_GOAL)} katkı puanı gerekir.</Text>
         <Text style={styles.dim}>• Sandık ve görev ödülleri sabittir; rastgele ödül yoktur.</Text>
         <Text style={styles.dim}>• Taciz, sahte etkileşim ve hediye iadesi istismarı yasaktır; bu katkılar sayılmaz.</Text>
       </InfoSheet>
 
-      <InfoSheet visible={sheet === 'ranking'} title="🏆 Haftalık Kabile Sıralaması" onClose={() => setSheet(null)}>
+      <InfoSheet visible={sheet === 'ranking'} title="🏆 Haftalık Tayfa Sıralaması" onClose={() => setSheet(null)}>
         {[...FAMILIES]
           .sort((a, b) => kabileMeta(b.id).weeklyPower - kabileMeta(a.id).weeklyPower)
           .map((f) => {
@@ -661,11 +661,11 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <Text style={[styles.rank, { width: 40 }]}>No.{m.weeklyRank}</Text>
                 <Text style={{ fontSize: 24 }}>{f.emoji}</Text>
                 <Text style={{ color: '#fff', flex: 1, fontWeight: mine ? '800' : '500' }}>{f.name}</Text>
-                <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>⚔ {fmtK(mine ? weeklyPower : m.weeklyPower)}</Text>
+                <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>{fmtK(mine ? weeklyPower : m.weeklyPower)}</Text>
               </View>
             );
           })}
-        <Text style={[styles.dim, { marginTop: 8 }]}>Sıralama haftalık savaş gücüne göre yapılır ve Pazartesi 0:00&apos;da (UTC+3) sıfırlanır.</Text>
+        <Text style={[styles.dim, { marginTop: 8 }]}>Sıralama haftalık katkı puanına göre yapılır ve Pazartesi 0:00&apos;da (UTC+3) sıfırlanır.</Text>
       </InfoSheet>
 
       <InfoSheet visible={sheet === 'highlights'} title="⭐ Öne Çıkanlar" onClose={() => setSheet(null)}>
@@ -722,7 +722,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
             {done}/{countTasks.length}
           </Text>
         </View>
-        <Text style={styles.dim}>Görevler her gün saat 0:00&apos;da yenilenir (UTC+3). Bu hafta katkın: ⚔ {fmt(p.myPower)}</Text>
+        <Text style={styles.dim}>Görevler her gün saat 0:00&apos;da yenilenir (UTC+3). Bu hafta katkın: {fmt(p.myPower)} puan</Text>
         {KABILE_TASKS.map((t) => {
           const prog = taskProgress(t, p, counters);
           return (
@@ -732,18 +732,18 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
                 {t.title}
               </Text>
               <Text style={[styles.dim, prog.claimable && { color: colors.green, fontWeight: '800' }]}>
-                {prog.claimed ? 'Alındı' : prog.claimable ? 'Al' : t.kind === 'rate' ? `⚔+${t.power}/${t.per}🪙` : `⚔+${t.power}`}
+                {prog.claimed ? 'Alındı' : prog.claimable ? 'Al' : t.kind === 'rate' ? `+${t.power} puan/${t.per}🪙` : `+${t.power} puan`}
               </Text>
             </View>
           );
         })}
-        <GradientButton title="Görev Merkezi" icon="flash" onPress={() => router.push(KABILE_ROUTES.merkez)} />
+        <GradientButton title="Görevler" icon="flash" onPress={() => router.push(KABILE_ROUTES.merkez)} />
       </Card>
       <Card style={[styles.row, { gap: 10 }]}>
         <Text style={{ fontSize: 30 }}>🧰</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Haftalık sandıklar</Text>
-          <Text style={styles.dim}>{readyChests ? `${readyChests} sandık alınmayı bekliyor` : 'Yeni sandık için kabile gücünü artır'}</Text>
+          <Text style={styles.dim}>{readyChests ? `${readyChests} sandık alınmayı bekliyor` : 'Yeni sandık için tayfanın katkı puanını artır'}</Text>
         </View>
         <Pressable style={[styles.small, { backgroundColor: colors.primary }]} onPress={() => router.push(KABILE_ROUTES.merkez)}>
           <Text style={styles.smallText}>Aç</Text>
@@ -751,7 +751,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
       </Card>
       <Pressable style={[styles.roomCard, { backgroundColor: colors.card }]} onPress={() => router.push(`/oda/${roomId}`)}>
         <Text style={{ fontSize: 22 }}>🎙️</Text>
-        <Text style={{ color: '#fff', fontWeight: '700', flex: 1 }}>Kabile odasına git</Text>
+        <Text style={{ color: '#fff', fontWeight: '700', flex: 1 }}>Tayfa odasına git</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
       </Pressable>
     </>
@@ -764,7 +764,7 @@ function CoupleTab() {
     <>
       {top && (
         <LinearGradient colors={['#076A70', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 18, padding: 16, gap: 10 }}>
-          <Text style={[styles.title, { textAlign: 'center' }]}>💞 En Tatlı Çift</Text>
+          <Text style={[styles.title, { textAlign: 'center' }]}>💞 En Uyumlu İkili</Text>
           <View style={styles.row}>
             <Avatar uri={userById(top.a).avatar} size={48} />
             <View style={{ marginLeft: -16 }}>
@@ -774,7 +774,7 @@ function CoupleTab() {
               <Text style={{ color: '#fff', fontWeight: '800' }}>
                 {userById(top.a).name} & {userById(top.b).name}
               </Text>
-              <Text style={styles.dim}>CP · LV.{top.level}</Text>
+              <Text style={styles.dim}>İkili · LV.{top.level}</Text>
             </View>
             <Text style={{ color: '#F9A8D4', fontWeight: '900', fontSize: 16 }}>{fmtK(top.score)} ❤</Text>
           </View>
@@ -794,9 +794,9 @@ function CoupleTab() {
             <Text style={{ color: '#F9A8D4', fontWeight: '700' }}>{fmtK(c.score)} ❤</Text>
           </View>
         ))}
-        <Text style={styles.dim}>Dostlar aynı kabilede olduğunda kabile avantajlarından yararlanabilir.</Text>
+        <Text style={styles.dim}>Dostlar aynı tayfadaysa tayfa avantajlarından da yararlanır.</Text>
       </Card>
-      <GradientButton title="İlişki Meydanı" icon="heart" onPress={() => router.push(KABILE_ROUTES.iliski)} />
+      <GradientButton title="Uyum Köşesi" icon="heart" onPress={() => router.push(KABILE_ROUTES.iliski)} />
     </>
   );
 }
@@ -804,8 +804,8 @@ function CoupleTab() {
 function ThemeTab({ themeId, onPick, level, canManage }: { themeId: string; onPick: (id: string) => void; level: number; canManage: boolean }) {
   return (
     <Card style={{ gap: 10 }}>
-      <Text style={styles.title}>Kabile teması</Text>
-      <Text style={styles.dim}>{canManage ? 'Tema kabile profilinin üst kısmında herkes için görünür.' : 'Temayı yalnızca lider ve yardımcılar değiştirebilir.'}</Text>
+      <Text style={styles.title}>Tayfa teması</Text>
+      <Text style={styles.dim}>{canManage ? 'Tema tayfa profilinin üst kısmında herkes için görünür.' : 'Temayı yalnızca lider ve yardımcılar değiştirebilir.'}</Text>
       <View style={styles.themeGrid}>
         {KABILE_THEMES.map((t) => {
           const locked = level < t.minLevel;
@@ -815,7 +815,7 @@ function ThemeTab({ themeId, onPick, level, canManage }: { themeId: string; onPi
               key={t.id}
               style={[styles.themeItem, active && { borderColor: colors.gold }]}
               onPress={() => {
-                if (locked) return showAlert('Kilitli tema', `${t.name} LV${t.minLevel} kabilelerde açılır.`);
+                if (locked) return showAlert('Kilitli tema', `${t.name} LV${t.minLevel} tayfalarda açılır.`);
                 if (!canManage) return showAlert('Yetki yok', 'Temayı yalnızca lider ve yardımcılar değiştirebilir.');
                 onPick(t.id);
               }}

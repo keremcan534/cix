@@ -300,16 +300,16 @@ export function RoomInfoSheet({
                 </ArtText>
               </LinearGradient>
             </Pressable>
-            <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Kabile">
+            <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Tayfa">
               <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
-                <Text style={styles.cardLabel}>Kabile</Text>
+                <Text style={styles.cardLabel}>Tayfa</Text>
                 {clan?.art ? (
                   <ArtText art={clan.art} size={26} style={styles.cardValue}>
                     {clan.label}
                   </ArtText>
                 ) : (
                   <Text style={styles.cardValue} numberOfLines={1}>
-                    {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
+                    {clan ? clan.label : owner ? '+ Tayfa kur / katıl' : 'Yok'}
                   </Text>
                 )}
               </LinearGradient>
@@ -616,7 +616,7 @@ export function RoomSettingsScreen({
   layoutLabel: string;
   /** The classic grid is in use (its mic count can be changed here). */
   classicActive: boolean;
-  /** The "Yayına Katılma Modu" sheet, rendered inside this screen so it opens on top of it. */
+  /** The "Sahne Düzeni" sheet, rendered inside this screen so it opens on top of it. */
   renderLayouts: (visible: boolean, onClose: () => void) => ReactNode;
   /** Classic mic count change, validated by lib/room-modes. */
   onClassicMics: (n: number) => Result;
@@ -666,7 +666,7 @@ export function RoomSettingsScreen({
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
           <Section title="Mikrofon pozisyonu" />
-          <Row label="Yayına Katılma Modu" value={layoutLabel} onPress={() => setPicker('layouts')} />
+          <Row label="Sahne Düzeni" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
           <Row
             label="Mikrofon kuyruğu"
@@ -681,10 +681,10 @@ export function RoomSettingsScreen({
             locked={micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`}
           />
           <Row
-            label="Patron Koltuğu"
+            label="Dümen Koltuğu"
             hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · oturumun en çok hediye gönderen kişisi oturur`}
             toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
-            locked={bossOpen ? undefined : `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`}
+            locked={bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`}
           />
 
           <Section title="Oda üyeleri" />
@@ -709,7 +709,7 @@ export function RoomSettingsScreen({
             toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
           />
           <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} />
-          <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve patron koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
+          <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
         </ScrollView>
       </SafeAreaView>
 
@@ -858,11 +858,11 @@ export function RoomSettingsScreen({
   );
 }
 
-// --- Boss seat ("Patron Koltuğu") ---------------------------------------------------------
+// --- Boss seat ("Dümen Koltuğu") ---------------------------------------------------------
 export function BossSeat({ userId, speaking, onPress }: { userId: string | null; speaking: boolean; onPress: () => void }) {
   const u = userId ? userById(userId) : null;
   return (
-    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Patron koltuğu">
+    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Dümen koltuğu">
       <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
         {u ? (
           <Image source={{ uri: u.avatar }} style={{ width: 62, height: 62, borderRadius: 31 }} />
@@ -872,9 +872,9 @@ export function BossSeat({ userId, speaking, onPress }: { userId: string | null;
           </View>
         )}
       </LinearGradient>
-      <Text style={styles.bossTag}>👑 PATRON</Text>
+      <Text style={styles.bossTag}>DÜMEN</Text>
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>
-        {u ? (userId === 'me' ? 'Sen' : u.name) : 'Patron Koltuğu'}
+        {u ? (userId === 'me' ? 'Sen' : u.name) : 'Dümen Koltuğu'}
       </Text>
     </Pressable>
   );
@@ -883,8 +883,8 @@ export function BossSeat({ userId, speaking, onPress }: { userId: string | null;
 export const bossSeatInfo = (current: string | null, myContribution: number, top: number) => {
   const need = Math.max(BOSS_SEAT_MIN_COINS, top + 1) - myContribution;
   return current === 'me'
-    ? 'Patron koltuğundasın 👑 Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
-    : `Patron koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
+    ? 'Dümen koltuğundasın. Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
+    : `Dümen koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
 };
 
 const styles = StyleSheet.create({

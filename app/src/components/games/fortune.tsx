@@ -348,7 +348,7 @@ function Paytable({ lineBet }: { lineBet: number }) {
         </View>
       ))}
       <Text style={f.dim}>
-        {SYMBOLS[WILD].emoji} Servet (WILD) 2.–4. makarada çıkar, Kasa dışındaki her sembolün yerine geçer. {SYMBOLS[SCATTER].emoji} Kasa ekranın herhangi bir yerinde 3 veya daha fazla
+        {SYMBOLS[WILD].emoji} {SYMBOLS[WILD].name} (WILD) 2.–4. makarada çıkar, Kasa dışındaki her sembolün yerine geçer. {SYMBOLS[SCATTER].emoji} Kasa ekranın herhangi bir yerinde 3 veya daha fazla
         gelirse {FREE_SPINS} bedava dönüş, kazançlar ×{FREE_MULT}.
       </Text>
       <View style={f.lineGrid}>

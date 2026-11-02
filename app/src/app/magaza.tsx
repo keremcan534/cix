@@ -199,7 +199,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
         <Text style={styles.entryPreviewText} numberOfLines={1}>
           Hoş geldin
         </Text>
-        <Text style={{ fontSize: 14 }}>{look.mark}</Text>
+        {!!look.mark && <Text style={{ fontSize: 14 }}>{look.mark}</Text>}
       </LinearGradient>
     );
     if (!pic) return banner;

@@ -69,7 +69,7 @@ export default function GameAdmin() {
           value={tab}
           options={[
             ['room', 'Ücretsiz oda oyunları'],
-            ['casino', 'Casino (Servet Lv.2)'],
+            ['casino', 'Oyun Salonu (Cömertlik Lv.2)'],
           ]}
           onChange={setTab}
         />
@@ -109,8 +109,8 @@ export default function GameAdmin() {
                 </GameTitle>
                 <Row label="Aktif" value={g.active} onChange={(v) => updateCasino(g.id, { active: v })} />
                 <Text style={s.label}>Minimum VIP seviyesi</Text>
-                <Chips value={g.minWealth} options={[1, 2, 3, 5, 10].map((n) => [n, `Servet Lv.${n}`] as [number, string])} onChange={(v) => updateCasino(g.id, { minWealth: v })} />
-                <Row label="Profildeki Oyun Merkezi'nden" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />
+                <Chips value={g.minWealth} options={[1, 2, 3, 5, 10].map((n) => [n, `Cömertlik Lv.${n}`] as [number, string])} onChange={(v) => updateCasino(g.id, { minWealth: v })} />
+                <Row label="Profildeki Oyun Salonu'ndan" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />
                 <Row label="Oda içinden" value={g.fromRoom} onChange={(v) => updateCasino(g.id, { fromRoom: v })} />
                 <Text style={s.label}>Günlük limit (kullanıcı başına)</Text>
                 <Chips value={g.dailyLimit} options={[40_000, 200_000, 400_000, 1_000_000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />

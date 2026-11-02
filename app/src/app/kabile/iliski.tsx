@@ -30,7 +30,7 @@ export default function IliskiMeydani() {
   const sendGift = (g: Gift) => {
     if (!giftTo) return;
     const u = userById(giftTo);
-    if (!spendCoins(g.price, `CP hediyesi: ${g.name} → ${u.name}`)) {
+    if (!spendCoins(g.price, `İkili hediyesi: ${g.name} → ${u.name}`)) {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
@@ -44,15 +44,15 @@ export default function IliskiMeydani() {
   return (
     <SafeAreaView style={styles.safe}>
       <Header
-        title="İlişki Meydanı"
+        title="Uyum Köşesi"
         right={
           <Pressable
             hitSlop={8}
             accessibilityLabel="Kurallar"
             onPress={() =>
               showAlert(
-                'İlişki Meydanı',
-                'Çift (CP) ve dost sıralaması, bu hafta birbirine gönderilen çift hediyelerinden gelen yakınlık puanına göre yapılır. Dostlar aynı kabilede olduğunda kabile avantajlarından yararlanabilir.',
+                'Uyum Köşesi',
+                'İkili ve dost sıralaması, bu hafta birbirine gönderilen İkili hediyelerinden gelen yakınlık puanına göre yapılır. Dostlar aynı tayfadaysa tayfa avantajlarından da yararlanır.',
               )
             }>
             <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>?</Text>
@@ -61,14 +61,14 @@ export default function IliskiMeydani() {
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         <LinearGradient colors={['#076A70', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-          <Text style={styles.heroTitle}>{mode === 'cp' ? 'En Tatlı Çift' : 'En Yakın Dostlar'}</Text>
+          <Text style={styles.heroTitle}>{mode === 'cp' ? 'En Uyumlu İkili' : 'En Yakın Dostlar'}</Text>
           {top && <PairCard pair={top} mode={mode} big />}
         </LinearGradient>
 
         <View style={styles.toggle}>
           {(
             [
-              ['cp', 'Çift'],
+              ['cp', 'İkili'],
               ['dost', 'Dost'],
             ] as const
           ).map(([k, l]) => (
@@ -81,9 +81,9 @@ export default function IliskiMeydani() {
         <Card style={{ gap: 10 }}>
           <View style={styles.titleRow}>
             <Art name={mode === 'cp' ? 'iliski-cift-cp-en-tatli-cift' : 'iliski-dost-en-yakin-dostlar'} size={22} />
-            <Text style={styles.sectionTitle}>{mode === 'cp' ? 'En tatlı çift' : 'En yakın dostlar'}</Text>
+            <Text style={styles.sectionTitle}>{mode === 'cp' ? 'En uyumlu ikili' : 'En yakın dostlar'}</Text>
           </View>
-          <Text style={[styles.dim, { textAlign: 'center' }]}>Dostlar aynı kabilede olduğunda kabile avantajlarından yararlanabilir.</Text>
+          <Text style={[styles.dim, { textAlign: 'center' }]}>Dostlar aynı tayfadaysa tayfa avantajlarından da yararlanır.</Text>
           {list.map((pair, i) => (
             <View key={`${pair.a}-${pair.b}`} style={styles.rankRow}>
               <Text style={[styles.rank, i < 3 && { color: colors.gold }]}>{i + 1}</Text>
@@ -96,15 +96,15 @@ export default function IliskiMeydani() {
 
         {family ? (
           <Card style={{ gap: 8 }}>
-            <Text style={styles.sectionTitle}>Kabile üyelerine CP hediyesi gönder</Text>
-            <Text style={styles.dim}>Çift hediyeleri yakınlık puanı kazandırır. Görev Merkezi&apos;nde her 350 🪙 için +2 Güç Puanı (sınırsız).</Text>
-            <GradientButton title="CP hediyesi gönder" icon="heart" onPress={() => setPickTo(true)} />
+            <Text style={styles.sectionTitle}>Tayfa üyelerine İkili hediyesi gönder</Text>
+            <Text style={styles.dim}>İkili hediyeleri yakınlık puanı kazandırır. Görevler&apos;de her 350 🪙 için +2 katkı puanı (sınırsız).</Text>
+            <GradientButton title="İkili hediyesi gönder" icon="heart" onPress={() => setPickTo(true)} />
             <Pressable onPress={() => router.push(KABILE_ROUTES.merkez)} style={{ alignItems: 'center', padding: 4 }}>
-              <Text style={{ color: '#A5F3F5', fontWeight: '700' }}>Görev Merkezi&apos;ne git ›</Text>
+              <Text style={{ color: '#A5F3F5', fontWeight: '700' }}>Görevler&apos;e git ›</Text>
             </Pressable>
           </Card>
         ) : (
-          <GradientButton title="Kabileye katıl" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+          <GradientButton title="Tayfaya katıl" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         )}
       </ScrollView>
 
@@ -116,7 +116,7 @@ export default function IliskiMeydani() {
       />
       <ActionSheet
         visible={!!giftTo}
-        title={giftTo ? `${userById(giftTo).name} · CP hediyesi` : ''}
+        title={giftTo ? `${userById(giftTo).name} · İkili hediyesi` : ''}
         onClose={() => setGiftTo(null)}
         options={CP_GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price.toLocaleString('tr-TR')} 🪙`, onPress: () => sendGift(g) }))}
       />
@@ -141,7 +141,7 @@ function PairCard({ pair, mode, big }: { pair: Pair; mode: 'cp' | 'dost'; big?: 
           {a.name} & {b.name}
         </Text>
         <View style={{ flexDirection: 'row', gap: 6 }}>
-          <Text style={styles.chip}>{mode === 'cp' ? 'CP' : 'Dost'}</Text>
+          <Text style={styles.chip}>{mode === 'cp' ? 'İkili' : 'Dost'}</Text>
           <Text style={styles.chip}>LV.{pair.level}</Text>
         </View>
       </View>

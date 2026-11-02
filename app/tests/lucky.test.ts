@@ -129,7 +129,7 @@ describe('Lucky: toplu gönderim', () => {
 
   test('bakiye ya da limit tüm gönderimi karşılamıyorsa hiç ücret alınmaz, gerçek neden döner', () => {
     const short = ledgerWallet(10);
-    assert.deepEqual(batch(short, ['b1'], 99), { records: [], error: 'Yetersiz bakiye.' });
+    assert.deepEqual(batch(short, ['b1'], 100), { records: [], error: 'Yetersiz bakiye.' });
     assert.deepEqual(short.rows, []);
     const limited = ledgerWallet(1e9, () => 'Günlük harcama limitine ulaştın.');
     assert.deepEqual(batch(limited, ['b1'], 2), { records: [], error: 'Günlük harcama limitine ulaştın.' });
@@ -142,7 +142,7 @@ describe('Lucky: toplu gönderim', () => {
     // The second recipient is the sender: those two gifts can't go out and come back as a refund.
     const { records, error } = batch(wl, ['c1', 'batcher'], 2);
     assert.equal(records.length, 2);
-    assert.equal(error, 'Kendine Lucky hediye gönderemezsin.');
+    assert.equal(error, 'Kendine Uğurlu hediye gönderemezsin.');
     assert.ok(wl.rows.includes(price * 2), 'iade satırı');
   });
 });

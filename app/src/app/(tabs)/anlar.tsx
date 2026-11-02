@@ -240,7 +240,7 @@ function MomentCard({
           <FramedAvatar uri={author.avatar} size={50} vipLevel={svip} frameId={frameId} online={!svip && author.online} />
           {svip > 0 && (
             <LinearGradient colors={['#0FB8BE', '#FF6576']} style={styles.svipTag}>
-              <Text style={styles.svipText}>SVIP{svip}</Text>
+              <Text style={styles.svipText}>İnci {svip}</Text>
             </LinearGradient>
           )}
         </Pressable>
