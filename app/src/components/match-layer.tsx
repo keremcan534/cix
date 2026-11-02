@@ -14,7 +14,7 @@ import { useMedia } from '@/lib/media';
 import { PHASE_LABEL, acceptMatch, cancelMatch, declineMatch, modeLabel, priceOf, resetMatch, setMatchDeps, startMatch, useMatch } from '@/lib/match';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { ThemeScope, colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
 const OWN_SCREENS = ['/eslesme', '/tanis'];
@@ -37,8 +37,9 @@ export function MatchLayer() {
   }, [active]);
 
   const incoming = ['found', 'awaiting_peer', 'connecting'].includes(m.phase) && path !== '/eslesme';
+  // A call overlay: dark in both modes, like the call screen it opens.
   return (
-    <>
+    <ThemeScope scheme="dark">
       {m.phase === 'searching' && !onOwnScreen && (
         <View style={s.pill} accessibilityLiveRegion="polite">
           <Ionicons name="search" size={16} color={semantic.action} />
@@ -69,7 +70,7 @@ export function MatchLayer() {
       <Modal visible={incoming} transparent animationType="fade" onRequestClose={declineMatch}>
         {incoming && <IncomingCard />}
       </Modal>
-    </>
+    </ThemeScope>
   );
 }
 

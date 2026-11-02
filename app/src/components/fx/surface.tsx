@@ -10,17 +10,19 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View, type GestureRespo
 import { tapHaptic } from '@/lib/haptics';
 import { useSettings } from '@/store';
 import type { Scene } from '@/components/fx/scenes';
-import { semantic } from '@/theme';
+import { makeStyles, useTheme, type Theme } from '@/theme';
 
 const GLOW = require('../../../assets/fx/glow.png');
 
 /** Soft turquoise and coral light behind a screen, so the background is not a flat fill. */
 export function Ambient() {
+  const { semantic, surface } = useTheme();
+  const g = surface.glow;
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden' }]}>
-      <Image source={GLOW} style={[s.glow, { left: -200, top: -160, opacity: 0.26, tintColor: semantic.action }]} />
-      <Image source={GLOW} style={[s.glow, { right: -230, top: 280, opacity: 0.16, tintColor: semantic.social }]} />
-      <Image source={GLOW} style={[s.glow, { left: -180, bottom: -140, opacity: 0.14, tintColor: semantic.action }]} />
+      <Image source={GLOW} style={[s.glow, { left: -200, top: -160, opacity: 0.26 * g, tintColor: semantic.action }]} />
+      <Image source={GLOW} style={[s.glow, { right: -230, top: 280, opacity: 0.16 * g, tintColor: semantic.social }]} />
+      <Image source={GLOW} style={[s.glow, { left: -180, bottom: -140, opacity: 0.14 * g, tintColor: semantic.action }]} />
     </View>
   );
 }
@@ -48,21 +50,25 @@ export function Gloss({ radius = 999, strength = 0.4 }: { radius?: number; stren
 }
 
 /**
- * The screen's own sea photo (fx/scenes) under a navy veil, with a soft glow of the screen's accent behind the
- * header. The veil is darkest at the top and bottom, where headers and tab bars sit, so the photo shows mostly
- * between cards; bright photos carry a stronger `veil`. `strength` is the photo's opacity (0–1).
+ * The screen's own sea photo (fx/scenes) under a veil of the background color, with a soft glow of the screen's
+ * accent behind the header. The veil is thickest at the top and bottom, where headers and tab bars sit, so the
+ * photo shows mostly between cards; bright photos carry a stronger `veil`. `strength` is the photo's opacity (0–1).
+ * The light scheme shows the photo faintly under a paper veil, as a cool wash rather than a picture.
  */
 export function Backdrop({ scene, strength = 0.9 }: { scene: Scene; strength?: number }) {
+  const { surface, dark } = useTheme();
   const v = scene.veil ?? 0.18;
+  const c = surface.veil;
+  const a = (x: number) => (dark ? x : Math.min(x + 0.22, 0.94));
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden' }]}>
-      <Image source={scene.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength }]} />
+      <Image source={scene.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: strength * surface.photo }]} />
       <LinearGradient
-        colors={['rgba(8,15,30,0.7)', `rgba(8,15,30,${v})`, `rgba(8,15,30,${Math.min(v + 0.12, 0.9)})`, 'rgba(8,15,30,0.86)']}
+        colors={[`rgba(${c},${a(0.7)})`, `rgba(${c},${a(v)})`, `rgba(${c},${a(Math.min(v + 0.12, 0.9))})`, `rgba(${c},${a(0.86)})`]}
         locations={[0, 0.3, 0.66, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <Image source={GLOW} style={[s.glow, { alignSelf: 'center', top: -320, opacity: 0.22, tintColor: scene.light }]} />
+      <Image source={GLOW} style={[s.glow, { alignSelf: 'center', top: -320, opacity: 0.22 * surface.glow, tintColor: scene.light }]} />
     </View>
   );
 }
@@ -70,21 +76,25 @@ export function Backdrop({ scene, strength = 0.9 }: { scene: Scene; strength?: n
 /** Frosted glass for surfaces that float over scrolling content (bars, headers, sheets). */
 export function Glass({ children, style, intensity = 45 }: { children?: ReactNode; style?: StyleProp<ViewStyle>; intensity?: number }) {
   // Android without a blur target shows BlurView as a plain translucent layer; the tint keeps text legible there too.
+  const { surface } = useTheme();
   return (
     <View style={[{ overflow: 'hidden' }, style]}>
-      <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,15,30,0.55)' }]} />
+      <BlurView intensity={intensity} tint={surface.blurTint} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: surface.glass }]} />
       {children}
     </View>
   );
 }
 
-const DEPTH = ['#1C2E4A', '#132239'] as const;
-
-/** The default card: a top-lit gradient, a faint rim, an edge highlight and a soft drop shadow. */
-export function DepthCard({ children, style, tint = DEPTH }: { children?: ReactNode; style?: StyleProp<ViewStyle>; tint?: readonly [string, string, ...string[]] }) {
+/**
+ * The default card: a top-lit gradient, a faint rim, an edge highlight and a soft drop shadow. Without a `tint` it
+ * takes the scheme's card gradient (night blue, or white in the light scheme).
+ */
+export function DepthCard({ children, style, tint }: { children?: ReactNode; style?: StyleProp<ViewStyle>; tint?: readonly [string, string, ...string[]] }) {
+  const { surface } = useTheme();
+  const d = useDepth();
   return (
-    <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 0.35, y: 1 }} style={[s.depth, style]}>
+    <LinearGradient colors={tint ?? surface.depth} start={{ x: 0, y: 0 }} end={{ x: 0.35, y: 1 }} style={[d.depth, style]}>
       <EdgeLight />
       {children}
     </LinearGradient>
@@ -157,9 +167,19 @@ const s = StyleSheet.create({
   glow: { position: 'absolute', width: 460, height: 460 },
   edge: { position: 'absolute', top: 0, height: 1 },
   gloss: { position: 'absolute', top: 0, left: 0, right: 0, height: '52%' },
-  depth: { borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', boxShadow: '0 8px 20px rgba(0,0,0,0.35)' },
   shine: { position: 'absolute', top: -30, bottom: -30, width: SHINE_W },
 });
 
-/** Translucent chip/pill fill that reads as glass over the ambient glow. */
+const useDepth = makeStyles(({ surface, dark }) => ({
+  depth: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: surface.rim,
+    boxShadow: dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)',
+  },
+}));
+
+/** Translucent chip/pill fill that reads as glass over the ambient glow (dark surfaces; screens use glassChipOf). */
 export const glassChip = { backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' } as const;
+/** glassChip in the given scheme's ink, for makeStyles: `tabs: { ...glassChipOf(t) }`. */
+export const glassChipOf = (t: Theme) => ({ backgroundColor: t.ink(0.06), borderWidth: 1, borderColor: t.ink(0.1) }) as const;

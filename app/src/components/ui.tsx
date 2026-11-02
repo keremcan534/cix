@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, type ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { cosmeticById } from '@/data/catalog';
@@ -13,11 +13,12 @@ import { goBack } from '@/lib/nav';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { useSettings } from '@/store';
-import { colors, fonts, gradient, semantic } from '@/theme';
+import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 
 export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
+  const { colors, semantic, gradient } = useTheme();
   // No photo (sample people carry none): a tinted disc with the name's initial, or a person glyph.
   const face = (style: object) =>
     uri ? (
@@ -25,9 +26,9 @@ export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; s
     ) : (
       <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
         {name?.trim() ? (
-          <Text style={{ color: semantic.action, fontSize: Math.round(size * 0.42), fontWeight: '800' }}>{name.trim().charAt(0).toLocaleUpperCase('tr-TR')}</Text>
+          <Text style={{ color: semantic.actionText, fontSize: Math.round(size * 0.42), fontWeight: '800' }}>{name.trim().charAt(0).toLocaleUpperCase('tr-TR')}</Text>
         ) : (
-          <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.action} />
+          <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.actionText} />
         )}
       </View>
     );
@@ -61,14 +62,17 @@ export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; s
 
 /** Icon for empty, locked and permission states: a line icon in a soft tinted disc, never a big emoji. */
 export function StateIcon({ name, size = 64, tone = 'action' }: { name: keyof typeof Ionicons.glyphMap; size?: number; tone?: 'action' | 'money' | 'social' }) {
+  const { semantic } = useTheme();
+  // The disc is tinted with the fill color; the glyph uses the text color so it reads on light screens too.
   const c = tone === 'money' ? semantic.money : tone === 'social' ? semantic.social : semantic.action;
+  const ink = tone === 'money' ? semantic.moneyText : tone === 'social' ? semantic.socialText : semantic.actionText;
   return (
     <View
       style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: `${c}1A`, borderWidth: 1, borderColor: `${c}4D` }}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Ionicons name={name} size={Math.round(size * 0.44)} color={c} />
+      <Ionicons name={name} size={Math.round(size * 0.44)} color={ink} />
     </View>
   );
 }
@@ -78,6 +82,8 @@ export function VerifiedBadge({ size = 14 }: { size?: number }) {
 }
 
 export function VipBadge() {
+  const { semantic } = useTheme();
+  const styles = useStyles();
   return (
     <LinearGradient colors={semantic.status} style={styles.vip}>
       <Text style={[styles.vipText, { color: semantic.statusInk }]}>VIP</Text>
@@ -108,6 +114,8 @@ export function Button({
   variant?: ButtonVariant;
   disabled?: boolean;
 }) {
+  const { colors, semantic, gradient } = useTheme();
+  const styles = useStyles();
   const raised = variant === 'hero' || variant === 'money';
   // A thin key edge: enough to feel pressable, not a toy.
   const edge = 2;
@@ -160,10 +168,13 @@ export function GradientButton(props: { title: string; onPress?: () => void; ico
 }
 
 export function Screen({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
   return <View style={{ flex: 1, backgroundColor: colors.bg }}>{children}</View>;
 }
 
 export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={styles.coin}>
       <Icon3D name="coin" size={18} />
@@ -173,7 +184,7 @@ export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => vo
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic }) => ({
   vip: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   vipText: { color: '#3B2300', fontSize: 11, fontWeight: '800' },
   btn: {
@@ -205,13 +216,16 @@ const styles = StyleSheet.create({
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
   textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center' },
+  headerTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center' },
   headerSide: { flex: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center' },
   headerBack: { width: 40, height: 40, justifyContent: 'center' },
-});
+}));
 
 /** Secondary action inside a card: colored text with a chevron instead of a typed arrow. */
-export function TextLink({ title, onPress, color = colors.primaryText }: { title: string; onPress: () => void; color?: string }) {
+export function TextLink({ title, onPress, color: own }: { title: string; onPress: () => void; color?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const color = own ?? colors.primaryText;
   return (
     <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={styles.textLink}>
       <Text style={{ color, fontWeight: '700' }}>{title}</Text>
@@ -221,12 +235,14 @@ export function TextLink({ title, onPress, color = colors.primaryText }: { title
 }
 
 export function Header({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     // Equal flexible sides keep the title on the screen's centre line whatever sits on the right.
     <View style={styles.header}>
       <View style={styles.headerSide}>
         <Pressable onPress={() => (onBack ? onBack() : goBack())} hitSlop={8} style={styles.headerBack} accessibilityRole="button" accessibilityLabel="Geri">
-          <Ionicons name="chevron-back" size={26} color="#fff" />
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
       </View>
       <Text style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
@@ -242,6 +258,7 @@ export function Header({ title, right, onBack }: { title: string; right?: ReactN
 export const FramedAvatar = memo(FramedAvatarBase);
 function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artScale }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number }) {
   const settings = useSettings();
+  const { colors } = useTheme();
   const tier = vipTier(vipLevel);
   const frame = cosmeticById(frameId);
   const art = frameArtOf(frame?.id);
@@ -288,6 +305,7 @@ export function CharmBadge({ level, size = 'sm' }: { level: number; size?: 'sm' 
   return <TierBadge tier={charmTier(level)} level={level} size={size} label={`Yankı seviyesi ${level}`} />;
 }
 function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: 'sm' | 'lg'; label: string }) {
+  const styles = useStyles();
   const lg = size === 'lg';
   return (
     <LinearGradient
@@ -316,6 +334,7 @@ export function LevelChips({ wealth, charm, hideWealth, hideCharm }: { wealth: n
 }
 
 export function VipTitle({ level }: { level: number }) {
+  const styles = useStyles();
   const tier = vipTier(level);
   if (!tier) return null;
   return (
@@ -327,14 +346,17 @@ export function VipTitle({ level }: { level: number }) {
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[{ backgroundColor: colors.card, borderRadius: 18, padding: 16 }, style]}>{children}</View>;
+  const { colors, lift } = useTheme();
+  return <View style={[{ backgroundColor: colors.card, borderRadius: 18, padding: 16 }, lift, style]}>{children}</View>;
 }
 
 export function DiamondPill({ diamonds }: { diamonds: number }) {
+  const { semantic } = useTheme();
+  const styles = useStyles();
   return (
     <View style={[styles.coin, { backgroundColor: 'rgba(56,189,248,0.15)' }]}>
       <Icon3D name="diamond" size={17} />
-      <Text style={[styles.coinText, { color: '#7DD3FC' }]}>{diamonds.toLocaleString('tr-TR')}</Text>
+      <Text style={[styles.coinText, { color: semantic.diamondText }]}>{diamonds.toLocaleString('tr-TR')}</Text>
     </View>
   );
 }

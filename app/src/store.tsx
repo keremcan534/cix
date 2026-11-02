@@ -1,5 +1,7 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
+import { StatusBar } from 'expo-status-bar';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Appearance as SystemAppearance, useColorScheme } from 'react-native';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
 import { COSMETICS, FREE_PACK_IDS, ROOM_THEMES, ROOM_TYPES, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
@@ -23,6 +25,7 @@ import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
+import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 
@@ -38,6 +41,8 @@ export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'sy
 export type Ticket = { id: string; number: string; category: TicketCategory; text: string; status: 'Açık' | 'Yanıtlandı' | 'Çözüldü' | 'Yeniden açıldı'; time: string; replies: { from: 'me' | 'support'; text: string; time: string }[] };
 export type NotifyType = 'live' | 'invite' | 'event' | 'agency' | 'fanclub' | 'game' | 'payment' | 'system';
 export type Settings = {
+  /** Ayarlar › Görünüm: follow the phone, or always light / dark. */
+  appearance: Appearance;
   effectsOff: boolean;
   haptics: boolean;
   reduceMotion: boolean;
@@ -403,6 +408,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   const [settings, setSettings] = useState<Settings>(() => {
     const defaults: Settings = {
+      appearance: 'system',
       effectsOff: false,
       haptics: true,
       invisibleEntry: false,
@@ -433,7 +439,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       hideCharm: false,
     };
     const saved = withDefaults(defaults, s.settings);
-    return { ...saved, notifyTypes: withDefaults(defaults.notifyTypes, saved.notifyTypes) };
+    return {
+      ...saved,
+      appearance: oneOf(saved.appearance, APPEARANCES) ?? defaults.appearance,
+      notifyTypes: withDefaults(defaults.notifyTypes, saved.notifyTypes),
+    };
   });
   const settingsRef = useRef(settings);
   useEffect(() => {
@@ -978,8 +988,32 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   return (
     <Ctx.Provider value={value}>
-      <SettingsCtx.Provider value={settings}>{children}</SettingsCtx.Provider>
+      <SettingsCtx.Provider value={settings}>
+        <AppTheme appearance={settings.appearance}>{children}</AppTheme>
+      </SettingsCtx.Provider>
     </Ctx.Provider>
+  );
+}
+
+const APPEARANCES = ['system', 'light', 'dark'] as const;
+
+/**
+ * The app's color scheme: the Görünüm setting, or the phone's when it is `system`. Native views (alerts, the
+ * keyboard) follow the same choice. The status bar here is mounted after the root layout's, so it decides the
+ * bar's style; rooms and calls, which stay dark, mount their own on top while they are open.
+ */
+function AppTheme({ appearance, children }: { appearance: Appearance; children: ReactNode }) {
+  const system = useColorScheme();
+  const scheme: Scheme = appearance === 'system' ? (system === 'light' ? 'light' : 'dark') : appearance;
+  useEffect(() => {
+    // Web has no app-level override; the browser's own setting is what `system` reads there.
+    SystemAppearance.setColorScheme?.(appearance === 'system' ? 'auto' : appearance);
+  }, [appearance]);
+  return (
+    <ThemeScope scheme={scheme}>
+      {children}
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    </ThemeScope>
   );
 }
 
