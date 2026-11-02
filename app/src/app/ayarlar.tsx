@@ -1,6 +1,6 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +8,7 @@ import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
+import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
@@ -43,6 +44,7 @@ const coin = <Icon3D name="coin" size={14} />;
 
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
+  const [licenses, setLicenses] = useState(false);
   const snoozed = settings.snoozeUntil > nowMs();
   const snooze = (h: number) => {
     setSetting('snoozeUntil', h ? nowMs() + h * 3_600_000 : 0);
@@ -238,7 +240,7 @@ export default function SettingsScreen() {
             title="Kullanım koşulları ve gizlilik"
             onPress={() => showAlert('Kullanım koşulları', 'Kullanım koşulları ve gizlilik politikası yayın öncesinde hukuk danışmanıyla hazırlanacak.')}
           />
-          <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => router.push('/lisanslar')} />
+          <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => setLicenses(true)} />
         </ListGroup>
 
         <ListGroup
@@ -282,6 +284,7 @@ export default function SettingsScreen() {
           )}
         </ListGroup>
       </ScrollView>
+      <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
     </SafeAreaView>
   );
 }

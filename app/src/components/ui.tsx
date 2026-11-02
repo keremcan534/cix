@@ -205,10 +205,10 @@ export function TextLink({ title, onPress, color = colors.primaryText }: { title
   );
 }
 
-export function Header({ title, right }: { title: string; right?: ReactNode }) {
+export function Header({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
   return (
     <View style={styles.header}>
-      <Pressable onPress={() => goBack()} hitSlop={10} style={{ width: 32 }} accessibilityLabel="Geri">
+      <Pressable onPress={() => (onBack ? onBack() : goBack())} hitSlop={10} style={{ width: 32 }} accessibilityLabel="Geri">
         <Ionicons name="chevron-back" size={26} color="#fff" />
       </Pressable>
       <Text style={styles.headerTitle} numberOfLines={1}>
