@@ -259,13 +259,13 @@ export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online, ar
   );
 }
 
-/** Servet Seviyesi badge: the level group's colors and symbol plus the level number. */
+/** Cömertlik Seviyesi badge: the level group's colors and symbol plus the level number. */
 export function WealthBadge({ level, size = 'sm' }: { level: number; size?: 'sm' | 'lg' }) {
-  return <TierBadge tier={wealthTier(level)} level={level} size={size} label={`Servet seviyesi ${level}`} />;
+  return <TierBadge tier={wealthTier(level)} level={level} size={size} label={`Cömertlik seviyesi ${level}`} />;
 }
-/** Cazibe Seviyesi badge (same shape, its own colors and symbols). */
+/** Yankı Seviyesi badge (same shape, its own colors and symbols). */
 export function CharmBadge({ level, size = 'sm' }: { level: number; size?: 'sm' | 'lg' }) {
-  return <TierBadge tier={charmTier(level)} level={level} size={size} label={`Cazibe seviyesi ${level}`} />;
+  return <TierBadge tier={charmTier(level)} level={level} size={size} label={`Yankı seviyesi ${level}`} />;
 }
 function TierBadge({ tier: t, level, size, label }: { tier: LevelTier; level: number; size: 'sm' | 'lg'; label: string }) {
   const lg = size === 'lg';

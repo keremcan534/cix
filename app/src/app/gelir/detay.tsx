@@ -79,7 +79,7 @@ export default function EarningsDetail() {
                 onInfo={() =>
                   showAlert(
                     'Toplanmamış Gelir',
-                    'Kazanılmış ancak henüz elmas bakiyene aktarılmamış gelirdir (ör. haftalık hesaplanan aile ve ajans bonusları, incelemedeki işlemler). Hesaplama tamamlanınca otomatik olarak bakiyene eklenir.',
+                    'Kazanılmış ancak henüz elmas bakiyene aktarılmamış gelirdir (ör. haftalık hesaplanan tayfa ve ajans bonusları, incelemedeki işlemler). Hesaplama tamamlanınca otomatik olarak bakiyene eklenir.',
                   )
                 }
               />
@@ -156,7 +156,7 @@ function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () 
   gifts.forEach((e) => {
     const g = e.gift;
     const key = g ? `${g.id}${g.lucky ? ':lucky' : ''}` : 'unknown';
-    const cur = groups.get(key) ?? { label: g ? `${g.emoji} ${g.name}${g.lucky ? ' (Lucky)' : ''}` : '🎁 Hediye (eski kayıt)', count: 0, total: 0, senders: new Map<string, number>() };
+    const cur = groups.get(key) ?? { label: g ? `${g.emoji} ${g.name}${g.lucky ? ' (Uğurlu)' : ''}` : '🎁 Hediye (eski kayıt)', count: 0, total: 0, senders: new Map<string, number>() };
     cur.count += g?.count ?? 1;
     cur.total += e.amount;
     if (e.fromId) cur.senders.set(e.fromId, (cur.senders.get(e.fromId) ?? 0) + 1);

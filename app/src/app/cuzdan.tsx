@@ -10,11 +10,10 @@ import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, fonts, semantic } from '@/theme';
+import { colors, semantic } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
-import { Art } from '@/components/Art';
 import { IS_DEMO } from '@/lib/build';
 
 export default function WalletScreen() {
@@ -31,7 +30,7 @@ export default function WalletScreen() {
     setTimeout(() => {
       const total = buyPack(pack.id);
       setProcessing(null);
-      showAlert('Başarılı 🎉', `${total.toLocaleString('tr-TR')} jeton hesabına eklendi. +${pack.coins.toLocaleString('tr-TR')} SVIP deneyim puanı. (Demo – gerçek ödeme alınmadı)`);
+      showAlert('Başarılı 🎉', `${total.toLocaleString('tr-TR')} jeton hesabına eklendi. +${pack.coins.toLocaleString('tr-TR')} İnci puanı. (Demo – gerçek ödeme alınmadı)`);
     }, 1200);
   };
   const rows = ledger.filter((r) => r.currency === filter);
@@ -104,7 +103,7 @@ export default function WalletScreen() {
               <Pressable
                 onPress={() => {
                   addCoins(1_000_000, 'Demo test bakiyesi');
-                  showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, SVIP puanı vermez)');
+                  showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, İnci puanı vermez)');
                 }}
                 style={styles.testBtn}
                 accessibilityRole="button"
@@ -115,13 +114,6 @@ export default function WalletScreen() {
               </Pressable>
             )}
           </View>
-          <Pressable onPress={() => router.push('/vip')} accessibilityLabel="SVIP Sistemi">
-            <LinearGradient colors={['#78350F', '#0B3B4A', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-              <Text style={styles.bannerTitle}>SVIP Sistemi</Text>
-              <Text style={{ color: '#FDE7C7', fontSize: 12 }}>{svipLevel ? `SVIP${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Her yüklenen jeton = 1 deneyim puanı'}</Text>
-              <Art name="finans-vip-elmas-paketi" size={52} style={{ position: 'absolute', right: 16, top: 8 }} />
-            </LinearGradient>
-          </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
             <View style={styles.flag}>
@@ -141,7 +133,7 @@ export default function WalletScreen() {
                   >
                     {first && (
                       <View style={styles.firstTag}>
-                        <Text style={styles.firstTagText}>İlk alıma özel</Text>
+                        <Text style={styles.firstTagText}>Hoş geldin paketi</Text>
                       </View>
                     )}
                     <Icon3D name="coin" size={40} />
@@ -153,6 +145,10 @@ export default function WalletScreen() {
               );
             })}
           </View>
+          <Pressable onPress={() => router.push('/vip')} style={styles.svipLink} accessibilityRole="link" accessibilityLabel="İnci seviyelerine bak">
+            <Text style={styles.svipLinkText}>İnci seviyelerine bak →</Text>
+            <Text style={styles.svipLinkSub}>{svipLevel ? `İnci ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
+          </Pressable>
           <Text style={styles.note}>Yüklemeye devam ederek Kullanım Koşulları ve Ödeme Sözleşmesi&apos;ni okuduğunu ve kabul ettiğini onaylarsın. Prototip: ödeme simüle edilir; iade/itiraz için Destek.</Text>
         </ScrollView>
       )}
@@ -176,12 +172,13 @@ const styles = StyleSheet.create({
   balanceN: { color: '#fff', fontSize: 32, fontWeight: '800' },
   section: { color: '#fff', fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
-  pack: { alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-  packFirst: { borderColor: 'rgba(246,189,96,0.75)' },
-  banner: { marginHorizontal: 16, borderRadius: 14, padding: 16, gap: 4, overflow: 'hidden' },
-  bannerTitle: { color: '#FDE68A', fontSize: 21, fontFamily: fonts.display, letterSpacing: -0.3 },
+  pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  packFirst: { borderColor: 'rgba(246,189,96,0.75)', paddingTop: 12 },
+  svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },
+  svipLinkText: { color: colors.gold, fontWeight: '700', fontSize: 14 },
+  svipLinkSub: { color: colors.textDim, fontSize: 12 },
   flag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  firstTag: { position: 'absolute', top: -9, alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  firstTag: { alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   firstTagText: { color: semantic.moneyInk, fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
   packSelected: { borderColor: colors.primaryText },

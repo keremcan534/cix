@@ -17,7 +17,7 @@ import { colors } from '@/theme';
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
 type Unit = 'coin' | 'diamond' | 'people' | 'xp';
 const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: Unit; how: string }[] = [
-  { key: 'zengin', label: 'Zenginler', emoji: '💰', art: 'siralama-zenginler', unit: 'coin', how: 'Geçerli hediye harcaması' },
+  { key: 'zengin', label: 'Cömertler', emoji: '💰', art: 'siralama-zenginler', unit: 'coin', how: 'Geçerli hediye harcaması' },
   { key: 'yayinci', label: 'Yayıncılar', emoji: '🎙️', art: 'siralama-yayincilar', unit: 'diamond', how: 'Alınan geçerli hediyeler (elmas)' },
   { key: 'oda', label: 'Odalar', emoji: '🔥', art: 'siralama-odalar', unit: 'people', how: 'Tekil katılımcı' },
   { key: 'ajans', label: 'Ajanslar', emoji: '🏢', art: 'siralama-ajanslar', unit: 'diamond', how: 'Ajans yayıncılarının toplam geçerli kazancı' },

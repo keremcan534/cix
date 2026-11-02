@@ -8,14 +8,14 @@ import { ROOMS, userById, type Room } from '@/data/mock';
 export type RankCard = { key: string; title: string; board: string; colors: readonly [string, string]; avatars: string[] };
 const topRoomCovers = [...ROOMS].sort((a, b) => b.listeners - a.listeners).slice(0, 3).map((r) => r.cover);
 export const RANK_CARDS: RankCard[] = [
-  { key: 'cazibe', title: 'Cazibe Listesi', board: 'yayinci', colors: ['#5A2232', '#2A1A24'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
-  { key: 'zengin', title: 'Zenginler', board: 'zengin', colors: ['#5C4012', '#2E2414'], avatars: LEADERBOARDS.zengin.daily.slice(0, 3).map((r) => r.user.avatar) },
-  { key: 'oda', title: 'En İyi Odalar', board: 'oda', colors: ['#0B4F63', '#12304A'], avatars: topRoomCovers },
+  { key: 'cazibe', title: 'Yankı Listesi', board: 'yayinci', colors: ['#5A2232', '#2A1A24'], avatars: LEADERBOARDS.yayinci.daily.slice(0, 3).map((r) => r.user.avatar) },
+  { key: 'zengin', title: 'Cömertler', board: 'zengin', colors: ['#5C4012', '#2E2414'], avatars: LEADERBOARDS.zengin.daily.slice(0, 3).map((r) => r.user.avatar) },
+  { key: 'oda', title: 'Haftanın Odaları', board: 'oda', colors: ['#0B4F63', '#12304A'], avatars: topRoomCovers },
   { key: 'dost', title: 'Dost Listesi', board: 'odaxp', colors: ['#0B3B4A', '#16253C'], avatars: ['u5', 'u11', 'u2'].map((id) => userById(id).avatar) },
 ];
 
 // --- Category tabs --------------------------------------------------------------------------
-export const ROOM_TABS = ['Popüler', 'Video', 'PK', 'CP', 'Gösteri'] as const;
+export const ROOM_TABS = ['Popüler', 'Görüntülü', 'PK', 'İkili', 'Sahne'] as const;
 export type RoomTab = (typeof ROOM_TABS)[number];
 
 // --- Countries (globe button) ---------------------------------------------------------------
@@ -42,7 +42,7 @@ type RoomExtra = {
   note?: string;
 };
 const ROOM_EXTRA: Record<string, RoomExtra> = {
-  r1: { familyId: 'f1', video: true, note: 'Aile davet kodu GECE01 · hoş geldin 🌙' },
+  r1: { familyId: 'f1', video: true, note: 'Tayfa davet kodu GECE01 · hoş geldin 🌙' },
   r2: { agencyId: 'a1', top: 1, pk: true },
   r3: { familyId: 'f3' },
   r4: { familyId: 'f4', top: 2, cp: true, video: true },
@@ -81,13 +81,13 @@ export const matchesTab = (room: Room, tab: RoomTab) => {
   switch (tab) {
     case 'Popüler':
       return true;
-    case 'Video':
+    case 'Görüntülü':
       return !!x.video;
     case 'PK':
       return room.theme === 'pk' || !!x.pk || room.tags.includes('PK');
-    case 'CP':
+    case 'İkili':
       return !!x.cp || room.theme === 'friends' || room.category === 'Arkadaşlık';
-    case 'Gösteri':
+    case 'Sahne':
       return room.theme === 'music' || room.roomType === 'music' || room.roomType === 'stage';
   }
 };
@@ -107,8 +107,8 @@ export const isMemberRoom = (id: string, agencyId: string | null, familyId: stri
 };
 
 export const ROOM_BANNER = {
-  title: 'Mikrofon Pozisyonu Yükseltmesi Seni Bekliyor',
-  sub: 'Oda seviyeni yükselt, daha fazla mikrofon aç',
+  title: 'Odana daha fazla koltuk aç',
+  sub: 'Oda seviyen yükseldikçe sahnede yer açılır',
   emoji: '🎤',
   colors: ['#2563EB', '#087A80'] as const,
 };

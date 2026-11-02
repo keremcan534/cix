@@ -1,4 +1,4 @@
-// Seviyeler: Servet Seviyesi (spending) and Cazibe Seviyesi (others' engagement) share one layout:
+// Seviyeler: Cömertlik Seviyesi (spending) and Yankı Seviyesi (others' engagement) share one layout:
 // my progress, the level groups, what each level opens, and a guide with the full points table.
 // Open on the charm tab with /seviye?tab=charm.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -38,9 +38,9 @@ type System = {
 };
 const SYSTEMS: Record<Kind, System> = {
   wealth: {
-    title: 'Servet',
+    title: 'Cömertlik',
     art: 'seviye-servet-seviyesi',
-    point: 'Servet puanı',
+    point: 'Cömertlik puanı',
     table: WEALTH_XP,
     tiers: WEALTH_TIERS,
     perks: WEALTH_PERKS,
@@ -50,9 +50,9 @@ const SYSTEMS: Record<Kind, System> = {
     estimated: WEALTH_ESTIMATED,
   },
   charm: {
-    title: 'Cazibe',
+    title: 'Yankı',
     art: 'seviye-cazibe-seviyesi',
-    point: 'Cazibe puanı',
+    point: 'Yankı puanı',
     table: CHARM_XP,
     tiers: CHARM_TIERS,
     perks: CHARM_PERKS,
@@ -163,18 +163,18 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Pressable onPress={() => router.push('/vip')} style={s.card} accessibilityLabel="Ayrıcalıklarım">
             <Text style={s.cardTitle}>Diğer ayrıcalıklarım</Text>
             <Text style={s.row}>
-              SVIP: {svipLevel ? `SVIP${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · SVIP${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
+              İnci: {svipLevel ? `İnci ${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · İnci ${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={s.row}>Asil:</Text>
+              <Text style={s.row}>Rütbe:</Text>
               {noble && <Art name={noble.art} size={18} />}
               <Text style={s.row}>{noble ? `${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}</Text>
             </View>
             <Text style={s.row}>VIP: {vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}</Text>
-            <Text style={[s.row, { color: colors.gold }]}>Ayrıcalık merkezine git ›</Text>
+            <Text style={[s.row, { color: colors.gold }]}>Ayrıcalıklara git ›</Text>
           </Pressable>
         )}
-        <Text style={s.dim}>Servet ve Cazibe seviyeleri kalıcıdır ve düşmez; VIP ve Asil süreli, SVIP ise yükleme deneyimiyle kalıcı olarak yükselir.</Text>
+        <Text style={s.dim}>Cömertlik ve Yankı seviyeleri kalıcıdır, düşmez. VIP ve Rütbe süreli; İnci ise yükledikçe yükselir ve kalıcıdır.</Text>
       </View>
     </ScrollView>
   );
@@ -235,15 +235,15 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
 
 const GUIDE: Record<Kind, { title: string; art?: ArtName; body: string[] }[]> = {
   wealth: [
-    { title: 'Servet seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça servet puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
-    { title: '🎁 Ne işe yarar?', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Casino oyunları Servet Lv.2 ile açılır.'] },
-    { title: '📈 Puan nasıl kazanılır?', body: ['Harcanan her 1 jeton 1 servet puanıdır. Sayılanlar: odada ve sohbette hediye, Lucky hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, kabile kurma ve kabile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
+    { title: 'Cömertlik seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
+    { title: '🎁 Ne işe yarar?', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Oyun Salonu Cömertlik Lv.2 ile açılır.'] },
+    { title: '📈 Puan nasıl kazanılır?', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Uğurlu hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, tayfa kurma ve tayfa hediyeleri, oda etkinlikleri ve animasyonlar.'] },
     { title: '⚠️ Sayılmayanlar', body: ['• Jetonla oynanan şans oyunları ve zar düellosu.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
   ],
   charm: [
-    { title: 'Cazibe seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir cazibe seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
-    { title: '💎 Kazancını ve popülerliğini etkiler', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında cazibesi yüksek olan daha üstte gösterilir.'] },
-    { title: '📈 Puan nasıl kazanılır?', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 cazibe puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
+    { title: 'Yankı seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
+    { title: '💎 Kazancını ve popülerliğini etkiler', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.'] },
+    { title: '📈 Puan nasıl kazanılır?', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
     { title: '⚠️ Dikkat', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
   ],
 };

@@ -17,7 +17,6 @@ import { privacyOf } from '@/data/privacy';
 import { staffBadgeOf } from '@/data/rbac';
 import { COUNTRIES } from '@/data/social-ui';
 import {
-  GIFT_CATALOG_TOTAL,
   GIFT_COLLECTIONS,
   collectionProgress,
   displayId,
@@ -51,9 +50,9 @@ const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', '
 type Tab = 'profil' | 'dinamik' | 'onur' | 'iliski';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'profil', label: 'Profil' },
-  { id: 'dinamik', label: 'Dinamik' },
-  { id: 'onur', label: 'Onur' },
-  { id: 'iliski', label: 'İlişki' },
+  { id: 'dinamik', label: 'Anlar' },
+  { id: 'onur', label: 'Vitrin' },
+  { id: 'iliski', label: 'Bağlar' },
 ];
 type Sheet = 'none' | 'more' | 'report' | 'call' | 'gift';
 type InviteKind = 'cp' | 'dost' | 'meet';
@@ -77,7 +76,7 @@ export default function UserProfile() {
   const moments = MOMENTS.filter((m) => m.userId === user.id);
   const photos = moments.filter((m) => m.image).map((m) => m.image!);
   const completion = profileCompletion(user, extras, photos.length);
-  // Others: demo values; me: my real Servet and Cazibe levels.
+  // Others: demo values; me: my real Cömertlik (wealth) and Yankı (charm) levels.
   const levels = user.id === 'me' ? { wealth: wealthLevel, charm: charmLevel } : wealthCharmOf(user.id);
   const guardian = guardianOf(user.id);
   const relations = relationsOf(user.id);
@@ -141,8 +140,8 @@ export default function UserProfile() {
     });
 
   const deliverGift = (g: Gift) => {
-    // Same SVIP lock as the room's gift sheet.
-    if ((g.minSvip ?? 0) > svipLevel) return showAlert('SVIP hediyesi', `${g.name}, SVIP ${g.minSvip} ve üzerine özel. Senin seviyen: SVIP ${svipLevel}.`);
+    // Same İnci (SVIP) lock as the room's gift sheet.
+    if ((g.minSvip ?? 0) > svipLevel) return showAlert('Üyelere özel hediye', `${g.name}, İnci ${g.minSvip} ve üstü için. Senin seviyen: İnci ${svipLevel}.`);
     if (!spendCoins(g.price, `Hediye: ${g.name} → ${user.name}`)) {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
@@ -167,7 +166,7 @@ export default function UserProfile() {
     if (sentInvites.includes(key)) return showAlert('Davet zaten gönderildi', `${target.name} henüz yanıt vermedi.`);
     setSentInvites((l) => [...l, key]);
     const copy = {
-      cp: { icon: 'heart' as const, title: 'CP daveti gönderildi', body: `${target.name} kişisine CP oluşturma daveti gönderdin. Kabul ederse ilişki sekmesinde görünecek.` },
+      cp: { icon: 'heart' as const, title: 'İkili daveti gönderildi', body: `${target.name} kişisine İkili daveti gönderdin. Kabul ederse Bağlar sekmesinde görünecek.` },
       dost: { icon: 'people' as const, title: 'Dost daveti gönderildi', body: `${target.name} kişisine dostluk daveti gönderdin.` },
       meet: { icon: 'home' as const, title: 'Buluşma odası daveti', body: `${target.name} kişisini buluşma odana davet ettin.` },
     }[kind];
@@ -181,7 +180,7 @@ export default function UserProfile() {
       setPickerKind(kind);
       return;
     }
-    const label = kind === 'cp' ? 'CP oluşturma daveti' : kind === 'dost' ? 'Dost daveti' : 'Buluşma odası daveti';
+    const label = kind === 'cp' ? 'İkili daveti' : kind === 'dost' ? 'Dost daveti' : 'Buluşma odası daveti';
     showAlert(label, `${user.name} kişisine ${label.toLocaleLowerCase('tr-TR')} gönderilsin mi?`, [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Gönder', onPress: () => sendInvite(kind, user.id) },
@@ -568,7 +567,7 @@ export default function UserProfile() {
             <AffiliationSection title="Ajans" item={agency} empty={isMe ? 'Katıl' : 'Ajansı yok'} emptyHref={isMe ? '/ajans' : undefined} />
             <Band />
 
-            <AffiliationSection title="Kabile" item={kabile} empty={isMe ? 'Katıl' : 'Kabilesi yok'} emptyHref={isMe ? '/aile' : undefined} />
+            <AffiliationSection title="Tayfa" item={kabile} empty={isMe ? 'Katıl' : 'Tayfası yok'} emptyHref={isMe ? '/aile' : undefined} />
           </View>
         )}
 
@@ -678,7 +677,7 @@ export default function UserProfile() {
         visible={sheet === 'gift'}
         title={`${user.name} kişisine hediye gönder`}
         onClose={() => setSheet('none')}
-        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}${(g.minSvip ?? 0) > svipLevel ? ` · 🔒 SVIP ${g.minSvip}` : ''}`, onPress: () => sendGift(g) }))}
+        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}${(g.minSvip ?? 0) > svipLevel ? ` · 🔒 İnci ${g.minSvip}` : ''}`, onPress: () => sendGift(g) }))}
       />
 
       {editOpen && (
@@ -695,7 +694,7 @@ export default function UserProfile() {
 
       <UserPicker
         visible={pickerKind !== null}
-        title={pickerKind === 'dost' ? 'Dost daveti gönder' : 'CP oluşturma daveti'}
+        title={pickerKind === 'dost' ? 'Dost daveti gönder' : 'İkili daveti gönder'}
         users={pickerUsers}
         pending={pickerKind ? sentInvites.filter((k) => k.startsWith(`${pickerKind}:`)).map((k) => k.split(':')[1]) : []}
         onClose={() => setPickerKind(null)}
@@ -719,9 +718,9 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
       onPress={() =>
         g
           ? router.push(`/kullanici/${g.id}`)
-          : showAlert('KORUMA', 'Bu profilin henüz bir koruması yok. Hayran kulübünde en çok destek veren kişi KORUMA olur.')
+          : showAlert('Fener Bekçisi', 'Bu profilin henüz bekçisi yok. Hayran kulübünde en çok destek veren kişi Fener Bekçisi olur.')
       }
-      accessibilityLabel="Koruma"
+      accessibilityLabel="Fener Bekçisi"
     >
       {g ? (
         <View style={styles.guardianRing}>
@@ -734,7 +733,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
       )}
       <LinearGradient colors={['#FDE68A', '#F59E0B', '#B45309']} style={styles.guardianLabel}>
         <Ionicons name="shield" size={10} color="#5B2A00" />
-        <Text style={styles.guardianText}>KORUMA</Text>
+        <Text style={styles.guardianText}>BEKÇİ</Text>
       </LinearGradient>
       {g && guardian && (
         <Text style={[styles.meta, { fontSize: 12, marginTop: 4 }]} numberOfLines={1}>
@@ -933,7 +932,7 @@ function MomentItem({ moment, user }: { moment: Moment; user: User }) {
   );
 }
 
-// --- Onur tab ----------------------------------------------------------------------
+// --- Vitrin (onur) tab ----------------------------------------------------------------------
 
 function WallBanner({ title, colors: bg, right, onPress, subtitle, children }: { title: string; colors: readonly [ColorValue, ColorValue, ...ColorValue[]]; right: ReactNode; onPress?: () => void; subtitle?: string; children: ReactNode }) {
   return (
@@ -983,9 +982,9 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
   return (
     <View style={{ padding: 16, gap: 16 }}>
       <WallBanner
-        title="Madalya Duvarı"
+        title="Madalyalar"
         colors={['#B45309', '#F59E0B', '#92400E']}
-        onPress={explain('Madalya Duvarı', isMe ? 'Etkinliklere katılarak ve görevleri tamamlayarak madalya kazan.' : `${medals.length} madalya kazanılmış.`)}
+        onPress={explain('Madalyalar', isMe ? 'Etkinliklere katılarak ve görevleri tamamlayarak madalya kazan.' : `${medals.length} madalya kazanılmış.`)}
         right={
           <>
             <Text style={styles.wallCount}>🏅 {gold}</Text>
@@ -998,10 +997,10 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
       </WallBanner>
 
       <WallBanner
-        title="Unvan Duvarı"
+        title="Unvanlar"
         colors={['#0B3B4A', '#087A80', '#0B3B4A']}
         subtitle="Yalnızca dinamik unvanları göster"
-        onPress={explain('Unvan Duvarı', 'Sıralamalarda ve etkinliklerde derece yaparak unvan kazan.')}
+        onPress={explain('Unvanlar', 'Sıralamalarda ve etkinliklerde derece yaparak unvan kazan.')}
         right={
           <>
             <Text style={styles.wallCount}>{titles.length}</Text>
@@ -1026,7 +1025,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
       </WallBanner>
 
       <WallBanner
-        title="Araç Duvarı"
+        title="Binekler"
         colors={['#7F1D1D', '#DC2626', '#7F1D1D']}
         onPress={() => router.push('/magaza')}
         right={
@@ -1040,10 +1039,10 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
       </WallBanner>
 
       <View style={[styles.sectionHead, { marginTop: 6 }]}>
-        <Text style={[styles.sectionTitle, { color: '#fff', fontSize: 18 }]}>Hediyeler Duvarı</Text>
+        <Text style={[styles.sectionTitle, { color: '#fff', fontSize: 18 }]}>Hediye Koleksiyonu</Text>
         <View style={{ flex: 1 }} />
         <Text style={styles.meta}>
-          Aydınlatılmış <Text style={{ color: '#fff', fontWeight: '800' }}>{lit}</Text>/{GIFT_CATALOG_TOTAL}
+          Toplanan <Text style={{ color: '#fff', fontWeight: '800' }}>{lit}</Text>/{GIFTS.length}
         </Text>
       </View>
       <View style={styles.giftWall}>
@@ -1086,7 +1085,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
   );
 }
 
-// --- İlişki tab ----------------------------------------------------------------------
+// --- Bağlar (iliski) tab ----------------------------------------------------------------------
 
 function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User; isMe: boolean; relations: { cp: Relation[]; dost: Relation[] }; pending: string[]; onInvite: (k: InviteKind) => void }) {
   const [kind, setKind] = useState<'cp' | 'dost'>('cp');
@@ -1107,7 +1106,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
           <View style={styles.segment}>
             {(['cp', 'dost'] as const).map((k) => (
               <Pressable key={k} style={[styles.segmentItem, kind === k && styles.segmentActive]} onPress={() => setKind(k)}>
-                <Text style={[styles.segmentText, kind === k && { color: '#fff' }]}>{k === 'cp' ? 'CP' : 'Dost'}</Text>
+                <Text style={[styles.segmentText, kind === k && { color: '#fff' }]}>{k === 'cp' ? 'İkili' : 'Dost'}</Text>
               </Pressable>
             ))}
           </View>
@@ -1122,9 +1121,9 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
             style={styles.relIcon}
             onPress={() =>
               showAlert(
-                kind === 'cp' ? 'CP nedir?' : 'Dost nedir?',
+                kind === 'cp' ? 'İkili nedir?' : 'Dost nedir?',
                 kind === 'cp'
-                  ? 'CP, iki kullanıcının karşılıklı kabul ettiği özel ilişkidir. Birlikte geçirilen gün ve hediyelerle seviye atlar; Lv.5 ile düğün ayırtılabilir.'
+                  ? 'İkili, iki kişinin karşılıklı kabul ettiği özel bağdır. Birlikte geçen günler ve hediyelerle seviye atlar; İkili Lv.5 ile tören hakkı açılır.'
                   : 'Dost ilişkisi en yakın arkadaşların için. Kanka, Kardeş, Sırdaş gibi etiketler seçebilirsin.',
               )
             }
@@ -1139,7 +1138,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
             <Text style={{ color: '#A5F3F5', fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
           </Pressable>
         )}
-        {isMe && hidden && <Text style={[styles.meta, { marginTop: 6, textAlign: 'right', fontSize: 12 }]}>İlişkilerin diğer kullanıcılardan gizli.</Text>}
+        {isMe && hidden && <Text style={[styles.meta, { marginTop: 6, textAlign: 'right', fontSize: 12 }]}>Bağların diğer kullanıcılardan gizli.</Text>}
 
         <View style={{ gap: 12, marginTop: 14 }}>
           {showList &&
@@ -1147,7 +1146,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
               <RelationRow key={r.partnerId} user={user} relation={r} kind={kind} canWed={isMe && kind === 'cp'} />
             ))}
           {showList && list.length === 0 && (
-            <Text style={[styles.meta, { textAlign: 'center', paddingVertical: 12 }]}>{kind === 'cp' ? 'Henüz CP yok.' : 'Henüz dost yok.'}</Text>
+            <Text style={[styles.meta, { textAlign: 'center', paddingVertical: 12 }]}>{kind === 'cp' ? 'Henüz İkili yok.' : 'Henüz dost yok.'}</Text>
           )}
           {waiting.map((w) => (
             <View key={w.id} style={[styles.row, styles.pendingRow]}>
@@ -1158,7 +1157,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
           ))}
           <View style={styles.slot}>
             <Text style={styles.slotNo}>{list.length + 1}</Text>
-            <InviteButton icon="add-circle" title={kind === 'cp' ? 'CP oluşturma daveti' : 'Dost daveti gönder'} onPress={() => onInvite(kind)} />
+            <InviteButton icon="add-circle" title={kind === 'cp' ? 'İkili daveti gönder' : 'Dost daveti gönder'} onPress={() => onInvite(kind)} />
           </View>
           <View style={styles.slot}>
             <Text style={styles.slotNo}>{list.length + 2}</Text>
@@ -1203,12 +1202,12 @@ function RelationRow({ user, relation, kind, canWed }: { user: User; relation: R
           style={styles.wedPill}
           onPress={() =>
             relation.level >= 5
-              ? showAlert('Düğün ayırt', `${partner.name} ile düğün salonu ayırtıldı 💒`)
-              : showAlert('Düğün ayırt', `Düğün salonu CP Lv.5 ile açılır. ${partner.name} ile şu an Lv.${relation.level}. Birlikte odada vakit geçirip hediyeleşerek seviye atlayın.`)
+              ? showAlert('Tören hakkı', `${partner.name} ile tören salonu ayrıldı 💒`)
+              : showAlert('Tören hakkı', `Tören hakkı İkili Lv.5 ile açılır. ${partner.name} ile şu an Lv.${relation.level}. Birlikte odada vakit geçirip hediyeleşerek seviye atlayın.`)
           }
         >
           <Text style={{ fontSize: 12 }}>💒</Text>
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Düğün ayırt</Text>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Tören hakkı</Text>
         </Pressable>
       )}
     </View>
@@ -1375,7 +1374,7 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
       </View>
       <Pressable onPress={() => router.push('/seviye')} accessibilityLabel="Seviye ve deneyim puanı">
         <Text style={styles.meta}>
-          Servet puanı {n(p.wealthXp)} · Cazibe puanı {n(p.charmXp)} · Hediye: {n(p.giftsSent)} gönderdin, {n(p.giftsReceived)} aldın ›
+          Cömertlik puanı {n(p.wealthXp)} · Yankı puanı {n(p.charmXp)} · Hediye: {n(p.giftsSent)} gönderdin, {n(p.giftsReceived)} aldın ›
         </Text>
       </Pressable>
     </View>

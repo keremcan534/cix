@@ -1,4 +1,4 @@
-// Servet Seviyesi (wealth level): Lv.0–50 from wealth points. Points come from qualifying coin spending
+// Cömertlik Seviyesi (wealth level): Lv.0–50 from wealth points. Points come from qualifying coin spending
 // (gifts, Lucky gifts at the coins actually spent, paid messages and calls, store, family, room activities).
 // Coin games and coin hand-outs (room envelopes, transfers) never add points.
 // Thresholds are product data; Lv.35 and Lv.36 are interpolated until the product team confirms them.
@@ -30,22 +30,22 @@ export const countsForWealth = (reason: string) => !NOT_COUNTED.some((r) => r.te
 
 /** Level groups share an emblem; each has its own colors and symbol. */
 export type LevelIcon = 'leaf' | 'diamond-outline' | 'diamond' | 'flower' | 'ribbon' | 'flame' | 'sparkles' | 'shield' | 'star' | 'planet' | 'trophy' | 'flash' | 'moon' | 'heart' | 'musical-notes' | 'color-palette' | 'rose';
-/** A group of levels sharing one emblem (used by Servet and Cazibe). */
+/** A group of levels sharing one emblem (used by Cömertlik and Yankı). */
 export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string };
 export type WealthTier = LevelTier;
 export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume' };
 export const WEALTH_TIERS: WealthTier[] = [
-  { from: 0, to: 4, name: 'Filiz', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
-  { from: 5, to: 9, name: 'Kristal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
-  { from: 10, to: 14, name: 'Safir', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF' },
-  { from: 15, to: 19, name: 'Gül', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8' },
-  { from: 20, to: 24, name: 'Kızıl Taç', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED' },
-  { from: 25, to: 28, name: 'Yakut', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2' },
-  { from: 29, to: 32, name: 'Ametist', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF' },
-  { from: 33, to: 36, name: 'Hanedan', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8' },
-  { from: 37, to: 40, name: 'Altın Kanat', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006' },
-  { from: 41, to: 45, name: 'Gece Yıldızı', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF' },
-  { from: 46, to: 50, name: 'Efsane', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3' },
+  { from: 0, to: 4, name: 'Damla', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
+  { from: 5, to: 9, name: 'Kaynak', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
+  { from: 10, to: 14, name: 'Dere', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF' },
+  { from: 15, to: 19, name: 'Irmak', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8' },
+  { from: 20, to: 24, name: 'Şelale', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED' },
+  { from: 25, to: 28, name: 'Göl', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2' },
+  { from: 29, to: 32, name: 'Koy', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF' },
+  { from: 33, to: 36, name: 'Körfez', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8' },
+  { from: 37, to: 40, name: 'Deniz', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006' },
+  { from: 41, to: 45, name: 'Okyanus', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF' },
+  { from: 46, to: 50, name: 'Derya', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3' },
 ];
 export const wealthTier = (level: number) => WEALTH_TIERS.find((t) => level >= t.from && level <= t.to) ?? WEALTH_TIERS[0];
 

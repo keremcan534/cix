@@ -17,13 +17,13 @@ import { Icon3D } from '@/components/Icon3D';
 
 // Income labels for each store earning source.
 export const INCOME_LABEL: Record<EarningSource, string> = {
-  Hediye: 'Parti Hediyeleri Geliri',
+  Hediye: 'Oda Hediyeleri Geliri',
   Arama: 'Arama Geliri',
-  'Cazibe bonusu': 'Cazibe Seviyesi Bonusu',
+  'Cazibe bonusu': 'Yankı Bonusu',
   Görev: 'Görev Ödülü',
   'Ajans bonusu': 'Ajans bonusu',
   'Oda sahibi bonusu': 'Oda sahibi bonusu',
-  'Aile bonusu': 'Aile bonusu',
+  'Aile bonusu': 'Tayfa bonusu',
   'Arama bonusu': 'Arama bonusu',
 };
 
@@ -32,7 +32,7 @@ export const incomeDetail = (e: Earning) => {
   if (e.source === 'Hediye') {
     // Older rows have no gift stored; the price alone can't tell which gift it was.
     const g = e.gift;
-    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Lucky (${pct(LUCKY_RECIPIENT_SHARE)})` : ''}` : '🎁 Hediye';
+    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Uğurlu (${pct(LUCKY_RECIPIENT_SHARE)})` : ''}` : '🎁 Hediye';
   }
   if (e.source === 'Oda sahibi bonusu') return `Bonus ${pct(RULES.roomOwnerBonus)}`;
   if (e.source === 'Arama') return 'Görüntülü arama';
@@ -44,21 +44,21 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function IncomeScreen() {
   const { diamonds, earnings } = useApp();
-  // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
+  // Diamonds turn into coins only in the main Jeton Noktası (coins bank) account (lib/coins-bank); hosts cash out instead.
   const instant = () =>
     showAlert(
       'Anında bozdur',
-      `Coins Bank elmasını resmi değerinden hemen öder: ${fmt(diamonds)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(diamonds)))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.`,
+      `Jeton Noktası elmasını resmi değerinden hemen öder: ${fmt(diamonds)} 💎 ≈ ${fmt(Math.floor(diamondValueTl(diamonds)))} TL. Senden ücret kesilmez. Haftalık ödemeyi beklemek istersen Para Çek'i kullan.`,
       [
         { text: 'Kapat', style: 'cancel' },
-        { text: "Coins Bank'a git", onPress: () => router.push('/coins-bank') },
+        { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },
       ],
     );
 
   const info = () =>
     showAlert(
       'Mevcut Elmaslar',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Bakiyen yaklaşık ${usd(diamonds)} değerindedir.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir. Haftalık ödemeyi beklemeden Coins Bank üzerinden anında bozdurabilirsin; elmas jetona yalnızca Coins Bank hesabında çevrilir.`,
+      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Bakiyen yaklaşık ${usd(diamonds)} değerindedir.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir. Haftalık ödemeyi beklemeden Jeton Noktası üzerinden anında bozdurabilirsin; elmas jetona yalnızca Jeton Noktası hesabında çevrilir.`,
     );
 
   return (
@@ -67,7 +67,7 @@ export default function IncomeScreen() {
         title="Gelir"
         right={
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Ödüllü davet">
+            <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
               <Ionicons name="gift" size={18} color={colors.gold} />
             </Pressable>
             <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
@@ -94,10 +94,10 @@ export default function IncomeScreen() {
           </View>
         </LinearGradient>
 
-        <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Coins Bank">
+        <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">
           <Art name="finans-haftalik-odeme-banka" size={26} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Coins Bank</Text>
+            <Text style={styles.rowTitle}>Jeton Noktası</Text>
             <Text style={styles.dim}>Cüzdan, kazançlar, ödemeler ve kurallar</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />

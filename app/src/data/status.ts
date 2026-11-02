@@ -1,92 +1,62 @@
-// Status systems: SVIP (recharge experience), VIP (subscription), Asil/Noble (monthly title).
+// Status systems: İnci (SVIP, recharge experience), VIP (subscription), Rütbe (noble, monthly title).
 import type { ArtName } from '@/components/Art';
 
-// --- SVIP: 1 recharged coin = 1 experience point; levels never expire ---------------
+// --- İnci (SVIP): 1 recharged coin = 1 experience point; levels never expire ---------------
 export const SVIP_LEVELS = [
-  { level: 1, xp: 500_000, rights: 8, colors: ['#134E4A', '#0F172A'] as [string, string], emoji: '💠', art: 'svip-01' as ArtName },
-  { level: 2, xp: 1_250_000, rights: 10, colors: ['#14532D', '#052E16'] as [string, string], emoji: '🟢', art: 'svip-02' as ArtName },
-  { level: 3, xp: 2_500_000, rights: 12, colors: ['#065F46', '#022C22'] as [string, string], emoji: '🔷', art: 'svip-03' as ArtName },
-  { level: 4, xp: 4_000_000, rights: 15, colors: ['#1E3A8A', '#0B1437'] as [string, string], emoji: '🔹', art: 'svip-04' as ArtName },
-  { level: 5, xp: 7_500_000, rights: 18, colors: ['#78350F', '#1C0F05'] as [string, string], emoji: '🏵️', art: 'svip-05' as ArtName },
-  { level: 6, xp: 15_000_000, rights: 21, colors: ['#7F1D1D', '#1F0707'] as [string, string], emoji: '🎖️', art: 'svip-06' as ArtName },
-  { level: 7, xp: 40_000_000, rights: 23, colors: ['#4C1D95', '#140A2E'] as [string, string], emoji: '🔮', art: 'svip-07' as ArtName },
-  { level: 8, xp: 100_000_000, rights: 26, colors: ['#3F3F46', '#09090B'] as [string, string], emoji: '⚜️', art: 'svip-08' as ArtName },
-  { level: 9, xp: 210_000_000, rights: 27, colors: ['#9F1239', '#2A0510'] as [string, string], emoji: '👑', art: 'svip-09' as ArtName },
-  { level: 10, xp: 400_000_000, rights: 28, colors: ['#BE185D', '#312E81'] as [string, string], emoji: '🌈', art: 'svip-10' as ArtName },
+  { level: 1, xp: 500_000, rights: 2, colors: ['#134E4A', '#0F172A'] as [string, string], emoji: '💠', art: 'svip-01' as ArtName },
+  { level: 2, xp: 1_250_000, rights: 3, colors: ['#14532D', '#052E16'] as [string, string], emoji: '🟢', art: 'svip-02' as ArtName },
+  { level: 3, xp: 2_500_000, rights: 4, colors: ['#065F46', '#022C22'] as [string, string], emoji: '🔷', art: 'svip-03' as ArtName },
+  { level: 4, xp: 4_000_000, rights: 6, colors: ['#1E3A8A', '#0B1437'] as [string, string], emoji: '🔹', art: 'svip-04' as ArtName },
+  { level: 5, xp: 7_500_000, rights: 7, colors: ['#78350F', '#1C0F05'] as [string, string], emoji: '🏵️', art: 'svip-05' as ArtName },
+  { level: 6, xp: 15_000_000, rights: 8, colors: ['#7F1D1D', '#1F0707'] as [string, string], emoji: '🎖️', art: 'svip-06' as ArtName },
+  { level: 7, xp: 40_000_000, rights: 10, colors: ['#4C1D95', '#140A2E'] as [string, string], emoji: '🔮', art: 'svip-07' as ArtName },
+  { level: 8, xp: 100_000_000, rights: 11, colors: ['#3F3F46', '#09090B'] as [string, string], emoji: '⚜️', art: 'svip-08' as ArtName },
+  { level: 9, xp: 210_000_000, rights: 12, colors: ['#9F1239', '#2A0510'] as [string, string], emoji: '👑', art: 'svip-09' as ArtName },
+  { level: 10, xp: 400_000_000, rights: 14, colors: ['#BE185D', '#312E81'] as [string, string], emoji: '🌈', art: 'svip-10' as ArtName },
 ];
 export const svipLevelOf = (xp: number) => SVIP_LEVELS.filter((l) => xp >= l.xp).length;
-/** Ordered so that SVIP n has the first `rights` entries. */
-export const SVIP_RIGHTS: { name: string; emoji: string; art?: ArtName }[] = [
-  { name: 'Puan Takas Mağazası', emoji: '🏪', art: 'ayricalik-puan-takas-magazasi' },
-  { name: 'SVIP Etiket', emoji: '🏷️', art: 'ayricalik-svip-etiket' },
-  { name: 'Yükseltme bildirimleri', emoji: '📣', art: 'ayricalik-yukseltme-bildirimleri' },
-  { name: 'SVIP rozeti', emoji: '🎖️', art: 'ayricalik-svip-rozeti' },
-  { name: 'Genel sohbet balonu', emoji: '🎨', art: 'ayricalik-genel-sohbet-balonu' },
-  { name: 'Profil çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi' },
-  { name: 'Giriş ekranı kayan yazı', emoji: '✨', art: 'ayricalik-giris-ekrani-kayan-yazi' },
-  { name: 'Özel ürünü satın al', emoji: '🛍️', art: 'ayricalik-ozel-urunu-satin-al' },
-  { name: 'Araç', emoji: '🚗', art: 'ayricalik-arac' },
-  { name: "SVIP'e özel hediye", emoji: '🎁', art: 'ayricalik-svip-e-ozel-hediye' },
-  { name: 'Ücretsiz yayın sayısı', emoji: '🆓' },
-  { name: 'Bilgi kartı çerçevesi', emoji: '🪪', art: 'ayricalik-bilgi-karti-cercevesi' },
-  { name: 'Servet Puanı Bonusu', emoji: '💰', art: 'ayricalik-servet-puani-bonusu' },
-  { name: 'DIY unvanı', emoji: '✏️', art: 'ayricalik-diy-unvani' },
-  { name: 'Oda Profil Arka Planı', emoji: '🏞️', art: 'ayricalik-oda-profil-arka-plani' },
-  { name: 'Profil hediyesi', emoji: '💝', art: 'ayricalik-profil-hediyesi' },
-  { name: 'Özel müşteri temsilcisi', emoji: '🎧', art: 'ayricalik-ozel-musteri-temsilcisi' },
-  { name: 'Kişisel albüm animasyonlu görsel', emoji: '🎞️', art: 'ayricalik-kisisel-album-animasyonlu-gorsel' },
-  { name: 'Profil aracı', emoji: '🏎️', art: 'ayricalik-profil-araci' },
-  { name: 'Yükleme indirimi', emoji: '💸', art: 'ayricalik-yukleme-indirimi' },
-  { name: 'Hediye Combo Skin', emoji: '🔥', art: 'ayricalik-hediye-combo-skin' },
-  { name: 'Gizli ziyaret', emoji: '🥷', art: 'ayricalik-gizli-ziyaret' },
-  { name: 'Özel oda kapağı', emoji: '🖼️', art: 'ayricalik-ozel-oda-kapagi' },
-  { name: 'Renkli takma ad', emoji: '🌈' },
-  { name: 'AI hediye', emoji: '🤖' },
-  { name: 'Doğum günü hediyesi', emoji: '🎂' },
-  { name: 'Profil Sayfası Çerçevesi', emoji: '🪞' },
-  { name: 'Profil Sayfası Arka Planı', emoji: '🌌' },
-  { name: 'Özel ID', emoji: '🔢' },
-  { name: 'Etkinlik önceliği', emoji: '⏫' },
-  { name: 'Kişiye özel tasarım hediye', emoji: '💎' },
+export type RightGroup = 'Görünüm' | 'Odada' | 'Sosyal' | 'Destek';
+/** Ordered so that İnci n has the first `rights` entries (entry notice from İnci 1, gifts from İnci 2). */
+export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?: ArtName }[] = [
+  { name: 'Özel giriş duyurusu', emoji: '✨', group: 'Odada', art: 'ayricalik-giris-ekrani-kayan-yazi' },
+  { name: 'İnci rozeti', emoji: '🎖️', group: 'Görünüm', art: 'ayricalik-svip-rozeti' },
+  { name: 'Üyelere özel hediyeler', emoji: '🎁', group: 'Odada', art: 'ayricalik-svip-e-ozel-hediye' },
+  { name: 'Renkli sohbet balonu', emoji: '🎨', group: 'Görünüm', art: 'ayricalik-genel-sohbet-balonu' },
+  { name: 'Profil çerçevesi', emoji: '🖼️', group: 'Görünüm', art: 'ayricalik-profil-cercevesi' },
+  { name: 'Puanla alışveriş', emoji: '🏪', group: 'Destek', art: 'ayricalik-puan-takas-magazasi' },
+  { name: 'Profil kartı çerçevesi', emoji: '🪪', group: 'Görünüm', art: 'ayricalik-bilgi-karti-cercevesi' },
+  { name: 'Hediye serisi efekti', emoji: '🔥', group: 'Odada', art: 'ayricalik-hediye-combo-skin' },
+  { name: 'Kendi unvanını yaz', emoji: '✏️', group: 'Görünüm', art: 'ayricalik-diy-unvani' },
+  { name: 'Sessiz ziyaret', emoji: '🥷', group: 'Sosyal', art: 'ayricalik-gizli-ziyaret' },
+  { name: 'Dolu odaya girebilme', emoji: '🚪', group: 'Odada' },
+  { name: 'Mesaj çevirisi', emoji: '🔤', group: 'Sosyal' },
+  { name: 'Yüklemede indirim', emoji: '💸', group: 'Destek', art: 'ayricalik-yukleme-indirimi' },
+  { name: 'Öncelikli destek', emoji: '🎧', group: 'Destek', art: 'ayricalik-ozel-musteri-temsilcisi' },
 ];
 
-// --- Asil (Noble): bought with coins for 30 days -------------------------------------
+// --- Rütbe (noble): bought with coins for 30 days -------------------------------------
 export const NOBLE_TIERS = [
-  { tier: 1, name: 'Şövalye', emoji: '🛡️', art: 'asil-1-sovalye' as ArtName, price: 15_000, rights: 9, colors: ['#94A3B8', '#334155'] as [string, string] },
-  { tier: 2, name: 'Vikont', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 15, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
-  { tier: 3, name: 'Kont', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 19, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
-  { tier: 4, name: 'Markiz', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 24, colors: ['#F472B6', '#BE123C'] as [string, string] },
-  { tier: 5, name: 'Dük', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 27, colors: ['#FCD34D', '#B45309'] as [string, string] },
+  { tier: 1, name: 'Gemici', emoji: '🛡️', art: 'asil-1-sovalye' as ArtName, price: 15_000, rights: 4, colors: ['#94A3B8', '#334155'] as [string, string] },
+  { tier: 2, name: 'Dümenci', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 6, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
+  { tier: 3, name: 'Lostromo', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 8, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
+  { tier: 4, name: 'Amiral', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 10, colors: ['#F472B6', '#BE123C'] as [string, string] },
+  { tier: 5, name: 'Kaptan-ı Derya', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 12, colors: ['#FCD34D', '#B45309'] as [string, string] },
 ];
 export const NOBLE_DAYS = 30;
-export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName; isNew?: boolean }[] = [
-  { name: 'Jeton Hediye Et', emoji: '💗', art: 'ayricalik-jeton-hediye-et', isNew: true },
-  { name: 'VIP Listesi', emoji: '👑', art: 'ayricalik-vip-listesi' },
-  { name: 'Araçlar', emoji: '🚘', art: 'ayricalik-araclar' },
-  { name: 'Noble Madalyası', emoji: '🏅', art: 'ayricalik-asil-madalyasi' },
-  { name: 'Asil Etiketi', emoji: '🔖', art: 'ayricalik-asil-etiketi' },
-  { name: 'Profil Çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi' },
-  { name: 'Giriş Ekranı', emoji: '🌟', art: 'ayricalik-giris-ekrani' },
-  { name: 'Oda Kilitleme', emoji: '🔒', art: 'ayricalik-oda-kilitleme' },
-  { name: 'Oda Üyesi Asil Koltuğu', emoji: '🛋️', art: 'ayricalik-asil-koltugu' },
-  { name: 'Özel arka plan', emoji: '🏞️', art: 'ayricalik-ozel-arka-plan', isNew: true },
-  { name: 'Özel Hediyeler', emoji: '🎁', art: 'ayricalik-ozel-hediyeler' },
+/** Ordered so that tier n has the first `rights` entries; GATES below read rights by name. */
+export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName }[] = [
+  { name: 'Rütbe Nişanı', emoji: '🏅', art: 'ayricalik-asil-madalyasi' },
+  { name: 'Rütbe etiketi', emoji: '🔖', art: 'ayricalik-asil-etiketi' },
+  { name: 'Oda kilitleme', emoji: '🔒', art: 'ayricalik-oda-kilitleme' },
+  { name: 'Giriş karşılaması', emoji: '🌟', art: 'ayricalik-giris-ekrani' },
+  { name: 'Profil çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi' },
   { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu' },
-  { name: 'Profil kart çerçevesi', emoji: '🪪', art: 'ayricalik-profil-kart-cercevesi' },
-  { name: 'Oda Kartı', emoji: '🗂️' },
-  { name: 'Oda Kenarlığı', emoji: '🔲' },
-  { name: 'Özel Emoji Paketleri', emoji: '😊' },
-  { name: 'Dinamik Oda Kapağı', emoji: '🎞️', isNew: true },
-  { name: 'Renkli kullanıcı adı', emoji: '🌈' },
-  { name: 'Gizli Ziyaret', emoji: '🎭' },
-  { name: 'Tam Dolu Odalar', emoji: '🚪' },
-  { name: 'Çevrimiçi Gizlilik', emoji: '🫥' },
-  { name: 'Ulusal Dolaşım', emoji: '🌍' },
-  { name: 'Lider Tablosu Gizemli Kişi Kimliği', emoji: '🕵️' },
-  { name: 'Gizli Oda Girişi', emoji: '👻' },
-  { name: 'Yayın Engelleme', emoji: '🔇' },
-  { name: 'Klan Gizliliği', emoji: '🎭', isNew: true },
-  { name: 'Metin Çevirisi', emoji: '🔤' },
+  { name: 'Odada ayrılmış koltuk', emoji: '🛋️', art: 'ayricalik-asil-koltugu' },
+  { name: 'Binekler', emoji: '🚘', art: 'ayricalik-araclar' },
+  { name: 'Gizli oda girişi', emoji: '👻' },
+  { name: 'Arkadaşına jeton gönder', emoji: '💗', art: 'ayricalik-jeton-hediye-et' },
+  { name: 'Sıralamada gizli kalma', emoji: '🕵️' },
+  { name: 'Tayfa içinde görünmezlik', emoji: '🎭' },
 ];
 export const nobleInfo = (tier: number) => NOBLE_TIERS.find((t) => t.tier === tier);
 export const hasNobleRight = (tier: number, name: string) => {
@@ -105,52 +75,42 @@ export const VIP_PLANS = [
 export const VIP_COMPARE: [string, string | boolean, string | boolean][] = [
   ['Sesli sohbet', '2.000 Jeton / dakika', '%20 indirim'],
   ['Görüntülü sohbet', '3.000 Jeton / dakika', '%20 indirim'],
-  ['Ses eşleşmesi', '1.750 Jeton / dakika', 'Her gün ücretsiz 1 kez'],
-  ['Video eşleşmesi', '2.500 Jeton / dakika', 'Her gün ücretsiz 1 kez'],
-  ['Ziyaretçileri görüntüle', false, true],
-  ['Altın takma adı', false, true],
-  ['Premium madalya', false, true],
-  ['Ekstra ödül', false, true],
-  ['VIP hediye paketi', false, true],
+  ['Sesli eşleşme', '1.750 Jeton / dakika', 'Günde 1 ücretsiz'],
+  ['Görüntülü eşleşme', '2.500 Jeton / dakika', 'Günde 1 ücretsiz'],
+  ['Profiline bakanları gör', false, true],
+  ['Altın renkli isim', false, true],
+  ['VIP madalyası', false, true],
+  ['Ek giriş ödülü', false, true],
+  ['Hoş Geldin Kutusu', false, true],
   ['Seviyeleri gizle', false, true],
 ];
 /** "VIP Ayrıcalıkları" carousel (Ionicons names). */
 export const VIP_PERKS: { name: string; desc: string; icon: string }[] = [
-  { name: 'Çağrı İndirimi', desc: 'Özel indirimden yararlanarak her aramada %20 indirim kazanmak', icon: 'call' },
-  { name: 'Ziyaretçiler', desc: 'Sizi ziyaret eden kullanıcıları bulundurun', icon: 'eye' },
-  { name: 'Altın Takma Adı', desc: 'Gösterilen özel takma adı', icon: 'sparkles' },
-  { name: 'Ekstra ödül', desc: 'Ekstra check-in ödülü', icon: 'ribbon' },
-  { name: 'Eşleşme', desc: 'Her gün 1 ücretsiz ses ve video eşleşmesi', icon: 'shuffle' },
-  { name: 'Premium Madalya', desc: 'Profilde parlayan VIP madalyası', icon: 'medal' },
-  { name: 'Hediye Paketi', desc: 'Üyelik büyük hediye paketi', icon: 'gift' },
-  { name: 'Seviyeleri gizle', desc: 'Zenginlik ve cazibe seviyeni gizle', icon: 'eye-off' },
+  { name: 'Arama indirimi', desc: 'Aramalarda %20 indirim', icon: 'call' },
+  { name: 'Ziyaretçiler', desc: 'Profiline bakanları gör', icon: 'eye' },
+  { name: 'Altın renkli isim', desc: 'Adın her yerde altın renginde görünür', icon: 'sparkles' },
+  { name: 'Ek ödül', desc: 'Günlük girişte fazladan ödül', icon: 'ribbon' },
+  { name: 'Eşleşme', desc: 'Her gün 1 ücretsiz sesli ve görüntülü eşleşme', icon: 'shuffle' },
+  { name: 'VIP madalyası', desc: 'Profilinde parlayan madalya', icon: 'medal' },
+  { name: 'Hoş Geldin Kutusu', desc: 'Her planla gelen hediyeler', icon: 'gift' },
+  { name: 'Seviyeleri gizle', desc: 'Cömertlik ve Yankı seviyeni gizle', icon: 'eye-off' },
 ];
-/** "Üyelik Büyük Hediye Paketi": granted with every plan. */
+/** "Hoş Geldin Kutusu": granted with every plan. */
 export const VIP_GIFT_PACK: { name: string; emoji: string; days: number; qty: number }[] = [
-  { name: 'LOVE', emoji: '💝', days: 7, qty: 1 },
-  { name: 'vip', emoji: '🏷️', days: 7, qty: 1 },
   { name: 'VIP Sohbet Balonu', emoji: '💬', days: 7, qty: 1 },
   { name: 'VIP Giriş Efekti', emoji: '✨', days: 7, qty: 1 },
-];
-/** Masked "x***y N Gün pakete abone oldu" ticker lines. */
-export const VIP_TICKER: [string, number][] = [
-  ['s***n', 7],
-  ['N***0', 90],
-  ['Y***z', 30],
-  ['e***n', 90],
-  ['M***a', 7],
 ];
 
 // --- Gates used across the app (admin-configurable in the real product) -------------------
 export const GATES = {
-  /** Game center: SVIP2 or Vikont+ */
+  /** Game center: İnci 2 or Dümenci+ */
   games: (svip: number, noble: number) => svip >= 2 || noble >= 2,
-  /** Invisible room entry: Asil right "Gizli Oda Girişi" (Markiz+) */
-  invisibleEntry: (noble: number) => hasNobleRight(noble, 'Gizli Oda Girişi'),
-  /** Entry banner: Asil "Giriş Ekranı" or SVIP "Giriş ekranı kayan yazı" */
+  /** Invisible room entry: Rütbe right "Gizli oda girişi" (Amiral+) */
+  invisibleEntry: (noble: number) => hasNobleRight(noble, 'Gizli oda girişi'),
+  /** Entry banner: Rütbe "Giriş karşılaması" or İnci "Özel giriş duyurusu" */
   entryBanner: (svip: number, noble: number) => noble >= 1 || svip >= 1,
-  /** Room lock via nobility ("veya soyluluk") */
-  roomLock: (noble: number) => hasNobleRight(noble, 'Oda Kilitleme'),
+  /** Room lock via a Rütbe tier */
+  roomLock: (noble: number) => hasNobleRight(noble, 'Oda kilitleme'),
 };
 
 // --- Recharge packs (TRY, store prices) -------------------------------------------------

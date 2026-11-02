@@ -18,7 +18,7 @@ import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; tag?: string; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean };
+type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean };
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
@@ -32,7 +32,7 @@ const GROWTH: Item[] = [
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true },
   { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true },
-  { icon: 'leaf-outline', label: 'Lucky hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true },
+  { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true },
 ];
@@ -52,8 +52,8 @@ export default function ProfileScreen() {
 
   const main: Item[] = [
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
-    { icon: 'business-outline', img: 'coin', label: 'Coins Bank', tag: 'Yeni!', onPress: () => router.push('/coins-bank') },
-    { icon: 'storefront-outline', img: 'bag', label: 'Alışveriş Merkezi', tag: 'Yeni!', onPress: () => router.push('/magaza') },
+    { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank') },
+    { icon: 'storefront-outline', img: 'bag', label: 'Çarşı', onPress: () => router.push('/magaza') },
     {
       icon: 'checkmark-circle-outline',
       label: 'Kimlik Doğrulamam',
@@ -61,7 +61,7 @@ export default function ProfileScreen() {
       onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
     },
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
-    { icon: 'ribbon-outline', img: 'crown', label: 'Servet ve Cazibe Seviyesi', onPress: () => router.push('/seviye') },
+    { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
   ];
   const visible = (m: Item) => (m.demoOnly && !IS_DEMO ? false : m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
 
@@ -121,16 +121,16 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="SVIP" sub={svipLevel ? `SVIP${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} tag="YENİ" onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="İnci" sub={svipLevel ? `İnci ${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
             <StatusCard title="VIP" sub={vipLevel ? `VIP${vipLevel}` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
-            <StatusCard title="Asil" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
+            <StatusCard title="Rütbe" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
         </View>
 
         <View style={[styles.card, { flexDirection: 'row' }]}>
-          <Shortcut emoji="🎁" label="Bedava Para" onPress={() => router.push('/gorevler')} />
-          <Shortcut emoji="⛺" label="Kabile" onPress={() => router.push('/aile')} />
-          <Shortcut emoji="✉️" label="Davet" tag="Kazan" onPress={() => router.push('/davet')} />
+          <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
+          <Shortcut emoji="⛺" label="Tayfam" onPress={() => router.push('/aile')} />
+          <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />
         </View>
 
         {myRoom.profileVisible && (
@@ -154,12 +154,12 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.gameCard}>
-          <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Merkezi">
+          <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
             <Icon3D name="wheel" size={30} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Oyun Merkezi</Text>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Oyun Salonu</Text>
               <Text style={{ color: colors.textDim, fontSize: 12 }}>
-                Casino oyunları Servet Lv.2+ · {wealthLevel >= 2 ? 'erişimin açık' : `şu an Lv.${wealthLevel}`} · odaya girmeden oyna
+                Cömertlik Lv.2 ve üstü · {wealthLevel >= 2 ? 'erişimin açık' : `şu an Lv.${wealthLevel}`} · odaya girmeden oyna
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
@@ -204,7 +204,6 @@ function Group({ items }: { items: Item[] }) {
         <Pressable key={m.label} style={[styles.menuRow, i > 0 && styles.sep]} onPress={m.onPress} accessibilityLabel={m.label}>
           {m.img ? <Icon3D name={m.img} size={28} /> : <Ionicons name={m.icon} size={24} color="#fff" />}
           <Text style={styles.menuLabel}>{m.label}</Text>
-          {m.tag && <Text style={{ color: '#F59E0B', fontWeight: '800', fontSize: 12 }}>{m.tag}</Text>}
           {m.dot && <View style={styles.redDot} />}
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </Pressable>
@@ -214,26 +213,24 @@ function Group({ items }: { items: Item[] }) {
 }
 
 /** Status tile; `sub` stays short (the crown art sits in the bottom-right corner). */
-function StatusCard({ title, sub, colors: c, tag, dot, onPress }: { title: string; sub: string; colors: [string, string]; tag?: string; dot?: boolean; onPress: () => void }) {
+function StatusCard({ title, sub, colors: c, dot, onPress }: { title: string; sub: string; colors: [string, string]; dot?: boolean; onPress: () => void }) {
   return (
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={title}>
       <LinearGradient colors={c} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.status}>
-        {tag && <Text style={styles.newTag}>{tag}</Text>}
         {dot && <View style={[styles.redDot, { position: 'absolute', top: 8, right: 8 }]} />}
         <Text style={styles.statusTitle}>{title}</Text>
         <Text style={styles.statusSub} numberOfLines={1}>
           {sub}
         </Text>
-        {title !== 'Asil' && <Icon3D name="crown" size={34} style={{ position: 'absolute', right: 6, bottom: 6, opacity: title === 'VIP' ? 1 : 0.9 }} />}
+        {title !== 'Rütbe' && <Icon3D name="crown" size={34} style={{ position: 'absolute', right: 6, bottom: 6, opacity: title === 'VIP' ? 1 : 0.9 }} />}
       </LinearGradient>
     </Pressable>
   );
 }
 
-function Shortcut({ emoji, label, tag, onPress }: { emoji: string; label: string; tag?: string; onPress: () => void }) {
+function Shortcut({ emoji, label, onPress }: { emoji: string; label: string; onPress: () => void }) {
   return (
     <Pressable style={{ flex: 1, alignItems: 'center', gap: 6 }} onPress={onPress} accessibilityLabel={label}>
-      {tag && <Text style={styles.earnTag}>{tag}</Text>}
       <View style={styles.shortIcon}>
         <EmojiIcon emoji={emoji} size={30} />
       </View>
@@ -272,9 +269,7 @@ const styles = StyleSheet.create({
   status: { borderRadius: 14, padding: 12, minHeight: 74, justifyContent: 'center', gap: 4 },
   statusTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
   statusSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
-  newTag: { position: 'absolute', top: -8, right: 10, backgroundColor: semantic.social, color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.4, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   shortIcon: { width: 60, height: 60, borderRadius: 18, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  earnTag: { position: 'absolute', top: -6, right: 8, zIndex: 1, color: semantic.moneyInk, backgroundColor: semantic.money, fontWeight: '800', fontSize: 10, letterSpacing: 0.3, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   gameCard: { marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)' },
   gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   gameRow: { flexDirection: 'row', gap: 8 },

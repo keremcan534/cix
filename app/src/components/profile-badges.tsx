@@ -95,9 +95,9 @@ export function AffiliationPills({ user }: { user: User }) {
         isMe && <Pill icon="business" label="Ajans yok · Katıl" empty a11y="Ajans: yok. Ajansa katıl" href="/ajans" />
       )}
       {kabile ? (
-        <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Kabile: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
+        <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Tayfa: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
       ) : (
-        isMe && <Pill icon="people" label="Kabile yok · Katıl" empty a11y="Kabile: yok. Kabileye katıl" href={KABILE_ROUTES.profile} />
+        isMe && <Pill icon="people" label="Tayfa yok · Katıl" empty a11y="Tayfa: yok. Bir tayfaya katıl" href={KABILE_ROUTES.profile} />
       )}
     </View>
   );

@@ -15,13 +15,14 @@ export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip';
 /** `ride` is the ride's emoji (also used in the text); `rideArt` its picture, drawn instead when there is one. */
 export type EntryShow = { name: string; avatar: string; fx: EntryFx; ride?: string; rideArt?: number; colors?: readonly [string, string]; badge?: string };
 
+/** `mark` is the emoji at the banner's end; empty for none. */
 type Look = { colors: readonly [string, string, string]; particle: string[]; mark: string; creature?: string; flash?: boolean };
 export const ENTRY_LOOKS: Record<EntryFx, Look> = {
   sparkle: { colors: ['#0B3B4A', '#087A80', '#0FB8BE'], particle: ['#A5F3F5', '#FFFFFF', '#F6BD60'], mark: '✨' },
   thunder: { colors: ['#172554', '#1D4ED8', '#38BDF8'], particle: ['#E0F2FE', '#FDE047', '#FFFFFF'], mark: '⚡', flash: true },
   dragon: { colors: ['#450A0A', '#B91C1C', '#EA580C'], particle: ['#FDE047', '#F97316', '#FECACA'], mark: '🔥', creature: '🐉' },
   comet: { colors: ['#080F1E', '#12304A', '#0A8F95'], particle: ['#CFFAFE', '#FFFFFF', '#13D9DF'], mark: '🌠', creature: '☄️' },
-  vip: { colors: ['#3B2A12', '#8A5A1C', '#C98A2E'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '👑' },
+  vip: { colors: ['#3B2A12', '#8A5A1C', '#C98A2E'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '' },
 };
 const TOTAL_MS = 3200;
 const BURST = 12;
@@ -73,10 +74,12 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
   }, [still, enter, exit, shine, burst, travel, flash, look.flash]);
 
   const bannerW = Math.min(width - 24, 420);
+  // A status badge (e.g. "İnci 3") leads the line: "İnci 3 · Ada güverteye çıktı".
+  const who = show.badge ? `${show.badge} · ${show.name}` : show.name;
   const opacity = exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   return (
-    <View pointerEvents="none" style={[s.band, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${show.name} odaya katıldı`}>
+    <View pointerEvents="none" style={[s.band, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${who}${show.ride ? ` ${show.ride} ile` : ''} güverteye çıktı`}>
       {/* Ride / creature crossing behind the banner */}
       {traveller && !still && (() => {
         const motion = {
@@ -117,14 +120,13 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.name} numberOfLines={1}>
-              {show.badge ? `${show.badge} ` : ''}
-              {show.name}
+              {who}
             </Text>
             <Text style={s.sub} numberOfLines={1}>
-              {show.ride ? `${show.ride} ile ` : ''}odaya katıldı
+              {show.ride ? `${show.ride} ile ` : ''}güverteye çıktı
             </Text>
           </View>
-          <Text style={s.mark}>{look.mark}</Text>
+          {!!look.mark && <Text style={s.mark}>{look.mark}</Text>}
           {/* Lightning flash, clipped to the banner */}
           {look.flash && !still && <Animated.View style={[StyleSheet.absoluteFill, s.flash, { opacity: flash }]} />}
         </LinearGradient>

@@ -66,7 +66,7 @@ export type Settings = {
   dailySpendLimit: number; // coins; 0 = no limit
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
   luckyAnnounce: boolean;
-  /** VIP "Seviyeyi Gizle": hide my Servet / Cazibe badges from others while VIP is active. */
+  /** VIP "Seviyeleri gizle": hide my Cömertlik / Yankı badges from others while VIP is active. */
   hideWealth: boolean;
   hideCharm: boolean;
 };
@@ -116,7 +116,7 @@ type AppState = {
   addGameCoins: (n: number, reason?: string) => void;
   spendGameCoins: (n: number, reason?: string) => boolean;
   spentTotal: number;
-  /** Servet puanı: qualifying spending only (data/wealth). */
+  /** Cömertlik puanı (wealth): qualifying spending only (data/wealth). */
   wealthXp: number;
   wealthLevel: number;
   ledger: LedgerRow[];
@@ -153,7 +153,7 @@ type AppState = {
   becomeHost: () => void;
   diamonds: number;
   totalDiamonds: number;
-  /** Cazibe puanı and level (data/charm): drives the earnings bonus and Keşfet ranking. */
+  /** Yankı puanı (charm) and level (data/charm): drives the earnings bonus and Keşfet ranking. */
   charmXp: number;
   charmLevel: number;
   weekly: number[];
@@ -175,7 +175,7 @@ type AppState = {
   checkIn: () => number;
   inviteCode: string;
   // vip, agency, family
-  /** Visual status level (frames/badges), derived from SVIP, Asil and VIP subscription. */
+  /** Visual status level (frames/badges), derived from İnci (SVIP), Rütbe (noble) and VIP subscription. */
   vipLevel: number;
   svipXp: number;
   svipLevel: number;
@@ -639,14 +639,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     creditDiamonds(n, source, fromId, gift);
     if (source === 'Hediye' && gift) recordGift('me', gift.id, gift.count);
     if (source !== 'Hediye' && source !== 'Arama') return;
-    // Cazibe: gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
+    // Yankı (charm): gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
     const before = charmLevelOf(charmRef.current);
     const bonus = source === 'Hediye' ? Math.floor((n * charmBonusPct(before)) / 100) : 0;
     if (bonus > 0) creditDiamonds(bonus, 'Cazibe bonusu', fromId);
     charmRef.current += n;
     setCharmXp(charmRef.current);
     const after = charmLevelOf(charmRef.current);
-    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Cazibe seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
+    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Yankı seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
   };
 
   const notify = (n: Omit<Notice, 'id' | 'time' | 'read'>) => {
@@ -679,7 +679,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       wealthRef.current += n;
       setWealthXp(wealthRef.current);
       const after = wealthLevelOf(wealthRef.current);
-      if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Servet seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Servet Seviyesi sayfasında gör.', href: '/seviye' });
+      if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Cömertlik seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Cömertlik sayfasında gör.', href: '/seviye' });
     }
     return true;
   };
@@ -858,7 +858,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     nobleDays,
     buyNoble: (tier) => {
       const t = nobleInfo(tier);
-      if (!t || !spend(t.price, `Asil: ${t.name} (${NOBLE_DAYS} gün)`)) return false;
+      if (!t || !spend(t.price, `Rütbe: ${t.name} (${NOBLE_DAYS} gün)`)) return false;
       setNobleTier(tier);
       setNobleDays(NOBLE_DAYS);
       return true;

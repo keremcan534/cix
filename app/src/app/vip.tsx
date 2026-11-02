@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_GIFT_PACK, VIP_PERKS, VIP_PLANS, VIP_TICKER } from '@/data/status';
+import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_GIFT_PACK, VIP_PERKS, VIP_PLANS } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
@@ -34,9 +34,9 @@ export default function PrivilegeCenter() {
         <View style={styles.segment}>
           {(
             [
-              ['svip', 'SVIP'],
+              ['svip', 'İnci'],
               ['vip', 'VIP'],
-              ['noble', 'Asil'],
+              ['noble', 'Rütbe'],
             ] as const
           ).map(([k, l]) => (
             <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
@@ -44,7 +44,7 @@ export default function PrivilegeCenter() {
             </Pressable>
           ))}
         </View>
-        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'SVIP: yüklenen her jeton 1 deneyim puanıdır, seviye düşmez.\nVIP: 7 gün, 1 ay veya 3 aylık mağaza aboneliği.\nAsil: jetonla 30 günlük unvan.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
+        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'İnci: yüklediğin her jeton 1 puan, seviyen hiç düşmez.\nVIP: 7 günlük, 1 aylık ya da 3 aylık abonelik.\nRütbe: jetonla alınır, 30 gün geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
           <Ionicons name="help-circle-outline" size={26} color="#fff" />
         </Pressable>
       </View>
@@ -65,8 +65,8 @@ function Svip() {
       <View style={[styles.segment, { alignSelf: 'center', marginBottom: 12 }]}>
         {(
           [
-            ['rights', 'Ayrıcalık Merkezi'],
-            ['shop', 'Özel Mağaza'],
+            ['rights', 'Ayrıcalıklar'],
+            ['shop', 'Üyelere Özel'],
           ] as const
         ).map(([k, l]) => (
           <Pressable key={k} onPress={() => (k === 'shop' ? router.push('/magaza') : setSub(k))} style={[styles.segBtn, sub === k && styles.segActive]}>
@@ -86,7 +86,7 @@ function Svip() {
           const locked = svipLevel < l.level;
           const isNext = svipLevel === l.level - 1;
           return (
-            <Pressable key={l.level} onPress={() => setIndex(i)} style={{ width: cardW }} accessibilityLabel={`SVIP${l.level} kartı`}>
+            <Pressable key={l.level} onPress={() => setIndex(i)} style={{ width: cardW }} accessibilityLabel={`İnci ${l.level} kartı`}>
               <LinearGradient colors={l.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.svipCard, index === i && { borderColor: GOLD }]}>
                 {locked && (
                   <View style={styles.lockChip}>
@@ -95,7 +95,7 @@ function Svip() {
                   </View>
                 )}
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.svipTitle}>SVIP{l.level}</Text>
+                  <Text style={styles.svipTitle}>İnci {l.level}</Text>
                   {l.art ? <Art name={l.art} size={68} style={{ marginLeft: 'auto' }} /> : <Text style={{ fontSize: 54, marginLeft: 'auto' }}>{l.emoji}</Text>}
                 </View>
                 {isNext ? (
@@ -108,7 +108,7 @@ function Svip() {
                     </View>
                   </>
                 ) : locked ? (
-                  <Text style={styles.cardText}>Kilidi Açılmadı, Deneyim Puanı {fmt(l.xp)} Olmalıdır</Text>
+                  <Text style={styles.cardText}>Bu seviyeye {fmt(l.xp - svipXp)} puan kaldı</Text>
                 ) : (
                   <Text style={[styles.cardText, { color: GOLD }]}>✓ Açıldı · kalıcı</Text>
                 )}
@@ -125,7 +125,7 @@ function Svip() {
       <View style={styles.rightsTitleRow}>
         <Art name="svip-svip-isareti" size={22} />
         <Text style={[styles.rightsTitle, { marginVertical: 0 }]}>
-          SVIP{lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length}
+          İnci {lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length}
         </Text>
         <Art name="svip-svip-isareti" size={22} />
       </View>
@@ -138,7 +138,7 @@ function Svip() {
               style={[styles.rightCell, !on && { opacity: 0.38 }]}
               onPress={() => {
                 const need = SVIP_LEVELS.find((x) => x.rights > i);
-                showAlert(r.name, on ? `SVIP${lv.level} ile kullanılabilir.` : need ? `SVIP${need.level} ile açılır.` : 'Yakında.');
+                showAlert(r.name, on ? `İnci ${lv.level} ile kullanabilirsin.` : need ? `İnci ${need.level} ile açılır.` : 'Yakında.');
               }}>
               <View style={styles.rightIcon}>
                 {r.art ? <Art name={r.art} size={34} /> : <Text style={{ fontSize: 26 }}>{r.emoji}</Text>}
@@ -150,7 +150,7 @@ function Svip() {
           );
         })}
       </View>
-      <Text style={styles.note}>Yüklenen her 1 jeton = 1 SVIP deneyim puanı. Bonus jetonlar ve hediye olarak alınan jetonlar sayılmaz. İadesi yapılan yüklemelerin puanı geri alınır.</Text>
+      <Text style={styles.note}>Yüklediğin her jeton 1 İnci puanı kazandırır. Bonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen yüklemenin puanı geri alınır.</Text>
     </ScrollView>
   );
 }
@@ -184,7 +184,7 @@ function Vip() {
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
         {VIP_PLANS.map((x) => (
           <Pressable key={x.days} onPress={() => setPlan(x.days)} style={[styles.plan, plan === x.days && { borderColor: GOLD }]} accessibilityLabel={`VIP ${x.label}, ${x.tl} TL`}>
-            <Text style={styles.planTag}>%{x.save} KAYDET</Text>
+            <Text style={styles.planTag}>%{x.save} daha uygun</Text>
             <Text style={{ color: colors.textDim, fontSize: 15, marginTop: 10 }}>{x.label}</Text>
             <Text style={{ color: plan === x.days ? '#fff' : '#D4D4D8', fontWeight: '900', fontSize: 26 }}>
               <Text style={{ fontSize: 11, fontWeight: '600' }}>TRY</Text>
@@ -227,7 +227,7 @@ function Vip() {
         <Dots count={perkPages} index={perkPage} />
         <View style={styles.giftBox}>
           <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
-            Üyelik Büyük Hediye Paketi <Text style={{ color: GOLD }}>({VIP_GIFT_PACK.length})</Text>
+            Hoş Geldin Kutusu <Text style={{ color: GOLD }}>({VIP_GIFT_PACK.length})</Text>
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18 }}>
             {VIP_GIFT_PACK.map((g) => (
@@ -235,7 +235,7 @@ function Vip() {
                 <Text style={{ fontSize: 34 }}>{g.emoji}</Text>
                 <View>
                   <Text style={{ color: GOLD, fontWeight: '700' }}>{g.name}</Text>
-                  <Text style={{ color: colors.textDim, fontSize: 12 }}>Geçerlilik Süresi: {g.days} Gün</Text>
+                  <Text style={{ color: colors.textDim, fontSize: 12 }}>{g.days} gün geçerli</Text>
                   <Text style={{ color: colors.textDim, fontSize: 12 }}>Adet: {g.qty}</Text>
                 </View>
               </View>
@@ -272,8 +272,8 @@ function Vip() {
         <View style={styles.toggles}>
           {(
             [
-              ['hideWealth', 'Zenginlik seviyesini gizle'],
-              ['hideCharm', 'Cazibe seviyesini gizle'],
+              ['hideWealth', 'Cömertlik seviyesini gizle'],
+              ['hideCharm', 'Yankı seviyesini gizle'],
             ] as const
           ).map(([k, l], i) => (
             <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' }]}>
@@ -285,9 +285,9 @@ function Vip() {
       </View>
 
       <Text style={[styles.note, { textAlign: 'center' }]}>
-        Abonelik ücreti {store} hesabı üzerinden tahsil edilecek ve ücret, {store} hesabında ayarlanan ödeme yöntemindeki yerel para birimine göre düşülecektir (farklı ülke
-        politikaları, özel ödeme koşulları nedeniyle ek vergi ve ücretler gerekli olabilir; fiyat {store} ödeme sayfasına tabidir). Abonelik, sona ermeden 24 saat önce
-        yenileme için otomatik olarak ücretlendirilecektir. Aboneliği istediğiniz zaman {store}{"'"}da iptal edebilirsiniz. Etkinleştirerek şunu kabul etmiş olursunuz:{' '}
+        Ödeme {store} hesabından, hesabındaki ödeme yöntemiyle ve yerel para biriminde alınır. Ülkene göre vergi eklenebilir; son fiyatı {store} ödeme sayfasında
+        görürsün. Abonelik, süresi bitmeden 24 saat önce kendiliğinden yenilenir ve ücretlendirilir. İstediğin zaman {store} üzerinden iptal edebilirsin. Satın alarak
+        şunları kabul edersin:{' '}
         <Text style={{ color: '#fff' }}>Yinelenen abonelik koşulları, Gizlilik Politikası</Text>
       </Text>
       <BuyButton onPress={buy} />
@@ -307,29 +307,11 @@ function CompareCell({ value, style, vip }: { value: string | boolean; style: ob
 
 function BuyButton({ onPress }: { onPress: () => void }) {
   return (
-    <>
-      <Ticker />
-      <Pressable onPress={onPress} accessibilityRole="button">
-        <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.buyBtn}>
-          <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>VIP Satın Al</Text>
-        </LinearGradient>
-      </Pressable>
-    </>
-  );
-}
-
-/** Rotating "x***y N Gün pakete abone oldu" line above the buy button. */
-function Ticker() {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setI((n) => (n + 1) % VIP_TICKER.length), 3000);
-    return () => clearInterval(t);
-  }, []);
-  const [name, days] = VIP_TICKER[i];
-  return (
-    <Text style={{ color: '#fff', textAlign: 'center', fontSize: 14 }}>
-      👤 {name} <Text style={{ color: GOLD }}>{days} Gün pakete abone oldu</Text>
-    </Text>
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <LinearGradient colors={['#FDE7C7', '#F5C189']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.buyBtn}>
+        <Text style={{ color: '#3B2A12', fontWeight: '900', fontSize: 18 }}>VIP Satın Al</Text>
+      </LinearGradient>
+    </Pressable>
   );
 }
 
@@ -350,13 +332,13 @@ function Noble() {
   const owned = nobleTier >= sel;
   const buy = () => {
     if (coins < t.price)
-      return showAlert('Kilidi açılmadı', `${t.name} için 🪙 ${fmt(t.price)} gerekir. Lütfen önce bakiye yükleyin.`, [
+      return showAlert('Kilidi açılmadı', `${t.name} için 🪙 ${fmt(t.price)} gerekir. Önce jeton yükle.`, [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Yükle', onPress: () => router.push('/cuzdan') },
       ]);
-    showAlert(`${t.name} unvanı`, `${NOBLE_DAYS} gün · 🪙 ${fmt(t.price)}. Onaylıyor musun?`, [
+    showAlert(`${t.name} rütbesi`, `${NOBLE_DAYS} gün · 🪙 ${fmt(t.price)}. Onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${t.rights} özel hak açıldı.`) },
+      { text: 'Al', onPress: () => buyNoble(t.tier) && showAlert(`${t.emoji} ${t.name} oldun!`, `${t.rights} hak açıldı.`) },
     ]);
   };
   return (
@@ -376,7 +358,7 @@ function Noble() {
           {owned && <Text style={[styles.cardText, { color: GOLD, marginTop: 8 }]}>✓ Aktif · {nobleDays} gün kaldı</Text>}
         </View>
         <Text style={[styles.rightsTitle, { color: GOLD }]}>
-          Özel Haklar {t.rights}/{NOBLE_RIGHTS.length}
+          Rütbe hakları {t.rights}/{NOBLE_RIGHTS.length}
         </Text>
         <View style={styles.grid}>
           {NOBLE_RIGHTS.map((r, i) => {
@@ -387,12 +369,9 @@ function Noble() {
                 style={[styles.rightCell, { backgroundColor: 'transparent', borderWidth: 0 }, !on && { opacity: 0.35 }]}
                 onPress={() => {
                   const need = NOBLE_TIERS.find((x) => x.rights > i);
-                  showAlert(r.name, on ? `${t.name} ile kullanılabilir.` : need ? `${need.name} ile açılır.` : '');
+                  showAlert(r.name, on ? `${t.name} ile kullanabilirsin.` : need ? `${need.name} rütbesiyle açılır.` : '');
                 }}>
-                <View>
-                  {r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}
-                  {r.isNew && <Text style={styles.newTag}>Yeni</Text>}
-                </View>
+                <View>{r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}</View>
                 <Text style={[styles.rightName, { color: GOLD }]} numberOfLines={2}>
                   {r.name}
                 </Text>
@@ -457,7 +436,6 @@ const styles = StyleSheet.create({
   nobleTab: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700', paddingVertical: 6 },
   nobleTabOn: { color: '#fff', borderBottomWidth: 3, borderBottomColor: '#fff' },
   emblem: { width: 170, height: 170, borderRadius: 85, alignItems: 'center', justifyContent: 'center' },
-  newTag: { position: 'absolute', top: -6, right: -18, backgroundColor: colors.red, color: '#fff', fontSize: 9, fontWeight: '800', borderRadius: 6, paddingHorizontal: 4, overflow: 'hidden' },
   bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: '#1B1A17', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 2, borderColor: '#B8955A' },
   alBtn: { backgroundColor: GOLD, borderRadius: 999, paddingHorizontal: 34, paddingVertical: 12 },
 });
