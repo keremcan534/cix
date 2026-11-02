@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -12,7 +12,7 @@ import { userById } from '@/data/mock';
 import { usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp, type Earning, type EarningSource, type LedgerRow } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type Main = 'diamonds' | 'gifts';
 type Sub = 'system' | 'spend' | 'social';
@@ -28,6 +28,8 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function EarningsDetail() {
   const { totalDiamonds, withdrawals, earnings, ledger } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [main, setMain] = useState<Main>('diamonds');
   const [sub, setSub] = useState<Sub>('system');
   const [refreshing, setRefreshing] = useState(false);
@@ -59,7 +61,7 @@ export default function EarningsDetail() {
           ] as const
         ).map(([k, l]) => (
           <Pressable key={k} onPress={() => setMain(k)} style={[styles.tab, main === k && styles.tabActive]}>
-            <Text style={[styles.tabText, main === k && { color: '#fff' }]}>{l}</Text>
+            <Text style={[styles.tabText, main === k && { color: colors.text }]}>{l}</Text>
           </Pressable>
         ))}
       </View>
@@ -109,6 +111,8 @@ export default function EarningsDetail() {
 }
 
 function SummaryRow({ label, value, hint, onInfo }: { label: string; value: string; hint?: string; onInfo?: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.sumRow}>
       <Icon3D name="diamond" size={18} />
@@ -127,6 +131,8 @@ function SummaryRow({ label, value, hint, onInfo }: { label: string; value: stri
 }
 
 function SpendRow({ l }: { l: LedgerRow }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Card style={styles.row}>
       <View style={{ flex: 1, gap: 4 }}>
@@ -144,6 +150,7 @@ function SpendRow({ l }: { l: LedgerRow }) {
 }
 
 function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () => void }) {
+  const styles = useStyles();
   const gifts = earnings.filter((e) => e.source === 'Hediye');
   if (!gifts.length)
     return (
@@ -176,11 +183,11 @@ function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () 
               <Text style={styles.rowTitle}>
                 {g.label} x{g.count}
               </Text>
-              <Text style={{ color: '#5EEAF0', fontWeight: '600' }} numberOfLines={1}>
+              <Text style={styles.senders} numberOfLines={1}>
                 {top.map(([id, n]) => `${userById(id).name} (${n})`).join(', ') || '—'}
               </Text>
             </View>
-            <Text style={styles.rowTitle}>+{fmt(g.total)} 💎</Text>
+            <Text style={[styles.rowTitle, styles.diamondAmount]}>+{fmt(g.total)} 💎</Text>
           </Card>
         );
       })}
@@ -189,19 +196,20 @@ function GiftReceipts({ earnings, onRetry }: { earnings: Earning[]; onRetry: () 
 }
 
 function Empty({ onRetry }: { onRetry: () => void }) {
+  const styles = useStyles();
   return (
     <View style={styles.empty}>
       <Art name="maskot-bos-durum-maskotu" size={72} />
       <Text style={[styles.dim, { fontSize: 15 }]}>Henüz kayıt yok</Text>
       <Text style={[styles.dim, { textAlign: 'center' }]}>Yeni kazançlar geldikçe burada listelenir.</Text>
       <Pressable onPress={onRetry} style={styles.retry}>
-        <Text style={{ color: '#5EEAF0', fontWeight: '800', fontSize: 16 }}>Yenile</Text>
+        <Text style={styles.retryText}>Yenile</Text>
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 3, borderBottomColor: 'transparent' },
@@ -209,18 +217,22 @@ const styles = StyleSheet.create({
   tabText: { color: colors.textDim, fontSize: 16, fontWeight: '700' },
   summary: { paddingHorizontal: 16, paddingTop: 10, gap: 4, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10 },
   sumRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  sumLabel: { color: '#fff', fontSize: 16 },
-  sumValue: { color: '#fff', fontWeight: '700' },
+  sumLabel: { color: colors.text, fontSize: 16 },
+  sumValue: { color: colors.text, fontWeight: '700' },
   hint: { color: colors.textDim, fontSize: 12 },
   subTabs: { flexDirection: 'row', paddingHorizontal: 16, gap: 22, paddingTop: 12 },
   subTab: { alignItems: 'center', gap: 6 },
   subText: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
-  subActive: { color: '#fff', fontWeight: '800' },
+  subActive: { color: colors.text, fontWeight: '800' },
   subBar: { width: 18, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
   list: { padding: 16, gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  rowTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  // Diamond amount: white in the dark scheme (as before), the diamond's blue on the light one.
+  diamondAmount: { color: dark ? colors.text : semantic.diamondText },
+  senders: { color: dark ? '#5EEAF0' : semantic.actionText, fontWeight: '600' },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 60 },
   retry: { marginTop: 10, backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 30, paddingVertical: 12 },
-});
+  retryText: { color: dark ? '#5EEAF0' : semantic.actionText, fontWeight: '800', fontSize: 16 },
+}));

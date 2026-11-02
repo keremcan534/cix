@@ -4,14 +4,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { RewardBurst } from '@/components/fx/reward';
 import { DepthCard } from '@/components/fx/surface';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 const REWARD = 300;
 
@@ -21,6 +21,8 @@ export function StarterPath() {
   const { me, recentRooms, stats, following, checkedInToday, starter, claimStarter, hideStarter, settings } = useApp();
   const [open, setOpen] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const { colors, semantic } = useTheme();
+  const s = useStyles();
   if (starter.hidden || (starter.claimed && !celebrate)) return null;
 
   const steps: Step[] = [
@@ -60,10 +62,10 @@ export function StarterPath() {
           <Text style={[s.stepText, x.done && s.stepDone]} numberOfLines={1}>
             {x.title}
           </Text>
-          {x.done ? <Ionicons name="checkmark-circle" size={22} color={semantic.success} /> : (
+          {x.done ? <Ionicons name="checkmark-circle" size={22} color={semantic.successText} /> : (
             <View style={s.goPill}>
               <Text style={s.go}>Git</Text>
-              <Ionicons name="chevron-forward" size={13} color={semantic.action} />
+              <Ionicons name="chevron-forward" size={13} color={semantic.actionText} />
             </View>
           )}
         </Pressable>
@@ -97,21 +99,21 @@ export function StarterPath() {
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, dark, ink }) => ({
   card: { marginHorizontal: 16, padding: 14, gap: 10 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { color: colors.text, fontWeight: '900', fontSize: 16 },
-  count: { color: semantic.action, fontWeight: '800', fontSize: 13 },
+  count: { color: semantic.actionText, fontWeight: '800', fontSize: 13 },
   link: { color: semantic.tonalText, fontWeight: '700', fontSize: 13, marginRight: 6 },
-  track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.3)', overflow: 'hidden' },
-  fill: { height: 6, borderRadius: 3, backgroundColor: semantic.action, boxShadow: '0 0 8px rgba(19,217,223,0.8)' },
+  track: { height: 6, borderRadius: 3, backgroundColor: dark ? 'rgba(0,0,0,0.3)' : ink(0.08), overflow: 'hidden' },
+  fill: { height: 6, borderRadius: 3, backgroundColor: semantic.action, boxShadow: dark ? '0 0 8px rgba(19,217,223,0.8)' : '0 0 6px rgba(19,217,223,0.45)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   stepText: { color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 },
   stepDone: { color: colors.textDim, textDecorationLine: 'line-through' },
-  goPill: { flexDirection: 'row', alignItems: 'center', gap: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(19,217,223,0.12)' },
-  go: { color: semantic.action, fontWeight: '700', fontSize: 13 },
+  goPill: { flexDirection: 'row', alignItems: 'center', gap: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999, backgroundColor: dark ? 'rgba(19,217,223,0.12)' : 'rgba(0,140,148,0.08)' },
+  go: { color: semantic.actionText, fontWeight: '700', fontSize: 13 },
   hintRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   hint: { color: colors.textDim, fontSize: 12 },
   claim: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: semantic.money, borderRadius: 999, paddingVertical: 11 },
   claimText: { color: semantic.moneyInk, fontWeight: '900', fontSize: 15 },
-});
+}));

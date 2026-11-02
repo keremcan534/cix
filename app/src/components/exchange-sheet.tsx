@@ -2,7 +2,7 @@
 // A bottom sheet with the amount, quick shares of the balance, a live "x 💎 → y jeton" preview and one button.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
 
 import { Icon3D } from '@/components/Icon3D';
 import { Text, TextInput } from '@/components/text';
@@ -11,7 +11,7 @@ import { RULES } from '@/data/rules';
 import { successHaptic } from '@/lib/haptics';
 import { exchangeOwnDiamonds, selfExchangeRate } from '@/lib/coins-bank';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const SHARES = [
@@ -25,6 +25,8 @@ const PER_10K = Math.floor(10_000 * selfExchangeRate());
 
 export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { diamonds, coins, exchangeDiamonds, notify } = useApp();
+  const { colors, semantic } = useTheme();
+  const s = useStyles();
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   const amount = Number(raw || 0);
@@ -57,7 +59,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
           </View>
           <Text style={s.sub}>Elmasların, uygulamadaki jeton fiyatıyla anında jetona dönüşür. Ücret kesilmez.</Text>
 
-          <View style={[s.field, focused && { borderColor: semantic.action }]}>
+          <View style={[s.field, focused && { borderColor: semantic.actionText }]}>
             <Icon3D name="diamond" size={26} />
             <TextInput
               value={raw ? fmt(amount) : ''}
@@ -91,7 +93,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
               <Text style={s.sideLabel}>VERİLEN</Text>
               <View style={s.sideRow}>
                 <Icon3D name="diamond" size={20} />
-                <Text style={s.sideN} numberOfLines={1} adjustsFontSizeToFit>{fmt(amount)}</Text>
+                <Text style={[s.sideN, s.diamondN]} numberOfLines={1} adjustsFontSizeToFit>{fmt(amount)}</Text>
               </View>
             </View>
             <View style={s.arrow}>
@@ -101,7 +103,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
               <Text style={s.sideLabel}>ALINAN</Text>
               <View style={s.sideRow}>
                 <Icon3D name="coin" size={20} />
-                <Text style={[s.sideN, { color: semantic.money }]} numberOfLines={1} adjustsFontSizeToFit>{fmt(quote.ok ? quote.coins : 0)}</Text>
+                <Text style={[s.sideN, { color: semantic.moneyText }]} numberOfLines={1} adjustsFontSizeToFit>{fmt(quote.ok ? quote.coins : 0)}</Text>
               </View>
             </View>
           </View>
@@ -124,7 +126,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.6)' },
   sheet: {
     backgroundColor: colors.card,
@@ -135,29 +137,31 @@ const s = StyleSheet.create({
     paddingBottom: 28,
     gap: 12,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    boxShadow: '0 -10px 30px rgba(0,0,0,0.45)',
+    borderColor: ink(0.12),
+    boxShadow: dark ? '0 -10px 30px rgba(0,0,0,0.45)' : '0 -1px 2px rgba(16,36,64,0.05), 0 -10px 30px rgba(16,36,64,0.12)',
   },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  title: { color: colors.text, fontSize: 20, fontWeight: '800' },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   sub: { color: colors.textDim, fontSize: 13, lineHeight: 19, marginTop: -4 },
   field: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg, borderRadius: 18, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, height: 64 },
-  input: { flex: 1, minWidth: 0, color: '#fff', fontSize: 28, fontWeight: '800', paddingVertical: 0, outlineStyle: 'none' } as object,
+  input: { flex: 1, minWidth: 0, color: colors.text, fontSize: 28, fontWeight: '800', paddingVertical: 0, outlineStyle: 'none' } as object,
   unit: { color: colors.textDim, fontSize: 14, fontWeight: '600' },
   balance: { color: colors.textDim, fontSize: 12, marginTop: -6, marginLeft: 4 },
   chips: { flexDirection: 'row', gap: 8 },
   chip: { flex: 1, height: 36, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: semantic.action, borderColor: semantic.action },
-  chipText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  chipText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   preview: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 18, padding: 14 },
   side: { flex: 1, gap: 4 },
   sideLabel: { color: colors.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.6 },
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sideN: { color: '#fff', fontSize: 20, fontWeight: '800', flexShrink: 1 },
+  sideN: { color: colors.text, fontSize: 20, fontWeight: '800', flexShrink: 1 },
+  // The diamonds given: white in the dark scheme (as before), the diamond's blue on the light one.
+  diamondN: { color: dark ? colors.text : semantic.diamondText },
   arrow: { width: 34, height: 34, borderRadius: 17, backgroundColor: semantic.action, alignItems: 'center', justifyContent: 'center' },
   rate: { color: colors.textDim, fontSize: 12, textAlign: 'center' },
-  note: { color: '#fff', fontSize: 13, textAlign: 'center', marginTop: -6 },
+  note: { color: colors.text, fontSize: 13, textAlign: 'center', marginTop: -6 },
   fine: { color: colors.textDim, fontSize: 11, textAlign: 'center', lineHeight: 16 },
-});
+}));

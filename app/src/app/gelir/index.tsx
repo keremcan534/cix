@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -15,7 +15,7 @@ import { showAlert } from '@/lib/alert';
 import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
 import { stampLabel } from '@/lib/tr';
 import { useApp, type Earning, type EarningSource } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 
 // Income labels for each store earning source.
@@ -47,6 +47,8 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function IncomeScreen() {
   const { diamonds, earnings } = useApp();
+  const { colors, semantic, ink } = useTheme();
+  const styles = useStyles();
   const [exchange, setExchange] = useState(false);
   // Three ways out: Çevir (own diamonds → coins at the in-app price), Anında bozdur (Jeton Noktası pays the
   // cash value now) and Para Çek (weekly payout).
@@ -83,10 +85,10 @@ export default function IncomeScreen() {
       />
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
-        <LinearGradient colors={['#1F3050', '#16253C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
+        <LinearGradient colors={[colors.cardAlt, colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balance}>
           <Pressable onPress={info} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={styles.balanceLabel}>Mevcut Elmaslar {usd(diamonds)}</Text>
-            <Ionicons name="help-circle-outline" size={18} color="rgba(255,255,255,0.9)" />
+            <Ionicons name="help-circle-outline" size={18} color={ink(0.9)} />
           </Pressable>
           <Text style={styles.balanceN}>{fmt(diamonds)}</Text>
           <Pressable style={({ pressed }) => [styles.exchangeBtn, pressed && { transform: [{ scale: 0.98 }] }]} onPress={() => setExchange(true)} accessibilityRole="button" accessibilityLabel="Elmasları jetona çevir">
@@ -146,6 +148,7 @@ export default function IncomeScreen() {
 }
 
 export function EarningRow({ e }: { e: Earning }) {
+  const styles = useStyles();
   return (
     <Card style={styles.row}>
       <View style={{ flex: 1, gap: 4 }}>
@@ -161,23 +164,24 @@ export function EarningRow({ e }: { e: Earning }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   headIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  balance: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.border },
-  balanceLabel: { color: 'rgba(255,255,255,0.92)', fontSize: 15 },
-  balanceN: { color: '#fff', fontSize: 40, fontWeight: '900', marginTop: 4 },
-  outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', borderRadius: 999, paddingVertical: 11, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
-  outlineText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  balance: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.border, ...(dark ? null : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }) },
+  balanceLabel: { color: ink(0.92), fontSize: 15 },
+  balanceN: { color: colors.text, fontSize: 40, fontWeight: '900', marginTop: 4 },
+  outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: dark ? 'rgba(255,255,255,0.85)' : ink(0.22), borderRadius: 999, paddingVertical: 11, alignItems: 'center', backgroundColor: dark ? 'rgba(255,255,255,0.12)' : colors.card },
+  outlineText: { color: colors.text, fontWeight: '800', fontSize: 15 },
   exchangeBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, backgroundColor: semantic.money, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 3, borderBottomColor: semantic.moneyEdge },
   exchangeTitle: { color: semantic.moneyInk, fontWeight: '900', fontSize: 16 },
   exchangeSub: { color: semantic.moneyInk, fontSize: 12, opacity: 0.8, marginTop: 1 },
   bankLink: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.border },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1 },
+  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700', flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  sender: { color: '#5EEAF0', fontWeight: '700' },
-  amount: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  rowTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  sender: { color: dark ? '#5EEAF0' : semantic.actionText, fontWeight: '700' },
+  // Diamond amount: white in the dark scheme (as before), the diamond's blue on the light one.
+  amount: { color: dark ? colors.text : semantic.diamondText, fontWeight: '800', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 13 },
-});
+}));

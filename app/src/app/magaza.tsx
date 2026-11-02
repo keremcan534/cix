@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -11,12 +11,12 @@ import { GlossButton, Halo, hueAt } from '@/components/fx/float';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
 import { AnimatedFrame, type FrameFx } from '@/components/fx/frames';
 import { SCENES } from '@/components/fx/scenes';
-import { Backdrop, EdgeLight, PressableScale, glassChip } from '@/components/fx/surface';
+import { Backdrop, EdgeLight, PressableScale, glassChipOf } from '@/components/fx/surface';
 import { CoinPill, Header } from '@/components/ui';
 import { COSMETICS, COSMETIC_KINDS, STICKER_PACKS, type Cosmetic, type CosmeticKind } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, fonts, semantic } from '@/theme';
+import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, StickerArt } from '@/components/ReactionArt';
 import { SPECIAL_ID_ART, STORE_TAB_ART, frameBadgeArtOf, storeArtOf } from '@/components/StoreArt';
@@ -28,6 +28,8 @@ export default function StoreScreen() {
   const { coins, inventory, equipped, buyCosmetic, equip, packUnlocked, buyEmojiPack, vipLevel, settings, me } = useApp();
   const [tab, setTab] = useState<Tab>('frame');
   const [preview, setPreview] = useState<EntryShow | null>(null);
+  const t = useTheme();
+  const styles = useStyles();
   const playPreview = (c: Cosmetic) =>
     setPreview({
       name: me.name,
@@ -52,7 +54,7 @@ export default function StoreScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }}>
       <Backdrop scene={SCENES.store} />
       <Header title="Mağaza" right={<CoinPill coins={coins} onPress={() => router.push('/cuzdan')} />} />
       <View style={styles.tabTrack}>
@@ -62,7 +64,7 @@ export default function StoreScreen() {
             return (
               <Pressable key={k.kind} onPress={() => setTab(k.kind)} style={[styles.tab, styles.tabRow, tab === k.kind && styles.tabActive]}>
                 {art ? <Image source={art} style={{ width: 18, height: 18 }} /> : <Text style={styles.tabText}>{k.emoji}</Text>}
-                <Text style={[styles.tabText, tab === k.kind && { color: semantic.actionInk }]}>{k.label}</Text>
+                <Text style={[styles.tabText, tab === k.kind && { color: t.semantic.actionInk }]}>{k.label}</Text>
               </Pressable>
             );
           })}
@@ -94,7 +96,7 @@ export default function StoreScreen() {
                     <Text style={styles.owned}>✓ Açık</Text>
                   ) : p.minVip && !p.price ? (
                     <View>
-                      <GlossButton label={`VIP ${p.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
+                      <GlossButton label={`VIP ${p.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
                     </View>
                   ) : (
                     <PressableScale
@@ -117,7 +119,7 @@ export default function StoreScreen() {
                   <Preview item={c} avatar={me.avatar} still={settings.reduceMotion} />
                   {(c.kind === 'entry' || c.kind === 'ride') && (
                     <Pressable onPress={() => playPreview(c)} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel={`${c.name} önizle`}>
-                      <Ionicons name="play" size={12} color={colors.primaryText} />
+                      <Ionicons name="play" size={12} color={t.colors.primaryText} />
                       <Text style={styles.previewText}>Önizle</Text>
                     </Pressable>
                   )}
@@ -134,7 +136,7 @@ export default function StoreScreen() {
                       </PressableScale>
                     ) : c.minVip && vipLevel < c.minVip ? (
                       <PressableScale onPress={() => router.push('/vip')}>
-                        <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
+                        <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
                       </PressableScale>
                     ) : (
                       <PressableScale onPress={() => buy(c)}>
@@ -153,12 +155,21 @@ export default function StoreScreen() {
 }
 
 /** A store item: a card lit in the item's color, its preview standing on a pool of that light. */
+// Like the game cards (fx/float BreakoutCard): the item's light over the scheme's card color.
 function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: ReactNode }) {
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
   return (
     <LinearGradient
-      colors={[`${hue}38`, `${hue}0A`, '#101C30']}
+      colors={[`${hue}38`, `${hue}0A`, dark ? '#101C30' : '#FFFFFF']}
       locations={[0, 0.5, 1]}
-      style={[styles.item, { borderColor: on ? colors.primaryText : `${hue}40`, boxShadow: `0 8px 20px rgba(0,0,0,0.35), 0 0 16px ${hue}1F` }]}
+      style={[
+        styles.item,
+        {
+          borderColor: on ? colors.primaryText : `${hue}40`,
+          boxShadow: `${dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 16px ${hue}1F`,
+        },
+      ]}
     >
       <EdgeLight inset={16} strength={0.4} />
       <View style={styles.halo}>
@@ -171,6 +182,8 @@ function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: Rea
 }
 
 function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; still?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const art = item.kind === 'frame' ? frameArtOf(item.id) : undefined;
   if (art) {
     // Size the avatar so the whole illustrated frame (wings, crown) fits the card.
@@ -249,38 +262,38 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
   return <Text style={{ fontSize: 44, height: 64, textAlignVertical: 'center' }}>{item.emoji}</Text>;
 }
 
-const styles = StyleSheet.create({
-  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: 'rgba(19,217,223,0.18)' },
-  previewText: { color: colors.primaryText, fontWeight: '700', fontSize: 12 },
+const useStyles = makeStyles((t) => ({
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  previewText: { color: t.colors.primaryText, fontWeight: '700', fontSize: 12 },
   entryPreview: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, borderRadius: 20, paddingHorizontal: 10, marginVertical: 12, maxWidth: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   entryPreviewSmall: { height: 32, marginVertical: 0 },
   entryPreviewText: { color: '#fff', fontWeight: '800', fontSize: 12, flexShrink: 1 },
   artStack: { alignItems: 'center', gap: 4 },
   artIcon: { width: 56, height: 56 },
   rideArt: { width: 72, height: 72 },
-  tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChip },
+  tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChipOf(t) },
   tab: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 999 },
-  tabActive: { backgroundColor: semantic.action, boxShadow: '0 3px 12px rgba(19,217,223,0.4)' },
-  tabText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
+  tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(19,217,223,0.4)' },
+  tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  warn: { color: colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
+  warn: { color: t.colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, paddingHorizontal: 16, paddingBottom: 30 },
   item: { width: '48.5%', borderRadius: 20, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1.5 },
   cta: { marginTop: 'auto' },
   halo: { position: 'absolute', top: 14, alignSelf: 'center', width: 90, height: 90 },
-  onTag: { position: 'absolute', top: 8, right: 8, color: semantic.actionInk, backgroundColor: colors.primaryText, fontSize: 10, fontWeight: '800', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', zIndex: 1 },
+  onTag: { position: 'absolute', top: 8, right: 8, color: t.semantic.actionInk, backgroundColor: t.semantic.action, fontSize: 10, fontWeight: '800', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', zIndex: 1 },
   packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
-  freeNote: { width: '100%', color: colors.textDim, fontSize: 12, textAlign: 'center' },
-  name: { color: '#fff', fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
-  meta: { color: colors.textDim, fontSize: 12 },
-  owned: { color: colors.green, fontWeight: '700', paddingVertical: 7 },
+  freeNote: { width: '100%', color: t.colors.textDim, fontSize: 12, textAlign: 'center' },
+  name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 16, lineHeight: 21, textAlign: 'center' },
+  meta: { color: t.colors.textDim, fontSize: 12 },
+  owned: { color: t.colors.green, fontWeight: '700', paddingVertical: 7 },
   framePreview: { width: 64, height: 64, borderRadius: 32, padding: 4 },
-  frameInner: { flex: 1, borderRadius: 28, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  frameInner: { flex: 1, borderRadius: 28, backgroundColor: t.colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   bubblePreview: { height: 64, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 16, marginVertical: 0 },
   bubblePreviewSmall: { height: 32 },
-  idPreview: { color: colors.gold, fontSize: 30, fontWeight: '900', height: 64, textAlignVertical: 'center', letterSpacing: 2, paddingTop: 12 },
+  idPreview: { color: t.colors.gold, fontSize: 30, fontWeight: '900', height: 64, textAlignVertical: 'center', letterSpacing: 2, paddingTop: 12 },
   idPreviewSmall: { fontSize: 20, height: 26, paddingTop: 0 },
   idArt: { width: 44, height: 44 },
   frameBadge: { position: 'absolute', right: -14, bottom: 0, width: 30, height: 30 },
-  footer: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },
-});
+  footer: { color: t.colors.textDim, fontSize: 12, textAlign: 'center', paddingBottom: 12 },
+}));

@@ -37,7 +37,7 @@ import { StarterPath } from '@/components/starter';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { TAB_BAR_HEIGHT, colors, fonts, gradient, gradientDeep, semantic } from '@/theme';
+import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
 type MainTab = 'mine' | 'rec';
@@ -59,6 +59,8 @@ export default function RoomsScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [headerH, setHeaderH] = useState(64);
   const insets = useSafeAreaInsets();
+  const { colors, semantic, gradient } = useTheme();
+  const styles = useStyles();
 
   const visible = ROOMS.filter((r) => !blocked.has(r.hostId));
   // The home screen leads with the open room whose host has the most in common with you (lib/closest).
@@ -222,6 +224,8 @@ const WHY_ICON: Record<RoomMatch['why'], keyof typeof Ionicons.glyphMap> = { per
 /** The screen's lead: the open room whose host has the most in common with you, and why (lib/closest). */
 function ClosestRoomCard({ match }: { match: RoomMatch }) {
   const { room, host, score, reason, why } = match;
+  const { colors, semantic, gradient } = useTheme();
+  const styles = useStyles();
   return (
     <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)} accessibilityRole="button" accessibilityLabel={`Sana en yakın oda: ${room.title}, yüzde ${score} benzer. ${reason}. Katıl`}>
       <DepthCard style={[styles.hero, glow('rgba(19,217,223,0.22)', 24, 8)]}>
@@ -271,6 +275,8 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
 // Shortcuts as a shelf of objects standing on their own light, not a row of small chips. Four, not five:
 // the game hub already lists every game, so the shelf doesn't feature one.
 function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const items: { key: string; source: number | undefined; hue: string; label: string; a11y?: string; onPress: () => void; dot?: boolean }[] = [
     { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
     { key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
@@ -297,6 +303,8 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
 }
 
 function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTab; onCat: (c: RoomTab) => void; countryFlag: string | null; onCountry: () => void }) {
+  const { colors, gradientDeep, surface, dark } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.catBar}>
       <View style={{ flex: 1 }}>
@@ -308,7 +316,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
             </Pressable>
           ))}
         </ScrollView>
-        <LinearGradient colors={['rgba(8,15,30,0)', 'rgba(8,15,30,0.95)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.catFade} />
+        <LinearGradient colors={[`rgba(${surface.veil},0)`, `rgba(${surface.veil},0.95)`]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.catFade} />
       </View>
       <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
         <LinearGradient colors={gradientDeep} style={styles.catIcon}>
@@ -320,7 +328,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
       </Pressable>
       <Pressable onPress={onCountry} hitSlop={6} accessibilityLabel="Ülke seç" style={{ marginRight: 16 }}>
         <View style={[styles.catIcon, { backgroundColor: colors.cardAlt }]}>
-          {flag ? <Text style={{ fontSize: 18 }}>{flag}</Text> : <Ionicons name="globe" size={20} color="#38BDF8" />}
+          {flag ? <Text style={{ fontSize: 18 }}>{flag}</Text> : <Ionicons name="globe" size={20} color={dark ? '#38BDF8' : '#0284C7'} />}
         </View>
       </Pressable>
     </View>
@@ -329,6 +337,8 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
 
 /** "Benzerlerin": people online now, closest match first, each wearing the same bead ring as room seats. */
 function SimilarPeople({ people, rooms }: { people: { u: User; score: number }[]; rooms: Room[] }) {
+  const { semantic } = useTheme();
+  const styles = useStyles();
   if (people.length === 0) return null;
   return (
     <View style={{ gap: 10 }}>
@@ -358,7 +368,7 @@ function SimilarPeople({ people, rooms }: { people: { u: User; score: number }[]
               <Text style={styles.hostName} numberOfLines={1}>
                 {u.name}
               </Text>
-              <Text style={[styles.personPct, score >= 70 && { color: semantic.action }]}>%{score}</Text>
+              <Text style={[styles.personPct, score >= 70 && { color: semantic.actionText }]}>%{score}</Text>
             </PressableScale>
           );
         })}
@@ -368,6 +378,8 @@ function SimilarPeople({ people, rooms }: { people: { u: User; score: number }[]
 }
 
 function SuggestionsRow({ items }: { items: Suggestion[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   if (items.length === 0) return null;
   return (
     <View style={{ gap: 10 }}>
@@ -404,9 +416,11 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
 }
 
 function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: string; announcement: string; cover: string; locked: boolean; avatar: string }) {
+  const { colors, semantic, dark } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={{ marginHorizontal: 16 }} onPress={() => router.push('/oda/yeni')}>
-      <LinearGradient colors={['#123B3A', colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.myRoom}>
+      <LinearGradient colors={[dark ? '#123B3A' : '#DDF2F1', colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.myRoom}>
         <Photo uri={cover || avatar} kind="cover" style={styles.myCover} />
         <View style={{ flex: 1, gap: 6 }}>
           <View style={styles.titleRow}>
@@ -425,7 +439,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: str
             </Text>
           </View>
           <View style={[styles.listeners, { alignSelf: 'flex-end', marginTop: 8 }]}>
-            <Ionicons name="stats-chart" size={13} color={semantic.live} />
+            <Ionicons name="stats-chart" size={13} color={semantic.actionText} />
             <Text style={styles.listenerText}>0</Text>
           </View>
         </View>
@@ -435,6 +449,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: str
 }
 
 function PromoBanner() {
+  const styles = useStyles();
   return (
     <Pressable style={{ marginHorizontal: 16, marginTop: 4 }} onPress={() => router.push('/seviye')}>
       <LinearGradient colors={ROOM_BANNER.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
@@ -451,11 +466,31 @@ function PromoBanner() {
 const TOP_BG = ['#4A3510', '#241A3D'] as const;
 
 function RoomRow({ room, match }: { room: Room; /** How close the host is to you (lib/similarity). */ match: number }) {
+  const styles = useStyles();
   const x = roomExtra(room.id);
-  const badge = roomBadge(room.id);
   // Only the week's top room keeps the lit card; rank badges on every row read as a leaderboard, not a home.
   const top = x.top === 1;
-  const content = (
+  const content = <RoomRowBody room={room} match={match} pk={x.pk} />;
+  return (
+    <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)} accessibilityHint={top ? 'Haftanın en iyi odası' : undefined}>
+      {top ? (
+        <DepthCard tint={TOP_BG} style={[styles.roomCard, styles.roomCardTop, glow('rgba(246,189,96,0.18)', 22, 6)]}>
+          {/* The top room's card is night gold in both schemes, so what sits on it reads in the dark one. */}
+          <ThemeScope scheme="dark">{content}</ThemeScope>
+          <Shine delay={900} every={6400} />
+        </DepthCard>
+      ) : (
+        <DepthCard style={styles.roomCard}>{content}</DepthCard>
+      )}
+    </PressableScale>
+  );
+}
+
+function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const badge = roomBadge(room.id);
+  return (
     <>
       <View style={styles.coverFrame}>
         <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.cover} />
@@ -493,7 +528,7 @@ function RoomRow({ room, match }: { room: Room; /** How close the host is to you
               <Text style={styles.tagText}>{roomTagLabel(room)}</Text>
             </View>
           )}
-          {x.pk && (
+          {pk && (
             <LinearGradient colors={['#FF6576', '#0E7C9A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pkPill}>
               <Gloss strength={0.35} />
               <Text style={styles.pkText}>PK</Text>
@@ -503,21 +538,11 @@ function RoomRow({ room, match }: { room: Room; /** How close the host is to you
       </View>
     </>
   );
-  return (
-    <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)} accessibilityHint={top ? 'Haftanın en iyi odası' : undefined}>
-      {top ? (
-        <DepthCard tint={TOP_BG} style={[styles.roomCard, styles.roomCardTop, glow('rgba(246,189,96,0.18)', 22, 6)]}>
-          {content}
-          <Shine delay={900} every={6400} />
-        </DepthCard>
-      ) : (
-        <DepthCard style={styles.roomCard}>{content}</DepthCard>
-      )}
-    </PressableScale>
-  );
 }
 
 function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room[]; onClose: () => void }) {
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const [q, setQ] = useState('');
   const close = () => {
     setQ('');
@@ -574,7 +599,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
                 <Text style={styles.announce}>ID: {roomCode(r.id)}</Text>
               </View>
               <View style={styles.listeners}>
-                <Ionicons name="stats-chart" size={12} color={semantic.live} />
+                <Ionicons name="stats-chart" size={12} color={semantic.actionText} />
                 <Text style={styles.listenerText}>{r.listeners}</Text>
               </View>
             </Pressable>
@@ -586,11 +611,14 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
   );
 }
 
-const styles = StyleSheet.create({
-  headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+// Shadow under cards and photo frames: deep and black at night, a soft navy lift on paper.
+const SOFT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
+
+const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
+  headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: ink(0.06) },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
   // header segment
-  segment: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  segment: { flexDirection: 'row', backgroundColor: ink(0.06), borderRadius: 999, padding: 3, borderWidth: 1, borderColor: surface.hairline },
   segItem: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   segItemOn: { backgroundColor: semantic.action, boxShadow: '0 0 12px rgba(19,217,223,0.45)' },
   segText: { color: colors.textDim, fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18 },
@@ -606,10 +634,11 @@ const styles = StyleSheet.create({
   heroCover: { height: 150, overflow: 'hidden' },
   heroImg: { width: '100%', height: '100%' },
   heroKicker: { position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(8,15,30,0.62)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(19,217,223,0.35)' },
-  heroKickerText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
+  heroKickerText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   heroScore: { position: 'absolute', right: 14, bottom: 8, alignItems: 'flex-end' },
   heroPct: { color: '#fff', fontFamily: fonts.display, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, textShadowColor: 'rgba(19,217,223,0.55)', textShadowRadius: 14 },
-  heroPctCap: { color: colors.textDim, fontSize: 11, fontWeight: '700', marginTop: -3 },
+  // On the cover's dark fade: the night palette's dim text in both schemes.
+  heroPctCap: { color: '#A3B1CF', fontSize: 11, fontWeight: '700', marginTop: -3 },
   heroBody: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   heroHost: { width: 44, height: 44, margin: 4 },
   heroTitle: { color: colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
@@ -634,19 +663,19 @@ const styles = StyleSheet.create({
   hostName: { color: colors.text, fontSize: 12, marginTop: 4 },
   // suggestions
   suggest: { width: 150, gap: 4 },
-  suggestFrame: { width: 150, height: 90, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', boxShadow: '0 6px 16px rgba(0,0,0,0.4)' },
+  suggestFrame: { width: 150, height: 90, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: surface.hairline, boxShadow: dark ? '0 6px 16px rgba(0,0,0,0.4)' : SOFT_SHADOW },
   suggestImg: { width: '100%', height: '100%' },
   suggestFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 40 },
   liveBadge: { position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(8,15,30,0.6)', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: semantic.live, boxShadow: '0 0 6px #13D9DF' },
   liveText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  suggestTitle: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  suggestTitle: { color: colors.text, fontWeight: '700', fontSize: 13 },
   suggestWhy: { color: colors.textDim, fontSize: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16 },
   // room rows
   roomCard: { flexDirection: 'row', gap: 12, padding: 10, overflow: 'hidden' },
   roomCardTop: { borderColor: 'rgba(246,189,96,0.35)' },
-  coverFrame: { width: 84, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cardAlt, boxShadow: '0 4px 10px rgba(0,0,0,0.35)' },
+  coverFrame: { width: 84, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cardAlt, boxShadow: dark ? '0 4px 10px rgba(0,0,0,0.35)' : SOFT_SHADOW },
   cover: { width: '100%', height: '100%' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   flag: { fontSize: 14 },
@@ -655,15 +684,15 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   badgeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, maxWidth: 128, overflow: 'hidden' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', flexShrink: 1 },
-  tagChip: { backgroundColor: 'rgba(19,217,223,0.2)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  tagText: { color: '#A5F3F5', fontSize: 11, fontWeight: '600' },
+  tagChip: { backgroundColor: dark ? 'rgba(19,217,223,0.2)' : 'rgba(0,140,148,0.12)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  tagText: { color: semantic.tonalText, fontSize: 11, fontWeight: '600' },
   pkPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   pkText: { color: '#fff', fontSize: 11, fontWeight: '900', fontStyle: 'italic' },
   listeners: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   listenerText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   empty: { color: colors.textDim, textAlign: 'center', paddingVertical: 28, paddingHorizontal: 16 },
   // Benim tab
-  myRoom: { flexDirection: 'row', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border },
+  myRoom: { flexDirection: 'row', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   myCover: { width: 92, height: 92, borderRadius: 12, backgroundColor: colors.cardAlt },
   odamChip: { backgroundColor: semantic.successFill, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1 },
   odamText: { color: '#fff', fontSize: 12, fontWeight: '800' },
@@ -687,4 +716,4 @@ const styles = StyleSheet.create({
   glowRoom: { marginVertical: -16 },
   glowRoomInner: { paddingVertical: 16 },
   fabInner: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', overflow: 'hidden' },
-});
+}));

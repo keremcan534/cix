@@ -10,7 +10,7 @@ import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
 import { useApp } from '@/store';
-import { colors, fonts, semantic } from '@/theme';
+import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 
@@ -39,6 +39,8 @@ const hms = (s: number) => `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3
 
 export default function TaskCenter() {
   const { coins, checkIn, checkInDay, checkedInToday, stats, claimedTasks, claimTask, settings } = useApp();
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const [reward, setReward] = useState<Reward | null>(null);
   const todayIndex = (checkedInToday ? checkInDay - 1 : checkInDay) % 7;
   const [selected, setSelected] = useState((todayIndex + (checkedInToday ? 1 : 0)) % 7);
@@ -81,7 +83,7 @@ export default function TaskCenter() {
                 <Pressable key={`d${i}`} onPress={() => setSelected(i)} style={[styles.day, done && styles.dayDone, selected === i && styles.daySel]} accessibilityLabel={`Gün ${i + 1}${done ? ', alındı' : ''}`}>
                   {big && <Text style={styles.large}>BÜYÜK</Text>}
                   <Icon3D name={big ? 'gift' : i === 3 ? 'coin' : 'envelope'} size={32} style={done ? { opacity: 0.5 } : undefined} />
-                  {done ? <Ionicons name="checkmark-circle" size={18} color={semantic.success} /> : <Text style={[styles.dayLabel, selected === i && { color: colors.text }]}>Gün {i + 1}</Text>}
+                  {done ? <Ionicons name="checkmark-circle" size={18} color={semantic.successText} /> : <Text style={[styles.dayLabel, selected === i && { color: colors.text }]}>Gün {i + 1}</Text>}
                   <Text style={styles.dayCoins}>+{r}</Text>
                 </Pressable>
               );
@@ -180,33 +182,33 @@ export default function TaskCenter() {
   );
 }
 
-const styles = StyleSheet.create({
-  card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, gap: 14 },
+const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
+  card: { backgroundColor: colors.card, borderRadius: 20, padding: 16, gap: 14, ...lift },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   checkTitle: { color: colors.text, fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
   checkBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   checkBtnDone: { backgroundColor: colors.cardAlt },
   checkBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   day: { width: 64, alignItems: 'center', gap: 4, paddingTop: 12, paddingBottom: 10, borderRadius: 14, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
-  dayDone: { backgroundColor: 'rgba(31,48,80,0.5)' },
+  dayDone: { backgroundColor: dark ? 'rgba(31,48,80,0.5)' : 'rgba(233,239,247,0.5)' },
   daySel: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.14)' },
-  large: { position: 'absolute', top: -7, backgroundColor: colors.gold, color: semantic.moneyInk, fontSize: 8, fontWeight: '800', letterSpacing: 0.4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  large: { position: 'absolute', top: -7, backgroundColor: semantic.money, color: semantic.moneyInk, fontSize: 8, fontWeight: '800', letterSpacing: 0.4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
-  tomorrow: { backgroundColor: 'rgba(19,217,223,0.12)', borderRadius: 16, padding: 14, gap: 12 },
+  tomorrow: { backgroundColor: dark ? 'rgba(19,217,223,0.12)' : 'rgba(0,140,148,0.07)', borderRadius: 16, padding: 14, gap: 12 },
   tomorrowTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   rewardBox: { flex: 1, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
-  h1: { color: '#fff', fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
-  timer: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  h1: { color: colors.text, fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
+  timer: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, ...lift },
   timerText: { color: colors.text, fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] },
   taskReward: { color: colors.gold, fontWeight: '700', fontSize: 14 },
   track: { height: 4, borderRadius: 2, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2, backgroundColor: semantic.action },
   task: { gap: 6, paddingVertical: 14 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  taskTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  taskTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   goBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 8, minWidth: 76, alignItems: 'center' },
   goText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   invite: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 16 },
-});
+}));
