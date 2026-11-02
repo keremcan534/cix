@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -9,7 +9,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
 
@@ -21,6 +21,8 @@ const DEMO_TEST_COINS = 1_000_000;
 
 export default function WelcomeScreen() {
   const { updateMe, login, addCoins, coins } = useApp();
+  const { colors, semantic, dark } = useTheme();
+  const styles = useStyles();
   const demoLogin = () => {
     updateMe({ name: 'Demo', age: 25, birthDate: '2001-03-14', verified: true, bio: '🎧 Müzik 🎮 Oyun', interests: ['🎧 Müzik', '🎮 Oyun', '💬 Sohbet'] });
     // Test balance so every paid flow (gifts, store, VIP) can be tried without the payment step.
@@ -30,7 +32,7 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <LinearGradient colors={['#0B3B4A', colors.bg, colors.bg]} style={{ flex: 1 }}>
+    <LinearGradient colors={[dark ? '#0B3B4A' : '#D9F1F3', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <Backdrop scene={SCENES.login} />
         <View style={styles.hero}>
@@ -47,7 +49,7 @@ export default function WelcomeScreen() {
           <SocialButton icon="logo-apple" title="Apple ile devam et" />
           {IS_DEMO && (
             <Pressable onPress={demoLogin} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 4 }}>
-              <Ionicons name="flash" size={14} color="#A5F3F5" />
+              <Ionicons name="flash" size={14} color={semantic.tonalText} />
               <Text style={styles.link}>Demo hesabıyla hızlı giriş</Text>
             </Pressable>
           )}
@@ -70,21 +72,24 @@ export default function WelcomeScreen() {
 
 function SocialButton({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
   // Prototype: social sign-in skips phone verification and goes straight to profile setup.
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={({ pressed }) => [styles.social, pressed && { opacity: 0.8 }]} onPress={() => router.push('/giris/profil')}>
-      <Ionicons name={icon} size={20} color="#fff" />
+      <Ionicons name={icon} size={20} color={colors.text} />
       <Text style={styles.socialText}>{title}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+// The light scheme lays the photo under a paper veil, so the hero text turns navy (with a paper halo instead of a shadow).
+const useStyles = makeStyles(({ colors, semantic, dark, lift }) => ({
   hero: { flex: 1 },
   center: { position: 'absolute', top: '22%', left: 0, right: 0, alignItems: 'center', gap: 12 },
   logoMark: { width: 96, height: 96 },
-  logo: { color: '#fff', fontSize: 38, fontWeight: '900', letterSpacing: -1 },
+  logo: { color: colors.text, fontSize: 38, fontWeight: '900', letterSpacing: -1 },
   // White with a soft shadow: the hero photo behind it is a bright sky.
-  tagline: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: 'rgba(8,15,30,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  tagline: { color: colors.text, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: dark ? 'rgba(8,15,30,0.85)' : 'rgba(243,246,251,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   actions: { paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
   social: {
     flexDirection: 'row',
@@ -96,8 +101,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
+    ...(dark ? null : { boxShadow: lift.boxShadow }),
   },
-  socialText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  socialText: { color: colors.text, fontWeight: '600', fontSize: 15 },
   terms: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 16, marginTop: 4 },
-  link: { color: '#A5F3F5', fontWeight: '600' },
-});
+  link: { color: semantic.tonalText, fontWeight: '600' },
+}));

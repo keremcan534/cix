@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -13,12 +13,14 @@ import { GradientButton } from '@/components/ui';
 import { INTERESTS } from '@/data/mock';
 import { GENDER_ART, interestParts } from '@/data/profile-art';
 import { useApp } from '@/store';
-import { colors, gradient } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 const THIS_YEAR = new Date().getFullYear();
 
 export default function ProfileSetupScreen() {
   const { updateMe } = useApp();
+  const { colors, gradient } = useTheme();
+  const styles = useStyles();
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'Kadın' | 'Erkek' | null>(null);
@@ -123,6 +125,7 @@ export default function ProfileSetupScreen() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={{ gap: 8 }}>
       <Text style={styles.label}>{label}</Text>
@@ -132,10 +135,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Chip({ label, art, active, onPress, grow }: { label: string; art?: ArtName; active: boolean; onPress: () => void; grow?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={[styles.chip, art && styles.chipRow, grow && { flex: 1, alignItems: 'center', justifyContent: 'center' }, active && styles.chipActive]}>
       {art && <Art name={art} size={18} />}
-      <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
+      <Text style={[styles.chipText, active && { color: colors.text }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -146,16 +151,17 @@ function InterestChip({ label, active, onPress }: { label: string; active: boole
   return <Chip label={art ? name : label} art={art} active={active} onPress={onPress} />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, dark, lift }) => ({
   photoRing: { width: 116, height: 116, borderRadius: 58, padding: 3 },
   photo: { flex: 1, borderRadius: 56, borderWidth: 3, borderColor: colors.bg },
   photoEmpty: { backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   photoPlus: { position: 'absolute', right: 4, bottom: 4, backgroundColor: colors.primary, borderRadius: 14, padding: 4, borderWidth: 2, borderColor: colors.bg },
   label: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
-  input: { backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 16, paddingHorizontal: 16, paddingVertical: 13 },
+  input: { backgroundColor: colors.card, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 16, paddingVertical: 13, ...lift },
   error: { color: colors.red, fontSize: 13, marginTop: -12 },
-  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: 'transparent' },
+  // Light: white chips carry a hairline-blue outline so they read on the paper background.
+  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: dark ? 'transparent' : colors.border },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  chipActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
+  chipActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
   chipText: { color: colors.textDim, fontWeight: '600' },
-});
+}));

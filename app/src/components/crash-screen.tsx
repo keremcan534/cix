@@ -2,26 +2,30 @@
 // RootCrashScreen replaces the whole app (an error above the screens: the store, the room layer, the saved
 // state); it doesn't use the store, so it still draws when the store is the problem. ScreenCrashScreen
 // replaces one screen; the tabs and the rest of the app keep working.
+// Colors come from the theme context only (never the store): outside the store's ThemeScope (the root boundary)
+// useTheme() falls back to the dark scheme, inside it (a screen boundary) the screen follows the active scheme.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text as T } from '@/components/text';
 import { showAlert } from '@/lib/alert';
 import { errorMessage } from '@/lib/crash-guard';
 import { resetLocalData, useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type Action = { label: string; onPress: () => void; kind: 'primary' | 'secondary' | 'link' };
 
 function CrashLayout({ title, body, error, actions }: { title: string; body: string; error: Error; actions: Action[] }) {
   const [details, setDetails] = useState(false);
+  const { semantic } = useTheme();
+  const s = useStyles();
   return (
     <ScrollView style={s.page} contentContainerStyle={s.content}>
       <View style={s.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Ionicons name="refresh" size={30} color={semantic.action} />
+        <Ionicons name="refresh" size={30} color={semantic.actionText} />
       </View>
       <T style={s.title} accessibilityRole="header">
         {title}
@@ -101,7 +105,7 @@ export function ScreenCrashScreen({ error, retry }: ErrorBoundaryProps) {
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   page: { flex: 1, backgroundColor: colors.bg },
   content: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 64, gap: 12 },
   icon: {
@@ -110,9 +114,9 @@ const s = StyleSheet.create({
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(19,217,223,0.10)',
+    backgroundColor: dark ? 'rgba(19,217,223,0.10)' : 'rgba(0,140,148,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(19,217,223,0.30)',
+    borderColor: dark ? 'rgba(19,217,223,0.30)' : 'rgba(0,140,148,0.18)',
     marginBottom: 8,
   },
   title: { color: colors.text, fontSize: 22, fontWeight: '800', textAlign: 'center' },
@@ -127,4 +131,4 @@ const s = StyleSheet.create({
   detailsToggle: { marginTop: 20, paddingVertical: 6, paddingHorizontal: 12 },
   detailsLabel: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   details: { color: colors.textDim, fontSize: 12, lineHeight: 18, textAlign: 'center', maxWidth: 360, opacity: 0.8 },
-});
+}));
