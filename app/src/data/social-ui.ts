@@ -42,10 +42,10 @@ export const EXTRA_BIOS: Record<string, string> = {
   u12: 'Kahve bağımlısı ☕ İyi bir kahve önerisi bekliyorum',
 };
 
-/** Deterministic two-decimal distance ("118.89km") derived from the integer mock distance. */
+/** Deterministic one-decimal distance in Turkish style ("118,9 km") derived from the integer mock distance. */
 export const preciseKm = (u: Pick<User, 'id' | 'distanceKm'>) => {
   const seed = [...u.id].reduce((s, ch) => s + ch.charCodeAt(0) * 7, 0) % 100;
-  return `${(u.distanceKm + seed / 100).toFixed(2)}km`;
+  return `${(u.distanceKm + seed / 100).toFixed(1).replace('.', ',')} km`;
 };
 
 export type Country = { code: string; name: string; flag: string };
@@ -75,11 +75,11 @@ export const DISCOVER_PROMO = {
 export type MomentTopic = { id: string; title: string; views: string; emoji: string; colors: readonly [string, string] };
 
 export const MOMENT_TOPICS: MomentTopic[] = [
-  { id: 'date', title: 'Romantik Randevu', views: '238.36k', emoji: '💞', colors: ['#087A80', '#C93C4F'] },
-  { id: 'pk', title: 'Odalar Arası PK', views: '25.59k', emoji: '⚔️', colors: ['#1D4ED8', '#DC2626'] },
-  { id: 'ootd', title: 'Günün Kombini', views: '109.33k', emoji: '👗', colors: ['#BE185D', '#F59E0B'] },
-  { id: 'travel', title: 'Gezi Günlüğü', views: '64.12k', emoji: '🧳', colors: ['#0A8F95', '#0EA5E9'] },
-  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41.08k', emoji: '🎧', colors: ['#0B4F63', '#0FB8BE'] },
+  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', colors: ['#087A80', '#C93C4F'] },
+  { id: 'pk', title: 'Odalar Arası PK', views: '25,6 B', emoji: '⚔️', colors: ['#1D4ED8', '#DC2626'] },
+  { id: 'ootd', title: 'Günün Kombini', views: '109,3 B', emoji: '👗', colors: ['#BE185D', '#F59E0B'] },
+  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', colors: ['#0A8F95', '#0EA5E9'] },
+  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', colors: ['#0B4F63', '#0FB8BE'] },
 ];
 
 /** Extra moments so every topic has content (ids don't clash with MOMENTS). */
@@ -129,7 +129,7 @@ export const agoMinutes = (time: string) => {
   return unit === 'sa' ? v * 60 : unit === 'g' ? v * 1440 : v;
 };
 
-export const distanceLabel = (km: number) => (km > 500 ? '>500.0km' : `${km.toFixed(1)}km`);
+export const distanceLabel = (km: number) => (km > 500 ? '500 km+' : `${km.toFixed(1).replace('.', ',')} km`);
 
 export type MomentComment = { id: string; userId: string; text: string; time: string };
 

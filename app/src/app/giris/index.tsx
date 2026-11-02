@@ -11,6 +11,7 @@ import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { openLegal } from '@/lib/legal';
 
 // The delivered brand mark (two people forming a heart); app icons are generated from the same file.
 const LOGO = require('../../../assets/brand/logo.png');
@@ -51,8 +52,15 @@ export default function WelcomeScreen() {
             </Pressable>
           )}
           <Text style={styles.terms}>
-            Devam ederek <Text style={styles.link}>Kullanım Koşulları</Text> ve{' '}
-            <Text style={styles.link}>Gizlilik Politikası</Text>&apos;nı kabul etmiş olursun. 18 yaşından büyük olmalısın.
+            Devam ederek{' '}
+            <Text style={styles.link} onPress={() => openLegal('terms')} accessibilityRole="link">
+              Kullanım Koşulları
+            </Text>{' '}
+            ve{' '}
+            <Text style={styles.link} onPress={() => openLegal('privacy')} accessibilityRole="link">
+              Gizlilik Politikası
+            </Text>
+            &apos;nı kabul etmiş olursun. 18 yaşından büyük olmalısın.
           </Text>
         </View>
       </SafeAreaView>

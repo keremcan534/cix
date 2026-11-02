@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
+import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -23,8 +24,6 @@ const STEPS = [
   `İlk odasına girdiğinde ikinize de ${coinsText} gelir.`,
 ];
 
-type Nav = { navigator?: { clipboard?: { writeText: (s: string) => Promise<void> } } };
-
 export default function InviteScreen() {
   const { inviteCode } = useApp();
 
@@ -36,23 +35,7 @@ export default function InviteScreen() {
     }
   };
 
-  const copy = async () => {
-    const clip = Platform.OS === 'web' ? (globalThis as Nav).navigator?.clipboard : undefined;
-    if (clip) {
-      try {
-        await clip.writeText(inviteCode);
-        return showAlert('Kopyalandı', `Davet kodun ${inviteCode} panoya kopyalandı.`);
-      } catch {
-        // fall through to the share sheet
-      }
-    }
-    if (Platform.OS === 'web') return showAlert('Kopyalandı', `Davet kodun: ${inviteCode}`);
-    try {
-      await Share.share({ message: inviteCode });
-    } catch {
-      showAlert('Davet kodun', inviteCode);
-    }
-  };
+  const copy = () => copyText(inviteCode, 'Davet kodu');
 
   return (
     <SafeAreaView style={styles.safe}>

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,6 +13,7 @@ import { hostLevel } from '@/data/economy';
 import { diamondValueTl } from '@/lib/coins-bank';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { IS_DEMO } from '@/lib/build';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { colors, gradient, gradientDeep } from '@/theme';
@@ -63,9 +65,14 @@ export default function HostCenter() {
             title="Yayıncı başvurusu yap"
             icon="mic"
             onPress={() => {
-              if (!me.verified) {
-                showAlert('Doğrulama gerekli', 'Yayıncı olmak için önce gerçek kişi doğrulaması yapmalısın. (Demo: yine de onaylandı)');
-              }
+              if (me.verified) return becomeHost();
+              // 18+ and real-person checks are a payout requirement, so a store build never skips them.
+              if (!IS_DEMO)
+                return showAlert('Doğrulama gerekli', 'Yayıncı olmak ve kazancını çekebilmek için önce 18 yaş ve gerçek kişi doğrulamasını tamamlamalısın. Doğrulama için Destek ekibimize yaz.', [
+                  { text: 'Vazgeç', style: 'cancel' },
+                  { text: 'Doğrulama talebi aç', onPress: () => router.push({ pathname: '/destek', params: { kategori: 'Doğrulama' } }) },
+                ]);
+              showAlert('Doğrulama gerekli', 'Yayıncı olmak için önce gerçek kişi doğrulaması yapmalısın. Bu demo sürümünde başvurun yine de onaylandı.');
               becomeHost();
             }}
           />
@@ -78,7 +85,10 @@ export default function HostCenter() {
 }
 
 function Dashboard() {
-  const { diamonds, totalDiamonds, weekly, earnings, agencyId, withdrawals } = useApp();
+  const { diamonds, totalDiamonds, weekly, earnings, agencyId, withdrawals, me } = useApp();
+  // The join window runs from sign-up; once it has passed the host is already on the management account.
+  const [joinedDays] = useState(() => (me.joinedAt ? Math.floor((Date.now() - new Date(me.joinedAt).getTime()) / 86_400_000) : 0));
+  const joinDaysLeft = Math.max(0, RULES.hostAgencyJoinDays - joinedDays);
   const { current, next } = hostLevel(totalDiamonds);
   const progress = next ? (totalDiamonds - current.min) / (next.min - current.min) : 1;
   const max = Math.max(...weekly, 1);
@@ -124,7 +134,7 @@ function Dashboard() {
           <Text style={{ color: colors.textDim, fontSize: 12, lineHeight: 17 }}>
             {agency
               ? `${RULES.agencyHostInactiveDays} gün çevrimiçi olmaz ve çekim yapmazsan ajanstan düşer, yönetim hesabına aktarılırsın. Kazancın etkilenmez.`
-              : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. Kalan süre: ${Math.max(0, RULES.hostAgencyJoinDays - 1)} gün.`}
+              : `Kayıttan itibaren ${RULES.hostAgencyJoinDays} gün içinde bir ajansa katılmazsan yönetim hesabına (platform) bağlanırsın: kazancını almaya ve para çekmeye sorunsuz devam edersin, sadece senin üzerinden ajans komisyonu oluşmaz. ${joinDaysLeft > 0 ? `Kalan süre: ${joinDaysLeft} gün.` : 'Bu süre doldu, şu an yönetim hesabına bağlısın; istediğin zaman bir ajansa katılabilirsin.'}`}
           </Text>
           {!agency && (
             <TextLink title="Ajansa katıl" color={colors.gold} onPress={() => router.push('/ajans')} />
@@ -214,14 +224,22 @@ function Analytics() {
   const callBonus = sum('Arama bonusu') + sum('Arama');
   const net = gifts + ownerBonus + familyBonus + callBonus;
   const { commission } = settlement(gifts, !!agencyId);
-  const seed = Math.max(1, Math.round(gifts / 500));
+  // Only figures the app actually records: this week's daily diamonds and the earning rows. Stream time and
+  // audience numbers need the server's room logs, so they are left out rather than estimated.
+  const fmt = (n: number) => n.toLocaleString('tr-TR');
+  const weekTotal = weekly.reduce((a, b) => a + b, 0);
+  const activeDays = weekly.filter((v) => v > 0).length;
+  const best = weekly.reduce((bi, v, i) => (v > weekly[bi] ? i : bi), 0);
+  const giftRows = earnings.filter((e) => e.source === 'Hediye');
+  const senders = new Set(giftRows.map((e) => e.fromId).filter(Boolean)).size;
+  const calls = earnings.filter((e) => e.source === 'Arama').length;
   const metrics = [
-    ['Toplam yayın süresi', `${12 + (seed % 30)} sa`],
-    ['Tekil katılımcı', String(140 + seed * 3)],
-    ['Yeni takipçi', String(18 + (seed % 40))],
-    ['Tekrar gelen', `%${35 + (seed % 30)}`],
-    ['Ort. katılım süresi', `${6 + (seed % 9)} dk`],
-    ['Etkinlik katılımı', String(22 + (seed % 15))],
+    ['Aktif gün', `${activeDays} / 7`],
+    ['En iyi gün', weekly[best] > 0 ? `${DAYS[best]} · ${fmt(weekly[best])}` : '—'],
+    ['Günlük ortalama', `${fmt(Math.round(weekTotal / 7))} elmas`],
+    ['Hediye gönderen', fmt(senders)],
+    ['Gelen hediye', fmt(giftRows.reduce((n, e) => n + (e.gift?.count ?? 1), 0))],
+    ['Ücretli arama', fmt(calls)],
   ];
   return (
     <Card style={{ gap: 8 }}>
@@ -229,6 +247,7 @@ function Analytics() {
         <Art name="finans-yayinci-analizi" size={20} />
         <Text style={styles.cardTitle}>Yayıncı analizi (bu hafta)</Text>
       </View>
+      {weekTotal === 0 && earnings.length === 0 && <Text style={styles.dim}>Bu hafta henüz kazanç yok. Oda açıp hediye aldığında rakamlar burada güncellenir.</Text>}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {metrics.map(([l, v]) => (
           <View key={l} style={styles.metric}>

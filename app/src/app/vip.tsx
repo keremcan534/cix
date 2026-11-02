@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { Text } from '@/components/text';
 import { NOBLE_DAYS, NOBLE_RIGHTS, NOBLE_TIERS, SVIP_LEVELS, SVIP_RIGHTS, VIP_COMPARE, VIP_GIFT_PACK, VIP_PERKS, VIP_PLANS } from '@/data/status';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { openLegal } from '@/lib/legal';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { SCENES } from '@/components/fx/scenes';
@@ -59,6 +60,15 @@ function Svip() {
   const cardW = Math.min(width, 520) - 48;
   const [index, setIndex] = useState(Math.max(0, svipLevel - 1));
   const [sub, setSub] = useState<'rights' | 'shop'>('rights');
+  // The carousel opens on the member's own level and a tapped card slides to the centre, so the card in
+  // view always matches the perks listed under it.
+  const step = cardW + 12;
+  const carousel = useRef<ComponentRef<typeof ScrollView>>(null);
+  const placed = useRef(false);
+  const select = (i: number) => {
+    setIndex(i);
+    carousel.current?.scrollTo({ x: i * step, animated: true });
+  };
   const lv = SVIP_LEVELS[index];
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -75,18 +85,25 @@ function Svip() {
         ))}
       </View>
       <ScrollView
+        ref={carousel}
         horizontal
         pagingEnabled={false}
-        snapToInterval={cardW + 12}
+        snapToInterval={step}
         decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
+        contentOffset={{ x: index * step, y: 0 }}
+        onContentSizeChange={() => {
+          if (placed.current) return;
+          placed.current = true;
+          carousel.current?.scrollTo({ x: index * step, animated: false });
+        }}
         contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
-        onMomentumScrollEnd={(e) => setIndex(Math.max(0, Math.min(9, Math.round(e.nativeEvent.contentOffset.x / (cardW + 12)))))}>
+        onMomentumScrollEnd={(e) => setIndex(Math.max(0, Math.min(SVIP_LEVELS.length - 1, Math.round(e.nativeEvent.contentOffset.x / step))))}>
         {SVIP_LEVELS.map((l, i) => {
           const locked = svipLevel < l.level;
           const isNext = svipLevel === l.level - 1;
           return (
-            <Pressable key={l.level} onPress={() => setIndex(i)} style={{ width: cardW }} accessibilityLabel={`İnci ${l.level} kartı`}>
+            <Pressable key={l.level} onPress={() => select(i)} style={{ width: cardW }} accessibilityLabel={`İnci ${l.level} kartı`}>
               <LinearGradient colors={l.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.svipCard, index === i && { borderColor: GOLD }]}>
                 {locked && (
                   <View style={styles.lockChip}>
@@ -212,7 +229,7 @@ function Vip() {
                     <Ionicons name={r.icon as keyof typeof Ionicons.glyphMap} size={22} color={GOLD} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: GOLD, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                    <Text style={{ color: GOLD, fontSize: 14, fontWeight: '700' }} numberOfLines={2}>
                       {r.name}
                     </Text>
                     <Text style={{ color: colors.textDim, fontSize: 11, lineHeight: 15 }} numberOfLines={3}>
@@ -229,18 +246,20 @@ function Vip() {
           <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
             Hoş Geldin Kutusu <Text style={{ color: GOLD }}>({VIP_GIFT_PACK.length})</Text>
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18 }}>
+          {/* Two per row, so nothing hides off the card's edge. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 12 }}>
             {VIP_GIFT_PACK.map((g) => (
-              <View key={g.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Text style={{ fontSize: 34 }}>{g.emoji}</Text>
-                <View>
-                  <Text style={{ color: GOLD, fontWeight: '700' }}>{g.name}</Text>
-                  <Text style={{ color: colors.textDim, fontSize: 12 }}>{g.days} gün geçerli</Text>
-                  <Text style={{ color: colors.textDim, fontSize: 12 }}>Adet: {g.qty}</Text>
+              <View key={g.name} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 8 }}>
+                <Art name={g.art} size={40} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: GOLD, fontWeight: '700' }} numberOfLines={2}>
+                    {g.name}
+                  </Text>
+                  <Text style={{ color: colors.textDim, fontSize: 12 }}>{`${g.days} gün · ${g.qty} adet`}</Text>
                 </View>
               </View>
             ))}
-          </ScrollView>
+          </View>
         </View>
       </View>
 
@@ -284,11 +303,18 @@ function Vip() {
         </View>
       </View>
 
-      <Text style={[styles.note, { textAlign: 'center' }]}>
+      <Text style={styles.note}>
         Ödeme {store} hesabından, hesabındaki ödeme yöntemiyle ve yerel para biriminde alınır. Ülkene göre vergi eklenebilir; son fiyatı {store} ödeme sayfasında
         görürsün. Abonelik, süresi bitmeden 24 saat önce kendiliğinden yenilenir ve ücretlendirilir. İstediğin zaman {store} üzerinden iptal edebilirsin. Satın alarak
         şunları kabul edersin:{' '}
-        <Text style={{ color: '#fff' }}>Yinelenen abonelik koşulları, Gizlilik Politikası</Text>
+        <Text style={styles.legalLink} onPress={() => openLegal('subscription')} accessibilityRole="link">
+          Abonelik Koşulları
+        </Text>{' '}
+        ve{' '}
+        <Text style={styles.legalLink} onPress={() => openLegal('privacy')} accessibilityRole="link">
+          Gizlilik Politikası
+        </Text>
+        .
       </Text>
       <BuyButton onPress={buy} />
     </ScrollView>
@@ -415,6 +441,7 @@ const styles = StyleSheet.create({
   rightIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E8B979', alignItems: 'center', justifyContent: 'center' },
   rightName: { color: GOLD, fontSize: 12, textAlign: 'center', paddingHorizontal: 4 },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, marginTop: 12 },
+  legalLink: { color: GOLD, fontWeight: '700', textDecorationLine: 'underline' },
   h1: { color: '#fff', fontWeight: '900', fontSize: 20 },
   table: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   tr: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' },

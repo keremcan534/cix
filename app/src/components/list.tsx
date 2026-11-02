@@ -27,7 +27,7 @@ export function ListGroup({ label, footer, children }: { label?: string; footer?
   const rows = Children.toArray(children).filter(isValidElement);
   return (
     <View style={s.section}>
-      {!!label && <Text style={s.label}>{label}</Text>}
+      {!!label && <Text style={s.label}>{label.toLocaleUpperCase('tr-TR')}</Text>}
       <View style={s.group}>
         {rows.map((row, i) => (
           <Fragment key={row.key ?? i}>
@@ -167,7 +167,7 @@ export function ChoiceChips<T extends string | number>({ value, options, onChang
 
 const s = StyleSheet.create({
   section: { gap: space.sm },
-  label: { color: colors.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingHorizontal: space.xs },
+  label: { color: colors.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, paddingHorizontal: space.xs },
   group: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.08)', marginLeft: 58 },
   footer: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: space.xs, opacity: 0.85 },

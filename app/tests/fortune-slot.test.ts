@@ -1,6 +1,6 @@
 /// <reference types="node" />
 // Altın Kasa (5×3 slot): line rules, Wild and Kasa, free spins, and the house rule. The expected return is computed
-// exactly from the strips; a long seeded simulation of whole rounds must land on the same number.
+// exactly from the strips; a seeded simulation of whole rounds must land on the same number.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -70,6 +70,23 @@ describe('Altın Kasa: bedava dönüş', () => {
   });
 });
 
+// The seeded simulation only cross-checks the wiring (playRound against fortuneReturn, which is exact). One round's
+// multiplier has σ ≈ 0.82, so the default 20,000 rounds allow ~5 standard errors (0.03); `npm run test:sim`
+// (SIM_FULL=1) adds the full-length run. Every simulated round also stays within the pool's FORTUNE_MAX.
+const SIM_FULL = { skip: !process.env.SIM_FULL };
+const simulate = (n: number, tolerance: number) => {
+  const rnd = seeded(77);
+  let sum = 0;
+  let worst = 0;
+  for (let i = 0; i < n; i++) {
+    const m = playRound(rnd).multiplier;
+    sum += m;
+    if (m > worst) worst = m;
+  }
+  assert.ok(worst <= FORTUNE_MAX, `en yüksek kazanç aşıldı: ${worst} > ${FORTUNE_MAX}`);
+  assert.ok(Math.abs(sum / n - fortuneReturn().total) < tolerance, `simülasyon ${sum / n} / hesap ${fortuneReturn().total}`);
+};
+
 describe('Altın Kasa: kasa kuralı', () => {
   test('beklenen geri ödeme %40’ı aşmaz ve en fazla 0,1 puan altında', () => {
     const r = fortuneReturn();
@@ -78,18 +95,12 @@ describe('Altın Kasa: kasa kuralı', () => {
     assert.equal(expectedReturn('fortune'), r.total);
   });
 
-  test('uzun simülasyon hesapla uyuşuyor', () => {
-    const rnd = seeded(77);
-    const n = 200_000;
-    let sum = 0;
-    for (let i = 0; i < n; i++) sum += playRound(rnd).multiplier;
-    assert.ok(Math.abs(sum / n - fortuneReturn().total) < 0.01, `simülasyon ${sum / n}`);
-  });
+  test('simülasyon hesapla uyuşuyor, hiçbir tur en yüksek çarpanı aşmıyor', () => simulate(20_000, 0.03));
 
-  test('havuzun karşılaması gereken en yüksek çarpan gerçek en yüksek kazancın üstünde', () => {
+  test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulate(200_000, 0.01));
+
+  test('havuzun karşılaması gereken en yüksek çarpan oyunun en yüksek kazancı', () => {
     assert.equal(maxMultiplier('fortune'), FORTUNE_MAX);
-    const rnd = seeded(5);
-    for (let i = 0; i < 20_000; i++) assert.ok(playRound(rnd).multiplier <= FORTUNE_MAX);
   });
 
   test('tur sonucu platform biçiminde gelir', () => {

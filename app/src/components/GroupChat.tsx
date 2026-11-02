@@ -78,11 +78,11 @@ export function GroupChat({
       </View>
       {tab === 'members' ? (
         <ScrollView contentContainerStyle={{ padding: 16, gap: 6 }}>
-          <Text style={styles.section}>Çevrimiçi ({online.length})</Text>
+          <Text style={styles.section}>ÇEVRİMİÇİ ({online.length})</Text>
           {online.map((u) => (
             <MemberRow key={u.id} u={u} note={presenceLabel(presenceOf(u.id), u.online)} />
           ))}
-          <Text style={[styles.section, { marginTop: 10 }]}>Çevrimdışı ({offline.length})</Text>
+          <Text style={[styles.section, { marginTop: 10 }]}>ÇEVRİMDIŞI ({offline.length})</Text>
           {offline.map((u) => (
             <MemberRow key={u.id} u={u} note={`Son aktif: ${lastActive(u)}`} />
           ))}
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   segBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   segActive: { backgroundColor: colors.primary },
   segText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  section: { color: colors.textDim, fontWeight: '800', fontSize: 12, textTransform: 'uppercase' },
+  section: { color: colors.textDim, fontWeight: '800', fontSize: 12 },
   dim: { color: colors.textDim, fontSize: 12 },
   member: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   pinBox: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(19,217,223,0.15)', borderRadius: 12, padding: 10, gap: 8 },

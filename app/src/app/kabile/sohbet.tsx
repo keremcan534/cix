@@ -110,11 +110,11 @@ export default function KabileChat() {
         title={family.name}
         onClose={() => setMenu(false)}
         options={[
-          { label: familyMuted ? '🔔 Bildirimleri aç' : '🔕 Sohbeti sessize al', onPress: () => setFamilyMuted(!familyMuted) },
-          { label: '🏰 Tayfa profili', onPress: () => router.push(KABILE_ROUTES.profile) },
-          { label: '🎯 Görevler', onPress: () => router.push(KABILE_ROUTES.merkez) },
-          { label: '💰 Tayfa Kasası', onPress: () => router.push(KABILE_ROUTES.kasa) },
-          { label: '💞 Uyum Köşesi', onPress: () => router.push(KABILE_ROUTES.iliski) },
+          { label: familyMuted ? 'Bildirimleri aç' : 'Sohbeti sessize al', icon: familyMuted ? 'notifications-outline' : 'notifications-off-outline', onPress: () => setFamilyMuted(!familyMuted) },
+          { label: 'Tayfa profili', icon: 'shield-outline', onPress: () => router.push(KABILE_ROUTES.profile) },
+          { label: 'Görevler', icon: 'checkbox-outline', onPress: () => router.push(KABILE_ROUTES.merkez) },
+          { label: 'Tayfa Kasası', icon: 'wallet-outline', onPress: () => router.push(KABILE_ROUTES.kasa) },
+          { label: 'Uyum Köşesi', icon: 'heart-outline', onPress: () => router.push(KABILE_ROUTES.iliski) },
         ]}
       />
       <ActionSheet

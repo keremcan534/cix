@@ -15,6 +15,7 @@ import { StateIcon, VerifiedBadge } from '@/components/ui';
 import { MATCH_GRACE_SECONDS } from '@/data/economy';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { IS_DEMO } from '@/lib/build';
 import { useMedia } from '@/lib/media';
 import { PHASE_LABEL, cancelMatch, dropConnection, hangUp, modeLabel, nextMatch, priceOf, resetMatch, startMatch, useMatch } from '@/lib/match';
 import { useApp } from '@/store';
@@ -207,16 +208,17 @@ export default function MatchCall() {
         title={peer.name}
         onClose={() => setSheet('none')}
         options={[
-          { label: '🚩 Şikâyet et', onPress: () => setTimeout(() => setSheet('report'), 300) },
+          { label: 'Şikâyet et', icon: 'flag-outline', onPress: () => setTimeout(() => setSheet('report'), 300) },
           {
-            label: '⛔ Engelle ve görüşmeyi bitir',
+            label: 'Engelle ve görüşmeyi bitir',
+            icon: 'ban-outline',
             destructive: true,
             onPress: () => {
               toggleBlock(peer.id);
               hangUp();
             },
           },
-          { label: '📶 Bağlantı kopmasını dene (demo)', onPress: dropConnection },
+          ...(IS_DEMO ? [{ label: 'Bağlantı kopmasını dene (demo)', icon: 'cellular-outline' as const, onPress: dropConnection }] : []),
         ]}
       />
       <ActionSheet

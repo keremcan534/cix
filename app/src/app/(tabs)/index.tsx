@@ -9,7 +9,7 @@ import { Text, TextInput } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Art, artSource } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
-import { gameArtOf } from '@/components/GameArt';
+import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
 import { Icon3D, icon3dSource, type Icon3DName } from '@/components/Icon3D';
@@ -36,6 +36,7 @@ import {
   type RoomTab,
 } from '@/data/rooms-ui';
 import { StarterPath } from '@/components/starter';
+import { useGames } from '@/lib/games';
 import { useApp } from '@/store';
 import { TAB_BAR_HEIGHT, colors, fonts, gradient, gradientDeep, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -242,11 +243,16 @@ function RankCards() {
 }
 
 // Shortcuts as a shelf of objects standing on their own light, not a row of small chips.
+/** The game the home shelf links to: the first of these that the game admin has switched on. */
+const SHELF_GAMES = ['wheel', 'fish', 'jackpot', 'slot'] as const;
+
 function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: boolean }) {
+  const { casino } = useGames();
+  const game = SHELF_GAMES.map((id) => casino.find((g) => g.id === id && g.active)).find(Boolean);
   const items = [
     { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
     { key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
-    { key: 'wheel', source: gameArtOf('wheel'), hue: '#FF8A5B', label: 'Şans Çarkı', onPress: () => router.push('/cark') },
+    ...(game ? [{ key: 'game', source: gameArtOf(game.id), hue: gameHueOf(game.id), label: game.name, onPress: () => router.push({ pathname: '/oyunlar', params: { oyun: game.id } }) }] : []),
     { key: 'games', source: artSource('ana-oyun-merkezi'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
     { key: 'tasks', source: artSource('ana-gorevler'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];

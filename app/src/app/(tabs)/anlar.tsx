@@ -23,6 +23,7 @@ import {
   type MomentComment,
 } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
+import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -34,13 +35,13 @@ type FeedMoment = Moment & { topicId?: string };
 const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m, topicId: MOMENT_TOPIC_OF[m.id] }));
 
 export default function MomentsScreen() {
-  const { bump, blocked, following, me, notifications, sendMessage, settings, vipLevel, equipped } = useApp();
+  const { bump, blocked, following, me, notifications, settings, vipLevel, equipped } = useApp();
   const [tab, setTab] = useState<Tab>('Önerilen');
   const [topic, setTopic] = useState<string | null>(null);
   const [moments, setMoments] = useState<FeedMoment[]>(INITIAL);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Record<string, MomentComment[]>>(SEED_COMMENTS);
-  const [greeted, setGreeted] = useState<Set<string>>(new Set());
+  const { hasGreeted, greet } = useGreet();
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const unread = notifications.filter((n) => !n.read).length;
@@ -56,13 +57,6 @@ export default function MomentsScreen() {
     setMoments((m) => [{ id: String(Date.now()), userId: 'me', text, image, likes: 0, comments: 0, time: 'şimdi', topicId }, ...m]);
     setComposing(false);
     bump('moments');
-  };
-
-  const greet = (user: User) => {
-    if (greeted.has(user.id)) return router.push(`/sohbet/${user.id}`);
-    sendMessage(user.id, 'Selam! 👋');
-    bump('greetings');
-    setGreeted((prev) => new Set(prev).add(user.id));
   };
 
   const share = async (m: Moment) => {
@@ -160,7 +154,7 @@ export default function MomentsScreen() {
               showDistance={settings.cityDiscovery}
               liked={liked.has(item.id)}
               commentCount={commentCount(item)}
-              greeted={greeted.has(author.id)}
+              greeted={hasGreeted(author.id)}
               onLike={() =>
                 setLiked((prev) => {
                   const next = new Set(prev);
@@ -443,7 +437,7 @@ const styles = StyleSheet.create({
   topics: { gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
   topic: { width: 168, height: 66, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
   topicActive: { borderColor: '#fff' },
-  topicTitle: { color: '#fff', fontWeight: '800', fontSize: 14, maxWidth: 130 },
+  topicTitle: { color: '#fff', fontWeight: '800', fontSize: 14, maxWidth: 148 },
   topicViews: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   topicEmoji: { position: 'absolute', right: 8, bottom: 4, fontSize: 28, opacity: 0.85 },
   topicFilter: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },

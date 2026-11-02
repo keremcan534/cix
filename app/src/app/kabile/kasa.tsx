@@ -10,6 +10,7 @@ import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui
 import { KABILE_ROUTES, KASA_GOAL, KASA_HISTORY_MOCK, ensureFresh, findKabile, fmt, kabileMemberIds, kabileMeta, memberPower, useKabileProgress } from '@/data/kabile';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -104,7 +105,7 @@ export default function KabileKasa() {
               <Pressable key={r.id} style={[styles.row, { paddingVertical: 5 }]} onPress={() => r.id !== 'me' && router.push(`/kullanici/${r.id}`)}>
                 <Text style={[styles.rank, i < 3 && { color: colors.gold }]}>{i + 1}</Text>
                 <Avatar uri={u.avatar} size={34} />
-                <Text style={{ color: '#fff', flex: 1 }}>{r.id === 'me' ? `${me.name} (sen)` : u.name}</Text>
+                <Text style={{ color: '#fff', flex: 1 }}>{r.id === 'me' ? youLabel(me.name) : u.name}</Text>
                 <Text style={{ color: '#A5F3F5', fontWeight: '800' }}>{fmt(r.power)} puan</Text>
               </Pressable>
             );

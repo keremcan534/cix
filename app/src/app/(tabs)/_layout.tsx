@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router/js-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { EdgeLight, Glass } from '@/components/fx/surface';
@@ -34,6 +35,10 @@ function TabBarGlass() {
 export default function TabLayout() {
   const { conversations } = useApp();
   const unread = conversations.reduce((sum, c) => sum + c.unread, 0);
+  // The bar's height must include the home-indicator inset: React Navigation pads by it inside the height we
+  // give, so a fixed 64 would leave the icons ~24pt on notched phones. Screens pad by TAB_BAR_HEIGHT + inset.
+  const insets = useSafeAreaInsets();
+  const bar = { backgroundColor: 'transparent', borderTopWidth: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingTop: 6, elevation: 0 } as const;
 
   return (
     <Tabs
@@ -43,7 +48,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primaryText,
         tabBarInactiveTintColor: colors.textDim,
-        tabBarStyle: { backgroundColor: 'transparent', borderTopWidth: 0, height: TAB_BAR_HEIGHT, paddingTop: 6, elevation: 0 },
+        tabBarStyle: bar,
         tabBarBackground: TabBarGlass,
         tabBarLabelStyle: { fontSize: 11, fontFamily: 'JakartaSemiBold', marginTop: 2 },
         tabBarIconStyle: { overflow: 'visible' },
@@ -59,7 +64,7 @@ export default function TabLayout() {
           title: 'Odalar',
           tabBarIcon: icon('home-outline', 'home'),
           // Rooms scroll under the glass bar (the screen pads its list by the bar height).
-          tabBarStyle: { position: 'absolute', backgroundColor: 'transparent', borderTopWidth: 0, height: TAB_BAR_HEIGHT, paddingTop: 6, elevation: 0 },
+          tabBarStyle: { ...bar, position: 'absolute' },
         }}
       />
       <Tabs.Screen

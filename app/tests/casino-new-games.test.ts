@@ -40,6 +40,33 @@ const deps = (wallet: { n: number }, game: { n: number }) =>
     creditGame: (n) => void (game.n += n),
   });
 
+// Seeded simulations only cross-check the wiring (playSlot / playOlympus against the analytic return, which the
+// tests check exactly). The default runs are short; `npm run test:sim` (SIM_FULL=1) adds the full-length runs.
+const SIM_FULL = { skip: !process.env.SIM_FULL };
+const simulateSlots = (n: number, tolerance: number) => {
+  for (const c of Object.values(SLOT_CONFIGS)) {
+    const r = slotReturn(c);
+    const mx = slotMax(c);
+    const rnd = seeded(c.id.length * 7);
+    let sum = 0;
+    let worst = 0;
+    for (let i = 0; i < n; i++) {
+      const m = playSlot(c, rnd).multiplier;
+      sum += m;
+      if (m > worst) worst = m;
+    }
+    assert.ok(worst <= mx, `${c.id} en yüksek kazancı aştı: ${worst} > ${mx}`);
+    assert.ok(Math.abs(sum / n - (r.lines + r.scatter)) < tolerance, `${c.id} simülasyon ${sum / n} / hesap ${r.lines + r.scatter}`);
+  }
+};
+const simulateOlympus = (n: number, tolerance: number) => {
+  const r = olympusReturn();
+  const rnd = seeded(21);
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += playOlympus(rnd).multiplier;
+  assert.ok(Math.abs(sum / n - r.total) < tolerance, `simülasyon ${sum / n} / hesap ${r.total}`);
+};
+
 describe('Çizgili slotlar', () => {
   test('Wild her sembolün yerine geçer, 1. makarada da; tamamı Wild olan çizgi JACKPOT', () => {
     assert.deepEqual(linePay(MEGA, ['wild', 'wild', 'seven', 'cherry', 'bell']), { sym: 'seven', count: 3, pay: MEGA.paytable.seven[0] });
@@ -69,18 +96,12 @@ describe('Çizgili slotlar', () => {
       assert.ok(r.total <= 0.4 + 1e-12, `${c.id}: ${r.total}`);
       assert.ok(r.total >= 0.399, `${c.id}: ${r.total}`);
       assert.equal(expectedReturn(c.id as never), r.total);
-      const rnd = seeded(c.id.length * 7);
-      const n = 60_000;
-      let sum = 0;
-      for (let i = 0; i < n; i++) {
-        const sp = playSlot(c, rnd);
-        assert.ok(sp.multiplier <= slotMax(c), `${c.id} en yüksek kazancı aştı`);
-        sum += sp.multiplier;
-      }
-      assert.ok(Math.abs(sum / n - (r.lines + r.scatter)) < 0.03, `${c.id} simülasyon ${sum / n} / hesap ${r.lines + r.scatter}`);
     }
     assert.equal(maxMultiplier('jackpot'), slotMax(MEGA));
+    simulateSlots(10_000, 0.05);
   });
+
+  test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateSlots(60_000, 0.03));
 });
 
 describe('Şimşek Dağı', () => {
@@ -125,13 +146,11 @@ describe('Şimşek Dağı', () => {
     const r = olympusReturn();
     assert.ok(r.total <= 0.4 + 1e-12, `${r.total}`);
     assert.ok(r.total >= 0.399, `${r.total}`);
-    const rnd = seeded(21);
-    const n = 200_000;
-    let sum = 0;
-    for (let i = 0; i < n; i++) sum += playOlympus(rnd).multiplier;
-    assert.ok(Math.abs(sum / n - r.total) < 0.02, `simülasyon ${sum / n} / hesap ${r.total}`);
+    simulateOlympus(30_000, 0.06);
     assert.ok(outcomeOf('olympus', '', seeded(2)).olympus);
   });
+
+  test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateOlympus(200_000, 0.02));
 });
 
 describe('Mercan Avı', () => {
@@ -146,6 +165,9 @@ describe('Mercan Avı', () => {
 });
 
 describe('Bahis tahtaları', () => {
+  // A failed assertion must not leave Math.random mocked for the tests after it.
+  afterEach(() => mock.restoreAll());
+
   test('her seçenek tek başına tam %40 öder; ağırlıklar doğru', () => {
     for (const b of Object.values(BOARDS)) for (const o of b.options) assert.ok(Math.abs(optionReturn(b, o.id) - 0.4) < 1e-12, `${b.id}/${o.id}`);
     assert.equal(boardTotal(LUCKY77), 20);
@@ -172,7 +194,6 @@ describe('Bahis tahtaları', () => {
     // Draw 0 of 20 → the 77 slice.
     mock.method(Math, 'random', () => 0);
     const r = playBoard('slot', { seven: 250, apple: 500 }, { from: 'profile' }, 'req-board-1');
-    mock.restoreAll();
     assert.ok(r.ok);
     assert.equal(r.row.bet, 750);
     assert.equal(r.row.payout, 2_000);

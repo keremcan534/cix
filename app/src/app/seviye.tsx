@@ -19,6 +19,7 @@ import { WEALTH_ESTIMATED, WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, w
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { goBack } from '@/lib/nav';
+import { fromN } from '@/lib/tr';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const TIER_W = 96;
@@ -157,7 +158,7 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Text style={s.statusText}>{open ? `Lv.${level} ayrıcalıkları açık.` : `Lv.${level} için ${fmt(sys.table[level] - xp)} ${sys.point.toLowerCase()} gerekiyor (toplam ${fmt(sys.table[level])}).`}</Text>
         </View>
         <PerkGrid title={`Lv.${level} ayrıcalıkları`} perks={sys.perks.filter((p) => p.kind === 'privilege' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} />
-        <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${firstCostume}’dan itibaren açılır.`} />
+        <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${fromN(firstCostume)} itibaren açılır.`} />
 
         {kind === 'wealth' && (
           <Pressable onPress={() => router.push('/vip')} style={s.card} accessibilityLabel="Ayrıcalıklarım">

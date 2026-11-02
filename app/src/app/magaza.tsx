@@ -126,19 +126,22 @@ export default function StoreScreen() {
                     {c.days ? `${c.days} gün` : 'Kalıcı'}
                     {c.minVip ? ` · VIP ${c.minVip}+` : ''}
                   </Text>
-                  {owned ? (
-                    <PressableScale onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
-                      <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
-                    </PressableScale>
-                  ) : c.minVip && vipLevel < c.minVip ? (
-                    <PressableScale onPress={() => router.push('/vip')}>
-                      <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
-                    </PressableScale>
-                  ) : (
-                    <PressableScale onPress={() => buy(c)}>
-                      <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
-                    </PressableScale>
-                  )}
+                  {/* Pinned to the card bottom so prices line up when a name wraps to two lines. */}
+                  <View style={styles.cta}>
+                    {owned ? (
+                      <PressableScale onPress={() => equip(isEquipped ? null : c.id, c.kind)}>
+                        <GlossButton label={isEquipped ? 'Çıkar' : 'Kullan'} tone={isEquipped ? 'locked' : 'action'} small />
+                      </PressableScale>
+                    ) : c.minVip && vipLevel < c.minVip ? (
+                      <PressableScale onPress={() => router.push('/vip')}>
+                        <GlossButton label={`VIP ${c.minVip}`} tone="locked" small icon={<Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
+                      </PressableScale>
+                    ) : (
+                      <PressableScale onPress={() => buy(c)}>
+                        <GlossButton label={c.price.toLocaleString('tr-TR')} small icon={<Icon3D name="coin" size={16} />} />
+                      </PressableScale>
+                    )}
+                  </View>
                 </Shelf>
               );
             })}
@@ -263,6 +266,7 @@ const styles = StyleSheet.create({
   warn: { color: colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, paddingHorizontal: 16, paddingBottom: 30 },
   item: { width: '48.5%', borderRadius: 20, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1.5 },
+  cta: { marginTop: 'auto' },
   halo: { position: 'absolute', top: 14, alignSelf: 'center', width: 90, height: 90 },
   onTag: { position: 'absolute', top: 8, right: 8, color: semantic.actionInk, backgroundColor: colors.primaryText, fontSize: 10, fontWeight: '800', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', zIndex: 1 },
   packPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,7 +41,15 @@ type Friend = { user: User; iFollow: boolean; followsMe: boolean };
 
 export default function MessagesScreen() {
   const { conversations, blocked, following, recentRooms, vipDays, markRead, myRoom } = useApp();
-  const [tab, setTab] = useState<Tab>('messages');
+  // Profil › Arkadaşlar opens this tab on Arkadaşlarım (the tab stays mounted, so follow later visits too).
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const asked = params.tab === 'friends' || params.tab === 'calls' ? params.tab : null;
+  const [tab, setTab] = useState<Tab>(asked ?? 'messages');
+  const [lastAsked, setLastAsked] = useState(asked);
+  if (asked !== lastAsked) {
+    setLastAsked(asked);
+    if (asked) setTab(asked);
+  }
   const [filter, setFilter] = useState<Filter>('all');
   const [menuOpen, setMenuOpen] = useState(false);
   const [visitorsOpen, setVisitorsOpen] = useState(false);

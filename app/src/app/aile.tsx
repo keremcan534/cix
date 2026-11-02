@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
-import { ActionSheet } from '@/components/ActionSheet';
+import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Art } from '@/components/Art';
 import { goToMember } from '@/components/GroupChat';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
@@ -36,6 +36,8 @@ import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { youLabel } from '@/lib/tr';
+import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
 
@@ -102,15 +104,16 @@ export default function FamilyScreen() {
               <Text style={{ fontSize: 32 }}>{f.emoji}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.title}>{f.name}</Text>
-                <Text style={styles.dim}>
-                  LV{lvl} · {f.members}/{familyCapacity(lvl)} üye · bonus {pct(RULES.familyRates[lvl - 1])}
+                <Text style={styles.dim} numberOfLines={1}>
+                  Lv.{lvl} · {f.members}/{familyCapacity(lvl)} üye
                 </Text>
-                <View style={{ flexDirection: 'row', marginTop: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                   {f.memberIds.slice(0, 5).map((id, j) => (
                     <View key={id} style={{ marginLeft: j ? -8 : 0 }}>
                       <Avatar uri={userById(id).avatar} size={22} />
                     </View>
                   ))}
+                  <Text style={[styles.dim, { marginLeft: 8 }]}>Bonus {pct(RULES.familyRates[lvl - 1])}</Text>
                 </View>
               </View>
               <Pressable
@@ -186,17 +189,17 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
 
   const target = menuFor ? userById(menuFor) : null;
   const targetInRoom = menuFor ? presenceOf(menuFor)?.kind === 'room' : false;
-  const memberOptions = menuFor
+  const memberOptions: SheetOption[] = menuFor
     ? [
-        { label: 'Profili gör', onPress: () => router.push(`/kullanici/${menuFor}`) },
-        ...(targetInRoom && target ? [{ label: '🎉 Odasına git', onPress: () => goToMember(target) }] : []),
-        ...(role === 'owner' && roleOf(menuFor) === 'member' ? [{ label: '🛡️ Yardımcı yap', onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'helper' })) }] : []),
-        ...(role === 'owner' && roleOf(menuFor) === 'helper' ? [{ label: 'Yardımcılığı kaldır', onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'member' })) }] : []),
+        { label: 'Profili gör', icon: 'person-outline' as const, onPress: () => router.push(`/kullanici/${menuFor}`) },
+        ...(targetInRoom && target ? [{ label: 'Odasına git', icon: 'enter-outline' as const, onPress: () => goToMember(target) }] : []),
+        ...(role === 'owner' && roleOf(menuFor) === 'member' ? [{ label: 'Yardımcı yap', icon: 'shield-checkmark-outline' as const, onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'helper' })) }] : []),
+        ...(role === 'owner' && roleOf(menuFor) === 'helper' ? [{ label: 'Yardımcılığı kaldır', icon: 'shield-outline' as const, onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'member' })) }] : []),
         ...(canManage && roleOf(menuFor) === 'member'
-          ? [{ label: 'Tayfadan çıkar', destructive: true, onPress: () => setMemberIds((m) => m.filter((x) => x !== menuFor)) }]
+          ? [{ label: 'Tayfadan çıkar', icon: 'person-remove-outline' as const, destructive: true, onPress: () => setMemberIds((m) => m.filter((x) => x !== menuFor)) }]
           : []),
-        { label: '🚫 Engelle', destructive: true, onPress: () => toggleBlock(menuFor) },
-        { label: '⚠️ Şikayet et', onPress: () => showAlert('Şikayet alındı', 'Moderasyon ekibi inceleyecek.') },
+        { label: 'Engelle', icon: 'ban-outline' as const, destructive: true, onPress: () => toggleBlock(menuFor) },
+        { label: 'Şikâyet et', icon: 'flag-outline' as const, onPress: () => showAlert('Şikâyet alındı', 'Moderasyon ekibi inceleyecek.') },
       ]
     : [];
 
@@ -266,7 +269,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <View style={{ alignItems: 'center', gap: 4 }}>
                   <StateIcon name="shield-checkmark-outline" />
                   <Text style={styles.lvChip}>
-                    LV{lvl} · {pct(RULES.familyRates[lvl - 1])}
+                    Lv.{lvl} · {pct(RULES.familyRates[lvl - 1])}
                   </Text>
                 </View>
               </View>
@@ -317,7 +320,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
 
           <View style={[styles.row, { marginTop: 16 }]}>
             <Text style={styles.sectionTitle}>Tayfa Etiketi</Text>
-            <Pressable style={[styles.row, { gap: 4 }]} onPress={() => showAlert('Tayfa ID kopyalandı', String(meta.tagId))} accessibilityLabel="Tayfa ID kopyala">
+            <Pressable style={[styles.row, { gap: 4 }]} onPress={() => copyText(String(meta.tagId), 'Tayfa ID')} accessibilityLabel="Tayfa ID kopyala">
               <Text style={styles.dim}>ID:{meta.tagId}</Text>
               <Ionicons name="copy-outline" size={14} color={colors.textDim} />
             </Pressable>
@@ -410,7 +413,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                       <View style={{ flex: 1, paddingVertical: 4 }}>
                         <View style={[styles.row, { gap: 6, paddingVertical: 0 }]}>
                           <Text style={{ color: '#fff', fontWeight: '700' }} numberOfLines={1}>
-                            {id === 'me' ? `${me.name} (sen)` : u.name}
+                            {id === 'me' ? youLabel(me.name) : u.name}
                           </Text>
                           {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: 'rgba(19,217,223,0.16)', color: colors.primaryText }]}>{ROLE_LABEL[r]}</Text>}
                         </View>
@@ -437,14 +440,14 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           {tab === 'durum' && (
             <>
               <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Tayfa seviyesi · LV{lvl}</Text>
+                <Text style={styles.title}>Tayfa seviyesi · Lv.{lvl}</Text>
                 <Text style={styles.dim}>
                   {totalMembers}/{familyCapacity(lvl)} üye · {activeRows.length} aktif · Lider: {userOf(family.leaderId).name} · Rolün: {ROLE_LABEL[role]}
                 </Text>
                 <View style={styles.bar}>
                   <View style={[styles.barFill, { width: `${Math.round(xpProgress * 100)}%` }]} />
                 </View>
-                <Text style={styles.dim}>{next ? `${fmt(family.xp)} / ${fmt(next)} XP → LV${lvl + 1}` : 'En yüksek seviye'}</Text>
+                <Text style={styles.dim}>{next ? `${fmt(family.xp)} / ${fmt(next)} XP → Lv.${lvl + 1}` : 'En yüksek seviye'}</Text>
               </Card>
               <Card style={{ gap: 6 }}>
                 <Text style={styles.title}>Bu haftaki tayfa bonusu</Text>
@@ -466,7 +469,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                       <Avatar uri={u.avatar} size={36} />
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: '#fff' }}>
-                          {r.id === 'me' ? `${me.name} (sen)` : u.name} {roleOf(r.id) !== 'member' ? ROLE_LABEL[roleOf(r.id)].split(' ')[0] : ''}
+                          {r.id === 'me' ? youLabel(me.name) : u.name} {roleOf(r.id) !== 'member' ? ROLE_LABEL[roleOf(r.id)].split(' ')[0] : ''}
                         </Text>
                         <Text style={styles.dim}>
                           {isActive(r) ? '🟢 Aktif' : '⚪ Pasif'} · {r.days} gün
@@ -491,7 +494,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                         <Pressable
                           style={[styles.small, { backgroundColor: semantic.successFill }]}
                           onPress={() => {
-                            if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `LV${lvl} tayfa en fazla ${familyCapacity(lvl)} üye alabilir.`);
+                            if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `Lv.${lvl} tayfa en fazla ${familyCapacity(lvl)} üye alabilir.`);
                             setPending((p) => p.filter((x) => x !== id));
                             setMemberIds((m) => [...m, id]);
                           }}>
@@ -531,16 +534,16 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <Text style={styles.dim}>İade edilen hediyeler, sahte etkileşim ve kısıtlı hesapların katkısı hesaba katılmaz. Bonus haftalık kapanıştan sonra cüzdana elmas olarak yansır.</Text>
               </Card>
               <Card style={{ gap: 2 }}>
-                <Text style={[styles.title, { marginBottom: 6 }]}>Seviyeler (LV1–15)</Text>
+                <Text style={[styles.title, { marginBottom: 6 }]}>Seviyeler (Lv.1–15)</Text>
                 <View style={styles.tableRow}>
-                  <Text style={[styles.th, { width: 44 }]}>LV</Text>
+                  <Text style={[styles.th, { width: 44 }]}>Lv</Text>
                   <Text style={[styles.th, { flex: 1 }]}>Gereken XP</Text>
                   <Text style={[styles.th, { width: 70 }]}>Kapasite</Text>
                   <Text style={[styles.th, { width: 60, textAlign: 'right' }]}>Bonus</Text>
                 </View>
                 {FAMILY_XP.map((xp, i) => (
                   <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: 'rgba(19,217,223,0.25)', borderRadius: 8 }]}>
-                    <Text style={[styles.td, { width: 44 }]}>LV{i + 1}</Text>
+                    <Text style={[styles.td, { width: 44 }]}>Lv.{i + 1}</Text>
                     <Text style={[styles.td, { flex: 1 }]}>{fmt(xp)}</Text>
                     <Text style={[styles.td, { width: 70 }]}>{familyCapacity(i + 1)}</Text>
                     <Text style={[styles.td, { width: 60, textAlign: 'right', color: colors.gold }]}>{pct(RULES.familyRates[i])}</Text>
@@ -553,7 +556,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                   <View key={p.from} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
                     <Ionicons name={lvl >= p.from ? 'checkmark-circle' : 'lock-closed'} size={14} color={lvl >= p.from ? colors.green : colors.textDim} style={{ marginTop: 2 }} />
                     <Text style={[styles.dim, { flex: 1 }, lvl >= p.from && { color: '#fff' }]}>
-                      LV{p.from}–{p.to}: {p.text}
+                      Lv.{p.from}–{p.to}: {p.text}
                     </Text>
                   </View>
                 ))}
@@ -598,12 +601,12 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         title={family.name}
         onClose={() => setMoreOpen(false)}
         options={[
-          { label: '📊 Veri Merkezi', onPress: () => setSheet('stats') },
-          { label: '📜 Tayfa kuralları', onPress: () => setSheet('rules') },
-          { label: familyMuted ? '🔔 Sohbet bildirimlerini aç' : '🔕 Sohbeti sessize al', onPress: () => setFamilyMuted(!familyMuted) },
-          ...(canManage ? [{ label: '👥 Üye davet et', onPress: () => setInviteOpen(true) }] : []),
-          { label: '⚠️ Tayfayı şikayet et', onPress: report },
-          { label: 'Tayfadan ayrıl', destructive: true, onPress: leave },
+          { label: 'Veri Merkezi', icon: 'stats-chart-outline' as const, onPress: () => setSheet('stats') },
+          { label: 'Tayfa kuralları', icon: 'document-text-outline' as const, onPress: () => setSheet('rules') },
+          { label: familyMuted ? 'Sohbet bildirimlerini aç' : 'Sohbeti sessize al', icon: familyMuted ? ('notifications-outline' as const) : ('notifications-off-outline' as const), onPress: () => setFamilyMuted(!familyMuted) },
+          ...(canManage ? [{ label: 'Üye davet et', icon: 'person-add-outline' as const, onPress: () => setInviteOpen(true) }] : []),
+          { label: 'Tayfayı şikâyet et', icon: 'flag-outline' as const, onPress: report },
+          { label: 'Tayfadan ayrıl', icon: 'exit-outline' as const, destructive: true, onPress: leave },
         ]}
       />
       <ActionSheet
@@ -611,8 +614,8 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         title="Tayfayı paylaş"
         onClose={() => setShareOpen(false)}
         options={[
-          { label: '🔗 Bağlantıyı paylaş', onPress: () => Share.share({ message: `${family.emoji} ${family.name} tayfasına katıl! Tayfa ID: ${meta.tagId}` }).catch(() => {}) },
-          { label: '👥 Arkadaşlarını davet et', onPress: () => (canManage ? setInviteOpen(true) : showAlert('Davet bağlantısı kopyalandı', `Tayfa ID: ${meta.tagId}`)) },
+          { label: 'Bağlantıyı paylaş', icon: 'link-outline' as const, onPress: () => Share.share({ message: `${family.emoji} ${family.name} tayfasına katıl! Tayfa ID: ${meta.tagId}` }).catch(() => {}) },
+          { label: 'Arkadaşlarını davet et', icon: 'people-outline' as const, onPress: () => (canManage ? setInviteOpen(true) : copyText(`Tayfa ID: ${meta.tagId}`, 'Davet bilgisi')) },
         ]}
       />
 
@@ -774,7 +777,7 @@ function CoupleTab() {
               <Text style={{ color: '#fff', fontWeight: '800' }}>
                 {userById(top.a).name} & {userById(top.b).name}
               </Text>
-              <Text style={styles.dim}>İkili · LV.{top.level}</Text>
+              <Text style={styles.dim}>İkili · Lv.{top.level}</Text>
             </View>
             <Text style={{ color: '#F9A8D4', fontWeight: '900', fontSize: 16 }}>{fmtK(top.score)} ❤</Text>
           </View>
@@ -815,7 +818,7 @@ function ThemeTab({ themeId, onPick, level, canManage }: { themeId: string; onPi
               key={t.id}
               style={[styles.themeItem, active && { borderColor: colors.gold }]}
               onPress={() => {
-                if (locked) return showAlert('Kilitli tema', `${t.name} LV${t.minLevel} tayfalarda açılır.`);
+                if (locked) return showAlert('Kilitli tema', `${t.name} Lv.${t.minLevel} tayfalarda açılır.`);
                 if (!canManage) return showAlert('Yetki yok', 'Temayı yalnızca lider ve yardımcılar değiştirebilir.');
                 onPick(t.id);
               }}
@@ -825,7 +828,7 @@ function ThemeTab({ themeId, onPick, level, canManage }: { themeId: string; onPi
                 {active && <Ionicons name="checkmark-circle" size={20} color={colors.gold} />}
               </LinearGradient>
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{t.name}</Text>
-              <Text style={styles.dim}>{locked ? `LV${t.minLevel}` : active ? 'Kullanılıyor' : 'Açık'}</Text>
+              <Text style={styles.dim}>{locked ? `Lv.${t.minLevel}` : active ? 'Kullanılıyor' : 'Açık'}</Text>
             </Pressable>
           );
         })}

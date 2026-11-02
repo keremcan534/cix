@@ -205,7 +205,9 @@ const styles = StyleSheet.create({
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
   textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flex: 1, textAlign: 'center' },
+  headerTitle: { color: '#fff', fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center' },
+  headerSide: { flex: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center' },
+  headerBack: { width: 40, height: 40, justifyContent: 'center' },
 });
 
 /** Secondary action inside a card: colored text with a chevron instead of a typed arrow. */
@@ -220,14 +222,17 @@ export function TextLink({ title, onPress, color = colors.primaryText }: { title
 
 export function Header({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
   return (
+    // Equal flexible sides keep the title on the screen's centre line whatever sits on the right.
     <View style={styles.header}>
-      <Pressable onPress={() => (onBack ? onBack() : goBack())} hitSlop={10} style={{ width: 32 }} accessibilityLabel="Geri">
-        <Ionicons name="chevron-back" size={26} color="#fff" />
-      </Pressable>
-      <Text style={styles.headerTitle} numberOfLines={1}>
+      <View style={styles.headerSide}>
+        <Pressable onPress={() => (onBack ? onBack() : goBack())} hitSlop={8} style={styles.headerBack} accessibilityRole="button" accessibilityLabel="Geri">
+          <Ionicons name="chevron-back" size={26} color="#fff" />
+        </Pressable>
+      </View>
+      <Text style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
         {title}
       </Text>
-      <View style={{ minWidth: 32, alignItems: 'flex-end' }}>{right}</View>
+      <View style={[styles.headerSide, { justifyContent: 'flex-end' }]}>{right}</View>
     </View>
   );
 }

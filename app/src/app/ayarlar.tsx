@@ -13,10 +13,11 @@ import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
 import { GATES } from '@/data/status';
-import { showAlert } from '@/lib/alert';
+import { confirmLogout, showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
 import { colors, semantic } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { openLegal } from '@/lib/legal';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -235,11 +236,8 @@ export default function SettingsScreen() {
             subtitle="Moderasyon, kısıtlama, transfer veya oyun kararı"
             onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Moderasyon kararı' } })}
           />
-          <ListRow
-            icon="document-text-outline"
-            title="Kullanım koşulları ve gizlilik"
-            onPress={() => showAlert('Kullanım koşulları', 'Kullanım koşulları ve gizlilik politikası yayın öncesinde hukuk danışmanıyla hazırlanacak.')}
-          />
+          <ListRow icon="document-text-outline" title="Kullanım Koşulları" onPress={() => openLegal('terms')} />
+          <ListRow icon="shield-checkmark-outline" title="Gizlilik Politikası" onPress={() => openLegal('privacy')} />
           <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => setLicenses(true)} />
         </ListGroup>
 
@@ -253,7 +251,7 @@ export default function SettingsScreen() {
           }
         >
           <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="KVKK kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
-          <ListRow icon="log-out-outline" tone="neutral" title="Çıkış yap" onPress={logout} chevron={false} />
+          <ListRow icon="log-out-outline" tone="neutral" title="Çıkış yap" onPress={() => confirmLogout(logout)} chevron={false} />
           {IS_DEMO && (
             <ListRow
               icon="refresh-outline"

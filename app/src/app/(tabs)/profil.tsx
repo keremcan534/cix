@@ -8,9 +8,11 @@ import { Text } from '@/components/text';
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
-import { USERS } from '@/data/mock';
+import { PROFILE_VISITORS } from '@/data/messages-ui';
+import { FOLLOWS_ME } from '@/data/mock';
 import { nobleInfo } from '@/data/status';
-import { showAlert } from '@/lib/alert';
+import { confirmLogout, showAlert } from '@/lib/alert';
+import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
@@ -41,14 +43,16 @@ const SUPPORT: Item[] = [
   { icon: 'shield-checkmark-outline', label: 'Güvenlik Merkezi', onPress: () => router.push('/ayarlar') },
   { icon: 'settings-outline', label: 'Ayarlar', onPress: () => router.push('/ayarlar') },
 ];
-const VISITORS = 53;
 const COMPLETION = 46;
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
+  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
-  const friends = USERS.filter((u) => following.has(u.id)).slice(0, 1);
+  // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through.
+  const followers = [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
+  const friendCount = new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
+  const visitorCount = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId)).length;
 
   const main: Item[] = [
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
@@ -84,7 +88,7 @@ export default function ProfileScreen() {
               <LevelChips wealth={wealthLevel} charm={charmLevel} />
             </View>
             <AffiliationPills user={me} />
-            <Pressable onPress={() => showAlert('ID kopyalandı', specialId ? specialId.name : '10284731')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Pressable onPress={() => copyText(specialId ? specialId.name : '10284731', 'ID')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'}</Text>
               <Ionicons name="copy-outline" size={13} color={colors.textDim} />
             </Pressable>
@@ -98,14 +102,14 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.stats}>
-          <Stat n={128} label="Takipçiler" />
+          <Stat n={followers} label="Takipçiler" />
           <Stat n={following.size} label="Takip" />
-          <Stat n={friends.length} label="Arkadaşlar" onPress={() => router.push('/(tabs)/mesajlar')} />
+          <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
           <Stat
-            n={VISITORS}
+            n={visitorCount}
             label="Ziyaretçiler"
             dot
-            onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? 'Son 7 günde profilini 53 kişi ziyaret etti. (VIP ayrıcalığı)' : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
+            onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? `Son 7 günde profilini ${visitorCount} kişi ziyaret etti. (VIP ayrıcalığı)` : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
           />
         </View>
 
@@ -178,7 +182,7 @@ export default function ProfileScreen() {
                 <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
                   {l}
                 </Text>
-                {vipLevel < 2 && <Ionicons name="lock-closed" size={11} color={colors.textDim} style={styles.gameLock} />}
+                {wealthLevel < 2 && <Ionicons name="lock-closed" size={11} color={colors.textDim} style={styles.gameLock} />}
               </Pressable>
             ))}
           </View>
@@ -188,7 +192,7 @@ export default function ProfileScreen() {
         <Group items={GROWTH.filter(visible)} />
         <Group items={SUPPORT} />
 
-        <Pressable style={styles.logout} onPress={logout}>
+        <Pressable style={styles.logout} onPress={() => confirmLogout(logout)} accessibilityRole="button">
           <Ionicons name="log-out-outline" size={18} color={colors.red} />
           <Text style={{ color: colors.red, fontWeight: '600' }}>Çıkış yap</Text>
         </Pressable>

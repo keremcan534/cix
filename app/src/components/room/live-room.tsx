@@ -1005,13 +1005,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (bossId && bossId !== 'me') {
       const u = userById(bossId);
       const options: SheetOption[] = [
-        { label: '👤 Profili gör', onPress: () => router.push(`/kullanici/${bossId}`) },
-        { label: '🎁 Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
-        { label: `ℹ️ Dümene geç: 🪙 ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} daha gönder`, onPress: () => showAlert('Dümen Koltuğu', bossSeatInfo(bossId, mine, top)) },
+        { label: 'Profili gör', icon: 'person-outline', onPress: () => router.push(`/kullanici/${bossId}`) },
+        { label: 'Hediye gönder', icon: 'gift-outline', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
+        { label: `Dümene geç: ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} jeton daha gönder`, icon: 'information-circle-outline', onPress: () => showAlert('Dümen Koltuğu', bossSeatInfo(bossId, mine, top)) },
       ];
       if (myRole === 'owner')
         options.push({
-          label: '⬇️ Dümen koltuğundan indir',
+          label: 'Dümen koltuğundan indir',
+          icon: 'arrow-down-circle-outline',
           destructive: true,
           onPress: () => {
             setBossRemoved((s) => new Set(s).add(bossId));

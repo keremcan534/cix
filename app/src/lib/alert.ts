@@ -32,3 +32,11 @@ export function showAlert(title: string, message?: string, buttons?: AlertButton
   if (ok) actions[actions.length - 1].onPress?.();
   else buttons?.find((b) => b.style === 'cancel')?.onPress?.();
 }
+
+/** Sign-out is one tap away on two screens; ask first so a stray tap doesn't end the session. */
+export function confirmLogout(logout: () => void) {
+  showAlert('Çıkış yap', 'Hesabından çıkış yapılsın mı?', [
+    { text: 'Vazgeç', style: 'cancel' },
+    { text: 'Çıkış yap', style: 'destructive', onPress: logout },
+  ]);
+}

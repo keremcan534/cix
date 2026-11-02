@@ -21,6 +21,12 @@ const wallet = (coins: number) => {
 const send = (userId: string, giftId: string, toId: string, wl: ReturnType<typeof wallet>, txId = newLuckyTxId()) =>
   sendLucky({ txId, userId, userAge: 30, roomId: 'lk-room', giftId, toId, toName: toId }, wl);
 
+// A forced result stays set until a draw uses it (a gift without that tier never does), so clear it after every
+// test: a failed assertion must not carry it into the next one.
+afterEach(() => {
+  if (getLucky().forceNext !== null) setForceNext(null);
+});
+
 describe('Lucky: gönderim sınırı yok', () => {
   test('eski günlük (500) ve dakikalık (60) sınırın üstünde gönderim; yalnız bakiye bitince durur', () => {
     const wl = wallet(20 * 600);
@@ -55,7 +61,6 @@ describe('Lucky: alıcıya %20', () => {
       assert.ok(r.ok);
       assert.equal(r.record.hostDiamonds, Math.floor(g.price * LUCKY_RECIPIENT_SHARE), g.name);
     }
-    setForceNext(null);
   });
 });
 

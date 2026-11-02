@@ -14,6 +14,9 @@ import { colors, fonts, semantic } from '@/theme';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 
+// Only the streak's top reward wears the BÜYÜK ribbon.
+const BIGGEST_CHECKIN = Math.max(...CHECKIN_REWARDS);
+
 const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
   roomMinutes: { desc: 'Sohbet odasında belirtilen süre kadar kal', go: () => router.push('/(tabs)') },
   giftsSent: { desc: 'Ödül almak için sohbet odasında hediyeler gönderin', go: () => router.push('/(tabs)') },
@@ -73,7 +76,7 @@ export default function TaskCenter() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
             {CHECKIN_REWARDS.map((r, i) => {
               const done = i < todayIndex || (i === todayIndex && checkedInToday);
-              const big = i === 1 || i === 6;
+              const big = r === BIGGEST_CHECKIN;
               return (
                 <Pressable key={`d${i}`} onPress={() => setSelected(i)} style={[styles.day, done && styles.dayDone, selected === i && styles.daySel]} accessibilityLabel={`Gün ${i + 1}${done ? ', alındı' : ''}`}>
                   {big && <Text style={styles.large}>BÜYÜK</Text>}

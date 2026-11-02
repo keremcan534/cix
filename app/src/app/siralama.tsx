@@ -14,6 +14,7 @@ import { AGENCIES } from '@/data/agency';
 import { ROOMS, USERS, type User } from '@/data/mock';
 import { colors } from '@/theme';
 import { Photo } from '@/components/photo';
+import { periodLabel } from '@/lib/tr';
 
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
 type Unit = 'coin' | 'diamond' | 'people' | 'xp';
@@ -24,7 +25,6 @@ const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: U
   { key: 'ajans', label: 'Ajanslar', emoji: '🏢', art: 'siralama-ajanslar', unit: 'diamond', how: 'Ajans yayıncılarının toplam geçerli kazancı' },
   { key: 'odaxp', label: 'Oda XP', emoji: '⭐', art: 'siralama-oda-xp', unit: 'xp', how: 'Doğrulanmış oda deneyim puanı' },
 ];
-const PERIOD_RANGE = { daily: '24 Ekim 2026', weekly: '19–25 Ekim 2026', monthly: '1–31 Ekim 2026' } as const;
 
 type Row = { id: string; name: string; avatar: string; score: number; user?: User; roomId?: string };
 
@@ -70,7 +70,7 @@ export default function Leaderboard() {
         ))}
       </View>
       <Text style={styles.how}>
-        {PERIOD_RANGE[period]} · Ölçüt: {info.how} · İade edilen hediyeler ve sahte etkileşimler hariç
+        {periodLabel(period)} · Ölçüt: {info.how} · İade edilen hediyeler ve sahte etkileşimler hariç
       </Text>
 
       <FlatList

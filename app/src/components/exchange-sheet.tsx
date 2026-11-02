@@ -88,7 +88,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
 
           <View style={s.preview}>
             <View style={s.side}>
-              <Text style={s.sideLabel}>Verilen</Text>
+              <Text style={s.sideLabel}>VERİLEN</Text>
               <View style={s.sideRow}>
                 <Icon3D name="diamond" size={20} />
                 <Text style={s.sideN} numberOfLines={1} adjustsFontSizeToFit>{fmt(amount)}</Text>
@@ -98,7 +98,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
               <Ionicons name="arrow-forward" size={18} color={semantic.actionInk} />
             </View>
             <View style={[s.side, { alignItems: 'flex-end' }]}>
-              <Text style={s.sideLabel}>Alınan</Text>
+              <Text style={s.sideLabel}>ALINAN</Text>
               <View style={s.sideRow}>
                 <Icon3D name="coin" size={20} />
                 <Text style={[s.sideN, { color: semantic.money }]} numberOfLines={1} adjustsFontSizeToFit>{fmt(quote.ok ? quote.coins : 0)}</Text>
@@ -153,7 +153,7 @@ const s = StyleSheet.create({
   chipText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   preview: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 18, padding: 14 },
   side: { flex: 1, gap: 4 },
-  sideLabel: { color: colors.textDim, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+  sideLabel: { color: colors.textDim, fontSize: 11, fontWeight: '600', letterSpacing: 0.6 },
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sideN: { color: '#fff', fontSize: 20, fontWeight: '800', flexShrink: 1 },
   arrow: { width: 34, height: 34, borderRadius: 17, backgroundColor: semantic.action, alignItems: 'center', justifyContent: 'center' },

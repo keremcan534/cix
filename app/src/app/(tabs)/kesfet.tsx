@@ -14,6 +14,7 @@ import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { charmRankBoost } from '@/data/charm';
 import { wealthCharmOf } from '@/data/profile';
+import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
@@ -34,8 +35,8 @@ export default function DiscoverScreen() {
   const [tab, setTab] = useState<Tab>('Benzer');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [greeted, setGreeted] = useState<Set<string>>(new Set());
-  const { blocked, settings, setSetting, sendMessage, bump, following, toggleFollow } = useApp();
+  const { hasGreeted, greet } = useGreet();
+  const { blocked, settings, setSetting, following, toggleFollow } = useApp();
   // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
   const needsOptIn = tab === 'Yakındaki' && !settings.cityDiscovery;
   const showDistance = tab === 'Yakındaki' || settings.cityDiscovery;
@@ -56,14 +57,6 @@ export default function DiscoverScreen() {
 
   const rows: Row[] = needsOptIn ? [] : users.map((user) => ({ kind: 'user', user }));
   if (rows.length > 0) rows.splice(Math.min(DISCOVER_PROMO.afterIndex, rows.length), 0, { kind: 'promo' });
-
-  const greet = (user: User) => {
-    if (greeted.has(user.id)) return router.push(`/sohbet/${user.id}`);
-    // A greeting is a free icebreaker; follow-up DMs follow the paid-DM rule in the chat screen.
-    sendMessage(user.id, 'Selam! 👋');
-    bump('greetings');
-    setGreeted((prev) => new Set(prev).add(user.id));
-  };
 
   const country = COUNTRIES.find((c) => c.code === filters.country) ?? COUNTRIES[0];
 
@@ -102,8 +95,8 @@ export default function DiscoverScreen() {
               <Pressable style={styles.iconBtn} onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
                 <Ionicons name="trophy-outline" size={24} color="#fff" />
               </Pressable>
-              <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Ülke ve filtreler">
-                <Text style={{ fontSize: 24 }}>🌍</Text>
+              <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Filtreler">
+                <Ionicons name="options-outline" size={24} color="#fff" />
                 {!isDefault(filters) && <View style={styles.filterDot} />}
               </Pressable>
             </View>
@@ -162,7 +155,7 @@ export default function DiscoverScreen() {
             <UserRow
               user={item.user}
               showDistance={showDistance}
-              greeted={greeted.has(item.user.id)}
+              greeted={hasGreeted(item.user.id)}
               onGreet={() => greet(item.user)}
               isFollowing={following.has(item.user.id)}
               onToggleFollow={() => toggleFollow(item.user.id)}

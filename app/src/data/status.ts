@@ -96,9 +96,9 @@ export const VIP_PERKS: { name: string; desc: string; icon: string }[] = [
   { name: 'Seviyeleri gizle', desc: 'Cömertlik ve Yankı seviyeni gizle', icon: 'eye-off' },
 ];
 /** "Hoş Geldin Kutusu": granted with every plan. */
-export const VIP_GIFT_PACK: { name: string; emoji: string; days: number; qty: number }[] = [
-  { name: 'VIP Sohbet Balonu', emoji: '💬', days: 7, qty: 1 },
-  { name: 'VIP Giriş Efekti', emoji: '✨', days: 7, qty: 1 },
+export const VIP_GIFT_PACK: { name: string; emoji: string; art: ArtName; days: number; qty: number }[] = [
+  { name: 'VIP Sohbet Balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu', days: 7, qty: 1 },
+  { name: 'VIP Giriş Efekti', emoji: '✨', art: 'ayricalik-giris-ekrani', days: 7, qty: 1 },
 ];
 
 // --- Gates used across the app (admin-configurable in the real product) -------------------

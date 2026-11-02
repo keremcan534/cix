@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, View, type ColorValue } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type ColorValue } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -33,6 +33,8 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
+import { copyText } from '@/lib/clipboard';
+import { goBack } from '@/lib/nav';
 import { successHaptic } from '@/lib/haptics';
 import { checkInteraction, type Action } from '@/lib/interaction';
 import { shareLink } from '@/lib/links';
@@ -188,17 +190,6 @@ export default function UserProfile() {
     ]);
   };
 
-  const copyText = (value: string, what: string) => {
-    const clip = Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
-    if (clip) {
-      clip.writeText(value).then(
-        () => showAlert(`${what} kopyalandı`, value),
-        () => showAlert(`${what}: ${value}`),
-      );
-      return;
-    }
-    showAlert(`${what}: ${value}`, 'Kopyalamak için metnin üzerine uzun bas.');
-  };
   const copyId = () => copyText(displayId(user.id), 'ID');
   const copyUsername = () => copyText(`@${user.username ?? ''}`, 'Kullanıcı adı');
 
@@ -609,8 +600,8 @@ export default function UserProfile() {
       {/* Fixed top bar; collapses into a solid bar with the tabs once scrolled past the header. */}
       <View pointerEvents="box-none" style={[styles.topBar, collapsed && { backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
         <View style={[styles.topRow, { marginTop: insets.top }]}>
-          <Pressable onPress={() => router.back()} style={[styles.iconBtn, collapsed && { backgroundColor: 'transparent' }]} accessibilityLabel="Geri">
-            <Ionicons name="arrow-back" size={22} color="#fff" />
+          <Pressable onPress={() => goBack()} style={[styles.iconBtn, collapsed && { backgroundColor: 'transparent' }]} accessibilityLabel="Geri">
+            <Ionicons name="chevron-back" size={24} color="#fff" />
           </Pressable>
           <Text style={styles.topTitle} numberOfLines={1}>
             {collapsed ? user.name : ''}
@@ -645,11 +636,11 @@ export default function UserProfile() {
         title={user.name}
         onClose={() => setSheet('none')}
         options={[
-          { label: '🎙️ Odama davet et', onPress: inviteToRoom },
-          { label: '🔗 Profili paylaş', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
-          { label: '📋 Kullanıcı adını kopyala', onPress: copyUsername },
-          { label: '🚩 Şikayet et', onPress: () => setTimeout(() => setSheet('report'), 300) },
-          { label: isBlocked ? 'Engeli kaldır' : '⛔ Engelle', destructive: true, onPress: () => toggleBlock(user.id) },
+          { label: 'Odama davet et', icon: 'mic-outline', onPress: inviteToRoom },
+          { label: 'Profili paylaş', icon: 'share-social-outline', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
+          { label: 'Kullanıcı adını kopyala', icon: 'copy-outline', onPress: copyUsername },
+          { label: 'Şikâyet et', icon: 'flag-outline', onPress: () => setTimeout(() => setSheet('report'), 300) },
+          { label: isBlocked ? 'Engeli kaldır' : 'Engelle', icon: 'ban-outline', destructive: true, onPress: () => toggleBlock(user.id) },
         ]}
       />
       <ActionSheet

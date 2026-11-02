@@ -15,6 +15,9 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
+import { openLegal } from '@/lib/legal';
+import { today } from '@/lib/persist';
+import { stampLabel } from '@/lib/tr';
 
 export default function WalletScreen() {
   const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp, addCoins } = useApp();
@@ -34,7 +37,8 @@ export default function WalletScreen() {
     }, 1200);
   };
   const rows = ledger.filter((r) => r.currency === filter);
-  const loadedToday = ledger.filter((r) => r.currency === 'coin' && r.amount > 0).reduce((x, r) => x + r.amount, 0);
+  const day = today();
+  const loadedToday = ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -80,7 +84,7 @@ export default function WalletScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: '#fff' }}>{item.reason}</Text>
                   <Text style={{ color: colors.textDim, fontSize: 12 }}>
-                    {item.time} · {item.status} · {item.ref}
+                    {stampLabel(item.day, item.time)} · {item.status} · {item.ref}
                   </Text>
                 </View>
                 <Text style={{ color: item.amount < 0 ? colors.red : colors.green, fontWeight: '800' }}>
@@ -116,10 +120,7 @@ export default function WalletScreen() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
-            <View style={styles.flag}>
-              <Text style={{ fontSize: 14 }}>🇹🇷</Text>
-              <Ionicons name="chevron-down" size={14} color={colors.textDim} />
-            </View>
+            <Text style={styles.currency}>Fiyatlar TL</Text>
           </View>
           <View style={styles.grid}>
             {RECHARGE_PACKS.map((p: RechargePack) => {
@@ -149,7 +150,17 @@ export default function WalletScreen() {
             <Text style={styles.svipLinkText}>İnci seviyelerine bak →</Text>
             <Text style={styles.svipLinkSub}>{svipLevel ? `İnci ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
           </Pressable>
-          <Text style={styles.note}>Yüklemeye devam ederek Kullanım Koşulları ve Ödeme Sözleşmesi&apos;ni okuduğunu ve kabul ettiğini onaylarsın. Prototip: ödeme simüle edilir; iade/itiraz için Destek.</Text>
+          <Text style={styles.note}>
+            Yüklemeye devam ederek{' '}
+            <Text style={styles.legalLink} onPress={() => openLegal('terms')} accessibilityRole="link">
+              Kullanım Koşulları
+            </Text>{' '}
+            ve{' '}
+            <Text style={styles.legalLink} onPress={() => openLegal('payment')} accessibilityRole="link">
+              Ödeme Sözleşmesi
+            </Text>
+            &apos;ni okuduğunu ve kabul ettiğini onaylarsın. {IS_DEMO ? 'Prototip: ödeme simüle edilir; ' : ''}İade ve itiraz için Destek&apos;e yazabilirsin.
+          </Text>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -177,7 +188,7 @@ const styles = StyleSheet.create({
   svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },
   svipLinkText: { color: colors.gold, fontWeight: '700', fontSize: 14 },
   svipLinkSub: { color: colors.textDim, fontSize: 12 },
-  flag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  currency: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   firstTag: { alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   firstTagText: { color: semantic.moneyInk, fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
@@ -195,5 +206,6 @@ const styles = StyleSheet.create({
   bonusText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   packCoins: { color: '#fff', fontSize: 18, fontWeight: '800' },
   packPrice: { color: colors.textDim },
-  note: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: 8 },
+  note: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 8, paddingHorizontal: 20 },
+  legalLink: { color: '#fff', fontWeight: '700', textDecorationLine: 'underline' },
 });

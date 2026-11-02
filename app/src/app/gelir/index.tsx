@@ -13,6 +13,7 @@ import { userById } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
+import { stampLabel } from '@/lib/tr';
 import { useApp, type Earning, type EarningSource } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -150,7 +151,7 @@ export function EarningRow({ e }: { e: Earning }) {
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={styles.rowTitle}>{INCOME_LABEL[e.source]}</Text>
         {e.fromId ? <Text style={styles.sender}>{userById(e.fromId).name}</Text> : <Text style={styles.sender}>Similar Club</Text>}
-        <Text style={styles.dim}>Bugün {e.time}</Text>
+        <Text style={styles.dim}>{stampLabel(e.day, e.time)}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 6 }}>
         <Text style={styles.amount}>+{fmt(e.amount)} 💎</Text>
