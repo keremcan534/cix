@@ -1,5 +1,6 @@
 // Gelir > Çevir: turn your own diamonds into coins at the in-app coin price (lib/coins-bank exchangeOwnDiamonds).
 // A bottom sheet with the amount, quick shares of the balance, a live "x 💎 → y jeton" preview and one button.
+// Only the withdrawable part can be exchanged; locked diamonds (lib/diamond-locks) wait for their lock.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
@@ -24,14 +25,16 @@ const SHARES = [
 const PER_10K = Math.floor(10_000 * selfExchangeRate());
 
 export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { diamonds, coins, exchangeDiamonds, notify } = useApp();
+  const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, coins, exchangeDiamonds, notify } = useApp();
   const { colors, semantic } = useTheme();
   const s = useStyles();
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   const amount = Number(raw || 0);
-  const quote = exchangeOwnDiamonds(amount, diamonds);
-  const tooFew = diamonds < RULES.exchangeMinDiamonds;
+  const exchangeQuote = exchangeOwnDiamonds(amount, diamonds);
+  // Same order as the store: the amount itself first, then whether the locked part is in it.
+  const quote = exchangeQuote.ok && amount > free ? { ok: false as const, reason: `${fmt(locked)} elmasın kilidi henüz açılmadı; çekilebilir bakiyen ${fmt(free)} elmas.` } : exchangeQuote;
+  const tooFew = free < RULES.exchangeMinDiamonds;
 
   const close = () => {
     setRaw('');
@@ -74,11 +77,13 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
             />
             <Text style={s.unit}>elmas</Text>
           </View>
-          <Text style={s.balance}>Bakiyen: {fmt(diamonds)} 💎</Text>
+          <Text style={s.balance}>
+            Çekilebilir: {fmt(free)} 💎{locked > 0 ? ` · Kilitli: ${fmt(locked)} 💎` : ''}
+          </Text>
 
           <View style={s.chips}>
             {SHARES.map((c) => {
-              const n = Math.floor(diamonds * c.f);
+              const n = Math.floor(free * c.f);
               const on = raw !== '' && amount === n;
               return (
                 <Pressable key={c.label} disabled={n < RULES.exchangeMinDiamonds} onPress={() => setRaw(String(n))} style={[s.chip, on && s.chipOn, n < RULES.exchangeMinDiamonds && { opacity: 0.4 }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
@@ -112,7 +117,9 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
           </Text>
           <Text style={[s.note, !quote.ok && raw !== '' && { color: semantic.danger }]}>
             {tooFew
-              ? `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} elmas gerekir.`
+              ? locked > 0
+                ? `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} çekilebilir elmas gerekir; kilitli elmasların açılınca çevirebilirsin.`
+                : `Çevirmek için en az ${fmt(RULES.exchangeMinDiamonds)} elmas gerekir.`
               : !quote.ok && raw !== ''
                 ? quote.reason
                 : `Çeviriden sonra: ${fmt(diamonds - (quote.ok ? amount : 0))} 💎 · ${fmt(coins + (quote.ok ? quote.coins : 0))} jeton`}

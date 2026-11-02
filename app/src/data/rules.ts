@@ -38,7 +38,10 @@ export type Rules = {
   maxWithdrawDiamonds: number; // per request
   weeklyWithdrawLimitDiamonds: number;
   autoApproveUnderDiamonds: number; // smaller payouts are auto-approved, larger ones need manual review
-  pendingDays: number; // days before earned diamonds become final (refund/chargeback window)
+  /** Days the diamonds from a gift of store-bought coins (Google Play / App Store) stay locked: refund window. */
+  pendingDays: number;
+  /** Days the diamonds from a gift of coins bought at a Jeton Noktası (coins bank) stay locked. */
+  jetonPendingDays: number;
   bonusCashable: number; // 0 = bonus credits can never be withdrawn
   // Host & agency lifecycle
   hostAgencyJoinDays: number; // unaffiliated host moves to the management account after N days
@@ -79,6 +82,7 @@ export const DEFAULT_RULES: Rules = {
   weeklyWithdrawLimitDiamonds: 10_000_000,
   autoApproveUnderDiamonds: 250_000,
   pendingDays: 7,
+  jetonPendingDays: 1,
   bonusCashable: 0,
   hostAgencyJoinDays: 3,
   agencyHostInactiveDays: 90,

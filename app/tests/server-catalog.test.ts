@@ -8,7 +8,7 @@ import path from 'node:path';
 
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
-import { exchangeOwnDiamonds } from '@/lib/coins-bank';
+import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, wholesaleQuote } from '@/lib/coins-bank';
 import { RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
@@ -45,6 +45,23 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
       const q = exchangeOwnDiamonds(d, d);
       assert.ok(q.ok);
       if (q.ok) assert.equal((server.exchangeCoins as (n: number) => number)(d), q.coins, `${d} elmas`);
+    }
+  });
+
+  test('Jeton Noktası: elmas bozdurma ve toptan fiyat sunucuyla aynı', () => {
+    const ex = server.EXCHANGE as { bankFee: number; wholesaleFee: number };
+    assert.deepEqual([ex.bankFee, ex.wholesaleFee], [RULES.coinsBankExchangeFee, RULES.coinsBankWholesaleFee]);
+    const num = (f: unknown) => f as (n: number) => number;
+    for (const d of [100, 101, 999, 5_000, 88_959, 1_000_000, 123_456_789]) {
+      const q = convertDiamonds('coins_bank_main', d);
+      assert.ok(q.ok);
+      if (q.ok) assert.equal(num(server.bankExchangeCoins)(d), q.coins, `${d} elmas → banka jetonu`);
+      assert.equal(num(server.diamondValueTl)(d), Math.round(diamondValueTl(d) * 100) / 100, `${d} elmasın TL değeri`);
+    }
+    for (const c of [1, 999, 50_000, 1_000_000, 123_456_789]) {
+      const q = wholesaleQuote('coins_bank_main', c);
+      assert.ok(q.ok);
+      if (q.ok) assert.equal(num(server.wholesaleTl)(c), Math.round(q.priceTl * 100) / 100, `${c} jeton toptan`);
     }
   });
 

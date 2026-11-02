@@ -247,7 +247,7 @@ function WalletTab() {
 
 // --- 2) Creator earnings ---------------------------------------------------------------
 function CreatorTab() {
-  const { isHost, becomeHost, diamonds, totalDiamonds, earnings, withdrawals, rules } = useApp();
+  const { isHost, becomeHost, totalDiamonds, withdrawableDiamonds, lockedDiamonds, withdrawals, rules } = useApp();
   const bank = useBank();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
@@ -256,7 +256,7 @@ function CreatorTab() {
       <LockedCard
         icon="mic-off"
         title="Yayıncı kazancın yok"
-        text="Hediye ve aramalardan elmas kazanmak için yayıncı merkezini aç. Kazançların, bekleyen/kesinleşmiş tutarların ve ödeme taleplerin burada yönetilir."
+        text="Hediye ve aramalardan elmas kazanmak için yayıncı merkezini aç. Kazançların, kilitli ve çekilebilir tutarların ve ödeme taleplerin burada yönetilir."
         action="Yayıncı merkezini aç (demo)"
         onPress={becomeHost}
       />
@@ -265,10 +265,10 @@ function CreatorTab() {
   const blocked = blockedFor(bank, 'creator');
   // Classic withdrawals made on /yayinci/cek count towards completed payouts and the weekly limit.
   const legacySum = sumD(withdrawals);
-  // Demo split: this session's earnings are all from today, i.e. inside the pending window.
-  const pending = Math.min(totalDiamonds, earnings.reduce((s, e) => s + e.amount, 0));
-  const final = totalDiamonds - pending;
-  const available = Math.max(0, diamonds - blocked);
+  // Locked: gift diamonds still inside the refund window (lib/diamond-locks); only the rest can be paid out.
+  const pending = lockedDiamonds;
+  const final = Math.max(0, totalDiamonds - pending);
+  const available = Math.max(0, withdrawableDiamonds - blocked);
   const completed = paidFor(bank, 'creator') + legacySum;
   const rejected = rejectedFor(bank, 'creator');
 
@@ -277,14 +277,14 @@ function CreatorTab() {
       <SectionTitle icon="stats-chart" title="Kazançlarım" />
       <View style={styles.grid}>
         <Stat label="Toplam kazanç" value={dia(totalDiamonds)} sub={usd(totalDiamonds)} color={semantic.diamondText} />
-        <Stat label="Bekleyen kazanç" value={dia(pending)} sub={`Son ${rules.pendingDays} gün · ${usd(pending)}`} color={colors.gold} />
+        <Stat label="Kilitli elmas" value={dia(pending)} sub={`İade süresinde · ${usd(pending)}`} color={colors.gold} />
         <Stat label="Kesinleşmiş kazanç" value={dia(final)} sub={usd(final)} color={colors.green} />
-        <Stat label="Çekilebilir bakiye" value={dia(available)} sub={usd(available)} color={colors.text} />
+        <Stat label="Çekilebilir kazanç" value={dia(available)} sub={usd(available)} color={colors.text} />
         <Stat label="Ödeme sürecinde" value={dia(blocked)} sub={`Bloke · ${usd(blocked)}`} color={colors.gold} />
         <Stat label="Tamamlanan ödemeler" value={dia(completed)} sub={usd(completed)} color={colors.green} />
         <Stat label="Reddedilen / başarısız" value={dia(rejected)} sub="Blokajı çözüldü" color={colors.red} />
       </View>
-      <Note text={`Bekleyen kazanç iade/ters ibraz penceresindedir (${rules.pendingDays} gün). Ajans ve BD komisyonları yayıncı kazancından kesilmez; platform ayrıca öder.`} />
+      <Note text={`Kilitli elmas iade süresindedir: Google Play veya App Store jetonuyla gelen hediyeler ${rules.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${rules.jetonPendingDays} gün kilitli kalır; süre dolunca çekilebilir kazanca geçer. Ajans ve BD komisyonları yayıncı kazancından kesilmez; platform ayrıca öder.`} />
 
       <PayoutAccountCard scope="creator" />
       <PayoutForm scope="creator" available={available} legacyWeekly={legacySum} />
