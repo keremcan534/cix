@@ -512,7 +512,7 @@ function Chip({ on, label, onPress, strong }: { on: boolean; label: string; onPr
 
 // The light scheme inverts the dark one's monochrome accents: white pills and buttons on night blue become navy
 // ones on white, so the selected tab and the main button keep the same weight.
-const useStyles = makeStyles(({ colors, lift, dark }) => ({
+const useStyles = makeStyles(({ colors, lift, dark, ink }) => ({
   actorBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 44 },
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 10, ...lift },
   h1: { color: colors.text, fontSize: 20, fontWeight: '900' },
@@ -524,9 +524,10 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   optText: { color: colors.text, fontSize: 16, flexShrink: 1 },
   critical: { color: colors.gold, fontSize: 11, fontWeight: '800', borderWidth: 1, borderColor: colors.gold, borderRadius: 6, paddingHorizontal: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  chipOn: { backgroundColor: colors.primary },
-  chipStrongOn: { backgroundColor: dark ? '#fff' : colors.text },
+  // Light: a white chip with a hairline, the pale fill alone melts into the paper.
+  chip: { backgroundColor: dark ? colors.cardAlt : colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, ...(dark ? {} : { borderWidth: 1, borderColor: ink(0.12) }) },
+  chipOn: { backgroundColor: colors.primary, ...(dark ? {} : { borderColor: colors.primary }) },
+  chipStrongOn: { backgroundColor: dark ? '#fff' : colors.text, ...(dark ? {} : { borderColor: colors.text }) },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   chipTextOn: { color: '#fff' },
   chipStrongTextOn: { color: dark ? '#111' : '#fff' },

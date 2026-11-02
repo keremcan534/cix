@@ -303,7 +303,7 @@ function Editor({ draft, onChange, onDone }: { draft: LuckyGift; onChange: (g: L
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, dark }) => ({
+const useStyles = makeStyles(({ colors, semantic, dark, ink }) => ({
   title: { color: colors.text, fontWeight: '800', fontSize: 15, flex: 1 },
   big: { color: semantic.moneyText, fontWeight: '900', fontSize: 24 },
   label: { color: colors.text, fontSize: 13, flex: 1 },
@@ -313,6 +313,6 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
   chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
-  small: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7 },
+  small: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: dark ? colors.cardAlt : colors.card, paddingHorizontal: 12, paddingVertical: 7, ...(dark ? {} : { borderWidth: 1, borderColor: ink(0.12) }) },
   input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
 }));

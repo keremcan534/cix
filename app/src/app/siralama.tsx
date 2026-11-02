@@ -127,11 +127,14 @@ function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
 
 function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; unit: Unit; onPress: () => void }) {
   const styles = useStyles();
+  const { dark } = useTheme();
   const m = MEDAL[place];
+  // The pale silver ring vanishes on the light podium; a deeper silver there.
+  const ring = place === 2 && !dark ? '#94A3B8' : m.color;
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1, gap: 4, marginTop: place === 1 ? 0 : 28 }}>
       <Art name={m.art} size={33} />
-      <Photo uri={row.avatar} kind="face" style={{ width: m.size, height: m.size, borderRadius: m.size / 2, borderWidth: 3, borderColor: m.color }} />
+      <Photo uri={row.avatar} kind="face" style={{ width: m.size, height: m.size, borderRadius: m.size / 2, borderWidth: 3, borderColor: ring }} />
       <Text style={styles.podiumName} numberOfLines={1}>
         {row.name}
       </Text>
