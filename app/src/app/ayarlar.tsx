@@ -116,13 +116,13 @@ export default function SettingsScreen() {
           <Toggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" />
           <Toggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
           <Toggle k="showCurrentRoom" icon="mic-outline" title="Bulunduğum odayı profilimde göster" subtitle="Kapalıyken profilinden odana 'Git' ile gelinemez." />
-          <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Lucky ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
+          <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Uğurlu hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
           <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
           <Toggle
             k="invisibleEntry"
             leading={<Art name="oda-gizli-giris" size={32} />}
             title="Odalara gizli giriş"
-            subtitle="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez."
+            subtitle="Rütbe: Amiral ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
             disabled={!GATES.invisibleEntry(nobleTier)}
           />
         </ListGroup>
@@ -233,7 +233,12 @@ export default function SettingsScreen() {
             subtitle="Moderasyon, kısıtlama, transfer veya oyun kararı"
             onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Moderasyon kararı' } })}
           />
-          <ListRow icon="document-text-outline" title="Kullanım koşulları ve gizlilik" onPress={() => showAlert('Kullanım Koşulları', 'Demo metni.')} />
+          <ListRow
+            icon="document-text-outline"
+            title="Kullanım koşulları ve gizlilik"
+            onPress={() => showAlert('Kullanım koşulları', 'Kullanım koşulları ve gizlilik politikası yayın öncesinde hukuk danışmanıyla hazırlanacak.')}
+          />
+          <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => router.push('/lisanslar')} />
         </ListGroup>
 
         <ListGroup

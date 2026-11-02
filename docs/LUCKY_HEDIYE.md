@@ -1,15 +1,15 @@
-# Lucky Hediye Modülü
+# Uğurlu Hediye Modülü
 
 Kaynak: *LUCKY HEDİYE VE ÇARPANLI COIN KAZANMA MODÜLÜ*.
 
-Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişiye hediye değerinin **%20'si** elmas olarak yazılır (`LUCKY_RECIPIENT_SHARE`, `src/data/rules.ts`); PK'da da aynı %20 puan sayılır. Gönderenin ödülü bundan ayrı hesaplanır.
+Kullanıcı Uğurlu kategorisinden bir hediye gönderir. Sunucu yayımlanmış olasılıklara göre bir çarpan çeker. Kazanırsa **hediye bedeli × çarpan** kadar jeton gönderenin bakiyesine eklenir. Hediyeyi alan kişiye hediye değerinin **%20'si** elmas olarak yazılır (`LUCKY_RECIPIENT_SHARE`, `src/data/rules.ts`); PK'da da aynı %20 puan sayılır. Gönderenin ödülü bundan ayrı hesaplanır.
 
 ## Dosyalar
 
 | Dosya | Görevi |
 |---|---|
 | `src/lib/lucky.ts` | Sunucunun yerine geçen katman: paketler, olasılıklar, çekiliş, ödül rezervi, kayıtlar, denetim. |
-| `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Lucky** rafı: paketler, tam olasılık tablosu, Geçmişim. |
+| `src/components/room/gift-sheet.tsx` | Hediye paneli › **🍀 Uğurlu** rafı: paketler, tam olasılık tablosu, Geçmişim. |
 | `src/components/room/lucky-combo.tsx` | Sağ alttaki tekrar çarkı: çember etrafında dolan çizgi, basınca aynı hediyeyi aynı kişilere tekrar gönderir (×1, ×2, ×3 …). |
 | `src/lib/broadcast.ts`, `src/components/fx/win-banner.tsx` | Tüm odalara kazanç duyurusu: üst ortada ışıltılı bant, sırayla gösterilir. |
 | `src/components/room/lucky-result.tsx` | Odadaki sonuç kartı (çarpan + ödül veya "ödül çıkmadı"). Dokunmaları engellemez, mikrofona dokunmaz. |
@@ -34,11 +34,11 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
   - Her gönderimin bir payı (varsayılan %70) ödül rezervine aktarılır.
   - Rezerv bir paketin en yüksek ödülünü karşılayamazsa ya da günlük ödül limiti dolarsa paket **jeton düşülmeden önce** kapanır.
 - **Ayar sürümü:** Her değişiklik sürümü artırır. Her kayıt, çekildiği olasılık tablosunu ve sürümü saklar.
-- **Gönderim sınırı yok:** Kullanıcı jetonu yettiği kadar Lucky gönderebilir; günlük ya da dakikalık kullanıcı sınırı yoktur.
-  - Yaş sınırı 18; kişi kendine Lucky gönderemez.
+- **Gönderim sınırı yok:** Kullanıcı jetonu yettiği kadar Uğurlu hediye gönderebilir; günlük ya da dakikalık kullanıcı sınırı yoktur.
+  - Yaş sınırı 18; kişi kendine Uğurlu hediye gönderemez.
 - **Alıcı ve PK:** Alıcıya hediye değerinin %20'si elmas yazılır (aşağı yuvarlanır). PK'da alıcının (Takım PK'da takımının) puanına da aynı %20 eklenir; gönderenin kazandığı ödül PK'ya hiç sayılmaz. Normal hediyeler değişmedi (tam değer).
-- **Servet puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
-- **Duyuru:** Herhangi bir odada biri kazanç elde edince (Lucky veya Oyun Merkezi) **tüm odalarda** üst ortada ışıltılı bir bant çıkar: "X kazandı! Lucky › Uğur Böceği ×10 · +1.000 jeton · oda adı".
+- **Cömertlik puanı:** Harcanan jeton sayılır, kazanılan ödül sayılmaz.
+- **Duyuru:** Herhangi bir odada biri kazanç elde edince (Uğurlu veya Oyun Merkezi) **tüm odalarda** üst ortada ışıltılı bir bant çıkar: "X kazandı! Uğurlu › Uğur Böceği ×10 · +1.000 jeton · oda adı".
   - Bantlar sırayla gösterilir (en fazla 6 bekler); 30 saniyeden eski duyuru gösterilmez.
   - Bir gönderimde birden çok kazanç varsa tek bant: en yüksek çarpan ve toplam ödül.
   - Kullanıcı Ayarlar › Gizlilik'ten adının gizlenmesini seçebilir; o zaman "Bir kullanıcı kazandı" yazar.
@@ -60,7 +60,7 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 | Mikrofondaki 5 kişiye tek dokunuşla gönderim: 5 ayrı çekiliş ve kayıt, bakiye doğru | ✅ −500 +1.000 (×10) |
 | Kazanç tüm odalarda bantla duyurulur; başka odaların kazançları da görünür | ✅ |
 | Rezerv yetersizse paket gönderime kapanır | ✅ ("Rezervi 1.000’e düşür (test)") |
-| Lucky gönderiminde koltuk ve mikrofon korunur | ✅ |
+| Uğurlu hediye gönderiminde koltuk ve mikrofon korunur | ✅ |
 
 ## Sunucuya taşınacaklar
 
@@ -76,7 +76,7 @@ Kullanıcı Lucky kategorisinden bir hediye gönderir. Sunucu yayımlanmış ola
 ## Karar bekleyenler
 
 - **Ödül kaynağı:** Rezerv payı (%70) ve günlük limit.
-- **Alıcının geliri (karar verildi):** Lucky hediyede alıcıya hediye değerinin %20'si elmas olarak yazılır (`RULES.luckyHostShare`, aşağı yuvarlanır); kalan kısım ödülleri karşılar. Her gönderimin kaydında `hostDiamonds` alanı tutulur.
+- **Alıcının geliri (karar verildi):** Uğurlu hediyede alıcıya hediye değerinin %20'si elmas olarak yazılır (`RULES.luckyHostShare`, aşağı yuvarlanır); kalan kısım ödülleri karşılar. Her gönderimin kaydında `hostDiamonds` alanı tutulur.
 - **Hukuk:** Mevzuat, mağaza kuralları ve yaş sınırı incelemesi.
   - Jetonlar nakde çevrilemez.
   - Gerçek para karşılığı ödül, hukuki onay olmadan eklenmeyecek.

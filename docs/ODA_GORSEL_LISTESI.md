@@ -1,6 +1,6 @@
 # Oda görselleri: ChatGPT ile üretim listesi
 
-Oda ekranı şu an koddan çizilen bir sahne kullanıyor (`app/src/components/room/stage-backdrop.tsx`): tema renkleri, ev sahibi koltuğuna düşen iki spot, sohbetin altında koyulaşan zemin. Rakiplerle (SUGO, Yalla) aradaki kalan fark, odanın kendine ait çizimleri. Bu liste o görsellerin üretimi içindir. Dosyalar geldiğinde `StageBackdrop` ilgili temanın görselini çizilmiş sahnenin altına koyar; spotlar ve zemin aynen kalır.
+Oda ekranı şu an koddan çizilen bir sahne kullanıyor (`app/src/components/room/stage-backdrop.tsx`): tema renkleri, ev sahibi koltuğuna düşen iki spot, sohbetin altında koyulaşan zemin. Odaya kendi kimliğini verecek olan, ona ait çizimler. Bu liste o görsellerin üretimi içindir. Dosyalar geldiğinde `StageBackdrop` ilgili temanın görselini çizilmiş sahnenin altına koyar; spotlar ve zemin aynen kalır.
 
 **Toplam: 6 oda arka planı + 3 koltuk görseli = 9 görsel.**
 

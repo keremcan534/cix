@@ -1,8 +1,8 @@
-# Servet ve Cazibe Seviyeleri
+# Cömertlik ve Yankı Seviyeleri
 
-"Kullanıcı Seviyesi" ekranının yerini **Servet Seviyesi** ve **Cazibe Seviyesi** sekmeleri aldı (`/seviye`, cazibe için `/seviye?tab=charm`).
+"Kullanıcı Seviyesi" ekranının yerini **Cömertlik Seviyesi** ve **Yankı Seviyesi** sekmeleri aldı (`/seviye`, Yankı için `/seviye?tab=charm`).
 
-Ekranlar referans görsellerin kopyası değildir; SimilarClub'ın koyu temasında, kendi amblem ve metinleriyle tasarlandı.
+Ekranlar SimilarClub'ın koyu temasında, kendi amblem ve metinleriyle tasarlandı.
 
 ## Ortak yapı
 
@@ -15,13 +15,12 @@ Her iki sekmede de aynı bölümler vardır:
 
 Rozetler profilde, Ben sekmesinde, Keşfet kartlarında ve seviye listelerinde görünür.
 
-## Servet Seviyesi (`src/data/wealth.ts`)
+## Cömertlik Seviyesi (`src/data/wealth.ts`)
 
 - **Puan:** Geçerli jeton harcamasında 1 jeton = 1 puan.
-  - **Sayılmaz:** Casino oyunları, zar düellosu, oda zarfı ve jeton transferi.
-  - **Lucky:** Yalnızca harcanan jeton sayılır, kazanılan ödül sayılmaz.
-- **Eşikler:** Lv.0–50, ürün tablosundan alındı.
-  - **Lv.35 (2.520.000) ve Lv.36 (3.250.000)** ekran görüntülerinde yoktu. Ara değer olarak hesaplandı; onay bekliyor.
+  - **Sayılmaz:** Oyun Salonu oyunları, zar düellosu, oda zarfı ve jeton transferi.
+  - **Uğurlu hediye:** Yalnızca harcanan jeton sayılır, kazanılan ödül sayılmaz.
+- **Eşikler:** Lv.0–50 başlangıç değerleridir; ürün kararıyla kesinleşecek.
 - **Açtıkları:**
   - **Her seviye:** Seviye rozeti ve öne çıkma.
   - **Lv.3:** Seviye hediyesi.
@@ -30,10 +29,10 @@ Rozetler profilde, Ben sekmesinde, Keşfet kartlarında ve seviye listelerinde g
   - **Lv.20:** Profil çerçevesi.
   - **Lv.33:** Platform duyurusu.
 - **Seviye atlama:** Kullanıcıya bildirim gelir.
-- **Casino:** Erişim **Servet Lv.2** ile açılır (önceden VIP2).
+- **Oyun Salonu:** Erişim **Cömertlik Lv.2** ile açılır (önceden VIP2).
 - **Eski kayıtlar:** Puan, toplam harcamadan başlatılır.
 
-## Cazibe Seviyesi (`src/data/charm.ts`)
+## Yankı Seviyesi (`src/data/charm.ts`)
 
 Her kullanıcıda bulunur.
 
@@ -41,11 +40,11 @@ Her kullanıcıda bulunur.
   - Alınan hediyelerden gelen her 1 elmas = 1 puan.
   - Ücretli aramalardan gelen elmas da sayılır.
   - Beğeni ve özel sohbet puanları sunucuya geçildiğinde günlük sınırla eklenecek.
-- **Eşikler:** Lv.0–50, ürün tablosunun tamamı kullanıldı.
+- **Eşikler:** Lv.0–50 başlangıç değerleridir; ürün kararıyla kesinleşecek.
 - **Kazanca etkisi:** Alınan hediye elmaslarına seviye bonusu eklenir.
   - **Oranlar:** Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5.
-  - Bonus, gelir geçmişinde "Cazibe Seviyesi Bonusu" olarak ayrı satırda görünür.
-- **Popülerliğe etkisi:** Keşfet'te çevrimiçi kişiler arasında cazibesi yüksek olan üstte gösterilir.
+  - Bonus, gelir geçmişinde "Yankı Bonusu" olarak ayrı satırda görünür.
+- **Popülerliğe etkisi:** Keşfet'te çevrimiçi kişiler arasında Yankı seviyesi yüksek olan üstte gösterilir.
 - **Açtıkları:**
   - **Her seviye:** Rozet ve keşfette öne çıkma.
   - **Lv.6:** Kazanç bonusu, sohbet balonu.
@@ -56,7 +55,7 @@ Her kullanıcıda bulunur.
 
 ## Karar bekleyenler
 
-- **Servet:** Lv.35 ve Lv.36 eşiklerinin onayı.
-- **Cazibe bonusu:** Oranlar ve gelir paylaşımıyla nasıl birleşeceği.
+- **Eşikler:** Cömertlik ve Yankı için Lv.0–50 eşiklerinin onayı.
+- **Yankı bonusu:** Oranlar ve gelir paylaşımıyla nasıl birleşeceği.
 - **Görünüm ödülleri:** Çerçeve, giriş efekti ve araç için tasarım içerikleri.
   - Şu an emoji ile temsil ediliyor; mağaza ürünlerine bağlanacak.

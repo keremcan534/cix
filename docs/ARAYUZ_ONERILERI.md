@@ -1,6 +1,6 @@
 # Arayüz önerileri: göz ve beyin dostu butonlar
 
-Platform taraması (Duolingo, Material 3 Expressive, Discord Stage, Clubhouse, Spotify, Instagram/TikTok, WhatsApp) ve bilişsel UX ilkelerine dayalı öneriler. Canlı buton örnekleri ve oda alt çubuğunun önce/sonra görseli için ayrı bir sayfa da hazırlandı.
+Erişilebilirlik yönergeleri, Material 3 Expressive araştırması ve bilişsel UX ilkelerine dayalı öneriler. Canlı buton örnekleri ve oda alt çubuğunun önce/sonra görseli için ayrı bir sayfa da hazırlandı.
 
 ## Bugünkü durum (kod taraması)
 
@@ -40,7 +40,7 @@ Tek bir `Button` bileşeni, beş varyant:
 | Token | Renk | Anlam | Kontrast |
 | --- | --- | --- | --- |
 | `action` | `#7C3AED` | Butonlar, seçili sekme | beyaz yazı 5,7 : 1 |
-| `social` | `#DB2777` | Beğeni, takip, CP, ilişki | beyaz yazı 4,6 : 1 |
+| `social` | `#DB2777` | Beğeni, takip, İkili, ilişki | beyaz yazı 4,6 : 1 |
 | `money` | `#FBBF24` | Jeton, hediye, yükleme | `#3B2300` yazı 8,8 : 1 |
 | `live` | `#22C55E` | Çevrimiçi, konuşuyor, mikrofon açık | koyu yazı (`#052E16`) |
 | `danger` | `#EF4444` | Bildirim sayısı, tehlikeli eylem | yalnız rozet ve çerçeve |
@@ -49,7 +49,7 @@ Gradyan önerisi: `#8B5CF6 → #EC4899` yerine `#7C3AED → #DB2777` (beyaz yaz�
 
 ## Sesli oda alt çubuğu
 
-Discord Stage / Clubhouse yaklaşımı: konuşanlar üstte büyük, dinleyiciler altta, konuşmak isteyene tek ve belirgin "el kaldır".
+Sahne yaklaşımı: konuşanlar üstte büyük, dinleyiciler altta, konuşmak isteyene tek ve belirgin "el kaldır".
 
 - Sıra: `Menü (•••)` · `Sohbet girişi` · `Mikrofon` · `Hediye`
 - Mikrofon 56 px, en büyük buton. Durum üç yoldan: renk (yeşil/gri), ikon (`mic` / `mic-off`), etiket (AÇIK/KAPALI).
@@ -83,8 +83,6 @@ Ayarlardaki "efektleri kapat" titreşimi de kapatmalı.
 - [UX Collective: Material 3 Expressive](https://uxdesign.cc/material-3-expressive-building-on-the-failures-of-flat-design-d7a9bb627298)
 - [Duolingo tarzı tasarım sistemi analizi (üçüncü taraf)](https://open-design.ai/plugins/design-system-duolingo/)
 - [Pressable: 3B buton sistemi](https://superdesign.dev/library/pressable-a-3d-button-system-cobalt)
-- [Discord: Stage Channels SSS](https://support.discord.com/hc/hi-in/articles/1500005513722-Stage-Channels-FAQ)
-- [Windows Central: Stage channels](https://windowscentral.com/stage-channels-are-discords-answer-clubhouse)
 - [Smashing Magazine: The Thumb Zone](https://smashingmagazine.com/2016/09/the-thumb-zone-designing-for-mobile-users)
 - [Addy Osmani: Touch-Friendly Design](https://addyosmani.com/blog/touch-friendly-design/)
 - [TetraLogical: Target size (WCAG 2.2)](https://tetralogical.com/blog/2022/12/20/foundations-target-size/)

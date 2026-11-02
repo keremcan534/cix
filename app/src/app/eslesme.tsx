@@ -27,21 +27,23 @@ const SCENARIOS: [Scenario, string][] = [
 ];
 
 export default function HemenTanis() {
-  const { me } = useApp();
+  const { me, settings } = useApp();
   const m = useMatch();
   const media = useMedia();
   const [filter, setFilter] = useState<MatchFilter>(m.filter);
   const [showTest, setShowTest] = useState(false);
   const [spin] = useState(() => new Animated.Value(0));
   const searching = m.phase === 'searching';
+  // "Reduce motion" and "effects off" keep the radar still: fixed rings, no loop; the status line below says it is searching.
+  const still = settings.reduceMotion || settings.effectsOff;
 
   useEffect(() => {
-    if (!searching) return;
     spin.setValue(0);
+    if (!searching || still) return;
     const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1400, easing: Easing.linear, useNativeDriver: true }));
     loop.start();
     return () => loop.stop();
-  }, [searching, spin]);
+  }, [searching, still, spin]);
 
   const start = (mode: MatchMode) => {
     resetMatch();
@@ -68,20 +70,30 @@ export default function HemenTanis() {
           ) : (
             <View style={{ alignItems: 'center', justifyContent: 'center', width: 240, height: 240 }}>
               {searching &&
-                [0, 1, 2].map((i) => (
-                  <Animated.View
-                    key={i}
-                    style={[
-                      s.radar,
-                      {
-                        opacity: spin.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }),
-                        transform: [{ scale: spin.interpolate({ inputRange: [0, 1], outputRange: [0.5 + i * 0.25, 1.3 + i * 0.25] }) }],
-                      },
-                    ]}
-                  />
-                ))}
+                [0, 1, 2].map((i) =>
+                  still ? (
+                    <View key={i} style={[s.radar, { opacity: 0.5 - i * 0.15, transform: [{ scale: 0.6 + i * 0.2 }] }]} />
+                  ) : (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        s.radar,
+                        {
+                          opacity: spin.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }),
+                          transform: [{ scale: spin.interpolate({ inputRange: [0, 1], outputRange: [0.5 + i * 0.25, 1.3 + i * 0.25] }) }],
+                        },
+                      ]}
+                    />
+                  ),
+                )}
               <LinearGradient colors={gradient} style={s.meRing}>
-                <Image source={{ uri: me.avatar }} style={s.meAvatar} />
+                {me.avatar ? (
+                  <Image source={{ uri: me.avatar }} style={s.meAvatar} />
+                ) : (
+                  <View style={[s.meAvatar, s.meInitial]}>
+                    <Text style={s.meInitialText}>{me.name.trim().charAt(0).toLocaleUpperCase('tr-TR') || '?'}</Text>
+                  </View>
+                )}
               </LinearGradient>
             </View>
           )}
@@ -176,6 +188,8 @@ const s = StyleSheet.create({
   radar: { position: 'absolute', width: 240, height: 240, borderRadius: 120, borderWidth: 2, borderColor: semantic.action },
   meRing: { width: 120, height: 120, borderRadius: 60, padding: 4 },
   meAvatar: { flex: 1, borderRadius: 60, borderWidth: 3, borderColor: colors.bg },
+  meInitial: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  meInitialText: { color: colors.primaryText, fontSize: 44, fontWeight: '800' },
   status: { color: colors.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 },
   start: { borderRadius: 20, paddingVertical: 18, alignItems: 'center', gap: 4 },
   startTitle: { color: '#fff', fontWeight: '900', fontSize: 16 },

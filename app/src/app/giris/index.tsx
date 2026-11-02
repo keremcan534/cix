@@ -9,19 +9,11 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
-import { USERS } from '@/data/mock';
-import { colors, gradient, semantic } from '@/theme';
+import { colors } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 
-// Avatars floating around the logo: [user index, size, top %, left %]
-const BUBBLES: [number, number, `${number}%`, `${number}%`][] = [
-  [0, 78, '6%', '8%'],
-  [4, 64, '2%', '66%'],
-  [1, 56, '30%', '78%'],
-  [6, 70, '54%', '4%'],
-  [10, 60, '62%', '70%'],
-  [8, 52, '70%', '18%'],
-];
+// The delivered brand mark (two people forming a heart); app icons are generated from the same file.
+const LOGO = require('../../../assets/brand/logo.png');
 
 /** Coins given to the demo account on quick login (no real payment). */
 const DEMO_TEST_COINS = 1_000_000;
@@ -41,17 +33,10 @@ export default function WelcomeScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         <Backdrop scene={SCENES.login} />
         <View style={styles.hero}>
-          {BUBBLES.map(([i, size, top, left]) => (
-            <View key={i} style={[styles.bubble, { top, left, width: size, height: size, borderRadius: size / 2 }]}>
-              <Image source={{ uri: USERS[i].avatar }} style={{ flex: 1, borderRadius: size / 2 }} />
-            </View>
-          ))}
           <View style={styles.center}>
-            <LinearGradient colors={gradient} style={styles.logoMark}>
-              <Ionicons name="mic" size={44} color={semantic.actionInk} />
-            </LinearGradient>
-            <Text style={styles.logo}>Similar Club</Text>
-            <Text style={styles.tagline}>Sesli odalarda yeni insanlarla tanış,{'\n'}sohbet et, eğlen.</Text>
+            <Image source={LOGO} style={styles.logoMark} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Text style={styles.logo} accessibilityRole="header">Similar Club</Text>
+            <Text style={styles.tagline}>Sana benzeyen insanlarla{'\n'}aynı odada buluş.</Text>
           </View>
         </View>
 
@@ -87,9 +72,8 @@ function SocialButton({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; t
 
 const styles = StyleSheet.create({
   hero: { flex: 1 },
-  bubble: { position: 'absolute', padding: 3, backgroundColor: 'rgba(255,255,255,0.12)' },
   center: { position: 'absolute', top: '22%', left: 0, right: 0, alignItems: 'center', gap: 12 },
-  logoMark: { width: 96, height: 96, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  logoMark: { width: 96, height: 96 },
   logo: { color: '#fff', fontSize: 38, fontWeight: '900', letterSpacing: -1 },
   // White with a soft shadow: the hero photo behind it is a bright sky.
   tagline: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: 'rgba(8,15,30,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },

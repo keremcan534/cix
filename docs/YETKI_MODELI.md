@@ -18,7 +18,7 @@ Tüm yetkiler tek bir merkezi panelden (uygulamada: **Ben > Rol ve Yetki Merkezi
 
 Kullanıcıları görüntüle, Kullanıcı susturma, Kullanıcı banlama (kritik), Oda yönetimi, Ajansları görüntüle, Ajans oluşturma başvurusu, Ajans atama, BD komisyon raporunu görüntüle, Finansal raporları görüntüle (kritik), Rol oluşturma (kritik, platform), Rol ve yetki değiştirme (kritik, platform).
 
-Ajans başvurusu grubu (atanmış/tüm başvurular, değerlendirme, belgeler, BD atama, kesin karar, ajans yönetimi, ajans komisyonu, Coins Bank, ödeme yetkisi, performans): ayrıntı [`AJANS_BASVURU.md`](AJANS_BASVURU.md).
+Ajans başvurusu grubu (atanmış/tüm başvurular, değerlendirme, belgeler, BD atama, kesin karar, ajans yönetimi, ajans komisyonu, Jeton Noktası, ödeme yetkisi, performans): ayrıntı [`AJANS_BASVURU.md`](AJANS_BASVURU.md).
 
 ## Kapsam
 

@@ -22,7 +22,7 @@ Onaydan sonra ajans hesabı **Kurulum** durumunda açılır:
 1. Ajans hesabı oluşturuldu (benzersiz `AGY-xxxxxx` kimliği ve davet kodu)
 2. Sözleşme hazırlandı ve ajans sahibi imzaladı
 3. Komisyon kuralı tanımlandı (oran, hesaplama tabanı, geçerlilik tarihi, gerekçe)
-4. Ajans Coins Bank etkinleştirildi
+4. Ajans Jeton Noktası etkinleştirildi
 5. Finansal doğrulama: ajans sahibinin eklediği ödeme hesabı doğrulandı
 6. Para çekme yetkisi **ayrıca** açıldı (1–5 tamam değilse sunucu reddeder)
 
@@ -59,7 +59,7 @@ Başvurunun onaylanması tek başına para çekme yetkisi vermez.
 | `agency_apps.decide`: kesin onay, ret, askıya alma | Admin | ✓ |
 | `agencies.manage`: sahip / yöneticiler, sözleşme | Admin | |
 | `agencies.commission`: ajans komisyon kuralı (yalnız platform kapsamı) | Admin | ✓ |
-| `agencies.coinsbank`: Coins Bank etkinleştirme | Admin | ✓ |
+| `agencies.coinsbank`: Jeton Noktası etkinleştirme | Admin | ✓ |
 | `agencies.payout`: finansal doğrulama, ödeme yetkisi, ödeme onayı, ters kayıt (yalnız platform kapsamı) | Admin | ✓ |
 | `agencies.performance`: atanmış ajans performansı | BD, Admin | |
 
@@ -110,5 +110,5 @@ Başvurunun onaylanması tek başına para çekme yetkisi vermez.
 - Hazır örnekler:
   - `SC-AJ-2026-000109` Admin onayı bekliyor.
   - `SC-AJ-2026-000104` ek bilgi bekliyor.
-  - `AGY-100081` Melodi Ajans aktif, Coins Bank ve ödeme yetkisi açık.
+  - `AGY-100081` Melodi Ajans aktif, Jeton Noktası ve ödeme yetkisi açık.
 - **Görevler ayrılığı denemesi:** komisyon kuralını "Sen" olarak tanımla, ödemeyi "Sen" ile onaylamayı dene; işlem reddedilir. Zeynep ile onaylanır.
