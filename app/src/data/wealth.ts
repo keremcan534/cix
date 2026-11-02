@@ -1,20 +1,30 @@
 // Cömertlik Seviyesi (wealth level): Lv.0–50 from wealth points. Points come from qualifying coin spending
 // (gifts, Lucky gifts at the coins actually spent, paid messages and calls, store, family, room activities).
 // Coin games and coin hand-outs (room envelopes, transfers) never add points.
-// Thresholds are product data; Lv.35 and Lv.36 are interpolated until the product team confirms them.
 import type { ArtName } from '@/components/Art';
 
-export const WEALTH_XP = [
-  0, 10, 30, 55, 88, 130, 160, 195, 345, 555, // 0–9
-  950, 1_550, 2_560, 4_160, 6_000, 9_000, 13_100, 17_900, 25_900, 38_400, // 10–19
-  55_000, 79_000, 113_500, 154_000, 200_000, 253_000, 317_000, 390_000, 489_000, 609_000, // 20–29
-  745_000, 915_500, 1_188_000, 1_529_000, 1_955_000, 2_520_000, 3_250_000, 4_185_000, 5_540_000, 7_240_000, // 30–39
-  9_240_000, 11_230_000, 13_630_000, 16_280_000, 19_180_000, 22_500_000, 25_620_000, 29_120_000, 33_020_000, 37_320_000, // 40–49
-  42_000_000, // 50
-];
+/** Readable threshold: to the nearest 5 below 100, otherwise two significant digits (1.700, 30.000, 1.100.000). */
+export const readablePoints = (x: number) => {
+  if (x < 100) return Math.max(5, Math.round(x / 5) * 5);
+  const step = 10 ** (Math.floor(Math.log10(x)) - 1);
+  return Math.round(x / step) * step;
+};
+
+/**
+ * Our level curve, shared by Cömertlik and Yankı: Lv.L needs about A · L^1.5 · G^L points, made readable.
+ * Two anchors set it, the points for Lv.1 and for the top level; G and A follow from them. The L^1.5 part makes
+ * the first levels come quickly (one small gift opens Lv.1), and from the middle on each level asks for roughly
+ * a quarter more than the one before. Retuning the levels means changing the two anchors, not a table.
+ */
+export function levelCurve(first: number, last: number, max = 50): number[] {
+  const g = (last / (first * max ** 1.5)) ** (1 / (max - 1));
+  const a = first / g;
+  return Array.from({ length: max + 1 }, (_, l) => (l === 0 ? 0 : readablePoints(a * l ** 1.5 * g ** l)));
+}
+
+/** Lv.1 at 10 points (one Gül), Lv.50 at 30 million. */
+export const WEALTH_XP = levelCurve(10, 30_000_000);
 export const WEALTH_MAX = WEALTH_XP.length - 1;
-/** Levels whose threshold still needs confirmation. */
-export const WEALTH_ESTIMATED = [35, 36];
 
 /** Highest level whose threshold is reached. */
 export const levelFromTable = (table: number[], xp: number) => {

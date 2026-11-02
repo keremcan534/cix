@@ -116,6 +116,7 @@ import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/m
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp } from '@/store';
+import { similarity } from '@/lib/similarity';
 import { colors, gradient, semantic } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 
@@ -393,6 +394,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const mySeat = allSeats.indexOf('me');
   const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
+  // "%82 benzer" for everyone else on a mic: the bead ring around their seat and the seat menu title
+  // (a handful of small set lookups, cheap enough to redo each render).
+  const simScores = new Map(seatedOthers.map((u) => [u, similarity(app.me, userById(u)).score]));
 
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
@@ -734,7 +738,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const next = new Set<string>();
       seatedKey.split(',').forEach((uid) => uid && !mutedUsers.has(uid) && Math.random() < 0.35 && next.add(uid));
       if (amSeated && sending && Math.random() < 0.5) next.add('me');
-      setSpeaking(next);
+      // Same talkers as last tick (often nobody): keep the old Set so the whole room doesn't re-render.
+      setSpeaking((prev) => (prev.size === next.size && [...next].every((u) => prev.has(u)) ? prev : next));
     }, 900);
     return () => clearInterval(t);
   }, [seatedKey, amSeated, sending, mutedUsers, visible]);
@@ -1210,7 +1215,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           },
         });
       const roleLabel = targetRole === 'owner' ? 'Oda sahibi' : targetRole === 'admin' ? 'Yönetici' : 'Üye';
-      return openSeatMenu(index, `${index + 1}. koltuk · ${u.name} · ${roleLabel}`, items);
+      // Plain members need no role word; the match fits in the menu's one-line title instead.
+      const sim = simScores.get(uid);
+      const parts = [`${index + 1}. koltuk`, u.name, targetRole !== 'member' && roleLabel, sim !== undefined && `%${sim} benzer`].filter(Boolean);
+      return openSeatMenu(index, parts.join(' · '), items);
     }
     if (index === 0) return isOwn ? sitMe(0) : undefined;
     if (canManage) {
@@ -1760,6 +1768,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         muted={uid === 'me' && !sending}
         modMuted={!!uid && mutedUsers.has(uid)}
         invitee={!uid && slots[i]?.state === 'invited' && slots[i].invitee ? userById(slots[i].invitee!).name : undefined}
+        similarity={uid ? simScores.get(uid) : undefined}
         role={uid ? roleOf(uid) : i === 0 && extra?.host ? 'owner' : undefined}
         locked={!uid && i > 0 && (lockedSeats.includes(i) || (!amSeated && seatAccess(micQueue, myRole) === 'request'))}
         compact={extra?.compact}
@@ -1777,7 +1786,27 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     );
   };
 
+  // The game keeps running while the room is minimized, so it is the one piece rendered in both states.
+  // Same root View and a fixed key in both returns, so React keeps the game's state across the switch.
+  const gamePanel = game ? (
+    <GamePanel
+      key="game"
+      open={game}
+      entry={gameEntry}
+      players={gamePlayers}
+      hidden={gameMin || !full}
+      voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
+      onSwitch={setGame}
+      onMinimize={() => setGameMin(true)}
+      onClose={() => setGame(null)}
+      onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
+    />
+  ) : null;
+
   if (!unlocked) return full ? <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} /> : null;
+  // Minimized: the host hides this view, so drawing seats, chat and effects would be wasted work on
+  // every room tick. Session, audio and timers live in hooks above and keep running.
+  if (!full) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{gamePanel}</View>;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StageBackdrop theme={theme} />
@@ -2257,19 +2286,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         </Pressable>
       )}
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
-      {game && (
-        <GamePanel
-          open={game}
-          entry={gameEntry}
-          players={gamePlayers}
-          hidden={gameMin || !full}
-          voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
-          onSwitch={setGame}
-          onMinimize={() => setGameMin(true)}
-          onClose={() => setGame(null)}
-          onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
-        />
-      )}
+      {gamePanel}
       {game && gameMin && (
         <Pressable style={styles.gameChip} onPress={() => setGameMin(false)} accessibilityLabel="Oyuna dön">
           <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>

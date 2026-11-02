@@ -42,7 +42,7 @@ import {
   watchOkey,
 } from '@/lib/okey-table';
 import { tapHaptic } from '@/lib/haptics';
-import { useApp } from '@/store';
+import { useSettings } from '@/store';
 import { colors, fonts, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -54,7 +54,7 @@ const TW = 23;
 const TH = 33;
 
 export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; crowd: Player[] }) {
-  const { settings } = useApp();
+  const settings = useSettings();
   const [viewer] = useState<SeatHolder>(() => ({ id: viewerKey(me.id), name: me.name, avatar: me.avatar, bot: false }));
   const table = useOkeyTable(roomId);
   const [note, setNote] = useState('');

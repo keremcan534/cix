@@ -4,11 +4,11 @@
 // one image per glow, transform-only animations; the light sweep stops with Settings.reduceMotion.
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState, type ReactNode } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { tapHaptic } from '@/lib/haptics';
-import { useApp } from '@/store';
+import { useSettings } from '@/store';
 import type { Scene } from '@/components/fx/scenes';
 import { semantic } from '@/theme';
 
@@ -92,8 +92,10 @@ export function DepthCard({ children, style, tint = DEPTH }: { children?: ReactN
 }
 
 /** A diagonal light sweep across the parent every few seconds; for valuable things (ranks, top rooms). */
-export function Shine({ radius = 16, every = 9000, delay = 0 }: { radius?: number; every?: number; delay?: number }) {
-  const { settings } = useApp();
+// Memoized so a store update elsewhere on the screen does not restart the sweep.
+export const Shine = memo(ShineBase);
+function ShineBase({ radius = 16, every = 9000, delay = 0 }: { radius?: number; every?: number; delay?: number }) {
+  const settings = useSettings();
   const [t] = useState(() => new Animated.Value(0));
   const [w, setW] = useState(0);
   useEffect(() => {

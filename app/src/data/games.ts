@@ -157,7 +157,7 @@ export const CASINO_GAMES: CasinoGame[] = [
     fromRoom: true,
     bets: [...STAKES.base],
     dailyLimit: dailyFor(STAKES.base),
-    rules: '6 makara, 5 sıra; semboller ekranın her yerinde öder: aynı sembolden 8 veya daha fazla kazandırır. Çarpan küreleri toplanır ve dönüşün kazancını çarpar. 4 veya daha fazla 🔦 Fener 10 bedava dönüş verir. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    rules: '5×4 deniz. Gemiler yükleriyle (bahsin 0,1 ile 50 katı) denize düşer; fener sıraları tarar ve birinde durur. Işıktaki gemilerin yükleri toplanır ve ışığın parlaklığıyla (×1, ×2, ×3, ×5) çarpılır. 3 veya daha fazla kandil Fırtına Gecesi’ni başlatır: 6 dönüş boyunca ışık iki sırayı birden tarar ve her dönüşte bir kat daha parlar. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },

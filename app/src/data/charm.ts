@@ -4,16 +4,13 @@
 //   - popularity: a higher place in Keşfet and suggestions (charmRankBoost).
 // Points: 1 diamond received from gifts = 1 point, plus small amounts for likes on moments and
 // one-to-one conversations (capped per day so they can't be farmed).
-import { levelFromTable, type LevelPerk, type LevelTier } from '@/data/wealth';
+import { levelCurve, levelFromTable, type LevelPerk, type LevelTier } from '@/data/wealth';
 
-export const CHARM_XP = [
-  0, 2, 4, 8, 16, 32, 64, 128, 256, 512, // 0–9
-  1_024, 1_536, 2_304, 3_456, 5_184, 7_776, 11_664, 17_496, 26_244, 39_366, // 10–19
-  59_049, 76_763, 99_791, 129_728, 168_646, 219_239, 285_010, 370_513, 481_666, 626_165, // 20–29
-  814_014, 1_000_001, 1_278_981, 1_697_450, 2_325_153, 3_266_707, 4_396_572, 5_752_409, 7_379_414, 9_331_819, // 30–39
-  11_674_705, 14_486_168, 17_859_924, 21_908_430, 26_766_638, 32_596_487, 39_592_306, 47_987_288, 58_061_266, 70_150_040, // 40–49
-  84_656_568, // 50
-];
+/**
+ * Same curve as Cömertlik (levelCurve), with a higher top: received diamonds add up from many senders, so the
+ * last levels ask for twice the points. Lv.1 at 10 points (the first Gül received), Lv.50 at 60 million.
+ */
+export const CHARM_XP = levelCurve(10, 60_000_000);
 export const CHARM_MAX = CHARM_XP.length - 1;
 export const charmLevelOf = (xp: number) => levelFromTable(CHARM_XP, xp);
 

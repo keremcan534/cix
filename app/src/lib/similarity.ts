@@ -2,6 +2,7 @@
 // Shared interests carry most of the weight; same city and close age add a little.
 // The reasons are shown next to the score so it never feels like a black box.
 import type { User } from '@/data/mock';
+import { youAreIn } from '@/lib/tr';
 
 export type Similarity = { score: number; shared: string[]; reasons: string[] };
 
@@ -15,7 +16,7 @@ export function similarity(me: User, other: User): Similarity {
   if (shared.length) reasons.push(`İkiniz de ${shared.join(', ')} seviyorsunuz`);
   if (me.city && me.city === other.city) {
     score += 8;
-    reasons.push(`İkiniz de ${other.city}'dasınız`);
+    reasons.push(`İkiniz de ${youAreIn(other.city)}`);
   }
   const ageGap = Math.abs(me.age - other.age);
   if (ageGap <= 3) {
@@ -24,3 +25,9 @@ export function similarity(me: User, other: User): Similarity {
   } else if (ageGap <= 6) score += 2;
   return { score: Math.round(Math.min(98, Math.max(30, score))), shared, reasons };
 }
+
+/**
+ * Seat ring in rooms: how many of `count` beads light up. Spread over the scores people actually get (30 is the
+ * floor; interests, city and age together top out at 93), so the floor lights one bead and a top match fills it.
+ */
+export const litBeads = (score: number, count = 12) => Math.max(1, Math.min(count, Math.round(1 + ((score - 30) / 65) * (count - 1))));

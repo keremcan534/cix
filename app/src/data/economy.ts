@@ -50,16 +50,6 @@ export const vipPerks = (level: number) => VIP_TIERS.filter((t) => t.level <= le
 export const VIP_ENTRY_LEVEL = 4; // entry banner unlocks at Altın
 export const VIP_INVISIBLE_LEVEL = 9; // invisible entry unlocks at Elmas
 
-// --- Wealth & Charm (separate from VIP and room level) ----------------------
-// Wealth: qualifying coins spent. Charm: diamonds received.
-const levelFrom = (value: number, base: number) => {
-  let lvl = 0;
-  while (value >= base * (2 ** lvl - 1) && lvl < 50) lvl++;
-  return Math.max(1, lvl);
-};
-export const wealthLevel = (spent: number) => levelFrom(spent, 100);
-export const charmLevel = (diamonds: number) => levelFrom(diamonds, 200);
-
 // --- Daily check-in & tasks --------------------------------------------------
 export const CHECKIN_REWARDS = [10, 15, 20, 30, 40, 50, 100];
 

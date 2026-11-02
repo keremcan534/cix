@@ -3,7 +3,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fromN, periodLabel, stampLabel, youLabel } from '@/lib/tr';
+import { fromN, locative, periodLabel, stampLabel, youAreIn, youLabel } from '@/lib/tr';
 
 describe('Sayı ekleri', () => {
   test('son kelimenin okunuşuna göre -den/-dan/-ten/-tan', () => {
@@ -49,5 +49,20 @@ describe('Satır zamanı', () => {
     assert.equal(stampLabel('2025-12-31', '23:59', now), '31 Aralık 2025 23:59');
     assert.equal(stampLabel(undefined, '14:05', now), '14:05', 'gün bilgisi olmayan eski kayıt');
     assert.equal(stampLabel('bozuk', '14:05', now), '14:05');
+  });
+});
+
+describe('Yer ekleri', () => {
+  test('ünlü uyumu ve sert ünsüz', () => {
+    assert.equal(locative('İstanbul'), 'İstanbul’da');
+    assert.equal(locative('İzmir'), 'İzmir’de');
+    assert.equal(locative('Ankara'), 'Ankara’da');
+    assert.equal(locative('Rize'), 'Rize’de');
+    assert.equal(locative('Antep'), 'Antep’te');
+    assert.equal(locative('Bursa'), 'Bursa’da');
+    assert.equal(locative('Muş'), 'Muş’ta');
+    assert.equal(youAreIn('İstanbul'), 'İstanbul’dasınız');
+    assert.equal(youAreIn('İzmir'), 'İzmir’desiniz');
+    assert.equal(youAreIn('Antep'), 'Antep’tesiniz');
   });
 });

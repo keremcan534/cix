@@ -16,6 +16,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
+import { SimilarityRing } from '@/components/similarity';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -44,6 +45,7 @@ export function Seat({
   slotWidth,
   modMuted,
   invitee,
+  similarity,
   onPress,
 }: {
   index: number;
@@ -79,6 +81,8 @@ export function Seat({
   modMuted?: boolean;
   /** Empty seat held for a pending mic invite (name of the invited person). */
   invitee?: string;
+  /** How much this person has in common with you (lib/similarity), drawn as a bead ring; not on your own seat. */
+  similarity?: number;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -97,7 +101,7 @@ export function Seat({
   const size = avatarSize ?? (host ? 70 : small ? 48 : 56);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
   const label = user
-    ? `${index + 1}. mikrofon, ${user.name}${muteText}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
+    ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
     : `${index + 1}. mikrofon, ${locked ? 'kilitli' : invitee ? `${invitee} için davet bekliyor` : 'boş'}`;
 
   return (
@@ -125,6 +129,7 @@ export function Seat({
             <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 16 : 19} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
           </LinearGradient>
         )}
+        {user && similarity !== undefined && !teamColor && <SimilarityRing score={similarity} size={size} />}
         {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
         {camera && user && (
           <View style={styles.camBadge} accessibilityLabel="Kamerası açık">

@@ -3,10 +3,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Platform } from 'react-native';
 
-import { useApp } from '@/store';
+import { useSettings } from '@/store';
 
 export function ScreenEnter({ children }: { children: ReactNode }) {
-  const { settings } = useApp();
+  const settings = useSettings();
   const still = Platform.OS !== 'web' || settings.reduceMotion;
   const [t] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {

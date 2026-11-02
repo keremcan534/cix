@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -12,7 +12,7 @@ import { AnimatedFrame, FRAME_LOOKS, type FrameFx } from '@/components/fx/frames
 import { goBack } from '@/lib/nav';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { ArtFrame, frameArtOf } from '@/components/fx/frame-art';
-import { useApp } from '@/store';
+import { useSettings } from '@/store';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
@@ -238,8 +238,10 @@ export function Header({ title, right, onBack }: { title: string; right?: ReactN
 }
 
 /** Avatar with the nobility (VIP) frame color, if any. */
-export function FramedAvatar({ uri, size = 44, vipLevel = 0, frameId, online, artScale }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number }) {
-  const { settings } = useApp();
+// Memoized: props are plain values and settings come from their own context, so rows re-render only when they change.
+export const FramedAvatar = memo(FramedAvatarBase);
+function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artScale }: { uri: string; size?: number; vipLevel?: number; frameId?: string; online?: boolean; /** How far illustrated frames may spread (see ArtFrame). */ artScale?: number }) {
+  const settings = useSettings();
   const tier = vipTier(vipLevel);
   const frame = cosmeticById(frameId);
   const art = frameArtOf(frame?.id);

@@ -262,6 +262,9 @@ type AppState = {
 
 
 const Ctx = createContext<AppState | null>(null);
+// Settings change rarely while the rest of the store changes often (coins, diamonds, room gifts). Animated
+// leaf components that only read settings subscribe here, so a balance tick doesn't re-render them.
+const SettingsCtx = createContext<Settings | null>(null);
 
 export const now = () => {
   const d = new Date();
@@ -973,11 +976,22 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     resetAll: onReset,
   };
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      <SettingsCtx.Provider value={settings}>{children}</SettingsCtx.Provider>
+    </Ctx.Provider>
+  );
 }
 
 export function useApp() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useApp must be used inside AppProvider');
+  return ctx;
+}
+
+/** Only the settings; re-renders when a setting changes, not on every store update. */
+export function useSettings() {
+  const ctx = useContext(SettingsCtx);
+  if (!ctx) throw new Error('useSettings must be used inside AppProvider');
   return ctx;
 }

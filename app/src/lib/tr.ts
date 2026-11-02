@@ -42,3 +42,23 @@ export function stampLabel(day: string | undefined, time: string, now = new Date
   if (diff === 1) return `Dün ${time}`;
   return `${dayMonth(date)}${y !== now.getFullYear() ? ` ${y}` : ''} ${time}`;
 }
+
+/** Last vowel of a word decides suffix vowels (major vowel harmony): a ı o u are back, e i ö ü front. */
+const isBack = (word: string) => {
+  const w = word.toLocaleLowerCase('tr-TR');
+  for (let i = w.length - 1; i >= 0; i--) {
+    if ('aıou'.includes(w[i])) return true;
+    if ('eiöü'.includes(w[i])) return false;
+  }
+  return false;
+};
+
+/** "İstanbul’da", "İzmir’de", "Antep’te": place name with the locative suffix. */
+export function locative(place: string): string {
+  const p = place.trim();
+  const d = 'çfhkpsşt'.includes(p.toLocaleLowerCase('tr-TR').slice(-1)) ? 't' : 'd';
+  return `${p}’${d}${isBack(p) ? 'a' : 'e'}`;
+}
+
+/** "İstanbul’dasınız", "İzmir’desiniz": you (plural) are in that place. */
+export const youAreIn = (place: string) => `${locative(place)}${isBack(place) ? 'sınız' : 'siniz'}`;

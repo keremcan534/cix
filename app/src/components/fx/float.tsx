@@ -2,12 +2,12 @@
 // small contact shadow, and on cards it is bigger than the card and breaks out over its top edge. Each item
 // gets its own hue, so a grid reads as a set of different things instead of one repeated tile.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState, type ReactNode } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { EdgeLight, Gloss, PressableScale } from '@/components/fx/surface';
-import { useApp } from '@/store';
+import { useSettings } from '@/store';
 import { fonts } from '@/theme';
 
 const GLOW = require('../../../assets/fx/glow.png');
@@ -19,8 +19,10 @@ export const hueAt = (i: number) => HUES[i % HUES.length];
 export type IconSource = { source?: number; emoji?: string };
 
 /** A 3D icon (or emoji) floating on its own light. `bob` lets it hover gently (off with reduceMotion). */
-export function FloatIcon({ source, emoji, size = 48, hue = HUES[3], bob = false, delay = 0 }: IconSource & { size?: number; hue?: string; bob?: boolean; delay?: number }) {
-  const { settings } = useApp();
+// Memoized: plain-value props; settings come from their own context.
+export const FloatIcon = memo(FloatIconBase);
+function FloatIconBase({ source, emoji, size = 48, hue = HUES[3], bob = false, delay = 0 }: IconSource & { size?: number; hue?: string; bob?: boolean; delay?: number }) {
+  const settings = useSettings();
   const still = !bob || settings.reduceMotion;
   const [t] = useState(() => new Animated.Value(0));
   useEffect(() => {

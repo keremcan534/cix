@@ -1,6 +1,6 @@
 /// <reference types="node" />
-// The casino games from the client's reference screens: the payline slots (lib/line-slot + lib/slot-configs), Olympus
-// Slot (6×5, pays anywhere), Mercan Avı (one round per shot), the bet boards (Gece Yarısı Çarkı, Tatlı Tezgâh, Sihir Destesi),
+// The casino games from the client's reference screens: the payline slots (lib/line-slot + lib/slot-configs), Fener
+// Kayalığı (ships in the lighthouse beam), Mercan Avı (one round per shot), the bet boards (Gece Yarısı Çarkı, Tatlı Tezgâh, Sihir Destesi),
 // Roket (crash) and Bereket Ağacı. Each keeps the house rule; JACKPOT funds are part of the 40 %.
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ import { FISH, FISH_HIT, fishDraw, fishReturn, shootFish } from '@/lib/fish-hunt
 import { JACKPOT_SEEDS, getGames, playBoard, playCasino, resetGames, setGameDeps } from '@/lib/games';
 import { TREE_PAYS, treePay, treeReturn } from '@/lib/gold-tree';
 import { linePay, playSlot, slotMax, slotReturn, slotSpin, stripsOf, type SlotConfig } from '@/lib/line-slot';
-import { CELLS, FREE_SPINS, OLYMPUS_MAX, evaluateGrid, olympusReturn, playOlympus, scatterPay, symbolPay, type OCell, type OSym } from '@/lib/olympus-slot';
+import { CELLS, COLS, FENER_MAX, ROWS, STORM_SPINS, STORM_TRIGGER, cargoLabel, evaluateBoard, fenerReturn, playFener, type FCell } from '@/lib/fener-slot';
 import { MEGA, SLOT_CONFIGS, SPELLBOOK, SUPER777 } from '@/lib/slot-configs';
 
 function seeded(seed: number) {
@@ -40,7 +40,7 @@ const deps = (wallet: { n: number }, game: { n: number }) =>
     creditGame: (n) => void (game.n += n),
   });
 
-// Seeded simulations only cross-check the wiring (playSlot / playOlympus against the analytic return, which the
+// Seeded simulations only cross-check the wiring (playSlot / playFener against the analytic return, which the
 // tests check exactly). The default runs are short; `npm run test:sim` (SIM_FULL=1) adds the full-length runs.
 const SIM_FULL = { skip: !process.env.SIM_FULL };
 const simulateSlots = (n: number, tolerance: number) => {
@@ -59,11 +59,11 @@ const simulateSlots = (n: number, tolerance: number) => {
     assert.ok(Math.abs(sum / n - (r.lines + r.scatter)) < tolerance, `${c.id} simülasyon ${sum / n} / hesap ${r.lines + r.scatter}`);
   }
 };
-const simulateOlympus = (n: number, tolerance: number) => {
-  const r = olympusReturn();
+const simulateFener = (n: number, tolerance: number) => {
+  const r = fenerReturn();
   const rnd = seeded(21);
   let sum = 0;
-  for (let i = 0; i < n; i++) sum += playOlympus(rnd).multiplier;
+  for (let i = 0; i < n; i++) sum += playFener(rnd).multiplier;
   assert.ok(Math.abs(sum / n - r.total) < tolerance, `simülasyon ${sum / n} / hesap ${r.total}`);
 };
 
@@ -104,53 +104,68 @@ describe('Çizgili slotlar', () => {
   test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateSlots(60_000, 0.03));
 });
 
-describe('Şimşek Dağı', () => {
-  const grid = (cells: OSym[], orbs: number[] = []): OCell[][] => {
-    let o = 0;
-    const flat = Array.from({ length: CELLS }, (_, i) => {
-      const sym = cells[i] ?? (['blue', 'green', 'gold', 'purple', 'red', 'goblet', 'ring'] as OSym[])[i % 7];
-      return sym === 'orb' ? { sym, orb: orbs[o++] } : { sym };
-    });
-    return Array.from({ length: 6 }, (_, c) => flat.slice(c * 5, c * 5 + 5));
-  };
+describe('Fener Kayalığı', () => {
+  // A board from a compact map: '.' sea, 'k' kandil, a number = a ship with that cargo in tenths of the stake.
+  const board = (rows: (string | number)[][]): FCell[][] =>
+    Array.from({ length: ROWS }, (_, r) =>
+      Array.from({ length: COLS }, (_, c) => {
+        const v = rows[r]?.[c] ?? '.';
+        return v === 'k' ? { kind: 'lamp' } : typeof v === 'number' ? { kind: 'ship', cargo: v } : { kind: 'sea' };
+      }),
+    );
 
-  test('8+ aynı sembol ekranın her yerinde öder; küreler toplanıp çarpar', () => {
-    assert.equal(symbolPay('crown', 7), 0);
-    assert.equal(symbolPay('crown', 8), 10);
-    assert.equal(symbolPay('crown', 12), 50);
-    const crowns = Array<OSym>(8).fill('crown');
-    // Filler: 22 cells of 7 symbols, at most 4 of each, so only the crowns pay.
-    assert.equal(evaluateGrid(grid(crowns), false).pay, 10);
-    const withOrbs = evaluateGrid(grid([...crowns, 'orb', 'orb'], [2, 5]), false);
-    assert.equal(withOrbs.orbs, 7);
-    assert.equal(withOrbs.pay, 70);
-    assert.equal(evaluateGrid(grid(['orb'], [10]), false).pay, 0, 'kazanç yoksa küre ödemez');
+  test('yalnızca ışıktaki sıranın gemileri öder, parlaklıkla çarpılır', () => {
+    const g = board([
+      [10, '.', 5],
+      ['.', 500],
+      [2, 2, 2, 2, 2],
+    ]);
+    assert.equal(evaluateBoard(g, [0], 1).pay, 1.5);
+    assert.equal(evaluateBoard(g, [0], 3).pay, 4.5);
+    assert.equal(evaluateBoard(g, [2], 5).pay, 5);
+    assert.equal(evaluateBoard(g, [3], 5).pay, 0, 'boş sıra ödemez');
+    // Fırtına: two rows at once.
+    assert.equal(evaluateBoard(g, [0, 1], 2).pay, 103);
+    // Tenths stay integers until the end: 0,1 × 3 is exactly 0,3.
+    assert.equal(evaluateBoard(board([[1, 1, 1]]), [0], 1).pay, 0.3);
+    assert.equal(cargoLabel(1), '×0,1');
+    assert.equal(cargoLabel(500), '×50');
   });
 
-  test('4+ Zeus öder ve bedava dönüş verir; bedava dönüşte Zeus ödemez', () => {
-    assert.equal(scatterPay(3), 0);
-    assert.equal(scatterPay(4), 3);
-    assert.equal(scatterPay(9), 100);
-    const zeus = Array<OSym>(4).fill('zeus');
-    assert.equal(evaluateGrid(grid(zeus), false).pay, 3);
-    assert.equal(evaluateGrid(grid(zeus), true).pay, 0);
+  test('3+ kandil Fırtına Gecesi’ni açar; fırtınada iki sıra yanar, parlaklık 1’den 6’ya çıkar', () => {
+    assert.equal(evaluateBoard(board([['k', 'k', '.', 'k']]), [0], 1).lamps, 3);
+    assert.equal(STORM_TRIGGER, 3);
     const rnd = seeded(11);
-    for (let i = 0; i < 3_000; i++) {
-      const r = playOlympus(rnd);
-      assert.equal(r.free.length, r.base.scatters >= 4 ? FREE_SPINS : 0);
-      assert.ok(r.multiplier <= OLYMPUS_MAX);
+    let storms = 0;
+    for (let i = 0; i < 20_000; i++) {
+      const r = playFener(rnd);
+      assert.equal(r.storm.length, r.base.lamps >= STORM_TRIGGER ? STORM_SPINS : 0);
+      assert.equal(r.base.lit.length, 1);
+      assert.ok(r.base.grid.flat().length === CELLS);
+      assert.ok(r.multiplier <= FENER_MAX);
+      if (r.storm.length) {
+        storms++;
+        r.storm.forEach((s, k) => {
+          assert.equal(s.brightness, k + 1);
+          assert.equal(s.lit.length, 2);
+          assert.notEqual(s.lit[0], s.lit[1]);
+        });
+      }
     }
+    assert.ok(storms > 100, `fırtına sayısı ${storms}`);
   });
 
   test('beklenen geri ödeme %40’ı aşmaz; simülasyon hesapla uyuşur', () => {
-    const r = olympusReturn();
+    const r = fenerReturn();
     assert.ok(r.total <= 0.4 + 1e-12, `${r.total}`);
     assert.ok(r.total >= 0.399, `${r.total}`);
-    simulateOlympus(30_000, 0.06);
-    assert.ok(outcomeOf('olympus', '', seeded(2)).olympus);
+    simulateFener(30_000, 0.06);
+    assert.ok(outcomeOf('olympus', '', seeded(2)).fener);
+    assert.equal(expectedReturn('olympus'), r.total);
+    assert.equal(maxMultiplier('olympus'), FENER_MAX);
   });
 
-  test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateOlympus(200_000, 0.02));
+  test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateFener(200_000, 0.02));
 });
 
 describe('Mercan Avı', () => {

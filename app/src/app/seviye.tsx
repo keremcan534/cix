@@ -15,7 +15,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { Avatar, CharmBadge, WealthBadge } from '@/components/ui';
 import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmBonusPct, charmTier } from '@/data/charm';
 import { SVIP_LEVELS, nobleInfo } from '@/data/status';
-import { WEALTH_ESTIMATED, WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
+import { WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { goBack } from '@/lib/nav';
@@ -35,7 +35,6 @@ type System = {
   tierOf: (l: number) => LevelTier;
   Badge: (p: { level: number; size?: 'sm' | 'lg' }) => ReactNode;
   perkDetail: (p: LevelPerk, level: number) => string;
-  estimated: number[];
 };
 const SYSTEMS: Record<Kind, System> = {
   wealth: {
@@ -48,7 +47,6 @@ const SYSTEMS: Record<Kind, System> = {
     tierOf: wealthTier,
     Badge: WealthBadge,
     perkDetail: (p, level) => (p.key === 'gift' ? `${levelGiftOf(level)} · ${p.detail}` : p.detail),
-    estimated: WEALTH_ESTIMATED,
   },
   charm: {
     title: 'Yankı',
@@ -60,7 +58,6 @@ const SYSTEMS: Record<Kind, System> = {
     tierOf: charmTier,
     Badge: CharmBadge,
     perkDetail: (p, level) => (p.key === 'bonus' ? `+%${Math.max(1, charmBonusPct(level))} · ${p.detail}` : p.key === 'rank' ? `Sıralama ağırlığı ${level} · ${p.detail}` : p.detail),
-    estimated: [],
   },
 };
 
@@ -234,18 +231,18 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
   );
 }
 
-const GUIDE: Record<Kind, { title: string; art?: ArtName; body: string[] }[]> = {
+const GUIDE: Record<Kind, { title: string; art?: ArtName; icon?: keyof typeof Ionicons.glyphMap; body: string[] }[]> = {
   wealth: [
     { title: 'Cömertlik seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
-    { title: '🎁 Ne işe yarar?', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Oyun Salonu Cömertlik Lv.2 ile açılır.'] },
-    { title: '📈 Puan nasıl kazanılır?', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Uğurlu hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, tayfa kurma ve tayfa hediyeleri, oda etkinlikleri ve animasyonlar.'] },
-    { title: '⚠️ Sayılmayanlar', body: ['• Jetonla oynanan şans oyunları ve zar düellosu.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
+    { title: 'Ne işe yarar?', icon: 'gift-outline', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Oyun Salonu Cömertlik Lv.2 ile açılır.'] },
+    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Uğurlu hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, tayfa kurma ve tayfa hediyeleri, oda etkinlikleri ve animasyonlar.'] },
+    { title: 'Sayılmayanlar', icon: 'alert-circle-outline', body: ['• Jetonla oynanan şans oyunları ve zar düellosu.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
   ],
   charm: [
     { title: 'Yankı seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
-    { title: '💎 Kazancını ve popülerliğini etkiler', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.'] },
-    { title: '📈 Puan nasıl kazanılır?', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
-    { title: '⚠️ Dikkat', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
+    { title: 'Kazancını ve popülerliğini etkiler', icon: 'diamond-outline', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.'] },
+    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
+    { title: 'Dikkat', icon: 'alert-circle-outline', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
   ],
 };
 
@@ -265,14 +262,10 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
           {GUIDE[kind].map((g) => (
             <View key={g.title} style={s.card}>
-              {g.art ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Art name={g.art} size={20} />
-                  <Text style={s.cardTitle}>{g.title}</Text>
-                </View>
-              ) : (
+              <View style={s.guideHead}>
+                {g.art ? <Art name={g.art} size={20} /> : g.icon ? <Ionicons name={g.icon} size={18} color={colors.gold} /> : null}
                 <Text style={s.cardTitle}>{g.title}</Text>
-              )}
+              </View>
               {g.body.map((b) => (
                 <Text key={b} style={s.body}>
                   {b}
@@ -281,7 +274,11 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
             </View>
           ))}
           <View style={s.card}>
-            <Text style={s.cardTitle}>📋 Seviye tablosu</Text>
+            <View style={s.guideHead}>
+              <Ionicons name="list" size={18} color={colors.gold} />
+              <Text style={s.cardTitle}>Seviye tablosu</Text>
+            </View>
+            <Text style={[s.dim, { marginBottom: 4 }]}>İlk seviyeler hızlı açılır; ortadan sonra her seviye bir öncekinden yaklaşık dörtte bir fazla puan ister.</Text>
             <View style={s.tableHead}>
               <Text style={[s.cell, s.headCell]}>Seviye</Text>
               <Text style={[s.cell, s.headCell, { textAlign: 'right' }]}>Gereken puan</Text>
@@ -292,16 +289,12 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
                 <Text style={s.cell}>
                   Lv.{l} · {sys.tierOf(l).name}
                 </Text>
-                <Text style={[s.cell, { textAlign: 'right' }]}>
-                  {fmt(xp)}
-                  {sys.estimated.includes(l) ? ' *' : ''}
-                </Text>
+                <Text style={[s.cell, { textAlign: 'right' }]}>{fmt(xp)}</Text>
                 <View style={[s.cell, { alignItems: 'flex-end' }]}>
                   <Badge level={l} />
                 </View>
               </View>
             ))}
-            {sys.estimated.length > 0 && <Text style={[s.dim, { marginTop: 6 }]}>* Taslak eşik; ürün ekibinin onayı bekleniyor.</Text>}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -334,6 +327,7 @@ const s = StyleSheet.create({
   statusText: { color: colors.text, fontSize: 13, flex: 1 },
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 8 },
   cardTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  guideHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   perk: { width: '33.33%', alignItems: 'center', gap: 4, paddingHorizontal: 4 },
   perkArt: { width: 72, height: 72, borderRadius: 22, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
