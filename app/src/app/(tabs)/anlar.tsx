@@ -25,6 +25,7 @@ import {
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const TABS = ['Arkadaşlar', 'Önerilen', 'Son'] as const;
 type Tab = (typeof TABS)[number];
@@ -401,7 +402,7 @@ function CommentsSheet({
                     router.push(`/kullanici/${u.id}`);
                   }}
                 >
-                  <Image source={{ uri: u.avatar }} style={styles.commentAvatar} />
+                  <Photo uri={u.avatar} kind="face" style={styles.commentAvatar} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={{ color: colors.textDim, fontSize: 12, fontWeight: '700' }}>
                       {u.name} · <Text style={{ fontWeight: '400' }}>{c.time}</Text>

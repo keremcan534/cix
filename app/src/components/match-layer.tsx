@@ -4,7 +4,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { VerifiedBadge } from '@/components/ui';
@@ -15,6 +15,7 @@ import { PHASE_LABEL, acceptMatch, cancelMatch, declineMatch, modeLabel, priceOf
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const OWN_SCREENS = ['/eslesme', '/tanis'];
 
@@ -101,7 +102,7 @@ export function IncomingCard({ inline }: { inline?: boolean }) {
     <View style={[s.backdrop, inline && s.inline]}>
       <View style={s.card}>
         <Text style={s.kicker}>{modeLabel(m.mode)} · {waiting ? PHASE_LABEL[m.phase] : 'Eşleşme bulundu!'}</Text>
-        <Image source={{ uri: peer.avatar }} style={s.photo} />
+        <Photo uri={peer.avatar} kind="face" style={s.photo} />
         <View style={s.nameRow}>
           <Text style={s.name}>
             {peer.name}, {peer.age}

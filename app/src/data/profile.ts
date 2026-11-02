@@ -156,8 +156,6 @@ export const vehiclesOf = (id: string) => COSMETICS.filter((c) => c.kind === 'ri
 export const giftWallOf = (id: string): (Gift & { count: number })[] =>
   GIFTS.map((g, i) => ({ ...g, count: Math.max(0, ((seedOf(id) * (i + 3)) % 11) - 3) }));
 
-/** Gifts in the catalog; the gift wall shows how many of them a user has collected. */
-export const GIFT_CATALOG_TOTAL = GIFTS.length;
 
 export type GiftCollection = { id: string; name: string; emoji: string; colors: [string, string]; total: number };
 export const GIFT_COLLECTIONS: GiftCollection[] = [

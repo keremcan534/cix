@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
@@ -19,6 +19,7 @@ import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
 import { useApp } from '@/store';
 import { colors, gradientDeep } from '@/theme';
+import { Photo } from '@/components/photo';
 
 export function ChatThread({ user, header, compact }: { user: User; /** Rendered above the thread; gets the "typing…" state. */ header: (typing: boolean) => ReactNode; /** Smaller intro, for sheets. */ compact?: boolean }) {
   const { conversations, sendMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
@@ -179,7 +180,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
 function RoomCard({ room }: { room: RoomInviteCard }) {
   return (
     <Pressable onPress={() => router.push(`/oda/${room.roomId}`)} style={styles.roomCard} accessibilityRole="button" accessibilityLabel={`${room.title} odasına katıl`}>
-      <Image source={{ uri: room.cover }} style={styles.roomCover} />
+      <Photo uri={room.cover} kind="cover" seed={room.roomId} style={styles.roomCover} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={styles.roomTitle} numberOfLines={1}>
           {room.title}

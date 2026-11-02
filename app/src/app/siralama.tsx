@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -13,6 +13,7 @@ import { LEADERBOARDS } from '@/data/economy';
 import { AGENCIES } from '@/data/agency';
 import { ROOMS, USERS, type User } from '@/data/mock';
 import { colors } from '@/theme';
+import { Photo } from '@/components/photo';
 
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
 type Unit = 'coin' | 'diamond' | 'people' | 'xp';
@@ -86,7 +87,7 @@ export default function Leaderboard() {
         renderItem={({ item, index }) => (
           <Pressable style={styles.row} onPress={() => open(item)}>
             <Text style={styles.rank}>{index + 4}</Text>
-            {item.roomId ? <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 10 }} /> : <Avatar uri={item.avatar} size={40} />}
+            {item.roomId ? <Photo uri={item.avatar} kind="cover" seed={item.roomId} style={{ width: 40, height: 40, borderRadius: 10 }} /> : <Avatar uri={item.avatar} size={40} />}
             <Text style={styles.name} numberOfLines={1}>
               {item.name}
             </Text>
@@ -125,7 +126,7 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1, gap: 4, marginTop: place === 1 ? 0 : 28 }}>
       <Art name={m.art} size={33} />
-      <Image source={{ uri: row.avatar }} style={{ width: m.size, height: m.size, borderRadius: m.size / 2, borderWidth: 3, borderColor: m.color }} />
+      <Photo uri={row.avatar} kind="face" style={{ width: m.size, height: m.size, borderRadius: m.size / 2, borderWidth: 3, borderColor: m.color }} />
       <Text style={styles.podiumName} numberOfLines={1}>
         {row.name}
       </Text>

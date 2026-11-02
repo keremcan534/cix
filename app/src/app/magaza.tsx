@@ -20,6 +20,7 @@ import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, StickerArt } from '@/components/ReactionArt';
 import { SPECIAL_ID_ART, STORE_TAB_ART, frameBadgeArtOf, storeArtOf } from '@/components/StoreArt';
+import { Photo } from '@/components/photo';
 
 type Tab = CosmeticKind | 'emoji';
 
@@ -174,7 +175,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
     return (
       <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }}>
         <ArtFrame art={art} size={size} still={still} maxScale={3}>
-          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
+          <Photo uri={avatar} kind="face" style={{ width: '100%', height: '100%' }} />
         </ArtFrame>
       </View>
     );
@@ -184,7 +185,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
     return (
       <View style={{ height: 104, justifyContent: 'center', alignItems: 'center' }}>
         <AnimatedFrame fx={item.fx as FrameFx} size={64} still={still}>
-          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
+          <Photo uri={avatar} kind="face" style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
         {badge && <Image source={badge} style={styles.frameBadge} accessibilityLabel={item.name} />}
       </View>

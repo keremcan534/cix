@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -13,6 +13,7 @@ import { roomById, userById, type User } from '@/data/mock';
 import { followRoute, presenceLabel, presenceOf } from '@/data/presence';
 import type { GroupMsg } from '@/store';
 import { colors } from '@/theme';
+import { Photo } from '@/components/photo';
 
 export type QuickAction = { key: string; label: string; emoji: string; art?: ArtName; tag?: string; onPress: () => void };
 
@@ -104,7 +105,7 @@ export function GroupChat({
               )}
               {room && (
                 <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${room.id}`)} accessibilityLabel="Grup odası">
-                  <Image source={{ uri: room.cover }} style={{ width: 40, height: 40, borderRadius: 8 }} />
+                  <Photo uri={room.cover} kind="cover" seed={room.id} style={{ width: 40, height: 40, borderRadius: 8 }} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#fff', fontWeight: '800' }} numberOfLines={1}>
                       {room.password ? '🔒 ' : ''}

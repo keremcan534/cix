@@ -19,6 +19,7 @@ import { colors, semantic } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
+import { Photo } from '@/components/photo';
 
 const TABS = ['Benzer', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
@@ -235,7 +236,7 @@ function UserRow({
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
       <View>
-        <Image source={{ uri: user.avatar }} style={styles.photo} />
+        <Photo uri={user.avatar} kind="face" style={styles.photo} />
         {user.online && <View style={styles.onlineDot} />}
       </View>
       <View style={{ flex: 1, gap: 5 }}>
@@ -291,7 +292,7 @@ function PromoCard() {
     <Pressable style={styles.promoWrap} onPress={() => router.push(`/oda/${room.id}`)}>
       <LinearGradient colors={['rgba(255,101,118,0.22)', 'rgba(19,217,223,0.22)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
         <View style={styles.promoTop}>
-          <Image source={{ uri: room.cover }} style={styles.promoCover} />
+          <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.promoCover} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.promoTitle} numberOfLines={1}>
               {room.title}

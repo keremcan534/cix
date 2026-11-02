@@ -13,6 +13,7 @@ import { ROLE_RANK, type RoomRole } from '@/components/room/parts';
 import { userById } from '@/data/mock';
 import type { MicInvite, RoomLive, RoomView } from '@/lib/room-presence';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const nameOf = (uid: string) => (uid === 'me' ? 'Sen' : userById(uid).name);
@@ -188,7 +189,7 @@ export function ParticipantsSheet({
             return (
               <View style={[s.row, expanded && s.rowOpen]}>
                 <Pressable style={s.rowMain} onPress={() => setOpen(expanded ? null : uid)} accessibilityRole="button" accessibilityLabel={`${me ? 'Sen' : u.name}, ${status}. İşlemler`} aria-expanded={expanded}>
-                  <Image source={{ uri: u.avatar }} style={[s.av, blocked.has(uid) && { opacity: 0.45 }]} />
+                  <Photo uri={u.avatar} kind="face" style={[s.av, blocked.has(uid) && { opacity: 0.45 }]} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={s.name} numberOfLines={1}>
                       {me ? 'Sen' : u.name}

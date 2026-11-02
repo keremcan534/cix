@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -17,6 +17,7 @@ import { PHASE_LABEL, cancelMatch, modeLabel, priceOf, resetMatch, setScenario, 
 import { useApp } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { Photo } from '@/components/photo';
 
 const FILTERS: MatchFilter[] = ['Herkes', 'Kadın', 'Erkek'];
 const SCENARIOS: [Scenario, string][] = [
@@ -88,7 +89,7 @@ export default function HemenTanis() {
                 )}
               <LinearGradient colors={gradient} style={s.meRing}>
                 {me.avatar ? (
-                  <Image source={{ uri: me.avatar }} style={s.meAvatar} />
+                  <Photo uri={me.avatar} kind="face" style={s.meAvatar} />
                 ) : (
                   <View style={[s.meAvatar, s.meInitial]}>
                     <Text style={s.meInitialText}>{me.name.trim().charAt(0).toLocaleUpperCase('tr-TR') || '?'}</Text>

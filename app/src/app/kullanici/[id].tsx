@@ -44,6 +44,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
 import { colors, gradientDeep, semantic } from '@/theme';
 import { Art } from '@/components/Art';
+import { Photo } from '@/components/photo';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -228,7 +229,7 @@ export default function UserProfile() {
       >
         {/* Cover + header */}
         <View>
-          <Image source={{ uri: user.avatar.replace('200', '800') }} style={styles.cover} />
+          <Photo uri={user.avatar.replace('200', '800')} kind="face" style={styles.cover} />
           <LinearGradient colors={['rgba(8,15,30,0.55)', 'transparent', 'rgba(8,15,30,0.6)']} style={StyleSheet.absoluteFill} />
           {isMe && (
             <Pressable style={[styles.voicePill, { top: insets.top + 58 }]} onPress={() => showAlert('Ses tanıtımı', 'Profilin için 15 saniyelik bir ses tanıtımı kaydı yakında burada olacak.')}>
@@ -543,7 +544,7 @@ export default function UserProfile() {
               <SectionTitle title="Oda" />
               {room ? (
                 <Pressable style={styles.roomCard} onPress={room.go}>
-                  <Image source={{ uri: room.cover }} style={styles.roomCover} />
+                  <Photo uri={room.cover} kind="cover" seed={room.title} style={styles.roomCover} />
                   <View style={{ flex: 1, gap: 6 }}>
                     <Text style={styles.roomTitle} numberOfLines={1}>
                       {room.title}
@@ -724,7 +725,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
     >
       {g ? (
         <View style={styles.guardianRing}>
-          <Image source={{ uri: g.avatar }} style={styles.guardianImg} />
+          <Photo uri={g.avatar} kind="face" style={styles.guardianImg} />
         </View>
       ) : (
         <View style={[styles.guardianRing, { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' }]}>

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -16,6 +16,7 @@ import { checkInteraction } from '@/lib/interaction';
 import { beginCall, endCall } from '@/lib/media';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { Photo } from '@/components/photo';
 
 type Phase = 'ringing' | 'connected' | 'ended';
 
@@ -128,7 +129,7 @@ export default function CallScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       {/* "Remote video": the other person's photo, blurred while ringing / for voice calls. */}
-      <Image source={{ uri: user.avatar.replace('200', '800') }} style={StyleSheet.absoluteFill} blurRadius={phase === 'connected' && video ? 0 : 30} />
+      <Photo uri={user.avatar.replace('200', '800')} kind="face" style={StyleSheet.absoluteFill} blurRadius={phase === 'connected' && video ? 0 : 30} />
       <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.75)']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={{ flex: 1 }}>
@@ -153,7 +154,7 @@ export default function CallScreen() {
                 { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.8] }) }] },
               ]}
             />
-            <Image source={{ uri: user.avatar }} style={styles.bigAvatar} />
+            <Photo uri={user.avatar} kind="face" style={styles.bigAvatar} />
             <Text style={styles.priceNote}>
               🪙 {price} jeton / dakika · {user.name} her dakika için elmas kazanır
             </Text>
@@ -163,7 +164,7 @@ export default function CallScreen() {
         {phase === 'connected' && video && (
           <View style={styles.selfView}>
             {camOn ? (
-              <Image source={{ uri: me.avatar }} style={{ flex: 1, transform: [{ scaleX: front ? -1 : 1 }] }} />
+              <Photo uri={me.avatar} kind="face" style={{ flex: 1, transform: [{ scaleX: front ? -1 : 1 }] }} />
             ) : (
               <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
                 <Ionicons name="videocam-off" size={26} color="#fff" />

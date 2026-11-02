@@ -17,15 +17,28 @@ import { colors, fonts, gradient, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 
-export function Avatar({ uri, size = 44, online, ring }: { uri: string; size?: number; online?: boolean; ring?: boolean }) {
+export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
+  // No photo (sample people carry none): a tinted disc with the name's initial, or a person glyph.
+  const face = (style: object) =>
+    uri ? (
+      <Image source={{ uri }} style={style} />
+    ) : (
+      <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
+        {name?.trim() ? (
+          <Text style={{ color: semantic.action, fontSize: Math.round(size * 0.42), fontWeight: '800' }}>{name.trim().charAt(0).toLocaleUpperCase('tr-TR')}</Text>
+        ) : (
+          <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.action} />
+        )}
+      </View>
+    );
   return (
     <View style={{ width: size, height: size }}>
       {ring ? (
         <LinearGradient colors={gradient} style={{ width: size, height: size, borderRadius: size / 2, padding: 2 }}>
-          <Image source={{ uri }} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
+          {face({ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg })}
         </LinearGradient>
       ) : (
-        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.cardAlt }} />
+        face({ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.cardAlt })
       )}
       {online && (
         <View

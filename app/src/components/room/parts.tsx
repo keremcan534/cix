@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { Animated, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
@@ -15,6 +15,7 @@ import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine } from '@/components/fx/surface';
+import { Photo } from '@/components/photo';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -114,7 +115,7 @@ export function Seat({
         {user && (vipLevel > 0 || frameId) ? (
           <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
         ) : user ? (
-          <Image source={{ uri: user.avatar }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+          <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
         ) : (
           // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
           <LinearGradient

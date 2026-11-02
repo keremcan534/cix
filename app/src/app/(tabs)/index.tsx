@@ -38,6 +38,7 @@ import {
 import { StarterPath } from '@/components/starter';
 import { useApp } from '@/store';
 import { TAB_BAR_HEIGHT, colors, fonts, gradient, gradientDeep, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -336,7 +337,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
         {items.map(({ r, reason, why }) => (
           <PressableScale key={r.id} style={styles.suggest} onPress={() => router.push(`/oda/${r.id}`)}>
             <View style={styles.suggestFrame}>
-              <Image source={{ uri: r.cover }} style={styles.suggestImg} />
+              <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.suggestImg} />
               <LinearGradient colors={['rgba(8,15,30,0)', 'rgba(8,15,30,0.55)']} style={styles.suggestFade} />
               <EdgeLight inset={10} strength={0.35} />
               <View style={styles.liveBadge}>
@@ -364,7 +365,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: str
   return (
     <Pressable style={{ marginHorizontal: 16 }} onPress={() => router.push('/oda/yeni')}>
       <LinearGradient colors={['#123B3A', colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.myRoom}>
-        <Image source={{ uri: cover || avatar }} style={styles.myCover} />
+        <Photo uri={cover || avatar} kind="cover" style={styles.myCover} />
         <View style={{ flex: 1, gap: 6 }}>
           <View style={styles.titleRow}>
             <Text style={styles.flag}>🇹🇷</Text>
@@ -424,7 +425,7 @@ function RoomRow({ room }: { room: Room }) {
         </View>
       )}
       <View style={styles.coverFrame}>
-        <Image source={{ uri: room.cover }} style={styles.cover} />
+        <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.cover} />
         <EdgeLight inset={8} strength={0.4} />
       </View>
       <View style={{ flex: 1, gap: 5, justifyContent: 'center' }}>
@@ -531,7 +532,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
                 router.push(`/oda/${r.id}`);
               }}
             >
-              <Image source={{ uri: r.cover }} style={styles.searchCover} />
+              <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.searchCover} />
               <View style={{ flex: 1, gap: 2 }}>
                 <View style={styles.titleRow}>
                   {!!r.password && <Ionicons name="lock-closed" size={12} color={colors.gold} />}

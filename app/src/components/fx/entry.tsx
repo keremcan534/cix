@@ -7,9 +7,10 @@
 // fades in and out, without travel, flashes or particles.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/components/text';
+import { Photo } from '@/components/photo';
 
 export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip';
 /** `ride` is the ride's emoji (also used in the text); `rideArt` its picture, drawn instead when there is one. */
@@ -116,7 +117,7 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
             </Animated.View>
           )}
           <View style={s.avatarRing}>
-            <Image source={{ uri: show.avatar }} style={s.avatar} />
+            <Photo uri={show.avatar} kind="face" style={s.avatar} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.name} numberOfLines={1}>

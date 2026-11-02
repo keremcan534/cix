@@ -169,7 +169,7 @@ export default function ProfileScreen() {
               [
                 ['slot', '🎰', 'Gece Yarısı Çarkı'],
                 ['jackpot', '💰', 'Hazine Kulesi'],
-                ['olympus', '⚡', 'Şimşek Dağı'],
+                ['olympus', '🔦', 'Fener Kayalığı'],
                 ['fish', '🐟', 'Mercan Avı'],
               ] as const
             ).map(([id, e, l]) => (

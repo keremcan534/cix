@@ -44,6 +44,7 @@ import {
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { colors, fonts, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const INK = ['#D99A00', '#1E6FD9', '#1C2433', '#D93A45'];
 const FELT = ['#0E5A5E', '#0A3C47', '#08283A'] as const;
@@ -310,7 +311,7 @@ function SeatChip({
           <Text style={{ fontSize: 15 }}>🤖</Text>
         </View>
       ) : (
-        <Image source={{ uri: h.avatar }} style={s.av} />
+        <Photo uri={h.avatar} kind="face" style={s.av} />
       )}
       <View style={{ flexShrink: 1 }}>
         <Text style={s.seatName} numberOfLines={1}>

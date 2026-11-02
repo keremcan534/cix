@@ -37,6 +37,7 @@ import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
 import { colors, gradient, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
 type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean; art?: number };
@@ -270,7 +271,7 @@ export function RoomInfoSheet({
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
             <Pressable onPress={() => owner && setSub('decor')} accessibilityLabel="Kapak seç">
-              <Image source={{ uri: cover }} style={styles.cover} />
+              <Photo uri={cover} kind="cover" style={styles.cover} />
               {owner && <Text style={styles.coverLabel}>Kapak Seç</Text>}
             </Pressable>
             <View style={{ flex: 1, gap: 6 }}>
@@ -375,7 +376,7 @@ export function RoomInfoSheet({
             </View>
           )}
 
-          {owner && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Image source={{ uri: cover }} style={{ width: 34, height: 44, borderRadius: 6 }} />} />}
+          {owner && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Photo uri={cover} kind="cover" style={{ width: 34, height: 44, borderRadius: 6 }} />} />}
           <Line label="Oda hediye kaydı" onPress={() => setSub('gifts')} />
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -865,7 +866,7 @@ export function BossSeat({ userId, speaking, onPress }: { userId: string | null;
     <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Dümen koltuğu">
       <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
         {u ? (
-          <Image source={{ uri: u.avatar }} style={{ width: 62, height: 62, borderRadius: 31 }} />
+          <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
         ) : (
           <View style={styles.bossEmpty}>
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />

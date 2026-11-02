@@ -149,7 +149,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   {
     id: 'olympus',
     name: 'Fener Kayalığı',
-    emoji: '⚡',
+    emoji: '🔦',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
     minWealth: 2,
