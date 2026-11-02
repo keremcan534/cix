@@ -94,7 +94,7 @@ export const spinWheel = () => {
 // --- Families -----------------------------------------------------------------
 export const FAMILIES = [
   { id: 'f1', name: 'Gece Kuşları', emoji: '🦉', level: 12, xp: 142_000, weekly: 100_000, members: 86, points: 1_284_000, leaderId: 'u1', memberIds: ['u1', 'u2', 'u9', 'u7', 'u4'] },
-  { id: 'f2', name: 'Karaoke Ailesi', emoji: '🎤', level: 9, xp: 58_000, weekly: 64_000, members: 54, points: 842_500, leaderId: 'u11', memberIds: ['u11', 'u4', 'u8', 'u5'] },
+  { id: 'f2', name: 'Karaoke Tayfası', emoji: '🎤', level: 9, xp: 58_000, weekly: 64_000, members: 54, points: 842_500, leaderId: 'u11', memberIds: ['u11', 'u4', 'u8', 'u5'] },
   { id: 'f3', name: 'Oyun Kurtları', emoji: '🐺', level: 7, xp: 27_500, weekly: 38_000, members: 40, points: 515_200, leaderId: 'u2', memberIds: ['u2', 'u6', 'u10', 'u12'] },
   { id: 'f4', name: 'İstanbul Sohbet', emoji: '🌉', level: 5, xp: 12_400, weekly: 17_500, members: 27, points: 230_900, leaderId: 'u5', memberIds: ['u5', 'u7', 'u3'] },
 ];

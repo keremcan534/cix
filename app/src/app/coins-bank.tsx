@@ -119,7 +119,7 @@ export default function CoinsBankScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <Header
-        title="Coins Bank"
+        title="Jeton Noktası"
         right={
           <View style={styles.protoPill}>
             <Text style={styles.protoPillText}>PROTOTİP</Text>

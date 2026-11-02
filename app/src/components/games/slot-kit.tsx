@@ -1,4 +1,4 @@
-// Shared pieces of the launch casino games (Gece Yarısı Çarkı, Hazine Kulesi, Şimşek Dağı, Mercan Avı): the balance pill, the
+// Shared pieces of the launch casino games (Gece Yarısı Çarkı, Hazine Kulesi, Fener Kayalığı, Mercan Avı): the balance pill, the
 // bet stepper and the round helpers. Rounds always go through playCasino (lib/games); these only show them.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';

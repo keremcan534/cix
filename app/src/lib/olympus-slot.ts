@@ -1,11 +1,11 @@
-// Zeus Tapınağı: the 6×5 "pays anywhere" slot. Same house rule as every coin game: the expected return of a round,
+// Fener Kayalığı: the 6×5 "pays anywhere" slot. Same house rule as every coin game: the expected return of a round,
 // free spins included, is at most 40 % of the stake (see lib/casino-odds).
 //
 // Model:
 //  - The server draws each of the 30 cells on its own from the symbol weights below.
 //  - A symbol pays when 8 or more of it are anywhere on the screen (8–9, 10–11, 12+), in multiples of the stake.
 //  - Multiplier orbs (×2…×50) add up and multiply the spin's symbol wins (only when it has one).
-//  - Zeus (scatter) pays 4, 5 or 6+ anywhere and 4+ give FREE_SPINS free spins. Zeus does nothing during free spins
+//  - The Fener scatter pays 4, 5 or 6+ anywhere and 4+ give FREE_SPINS free spins. The scatter does nothing during free spins
 //    (no pay, no retrigger), so a round always ends.
 //  - One round pays at most OLYMPUS_MAX times the stake.
 //
@@ -30,7 +30,7 @@ export const OSYMBOLS: Record<OSym, { name: string; emoji: string }> = {
   gold: { name: 'Altın Kalp', emoji: '💛' },
   green: { name: 'Yeşil Maça', emoji: '💚' },
   blue: { name: 'Mavi Elmas', emoji: '💎' },
-  zeus: { name: 'Zeus', emoji: '⚡' },
+  zeus: { name: 'Fener', emoji: '🔦' },
   orb: { name: 'Çarpan Küresi', emoji: '🔮' },
 };
 
@@ -47,7 +47,7 @@ export const OPAYTABLE: Partial<Record<OSym, [number, number, number]>> = {
   blue: [0.25, 0.75, 2],
 };
 export const MIN_COUNT = 8;
-/** Zeus pays for 4, 5 and 6+ anywhere (base spin only). */
+/** The scatter pays for 4, 5 and 6+ anywhere (base spin only). */
 export const SCATTER_PAY: [number, number, number] = [3, 5, 100];
 export const SCATTER_TRIGGER = 4;
 export const FREE_SPINS = 10;
@@ -90,7 +90,7 @@ export type OSpin = {
   /** Sum of the orbs on screen (0 when none). */
   orbs: number;
   scatters: number;
-  /** Total of this spin in multiples of the stake (symbol wins × orbs, plus Zeus pay on the base spin). */
+  /** Total of this spin in multiples of the stake (symbol wins × orbs, plus scatter pay on the base spin). */
   pay: number;
 };
 export type OlympusRound = { base: OSpin; free: OSpin[]; multiplier: number; capped: boolean };
@@ -99,7 +99,7 @@ const tier = (count: number) => (count >= 12 ? 2 : count >= 10 ? 1 : 0);
 export const symbolPay = (sym: OSym, count: number) => (count >= MIN_COUNT && OPAYTABLE[sym] ? OPAYTABLE[sym]![tier(count)] : 0);
 export const scatterPay = (count: number) => (count >= SCATTER_TRIGGER ? SCATTER_PAY[Math.min(2, count - SCATTER_TRIGGER)] : 0);
 
-/** Evaluates a filled grid; `free` = a free spin (Zeus neither pays nor retriggers). */
+/** Evaluates a filled grid; `free` = a free spin (the scatter neither pays nor retriggers). */
 export function evaluateGrid(grid: OCell[][], free: boolean): OSpin {
   const counts = new Map<OSym, number>();
   let orbs = 0;
@@ -133,7 +133,7 @@ export function olympusSpin(rnd: (n: number) => number, free: boolean): OSpin {
   );
 }
 
-/** One round: the base spin and, with 4+ Zeus, the free spins. */
+/** One round: the base spin and, with 4+ scatters, the free spins. */
 export function playOlympus(rnd: (n: number) => number): OlympusRound {
   const base = olympusSpin(rnd, false);
   const free = base.scatters >= SCATTER_TRIGGER ? Array.from({ length: FREE_SPINS }, () => olympusSpin(rnd, true)) : [];
@@ -154,7 +154,7 @@ function binomial(n: number, p: number): number[] {
 
 /**
  * Exact expected return of one round, as a share of the stake, ignoring the OLYMPUS_MAX cap (the cap only lowers
- * it, so this is an upper bound): symbol wins × orbs per spin, Zeus pays, and the free-spin chance.
+ * it, so this is an upper bound): symbol wins × orbs per spin, scatter pays, and the free-spin chance.
  */
 export function olympusReturn(weights: Record<OSym, number> = WEIGHTS): { spin: number; scatter: number; trigger: number; total: number } {
   const total = SYMS.reduce((n, s) => n + weights[s], 0);

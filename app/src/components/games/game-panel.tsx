@@ -94,7 +94,7 @@ export function GamePanel({
         <Text style={p.title} numberOfLines={1}>
           {titleArt ? '' : `${titleEmoji} `}
           {title}
-          {casinoGame ? <Text style={p.badge}> Servet Lv.{casinoGame.minWealth}</Text> : <Text style={p.free}> Ücretsiz</Text>}
+          {casinoGame ? <Text style={p.badge}> Cömertlik Lv.{casinoGame.minWealth}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
         {onMinimize && (
           <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">

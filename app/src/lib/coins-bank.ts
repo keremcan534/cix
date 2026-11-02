@@ -19,7 +19,7 @@ export const exchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usd
  * so the bank never gets more than its fee).
  */
 export function convertDiamonds(kind: AccountKind, diamonds: number, r: Rules = RULES): Quote<{ coins: number; paidTl: number; feeTl: number }> {
-  if (kind !== 'coins_bank_main') return { ok: false, reason: 'Elmas yalnızca ana Coins Bank hesabında jetona çevrilir. Kazancını Coins Bank üzerinden bozdurabilir veya haftalık çekebilirsin.' };
+  if (kind !== 'coins_bank_main') return { ok: false, reason: 'Elmas yalnızca ana Jeton Noktası hesabında jetona çevrilir. Kazancını Jeton Noktası üzerinden bozdurabilir veya haftalık çekebilirsin.' };
   if (!Number.isInteger(diamonds) || diamonds <= 0) return { ok: false, reason: 'Geçerli bir elmas miktarı gir.' };
   const coins = Math.floor(diamonds * exchangeRate(r));
   const paidTl = diamondValueTl(diamonds, r);
@@ -28,7 +28,7 @@ export function convertDiamonds(kind: AccountKind, diamonds: number, r: Rules = 
 
 /** Price the Coins Bank pays management for coins: its selling price minus its wholesale fee. */
 export function wholesaleQuote(kind: AccountKind, coins: number, r: Rules = RULES): Quote<{ priceTl: number; retailTl: number; feeTl: number }> {
-  if (kind !== 'coins_bank_main') return { ok: false, reason: 'Toptan jeton alımı yalnızca ana Coins Bank hesabına açıktır.' };
+  if (kind !== 'coins_bank_main') return { ok: false, reason: 'Toptan jeton alımı yalnızca ana Jeton Noktası hesabına açıktır.' };
   if (!Number.isInteger(coins) || coins <= 0) return { ok: false, reason: 'Geçerli bir jeton miktarı gir.' };
   const retailTl = coins / r.coinsBankRetailCoinsPerTl;
   const priceTl = retailTl * (1 - r.coinsBankWholesaleFee);

@@ -16,7 +16,7 @@ import { useApp } from '@/store';
 
 const short = (n: number) => (n >= 1_000 ? `${n / 1_000}K` : String(n));
 const HEIGHT = 300;
-/** The multiplier grows as e^(GROWTH · seconds), like the reference: 2x after ~2.8 s, 10x after ~9 s. */
+/** The multiplier grows as e^(GROWTH · seconds): 2x after ~2.8 s, 10x after ~9 s. */
 const GROWTH = 0.25;
 const AUTO_LOSS = 20;
 const CHIP_COLORS = ['#16A34A', '#2563EB', '#DC2626', '#7C3AED'];

@@ -34,7 +34,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'today', label: 'Bugün' },
 ];
 
-// Fallback cover for the "Parti Odası" row when no room was visited yet: the busiest room.
+// Fallback cover for the "Canlı Odalar" row when no room was visited yet: the busiest room.
 const POPULAR_ROOM = [...ROOMS].sort((a, b) => b.listeners - a.listeners)[0];
 
 type Friend = { user: User; iFollow: boolean; followsMe: boolean };
@@ -70,7 +70,7 @@ export default function MessagesScreen() {
   const calls = clearedCalls ? [] : CALL_HISTORY.filter((c) => !blocked.has(c.userId));
   const visitors = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId));
 
-  // Last visited room for the "Parti Odası" row.
+  // Last visited room for the "Canlı Odalar" row.
   const lastRoomId = recentRooms[0];
   const lastRoom = lastRoomId ? ROOMS.find((r) => r.id === lastRoomId) : undefined;
   const partyCover = lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover);
@@ -135,8 +135,8 @@ export default function MessagesScreen() {
           <SystemRow
             icon={<Ionicons name="mic" size={22} color="#fff" />}
             iconColors={gradientDeep}
-            title="Parti Odası"
-            subtitle={lastRoom ? `Katıldığın oda çok aktif! · ${lastRoom.title}` : 'Katıldığın oda çok aktif!'}
+            title="Canlı Odalar"
+            subtitle={lastRoom ? `Son girdiğin oda · ${lastRoom.title}` : 'Şu an açık odalara göz at'}
             onPress={openParty}
             right={<Image source={{ uri: partyCover }} style={styles.roomCover} />}
           />
@@ -144,24 +144,29 @@ export default function MessagesScreen() {
           <SystemRow
             icon={<Icon3D name="coin" size={30} />}
             iconColors={['#F59E0B', '#FBBF24']}
-            title="Kabileye katıl, jeton kazan"
-            subtitle="Haydi birlikte ücretsiz sohbet edelim!"
+            title="Tayfanı bul"
+            subtitle="Birlikte konuşacak insanlar seni bekliyor"
             onPress={() => router.push('/aile')}
           />
-          <View style={styles.sep} />
-          <SystemRow
-            icon={<Ionicons name="eye" size={22} color="#fff" />}
-            iconColors={['#FF8A97', '#FF6576']}
-            title="Profil ziyaretçilerin"
-            subtitle="Biri seni sık sık gizlice ziyaret ediyor"
-            onPress={openVisitors}
-            right={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {!visitorsSeen && visitors.length > 0 && <CountBadge n={visitors.length} />}
-                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-              </View>
-            }
-          />
+          {/* Only shown when there are visitors to list; the count is the same list the sheet shows. */}
+          {visitors.length > 0 && (
+            <>
+              <View style={styles.sep} />
+              <SystemRow
+                icon={<Ionicons name="eye" size={22} color="#fff" />}
+                iconColors={['#FF8A97', '#FF6576']}
+                title="Profil ziyaretçilerin"
+                subtitle={`Son 7 günde ${visitors.length} kişi profiline baktı`}
+                onPress={openVisitors}
+                right={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {!visitorsSeen && <CountBadge n={visitors.length} />}
+                    <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+                  </View>
+                }
+              />
+            </>
+          )}
         </View>
       )}
     </View>

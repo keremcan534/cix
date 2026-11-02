@@ -1,4 +1,4 @@
-// "Yayına Katılma Modu" sheet: mode tabs, a 3-column grid of layout cards (mini schema, mic count, room level,
+// "Sahne Düzeni" sheet: mode tabs, a 3-column grid of layout cards (mini schema, mic count, room level,
 // lock and how it opens, PK badge in PK rooms, selection). Picking only ASKS lib/room-modes; the card shows as
 // selected only after the domain accepted the change, and a refusal is shown as such.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -119,7 +119,7 @@ export function LayoutPickerSheet({
       <View style={st.sheet}>
         <View style={st.head}>
           <Text style={st.title} accessibilityRole="header">
-            Yayına Katılma Modu
+            Sahne Düzeni
           </Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Kapat" style={st.close}>
             <Ionicons name="close" size={22} color={colors.textDim} />

@@ -1,4 +1,4 @@
-// Oyun Merkezi (profile entry point). Casino games open here without joining any room; free room games
+// Oyun Merkezi (profile entry point). Oyun Salonu games open here without joining any room; free room games
 // can be tried with online players and are meant to be played inside rooms. Same platform, wallet and
 // history as the in-room entry (lib/games).
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -40,7 +40,7 @@ export default function GameCenter() {
       <View style={s.tabs}>
         {(
           [
-            ['casino', 'Casino'],
+            ['casino', 'Oyun Salonu'],
             ['room', 'Oda oyunları'],
             ['history', 'Geçmiş'],
           ] as [Tab, string][]
@@ -56,8 +56,8 @@ export default function GameCenter() {
             <DepthCard style={s.banner}>
               <FloatIcon source={icon3dSourceFor('👑')} size={36} hue={colors.gold} />
               <View style={{ flex: 1 }}>
-                <Text style={s.bannerTitle}>Servet Lv.{wealthLevel}</Text>
-                <Text style={s.dim}>Casino Lv.2 ve üzerine açık, erişim her turda sunucuda kontrol edilir. Odaya girmen gerekmez.</Text>
+                <Text style={s.bannerTitle}>Cömertlik Lv.{wealthLevel}</Text>
+                <Text style={s.dim}>Cömertlik Lv.2 ve üzerine açık, erişim her turda sunucuda kontrol edilir. Odaya girmen gerekmez.</Text>
               </View>
             </DepthCard>
             <View style={s.grid}>
@@ -85,7 +85,7 @@ export default function GameCenter() {
                           {g.bets[0].toLocaleString('tr-TR')}–{g.bets[g.bets.length - 1].toLocaleString('tr-TR')} jeton · {g.fromRoom ? 'odada da açılır' : 'yalnızca buradan'}
                           {g.providerStatus !== 'online' ? ' · sağlayıcı sorunlu' : ''}
                         </Text>
-                        <GlossButton label={access.ok ? 'Oyna' : `Servet Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
+                        <GlossButton label={access.ok ? 'Oyna' : `Cömertlik Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color="#C7D2E5" />} />
                       </BreakoutCard>
                     </View>
                   );
@@ -145,7 +145,7 @@ export default function GameCenter() {
 
         {tab === 'history' &&
           (history.length === 0 ? (
-            <Text style={s.dim}>Henüz oyun hareketi yok. Casino turları, iadeler ve reddedilen istekler burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.</Text>
+            <Text style={s.dim}>Henüz oyun hareketi yok. Oyun Salonu turları, iadeler ve reddedilen istekler burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.</Text>
           ) : (
             history.map((h) => (
               <Card key={h.requestId + h.txId} style={{ gap: 2 }}>

@@ -1,6 +1,6 @@
 // Two independent game catalogs (Oyun Merkezi spec §6):
 //  - Oda oyunları: free for everyone, played with people in the room; VIP never required.
-//  - Casino (VIP2): chance games, minimum VIP level per game (default 2), opened from the profile's
+//  - Oyun Salonu (VIP2): chance games, minimum VIP level per game (default 2), opened from the profile's
 //    Oyun Merkezi or from inside a room. Both entry points use the same platform (lib/games.ts).
 // Every value here is a default the admin screen (oyun-yonetimi) can change. Provider names are
 // placeholders until the provider/licence research (spec §7) is done.
@@ -33,7 +33,7 @@ export type CasinoGame = {
   emoji: string;
   provider: string;
   active: boolean;
-  /** Minimum Servet Seviyesi (wealth level) to play. */
+  /** Minimum Cömertlik level (wealth level) to play. */
   minWealth: number;
   fromProfile: boolean;
   fromRoom: boolean;
@@ -63,7 +63,6 @@ export const ROOM_GAMES: RoomGame[] = [
     vipRequired: false,
     playable: true,
     leaderboard: true,
-    note: 'UNO benzeri mekanik, özgün ad ve tasarım (UNO lisansı alınmadan marka kullanılmaz).',
   },
   {
     id: 'okey',
@@ -114,7 +113,7 @@ export const STAKES = {
 /** Daily per-game ceiling: forty rounds at the game's top stake. */
 const dailyFor = (bets: readonly number[]) => 40 * bets[bets.length - 1];
 
-// Casino catalog from the client's reference screens. The older games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın Kasa) stay
+// Oyun Salonu kataloğu. The older games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın Kasa) stay
 // in the catalog switched off; the admin screen can turn them back on.
 export const CASINO_GAMES: CasinoGame[] = [
   {
@@ -149,7 +148,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'olympus',
-    name: 'Şimşek Dağı',
+    name: 'Fener Kayalığı',
     emoji: '⚡',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -158,7 +157,7 @@ export const CASINO_GAMES: CasinoGame[] = [
     fromRoom: true,
     bets: [...STAKES.base],
     dailyLimit: dailyFor(STAKES.base),
-    rules: '6 makara, 5 sıra; semboller ekranın her yerinde öder: aynı sembolden 8 veya daha fazla kazandırır. Çarpan küreleri toplanır ve dönüşün kazancını çarpar. 4 veya daha fazla ⚡ Zeus 10 bedava dönüş verir. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    rules: '6 makara, 5 sıra; semboller ekranın her yerinde öder: aynı sembolden 8 veya daha fazla kazandırır. Çarpan küreleri toplanır ve dönüşün kazancını çarpar. 4 veya daha fazla 🔦 Fener 10 bedava dönüş verir. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
@@ -239,7 +238,7 @@ export const CASINO_GAMES: CasinoGame[] = [
   },
   {
     id: 'foodwheel',
-    name: 'Tatlı Tezgâh',
+    name: 'Liman Pazarı',
     emoji: '🎡',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
@@ -340,7 +339,7 @@ export const CASINO_GAMES: CasinoGame[] = [
     fromRoom: true,
     bets: [...STAKES.base],
     dailyLimit: dailyFor(STAKES.base),
-    rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 💰 Servet her sembolün yerine geçer (Kasa hariç). 3 veya daha fazla 🏦 Kasa 8 bedava dönüş verir, bedava dönüşlerde kazançlar 2 katı. Bir turda en fazla bahsin 850 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 💰 Kese her sembolün yerine geçer (Kasa hariç). 3 veya daha fazla 🏦 Kasa 8 bedava dönüş verir, bedava dönüşlerde kazançlar 2 katı. Bir turda en fazla bahsin 850 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },

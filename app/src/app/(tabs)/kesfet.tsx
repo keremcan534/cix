@@ -20,7 +20,7 @@ import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
 
-const TABS = ['Senin için', 'Yakındaki'] as const;
+const TABS = ['Benzer', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
 type Gender = 'Hepsi' | 'Kadın' | 'Erkek';
 type Filters = { country: string; gender: Gender; onlineOnly: boolean; newest: boolean };
@@ -30,7 +30,7 @@ const DEFAULT_FILTERS: Filters = { country: 'ALL', gender: 'Hepsi', onlineOnly: 
 const isDefault = (f: Filters) => f.country === 'ALL' && f.gender === 'Hepsi' && !f.onlineOnly && !f.newest;
 
 export default function DiscoverScreen() {
-  const [tab, setTab] = useState<Tab>('Senin için');
+  const [tab, setTab] = useState<Tab>('Benzer');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [greeted, setGreeted] = useState<Set<string>>(new Set());
@@ -42,7 +42,7 @@ export default function DiscoverScreen() {
   let users =
     tab === 'Yakındaki'
       ? USERS.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
-      : // Online first, then Cazibe Seviyesi: charm is what lifts a profile in discovery.
+      : // Online first, then Yankı level: charm is what lifts a profile in discovery.
         [...USERS].sort((a, b) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm));
   if (filters.newest) users = [...users].reverse();
   users = users.filter(
@@ -143,7 +143,7 @@ export default function DiscoverScreen() {
               <Pressable style={styles.optInBtn} onPress={() => setSetting('cityDiscovery', true)}>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>Şehir bazlı keşfi aç</Text>
               </Pressable>
-              <Pressable onPress={() => setTab('Senin için')}>
+              <Pressable onPress={() => setTab('Benzer')}>
                 <Text style={{ color: colors.textDim }}>Şimdilik herkesi göster</Text>
               </Pressable>
             </View>

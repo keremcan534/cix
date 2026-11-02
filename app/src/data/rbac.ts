@@ -55,13 +55,13 @@ export const PERMISSIONS: { key: PermissionKey; label: string; group: string; cr
   { key: 'agency_apps.decide', label: 'Başvuruyu kesin onaylama / reddetme / askıya alma', group: 'Ajans başvurusu', critical: true },
   { key: 'agencies.manage', label: 'Ajans hesabı yönetimi (sahip, yöneticiler, sözleşme)', group: 'Ajans başvurusu' },
   { key: 'agencies.commission', label: 'Ajans komisyon kuralı tanımlama', group: 'Ajans başvurusu', critical: true, minScope: 'platform' },
-  { key: 'agencies.coinsbank', label: 'Ajans Coins Bank erişimini etkinleştirme', group: 'Ajans başvurusu', critical: true },
+  { key: 'agencies.coinsbank', label: 'Ajans Jeton Noktası erişimini etkinleştirme', group: 'Ajans başvurusu', critical: true },
   { key: 'agencies.payout', label: 'Ajans ödeme yetkisi, finansal doğrulama ve ödeme onayı', group: 'Ajans başvurusu', critical: true, minScope: 'platform' },
   { key: 'agencies.performance', label: 'Atanmış ajansların performansını görüntüle', group: 'Ajans başvurusu' },
   { key: 'games.manage', label: 'Oyun kataloğu, VIP şartı, limit ve sağlayıcı ayarları', group: 'Oyun', critical: true, minScope: 'platform' },
   { key: 'animations.manage', label: 'Animasyon kataloğu, fiyat, lisans ve sağlayıcı yönetimi', group: 'İçerik', critical: true, minScope: 'platform' },
   { key: 'pk.manage', label: 'PK ayarları (Normal, Takım, odalar arası), aktif PK izleme, iade ve iptal', group: 'Oda', critical: true, minScope: 'platform' },
-  { key: 'lucky.manage', label: 'Lucky hediye paketleri, olasılıklar, ödül rezervi ve kayıtlar', group: 'Oda', critical: true, minScope: 'platform' },
+  { key: 'lucky.manage', label: 'Uğurlu hediye paketleri, olasılıklar, ödül rezervi ve kayıtlar', group: 'Oda', critical: true, minScope: 'platform' },
 ];
 export const permLabel = (k: PermissionKey) => PERMISSIONS.find((p) => p.key === k)?.label ?? k;
 export const SCOPE_LABEL: Record<ScopeType, string> = { platform: 'Platform', region: 'Bölge', agency: 'Ajans', room: 'Oda' };

@@ -65,7 +65,7 @@ const GIFT_ROWS = [
 export const GIFTS = new Map(GIFT_ROWS.map(([id, name, price, cat, minSvip = 0]) => [id, { id, name, price, cat, minSvip }]));
 
 /** Gift counts the panel offers; any other count is refused. */
-export const GIFT_COUNTS = [1, 10, 66, 99, 188, 520, 1314];
+export const GIFT_COUNTS = [1, 5, 10, 25, 50, 100, 250];
 
 /** Coin packs. The store product id is `coins_<coins>` on both stores; firstBonus is paid on the first purchase of that pack. */
 export const PACKS = [

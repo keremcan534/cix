@@ -1,4 +1,4 @@
-// Şimşek Dağı: the 6×5 "pays anywhere" slot (lib/olympus-slot). playCasino (lib/games) settles the whole round, free
+// Fener Kayalığı: the 6×5 "pays anywhere" slot (lib/olympus-slot). playCasino (lib/games) settles the whole round, free
 // spins included, before anything moves; the grid only replays outcome.olympus. Oto stops at free spins, a big win,
 // the loss limit or any refusal.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -32,7 +32,7 @@ function Cell({ cell, lit, dim }: { cell: OCell; lit: boolean; dim?: boolean }) 
       ) : (
         <Text style={[o.sym, dim && { opacity: 0.4 }]}>{OSYMBOLS[cell.sym].emoji}</Text>
       )}
-      {cell.sym === SCATTER && !dim && <Text style={o.tag}>ZEUS</Text>}
+      {cell.sym === SCATTER && !dim && <Text style={o.tag}>FENER</Text>}
     </View>
   );
 }
@@ -101,7 +101,7 @@ export function OlympusPlayer({ entry }: { entry: Entry }) {
     setLast({ win: Math.floor(round.base.pay * bet), orbs: round.base.orbs });
     if (round.free.length) {
       successHaptic();
-      setStatus({ text: `⚡ ZEUS! ${FREE_SPINS} bedava dönüş`, tone: 'bonus' });
+      setStatus({ text: `Fener yandı! ${FREE_SPINS} bedava dönüş`, tone: 'bonus' });
       await sleep(1500);
       let won = round.base.pay;
       for (let i = 0; i < round.free.length; i++) {
@@ -174,8 +174,7 @@ export function OlympusPlayer({ entry }: { entry: Entry }) {
             <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={18} color="#FDE68A" />
           </Pressable>
           <View style={{ alignItems: 'center', flex: 1 }}>
-            <Text style={o.zeus}>🏛️⚡🏛️</Text>
-            <Text style={o.title}>ŞİMŞEK DAĞI</Text>
+            <Text style={o.title} numberOfLines={1} adjustsFontSizeToFit>FENER KAYALIĞI</Text>
             <Text style={[o.title, o.title2]}>SLOT</Text>
           </View>
           <Pressable style={o.icon} onPress={() => setShowPays((v) => !v)} accessibilityLabel="Ödeme tablosu">
@@ -183,7 +182,7 @@ export function OlympusPlayer({ entry }: { entry: Entry }) {
           </Pressable>
         </View>
         <Text style={o.tagline}>SEMBOLLER EKRANIN HER YERİNDE ÖDER</Text>
-        <View style={o.grid} accessibilityLabel="Olympus makaraları">
+        <View style={o.grid} accessibilityLabel="Makaralar">
           {grid.map((col, c) => (
             <View key={c} style={o.col}>
               {col.map((cell, r) => (
@@ -242,7 +241,7 @@ export function OlympusPlayer({ entry }: { entry: Entry }) {
             </View>
           ))}
           <Text style={o.dim}>
-            ⚡ Zeus 4 / 5 / 6+: {SCATTER_PAY.map((p) => fmt(p * bet)).join(' / ')} jeton ve {FREE_SPINS} bedava dönüş. 🔮 Küreler toplanır, dönüşün kazancını çarpar.
+            {OSYMBOLS[SCATTER].emoji} {OSYMBOLS[SCATTER].name} 4 / 5 / 6+: {SCATTER_PAY.map((p) => fmt(p * bet)).join(' / ')} jeton ve {FREE_SPINS} bedava dönüş. 🔮 Küreler toplanır, dönüşün kazancını çarpar.
           </Text>
         </View>
       )}
@@ -255,7 +254,6 @@ const o = StyleSheet.create({
   stage: { borderRadius: 22, padding: 8, gap: 6 },
   head: { flexDirection: 'row', alignItems: 'center' },
   icon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#3B0764', borderWidth: 2, borderColor: '#FACC15', alignItems: 'center', justifyContent: 'center' },
-  zeus: { fontSize: 22 },
   title: { color: '#FACC15', fontSize: 30, fontWeight: '900', letterSpacing: 1, lineHeight: 32, textShadowColor: '#7F1D1D', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 1 },
   title2: { fontSize: 24, lineHeight: 26 },
   tagline: { color: '#78350F', fontWeight: '900', fontSize: 11, textAlign: 'center', letterSpacing: 0.5 },
