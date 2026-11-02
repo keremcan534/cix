@@ -44,7 +44,7 @@ import { SimilarityCard } from '@/components/similarity';
 import { AffiliationPills, GenderChip, useAffiliations, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
-import { colors, gradientDeep, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Art } from '@/components/Art';
 import { Photo } from '@/components/photo';
 
@@ -71,6 +71,8 @@ export default function UserProfile() {
   const isMe = id === 'me';
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
+  const { colors, semantic, dark } = useTheme();
+  const styles = useStyles();
 
   const club = fanClubs[user.id];
   const isFollowing = following.has(user.id);
@@ -209,6 +211,8 @@ export default function UserProfile() {
   const { agency, kabile } = useAffiliations(user);
 
   const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
+  // The collapsed bar is solid background: the light scheme swaps the photo's dark chip for a soft ink one.
+  const onBar = collapsed && !dark;
   const pickerUsers = USERS.filter((u) => following.has(u.id) && !blocked.has(u.id));
 
   return (
@@ -282,7 +286,7 @@ export default function UserProfile() {
                 {priv.showOnline ? (
                   <>
                     <View style={[styles.dot, { backgroundColor: user.online ? semantic.live : colors.textDim }]} />
-                    <Text style={{ color: user.online ? semantic.live : colors.textDim, fontSize: 13 }}>
+                    <Text style={{ color: user.online ? semantic.actionText : colors.textDim, fontSize: 13 }}>
                       {user.online ? 'Çevrimiçi' : lastSeen ? `Son görülme ${lastSeen}` : 'Çevrimdışı'}
                     </Text>
                   </>
@@ -308,7 +312,7 @@ export default function UserProfile() {
             <Text style={styles.bio}>{user.bio || (isMe ? 'Kendini birkaç kelimeyle anlat…' : '')}</Text>
             {isMe && (
               <View style={styles.bioEdit}>
-                <Ionicons name="pencil" size={13} color="#fff" />
+                <Ionicons name="pencil" size={13} color={colors.text} />
               </View>
             )}
           </Pressable>
@@ -334,7 +338,7 @@ export default function UserProfile() {
               accessibilityLabel="Bulunduğu yere git">
               {presence.kind === 'room' ? <Icon3D name="mic" size={26} /> : <Ionicons name="call" size={20} color={colors.gold} />}
               <View style={{ flex: 1 }}>
-                <Text style={{ color: '#fff', fontWeight: '800' }} numberOfLines={1}>
+                <Text style={{ color: colors.text, fontWeight: '800' }} numberOfLines={1}>
                   {presence.kind === 'room' ? `Şu an odada: ${presence.title}` : `Şu an ${presence.mode} görüşmede`}
                 </Text>
                 <Text style={styles.meta}>{presence.kind === 'room' ? (presence.locked ? 'Şifreli oda · girişte şifre sorulur' : 'Dokun, yanına git') : 'Özel görüşmeye katılınamaz'}</Text>
@@ -601,18 +605,18 @@ export default function UserProfile() {
       <View pointerEvents="box-none" style={[styles.topBar, collapsed && { backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
         <View style={[styles.topRow, { marginTop: insets.top }]}>
           <Pressable onPress={() => goBack()} style={[styles.iconBtn, collapsed && { backgroundColor: 'transparent' }]} accessibilityLabel="Geri">
-            <Ionicons name="chevron-back" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color={collapsed ? colors.text : '#fff'} />
           </Pressable>
           <Text style={styles.topTitle} numberOfLines={1}>
             {collapsed ? user.name : ''}
           </Text>
           {isMe ? (
-            <Pressable onPress={() => setEditOpen(true)} style={styles.iconBtn} accessibilityLabel="Profili düzenle">
-              <Ionicons name="pencil" size={20} color="#fff" />
+            <Pressable onPress={() => setEditOpen(true)} style={[styles.iconBtn, onBar && styles.iconBtnBar]} accessibilityLabel="Profili düzenle">
+              <Ionicons name="pencil" size={20} color={onBar ? colors.text : '#fff'} />
             </Pressable>
           ) : (
-            <Pressable onPress={() => setSheet('more')} style={styles.iconBtn} accessibilityLabel="Diğer">
-              <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
+            <Pressable onPress={() => setSheet('more')} style={[styles.iconBtn, onBar && styles.iconBtnBar]} accessibilityLabel="Diğer">
+              <Ionicons name="ellipsis-horizontal" size={22} color={onBar ? colors.text : '#fff'} />
             </Pressable>
           )}
         </View>
@@ -622,8 +626,8 @@ export default function UserProfile() {
       {!isMe && (
         <SafeAreaView edges={['bottom']} style={styles.bottom}>
           <Pressable style={[styles.followBtn, isFollowing && styles.followingBtn]} onPress={follow} accessibilityLabel="Takip et">
-            <Ionicons name={isFollowing ? 'checkmark' : 'add'} size={20} color="#fff" />
-            <Text style={styles.followText}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
+            <Ionicons name={isFollowing ? 'checkmark' : 'add'} size={20} color={isFollowing ? colors.text : '#fff'} />
+            <Text style={[styles.followText, isFollowing && styles.followingText]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
           </Pressable>
           <BarButton icon="chatbubble-ellipses" label="Mesaj" off={!can('message').ok} onPress={() => guard('message', () => router.push(`/sohbet/${user.id}`))} />
           <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />
@@ -703,6 +707,8 @@ export default function UserProfile() {
 // --- Header pieces -------------------------------------------------------------
 
 function Guardian({ guardian }: { guardian: { userId: string; points: number } | null }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const g = guardian ? userById(guardian.userId) : null;
   return (
     <Pressable
@@ -737,6 +743,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
 }
 
 function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const styles = useStyles();
   return (
     <View style={styles.tabBar}>
       {TABS.map((t) => {
@@ -753,9 +760,11 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 }
 
 function Stat({ n, label, onPress }: { n: number; label: string; onPress?: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={{ flex: 1, alignItems: 'center' }} onPress={onPress} disabled={!onPress}>
-      <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{n.toLocaleString('tr-TR')}</Text>
+      <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800' }}>{n.toLocaleString('tr-TR')}</Text>
       <Text style={[styles.meta, { fontSize: 12 }]}>{label}</Text>
     </Pressable>
   );
@@ -763,6 +772,8 @@ function Stat({ n, label, onPress }: { n: number; label: string; onPress?: () =>
 
 function BarButton({ icon, label, onPress, highlight, off }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; highlight?: boolean; off?: boolean }) {
   // "off" stays tappable so the reason can be shown, but looks disabled.
+  const { colors, gradientDeep } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 2, opacity: off ? 0.4 : 1 }} accessibilityLabel={label} accessibilityState={{ disabled: off }}>
       {highlight ? (
@@ -771,7 +782,7 @@ function BarButton({ icon, label, onPress, highlight, off }: { icon: keyof typeo
         </LinearGradient>
       ) : (
         <View style={styles.roundBtn}>
-          <Ionicons name={icon} size={21} color="#fff" />
+          <Ionicons name={icon} size={21} color={colors.text} />
         </View>
       )}
       <Text style={{ color: colors.textDim, fontSize: 11 }}>{label}</Text>
@@ -782,10 +793,13 @@ function BarButton({ icon, label, onPress, highlight, off }: { icon: keyof typeo
 // --- Profil tab pieces -----------------------------------------------------------
 
 function Band() {
+  const styles = useStyles();
   return <View style={styles.band} />;
 }
 
 function AffiliationSection({ title, item, empty, emptyHref }: { title: string; item: Affiliation | null; empty: string; emptyHref?: Href }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   if (!item) return (
     <View style={styles.section}>
       <SectionTitle title={title} right={empty} onPress={emptyHref ? () => router.push(emptyHref) : undefined} />
@@ -810,6 +824,8 @@ function AffiliationSection({ title, item, empty, emptyHref }: { title: string; 
 }
 
 function SectionTitle({ title, onPress, right }: { title: string; onPress?: () => void; right?: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={styles.sectionHead} onPress={onPress} disabled={!onPress}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -821,32 +837,38 @@ function SectionTitle({ title, onPress, right }: { title: string; onPress?: () =
 }
 
 function InfoBox({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.infoBox}>
       <LinearGradient colors={['#13D9DF', colors.primary]} style={styles.infoIcon}>
         <Ionicons name={icon} size={20} color="#fff" />
       </LinearGradient>
-      <Text style={{ color: '#E9E4FF', flex: 1, fontSize: 14 }}>{text}</Text>
+      <Text style={{ color: dark ? '#E9E4FF' : colors.text, flex: 1, fontSize: 14 }}>{text}</Text>
     </View>
   );
 }
 
 function Chip({ icon, emoji, label }: { icon?: keyof typeof Ionicons.glyphMap; emoji?: string; label: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.chip}>
-      {icon && <Ionicons name={icon} size={15} color="#fff" />}
+      {icon && <Ionicons name={icon} size={15} color={colors.text} />}
       {emoji && <Text style={{ fontSize: 15 }}>{emoji}</Text>}
-      <Text style={{ color: '#fff', fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: colors.text, fontSize: 14 }}>{label}</Text>
     </View>
   );
 }
 
 function InfoRow({ icon, label, hint, children }: { icon: keyof typeof Ionicons.glyphMap; label: string; hint?: string; children: ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={19} color="#fff" />
+      <Ionicons name={icon} size={19} color={colors.text} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ color: '#fff', fontSize: 15 }}>{label}</Text>
+        <Text style={{ color: colors.text, fontSize: 15 }}>{label}</Text>
         {hint && (
           <View style={styles.row}>
             <Ionicons name="alert-circle-outline" size={12} color={colors.textDim} />
@@ -860,6 +882,8 @@ function InfoRow({ icon, label, hint, children }: { icon: keyof typeof Ionicons.
 }
 
 function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }) {
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const [showHistory, setShowHistory] = useState(false);
   const points = club?.points ?? 0;
   const fan = fanLevel(points);
@@ -867,7 +891,7 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
     <View style={styles.fanCard}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Ionicons name="heart" size={15} color={colors.pink} style={{ marginRight: 6 }} />
-        <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }}>{name} hayran kulübü</Text>
+        <Text style={{ color: colors.text, fontWeight: '800', flex: 1 }}>{name} hayran kulübü</Text>
         <Text style={{ color: colors.gold, fontWeight: '800' }}>
           Lv.{fan.index + 1} · {points} puan
         </Text>
@@ -876,7 +900,7 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
         {fan.current.name} · Ödül: {fan.current.reward}
       </Text>
       <View style={styles.track}>
-        <View style={{ height: 6, backgroundColor: colors.pink, width: fan.next ? `${((points - fan.current.min) / (fan.next.min - fan.current.min)) * 100}%` : '100%' }} />
+        <View style={{ height: 6, backgroundColor: semantic.social, width: fan.next ? `${((points - fan.current.min) / (fan.next.min - fan.current.min)) * 100}%` : '100%' }} />
       </View>
       <Text style={styles.meta}>{fan.next ? `Sonraki: ${fan.next.name} (${fan.next.min} puan) → ${fan.next.reward}` : 'En üst kulüp seviyesi'}</Text>
       <Text style={styles.meta}>Puan kazan: takip et (+10), odasına katıl (+5), odada kal (+2/dk), görevler; hediye zorunlu değil.</Text>
@@ -899,16 +923,18 @@ function FanClubCard({ name, club }: { name: string; club: FanClub | undefined }
 }
 
 function MomentItem({ moment, user }: { moment: Moment; user: User }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.moment}>
       <View style={styles.row}>
         <Avatar uri={user.avatar} size={36} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>{user.name}</Text>
+          <Text style={{ color: colors.text, fontWeight: '700' }}>{user.name}</Text>
           <Text style={[styles.meta, { fontSize: 12 }]}>{moment.time}</Text>
         </View>
       </View>
-      <Text style={{ color: '#fff', fontSize: 15 }}>{moment.text}</Text>
+      <Text style={{ color: colors.text, fontSize: 15 }}>{moment.text}</Text>
       {moment.image && <Image source={{ uri: moment.image }} style={styles.momentImg} />}
       <View style={[styles.row, { gap: 16 }]}>
         <View style={styles.row}>
@@ -927,6 +953,7 @@ function MomentItem({ moment, user }: { moment: Moment; user: User }) {
 // --- Vitrin (onur) tab ----------------------------------------------------------------------
 
 function WallBanner({ title, colors: bg, right, onPress, subtitle, children }: { title: string; colors: readonly [ColorValue, ColorValue, ...ColorValue[]]; right: ReactNode; onPress?: () => void; subtitle?: string; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} disabled={!onPress}>
       <LinearGradient colors={bg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wall}>
@@ -945,6 +972,7 @@ function WallBanner({ title, colors: bg, right, onPress, subtitle, children }: {
 }
 
 function Pedestals({ items, tint }: { items: { id: string; emoji: string; name: string }[]; tint: string }) {
+  const styles = useStyles();
   const slots = [0, 1, 2, 3].map((i) => items[i] ?? null);
   return (
     <View style={styles.pedestals}>
@@ -962,6 +990,8 @@ function Pedestals({ items, tint }: { items: { id: string; emoji: string; name: 
 }
 
 function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: boolean; giftWall: (Gift & { count: number })[]; myRides: { id: string; emoji: string; name: string }[] | null }) {
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
   const medals = medalsOf(userId);
   const titles = titlesOf(userId);
   const rides = myRides ?? vehiclesOf(userId).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name }));
@@ -1031,10 +1061,10 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
       </WallBanner>
 
       <View style={[styles.sectionHead, { marginTop: 6 }]}>
-        <Text style={[styles.sectionTitle, { color: '#fff', fontSize: 18 }]}>Hediye Koleksiyonu</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 }]}>Hediye Koleksiyonu</Text>
         <View style={{ flex: 1 }} />
         <Text style={styles.meta}>
-          Toplanan <Text style={{ color: '#fff', fontWeight: '800' }}>{lit}</Text>/{GIFTS.length}
+          Toplanan <Text style={{ color: colors.text, fontWeight: '800' }}>{lit}</Text>/{GIFTS.length}
         </Text>
       </View>
       <View style={styles.giftWall}>
@@ -1051,17 +1081,17 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
 
       <View style={styles.catalog}>
         <View style={styles.sectionHead}>
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>Hediye Kataloğu</Text>
+          <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>Hediye Kataloğu</Text>
           <View style={{ flex: 1 }} />
           <Text style={styles.meta}>
-            <Text style={{ color: '#fff', fontWeight: '800' }}>{doneCollections}</Text>/{collections.length}
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{doneCollections}</Text>/{collections.length}
           </Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {collections.map((c) => (
-            <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : ['#3F3A52', '#1F1B2E']} style={styles.collection}>
+            <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : dark ? ['#3F3A52', '#1F1B2E'] : ['#E9EFF7', '#D5DEEA']} style={styles.collection}>
               <Text style={{ fontSize: 44, opacity: c.done > 0 ? 1 : 0.4 }}>{c.emoji}</Text>
-              <Text style={styles.collectionName} numberOfLines={2}>
+              <Text style={[styles.collectionName, c.done === 0 && styles.collectionNameLocked]} numberOfLines={2}>
                 {c.name}
               </Text>
               <View style={styles.collectionBar}>
@@ -1080,6 +1110,8 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
 // --- Bağlar (iliski) tab ----------------------------------------------------------------------
 
 function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User; isMe: boolean; relations: { cp: Relation[]; dost: Relation[] }; pending: string[]; onInvite: (k: InviteKind) => void }) {
+  const { colors, semantic, dark } = useTheme();
+  const styles = useStyles();
   const [kind, setKind] = useState<'cp' | 'dost'>('cp');
   const [top1Only, setTop1Only] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -1090,10 +1122,10 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
 
   return (
     <View style={{ padding: 16 }}>
-      <LinearGradient colors={['#5A2232', '#2A1A24', colors.card]} style={styles.relCard}>
+      <LinearGradient colors={dark ? ['#5A2232', '#2A1A24', colors.card] : ['#FDE6EA', '#FFF4F6', colors.card]} style={styles.relCard}>
         <View style={styles.row}>
           <Pressable style={styles.relIcon} onPress={() => router.push('/magaza')} accessibilityLabel="Mağaza">
-            <Ionicons name="storefront" size={18} color="#fff" />
+            <Ionicons name="storefront" size={18} color={colors.text} />
           </Pressable>
           <View style={styles.segment}>
             {(['cp', 'dost'] as const).map((k) => (
@@ -1127,7 +1159,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
         {isMe && (
           <Pressable style={[styles.row, { alignSelf: 'flex-end', marginTop: 10 }]} onPress={() => setTop1Only((v) => !v)}>
             <Ionicons name={top1Only ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={colors.primaryText} />
-            <Text style={{ color: '#A5F3F5', fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
+            <Text style={{ color: semantic.tonalText, fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
           </Pressable>
         )}
         {isMe && hidden && <Text style={[styles.meta, { marginTop: 6, textAlign: 'right', fontSize: 12 }]}>Bağların diğer kullanıcılardan gizli.</Text>}
@@ -1143,7 +1175,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
           {waiting.map((w) => (
             <View key={w.id} style={[styles.row, styles.pendingRow]}>
               <Avatar uri={w.avatar} size={30} />
-              <Text style={{ color: '#fff', flex: 1 }}>{w.name}</Text>
+              <Text style={{ color: colors.text, flex: 1 }}>{w.name}</Text>
               <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700' }}>Davet bekleniyor</Text>
             </View>
           ))}
@@ -1162,6 +1194,7 @@ function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User
 }
 
 function RelationRow({ user, relation, kind, canWed }: { user: User; relation: Relation; kind: 'cp' | 'dost'; canWed: boolean }) {
+  const styles = useStyles();
   const partner = userById(relation.partnerId);
   return (
     <View style={styles.relRow}>
@@ -1207,6 +1240,8 @@ function RelationRow({ user, relation, kind, canWed }: { user: User; relation: R
 }
 
 function InviteButton({ icon, title, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; onPress: () => void }) {
+  const { semantic } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}>
       <LinearGradient colors={[semantic.socialFill, '#A82F42']} style={styles.inviteBtn}>
@@ -1226,6 +1261,8 @@ const GENDERS: [User['gender'] | 'hidden', string][] = [
 ];
 
 function EditSheet({ user, onSave, onClose, onPhoto }: { user: User; onSave: (patch: Partial<User>) => void; onClose: () => void; onPhoto: () => void }) {
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const [name, setName] = useState(user.name);
   const [username, setUsername] = useState(user.username ?? '');
   const [bio, setBio] = useState(user.bio);
@@ -1275,7 +1312,7 @@ function EditSheet({ user, onSave, onClose, onPhoto }: { user: User; onSave: (pa
           <Field label="Kullanıcı adı" error={errors.username} hint="Benzersiz olmalı. ID numaran değişmez.">
             <View style={[styles.row, styles.input, { paddingVertical: 0 }]}>
               <Text style={{ color: colors.textDim, fontSize: 15 }}>@</Text>
-              <TextInput value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" autoCorrect={false} maxLength={20} style={{ flex: 1, color: '#fff', fontSize: 15, paddingVertical: 10 }} placeholder="kullanici.adi" placeholderTextColor={colors.textDim} />
+              <TextInput value={username} onChangeText={(t) => setUsername(t.toLowerCase())} autoCapitalize="none" autoCorrect={false} maxLength={20} style={{ flex: 1, color: colors.text, fontSize: 15, paddingVertical: 10 }} placeholder="kullanici.adi" placeholderTextColor={colors.textDim} />
             </View>
           </Field>
           <Field label={`Hakkımda · ${bio.length}/${LIMITS.bio}`} error={errors.bio}>
@@ -1297,7 +1334,7 @@ function EditSheet({ user, onSave, onClose, onPhoto }: { user: User; onSave: (pa
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {INTERESTS.map((i) => (
                 <Pressable key={i} onPress={() => toggleInterest(i)} style={[styles.editChip, interests.includes(i) && styles.editChipOn]}>
-                  <Text style={{ color: '#fff', fontSize: 13 }}>{i}</Text>
+                  <Text style={{ color: colors.text, fontSize: 13 }}>{i}</Text>
                 </Pressable>
               ))}
             </View>
@@ -1315,6 +1352,7 @@ function EditSheet({ user, onSave, onClose, onPhoto }: { user: User; onSave: (pa
 }
 
 function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -1325,11 +1363,13 @@ function Field({ label, error, hint, children }: { label: string; error?: string
 }
 
 function ChipRow<T extends string | undefined>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
       {options.map(([v, l]) => (
         <Pressable key={String(v)} onPress={() => onChange(v)} style={[styles.editChip, value === v && styles.editChipOn]}>
-          <Text style={{ color: '#fff', fontSize: 13 }}>{l}</Text>
+          <Text style={{ color: colors.text, fontSize: 13 }}>{l}</Text>
         </Pressable>
       ))}
     </View>
@@ -1338,6 +1378,8 @@ function ChipRow<T extends string | undefined>({ value, options, onChange }: { v
 
 /** Owner-only numbers: balances, VIP end date and XP never appear on profiles others open. */
 function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | null; wealthXp: number; charmXp: number; giftsSent: number; giftsReceived: number }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const n = (x: number) => x.toLocaleString('tr-TR');
   return (
     <View style={styles.privateCard}>
@@ -1374,6 +1416,8 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
 }
 
 function UserPicker({ visible, title, users, pending, onPick, onClose }: { visible: boolean; title: string; users: User[]; pending: string[]; onPick: (id: string) => void; onClose: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
@@ -1390,7 +1434,7 @@ function UserPicker({ visible, title, users, pending, onPick, onClose }: { visib
                 <Pressable key={u.id} style={({ pressed }) => [styles.pickRow, pressed && { backgroundColor: colors.cardAlt }]} onPress={() => onPick(u.id)}>
                   <Avatar uri={u.avatar} size={40} online={u.online} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{u.name}</Text>
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>{u.name}</Text>
                     <Text style={[styles.meta, { fontSize: 12 }]}>
                       {u.age} · {u.city}
                     </Text>
@@ -1409,38 +1453,39 @@ function UserPicker({ visible, title, users, pending, onPick, onClose }: { visib
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   cover: { width: '100%', height: 240, backgroundColor: colors.card },
   voicePill: { position: 'absolute', right: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 999, paddingLeft: 4, paddingRight: 12, paddingVertical: 4 },
   micDot: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26, paddingHorizontal: 16, paddingBottom: 6 },
   avatarWrap: { marginTop: -48, alignSelf: 'flex-start', borderRadius: 60, borderWidth: 3, borderColor: colors.bg },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: '#fff', fontSize: 26, fontWeight: '900', flexShrink: 1 },
+  name: { color: colors.text, fontSize: 26, fontWeight: '900', flexShrink: 1 },
   flag: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4 },
-  flagText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  flagText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   genderText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   dot: { width: 8, height: 8, borderRadius: 4 },
   vSep: { width: 1, height: 14, backgroundColor: colors.border, marginHorizontal: 4 },
   meta: { color: colors.textDim, fontSize: 13 },
-  bio: { color: '#E9E4FF', fontSize: 16, flexShrink: 1 },
+  bio: { color: dark ? '#E9E4FF' : colors.text, fontSize: 16, flexShrink: 1 },
   bioEdit: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, paddingVertical: 10, marginTop: 14 },
+  stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 14, paddingVertical: 10, marginTop: 14, ...lift },
   guardian: { width: 96, alignItems: 'center', paddingTop: 14 },
-  guardianRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: colors.gold, overflow: 'hidden' },
+  guardianRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: semantic.money, overflow: 'hidden' },
   guardianImg: { width: '100%', height: '100%' },
   guardianLabel: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -12, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FEF3C7' },
   guardianText: { color: '#5B2A00', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
   tabBar: { flexDirection: 'row', justifyContent: 'center', gap: 26, height: TAB_H, backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabItem: { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4, gap: 5 },
   tabText: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
-  tabTextActive: { color: '#fff', fontSize: 19, fontWeight: '900' },
+  tabTextActive: { color: colors.text, fontSize: 19, fontWeight: '900' },
   tabIndicator: { width: 18, height: 4, borderRadius: 2, backgroundColor: colors.primary },
   topBar: { position: 'absolute', top: 0, left: 0, right: 0 },
   topRow: { height: BAR_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
-  topTitle: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '700' },
+  topTitle: { flex: 1, color: colors.text, fontSize: 18, fontWeight: '700' },
   iconBtn: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 999, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  band: { height: 8, backgroundColor: 'rgba(0,0,0,0.28)' },
+  iconBtnBar: { backgroundColor: ink(0.06) },
+  band: { height: 8, backgroundColor: dark ? 'rgba(0,0,0,0.28)' : ink(0.045) },
   section: { padding: 16, gap: 12 },
   sectionHead: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { color: colors.textDim, fontSize: 16, fontWeight: '800' },
@@ -1451,21 +1496,21 @@ const styles = StyleSheet.create({
   rewardFill: { height: 6, backgroundColor: '#fff', borderRadius: 3 },
   rewardPct: { color: '#fff', fontWeight: '900', fontSize: 13, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1, overflow: 'hidden' },
   editPill: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 14, padding: 14 },
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 14, padding: 14, ...lift },
   infoIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  infoCard: { backgroundColor: colors.card, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
+  infoCard: { backgroundColor: colors.card, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6, ...lift },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  infoValue: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 10 },
+  infoValue: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  roomCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 10, ...lift },
   roomCover: { width: 84, height: 84, borderRadius: 12, backgroundColor: colors.cardAlt },
-  roomTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  lvChip: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: 'rgba(34,197,94,0.18)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  roomTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  lvChip: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: dark ? 'rgba(34,197,94,0.18)' : 'rgba(21,128,61,0.12)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   lvText: { color: colors.green, fontWeight: '800', fontSize: 12 },
-  familyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 12 },
+  familyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 12, ...lift },
   familyEmoji: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: 'rgba(255,101,118,0.4)' },
+  fanCard: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: dark ? 'rgba(255,101,118,0.4)' : 'rgba(200,48,74,0.26)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   track: { height: 6, borderRadius: 3, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   photo: { width: 110, height: 110, borderRadius: 12 },
   addPhoto: { backgroundColor: colors.card, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, alignItems: 'center', justifyContent: 'center', gap: 2 },
@@ -1475,15 +1520,15 @@ const styles = StyleSheet.create({
   handle: { color: colors.textDim, fontSize: 14, fontWeight: '600' },
   staffChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#B91C1C', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   statusNote: { color: colors.gold, fontSize: 13, marginTop: 8 },
-  privateCard: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, borderWidth: 1, borderColor: colors.border },
+  privateCard: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, ...(dark ? { borderWidth: 1, borderColor: colors.border } : lift) },
   privateRow: { flexDirection: 'row', gap: 8 },
   privateCell: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
   privateValue: { color: colors.text, fontWeight: '900', fontSize: 15 },
-  fieldError: { color: '#FF7A82', fontSize: 12, marginTop: 4, fontWeight: '600' },
+  fieldError: { color: semantic.danger, fontSize: 12, marginTop: 4, fontWeight: '600' },
   editChip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  editChipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.18)' },
+  editChipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 4 },
-  moment: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10 },
+  moment: { backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 10, ...lift },
   momentImg: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: colors.cardAlt },
   wall: { borderRadius: 14, padding: 12, paddingTop: 0, borderWidth: 1, borderColor: 'rgba(254,243,199,0.5)', overflow: 'hidden' },
   wallHead: { flexDirection: 'row', alignItems: 'center' },
@@ -1497,41 +1542,43 @@ const styles = StyleSheet.create({
   titleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, justifyContent: 'space-between' },
   titleSlot: { width: '31%', height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   titleText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  giftWall: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.card, borderRadius: 16, padding: 8 },
+  giftWall: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.card, borderRadius: 16, padding: 8, ...lift },
   giftCell: { width: '25%', alignItems: 'center', paddingVertical: 8, gap: 1 },
-  catalog: { backgroundColor: colors.card, borderRadius: 18, padding: 14, gap: 12 },
+  catalog: { backgroundColor: colors.card, borderRadius: 18, padding: 14, gap: 12, ...lift },
   collection: { width: 120, height: 160, borderRadius: 14, alignItems: 'center', justifyContent: 'flex-end', padding: 8, gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  collectionName: { color: colors.gold, fontWeight: '900', fontSize: 14, textAlign: 'center' },
+  collectionName: { color: semantic.money, fontWeight: '900', fontSize: 14, textAlign: 'center' },
+  collectionNameLocked: dark ? {} : { color: colors.textDim },
   collectionBar: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
-  relCard: { borderRadius: 22, padding: 14, borderWidth: 1, borderColor: colors.border },
-  relIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  segment: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 999, padding: 3 },
+  relCard: { borderRadius: 22, padding: 14, ...(dark ? { borderWidth: 1, borderColor: colors.border } : lift) },
+  relIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: dark ? 'rgba(255,255,255,0.1)' : ink(0.06), alignItems: 'center', justifyContent: 'center' },
+  segment: { flex: 1, flexDirection: 'row', backgroundColor: dark ? 'rgba(0,0,0,0.3)' : ink(0.06), borderRadius: 999, padding: 3 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 999 },
   segmentActive: { backgroundColor: colors.primary },
   segmentText: { color: colors.textDim, fontWeight: '800', fontSize: 15 },
-  relRow: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: 12, paddingTop: 22 },
+  relRow: { backgroundColor: dark ? 'rgba(255,255,255,0.06)' : colors.card, borderRadius: 16, padding: 12, paddingTop: 22, ...lift },
   relLv: { position: 'absolute', top: 6, left: 8, backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
   relLvText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   relPair: { flexDirection: 'row', alignItems: 'center' },
-  relName: { color: '#fff', fontSize: 13, fontWeight: '600', maxWidth: 90 },
+  relName: { color: colors.text, fontSize: 13, fontWeight: '600', maxWidth: 90 },
   daysPill: { marginTop: -8, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 },
   wedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, marginTop: 8 },
-  pendingRow: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 8, gap: 10 },
-  slot: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: 14 },
+  pendingRow: { backgroundColor: dark ? 'rgba(255,255,255,0.06)' : colors.card, borderRadius: 12, padding: 8, gap: 10, ...lift },
+  slot: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: dark ? 'rgba(255,255,255,0.06)' : colors.card, borderRadius: 16, padding: 14, ...lift },
   slotNo: { color: colors.pink, fontSize: 15, fontWeight: '700', width: 16, textAlign: 'center' },
   inviteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
   followBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: 23, backgroundColor: semantic.socialFill },
   followingBtn: { backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   followText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  followingText: { color: colors.text },
+  roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...lift },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34 },
-  modalTitle: { color: '#fff', fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  modalTitle: { color: colors.text, fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
   inputLabel: { color: colors.textDim, fontSize: 13, fontWeight: '700', marginTop: 10, marginBottom: 6 },
-  input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+  input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.cardAlt, alignItems: 'center' },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 14 },
-  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: 'rgba(19,217,223,0.15)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#0FB8BE' },
+  presence: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: dark ? '#0FB8BE' : 'rgba(0,117,123,0.4)' },
   presenceGo: { color: '#fff', fontWeight: '800', backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 6, overflow: 'hidden' },
-});
+}));

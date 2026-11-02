@@ -1,7 +1,7 @@
 // Gender chip and agency / kabile pills shared by the Profil tab and the user profile screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { AGENCIES, ROLE_LABEL, agencyOf, type AgencyRole } from '@/data/agency';
@@ -9,18 +9,20 @@ import { findKabile, KABILE_ROUTES } from '@/data/kabile';
 import type { User } from '@/data/mock';
 import { familyOf } from '@/data/profile';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, themes, useTheme } from '@/theme';
 
-export const FEMALE_FILL = semantic.socialFill;
+// Gender fills carry white text and are the same in both schemes.
+export const FEMALE_FILL = themes.dark.semantic.socialFill;
 export const MALE_FILL = '#0369A1';
 
 /** Profile spec §2-A: a hidden gender shows only the age to others; the owner still sees it, marked as hidden. */
 export function GenderChip({ user, owner }: { user: User; owner?: boolean }) {
+  const styles = useStyles();
   const hidden = user.showGender === false;
   if (!user.gender || (hidden && !owner)) {
     return (
-      <View style={[styles.chip, { backgroundColor: colors.cardAlt }]} accessibilityLabel={`${user.age} yaş`}>
-        <Text style={styles.chipText}>{user.age}</Text>
+      <View style={[styles.chip, styles.ageChip]} accessibilityLabel={`${user.age} yaş`}>
+        <Text style={[styles.chipText, styles.ageChipText]}>{user.age}</Text>
       </View>
     );
   }
@@ -84,6 +86,7 @@ const publicRole = (r: AgencyRole) => (r === 'owner' ? ROLE_LABEL.owner : ROLE_L
 
 /** Compact pills under the name. Empty affiliations are hidden for others; the owner gets a soft "join" prompt. */
 export function AffiliationPills({ user }: { user: User }) {
+  const styles = useStyles();
   const { agency, kabile } = useAffiliations(user);
   const isMe = user.id === 'me';
   if (!agency && !kabile && !isMe) return null;
@@ -104,6 +107,8 @@ export function AffiliationPills({ user }: { user: User }) {
 }
 
 function Pill({ icon, emoji, label, a11y, href, empty }: { icon: keyof typeof Ionicons.glyphMap; emoji?: string; label: string; a11y: string; href?: Href; empty?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       style={[styles.pill, empty && styles.emptyPill]}
@@ -123,12 +128,14 @@ function Pill({ icon, emoji, label, a11y, href, empty }: { icon: keyof typeof Io
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   hiddenChip: { opacity: 0.6 },
+  ageChip: { backgroundColor: colors.cardAlt },
   chipText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  ageChipText: { color: colors.text },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
   emptyPill: { backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border },
-  pillText: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
-});
+  pillText: { color: colors.text, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+}));

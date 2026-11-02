@@ -12,7 +12,7 @@ import { Avatar, Header } from '@/components/ui';
 import { LEADERBOARDS } from '@/data/economy';
 import { AGENCIES } from '@/data/agency';
 import { ROOMS, USERS, type User } from '@/data/mock';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { periodLabel } from '@/lib/tr';
 
@@ -29,6 +29,8 @@ const BOARDS: { key: Board; label: string; emoji: string; art?: ArtName; unit: U
 type Row = { id: string; name: string; avatar: string; score: number; user?: User; roomId?: string };
 
 export default function Leaderboard() {
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
   const [board, setBoard] = useState<Board>('zengin');
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const info = BOARDS.find((b) => b.key === board)!;
@@ -58,7 +60,7 @@ export default function Leaderboard() {
         {BOARDS.map((b) => (
           <Pressable key={b.key} onPress={() => setBoard(b.key)} style={[styles.tab, board === b.key && styles.tabActive]} accessibilityLabel={b.label}>
             {b.art && <Art name={b.art} size={17} />}
-            <Text style={[styles.tabText, board === b.key && { color: '#fff' }]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
+            <Text style={[styles.tabText, board === b.key && styles.tabTextActive]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -78,7 +80,7 @@ export default function Leaderboard() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 8 }}
         ListHeaderComponent={
-          <LinearGradient colors={['#0B3B4A', colors.bg]} style={styles.podium}>
+          <LinearGradient colors={[dark ? '#0B3B4A' : '#D3EEF0', colors.bg]} style={styles.podium}>
             {second && <Podium row={second} place={2} unit={unit} onPress={() => open(second)} />}
             {first && <Podium row={first} place={1} unit={unit} onPress={() => open(first)} />}
             {third && <Podium row={third} place={3} unit={unit} onPress={() => open(third)} />}
@@ -107,6 +109,8 @@ const MEDAL = {
 
 /** A board's number with its unit drawn as an icon (coins, diamonds, people) or as an XP suffix. */
 function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const size = small ? 14 : 16;
   return (
     <View style={styles.scoreRow}>
@@ -122,6 +126,7 @@ function Score({ unit, n, small }: { unit: Unit; n: number; small?: boolean }) {
 }
 
 function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; unit: Unit; onPress: () => void }) {
+  const styles = useStyles();
   const m = MEDAL[place];
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', flex: 1, gap: 4, marginTop: place === 1 ? 0 : 28 }}>
@@ -135,20 +140,22 @@ function Podium({ row, place, unit, onPress }: { row: Row; place: 1 | 2 | 3; uni
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, lift, dark, ink }) => ({
   how: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 16, marginBottom: 8 },
   tabs: { gap: 6, paddingHorizontal: 16 },
-  tab: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center' },
-  tabActive: { backgroundColor: colors.primary },
+  // Light: a hairline instead of the card shadow, which the horizontal scroller would clip.
+  tab: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.card, alignItems: 'center', ...(dark ? {} : { borderWidth: StyleSheet.hairlineWidth, borderColor: ink(0.12) }) },
+  tabActive: { backgroundColor: colors.primary, ...(dark ? {} : { borderColor: colors.primary }) },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
+  tabTextActive: { color: '#fff' },
   periods: { flexDirection: 'row', justifyContent: 'center', gap: 24, paddingVertical: 12 },
   period: { color: colors.textDim, fontWeight: '600' },
-  periodActive: { color: '#fff', textDecorationLine: 'underline' },
+  periodActive: { color: colors.text, textDecorationLine: 'underline' },
   podium: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 20, paddingVertical: 18, paddingHorizontal: 8, marginBottom: 8 },
-  podiumName: { color: '#fff', fontWeight: '700', maxWidth: 100 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 14, padding: 10 },
+  podiumName: { color: colors.text, fontWeight: '700', maxWidth: 100 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 14, padding: 10, ...lift },
   rank: { color: colors.textDim, fontWeight: '800', width: 22, textAlign: 'center' },
-  name: { color: '#fff', fontWeight: '600', flex: 1 },
+  name: { color: colors.text, fontWeight: '600', flex: 1 },
   score: { color: colors.gold, fontWeight: '700' },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-});
+}));
