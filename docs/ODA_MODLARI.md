@@ -1,6 +1,6 @@
 # Oda Katılım Modları, Mikrofon Yerleşimleri ve Ortak YouTube İzleme
 
-Bu belge "Yayına Katılma Modu" çalışmasının uygulamasını ve teslim notlarını içerir. **Önce şunu bilmek gerekir:** uygulamada backend yoktur. Şartnamenin "sunucu tarafında doğrulama" istediği her kural (yetki, oda seviyesi, kilit, kapasite, YouTube bağlantısı, oynatma kontrolü) ekran bileşenlerinden bağımsız, saf TypeScript domain modüllerinde (`app/src/lib/room-modes.ts`, `app/src/lib/youtube.ts`) uygulanır ve testlidir. Arayüz bir düzen kimliğini doğrudan gönderse bile aynı kontrollerden geçer. Gerçek üründe bu fonksiyonlar sunucuya taşınmalıdır; istemci tarafındaki kontrol tek başına güvenlik sağlamaz.
+Bu belge "Sahne Düzeni" çalışmasının uygulamasını ve teslim notlarını içerir. **Önce şunu bilmek gerekir:** uygulamada backend yoktur. Şartnamenin "sunucu tarafında doğrulama" istediği her kural (yetki, oda seviyesi, kilit, kapasite, YouTube bağlantısı, oynatma kontrolü) ekran bileşenlerinden bağımsız, saf TypeScript domain modüllerinde (`app/src/lib/room-modes.ts`, `app/src/lib/youtube.ts`) uygulanır ve testlidir. Arayüz bir düzen kimliğini doğrudan gönderse bile aynı kontrollerden geçer. Gerçek üründe bu fonksiyonlar sunucuya taşınmalıdır; istemci tarafındaki kontrol tek başına güvenlik sağlamaz.
 
 ## 1. Mimari
 
@@ -16,7 +16,7 @@ Bu belge "Yayına Katılma Modu" çalışmasının uygulamasını ve teslim notl
 | | `components/room/youtube-player.web.tsx` / `youtube-player.tsx` | Web: resmi IFrame Player API. Android/iOS: aynı API bir WebView içinde. Oynatıcı bir kez oluşturulur; video/oynat/duraklat/sarma komutla iletilir. |
 | Bağlantı | `live-room.tsx`, `owner.tsx`, `parts.tsx`, `store.tsx`, `data/mock.ts` | Sahne tohumlama, ayar satırları, oda menüsü girişi, yuva durumları, kendi odanın düzeninin kalıcılığı (`MyRoom.layoutId`), örnek oda (Doğruluk mu Cesaret mi → 9 mikrofon PK takım). |
 
-Şartnamedeki `RoomSession.modeId / layoutId` alanları `RoomStage` (oda kimliğine göre modül durumu) olarak tutulur. Ses oturumu (`lib/room-session`) gibi ekrandan bağımsızdır; bu yüzden oda küçültülünce, Balkon açılınca veya mini karttan büyütülünce düzen ve oynatıcı korunur (web'de doğrulandı: aynı iframe).
+Şartnamedeki `RoomSession.modeId / layoutId` alanları `RoomStage` (oda kimliğine göre modül durumu) olarak tutulur. Ses oturumu (`lib/room-session`) gibi ekrandan bağımsızdır; bu yüzden oda küçültülünce, Güverte açılınca veya mini karttan büyütülünce düzen ve oynatıcı korunur (web'de doğrulandı: aynı iframe).
 
 ## 2. Modlar ve yerleşimler (başlangıç verisi)
 
@@ -30,14 +30,14 @@ Bu belge "Yayına Katılma Modu" çalışmasının uygulamasını ve teslim notl
 - Kapasite her zaman şemadaki yuva sayısıdır (test). Aynı kapasitede birden çok yerleşim vardır (Ses 6 ×3, Video 6 ×2, 8 ×2, 10 ×2).
 - Video modundaki turkuaz kutular **görüntülü yuvalardır** (kamerası açılabilen mikrofon yuvaları) ve kapasiteye dahildir. Ortak YouTube ekranı Video'da isteğe bağlıdır (video açılınca görünür), Sinema Salonu'nda her zaman vardır.
 - "Kilitli" saklanmaz: oda seviyesi `minimumRoomLevel`'ın altındaysa veya gereken özellik (`youtube`, `camera`) yoksa hesaplanır. Kartta da domain'de de aynı `layoutAccess` kullanılır.
-- **Varsayımlar:** 30 mikrofonun seviyesi görsellerde görünmüyordu, Lv.9 kabul edildi. 11 mikrofonun seviyesi okunamıyordu, Lv.1 kabul edildi. PK takım yerleşimlerinin yuva dağılımı (ör. 9 = sunucu + 4 kırmızı + 4 mavi) görsellerden birebir alınmadı; kapasiteyle tutarlı olacak şekilde seçildi.
+- **Varsayımlar:** 30 mikrofonlu düzen Lv.9, 11 mikrofonlu düzen Lv.1 kabul edildi. PK takım yerleşimlerinin yuva dağılımı (ör. 9 = sunucu + 4 kırmızı + 4 mavi) kapasiteyle tutarlı olacak şekilde seçildi. Seviyeler başlangıç değerleridir.
 - **Mevcut seviye kuralıyla ilişki:** Eski kural "standart oda 10, ajans 15, Lv.8'de +2, en fazla 15" idi. Bu kural **Klasik düzen** için aynen korunur (Oda Ayarları › Klasik düzen mikrofon sayısı). Katalog yerleşimleri kendi kapasitesini ve seviye şartını getirir (20/24/30 mikrofon Lv.7/8/9). Bu, oda seviyesi ödüllerindeki "özel mikrofon düzenleri (Lv.7)" ile uyumludur; ancak 15 üstü mikrofon için ürün kararı gerekir.
 
 ## 3. Mikrofon kuralları
 
 - Bir kullanıcı tek yuvada oturur; dolu yuvaya ikinci kişi oturamaz (`room-presence.takeSeat`, testli).
 - Katılma / davet / kabul / ayrılma mevcut presence akışıyla aynen çalışır; yerleşim yalnızca yuvaların nerede çizileceğini belirler.
-- **Kapasite küçültme:** Yeni sınırın dışında oturan konuşmacı varsa işlem reddedilir ve kim olduğu yazılır ("1 konuşmacı yeni 6 mikrofonluk düzenin dışında kalıyor (8. mikrofonda Elif)…"). Kimse sessizce Balkon'a taşınmaz. Aynı kural Klasik düzene dönüşte ve klasik mikrofon sayısını azaltırken de geçerlidir (eski davranış "fazlası dinleyiciye geçer" idi; şartnameye göre değiştirildi). Sınır dışındaki koltuk kilitleri düşer.
+- **Kapasite küçültme:** Yeni sınırın dışında oturan konuşmacı varsa işlem reddedilir ve kim olduğu yazılır ("1 konuşmacı yeni 6 mikrofonluk düzenin dışında kalıyor (8. mikrofonda Elif)…"). Kimse sessizce Güverte'ye taşınmaz. Aynı kural Klasik düzene dönüşte ve klasik mikrofon sayısını azaltırken de geçerlidir (eski davranış "fazlası dinleyiciye geçer" idi; şartnameye göre değiştirildi). Sınır dışındaki koltuk kilitleri düşer.
 - **Yuva durumları:** boş (kesikli çerçeve, +), kilitli (kilit), davet bekliyor (altın çerçeve, kum saati, "Davet"), mikrofon açık, mikrofon kapalı (gri rozet), yönetim tarafından susturuldu (kırmızı rozet). Her durumun ekran okuyucu metni vardır ("4. mikrofon, Selin için davet bekliyor").
 
 ## 4. Yetki ve kilit (domain katmanında)

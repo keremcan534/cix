@@ -23,8 +23,8 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | M12 Coin cüzdanı, hareket geçmişi, bekleyen satın alma | ✅ | `cuzdan` |
 | M13 Elmas, yayıncı kazancı, para çekme | ✅ | `yayinci/*` |
 | M14–M15 Ajans (AG-01…AG-08) | ✅ | `ajans/*` — aşağıya bak |
-| M16 VIP 1–15, Wealth/Charm ayrı | ✅ | `vip`, profil rozetleri |
-| M17 Topluluk/aile | ✅ | `aile` |
+| M16 VIP 1–15, Cömertlik/Yankı ayrı | ✅ | `vip`, profil rozetleri |
+| M17 Topluluk/tayfa | ✅ | `aile` |
 | M18 Bildirim merkezi (sosyal / finans-güvenlik ayrımı) | ✅ | `bildirimler` |
 | M19 Engelleme, şikâyet (talep numaralı) | ✅ | kullanıcı profili, oda menüsü |
 | M20 Destek merkezi: SSS, kategori, talep no, yanıt, yeniden açma | ✅ | `destek` |
@@ -87,27 +87,27 @@ Bu bir **tıklanabilir prototip**: backend yok, veriler sahte. "Sunucu tarafınd
 | Oda sahibi bonusu %20 (kendi odasındaki uygun hediyeler) | ✅ |
 | Ajans menüleri yalnızca ajans üyelerine görünür; ajans sohbet grubu (çevrimiçi/çevrimdışı, sabit duyuru) | ✅ |
 | Tek ajans kuralı; ajanslar arası transfer: talep → ajans sahibi onayı (ücretli/ücretsiz) → tamamlanma, adım zaman çizelgesi, itiraz | ✅ Ajans > Transfer / Panel > Transferler |
-| Aile sistemi: sahip/yardımcı/üye rolleri, başvuru onayı, aile sohbeti + sessize alma, LV1–15, kapasite, aktif üye tanımı, haftalık bonus %1–5 katkıya göre dağıtım | ✅ |
+| Tayfa sistemi: sahip/yardımcı/üye rolleri, başvuru onayı, tayfa sohbeti + sessize alma, LV1–15, kapasite, aktif üye tanımı, haftalık bonus %1–5 katkıya göre dağıtım | ✅ |
 | Bildirim türleri ayrı ayrı + erteleme (1/8/24 sa), düşük veri modu, hareketi azalt, davet izinleri | ✅ Ayarlar |
 | Oturumlar ve oturum sonlandırma, şüpheli giriş / yeniden doğrulama, çoklu hesap/IBAN risk notları | ✅ (gerçek kontrol sunucuda ⛔) |
 | İtiraz kategorileri: moderasyon kararı, hesap kısıtlaması, ajans transferi, oyun sonucu | ✅ Destek |
 | İşlem geçmişi referans numarası, günlük özet | ✅ Cüzdan |
-| Merkezi kazanç & bonus yönetim paneli (USD kuru, ajans %, oda sahibi %, aile oranları, arama bonusları, üst sınır, min. çekim, davet birimi, örnek hesaplayıcı, sürüm geçmişi) | ⛔ Mobil uygulamadan çıkarıldı; ayrı Finance Control platformuna taşınıyor (uygulamada sabit varsayılanlar) |
-| Oda kartı (başlığa dokun): kapak seç, ad düzenle, tema, oda ID, seviye kartı, kabile (aile/ajans), oda üyeleri (sayı/limit, başvuru rozeti), Oda Sahibi Merkezi (%20 pay, trafik paneli, bu oturumun hediye/zirve/süre istatistikleri), oda süslemesi, hediye kaydı, bülten, Paylaş / Davet et | ✅ |
+| Merkezi kazanç & bonus yönetim paneli (USD kuru, ajans %, oda sahibi %, tayfa oranları, arama bonusları, üst sınır, min. çekim, davet birimi, örnek hesaplayıcı, sürüm geçmişi) | ⛔ Mobil uygulamadan çıkarıldı; ayrı Finance Control platformuna taşınıyor (uygulamada sabit varsayılanlar) |
+| Oda kartı (başlığa dokun): kapak seç, ad düzenle, tema, oda ID, seviye kartı, tayfa (topluluk/ajans), oda üyeleri (sayı/limit, başvuru rozeti), Oda Sahibi Merkezi (%20 pay, trafik paneli, bu oturumun hediye/zirve/süre istatistikleri), oda süslemesi, hediye kaydı, bülten, Paylaş / Davet et | ✅ |
 | Tam ekran "Oda Ayarları": oda tipi, tema, kilit (Lv4 veya VIP), oda günlüğü, yayına katılma modu (mikrofon sayısı), mikrofon kontrolü, mikrofon izni (Lv4, oda üyeleri), patron koltuğu (Lv3), üyelik başvurusu (gerekmiyor/başvuru/kapalı), üyeleri/işlevleri kim yönetir, otomatik eleme (7/14/30 gün, her gün 00:00 UTC+3), kara liste, profilde oda görünürlüğü, video gizlilik koruması | ✅ |
-| Patron koltuğu: oturumun en çok hediye gönderen kişisi (en az 1.000 jeton) oturur, geçilince el değiştirir, sahip indirebilir | ✅ (`Yeni Arkadaşlar`, `Karaoke Akşamı` odalarında açık) |
+| Dümen koltuğu: oturumun en çok hediye gönderen kişisi (en az 1.000 jeton) oturur, geçilince el değiştirir, sahip indirebilir | ✅ (`Yeni Arkadaşlar`, `Karaoke Akşamı` odalarında açık) |
 | Oda menüsü ızgara panel: Etkileşimli Oyunlar, Jetonlu Oyunlar (VIP2, sağlayıcı akışı), Oda Araçları, Oda Ayarları (Paylaş, Efektler, Süsler, Ses, mikrofon gürültü giderme, Mesaj ayarları) | ✅ |
-| "Ben" sayfası: profil tamamlama, takipçi/takip/arkadaş/ziyaretçi, Yükleme kartı + SVIP/VIP/Asil kartları, Bedava Para / Kabile / Davet, Gelir, Alışveriş Merkezi, Kimlik doğrulama, Çanta, Kullanıcı Seviyesi, Müşteri hizmetleri, Güvenlik, Ayarlar | ✅ |
-| SVIP 1–10 (yüklenen 1 jeton = 1 deneyim puanı, 500k → 400M), 31 hak; VIP abonelik (1/3/6 ay) ve ayrıcalık karşılaştırması; Asil (Şövalye, Vikont, Kont, Markiz, Dük · 30 gün) 27 hak | ✅ `src/data/status.ts` |
-| Yükleme ekranı: TRY paketleri, "Sadece İlk Defa" bonusu, SVIP banner | ✅ (ödeme simüle) |
+| "Ben" sayfası: profil tamamlama, takipçi/takip/arkadaş/ziyaretçi, Yükleme kartı + İnci/VIP/Rütbe kartları, Jeton Kazan / Tayfa / Davet, Gelir, Çarşı, Kimlik doğrulama, Çanta, Kullanıcı Seviyesi, Müşteri hizmetleri, Güvenlik, Ayarlar | ✅ |
+| İnci 1–10 (yüklenen 1 jeton = 1 deneyim puanı, 500k → 400M), 31 hak; VIP abonelik (1/3/6 ay) ve ayrıcalık karşılaştırması; Rütbe (Gemici, Dümenci, Lostromo, Amiral, Kaptan-ı Derya · 30 gün) 27 hak | ✅ `src/data/status.ts` |
+| Yükleme ekranı: TRY paketleri, "Sadece İlk Defa" bonusu, İnci bandı | ✅ (ödeme simüle) |
 | Görev Merkezi: 7 günlük check-in, yarının ödülleri, gece yarısına geri sayım, Git/Al | ✅ |
 | Gelir / Kazanç detayları, Ödüllü Davet (kayıt ödülü cinsiyetten bağımsız, gelir görevi, %8 gelir / %4 şarj payı, süreli ek bonus), Müşteri hizmetleri | ✅ |
-| Kullanıcı profili (Profil / dinamik / Onur / İlişki, koruma, CP) ve hediye paneli (Hot / Gameplay / Çift / Ayrıcalık, SVIP kilitli hediyeler, çanta, favoriler) | ✅ |
+| Kullanıcı profili (Profil / Anlar / Vitrin / Bağlar, Fener Bekçisi rozeti, İkili) ve hediye paneli (Hot / Gameplay / Çift / Ayrıcalık, İnci kilitli hediyeler, çanta, favoriler) | ✅ |
 | Sekme düzeni: Senin İçin · Anlar · Odalar (ortada büyük düğme) · Mesajlar · Ben; Odalar (Benim/Önerilen, sıralama kartları, kategori sekmeleri, TOP odalar), Senin İçin (kısayol kartları, Hi, Gerçek rozeti), Anlar (konu kartları, yorum), Mesajlar (Arkadaşlarım, Aramalar, ziyaretçiler) | ✅ |
 | Merkezi Rol ve Yetki Merkezi: roller, izinler (yasak dahil), kapsamlar (platform/bölge/ajans/oda), çoklu rol ataması, etkin yetki kontrolü, moderasyon kayıtları, denetim kaydı, teknik şartname çıktısı | ✅ `docs/YETKI_MODELI.md` (gerçek koruma sunucuda ⛔) |
-| Kabile: profil (seviye kartı, duyuru, etiket, haftalık sıralama, Oda/Görev/Çift/Durum/Tema), kabile sohbeti, Görev Merkezi (sabit ödüllü sandıklar), Kabile Kasası, İlişki Meydanı | ✅ |
-| Hangi odada olduğu: profil, ajans sohbeti ve kabile sohbetinde görünür, dokununca o odaya gidilir (kilitliyse şifre), odada "A, B kişisini takip ederek odaya katıldı" mesajı | ✅ |
-| Coins Bank: cüzdan, yayıncı/ajans/BD defterleri, blokajlı para çekme, otomatik onay / manuel inceleme durumu | ✅ `docs/COINS_BANK.md` (ödeme simüle; kurallar, onay ve mutabakat ayrı Finance Control platformunda) |
+| Tayfa: profil (seviye kartı, duyuru, etiket, haftalık sıralama, Oda/Görev/Çift/Durum/Tema), tayfa sohbeti, Görevler (sabit ödüllü sandıklar), Tayfa Kasası, Uyum Köşesi | ✅ |
+| Hangi odada olduğu: profil, ajans sohbeti ve tayfa sohbetinde görünür, dokununca o odaya gidilir (kilitliyse şifre), odada "A, B kişisini takip ederek odaya katıldı" mesajı | ✅ |
+| Jeton Noktası: cüzdan, yayıncı/ajans/BD defterleri, blokajlı para çekme, otomatik onay / manuel inceleme durumu | ✅ `docs/COINS_BANK.md` (ödeme simüle; kurallar, onay ve mutabakat ayrı Finance Control platformunda) |
 | Yayıncı/ajans yaşam döngüsü: ajanssız yayıncı 3 gün → yönetim hesabı, 90 gün pasif → ajanstan düşer, ajans aktivasyonu 20 yayıncı / 10×10 USD, aylık 5 yeni yayıncı, komisyon düşüşü, aday statüsüne düşme; süreler panelden | ✅ |
 | Jackpot / şans çarpanlı hediye ve rastgele ödüllü kutular | ⛔ bilinçli olarak eklenmedi (kumar niteliği; lisans/hukuk gerekir) |
 

@@ -56,7 +56,7 @@ Sesli odada ayrıca: oda sahibi yönetimi (sustur, koltuktan indir, odadan at), 
 | Ekran | Dosya | Neler var |
 | --- | --- | --- |
 | Oda (genişletildi) | `src/app/oda/[id].tsx`, `src/components/room/` | 10/15 mikrofon, oda XP ve 1–15 seviye, konuşma isteği, oda yöneticisi + rol hiyerarşisi, oda ayarları, şifreli oda, gizli giriş, etiketli bot, katkı sıralaması, oda zarfı, ortak müzik, zar oyunu, PK daveti/geri sayım/MVP, emoji paneli |
-| VIP 1–15 | `src/app/vip.tsx` | 15 seviye (Üye → İmparator), birikimli ayrıcalıklar, Wealth ve Charm ayrı seviyeler |
+| VIP 1–15 | `src/app/vip.tsx` | 15 seviye (Üye → İmparator), birikimli ayrıcalıklar, Cömertlik ve Yankı ayrı seviyeler |
 | Mağaza | `src/app/magaza.tsx` | Çerçeve, giriş efekti, binek, sohbet balonu, özel ID, emoji paketleri; satın al / kullan |
 | Ajans | `src/app/ajans/` | Kodla katılım (şartlar + onay), ajans kurma başvurusu, yayıncı ajans ekranı, geçiş/ayrılma talebi, sahip paneli (10 bölüm), baş asistan izin kısıtı, davet ağı ağacı, komisyon defteri |
 | Bildirimler | `src/app/bildirimler.tsx` | Sosyal ve finans/güvenlik ayrımı |
@@ -73,29 +73,29 @@ Ek ve yeni güncelleme belgeleriyle eklenenler:
 | Oyun merkezi | `src/app/oyunlar.tsx` | VIP2'de açılır, sağlayıcı doğrulamalı sonuç |
 | Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
 
-Sonradan eklenenler: Ben sayfası, SVIP 1–10 / VIP abonelik / Asil (Şövalye–Dük) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
+Sonradan eklenenler: Ben sayfası, İnci 1–10 / VIP abonelik / Rütbe (Gemici–Kaptan-ı Derya) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
 
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 
-Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD (1.000.000 jetonluk paket 23.599,99 TL), Lucky hediyede alıcıya değerin %20'si, elmas → jeton yalnız ana Coins Bank hesabında değere göre (%3), Coins Bank toptan %2, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Uygulamada bu değerler sabit varsayılanlardır; finans yönetimi (kurallar, onay, mutabakat) mobil uygulamadan çıkarıldı ve ayrı Finance Control platformuna taşınıyor.
+Ekonomi kuralları `src/data/rules.ts` içinde: 1 jetonluk hediye = 1 elmas, 5.000 elmas = 1 USD (1.000.000 jetonluk paket 23.599,99 TL), Uğurlu hediyede alıcıya değerin %20'si, elmas → jeton yalnız ana Jeton Noktası hesabında değere göre (%3), Jeton Noktası toptan %2, ajans komisyonu %40 (yayıncıdan kesilmez, ayrıca ödenir), oda sahibi bonusu %20, en az 50.000 elmas çekilebilir. Uygulamada bu değerler sabit varsayılanlardır; finans yönetimi (kurallar, onay, mutabakat) mobil uygulamadan çıkarıldı ve ayrı Finance Control platformuna taşınıyor.
 
 Ortak durum (giriş, profil, jeton, takip, mesajlar) `src/store.tsx` içinde. Giriş yapılmadan uygulama ekranları açılmaz (`Stack.Protected`); Profil > Çıkış yap ile başa dönülür.
 
 ## Ajans başvuru sistemi
 
-Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sözleşme, komisyon, Coins Bank, ödeme yetkisi) ve denetim kaydı: [`docs/AJANS_BASVURU.md`](docs/AJANS_BASVURU.md). Uygulamada **Ben > Ajans başvuru yönetimi**.
+Ajans başvuru formu, durum takibi, BD/Admin yönetim paneli, ajans hesabı (sözleşme, komisyon, Jeton Noktası, ödeme yetkisi) ve denetim kaydı: [`docs/AJANS_BASVURU.md`](docs/AJANS_BASVURU.md). Uygulamada **Ben > Ajans başvuru yönetimi**.
 
 ## Canlı oda ve PK
 
-- **Balkon, oda sayacı, katılımcı yönetimi, sohbet filtreleri:** mikrofonların altında Balkon ve dokunulabilir toplam sayaç; "Odadaki Kullanıcılar" penceresinde mikrofon daveti (davet edilen kabul eder), mikrofon susturma, kişisel sessiz, onaylı odadan çıkarma; sohbette Tümü / Hediyeler / Sohbet sekmeleri. Ayrıntı: [`docs/CANLI_ODA.md`](docs/CANLI_ODA.md).
+- **Güverte, oda sayacı, katılımcı yönetimi, sohbet filtreleri:** mikrofonların altında Güverte ve dokunulabilir toplam sayaç; "Odadaki Kullanıcılar" penceresinde mikrofon daveti (davet edilen kabul eder), mikrofon susturma, kişisel sessiz, onaylı odadan çıkarma; sohbette Tümü / Hediyeler / Sohbet sekmeleri. Ayrıntı: [`docs/CANLI_ODA.md`](docs/CANLI_ODA.md).
 - **Küçültülebilir oda:** geri tuşu veya kapatma "Odayı küçült / Odadan çık" diye sorar; küçültülen oda her ekranda mini kart olarak sürer (aynı oturum, yeniden bağlanmadan), başka odaya geçiş önce sorulur, uygulama yeniden açılınca güvenli geri dönüş önerilir. Ses motoru şimdilik simülasyon; gerçek ses ve arka plan sesi için yapılandırma hazır. Ayrıntı ve teslim raporu: [`docs/ODA_OTURUMU.md`](docs/ODA_OTURUMU.md).
 - **PK:** Normal PK (varsayılan, bireysel), Takım PK (sunucuda rastgele veya manuel takımlar, ikiye ayrılan mikrofon alanı) ve odalar arası PK; koltuk altında canlı PK puanı, sonuç ekranı ve "Taç Kazandıranlar". Ayrıntı: [`docs/PK_MODULU.md`](docs/PK_MODULU.md).
-- **Yayına Katılma Modu ve ortak YouTube ekranı:** Oda Ayarları (veya oda menüsü) › Yayına Katılma Modu: Ses / Video / Sinema Salonu / Çift Odası sekmelerinde 34 mikrofon yerleşimi (katalog verisi), oda seviyesi kilidi, PK takım bölgeleri; Video ve Sinema Salonu'nda yalnızca YouTube bağlantısıyla ortak izleme. Yetki, seviye, kapasite ve bağlantı doğrulaması `lib/room-modes` içinde. Ayrıntı: [`docs/ODA_MODLARI.md`](docs/ODA_MODLARI.md).
+- **Sahne Düzeni ve ortak YouTube ekranı:** Oda Ayarları (veya oda menüsü) › Sahne Düzeni: Ses / Video / Sinema Salonu / Çift Odası sekmelerinde 34 mikrofon yerleşimi (katalog verisi), oda seviyesi kilidi, PK takım bölgeleri; Video ve Sinema Salonu'nda yalnızca YouTube bağlantısıyla ortak izleme. Yetki, seviye, kapasite ve bağlantı doğrulaması `lib/room-modes` içinde. Ayrıntı: [`docs/ODA_MODLARI.md`](docs/ODA_MODLARI.md).
 - **Maliyet hesabı:** uygulamadaki ekonomi kurallarıyla 24 aylık kâr-zarar, nakit ihtiyacı ve 100 TL'nin dağılımı; varsayımlar sayfada değiştirilebilir. Tarayıcıda açın: [`docs/maliyet-hesabi.html`](docs/maliyet-hesabi.html).
 
 ## Görseller
 
-Emojilerin yerini alacak 536 görselin listesi ve teslim durumu: [`docs/GORSEL_URETIM_LISTESI.md`](docs/GORSEL_URETIM_LISTESI.md). Hediyeler (Lucky dahil), efekt hediyeleri/animasyonlar ve tepki çıkartmaları uygulamada; bölüm 4–12'nin taslakları kalite nedeniyle henüz bağlanmadı.
+Emojilerin yerini alacak 536 görselin listesi ve teslim durumu: [`docs/GORSEL_URETIM_LISTESI.md`](docs/GORSEL_URETIM_LISTESI.md). Hediyeler (Uğurlu dahil), efekt hediyeleri/animasyonlar ve tepki çıkartmaları uygulamada; bölüm 4–12'nin taslakları kalite nedeniyle henüz bağlanmadı.
 
 ## Testler
 

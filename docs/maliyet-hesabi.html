@@ -155,14 +155,14 @@ a { color: var(--accent); }
       </div>
       <div class="group">
         <h3>Jetonlar nereye harcanıyor</h3>
-        <div class="ctl"><label for="casino">Casino oyunları <output id="casinoOut"></output></label><input id="casino" type="range" min="0" max="60" step="1"></div>
-        <div class="ctl"><label for="lucky">Lucky hediye <output id="luckyOut"></output></label><input id="lucky" type="range" min="0" max="40" step="1"></div>
+        <div class="ctl"><label for="casino">Oyun Salonu oyunları <output id="casinoOut"></output></label><input id="casino" type="range" min="0" max="60" step="1"></div>
+        <div class="ctl"><label for="lucky">Uğurlu hediye <output id="luckyOut"></output></label><input id="lucky" type="range" min="0" max="40" step="1"></div>
         <div class="ctl"><label for="vip">VIP, kozmetik, efekt <output id="vipOut"></output></label><input id="vip" type="range" min="0" max="40" step="1"></div>
         <p class="small" id="giftShare"></p>
       </div>
       <div class="group">
         <h3>İşletme</h3>
-        <div class="ctl"><label for="cb">Satışların Coins Bank'tan geçen payı <output id="cbOut"></output></label><input id="cb" type="range" min="0" max="80" step="5"></div>
+        <div class="ctl"><label for="cb">Satışların Jeton Noktası'ndan geçen payı <output id="cbOut"></output></label><input id="cb" type="range" min="0" max="80" step="5"></div>
         <div class="ctl"><label for="agy">Ajanslı yayıncılara giden hediye <output id="agyOut"></output></label><input id="agy" type="range" min="0" max="100" step="5"></div>
         <div class="ctl"><label for="mins">Aktif kullanıcının günlük oda süresi <output id="minsOut"></output></label><input id="mins" type="range" min="15" max="180" step="5"></div>
         <div class="ctl"><label for="team">Ekip ve ofis, aylık <output id="teamOut"></output></label><input id="team" type="range" min="0" max="1500000" step="25000"></div>
@@ -182,16 +182,14 @@ a { color: var(--accent); }
     <ul class="rules">
       <li>1 USD = 5.000 elmas; 1 jetonluk hediye yayıncıya 1 elmas. Jeton paketleri 29,99 TL (1.000 jeton) ile 23.599,99 TL (1.000.000 jeton) arası.</li>
       <li>Ajans komisyonu yayıncı kazancının %40'ı, oda sahibi bonusu %20, diğer bonuslar ~%5; yayıncıdan kesilmez, şirket öder.</li>
-      <li>Casino: oynanan jetonun %60'ı kasaya, %40'ı kazananlara. Kazanç ayrı oyun bakiyesine yazılır, hediye edilemez.</li>
-      <li>Lucky hediye: gönderen ortalama fiyatın %65'ini geri kazanır; alıcıya fiyatın %20'si elmas yazılır.</li>
-      <li>Coins Bank ortalama %2,5 alır ve parayı hemen öder. Mağaza (Apple, Google) KDV hariç tutarın %15'ini alır (yıllık 1 milyon USD'yi geçince %30) ve 15–45 gün sonra öder. KDV %20.</li>
+      <li>Oyun Salonu: oynanan jetonun %60'ı kasaya, %40'ı kazananlara. Kazanç ayrı oyun bakiyesine yazılır, hediye edilemez.</li>
+      <li>Uğurlu hediye: gönderen ortalama fiyatın %65'ini geri kazanır; alıcıya fiyatın %20'si elmas yazılır.</li>
+      <li>Jeton Noktası ortalama %2,5 alır ve parayı hemen öder. Mağaza (Apple, Google) KDV hariç tutarın %15'ini alır (yıllık 1 milyon USD'yi geçince %30) ve 15–45 gün sonra öder. KDV %20.</li>
       <li>Ses: her ay ucuz olan seçilir. LiveKit Cloud (5.000 dakikaya kadar ücretsiz, sonra 50 veya 500 USD + kullanım) ya da kendi LiveKit sunucumuz: yük azken 2 küçük Hetzner VPS (~7 USD, Oracle ücretsizse 0), sonra yedekli 16 çekirdekli sunucular (~75 USD, sunucu başına 20 TB trafik dahil, fazlası ~1,1 USD/TB) + bakım.</li>
       <li>Veritabanı Supabase Pro (25 USD'den başlar). Dosyalar Cloudflare R2 (10 GB ücretsiz, indirme ücretsiz), bildirimler Expo Push (ücretsiz), derleme EAS Starter (19 USD). SMS Netgsm OTP paketleri (0,40 → 0,18 TL), Google/Apple ile giriş ücretsiz. Kur 49,8 TL/USD.</li>
     </ul>
     <details><summary>Kaynaklar</summary>
       <p class="small" style="margin-top:8px;display:grid;gap:4px">
-        <a href="https://www.stocktitan.net/news/JOYY/joyy-reports-second-quarter-2026-financial-results-total-revenues-rocdq3yu6pcc.html" target="_blank" rel="noopener">JOYY (BIGO Live) 2026/Ç2 sonuçları</a>
-        <a href="https://www.stocktitan.net/sec-filings/YALA/6-k-yalla-group-ltd-current-report-foreign-issuer-2c7046b74077.html" target="_blank" rel="noopener">Yalla Group 2026/Ç2 sonuçları</a>
         <a href="https://sensortower.com/blog/2025-q2-unified-top-5-social%20apps-revenue-tr-6009e912241bc16eb8566eef" target="_blank" rel="noopener">Sensor Tower: Türkiye sosyal uygulamalar 2025/Ç2</a>
         <a href="https://www.forasoft.com/blog/article/livekit-vs-agora-cost-analysis" target="_blank" rel="noopener">LiveKit Cloud ve Agora fiyatları 2026</a>
         <a href="https://uibakery.io/blog/supabase-pricing" target="_blank" rel="noopener">Supabase fiyatları 2026</a>
@@ -386,7 +384,7 @@ function breakdown(rows) {
   const g = r.gross || 1;
   const items = [
     { name: 'Vergi (KDV)', v: r.gross - r.revenue, color: 'var(--s5)' },
-    { name: 'Mağaza ve Coins Bank payı', v: r.store, color: 'var(--s4)' },
+    { name: 'Mağaza ve Jeton Noktası payı', v: r.store, color: 'var(--s4)' },
     { name: 'Yayıncı, ajans ve bonuslar', v: r.payouts, color: 'var(--s1)' },
     { name: 'Sunucu, reklam ve ekip', v: r.infra + r.ua + r.team, color: 'var(--s2)' },
   ];
