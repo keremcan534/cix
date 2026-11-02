@@ -81,6 +81,15 @@ export const PACKS = [
 ].map((p) => ({ firstBonus: 0, ...p, productId: `coins_${p.coins}` }));
 export const PACK_BY_PRODUCT = new Map(PACKS.map((p) => [p.productId, p]));
 
+/**
+ * Diamonds → coins (Gelir > Çevir): a diamond's official value (5.000 💎 = 1 USD, at USD_TRY) priced like the
+ * best pack, no fee, coins rounded down. The same sum as app/src/lib/coins-bank.ts exchangeOwnDiamonds with
+ * the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift.
+ */
+export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 49.8, minDiamonds: 100 };
+const BEST = PACKS.at(-1);
+export const exchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * (BEST.coins / BEST.tl)));
+
 /** SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point). */
 export const SVIP_XP = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
 export const svipLevel = (xp) => SVIP_XP.filter((t) => xp >= t).length;

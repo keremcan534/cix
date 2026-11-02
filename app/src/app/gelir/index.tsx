@@ -1,18 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
+import { ExchangeSheet } from '@/components/exchange-sheet';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
-import { diamondValueTl } from '@/lib/coins-bank';
+import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
 import { useApp, type Earning, type EarningSource } from '@/store';
-import { colors } from '@/theme';
+import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 
 // Income labels for each store earning source.
@@ -44,7 +46,9 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 export default function IncomeScreen() {
   const { diamonds, earnings } = useApp();
-  // Diamonds turn into coins only in the main Jeton Noktası (coins bank) account (lib/coins-bank); hosts cash out instead.
+  const [exchange, setExchange] = useState(false);
+  // Three ways out: Çevir (own diamonds → coins at the in-app price), Anında bozdur (Jeton Noktası pays the
+  // cash value now) and Para Çek (weekly payout).
   const instant = () =>
     showAlert(
       'Anında bozdur',
@@ -58,7 +62,7 @@ export default function IncomeScreen() {
   const info = () =>
     showAlert(
       'Mevcut Elmaslar',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Bakiyen yaklaşık ${usd(diamonds)} değerindedir.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir. Haftalık ödemeyi beklemeden Jeton Noktası üzerinden anında bozdurabilirsin; elmas jetona yalnızca Jeton Noktası hesabında çevrilir.`,
+      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Bakiyen yaklaşık ${usd(diamonds)} değerindedir.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir. Haftalık ödemeyi beklemeden Jeton Noktası üzerinden anında bozdurabilir ya da Çevir ile uygulamadaki jeton fiyatından hemen jetona çevirebilirsin.`,
     );
 
   return (
@@ -84,7 +88,15 @@ export default function IncomeScreen() {
             <Ionicons name="help-circle-outline" size={18} color="rgba(255,255,255,0.9)" />
           </Pressable>
           <Text style={styles.balanceN}>{fmt(diamonds)}</Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 14 }}>
+          <Pressable style={({ pressed }) => [styles.exchangeBtn, pressed && { transform: [{ scale: 0.98 }] }]} onPress={() => setExchange(true)} accessibilityRole="button" accessibilityLabel="Elmasları jetona çevir">
+            <Ionicons name="swap-horizontal" size={20} color={semantic.moneyInk} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.exchangeTitle}>Çevir</Text>
+              <Text style={styles.exchangeSub} numberOfLines={1}>10.000 💎 = {fmt(Math.floor(10_000 * selfExchangeRate()))} jeton · ücret yok</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={semantic.moneyInk} />
+          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
             <Pressable style={styles.outlineBtn} onPress={() => router.push('/yayinci/cek')}>
               <Text style={styles.outlineText}>Para Çek</Text>
             </Pressable>
@@ -127,7 +139,7 @@ export default function IncomeScreen() {
           </Pressable>
         )}
       </ScrollView>
-
+      <ExchangeSheet visible={exchange} onClose={() => setExchange(false)} />
     </SafeAreaView>
   );
 }
@@ -156,6 +168,9 @@ const styles = StyleSheet.create({
   balanceN: { color: '#fff', fontSize: 40, fontWeight: '900', marginTop: 4 },
   outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', borderRadius: 999, paddingVertical: 11, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
   outlineText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  exchangeBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, backgroundColor: semantic.money, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 3, borderBottomColor: semantic.moneyEdge },
+  exchangeTitle: { color: semantic.moneyInk, fontWeight: '900', fontSize: 16 },
+  exchangeSub: { color: semantic.moneyInk, fontSize: 12, opacity: 0.8, marginTop: 1 },
   bankLink: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.border },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700', flex: 1 },

@@ -145,7 +145,7 @@ describe('Hediyeler ve sıralama', () => {
   test('katalog herkese açık; fiyatı sunucu belirler; tekrar istek bir kez; SVIP sınırı; sıralamalar', async () => {
     const [cs, cat] = await call('GET', '/api/catalog');
     assert.equal(cs, 200);
-    assert.ok(cat.gifts.length > 50 && cat.counts.includes(1314) && cat.packs[0].productId === 'coins_1000');
+    assert.ok(cat.gifts.length > 50 && cat.counts.includes(250) && cat.packs[0].productId === 'coins_1000');
 
     const a = await signUp('Cömert');
     const b = await signUp('Yıldız');

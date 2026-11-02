@@ -28,6 +28,7 @@ export type Rules = {
   roomEventBonus: number;
   bonusCapPerWeek: number; // diamonds, per user
   minWithdrawDiamonds: number;
+  exchangeMinDiamonds: number; // smallest diamond amount anyone may turn into coins (Gelir > Çevir)
   inviteUnitsPerPurchase: number;
   inviteIncomeShare: number; // share of an invited friend's income, paid by the platform
   inviteRechargeShare: number; // share of an invited friend's recharges, paid by the platform
@@ -68,6 +69,7 @@ export const DEFAULT_RULES: Rules = {
   roomEventBonus: 0.02,
   bonusCapPerWeek: 500_000,
   minWithdrawDiamonds: 50_000,
+  exchangeMinDiamonds: 100,
   inviteUnitsPerPurchase: 1,
   inviteIncomeShare: 0.08,
   inviteRechargeShare: 0.04,

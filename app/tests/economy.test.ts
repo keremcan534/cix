@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { DEFAULT_RULES, RULES, luckyHostDiamonds } from '@/data/rules';
 import { RECHARGE_PACKS } from '@/data/status';
 import { splitStake } from '@/lib/casino-odds';
-import { convertDiamonds, diamondValueTl, exchangeRate, wholesaleQuote } from '@/lib/coins-bank';
+import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, exchangeRate, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
 
 const close = (a: number, b: number, tol = 1e-9) => Math.abs(a - b) <= tol;
 
@@ -89,6 +89,32 @@ describe('Coins Bank', () => {
       assert.equal(convertDiamonds('coins_bank_main', n).ok, false, `elmas ${n}`);
       assert.equal(wholesaleQuote('coins_bank_main', n).ok, false, `jeton ${n}`);
     }
+  });
+});
+
+describe('Gelir > Çevir (elmas → jeton)', () => {
+  test('kur: elmasın değeri × en iyi paketin jeton fiyatı, ücret yok', () => {
+    assert.ok(close(selfExchangeRate(), (1 / 5_000) * 49.8 * (1_000_000 / 23_599.99)));
+    assert.ok(close(selfExchangeRate(), 0.422, 1e-3), `oran ${selfExchangeRate()}`);
+    const q = exchangeOwnDiamonds(88_959, 88_959);
+    assert.ok(q.ok);
+    if (q.ok) assert.equal(q.coins, 37_543);
+  });
+  test('jeton, elmasın nakit değerinin mağazada aldığından fazla olamaz; aşağı yuvarlanır', () => {
+    for (const d of [100, 137, 999, 50_000, 1_000_000, 123_456_789]) {
+      const q = exchangeOwnDiamonds(d, d);
+      assert.ok(q.ok);
+      if (!q.ok) continue;
+      assert.ok(q.coins / RULES.coinsBankRetailCoinsPerTl <= q.valueTl + 1e-9, `${d}`);
+      assert.ok(q.coins > d * selfExchangeRate() - 1);
+      assert.ok(close(q.valueTl, diamondValueTl(d)));
+    }
+  });
+  test('alt sınır, bakiye ve geçersiz miktarlar reddedilir', () => {
+    assert.equal(exchangeOwnDiamonds(99, 1_000).ok, false);
+    assert.equal(exchangeOwnDiamonds(100, 1_000).ok, true);
+    assert.equal(exchangeOwnDiamonds(1_001, 1_000).ok, false);
+    for (const n of [0, -5, 1.5, Number.NaN, Infinity]) assert.equal(exchangeOwnDiamonds(n, 1e12).ok, false, `elmas ${n}`);
   });
 });
 

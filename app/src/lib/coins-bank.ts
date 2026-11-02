@@ -1,4 +1,8 @@
-// Coins Bank rules (server stand-in). The Coins Bank is the one account that may turn diamonds into coins.
+// Diamonds → coins (server stand-in).
+//   - Çevir (everyone, Gelir screen): your own diamonds become coins at their official value, priced like the
+//     best coin pack in the store, with no fee. Coins are rounded down, so a diamond never buys more than the
+//     coins its cash value would buy (server/api/catalog.mjs exchangeCoins does the same sum).
+// Coins Bank rules: the main Jeton Noktası account also trades with hosts and management.
 //   - Exchange: it pays a host or agency the official value of their diamonds at once and receives coins worth
 //     that value plus its fee (3 %) at its selling price. The rate is derived from value, never a fixed number,
 //     so a diamond can't be sold for more than it is worth when the exchange rate or pack prices change.
@@ -14,12 +18,24 @@ export const diamondValueTl = (diamonds: number, r: Rules = RULES) => (diamonds 
 /** Coins per diamond for the Coins Bank: value × its selling price × (1 + fee). */
 export const exchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usdTry * r.coinsBankRetailCoinsPerTl * (1 + r.coinsBankExchangeFee);
 
+/** Coins per diamond for Çevir: value × the best pack's coins per TL (no fee). */
+export const selfExchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usdTry * r.coinsBankRetailCoinsPerTl;
+
+/** Çevir: whole diamonds from your own balance, at least the rule's minimum; coins rounded down. */
+export function exchangeOwnDiamonds(diamonds: number, balance: number, r: Rules = RULES): Quote<{ coins: number; valueTl: number }> {
+  if (!Number.isInteger(diamonds) || diamonds <= 0) return { ok: false, reason: 'Geçerli bir elmas miktarı gir.' };
+  if (diamonds < r.exchangeMinDiamonds) return { ok: false, reason: `En az ${r.exchangeMinDiamonds.toLocaleString('tr-TR')} elmas çevirebilirsin.` };
+  if (diamonds > balance) return { ok: false, reason: 'Yetersiz elmas bakiyesi.' };
+  return { ok: true, coins: Math.floor(diamonds * selfExchangeRate(r)), valueTl: diamondValueTl(diamonds, r) };
+}
+
 /**
- * Diamonds → coins. Only the main Coins Bank account; whole diamonds and coins only (coins are rounded down,
- * so the bank never gets more than its fee).
+ * Coins Bank exchange: the bank buys a host's diamonds at value and takes coins plus its fee. Only the main
+ * Coins Bank account; whole diamonds and coins only (coins are rounded down, so the bank never gets more than
+ * its fee).
  */
 export function convertDiamonds(kind: AccountKind, diamonds: number, r: Rules = RULES): Quote<{ coins: number; paidTl: number; feeTl: number }> {
-  if (kind !== 'coins_bank_main') return { ok: false, reason: 'Elmas yalnızca ana Jeton Noktası hesabında jetona çevrilir. Kazancını Jeton Noktası üzerinden bozdurabilir veya haftalık çekebilirsin.' };
+  if (kind !== 'coins_bank_main') return { ok: false, reason: 'Bu kur yalnızca ana Jeton Noktası hesabına açıktır. Kendi elmasını Gelir > Çevir ile jetona çevirebilirsin.' };
   if (!Number.isInteger(diamonds) || diamonds <= 0) return { ok: false, reason: 'Geçerli bir elmas miktarı gir.' };
   const coins = Math.floor(diamonds * exchangeRate(r));
   const paidTl = diamondValueTl(diamonds, r);

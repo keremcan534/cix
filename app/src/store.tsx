@@ -15,6 +15,7 @@ import { RULES, type Rules } from '@/data/rules';
 import { countsForWealth, wealthLevelOf } from '@/data/wealth';
 import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
+import { exchangeOwnDiamonds } from '@/lib/coins-bank';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { entriesWhere, isFiniteNumber, isRecord, itemsShaped, oneOf, pickValid, withDefaults, type Kind } from '@/lib/saved-state';
 import { setHapticsEnabled } from '@/lib/haptics';
@@ -161,6 +162,8 @@ type AppState = {
   receiveDiamonds: (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => void;
   withdrawals: Withdrawal[];
   requestWithdraw: (diamonds: number, iban: string) => string | null;
+  /** Gelir > Çevir: own diamonds → coins at the in-app coin price (lib/coins-bank); the coins, or why not. */
+  exchangeDiamonds: (diamonds: number) => { ok: true; coins: number } | { ok: false; reason: string };
   // tasks & check-in
   stats: Record<TaskKey, number>;
   bump: (key: TaskKey, n?: number) => void;
@@ -439,6 +442,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   const [isHost, setIsHost] = useState(s.isHost ?? false);
   const [diamonds, setDiamonds] = useState(s.diamonds ?? 0);
+  // Read by Çevir so two quick taps can't spend the same diamonds twice before the state updates.
+  const diamondsRef = useRef(diamonds);
+  useEffect(() => {
+    diamondsRef.current = diamonds;
+  }, [diamonds]);
   const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
   const [charmXp, setCharmXp] = useState(s.charmXp ?? s.totalDiamonds ?? 0);
   const charmRef = useRef(charmXp);
@@ -812,6 +820,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         notify({ kind: 'finance', icon: 'card', title: 'Para çekme onaylandı', body: `${amount.toLocaleString('tr-TR')} elmas hesabına aktarılıyor.`, href: '/yayinci/cek' });
       }, 5000);
       return null;
+    },
+
+    exchangeDiamonds: (amount) => {
+      const q = exchangeOwnDiamonds(amount, diamondsRef.current);
+      if (!q.ok) return q;
+      diamondsRef.current -= amount;
+      setDiamonds((d) => d - amount);
+      setCoins((c) => c + q.coins);
+      log('diamond', -amount, 'Jetona çevrildi');
+      log('coin', q.coins, 'Elmastan çevrildi');
+      return { ok: true, coins: q.coins };
     },
 
     stats,
