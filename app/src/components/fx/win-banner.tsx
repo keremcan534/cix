@@ -3,11 +3,12 @@
 // Visual only (pointerEvents none): it never covers controls for long and never touches the mic or seats.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { NEWS_TTL_MS, shiftWinNews, useWinNews, type WinNews } from '@/lib/broadcast';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const HOLD_MS = 3400;
@@ -67,7 +68,7 @@ function Banner({ news, top, still }: { news: WinNews; top: number; still?: bool
       <Animated.View style={{ opacity: enter, transform: [{ translateY }, { scale }] }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         <LinearGradient colors={['#4A2A00', '#7A4A00', '#5B1F4F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
           {!still && <Animated.View style={[s.sweep, { transform: [{ translateX: sweepX }, { rotate: '18deg' }] }]} />}
-          {news.avatar ? <Image source={{ uri: news.avatar }} style={s.avatar} /> : <Text style={s.avatarEmoji}>🎉</Text>}
+          {news.avatar ? <Photo uri={news.avatar} kind="face" style={s.avatar} /> : <Text style={s.avatarEmoji}>🎉</Text>}
           <View style={{ flexShrink: 1 }}>
             <Text style={s.title} numberOfLines={1}>
               {news.userName} kazandı!

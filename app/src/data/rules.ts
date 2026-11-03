@@ -28,6 +28,7 @@ export type Rules = {
   roomEventBonus: number;
   bonusCapPerWeek: number; // diamonds, per user
   minWithdrawDiamonds: number;
+  exchangeMinDiamonds: number; // smallest diamond amount anyone may turn into coins (Gelir > Çevir)
   inviteUnitsPerPurchase: number;
   inviteIncomeShare: number; // share of an invited friend's income, paid by the platform
   inviteRechargeShare: number; // share of an invited friend's recharges, paid by the platform
@@ -68,6 +69,7 @@ export const DEFAULT_RULES: Rules = {
   roomEventBonus: 0.02,
   bonusCapPerWeek: 500_000,
   minWithdrawDiamonds: 50_000,
+  exchangeMinDiamonds: 100,
   inviteUnitsPerPurchase: 1,
   inviteIncomeShare: 0.08,
   inviteRechargeShare: 0.04,
@@ -113,11 +115,11 @@ export const familyLevel = (xp: number) => {
   return lvl;
 };
 export const FAMILY_PERKS = [
-  { from: 1, to: 3, text: 'Aile sohbeti, temel aile rozeti, aktif üye listesi' },
-  { from: 4, to: 6, text: 'Gelişmiş aile profili, haftalık hedefler, ek aile görselleri' },
-  { from: 7, to: 9, text: 'Özel aile temaları, gelişmiş istatistikler, etkinlik araçları' },
-  { from: 10, to: 12, text: 'Daha yüksek üye kapasitesi, gelişmiş aile sıralaması, özel rozetler' },
-  { from: 13, to: 15, text: 'Seçkin aile görselleri, gelişmiş raporlar, en yüksek bonus oranları' },
+  { from: 1, to: 3, text: 'Tayfa sohbeti, temel tayfa rozeti, aktif üye listesi' },
+  { from: 4, to: 6, text: 'Gelişmiş tayfa profili, haftalık hedefler, ek tayfa görselleri' },
+  { from: 7, to: 9, text: 'Özel tayfa temaları, gelişmiş istatistikler, etkinlik araçları' },
+  { from: 10, to: 12, text: 'Daha yüksek üye kapasitesi, gelişmiş tayfa sıralaması, özel rozetler' },
+  { from: 13, to: 15, text: 'Seçkin tayfa görselleri, gelişmiş raporlar, en yüksek bonus oranları' },
 ];
 export const familyCapacity = (level: number) => 50 + (level - 1) * 25;
 /** Weekly family bonus = eligible family earnings × level rate; distributed by contribution. */

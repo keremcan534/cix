@@ -5,6 +5,7 @@
 //   GET  /api/ledger                                            → { rows }
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
 //   POST /api/wallet/gift       { to, amount, ref } (test only) → { user, replay }
+//   POST /api/wallet/exchange   { diamonds, ref }             → { user, replay, coins }
 // Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
 // purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
@@ -14,6 +15,7 @@ import http from 'node:http';
 
 import { adminRoutes } from './admin.mjs';
 import { authRoutes } from './auth.mjs';
+import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { HttpError, allow, auth, db, env, int, migrate, move, once, readJson, selfUser, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { liveRoutes } from './live.mjs';
@@ -39,6 +41,8 @@ const STARTED = Date.now();
 const TOPUP_PACKS = [1000, 5000, 10000];
 const TOPUP_DAILY = 50000;
 const GIFT_MAX = 1_000_000;
+/** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
+const EXCHANGE_MAX = 1_000_000_000;
 /**
  * Web origins allowed to call this: the dev server, the GitHub Pages preview, and the exact origins in
  * ALLOWED_ORIGINS (comma separated, e.g. the product's own domain). Native apps send no Origin.
@@ -112,6 +116,26 @@ const walletRoutes = {
       await move(c, u.id, 'coin', -n, 'Hediye gönderildi', ref, to);
       await move(c, to, 'diamond', n, 'Hediye alındı', `${ref}-in`, u.id);
     });
+  },
+
+  /**
+   * Gelir > Çevir: the user's own diamonds become coins at the server's rate (catalog.mjs exchangeCoins). The
+   * client sends only the diamond amount; the coins are worked out here. Both moves share one transaction and
+   * the ref, so a retry is applied once and a short balance (409) changes nothing.
+   */
+  async 'POST /api/wallet/exchange'(req) {
+    const u = await auth(req);
+    const { diamonds, ref } = await readJson(req);
+    const n = int(diamonds, EXCHANGE.minDiamonds, EXCHANGE_MAX);
+    if (!n) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas çevrilebilir`);
+    const coins = exchangeCoins(n);
+    const r = await once(u.id, 'diamond', ref, async (c) => {
+      // Coins first: a second copy of the same request waits on the row, then hits the unique ledger ref
+      // (a replay) instead of the diamond balance check (a false "not enough").
+      await move(c, u.id, 'coin', coins, 'Elmastan çevrildi', ref);
+      await move(c, u.id, 'diamond', -n, 'Jetona çevrildi', ref);
+    });
+    return { ...r, coins };
   },
 };
 

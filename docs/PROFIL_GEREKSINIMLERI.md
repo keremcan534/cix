@@ -47,7 +47,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Takipçi / takip sayısı | 2 | ✓ | Diğer kullanıcılarda sayılar örnek veri. |
 | Arkadaş sayısı | 2 | 🆕 | Arkadaş = karşılıklı takip. Ayrı bir istek sistemi için 3. bölümdeki ürün kararına bak. |
 | Profil ziyaretçileri | 2 | ✓ | *Mesajlar → Profilimi kimler ziyaret etti* (VIP ayrıcalığı). |
-| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Kabile* kartları; ajans ve kabile adı ayrıca adın altında küçük etiket olarak görünür (Profil sekmesinde de). Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya kabilesi olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Kabilesi yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/kabileyi gösteriyorsa bağlantı vardır. |
+| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Tayfa* kartları; ajans ve tayfa adı ayrıca adın altında küçük etiket olarak görünür (Profil sekmesinde de). Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya tayfası olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Tayfası yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/tayfayı gösteriyorsa bağlantı vardır. |
 | Rozetler ve başarılar | 2 | ✓ | *Onur* sekmesi: madalyalar, unvanlar, hediye duvarı, koleksiyonlar. |
 
 ## 2-D. Görseller ve kişiselleştirme
@@ -57,7 +57,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Fotoğraf ekleme / değiştirme | 2 | 🆕 | Yukarıdaki profil fotoğrafı maddesine bak. |
 | Fotoğraf albümü | 2 | 🆕 yükleme | *Albüm*: en fazla 6 fotoğraf eklenip kaldırılabilir, paylaşılan anlardaki fotoğraflar da burada görünür. |
 | Profil çerçevesi | 2 | ✓ | Mağazadan alınan, hareketli çerçeveler dahil. |
-| Seviye ve seviye görseli | 2 | ✓ | Servet ve çekicilik seviye rozetleri. |
+| Seviye ve seviye görseli | 2 | ✓ | Cömertlik ve Yankı seviye rozetleri. |
 | Özel unvan / rozet | 2 | ✓ | VIP unvanı, *Onur* sekmesindeki unvanlar. |
 | Profil teması | **4** | — | Ürün kararı gerekiyor: temalar ücretli mi olacak (mağaza/VIP), yoksa herkese açık mı? Karar verilince kapak rengi ve arka plan teması eklenebilir. |
 
@@ -67,7 +67,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 |---|---|---|---|
 | Jeton / elmas bakiyesi (yalnızca sahibine) | 2 | 🆕 profilde | Kendi profilinde kilitli **"Yalnızca sen görürsün"** kartı: jeton, elmas, VIP. Başkasının profilinde hiçbir bakiye görünmez. |
 | Kullanıcı seviyesi | 2 | ✓ | |
-| Toplam XP | 2 | 🆕 profilde | Servet XP (geçerli harcama) ve Çekicilik XP (alınan elmas) gösteriliyor; ayrıntısı *Kullanıcı Seviyesi* ekranında. |
+| Toplam XP | 2 | 🆕 profilde | Cömertlik XP (geçerli harcama) ve Yankı XP (alınan elmas) gösteriliyor; ayrıntısı *Kullanıcı Seviyesi* ekranında. |
 | Hediye gönderme / alma istatistiği | 2 | 🆕 sahibine | "X gönderdin, Y aldın". Başkalarına sadece alınan hediye sayısı (*Hediye*) görünür. |
 | VIP durumu | 2 | ✓ | VIP rozeti herkese görünür. |
 | VIP bitiş tarihi (yalnızca sahibine) | 2 | 🆕 | Özel kartta "VIP bitişi: GG.AA.YYYY". |

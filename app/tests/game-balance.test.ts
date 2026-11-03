@@ -4,7 +4,10 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getGames, playCasino, playDuel, resetGames, setGameDeps, setProviderStatus, updateCasino } from '@/lib/games';
+import { CASINO_GAMES, MIN_STAKE } from '@/data/games';
+import { BOARDS } from '@/lib/board-games';
+import { PICKS, maxMultiplier } from '@/lib/casino-odds';
+import { POOL_SEED, getGames, playCasino, playDuel, resetGames, setGameDeps, setProviderStatus, updateCasino } from '@/lib/games';
 
 let wallet = 0;
 let game = 0;
@@ -37,26 +40,26 @@ describe('Oyun bakiyesi', () => {
   test('kazanç oyun bakiyesine yazılır, cüzdana değil', () => {
     deps(1_000, 0);
     forceRandom(0.9995);
-    const r = playCasino('wheel', 100, '', profile, 'req-test-1');
+    const r = playCasino('wheel', 250, '', profile, 'req-test-1');
     assert.equal(r.ok, true);
-    assert.equal(wallet, 900, 'bahis cüzdandan');
-    assert.equal(game, 2_000, '20x kazanç oyun bakiyesine');
+    assert.equal(wallet, 750, 'bahis cüzdandan');
+    assert.equal(game, 5_000, '20x kazanç oyun bakiyesine');
   });
 
   test('bahis önce oyun bakiyesinden düşer, yetmeyen kısım cüzdandan', () => {
     deps(1_000, 30);
     forceRandom(0);
-    playCasino('wheel', 100, '', profile, 'req-test-2');
-    assert.deepEqual([game, wallet], [0, 930]);
+    playCasino('wheel', 250, '', profile, 'req-test-2');
+    assert.deepEqual([game, wallet], [0, 780]);
   });
 
   test('yalnız oyun bakiyesiyle de oynanır; toplam yetmezse tur reddedilir ve hiçbir şey düşmez', () => {
-    deps(0, 100);
+    deps(0, 250);
     forceRandom(0);
-    assert.equal(playCasino('wheel', 100, '', profile, 'req-test-3').ok, true);
+    assert.equal(playCasino('wheel', 250, '', profile, 'req-test-3').ok, true);
     assert.equal(game, 0);
     deps(20, 30);
-    const r = playCasino('wheel', 100, '', profile, 'req-test-4');
+    const r = playCasino('wheel', 250, '', profile, 'req-test-4');
     assert.equal(r.ok, false);
     assert.deepEqual([wallet, game], [20, 30]);
   });
@@ -64,7 +67,7 @@ describe('Oyun bakiyesi', () => {
   test('sağlayıcı hatasında bahis geldiği yere iade edilir', () => {
     deps(1_000, 40);
     setProviderStatus('wheel', 'error');
-    const r = playCasino('wheel', 100, '', profile, 'req-test-5');
+    const r = playCasino('wheel', 250, '', profile, 'req-test-5');
     assert.equal(r.ok, false);
     assert.deepEqual([wallet, game], [1_000, 40]);
   });
@@ -72,10 +75,10 @@ describe('Oyun bakiyesi', () => {
   test('kasa defteri: oynananın %60’ı kasaya, kazanç havuzdan', () => {
     deps(1_000, 0);
     forceRandom(0.9995);
-    playCasino('wheel', 100, '', profile, 'req-test-6');
+    playCasino('wheel', 250, '', profile, 'req-test-6');
     const b = getGames().bank;
-    assert.deepEqual([b.wagered, b.house, b.paid], [100, 60, 2_000]);
-    assert.equal(b.pool, b.seed + 40 - 2_000);
+    assert.deepEqual([b.wagered, b.house, b.paid], [250, 150, 5_000]);
+    assert.equal(b.pool, b.seed + 100 - 5_000);
   });
 
   test('oda Zar Düellosu kazancı da oyun bakiyesine', () => {
@@ -86,5 +89,33 @@ describe('Oyun bakiyesi', () => {
     const r = playDuel(100);
     assert.ok(r.ok);
     assert.deepEqual([wallet, game], [400, 240]);
+  });
+});
+
+describe('Bahis kademeleri', () => {
+  test('hiçbir oyun 250 jetondan az bahis almaz; kademeler artan sırada', () => {
+    for (const g of CASINO_GAMES) {
+      assert.equal(g.bets[0], MIN_STAKE, `${g.id} en düşük bahis`);
+      assert.ok(g.bets.every((b, i) => i === 0 || b > g.bets[i - 1]), `${g.id} sırası`);
+      assert.ok(g.bets.every((b) => [250, 500, 1_000, 5_000, 10_000, 25_000].includes(b)), `${g.id} yalnız izinli tutarlar`);
+    }
+  });
+
+  test('en yüksek bahsin en büyük ödülü açılış havuzuna sığar (roket: oyuncunun seçtiği çarpan hariç)', () => {
+    for (const g of CASINO_GAMES) {
+      if (g.id === 'rocket') continue;
+      const picks = BOARDS[g.id] ? BOARDS[g.id].options.map((o) => o.id) : PICKS[g.id];
+      const top = Math.max(...picks.map((p) => maxMultiplier(g.id, p)));
+      const stake = g.bets[g.bets.length - 1];
+      assert.ok(stake * top <= POOL_SEED, `${g.id}: ${stake} × ${top} > ${POOL_SEED}`);
+    }
+  });
+
+  test('günlük limit en yüksek bahisle en az bir tura izin verir; 250 altı bahis reddedilir', () => {
+    for (const g of CASINO_GAMES) assert.ok(g.dailyLimit >= g.bets[g.bets.length - 1], g.id);
+    deps(1_000, 0);
+    const r = playCasino('wheel', 100, '', profile, 'req-stake-low');
+    assert.equal(r.ok, false);
+    assert.equal(wallet, 1_000, 'hiçbir şey düşmedi');
   });
 });

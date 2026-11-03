@@ -2,6 +2,8 @@
 
 Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir görsel**. Liste kodun taranmasıyla çıkarıldı (uygulamada 1.398 emoji kullanımı, 330 farklı emoji). Aynı görselin birden çok yerde kullanıldığı durumlarda tek satır ve tek dosya adı var.
 
+**Ad değişikliği notu:** Bu liste teslim edilen dosyaların kaydıdır; dosya adları ve görsel tarifleri teslim anındaki haliyle kalır. Ekrandaki adlar değişti: SVIP → İnci, Asil → Rütbe (Gemici, Dümenci, Lostromo, Amiral, Kaptan-ı Derya), Kabile/Aile → Tayfa, Patron koltuğu → Dümen koltuğu, Lucky → Uğurlu, CP → İkili, Casino → Oyun Salonu, Servet → Cömertlik, Cazibe → Yankı. Yeni adlara uygun görseller ayrı bir sanat listesiyle üretilecek.
+
 **Teslim durumu:** 536 görselin hepsi 512 px PNG olarak teslim alındı (iki ZIP, klasör 01–12). Tablonun "Not" sütunu her satırın durumunu söyler.
 
 - **Bölüm 1–3 (145 görsel): ✅ uygulamaya bağlandı.** Hediyeler `app/assets/gifts/192` ve `/512` (`components/GiftArt.tsx`, Lucky paketleri dahil; yönetimden eklenen yeni Lucky paketi `lucky-yeni-lucky.png` ile görünür; müzikli hediye köşesinde müzik rozeti). Efekt hediyeleri ve animasyonlar `app/assets/anim/192` ve `/512` (`components/fx/anim-art.tsx`, katalogda görsel türü `art`; kategori simgeleri animasyon yönetiminde). Tepkiler `app/assets/reactions` (`components/ReactionArt.tsx`): emoji panelinde, koltuk tepkisinde ve yalnız tepki emojisinden oluşan mesajlarda (oda, birebir ve grup sohbeti) çıkartma olarak görünür; yazıyla karışık emoji metin kalır. Paketler Unicode emojiyi saklamaya devam eder.
@@ -352,10 +354,10 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 18 | `oyun-hafiza-eslestirme.png` | Hafıza Eşleştirme | 🧩 | oyun kapak simgesi: Hafıza Eşleştirme | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 19 | `oyun-sans-carki.png` | Şans Çarkı | 🎡 | oyun kapak simgesi: Şans Çarkı | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
 | 20 | `oyun-zar-casino.png` | Zar (casino) | 🎲 | oyun kapak simgesi: Zar (casino) | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
-| 21 | `oyun-lucky-77.png` | Lucky 77 | 🎰 | oyun kapak simgesi: Lucky 77 | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
-| 22 | `oyun-dragon-tiger.png` | Dragon Tiger | 🐉 | oyun kapak simgesi: Dragon Tiger | P3 | Taslak teslim (parti 04–12) |
-| 23 | `casino-kart-ejder.png` | Ejder | 🐉 | Dragon Tiger masası: Ejder tarafı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: ejderha yerine alev simgesi, aynı görsel 2 dosyada |
-| 24 | `casino-kart-kaplan.png` | Kaplan | 🐯 | Dragon Tiger masası: Kaplan tarafı | P3 | Taslak teslim (parti 04–12) |
+| 21 | `oyun-lucky-77.png` | Gece Yarısı Çarkı | 🎰 | oyun kapak simgesi: Gece Yarısı Çarkı | P3 | ✅ 3D teslim edildi (oyun ikonları sayfası), bağlandı (`app/assets/games`, `components/GameArt.tsx`): Oyun Merkezi ve oda menüsü |
+| 22 | `oyun-dragon-tiger.png` | Ejder ile Kaplan | 🐉 | oyun kapak simgesi: Ejder ile Kaplan | P3 | Taslak teslim (parti 04–12) |
+| 23 | `casino-kart-ejder.png` | Ejder | 🐉 | Ejder ile Kaplan masası: Ejder tarafı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: ejderha yerine alev simgesi, aynı görsel 2 dosyada |
+| 24 | `casino-kart-kaplan.png` | Kaplan | 🐯 | Ejder ile Kaplan masası: Kaplan tarafı | P3 | Taslak teslim (parti 04–12) |
 | 25 | `slot-kiraz.png` | Kiraz | 🍒 | slot makinesi sembolü: Kiraz | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
 | 26 | `slot-limon.png` | Limon | 🍋 | slot makinesi sembolü: Limon | P3 | Taslak teslim (parti 04–12) |
 | 27 | `slot-uzum.png` | Üzüm | 🍇 | slot makinesi sembolü: Üzüm | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |

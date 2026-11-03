@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -15,8 +15,9 @@ import { USERS } from '@/data/mock';
 import { useMedia } from '@/lib/media';
 import { PHASE_LABEL, cancelMatch, modeLabel, priceOf, resetMatch, setScenario, startMatch, useMatch, type MatchFilter, type MatchMode, type Scenario } from '@/lib/match';
 import { useApp } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { Photo } from '@/components/photo';
 
 const FILTERS: MatchFilter[] = ['Herkes', 'Kadın', 'Erkek'];
 const SCENARIOS: [Scenario, string][] = [
@@ -27,21 +28,25 @@ const SCENARIOS: [Scenario, string][] = [
 ];
 
 export default function HemenTanis() {
-  const { me } = useApp();
+  const { me, settings } = useApp();
+  const { colors, gradient } = useTheme();
+  const s = useStyles();
   const m = useMatch();
   const media = useMedia();
   const [filter, setFilter] = useState<MatchFilter>(m.filter);
   const [showTest, setShowTest] = useState(false);
   const [spin] = useState(() => new Animated.Value(0));
   const searching = m.phase === 'searching';
+  // "Reduce motion" and "effects off" keep the radar still: fixed rings, no loop; the status line below says it is searching.
+  const still = settings.reduceMotion || settings.effectsOff;
 
   useEffect(() => {
-    if (!searching) return;
     spin.setValue(0);
+    if (!searching || still) return;
     const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1400, easing: Easing.linear, useNativeDriver: true }));
     loop.start();
     return () => loop.stop();
-  }, [searching, spin]);
+  }, [searching, still, spin]);
 
   const start = (mode: MatchMode) => {
     resetMatch();
@@ -57,7 +62,7 @@ export default function HemenTanis() {
         <View style={s.chips}>
           {FILTERS.map((f) => (
             <Pressable key={f} onPress={() => setFilter(f)} style={[s.chip, filter === f && s.chipOn]} disabled={searching || pending}>
-              <Text style={[s.chipText, filter === f && { color: '#fff' }]}>{f}</Text>
+              <Text style={[s.chipText, filter === f && s.chipTextOn]}>{f}</Text>
             </Pressable>
           ))}
         </View>
@@ -68,20 +73,30 @@ export default function HemenTanis() {
           ) : (
             <View style={{ alignItems: 'center', justifyContent: 'center', width: 240, height: 240 }}>
               {searching &&
-                [0, 1, 2].map((i) => (
-                  <Animated.View
-                    key={i}
-                    style={[
-                      s.radar,
-                      {
-                        opacity: spin.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }),
-                        transform: [{ scale: spin.interpolate({ inputRange: [0, 1], outputRange: [0.5 + i * 0.25, 1.3 + i * 0.25] }) }],
-                      },
-                    ]}
-                  />
-                ))}
+                [0, 1, 2].map((i) =>
+                  still ? (
+                    <View key={i} style={[s.radar, { opacity: 0.5 - i * 0.15, transform: [{ scale: 0.6 + i * 0.2 }] }]} />
+                  ) : (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        s.radar,
+                        {
+                          opacity: spin.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }),
+                          transform: [{ scale: spin.interpolate({ inputRange: [0, 1], outputRange: [0.5 + i * 0.25, 1.3 + i * 0.25] }) }],
+                        },
+                      ]}
+                    />
+                  ),
+                )}
               <LinearGradient colors={gradient} style={s.meRing}>
-                <Image source={{ uri: me.avatar }} style={s.meAvatar} />
+                {me.avatar ? (
+                  <Photo uri={me.avatar} kind="face" style={s.meAvatar} />
+                ) : (
+                  <View style={[s.meAvatar, s.meInitial]}>
+                    <Text style={s.meInitialText}>{me.name.trim().charAt(0).toLocaleUpperCase('tr-TR') || '?'}</Text>
+                  </View>
+                )}
               </LinearGradient>
             </View>
           )}
@@ -127,7 +142,7 @@ export default function HemenTanis() {
             <View style={s.chips}>
               {SCENARIOS.map(([k, l]) => (
                 <Pressable key={k} onPress={() => setScenario(k)} style={[s.chip, m.scenario === k && s.chipOn]}>
-                  <Text style={[s.chipText, m.scenario === k && { color: '#fff' }]}>{l}</Text>
+                  <Text style={[s.chipText, m.scenario === k && s.chipTextOn]}>{l}</Text>
                 </Pressable>
               ))}
             </View>
@@ -155,6 +170,8 @@ export default function HemenTanis() {
 }
 
 function StartButton({ mode, onPress }: { mode: MatchMode; onPress: () => void }) {
+  const { semantic, gradient } = useTheme();
+  const s = useStyles();
   const video = mode === 'video';
   return (
     <Pressable onPress={onPress} style={{ flex: 1 }} accessibilityLabel={`${modeLabel(mode)} başlat`}>
@@ -167,24 +184,27 @@ function StartButton({ mode, onPress }: { mode: MatchMode; onPress: () => void }
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border },
-  chipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.15)' },
+  chipOn: { borderColor: dark ? semantic.action : semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
+  chipTextOn: { color: colors.text },
   stage: { alignItems: 'center', gap: 10, minHeight: 280, justifyContent: 'center' },
   radar: { position: 'absolute', width: 240, height: 240, borderRadius: 120, borderWidth: 2, borderColor: semantic.action },
   meRing: { width: 120, height: 120, borderRadius: 60, padding: 4 },
   meAvatar: { flex: 1, borderRadius: 60, borderWidth: 3, borderColor: colors.bg },
+  meInitial: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  meInitialText: { color: colors.primaryText, fontSize: 44, fontWeight: '800' },
   status: { color: colors.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 },
   start: { borderRadius: 20, paddingVertical: 18, alignItems: 'center', gap: 4 },
   startTitle: { color: '#fff', fontWeight: '900', fontSize: 16 },
   startSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
-  cancel: { backgroundColor: colors.card, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
-  cancelText: { color: '#fff', fontWeight: '800' },
+  cancel: { backgroundColor: colors.card, borderRadius: 999, paddingVertical: 14, alignItems: 'center', ...lift },
+  cancelText: { color: colors.text, fontWeight: '800' },
   hint: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 17 },
-  card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: colors.border },
+  card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, gap: 6, ...(dark ? { borderWidth: 1, borderColor: colors.border } : lift) },
   cardTitle: { color: colors.text, fontWeight: '900', fontSize: 15, marginBottom: 2 },
   line: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
   testToggle: { color: semantic.tonalText, fontWeight: '800', textAlign: 'center' },
-});
+}));

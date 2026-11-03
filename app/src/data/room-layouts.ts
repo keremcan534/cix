@@ -1,8 +1,8 @@
-// Mic layout catalog ("Yayına Katılma Modu"). Modes and layouts are DATA: a new layout is one more line in
+// Mic layout catalog ("Sahne Düzeni"). Modes and layouts are DATA: a new layout is one more line in
 // LAYOUT_SPECS (or one more RoomLayout object from a panel) — no screen code changes. The renderer
 // (components/room/stage-layout) draws any schema; the domain (lib/room-modes) validates every change.
 //
-// Starting data follows the reference screens. Room levels are the starting values and use the room's own
+// Similar Club stage layouts. Room levels are the starting values and use the room's own
 // level (1–15, data/catalog roomLevel); "locked" is not stored, it is the room level being below
 // minimumRoomLevel (or a feature the room doesn't have).
 

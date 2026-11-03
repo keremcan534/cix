@@ -42,8 +42,9 @@ import {
   watchOkey,
 } from '@/lib/okey-table';
 import { tapHaptic } from '@/lib/haptics';
-import { useApp } from '@/store';
+import { useSettings } from '@/store';
 import { colors, fonts, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const INK = ['#D99A00', '#1E6FD9', '#1C2433', '#D93A45'];
 const FELT = ['#0E5A5E', '#0A3C47', '#08283A'] as const;
@@ -53,7 +54,7 @@ const TW = 23;
 const TH = 33;
 
 export function OkeyTable({ roomId, me, crowd }: { roomId: string; me: Player; crowd: Player[] }) {
-  const { settings } = useApp();
+  const settings = useSettings();
   const [viewer] = useState<SeatHolder>(() => ({ id: viewerKey(me.id), name: me.name, avatar: me.avatar, bot: false }));
   const table = useOkeyTable(roomId);
   const [note, setNote] = useState('');
@@ -310,7 +311,7 @@ function SeatChip({
           <Text style={{ fontSize: 15 }}>🤖</Text>
         </View>
       ) : (
-        <Image source={{ uri: h.avatar }} style={s.av} />
+        <Photo uri={h.avatar} kind="face" style={s.av} />
       )}
       <View style={{ flexShrink: 1 }}>
         <Text style={s.seatName} numberOfLines={1}>

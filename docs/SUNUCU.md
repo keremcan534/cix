@@ -20,7 +20,7 @@
 | Çağrı | Ne yapar |
 |---|---|
 | `GET /api/health` | Herkese açık: veritabanı yanıt veriyor mu, çalışan sürüm (commit), açık kalma süresi. Veritabanı yoksa 503. |
-| `GET /api/me` | Hesap ve bakiyeler (jeton, elmas, oyun bakiyesi), telefon, SVIP puanı |
+| `GET /api/me` | Hesap ve bakiyeler (jeton, elmas, oyun bakiyesi), telefon, İnci puanı |
 | `GET /api/ledger` | Son 50 işlem, her satırda işlem sonrası bakiye |
 | `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 jeton, günde en fazla 50.000. |
 | `POST /api/wallet/gift` `{to, amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): serbest miktarlı aktarım (Sunucu hesabı ekranı). Gerçek hediye `/api/gifts/send`. |
@@ -38,10 +38,10 @@ SMS sağlayıcısı `.env` içinde `SMS_PROVIDER`: `netgsm` (Netgsm REST v2, `NE
 **Hediye, sıralama, satın alma (`gifts.mjs`, `catalog.mjs`, `purchases.mjs`)**
 | Çağrı | Ne yapar |
 |---|---|
-| `GET /api/catalog` | Herkese açık: hediyeler (ad, fiyat, kategori, SVIP sınırı), adetler, jeton paketleri, SVIP eşikleri. Uygulamadaki veriyle aynı olduğu `app/tests/server-catalog.test.ts` ile denetlenir. |
-| `POST /api/gifts/send` `{to, giftId, count, room?, ref}` | Fiyatı sunucu belirler; uygulama yalnız hangi hediye ve kaç adet olduğunu söyler. Jeton → alıcıya bire bir elmas, tek işlemde. SVIP sınırlı hediyeler kontrol edilir. Oda dışındaki hediyede alıcıya bildirim gider. |
-| `GET /api/rankings?board=wealth\|charm&period=day\|week\|month` | Servet (gönderilen) ve cazibe (alınan) sıralaması, Türkiye saatine göre gün/hafta/ay, ilk 50 |
-| `POST /api/wallet/purchase` | Mağaza satın alımı: Google Play (`token`, hizmet hesabıyla Play Developer API) veya App Store (`transactionId`, App Store Server API, önce üretim sonra sandbox). Her makbuz bir kez yüklenir; başka hesapta kullanılmış makbuz reddedilir; paketin ilk alımında ilk alım hediyesi eklenir; alınan jeton SVIP puanı olur. Play ürünü tüketilir, paket tekrar alınabilir. Ürün kimlikleri `coins_<jeton>` (ör. `coins_1000`). |
+| `GET /api/catalog` | Herkese açık: hediyeler (ad, fiyat, kategori, İnci sınırı), adetler, jeton paketleri, İnci eşikleri. Uygulamadaki veriyle aynı olduğu `app/tests/server-catalog.test.ts` ile denetlenir. |
+| `POST /api/gifts/send` `{to, giftId, count, room?, ref}` | Fiyatı sunucu belirler; uygulama yalnız hangi hediye ve kaç adet olduğunu söyler. Jeton → alıcıya bire bir elmas, tek işlemde. İnci sınırlı hediyeler kontrol edilir. Oda dışındaki hediyede alıcıya bildirim gider. |
+| `GET /api/rankings?board=wealth\|charm&period=day\|week\|month` | Cömertlik (gönderilen) ve Yankı (alınan) sıralaması, Türkiye saatine göre gün/hafta/ay, ilk 50 |
+| `POST /api/wallet/purchase` | Mağaza satın alımı: Google Play (`token`, hizmet hesabıyla Play Developer API) veya App Store (`transactionId`, App Store Server API, önce üretim sonra sandbox). Her makbuz bir kez yüklenir; başka hesapta kullanılmış makbuz reddedilir; paketin ilk alımında ilk alım hediyesi eklenir; alınan jeton İnci puanı olur. Play ürünü tüketilir, paket tekrar alınabilir. Ürün kimlikleri `coins_<jeton>` (ör. `coins_1000`). |
 
 **Bildirim, yükleme, ses (`push.mjs`, `media.mjs`, `live.mjs`)**
 | Çağrı | Ne yapar |
@@ -93,7 +93,7 @@ Kod değişince: `scp -r -i ~/.ssh/oracle.key server/api ubuntu@130.61.230.94:/o
 ## Uygulama bağlantısı
 - `app/.env.local`: `EXPO_PUBLIC_API_URL=https://130-61-230-94.sslip.io` ve `EXPO_PUBLIC_LIVEKIT_URL=wss://130-61-230-94.sslip.io`. Bu dosya git'e girmez; yoksa uygulama tamamen yerel prototip verisiyle çalışır. GitHub Pages yayınında açmak için değişkenlerin derlemeye verilmesi gerekir.
 - `lib/api.ts`: giriş (cihaz anahtarı ve oturum AsyncStorage'da), bakiye, işlem kaydı, test yüklemesi, hediye, ses token'ı.
-- Ayarlar → **Sunucu hesabı** (`app/sunucu-hesabi.tsx`): sunucudaki hesap, bakiye ve işlem kaydı; test yüklemesi ve hesap kimliğiyle hediye gönderme. Uygulamanın diğer ekranları (cüzdan, hediye paneli, casino) **henüz yerel bakiyeyi kullanıyor**.
+- Ayarlar → **Sunucu hesabı** (`app/sunucu-hesabi.tsx`): sunucudaki hesap, bakiye ve işlem kaydı; test yüklemesi ve hesap kimliğiyle hediye gönderme. Uygulamanın diğer ekranları (cüzdan, hediye paneli, Oyun Salonu) **henüz yerel bakiyeyi kullanıyor**.
 - Ses (web): `lib/voice-setup.web.ts` gerçek motoru (`lib/livekit-engine.ts`, `livekit-client`) takar; ilk odada cihaz sunucuya giriş yapar, odaya hesap kimliğiyle katılır. Oda adı LiveKit'te `oda-<oda id>`.
 - Native: ses henüz simülasyon. `@livekit/react-native` + config plugin + development build gerekiyor (`docs/ODA_OTURUMU.md`).
 

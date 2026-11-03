@@ -1,6 +1,6 @@
 // Two independent game catalogs (Oyun Merkezi spec §6):
 //  - Oda oyunları: free for everyone, played with people in the room; VIP never required.
-//  - Casino (VIP2): chance games, minimum VIP level per game (default 2), opened from the profile's
+//  - Oyun Salonu (VIP2): chance games, minimum VIP level per game (default 2), opened from the profile's
 //    Oyun Merkezi or from inside a room. Both entry points use the same platform (lib/games.ts).
 // Every value here is a default the admin screen (oyun-yonetimi) can change. Provider names are
 // placeholders until the provider/licence research (spec §7) is done.
@@ -33,7 +33,7 @@ export type CasinoGame = {
   emoji: string;
   provider: string;
   active: boolean;
-  /** Minimum Servet Seviyesi (wealth level) to play. */
+  /** Minimum Cömertlik level (wealth level) to play. */
   minWealth: number;
   fromProfile: boolean;
   fromRoom: boolean;
@@ -63,7 +63,6 @@ export const ROOM_GAMES: RoomGame[] = [
     vipRequired: false,
     playable: true,
     leaderboard: true,
-    note: 'UNO benzeri mekanik, özgün ad ve tasarım (UNO lisansı alınmadan marka kullanılmaz).',
   },
   {
     id: 'okey',
@@ -94,7 +93,27 @@ export const ROOM_GAMES: RoomGame[] = [
   { id: 'memory', name: 'Hafıza Eşleştirme', emoji: '🧩', provider: 'Yerleşik', version: '—', active: false, phase: 2, minPlayers: 1, maxPlayers: 4, startBy: 'anyone', joinAfterStart: false, roundSeconds: 180, vipRequired: false, playable: false, leaderboard: true },
 ];
 
-// Casino catalog from the client's reference screens. The older games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın Kasa) stay
+/** No coin game takes less than this per round. */
+export const MIN_STAKE = 250;
+/**
+ * Stake ladders by a game's structure. The higher a game's top multiplier, the lower its top stake, so the
+ * biggest prize of the biggest stake always fits in the opening prize pool (lib/games POOL_SEED; checked by
+ * tests/game-balance): low-multiplier games go up to 25.000, very high-multiplier slots stop at 1.000.
+ */
+export const STAKES = {
+  /** Top multiplier up to ~80 (bet boards, wheels, dice, the rocket whose target the player picks). */
+  wide: [MIN_STAKE, 500, 1_000, 5_000, 10_000, 25_000],
+  /** Top multiplier up to ~200. */
+  high: [MIN_STAKE, 500, 1_000, 5_000, 10_000],
+  /** Top multiplier up to ~400. */
+  mid: [MIN_STAKE, 500, 1_000, 5_000],
+  /** Top multiplier above 400. */
+  base: [MIN_STAKE, 500, 1_000],
+} as const satisfies Record<string, readonly number[]>;
+/** Daily per-game ceiling: forty rounds at the game's top stake. */
+const dailyFor = (bets: readonly number[]) => 40 * bets[bets.length - 1];
+
+// Oyun Salonu kataloğu. The older games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın Kasa) stay
 // in the catalog switched off; the admin screen can turn them back on.
 export const CASINO_GAMES: CasinoGame[] = [
   {
@@ -106,8 +125,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [100, 1_000, 10_000, 100_000],
-    dailyLimit: 1_000_000,
+    bets: [...STAKES.wide],
+    dailyLimit: dailyFor(STAKES.wide),
     rules: 'Fişini Karpuz (x2), 77 (x8) veya Elma (x2) üzerine koy; aynı turda birden fazlasına oynayabilirsin. Çark 20 dilimli: 4 Karpuz, 4 Elma, 1 77, 6 Limon, 5 Üzüm; Limon ve Üzüm kimseye ödemez. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -121,24 +140,24 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 20, 50, 90, 100, 200],
-    dailyLimit: 10_000,
+    bets: [...STAKES.wide],
+    dailyLimit: dailyFor(STAKES.wide),
     rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 77 her sembolün yerine geçer. Bir çizgide beş 77 JACKPOT kazandırır: bahsin / en yüksek bahis kadar JACKPOT payı. Her bahsin %2’si JACKPOT’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
   {
     id: 'olympus',
-    name: 'Şimşek Dağı',
-    emoji: '⚡',
+    name: 'Fener Kayalığı',
+    emoji: '🔦',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 20, 50, 100],
-    dailyLimit: 10_000,
-    rules: '6 makara, 5 sıra; semboller ekranın her yerinde öder: aynı sembolden 8 veya daha fazla kazandırır. Çarpan küreleri toplanır ve dönüşün kazancını çarpar. 4 veya daha fazla ⚡ Zeus 10 bedava dönüş verir. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    bets: [...STAKES.base],
+    dailyLimit: dailyFor(STAKES.base),
+    rules: '5×4 deniz. Gemiler yükleriyle (bahsin 0,1 ile 50 katı) denize düşer; fener sıraları tarar ve birinde durur. Işıktaki gemilerin yükleri toplanır ve ışığın parlaklığıyla (×1, ×2, ×3, ×5) çarpılır. 3 veya daha fazla kandil Fırtına Gecesi’ni başlatır: 6 dönüş boyunca ışık iki sırayı birden tarar ve her dönüşte bir kat daha parlar. Bir turda en fazla bahsin 500 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
@@ -151,8 +170,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 20, 50, 100, 200],
-    dailyLimit: 20_000,
+    bets: [...STAKES.high],
+    dailyLimit: dailyFor(STAKES.high),
     rules: 'Bir balığa dokun, top ateş eder: her atış bir turdur ve bahis kadar jeton düşer. Balık yakalanırsa üstündeki çarpan kadar öder (2x–100x); büyük balık daha zor yakalanır. Boşa giden atış ücretsizdir. Dondurma ve kilit kartları yalnızca nişanı kolaylaştırır, şansı değiştirmez. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -166,8 +185,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [100, 1_000, 10_000, 100_000],
-    dailyLimit: 1_000_000,
+    bets: [...STAKES.wide],
+    dailyLimit: dailyFor(STAKES.wide),
     rules: 'Kaçış çarpanını seç ve roketi fırlat. Roket o çarpana patlamadan ulaşırsa bahsin o katını kazanırsın; önce patlarsa bahis gider. Patlama noktası fırlatmadan önce sunucuda belirlenir. Yüksek çarpana ulaşmak zordur: x çarpanına ulaşma şansı en fazla 0,4 / x. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -181,8 +200,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 50, 100, 500, 1_000],
-    dailyLimit: 50_000,
+    bets: [...STAKES.high],
+    dailyLimit: dailyFor(STAKES.high),
     rules: '3 makara, 3 sıra, 5 çizgi (üç sıra ve iki çapraz). Bir çizgide üç aynı sembol kazandırır; üç 7 en büyük ödüldür. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -196,8 +215,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [15, 30, 90, 150, 300],
-    dailyLimit: 50_000,
+    bets: [...STAKES.mid],
+    dailyLimit: dailyFor(STAKES.mid),
     rules: '5 makara, 3 sıra, 15 çizgi. Soldan başlayan 3, 4 veya 5 aynı sembol kazandırır; 🦁 Aslan her sembolün yerine geçer. Bir çizgide beş Aslan JACKPOT kazandırır: bahsin / en yüksek bahis kadar pay. Her bahsin %2’si JACKPOT’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -211,23 +230,23 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 50, 100, 500, 1_000],
-    dailyLimit: 50_000,
+    bets: [...STAKES.high],
+    dailyLimit: dailyFor(STAKES.high),
     rules: '3 makara, orta çizgi öder: üç Altın Ağaç 188x, üç kırmızı para 58x, üç mavi 28x, üç yeşil 18x, ilk makarada ağaç ve iki para 8x, herhangi üç para 2x. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
   {
     id: 'foodwheel',
-    name: 'Tatlı Tezgâh',
+    name: 'Liman Pazarı',
     emoji: '🎡',
     provider: 'Yerleşik (sunucu RNG)',
     active: true,
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [100, 1_000, 10_000, 100_000],
-    dailyLimit: 1_000_000,
+    bets: [...STAKES.wide],
+    dailyLimit: dailyFor(STAKES.wide),
     rules: 'Sekiz yemekten istediklerine fiş koy: sebzeler x5, Et x10, Karides x15, Balık x25, Yengeç x45. 🥗 Salata gelirse bütün sebzeler, 🍕 Pizza gelirse bütün et ve deniz ürünleri kazanır; 🍽️ Boş Tabak kimseye ödemez. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -241,8 +260,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [100, 1_000, 5_000, 10_000],
-    dailyLimit: 1_000_000,
+    bets: [...STAKES.high],
+    dailyLimit: dailyFor(STAKES.high),
     rules: 'Sekiz burç kartından istediklerine fiş koy; açılan kart üstündeki çarpan kadar öder (x4–x100). 🃏 Joker açılırsa kimse kazanmaz. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -256,8 +275,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [20, 100, 200, 500, 1_000],
-    dailyLimit: 50_000,
+    bets: [...STAKES.mid],
+    dailyLimit: dailyFor(STAKES.mid),
     rules: '5 makara, 3 sıra, 20 çizgi. Soldan başlayan 3, 4 veya 5 aynı sembol kazandırır; 🪅 Piñata her sembolün yerine geçer. Bir çizgide beş Piñata JACKPOT kazandırır: bahsin / en yüksek bahis kadar pay. Her bahsin %2’si JACKPOT’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -271,8 +290,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [20, 50, 100, 200, 500],
-    dailyLimit: 50_000,
+    bets: [...STAKES.mid],
+    dailyLimit: dailyFor(STAKES.mid),
     rules: '5 makara, 3 sıra, 20 çizgi; 🧙‍♀️ Cadı her sembolün yerine geçer. 📜 Parşömen ekranın her yerinde öder: 3 kitap MINI (bahsin 5 katı), 4 kitap MINOR (20 katı), 5 kitap MAJOR (100 katı). Bir çizgide beş Cadı GRAND JACKPOT kazandırır: bahsin / en yüksek bahis kadar pay. Her bahsin %2’si GRAND’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -286,8 +305,8 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 50, 100, 500, 1_000],
-    dailyLimit: 50_000,
+    bets: [...STAKES.high],
+    dailyLimit: dailyFor(STAKES.high),
     rules: '5 makara, 3 sıra, 10 çizgi. Soldan başlayan 3, 4 veya 5 aynı sembol kazandırır; WILD her sembolün yerine geçer. Bir çizgide beş WILD JACKPOT kazandırır: bahsin / en yüksek bahis kadar pay. Her bahsin %2’si JACKPOT’a eklenir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
@@ -301,14 +320,14 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 50, 100],
-    dailyLimit: 5000,
+    bets: [...STAKES.wide],
+    dailyLimit: dailyFor(STAKES.wide),
     rules: 'Çark 8 dilimli; dilimler 0x, 0.5x, 1x, 2x, 3x, 5x, 10x ve 20x çarpan verir. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },
-  { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'İki zar atılır. Toplam 10–12 "Büyük", 2–4 "Küçük" kazandırır (2.4x); 5–9 gelirse kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
-  { id: 'dragon', name: 'Ejder ile Kaplan', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [10, 50, 100, 500], dailyLimit: 5000, rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
+  { id: 'dice', name: 'Zar', emoji: '🎲', provider: 'Yerleşik (sunucu RNG)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [...STAKES.wide], dailyLimit: dailyFor(STAKES.wide), rules: 'İki zar atılır. Toplam 10–12 "Büyük", 2–4 "Küçük" kazandırır (2.4x); 5–9 gelirse kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Yerleşik · hukuki inceleme bekliyor' },
+  { id: 'dragon', name: 'Ejder ile Kaplan', emoji: '🐉', provider: 'Sağlayıcı (araştırılıyor)', active: false, minWealth: 2, fromProfile: true, fromRoom: true, bets: [...STAKES.wide], dailyLimit: dailyFor(STAKES.wide), rules: 'Ejder ve Kaplan birer kart açar. Seçtiğin taraf en az 4 yüksek gelirse 1.5x; beraberlik seçimi 5.2x. Fark 4’ten azsa kasa kazanır. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.', providerStatus: 'online', license: 'Sağlayıcı lisansı doğrulanmalı' },
   {
     id: 'fortune',
     name: 'Altın Kasa',
@@ -318,9 +337,9 @@ export const CASINO_GAMES: CasinoGame[] = [
     minWealth: 2,
     fromProfile: true,
     fromRoom: true,
-    bets: [10, 20, 50, 100],
-    dailyLimit: 5000,
-    rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 💰 Servet her sembolün yerine geçer (Kasa hariç). 3 veya daha fazla 🏦 Kasa 8 bedava dönüş verir, bedava dönüşlerde kazançlar 2 katı. Bir turda en fazla bahsin 850 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
+    bets: [...STAKES.base],
+    dailyLimit: dailyFor(STAKES.base),
+    rules: '5 makara, 3 sıra, 10 çizgi. Bahis çizgilere eşit bölünür; soldan başlayan 3, 4 veya 5 aynı sembol kazandırır. 💰 Kese her sembolün yerine geçer (Kasa hariç). 3 veya daha fazla 🏦 Kasa 8 bedava dönüş verir, bedava dönüşlerde kazançlar 2 katı. Bir turda en fazla bahsin 850 katı. Oynanan jetonun %60’ı kasaya kalır, %40’ı kazananlara dağılır.',
     providerStatus: 'online',
     license: 'Yerleşik · hukuki inceleme bekliyor',
   },

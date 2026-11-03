@@ -35,7 +35,7 @@ export function LuckyResult({ records, still, onDone }: { records: LuckyRecord[]
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.center]} accessibilityLiveRegion="polite">
       <Animated.View
         style={[s.card, reward ? (big ? s.cardBig : s.cardWin) : s.cardNone, { opacity: v, transform: [{ scale }] }]}
-        accessibilityLabel={reward ? `Lucky: en yüksek çarpan ${best.mult}, toplam ${reward} jeton kazandın` : 'Lucky: bu sefer ödül çıkmadı'}
+        accessibilityLabel={reward ? `Uğurlu hediye: en yüksek çarpan ${best.mult}, toplam ${reward} jeton kazandın` : 'Uğurlu hediye: bu sefer ödül çıkmadı'}
       >
         <GiftArt giftId={best.giftId} emoji={best.emoji} size={56} textStyle={s.emoji} />
         {reward ? (

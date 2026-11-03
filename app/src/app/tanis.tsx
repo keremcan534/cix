@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -15,10 +15,12 @@ import { StateIcon, VerifiedBadge } from '@/components/ui';
 import { MATCH_GRACE_SECONDS } from '@/data/economy';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { IS_DEMO } from '@/lib/build';
 import { useMedia } from '@/lib/media';
 import { PHASE_LABEL, cancelMatch, dropConnection, hangUp, modeLabel, nextMatch, priceOf, resetMatch, startMatch, useMatch } from '@/lib/match';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const REPORT_REASONS = ['Uygunsuz görüntü', 'Taciz / hakaret', 'Reşit değil', 'Dolandırıcılık', 'Sahte profil'];
@@ -103,7 +105,7 @@ export default function MatchCall() {
               {!!m.message && <Text style={s.dim}>{m.message}</Text>}
               {last && peer && (
                 <View style={s.summaryCard}>
-                  <Image source={{ uri: peer.avatar }} style={s.summaryAvatar} />
+                  <Photo uri={peer.avatar} kind="face" style={s.summaryAvatar} />
                   <Text style={s.summaryName}>{peer.name}</Text>
                   <Text style={s.dim}>
                     Süre {mmss(last.seconds)} · Ücret {last.charged} jeton
@@ -132,7 +134,7 @@ export default function MatchCall() {
     <View style={s.screen}>
       {/* Remote side: the peer's "video" (prototype: their photo) or a voice avatar. */}
       {video ? (
-        <Image source={{ uri: peer.avatar.replace('200', '800') }} style={StyleSheet.absoluteFill} />
+        <Photo uri={peer.avatar.replace('200', '800')} kind="face" style={StyleSheet.absoluteFill} />
       ) : (
         <LinearGradient colors={['#0B3B4A', colors.bg]} style={StyleSheet.absoluteFill} />
       )}
@@ -173,14 +175,14 @@ export default function MatchCall() {
               <Animated.View
                 style={[s.ring, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }] }]}
               />
-              <Image source={{ uri: peer.avatar }} style={s.voiceAvatar} />
+              <Photo uri={peer.avatar} kind="face" style={s.voiceAvatar} />
             </View>
           )}
         </View>
 
         {video && (
           <View style={s.selfView}>
-            {camOn ? <Image source={{ uri: me.avatar }} style={{ flex: 1 }} /> : <Ionicons name="videocam-off" size={26} color={colors.textDim} style={{ margin: 'auto' }} />}
+            {camOn ? <Photo uri={me.avatar} kind="face" style={{ flex: 1 }} /> : <Ionicons name="videocam-off" size={26} color={colors.textDim} style={{ margin: 'auto' }} />}
           </View>
         )}
 
@@ -206,16 +208,17 @@ export default function MatchCall() {
         title={peer.name}
         onClose={() => setSheet('none')}
         options={[
-          { label: '🚩 Şikâyet et', onPress: () => setTimeout(() => setSheet('report'), 300) },
+          { label: 'Şikâyet et', icon: 'flag-outline', onPress: () => setTimeout(() => setSheet('report'), 300) },
           {
-            label: '⛔ Engelle ve görüşmeyi bitir',
+            label: 'Engelle ve görüşmeyi bitir',
+            icon: 'ban-outline',
             destructive: true,
             onPress: () => {
               toggleBlock(peer.id);
               hangUp();
             },
           },
-          { label: '📶 Bağlantı kopmasını dene (demo)', onPress: dropConnection },
+          ...(IS_DEMO ? [{ label: 'Bağlantı kopmasını dene (demo)', icon: 'cellular-outline' as const, onPress: dropConnection }] : []),
         ]}
       />
       <ActionSheet

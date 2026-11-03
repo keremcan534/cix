@@ -9,7 +9,7 @@ export type WinNews = {
   id: string;
   userName: string;
   avatar?: string;
-  /** "Lucky › Uğur Böceği", "Oyun Merkezi › Şans Çarkı" … */
+  /** "Uğurlu › Uğur Böceği", "Oyun Merkezi › Şans Çarkı" … */
   source: string;
   roomTitle?: string;
   mult?: number;
@@ -58,9 +58,9 @@ export const roomTitleOf = (roomId: string) => (roomId === 'yeni' ? 'Benim Odam'
 
 // --- Simulated wins from other rooms (prototype only) --------------------------------------------
 const FAKE_SOURCES: { source: string; price: number; mults: number[] }[] = [
-  { source: 'Lucky › Şans Yoncası', price: 20, mults: [2, 5, 10, 20, 50, 100] },
-  { source: 'Lucky › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
-  { source: 'Lucky › Altın Nal', price: 500, mults: [2, 5, 10, 20] },
+  { source: 'Uğurlu › Şans Yoncası', price: 20, mults: [2, 5, 10, 20, 50, 100] },
+  { source: 'Uğurlu › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
+  { source: 'Uğurlu › Altın Nal', price: 500, mults: [2, 5, 10, 20] },
   { source: 'Oyun Merkezi › Şans Çarkı', price: 100, mults: [2, 3, 5, 10] },
   { source: 'Oyun Merkezi › Ejder ile Kaplan', price: 500, mults: [2, 8] },
 ];

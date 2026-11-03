@@ -1,4 +1,4 @@
-# Oyun Merkezi, Casino ve Oda İçi Oyunlar
+# Oyun Merkezi, Oyun Salonu ve Oda İçi Oyunlar
 
 Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivite Sistemi*.
 
@@ -6,19 +6,19 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 
 | Dosya | Görevi |
 |---|---|
-| `src/data/games.ts` | İki bağımsız katalog: **Oda oyunları** (ücretsiz, VIP yok) ve **Casino** (oyun başına minimum Servet Seviyesi, varsayılan Servet Lv.2). |
-| `src/lib/games.ts` | Ortak oyun platformu. Tek cüzdan (uygulamanın jeton bakiyesi), tek geçmiş. Casino turları sunucu mantığıyla işlenir. |
+| `src/data/games.ts` | İki bağımsız katalog: **Oda oyunları** (ücretsiz, VIP yok) ve **Oyun Salonu** (oyun başına minimum Cömertlik Seviyesi, varsayılan Cömertlik Lv.2). |
+| `src/lib/games.ts` | Ortak oyun platformu. Tek cüzdan (uygulamanın jeton bakiyesi), tek geçmiş. Oyun Salonu turları sunucu mantığıyla işlenir. |
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
-| `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları (UNO benzeri, özgün ad), XOX. |
+| `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları, XOX. |
 | `src/components/games/casino.tsx` | Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan. |
 | `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |
 | `src/lib/fortune-slot.ts` | Altın Kasa matematiği: makara şeritleri, ödeme tablosu, 10 çizgi, tam beklenen geri ödeme hesabı. |
-| `src/app/oyunlar.tsx` | Profildeki **Oyun Merkezi**: Casino · Oda oyunları · Geçmiş. |
+| `src/app/oyunlar.tsx` | Profildeki **Oyun Merkezi**: Oyun Salonu · Oda oyunları · Geçmiş. |
 | `src/app/oyun-yonetimi.tsx` | Yönetim paneli (`games.manage` yetkisi). |
 
 Erişim noktaları:
-- **Profil:** Ben sekmesindeki Oyun Merkezi kartı ve `/oyunlar`. Eski `/cark` bağlantısı da casino Şans Çarkı'na gider.
-- **Oda:** Menü › *Oda Oyunları · ücretsiz* ve *Casino · Servet Lv.2*.
+- **Profil:** Ben sekmesindeki Oyun Merkezi kartı ve `/oyunlar`. Eski `/cark` bağlantısı da Oyun Salonu'ndaki Şans Çarkı'na gider.
+- **Oda:** Menü › *Oda Oyunları · ücretsiz* ve *Oyun Salonu · Cömertlik Lv.2*.
 
 İki giriş noktası aynı platformu, aynı bakiyeyi ve aynı geçmişi kullanır.
 
@@ -29,11 +29,11 @@ Erişim noktaları:
 - Paneldeki mikrofon şeridi yalnızca durumu gösterir. Mikrofonu açıp kapatmak sadece kullanıcının kendi dokunuşuyla olur.
 - Oyun sesi ayrı ayarlanır (*Kapalı / Düşük / Orta / Yüksek*). Oyun sesleri sohbet sesini kısmaz.
 
-## Casino güvenliği (`playCasino`)
+## Oyun Salonu güvenliği (`playCasino`)
 
 İsteğin işlenme sırası:
 1. **Tekrar kontrolü:** Aynı istek kimliğiyle tekrar gelen istek aynı sonucu döndürür; ikinci kez jeton düşülmez.
-2. **Erişim:** Oyun aktif mi, sağlayıcı ayakta mı, bu giriş noktası (profil/oda) izinli mi, Servet Seviyesi yeterli mi? Seviye her turda yeniden okunur, ekrandaki bilgiye güvenilmez.
+2. **Erişim:** Oyun aktif mi, sağlayıcı ayakta mı, bu giriş noktası (profil/oda) izinli mi, Cömertlik Seviyesi yeterli mi? Seviye her turda yeniden okunur, ekrandaki bilgiye güvenilmez.
 3. **Limit:** Bahis tutarı ve günlük limit kontrolü.
 4. **Tahsilat:** Bahis tek bir hareketle düşülür.
 5. **Sağlayıcı:** Sağlayıcı hata verirse bahis aynı işlem numarasıyla iade edilir.
@@ -41,7 +41,7 @@ Erişim noktaları:
 
 Her tur `GM-…` işlem numarasıyla Oyun Merkezi › Geçmiş'te ve cüzdan hareketlerinde görünür; reddedilen istekler de kayda geçer.
 
-**Servet Seviyesi kalıcıdır** (düşmez); bu yüzden oyun sırasında erişim kaybı olmaz.
+**Cömertlik Seviyesi kalıcıdır** (düşmez); bu yüzden oyun sırasında erişim kaybı olmaz.
 
 ## Kasa kuralı: %60 kasa, %40 dağıtım
 
@@ -63,11 +63,11 @@ Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile 
 
 **Altın Kasa:** 5 makara × 3 sıra, 30 duraklı sabit makara şeritleri, 10 sabit çizgi (bahis çizgilere eşit bölünür). 💰 Servet (Wild) yalnızca 2.–4. makarada çıkar ve Kasa dışında her sembolün yerine geçer. 🏦 Kasa (Scatter) ekranın herhangi bir yerinde 3+ gelirse 8 bedava dönüş verir; bedava dönüşlerde kazançlar 2 katıdır ve yeniden tetiklenmez. Bütün tur (bedava dönüşler dahil) tek istekte sunucuda çözülür, tek bahis ve tek ödeme yazılır; ekran sadece sonucu oynatır. Beklenen geri ödeme %39,97'dir (makara sayıları tam %40'a bölünmüyor; kasa lehine). Kombinasyon sayısı (30⁵) tek tek saymaya çok büyük olduğu için oran şerit sayılarından tam olarak hesaplanır ve 200.000 turluk simülasyonla doğrulanır (`tests/fortune-slot.test.ts`). Havuz kontrolü için en yüksek çarpan 850x alınır (her çizgi en yüksek ödemede, ana dönüş + 8 bedava dönüş ×2). Otomatik çevirme 10/25/50 tur; bedava dönüşte, 10x+ kazançta, seçilen kayıp limitinde ve reddedilen turda kendiliğinden durur.
 
-Lucky hediye bu kurala dahil değildir; ayrı bir modüldür (`lib/lucky.ts`, beklenen geri ödeme %65).
+Uğurlu hediye bu kurala dahil değildir; ayrı bir modüldür (`lib/lucky.ts`, beklenen geri ödeme %65).
 
-## Erişim kuralı: Servet Seviyesi 2
+## Erişim kuralı: Cömertlik Seviyesi 2
 
-Ürün kararıyla (26.10) casino erişimi **VIP2 yerine Servet Seviyesi 2 ve üzeri** oldu. Servet seviyesi geçerli jeton harcamasından gelir ve kalıcıdır (bkz. `docs/SEVIYELER.md`). Casino ve zar düellosu bahisleri servet puanı kazandırmaz; yani oyun oynayarak seviye yükseltilemez. Yönetim panelinde oyun başına eşik Servet Lv.1 / 2 / 3 / 5 / 10 olarak seçilebilir.
+Ürün kararıyla (26.10) Oyun Salonu erişimi **VIP2 yerine Cömertlik Seviyesi 2 ve üzeri** oldu. Cömertlik seviyesi geçerli jeton harcamasından gelir ve kalıcıdır (bkz. `docs/SEVIYELER.md`). Oyun Salonu ve zar düellosu bahisleri cömertlik puanı kazandırmaz; yani oyun oynayarak seviye yükseltilemez. Yönetim panelinde oyun başına eşik Cömertlik Lv.1 / 2 / 3 / 5 / 10 olarak seçilebilir.
 
 ## Kabul testleri (§5.4)
 
@@ -76,7 +76,7 @@ Web prototipinde Playwright ile çalıştırıldı:
 | # | Test | Sonuç |
 |---|---|---|
 | 1 | Mikrofondayken Ludo açılır | ✅ Mikrofon açık, kişi koltukta |
-| 2 | Mikrofondayken casino oyunu (Zar) oynanır | ✅ Mikrofon açık, koltuk aynı |
+| 2 | Mikrofondayken Oyun Salonu oyunu (Zar) oynanır | ✅ Mikrofon açık, koltuk aynı |
 | 3 | Oyun ekranı kapatılır | ✅ Mikrofon açık |
 | 4 | Ludo'dan Zar'a geçilir | ✅ Mikrofon ve koltuk korunur |
 | 5 | Diğer üyeler sesi duymaya devam eder | ⏳ Gerçek ses altyapısı (LiveKit) ve birden fazla cihazla test edilmeli |
@@ -84,10 +84,10 @@ Web prototipinde Playwright ile çalıştırıldı:
 | 7 | Oyundan çıkılır | ✅ Koltuk ve oda üyeliği korunur |
 | 8 | Mikrofon kapalıyken oyun açılır | ✅ Kapalı kalır |
 | 9 | Oyun sesleri sohbeti bastırmaz | ⏳ Ayrı ses ayarı hazır; ses karışımı gerçek cihazda doğrulanmalı |
-| 10 | Odada değilken profilden casino açılır | ✅ Kullanıcı Oyun Merkezi'nde kalır, odaya sokulmaz |
+| 10 | Odada değilken profilden Oyun Salonu açılır | ✅ Kullanıcı Oyun Merkezi'nde kalır, odaya sokulmaz |
 
 Ek kontroller:
-- Servet Lv.0–1 kullanıcıda casino kilitli görünüyor; 30 servet puanına (Lv.2) ulaşınca açılıyor.
+- Cömertlik Lv.0–1 kullanıcıda Oyun Salonu kilitli görünüyor; 30 cömertlik puanına (Lv.2) ulaşınca açılıyor.
 - Aynı istek tekrar gönderildiğinde jeton değişimi 0.
 - Yönetim panelinden "Hata" seçilince tur iade ediliyor.
 
@@ -107,8 +107,8 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 
 ## Hukuki uyarı
 
-- Jetonlar gerçek paraya çevrilemiyor, ama hediye olarak gönderilip yayıncının elması olabiliyor ve **elmas paraya çevrilebiliyor**. Bu yüzden casino kazançlarının dolaylı yoldan paraya dönüşmesi mümkün.
-- Casino kazancı olarak gelen jetonların hediyeye harcanmasının engellenmesi (ayrı bir "oyun jetonu" olması) gerekip gerekmediği **hukukçuyla değerlendirilmeden casino canlıya alınmamalı**.
+- Jetonlar gerçek paraya çevrilemiyor, ama hediye olarak gönderilip yayıncının elması olabiliyor ve **elmas paraya çevrilebiliyor**. Bu yüzden Oyun Salonu kazançlarının dolaylı yoldan paraya dönüşmesi mümkün.
+- Oyun Salonu kazancı olarak gelen jetonların hediyeye harcanmasının engellenmesi (ayrı bir "oyun jetonu" olması) gerekip gerekmediği **hukukçuyla değerlendirilmeden Oyun Salonu canlıya alınmamalı**.
 - Ödeme ve ödül oranları da yönetim panelinden değiştirilebilir hâle getirilmeli. Şu an kurallar kodda.
 
 ## Sonraki adımlar
@@ -120,19 +120,19 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 
 ## Oyun adları
 
-Şans oyunlarının adları özgündür; bilinen ürünleri (ör. "Gates of Olympus", "Book of Ra", "Fruit Party") çağrıştıran ve jenerik adlar değiştirildi. Kimlikler (`id`) ve görsel dosya adları aynı kaldı.
+Şans oyunlarının adları özgündür. Kimlikler (`id`) ve görsel dosya adları kod içi anahtardır, ekranda görünmez.
 
-| Kimlik | Eski ad | Yeni ad |
-|---|---|---|
-| `slot` | Lucky 77 | Gece Yarısı Çarkı |
-| `jackpot` | Mega Jackpot | Hazine Kulesi |
-| `olympus` | Olympus Slot | Şimşek Dağı |
-| `fish` | Balık Avı | Mercan Avı |
-| `rocket` | Roket | Yörünge |
-| `super777` · `jungle` · `goldtree` | Süper 777 · Orman Avı · Altın Ağacı | Kızıl Yedi · Vahşi Patika · Bereket Ağacı |
-| `foodwheel` · `magiccard` | Lezzet Çarkı · Büyücü Kartı | Tatlı Tezgâh · Sihir Destesi |
-| `pinata` · `spellbook` · `neon` | Piñata · Büyü Kitabı · Neon Jackpot | Konfeti Kutusu · Kayıp Parşömen · Neon Bulvar |
-| `dragon` | Dragon Tiger | Ejder ile Kaplan |
-| oda menüsü `c2` | Meyve Partisi | Meyve Bahçesi |
+| Kimlik | Ad |
+|---|---|
+| `slot` | Gece Yarısı Çarkı |
+| `jackpot` | Hazine Kulesi |
+| `olympus` | Fener Kayalığı |
+| `fish` | Mercan Avı |
+| `rocket` | Yörünge |
+| `super777` · `jungle` · `goldtree` | Kızıl Yedi · Vahşi Patika · Bereket Ağacı |
+| `foodwheel` · `magiccard` | Liman Pazarı · Sihir Destesi |
+| `pinata` · `spellbook` · `neon` | Konfeti Kutusu · Kayıp Parşömen · Neon Bulvar |
+| `dragon` | Ejder ile Kaplan |
+| oda menüsü `c2` | Meyve Bahçesi |
 
 Yayından önce bu adlar için TÜRKPATENT'te marka taraması yapılmalı.

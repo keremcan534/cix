@@ -4,7 +4,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { VerifiedBadge } from '@/components/ui';
@@ -14,7 +14,8 @@ import { useMedia } from '@/lib/media';
 import { PHASE_LABEL, acceptMatch, cancelMatch, declineMatch, modeLabel, priceOf, resetMatch, setMatchDeps, startMatch, useMatch } from '@/lib/match';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { ThemeScope, colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const OWN_SCREENS = ['/eslesme', '/tanis'];
 
@@ -36,8 +37,9 @@ export function MatchLayer() {
   }, [active]);
 
   const incoming = ['found', 'awaiting_peer', 'connecting'].includes(m.phase) && path !== '/eslesme';
+  // A call overlay: dark in both modes, like the call screen it opens.
   return (
-    <>
+    <ThemeScope scheme="dark">
       {m.phase === 'searching' && !onOwnScreen && (
         <View style={s.pill} accessibilityLiveRegion="polite">
           <Ionicons name="search" size={16} color={semantic.action} />
@@ -68,7 +70,7 @@ export function MatchLayer() {
       <Modal visible={incoming} transparent animationType="fade" onRequestClose={declineMatch}>
         {incoming && <IncomingCard />}
       </Modal>
-    </>
+    </ThemeScope>
   );
 }
 
@@ -101,7 +103,7 @@ export function IncomingCard({ inline }: { inline?: boolean }) {
     <View style={[s.backdrop, inline && s.inline]}>
       <View style={s.card}>
         <Text style={s.kicker}>{modeLabel(m.mode)} · {waiting ? PHASE_LABEL[m.phase] : 'Eşleşme bulundu!'}</Text>
-        <Image source={{ uri: peer.avatar }} style={s.photo} />
+        <Photo uri={peer.avatar} kind="face" style={s.photo} />
         <View style={s.nameRow}>
           <Text style={s.name}>
             {peer.name}, {peer.age}

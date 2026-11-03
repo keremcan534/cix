@@ -1,20 +1,30 @@
-// Servet Seviyesi (wealth level): Lv.0–50 from wealth points. Points come from qualifying coin spending
+// Cömertlik Seviyesi (wealth level): Lv.0–50 from wealth points. Points come from qualifying coin spending
 // (gifts, Lucky gifts at the coins actually spent, paid messages and calls, store, family, room activities).
 // Coin games and coin hand-outs (room envelopes, transfers) never add points.
-// Thresholds are product data; Lv.35 and Lv.36 are interpolated until the product team confirms them.
 import type { ArtName } from '@/components/Art';
 
-export const WEALTH_XP = [
-  0, 10, 30, 55, 88, 130, 160, 195, 345, 555, // 0–9
-  950, 1_550, 2_560, 4_160, 6_000, 9_000, 13_100, 17_900, 25_900, 38_400, // 10–19
-  55_000, 79_000, 113_500, 154_000, 200_000, 253_000, 317_000, 390_000, 489_000, 609_000, // 20–29
-  745_000, 915_500, 1_188_000, 1_529_000, 1_955_000, 2_520_000, 3_250_000, 4_185_000, 5_540_000, 7_240_000, // 30–39
-  9_240_000, 11_230_000, 13_630_000, 16_280_000, 19_180_000, 22_500_000, 25_620_000, 29_120_000, 33_020_000, 37_320_000, // 40–49
-  42_000_000, // 50
-];
+/** Readable threshold: to the nearest 5 below 100, otherwise two significant digits (1.700, 30.000, 1.100.000). */
+export const readablePoints = (x: number) => {
+  if (x < 100) return Math.max(5, Math.round(x / 5) * 5);
+  const step = 10 ** (Math.floor(Math.log10(x)) - 1);
+  return Math.round(x / step) * step;
+};
+
+/**
+ * Our level curve, shared by Cömertlik and Yankı: Lv.L needs about A · L^1.5 · G^L points, made readable.
+ * Two anchors set it, the points for Lv.1 and for the top level; G and A follow from them. The L^1.5 part makes
+ * the first levels come quickly (one small gift opens Lv.1), and from the middle on each level asks for roughly
+ * a quarter more than the one before. Retuning the levels means changing the two anchors, not a table.
+ */
+export function levelCurve(first: number, last: number, max = 50): number[] {
+  const g = (last / (first * max ** 1.5)) ** (1 / (max - 1));
+  const a = first / g;
+  return Array.from({ length: max + 1 }, (_, l) => (l === 0 ? 0 : readablePoints(a * l ** 1.5 * g ** l)));
+}
+
+/** Lv.1 at 10 points (one Gül), Lv.50 at 30 million. */
+export const WEALTH_XP = levelCurve(10, 30_000_000);
 export const WEALTH_MAX = WEALTH_XP.length - 1;
-/** Levels whose threshold still needs confirmation. */
-export const WEALTH_ESTIMATED = [35, 36];
 
 /** Highest level whose threshold is reached. */
 export const levelFromTable = (table: number[], xp: number) => {
@@ -30,22 +40,22 @@ export const countsForWealth = (reason: string) => !NOT_COUNTED.some((r) => r.te
 
 /** Level groups share an emblem; each has its own colors and symbol. */
 export type LevelIcon = 'leaf' | 'diamond-outline' | 'diamond' | 'flower' | 'ribbon' | 'flame' | 'sparkles' | 'shield' | 'star' | 'planet' | 'trophy' | 'flash' | 'moon' | 'heart' | 'musical-notes' | 'color-palette' | 'rose';
-/** A group of levels sharing one emblem (used by Servet and Cazibe). */
+/** A group of levels sharing one emblem (used by Cömertlik and Yankı). */
 export type LevelTier = { from: number; to: number; name: string; icon: LevelIcon; colors: [string, string]; ink: string };
 export type WealthTier = LevelTier;
 export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume' };
 export const WEALTH_TIERS: WealthTier[] = [
-  { from: 0, to: 4, name: 'Filiz', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
-  { from: 5, to: 9, name: 'Kristal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
-  { from: 10, to: 14, name: 'Safir', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF' },
-  { from: 15, to: 19, name: 'Gül', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8' },
-  { from: 20, to: 24, name: 'Kızıl Taç', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED' },
-  { from: 25, to: 28, name: 'Yakut', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2' },
-  { from: 29, to: 32, name: 'Ametist', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF' },
-  { from: 33, to: 36, name: 'Hanedan', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8' },
-  { from: 37, to: 40, name: 'Altın Kanat', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006' },
-  { from: 41, to: 45, name: 'Gece Yıldızı', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF' },
-  { from: 46, to: 50, name: 'Efsane', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3' },
+  { from: 0, to: 4, name: 'Damla', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
+  { from: 5, to: 9, name: 'Kaynak', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
+  { from: 10, to: 14, name: 'Dere', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF' },
+  { from: 15, to: 19, name: 'Irmak', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8' },
+  { from: 20, to: 24, name: 'Şelale', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED' },
+  { from: 25, to: 28, name: 'Göl', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2' },
+  { from: 29, to: 32, name: 'Koy', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF' },
+  { from: 33, to: 36, name: 'Körfez', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8' },
+  { from: 37, to: 40, name: 'Deniz', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006' },
+  { from: 41, to: 45, name: 'Okyanus', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF' },
+  { from: 46, to: 50, name: 'Derya', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3' },
 ];
 export const wealthTier = (level: number) => WEALTH_TIERS.find((t) => level >= t.from && level <= t.to) ?? WEALTH_TIERS[0];
 

@@ -7,6 +7,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { Icon3D, icon3dFor, type Icon3DName } from '@/components/Icon3D';
 import { successHaptic } from '@/lib/haptics';
+// Dark-scheme tokens on purpose: the popup draws on its own navy scrim in both schemes, never on a card.
 import { colors, semantic } from '@/theme';
 
 export type Reward = { icon?: Icon3DName; emoji?: string; title: string; amount?: number };

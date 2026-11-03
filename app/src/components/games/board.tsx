@@ -1,4 +1,4 @@
-// Screen for the bet boards (lib/board-games): Gece Yarısı Çarkı fruit wheel, Tatlı Tezgâh and Sihir Destesi. Pick a chip, tap
+// Screen for the bet boards (lib/board-games): Gece Yarısı Çarkı fruit wheel, Liman Pazarı and Sihir Destesi. Pick a chip, tap
 // options to stack it on them (several options per round), then start: playBoard (lib/games) draws one result and
 // settles every bet before anything moves; the wheel or the light only lands on that result. Tekrar puts the last
 // round's bets back. Every option returns at most 40 % on its own (house rule).
@@ -24,7 +24,7 @@ const SLICE = 360 / LUCKY_WHEEL.length;
 type Look = { title: string; colors: [string, string, string]; card: string; cardOn: string; ink: string };
 const LOOKS: Record<BoardId, Look> = {
   slot: { title: 'Gece Yarısı Çarkı', colors: ['#2B1065', '#4C1D95', '#1E0B45'], card: '#86198F', cardOn: '#C026D3', ink: '#FDE68A' },
-  foodwheel: { title: 'Tatlı Tezgâh', colors: ['#4C1D95', '#7E22CE', '#312E81'], card: '#5B21B6', cardOn: '#DB2777', ink: '#FDE68A' },
+  foodwheel: { title: 'Liman Pazarı', colors: ['#4C1D95', '#7E22CE', '#312E81'], card: '#5B21B6', cardOn: '#DB2777', ink: '#FDE68A' },
   magiccard: { title: 'Sihir Destesi', colors: ['#3B0764', '#581C87', '#1E1B4B'], card: '#2E1065', cardOn: '#A16207', ink: '#FDE68A' },
 };
 
@@ -262,8 +262,8 @@ const s = StyleSheet.create({
   histNew: { backgroundColor: 'rgba(250,204,21,0.25)', borderRadius: 6, paddingHorizontal: 2, overflow: 'hidden' },
   msg: { alignSelf: 'stretch', borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.08)', paddingVertical: 8 },
   msgText: { color: '#fff', textAlign: 'center', fontWeight: '800' },
-  chips: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
-  chip: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.5)', borderStyle: 'dashed' },
+  chips: { flexDirection: 'row', gap: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  chip: { flex: 1, maxWidth: 56, aspectRatio: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.5)', borderStyle: 'dashed' },
   chipOn: { borderColor: '#FACC15', borderStyle: 'solid', transform: [{ scale: 1.12 }] },
   chipText: { color: '#fff', fontWeight: '900', fontSize: 15 },
   small: { borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#DB2777', alignItems: 'center', justifyContent: 'center' },

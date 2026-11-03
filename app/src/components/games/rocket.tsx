@@ -16,7 +16,7 @@ import { useApp } from '@/store';
 
 const short = (n: number) => (n >= 1_000 ? `${n / 1_000}K` : String(n));
 const HEIGHT = 300;
-/** The multiplier grows as e^(GROWTH · seconds), like the reference: 2x after ~2.8 s, 10x after ~9 s. */
+/** The multiplier grows as e^(GROWTH · seconds): 2x after ~2.8 s, 10x after ~9 s. */
 const GROWTH = 0.25;
 const AUTO_LOSS = 20;
 const CHIP_COLORS = ['#16A34A', '#2563EB', '#DC2626', '#7C3AED'];
@@ -209,9 +209,9 @@ const s = StyleSheet.create({
   panel: { backgroundColor: '#1E1B4B', borderRadius: 16, padding: 12, gap: 8, borderWidth: 2, borderColor: '#FACC15' },
   panelLabel: { color: '#C7D2FE', fontWeight: '800', fontSize: 12 },
   row: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
-  can: { width: 60, height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
+  can: { flex: 1, maxWidth: 60, height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
   canOn: { borderColor: '#FACC15', borderWidth: 3, transform: [{ scale: 1.08 }] },
-  canText: { color: '#fff', fontWeight: '900', fontSize: 17 },
+  canText: { color: '#fff', fontWeight: '900', fontSize: 16 },
   target: { borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', paddingHorizontal: 10, paddingVertical: 5 },
   targetOn: { borderColor: '#FACC15', backgroundColor: 'rgba(250,204,21,0.2)' },
   targetText: { color: '#fff', fontWeight: '800', fontSize: 13 },

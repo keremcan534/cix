@@ -12,7 +12,7 @@ import { isLive, useAnimations } from '@/lib/animations';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles } from '@/theme';
 
 /**
  * Inline emoji picker. Top row: Hareketli (rooms only), recents, standard emoji, then one tab per
@@ -25,6 +25,7 @@ import { colors } from '@/theme';
 export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) => void; hint?: string; onAnimate?: (animationId: string) => void }) {
   const { packUnlocked, recentEmojis, rememberEmoji, buyEmojiPack, ownedAnims, micFx, buyMicFx, setMicFx } = useApp();
   const { catalog } = useAnimations();
+  const styles = useStyles();
   const [tab, setTab] = useState<string>(onAnimate ? 'animated' : recentEmojis.length ? 'recent' : 'emoji');
   const [group, setGroup] = useState(STANDARD_EMOJI[0].id);
   const pack = STICKER_PACKS.find((p) => p.id === tab);
@@ -174,13 +175,14 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   hint: { color: colors.textDim, fontSize: 12, paddingHorizontal: 12, paddingBottom: 6 },
-  wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6 },
+  // Light: a hairline and a soft upward shadow so the white panel lifts off the paper behind it.
+  wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(11,26,46,0.08)', boxShadow: '0 -4px 16px rgba(16,36,64,0.06)' }) },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   tabIcon: { width: 18, height: 18 },
   tabActive: { backgroundColor: colors.cardAlt },
-  tabText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  tabText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 6, minHeight: 60 },
   cell: { width: '12.5%', alignItems: 'center', paddingVertical: 6 },
   stickerCell: { width: '20%', alignItems: 'center', paddingVertical: 6 },
@@ -188,19 +190,19 @@ const styles = StyleSheet.create({
   emojiScroll: { maxHeight: 200 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.cardAlt, borderColor: colors.cardAlt },
-  chipText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  chipText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   freeNote: { color: colors.textDim, fontSize: 10, textAlign: 'center', paddingBottom: 4 },
   empty: { color: colors.textDim, padding: 12 },
   sub: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
   fx: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 5 },
-  fxOn: { borderColor: '#13D9DF', backgroundColor: 'rgba(19,217,223,0.15)' },
-  fxText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  fxOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
+  fxText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   fxPrice: { color: colors.gold, fontSize: 11, fontWeight: '800' },
   animCell: { width: '25%', alignItems: 'center', paddingVertical: 6, gap: 1 },
-  animName: { color: '#fff', fontSize: 11, fontWeight: '700', maxWidth: '92%' },
-  free: { color: '#22C55E', fontSize: 10, fontWeight: '800' },
+  animName: { color: colors.text, fontSize: 11, fontWeight: '700', maxWidth: '92%' },
+  free: { color: semantic.successText, fontSize: 10, fontWeight: '800' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   price: { color: colors.gold, fontSize: 10, fontWeight: '800' },
   kind: { color: colors.textDim, fontSize: 9 },
   unlock: { alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 6 },
-});
+}));

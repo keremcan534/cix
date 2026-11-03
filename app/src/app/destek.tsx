@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -11,9 +11,10 @@ import { Card, GradientButton, Header } from '@/components/ui';
 import { FAQ, TICKET_CATEGORIES, type TicketCategory } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
 import { useApp, type Ticket } from '@/store';
-import { colors, gradientDeep } from '@/theme';
+import { makeStyles, useTheme, type Theme } from '@/theme';
 
-const STATUS_COLOR: Record<Ticket['status'], string> = { Açık: colors.gold, Yanıtlandı: '#7DD3FC', Çözüldü: colors.green, 'Yeniden açıldı': colors.primaryText };
+const statusColor = ({ colors, semantic }: Theme, status: Ticket['status']): string =>
+  ({ Açık: colors.gold, Yanıtlandı: semantic.diamondText, Çözüldü: colors.green, 'Yeniden açıldı': colors.primaryText })[status];
 
 // Quick-help chips → the matching ticket category.
 const TOPICS: { label: string; category: TicketCategory }[] = [
@@ -33,6 +34,8 @@ type View_ = 'home' | 'faq' | 'new' | 'list';
 export default function SupportScreen() {
   const { kategori } = useLocalSearchParams<{ kategori?: string }>();
   const { tickets, createTicket } = useApp();
+  const { colors, gradientDeep } = useTheme();
+  const styles = useStyles();
   const initial = TICKET_CATEGORIES.includes(kategori as TicketCategory) ? (kategori as TicketCategory) : 'Teknik';
   const [tab, setTab] = useState<View_>(kategori ? 'new' : 'home');
   const [category, setCategory] = useState<TicketCategory>(initial);
@@ -74,7 +77,7 @@ export default function SupportScreen() {
       {tab !== 'home' && (
         <View style={styles.segment}>
           <Pressable onPress={() => setTab('home')} style={styles.segBtn} accessibilityLabel="Müşteri hizmetleri ana sayfa">
-            <Ionicons name="home" size={15} color="#fff" />
+            <Ionicons name="home" size={15} color={colors.text} />
           </Pressable>
           {(
             [
@@ -84,7 +87,7 @@ export default function SupportScreen() {
             ] as const
           ).map(([k, l]) => (
             <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
-              <Text style={styles.segText}>{l}</Text>
+              <Text style={[styles.segText, tab === k && styles.segTextOn]}>{l}</Text>
             </Pressable>
           ))}
         </View>
@@ -176,6 +179,8 @@ export default function SupportScreen() {
 }
 
 function ServiceRow({ icon, tint, title, sub, onPress }: { icon: keyof typeof Ionicons.glyphMap; tint: readonly [string, string]; title: string; sub?: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}>
       <Card style={styles.service}>
@@ -194,27 +199,30 @@ function ServiceRow({ icon, tint, title, sub, onPress }: { icon: keyof typeof Io
 
 function TicketCard({ t }: { t: Ticket }) {
   const { replyTicket, setTicketStatus } = useApp();
+  const theme = useTheme();
+  const { colors, dark } = theme;
+  const styles = useStyles();
   const [reply, setReply] = useState('');
   const [open, setOpen] = useState(false);
   return (
     <Card style={{ gap: 8 }}>
       <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>
+          <Text style={{ color: colors.text, fontWeight: '700' }}>
             #{t.number} · {t.category}
           </Text>
           <Text style={styles.dim} numberOfLines={open ? undefined : 1}>
             {t.text}
           </Text>
         </View>
-        <Text style={{ color: STATUS_COLOR[t.status], fontWeight: '800', fontSize: 12 }}>{t.status}</Text>
+        <Text style={{ color: statusColor(theme, t.status), fontWeight: '800', fontSize: 12 }}>{t.status}</Text>
       </Pressable>
       {open && (
         <>
           {t.replies.map((r, i) => (
             <View key={i} style={[styles.reply, r.from === 'me' && { alignSelf: 'flex-end', backgroundColor: colors.primary }]}>
-              <Text style={{ color: '#fff', fontSize: 13 }}>{r.text}</Text>
-              <Text style={[styles.dim, { fontSize: 11 }]}>
+              <Text style={{ color: r.from === 'me' ? '#fff' : colors.text, fontSize: 13 }}>{r.text}</Text>
+              <Text style={[styles.dim, { fontSize: 11 }, r.from === 'me' && !dark && { color: 'rgba(255,255,255,0.8)' }]}>
                 {r.from === 'support' ? 'Destek' : 'Sen'} · {r.time}
               </Text>
             </View>
@@ -242,31 +250,32 @@ function TicketCard({ t }: { t: Ticket }) {
   );
 }
 
-const styles = StyleSheet.create({
-  segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4 },
+const useStyles = makeStyles(({ colors, lift }) => ({
+  segment: { flexDirection: 'row', alignSelf: 'center', backgroundColor: colors.card, borderRadius: 999, padding: 4, ...lift },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
-  heroTitle: { color: '#fff', fontSize: 28, fontWeight: '900' },
+  heroTitle: { color: colors.text, fontSize: 28, fontWeight: '900' },
   heroSub: { color: colors.textDim, fontSize: 16 },
   bot: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 6 },
-  topic: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 11 },
-  topicText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  cardTitle: { color: '#fff', fontWeight: '800', fontSize: 17 },
+  topic: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 11, ...lift },
+  topicText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  cardTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },
   faqRow: { paddingVertical: 14, gap: 6 },
-  faqQ: { color: '#fff', fontSize: 15, flex: 1 },
+  faqQ: { color: colors.text, fontSize: 15, flex: 1 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   service: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   serviceIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  serviceTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  serviceTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
   segBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   segActive: { backgroundColor: colors.primary },
-  segText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  segText: { color: colors.text, fontWeight: '700', fontSize: 13 },
+  segTextOn: { color: '#fff' },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   label: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
-  chipText: { color: '#fff', fontWeight: '600', fontSize: 12 },
-  input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: '#fff', fontSize: 15, paddingHorizontal: 14, paddingVertical: 11, textAlignVertical: 'top' },
+  chipText: { color: colors.text, fontWeight: '600', fontSize: 12 },
+  input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: colors.text, fontSize: 15, paddingHorizontal: 14, paddingVertical: 11, textAlignVertical: 'top' },
   attach: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reply: { backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10, maxWidth: '90%', gap: 2 },
   secondary: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.cardAlt, justifyContent: 'center' },
-});
+}));

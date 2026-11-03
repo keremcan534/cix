@@ -1,4 +1,4 @@
-// Seviyeler: Servet Seviyesi (spending) and Cazibe Seviyesi (others' engagement) share one layout:
+// Seviyeler: Cömertlik Seviyesi (spending) and Yankı Seviyesi (others' engagement) share one layout:
 // my progress, the level groups, what each level opens, and a guide with the full points table.
 // Open on the charm tab with /seviye?tab=charm.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -15,13 +15,17 @@ import { Art, type ArtName } from '@/components/Art';
 import { Avatar, CharmBadge, WealthBadge } from '@/components/ui';
 import { CHARM_PERKS, CHARM_TIERS, CHARM_XP, charmBonusPct, charmTier } from '@/data/charm';
 import { SVIP_LEVELS, nobleInfo } from '@/data/status';
-import { WEALTH_ESTIMATED, WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
+import { WEALTH_PERKS, WEALTH_TIERS, WEALTH_XP, levelGiftOf, wealthTier, type LevelPerk, type LevelTier } from '@/data/wealth';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { goBack } from '@/lib/nav';
+import { fromN } from '@/lib/tr';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const TIER_W = 96;
+/** The "me" card fades from the level group's color into night blue and keeps white text in both schemes. */
+const NIGHT_CARD = '#16253C';
+const NIGHT_BORDER = '#2B3F63';
 type Kind = 'wealth' | 'charm';
 
 type System = {
@@ -34,32 +38,29 @@ type System = {
   tierOf: (l: number) => LevelTier;
   Badge: (p: { level: number; size?: 'sm' | 'lg' }) => ReactNode;
   perkDetail: (p: LevelPerk, level: number) => string;
-  estimated: number[];
 };
 const SYSTEMS: Record<Kind, System> = {
   wealth: {
-    title: 'Servet',
+    title: 'Cömertlik',
     art: 'seviye-servet-seviyesi',
-    point: 'Servet puanı',
+    point: 'Cömertlik puanı',
     table: WEALTH_XP,
     tiers: WEALTH_TIERS,
     perks: WEALTH_PERKS,
     tierOf: wealthTier,
     Badge: WealthBadge,
     perkDetail: (p, level) => (p.key === 'gift' ? `${levelGiftOf(level)} · ${p.detail}` : p.detail),
-    estimated: WEALTH_ESTIMATED,
   },
   charm: {
-    title: 'Cazibe',
+    title: 'Yankı',
     art: 'seviye-cazibe-seviyesi',
-    point: 'Cazibe puanı',
+    point: 'Yankı puanı',
     table: CHARM_XP,
     tiers: CHARM_TIERS,
     perks: CHARM_PERKS,
     tierOf: charmTier,
     Badge: CharmBadge,
     perkDetail: (p, level) => (p.key === 'bonus' ? `+%${Math.max(1, charmBonusPct(level))} · ${p.detail}` : p.key === 'rank' ? `Sıralama ağırlığı ${level} · ${p.detail}` : p.detail),
-    estimated: [],
   },
 };
 
@@ -68,6 +69,8 @@ export default function LevelsScreen() {
   const app = useApp();
   const [tab, setTab] = useState<Kind>(params.tab === 'charm' ? 'charm' : 'wealth');
   const [help, setHelp] = useState(false);
+  const { colors, semantic } = useTheme();
+  const s = useStyles();
   const xp = tab === 'wealth' ? app.wealthXp : app.charmXp;
   const level = tab === 'wealth' ? app.wealthLevel : app.charmLevel;
 
@@ -100,6 +103,8 @@ export default function LevelsScreen() {
 function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: number }) {
   const sys = SYSTEMS[kind];
   const { me, svipLevel, svipXp, nobleTier, nobleDays, vipDays } = useApp();
+  const { colors, semantic, ink } = useTheme();
+  const s = useStyles();
   const [level, setLevel] = useState(Math.max(1, myLevel));
   const max = sys.table.length - 1;
   const tier = sys.tierOf(level);
@@ -116,7 +121,7 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      <LinearGradient colors={[mine.colors[1], colors.card]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.me}>
+      <LinearGradient colors={[mine.colors[1], NIGHT_CARD]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.me}>
         <Avatar uri={me.avatar} size={56} />
         <View style={{ flex: 1, gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -144,37 +149,37 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
 
       <View style={s.levels}>
         {Array.from({ length: tier.to - Math.max(1, tier.from) + 1 }, (_, i) => Math.max(1, tier.from) + i).map((l) => (
-          <Pressable key={l} onPress={() => setLevel(l)} style={[s.levelChip, l === level && { borderColor: tier.colors[0], backgroundColor: 'rgba(255,255,255,0.06)' }]} accessibilityRole="tab" accessibilityState={{ selected: l === level }}>
-            <Text style={[s.levelText, l === level && { color: '#fff' }]}>Lv.{l}</Text>
-            {myLevel >= l ? <Ionicons name="checkmark-circle" size={13} color={semantic.success} /> : <Ionicons name="lock-closed" size={11} color={colors.textDim} />}
+          <Pressable key={l} onPress={() => setLevel(l)} style={[s.levelChip, l === level && { borderColor: tier.colors[0], backgroundColor: ink(0.06) }]} accessibilityRole="tab" accessibilityState={{ selected: l === level }}>
+            <Text style={[s.levelText, l === level && { color: colors.text }]}>Lv.{l}</Text>
+            {myLevel >= l ? <Ionicons name="checkmark-circle" size={13} color={semantic.successText} /> : <Ionicons name="lock-closed" size={11} color={colors.textDim} />}
           </Pressable>
         ))}
       </View>
 
       <View style={{ paddingHorizontal: 16, gap: 12 }}>
         <View style={[s.status, open ? s.statusOk : null]}>
-          <Ionicons name={open ? 'checkmark-circle' : 'lock-closed'} size={16} color={open ? semantic.success : colors.gold} />
+          <Ionicons name={open ? 'checkmark-circle' : 'lock-closed'} size={16} color={open ? semantic.successText : colors.gold} />
           <Text style={s.statusText}>{open ? `Lv.${level} ayrıcalıkları açık.` : `Lv.${level} için ${fmt(sys.table[level] - xp)} ${sys.point.toLowerCase()} gerekiyor (toplam ${fmt(sys.table[level])}).`}</Text>
         </View>
         <PerkGrid title={`Lv.${level} ayrıcalıkları`} perks={sys.perks.filter((p) => p.kind === 'privilege' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} />
-        <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${firstCostume}’dan itibaren açılır.`} />
+        <PerkGrid title={`Lv.${level} görünüm`} perks={sys.perks.filter((p) => p.kind === 'costume' && p.from <= level)} level={level} open={open} Badge={Badge} detail={sys.perkDetail} empty={`Görünüm ödülleri Lv.${fromN(firstCostume)} itibaren açılır.`} />
 
         {kind === 'wealth' && (
           <Pressable onPress={() => router.push('/vip')} style={s.card} accessibilityLabel="Ayrıcalıklarım">
             <Text style={s.cardTitle}>Diğer ayrıcalıklarım</Text>
             <Text style={s.row}>
-              SVIP: {svipLevel ? `SVIP${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · SVIP${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
+              İnci: {svipLevel ? `İnci ${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · İnci ${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={s.row}>Asil:</Text>
+              <Text style={s.row}>Rütbe:</Text>
               {noble && <Art name={noble.art} size={18} />}
               <Text style={s.row}>{noble ? `${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}</Text>
             </View>
             <Text style={s.row}>VIP: {vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}</Text>
-            <Text style={[s.row, { color: colors.gold }]}>Ayrıcalık merkezine git ›</Text>
+            <Text style={[s.row, { color: colors.gold }]}>Ayrıcalıklara git ›</Text>
           </Pressable>
         )}
-        <Text style={s.dim}>Servet ve Cazibe seviyeleri kalıcıdır ve düşmez; VIP ve Asil süreli, SVIP ise yükleme deneyimiyle kalıcı olarak yükselir.</Text>
+        <Text style={s.dim}>Cömertlik ve Yankı seviyeleri kalıcıdır, düşmez. VIP ve Rütbe süreli; İnci ise yükledikçe yükselir ve kalıcıdır.</Text>
       </View>
     </ScrollView>
   );
@@ -182,16 +187,18 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
 
 function TierEmblem({ tier, on, reached, onPress }: { tier: LevelTier; on: boolean; reached: boolean; onPress: () => void }) {
   const size = on ? 72 : 54;
+  const { colors } = useTheme();
+  const s = useStyles();
   return (
     <Pressable onPress={onPress} style={s.tier} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${tier.name}, seviye ${Math.max(1, tier.from)}–${tier.to}${reached ? '' : ', henüz ulaşılmadı'}`}>
       <View style={{ height: 76, justifyContent: 'center' }}>
-        <LinearGradient colors={tier.colors} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.emblem, { width: size, height: size, borderRadius: size * 0.3, opacity: reached || on ? 1 : 0.45 }, on && { borderColor: '#fff' }]}>
+        <LinearGradient colors={tier.colors} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[s.emblem, { width: size, height: size, borderRadius: size * 0.3, opacity: reached || on ? 1 : 0.45 }, on && s.emblemOn]}>
           <View style={{ transform: [{ rotate: '-45deg' }] }}>
             <Ionicons name={tier.icon} size={on ? 34 : 24} color={tier.ink} />
           </View>
         </LinearGradient>
       </View>
-      <Text style={[s.tierName, on && { color: '#fff' }]} numberOfLines={1}>
+      <Text style={[s.tierName, on && { color: colors.text }]} numberOfLines={1}>
         {tier.name}
       </Text>
       <Text style={s.tierRange}>
@@ -202,6 +209,7 @@ function TierEmblem({ tier, on, reached, onPress }: { tier: LevelTier; on: boole
 }
 
 function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: string; perks: LevelPerk[]; level: number; open: boolean; empty?: string; Badge: System['Badge']; detail: System['perkDetail'] }) {
+  const s = useStyles();
   return (
     <View style={s.card}>
       <Text style={s.cardTitle}>{title}</Text>
@@ -233,18 +241,18 @@ function PerkGrid({ title, perks, level, open, empty, Badge, detail }: { title: 
   );
 }
 
-const GUIDE: Record<Kind, { title: string; art?: ArtName; body: string[] }[]> = {
+const GUIDE: Record<Kind, { title: string; art?: ArtName; icon?: keyof typeof Ionicons.glyphMap; body: string[] }[]> = {
   wealth: [
-    { title: 'Servet seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça servet puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
-    { title: '🎁 Ne işe yarar?', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Casino oyunları Servet Lv.2 ile açılır.'] },
-    { title: '📈 Puan nasıl kazanılır?', body: ['Harcanan her 1 jeton 1 servet puanıdır. Sayılanlar: odada ve sohbette hediye, Lucky hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, kabile kurma ve kabile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
-    { title: '⚠️ Sayılmayanlar', body: ['• Jetonla oynanan şans oyunları ve zar düellosu.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
+    { title: 'Cömertlik seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
+    { title: 'Ne işe yarar?', icon: 'gift-outline', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur. Oyun Salonu Cömertlik Lv.2 ile açılır.'] },
+    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Uğurlu hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, tayfa kurma ve tayfa hediyeleri, oda etkinlikleri ve animasyonlar.'] },
+    { title: 'Sayılmayanlar', icon: 'alert-circle-outline', body: ['• Jetonla oynanan şans oyunları ve zar düellosu.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
   ],
   charm: [
-    { title: 'Cazibe seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir cazibe seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
-    { title: '💎 Kazancını ve popülerliğini etkiler', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında cazibesi yüksek olan daha üstte gösterilir.'] },
-    { title: '📈 Puan nasıl kazanılır?', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 cazibe puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
-    { title: '⚠️ Dikkat', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
+    { title: 'Yankı seviyesi nedir?', art: 'seviye-cazibe-seviyesi', body: ['Diğer kullanıcıların seninle ne kadar etkileşim kurduğunu gösteren kalıcı seviyedir. Her kullanıcının bir Yankı seviyesi vardır ve profilinde, odada ve keşfette rozet olarak görünür.'] },
+    { title: 'Kazancını ve popülerliğini etkiler', icon: 'diamond-outline', body: [`• Kazanç: Lv.6’dan itibaren aldığın hediyelerin elmasına bonus eklenir (Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5). Bonus, gelir geçmişinde ayrı satır olarak görünür.`, '• Popülerlik: Keşfet ve önerilerde çevrimiçi kişiler arasında Yankı seviyesi yüksek olan daha üstte gösterilir.'] },
+    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Sana gönderilen hediyelerden gelen her 1 elmas 1 Yankı puanıdır; seninle yapılan ücretli aramalar da sayılır. Beğeni ve özel sohbet puanları sunucuya geçince günlük sınırla eklenecek.'] },
+    { title: 'Dikkat', icon: 'alert-circle-outline', body: ['Sahte etkileşimle puan artırmak, başkasının kimliğini kullanmak veya kural ihlali puan silinmesine ve hesabın kapatılmasına yol açar.'] },
   ],
 };
 
@@ -252,6 +260,8 @@ const GUIDE: Record<Kind, { title: string; art?: ArtName; body: string[] }[]> = 
 function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClose: () => void }) {
   const sys = SYSTEMS[kind];
   const Badge = sys.Badge;
+  const { colors, ink } = useTheme();
+  const s = useStyles();
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -264,14 +274,10 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
           {GUIDE[kind].map((g) => (
             <View key={g.title} style={s.card}>
-              {g.art ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Art name={g.art} size={20} />
-                  <Text style={s.cardTitle}>{g.title}</Text>
-                </View>
-              ) : (
+              <View style={s.guideHead}>
+                {g.art ? <Art name={g.art} size={20} /> : g.icon ? <Ionicons name={g.icon} size={18} color={colors.gold} /> : null}
                 <Text style={s.cardTitle}>{g.title}</Text>
-              )}
+              </View>
               {g.body.map((b) => (
                 <Text key={b} style={s.body}>
                   {b}
@@ -280,27 +286,27 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
             </View>
           ))}
           <View style={s.card}>
-            <Text style={s.cardTitle}>📋 Seviye tablosu</Text>
+            <View style={s.guideHead}>
+              <Ionicons name="list" size={18} color={colors.gold} />
+              <Text style={s.cardTitle}>Seviye tablosu</Text>
+            </View>
+            <Text style={[s.dim, { marginBottom: 4 }]}>İlk seviyeler hızlı açılır; ortadan sonra her seviye bir öncekinden yaklaşık dörtte bir fazla puan ister.</Text>
             <View style={s.tableHead}>
               <Text style={[s.cell, s.headCell]}>Seviye</Text>
               <Text style={[s.cell, s.headCell, { textAlign: 'right' }]}>Gereken puan</Text>
               <Text style={[s.cell, s.headCell, { textAlign: 'right' }]}>Rozet</Text>
             </View>
             {sys.table.map((xp, l) => (
-              <View key={l} style={[s.tableRow, l % 2 === 1 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
+              <View key={l} style={[s.tableRow, l % 2 === 1 && { backgroundColor: ink(0.03) }]}>
                 <Text style={s.cell}>
                   Lv.{l} · {sys.tierOf(l).name}
                 </Text>
-                <Text style={[s.cell, { textAlign: 'right' }]}>
-                  {fmt(xp)}
-                  {sys.estimated.includes(l) ? ' *' : ''}
-                </Text>
+                <Text style={[s.cell, { textAlign: 'right' }]}>{fmt(xp)}</Text>
                 <View style={[s.cell, { alignItems: 'flex-end' }]}>
                   <Badge level={l} />
                 </View>
               </View>
             ))}
-            {sys.estimated.length > 0 && <Text style={[s.dim, { marginTop: 6 }]}>* Taslak eşik; ürün ekibinin onayı bekleniyor.</Text>}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -308,13 +314,13 @@ function Guide({ kind, visible, onClose }: { kind: Kind; visible: boolean; onClo
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   top: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  seg: { flex: 1, flexDirection: 'row', backgroundColor: colors.card, borderRadius: 999, padding: 3 },
+  seg: { flex: 1, flexDirection: 'row', backgroundColor: colors.card, borderRadius: 999, padding: 3, ...lift },
   segItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 999 },
   segOn: { backgroundColor: semantic.action },
   segText: { color: colors.textDim, fontWeight: '800', fontSize: 13 },
-  me: { flexDirection: 'row', alignItems: 'center', gap: 14, margin: 16, marginTop: 6, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
+  me: { flexDirection: 'row', alignItems: 'center', gap: 14, margin: 16, marginTop: 6, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: NIGHT_BORDER, ...(dark ? {} : { boxShadow: '0 2px 4px rgba(16,36,64,0.08), 0 10px 24px rgba(16,36,64,0.14)' }) },
   name: { color: '#fff', fontSize: 18, fontWeight: '900', flexShrink: 1 },
   meLine: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
   meDim: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
@@ -323,6 +329,8 @@ const s = StyleSheet.create({
   tiers: { paddingHorizontal: 12, alignItems: 'flex-end' },
   tier: { width: TIER_W, alignItems: 'center', gap: 2 },
   emblem: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', transform: [{ rotate: '45deg' }] },
+  // The selected emblem's white ring; on paper a soft shadow lifts it so the ring reads.
+  emblemOn: { borderColor: '#fff', ...(dark ? {} : { boxShadow: '0 4px 12px rgba(16,36,64,0.22)' }) },
   tierName: { color: colors.textDim, fontWeight: '800', fontSize: 12, marginTop: 4 },
   tierRange: { color: colors.textDim, fontSize: 11 },
   levels: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 14 },
@@ -331,19 +339,20 @@ const s = StyleSheet.create({
   status: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 10, backgroundColor: 'rgba(251,191,36,0.08)' },
   statusOk: { backgroundColor: 'rgba(34,197,94,0.08)' },
   statusText: { color: colors.text, fontSize: 13, flex: 1 },
-  card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 8 },
-  cardTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 8, ...lift },
+  cardTitle: { color: colors.text, fontWeight: '800', fontSize: 15 },
+  guideHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   perk: { width: '33.33%', alignItems: 'center', gap: 4, paddingHorizontal: 4 },
   perkArt: { width: 72, height: 72, borderRadius: 22, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   lock: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   perkTitle: { color: colors.text, fontWeight: '800', fontSize: 12, textAlign: 'center' },
   perkDetail: { color: colors.textDim, fontSize: 11, textAlign: 'center', lineHeight: 14 },
-  row: { color: '#fff', fontSize: 14 },
+  row: { color: colors.text, fontSize: 14 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   body: { color: colors.text, fontSize: 13, lineHeight: 19 },
   tableHead: { flexDirection: 'row', paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   headCell: { color: colors.textDim, fontWeight: '700' },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderRadius: 6 },
   cell: { flex: 1, color: colors.text, fontSize: 12, fontVariant: ['tabular-nums'] },
-});
+}));

@@ -156,14 +156,12 @@ export const vehiclesOf = (id: string) => COSMETICS.filter((c) => c.kind === 'ri
 export const giftWallOf = (id: string): (Gift & { count: number })[] =>
   GIFTS.map((g, i) => ({ ...g, count: Math.max(0, ((seedOf(id) * (i + 3)) % 11) - 3) }));
 
-/** Total gifts in the (mock) global catalog, shown as "Aydınlatılmış 5/2169". */
-export const GIFT_CATALOG_TOTAL = 2169;
 
 export type GiftCollection = { id: string; name: string; emoji: string; colors: [string, string]; total: number };
 export const GIFT_COLLECTIONS: GiftCollection[] = [
   { id: 'gc1', name: 'Romantik Randevu', emoji: '🏰', colors: ['#EC4899', '#7C3AED'], total: 25 },
   { id: 'gc2', name: 'Mucize Keşif', emoji: '🧭', colors: ['#0EA5E9', '#6366F1'], total: 20 },
-  { id: 'gc3', name: 'Odalar Arası PK Savaşı', emoji: '⚔️', colors: ['#EF4444', '#F59E0B'], total: 12 },
+  { id: 'gc3', name: 'Odalar Arası PK', emoji: '⚔️', colors: ['#EF4444', '#F59E0B'], total: 12 },
   { id: 'gc4', name: 'Yıldızlı Gece', emoji: '🌌', colors: ['#312E81', '#8B5CF6'], total: 18 },
 ];
 export const collectionProgress = (id: string, col: GiftCollection) => (id === 'me' ? 0 : (seedOf(id + col.id) % (col.total + 1)) >> 1);

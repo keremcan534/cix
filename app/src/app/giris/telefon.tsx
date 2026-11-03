@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 // "5321234567" -> "532 123 45 67"
 const format = (digits: string) =>
@@ -15,6 +15,8 @@ const format = (digits: string) =>
 
 export default function PhoneScreen() {
   const { setPhone } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [digits, setDigits] = useState('');
   const valid = digits.length === 10 && digits.startsWith('5');
 
@@ -54,11 +56,11 @@ export default function PhoneScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, lift }) => ({
   row: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 28 },
-  prefix: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 14 },
-  prefixText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  prefix: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 14, ...lift },
+  prefixText: { color: colors.text, fontSize: 17, fontWeight: '600' },
   // minWidth 0: on web an input won't shrink below its content width and pushed the row off screen.
-  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 20, fontWeight: '600', paddingHorizontal: 16, paddingVertical: 14, letterSpacing: 1 },
+  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, borderRadius: 14, color: colors.text, fontSize: 20, fontWeight: '600', paddingHorizontal: 16, paddingVertical: 14, letterSpacing: 1, ...lift },
   error: { color: colors.red, paddingHorizontal: 20, marginTop: 8 },
-});
+}));

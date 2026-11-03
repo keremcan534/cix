@@ -1,4 +1,4 @@
-// Balkon (people in the room but not on a mic), the room's total counter, the "Odadaki Kullanıcılar" sheet
+// Güverte (people in the room but not on a mic), the room's total counter, the "Odadaki Kullanıcılar" sheet
 // with role-based actions, the mic invite prompt for the invited person, and the connection banner.
 // Every number and list here comes from one presence model (lib/room-presence deriveView); actions call
 // the room, which calls the presence server where they are validated.
@@ -13,12 +13,13 @@ import { ROLE_RANK, type RoomRole } from '@/components/room/parts';
 import { userById } from '@/data/mock';
 import type { MicInvite, RoomLive, RoomView } from '@/lib/room-presence';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const nameOf = (uid: string) => (uid === 'me' ? 'Sen' : userById(uid).name);
 
-// --- Balkon bar + total counter ----------------------------------------------------------------------
-/** Compact strip under the mics: Balkon count with a few faces (left) and the total counter (right). */
+// --- Güverte bar + total counter ----------------------------------------------------------------------
+/** Compact strip under the mics: Güverte count with a few faces (left) and the total counter (right). */
 export function BalconyBar({ view, stale, onOpen }: { view: RoomView; stale: boolean; onOpen: () => void }) {
   // Fewer faces on narrow phones so the label and count never truncate.
   const { width } = useWindowDimensions();
@@ -26,9 +27,9 @@ export function BalconyBar({ view, stale, onOpen }: { view: RoomView; stale: boo
   const more = view.balcony - faces.length;
   return (
     <View style={[s.bar, stale && { opacity: 0.7 }]}>
-      <Pressable style={s.balcony} onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Balkon, ${view.balcony} kişi. Listeyi aç`}>
+      <Pressable style={s.balcony} onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Güverte, ${view.balcony} kişi. Listeyi aç`}>
         <Text style={s.balconyTitle} numberOfLines={1}>
-          Balkon <Text style={s.balconyCount}>· {fmt(view.balcony)} kişi</Text>
+          Güverte <Text style={s.balconyCount}>· {fmt(view.balcony)} kişi</Text>
         </Text>
         {view.balcony > 0 ? (
           <View style={s.faces}>
@@ -121,8 +122,8 @@ export function ParticipantsSheet({
             <Text style={s.title} accessibilityRole="header">
               {inviteSeat !== null ? `${inviteSeat + 1}. mikrofona davet et` : 'Odadaki Kullanıcılar'}
             </Text>
-            <Text style={s.sub} accessibilityLabel={`${view.total} kişi, ${view.mic} mikrofonda, ${view.balcony} balkonda`}>
-              {fmt(view.total)} kişi · {fmt(view.mic)} mikrofonda · {fmt(view.balcony)} balkonda
+            <Text style={s.sub} accessibilityLabel={`${view.total} kişi, ${view.mic} mikrofonda, ${view.balcony} güvertede`}>
+              {fmt(view.total)} kişi · {fmt(view.mic)} mikrofonda · {fmt(view.balcony)} güvertede
             </Text>
           </View>
           <Pressable onPress={close} hitSlop={8} style={s.closeBtn} accessibilityLabel="Kapat">
@@ -138,13 +139,13 @@ export function ParticipantsSheet({
         {hiddenMe && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Art name="oda-gizli-giris" size={18} />
-            <Text style={[s.dim, { flex: 1 }]}>Gizli girişle Balkon’dasın: diğerlerinin listesinde ve sayısında görünmüyorsun.</Text>
+            <Text style={[s.dim, { flex: 1 }]}>Gizli girişle Güverte’desin: diğerlerinin listesinde ve sayısında görünmüyorsun.</Text>
           </View>
         )}
         <View style={s.tabs} accessibilityRole="tablist">
           {(
             [
-              ['balcony', 'Balkon', view.balcony],
+              ['balcony', 'Güverte', view.balcony],
               ['mic', 'Mikrofonda', view.mic],
               ['all', 'Tümü', view.total],
             ] as const
@@ -166,7 +167,7 @@ export function ParticipantsSheet({
           initialNumToRender={14}
           windowSize={7}
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={<Text style={[s.dim, { textAlign: 'center', paddingVertical: 24 }]}>{q ? 'Aramaya uyan kimse yok.' : tab === 'balcony' ? 'Balkon boş: odadaki herkes mikrofonda.' : tab === 'mic' ? 'Mikrofonda kimse yok.' : 'Oda boş.'}</Text>}
+          ListEmptyComponent={<Text style={[s.dim, { textAlign: 'center', paddingVertical: 24 }]}>{q ? 'Aramaya uyan kimse yok.' : tab === 'balcony' ? 'Güverte boş: odadaki herkes mikrofonda.' : tab === 'mic' ? 'Mikrofonda kimse yok.' : 'Oda boş.'}</Text>}
           renderItem={({ item: uid }) => {
             const u = userById(uid);
             const role = roleOf(uid);
@@ -175,7 +176,7 @@ export function ParticipantsSheet({
             const onMic = seat >= 0 || onBoss;
             const me = uid === 'me';
             const status = [
-              onBoss ? '👑 Patron koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Balkon',
+              onBoss ? 'Dümen koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Güverte',
               onMic && room.micMuted.includes(uid) ? 'mikrofonu kapatıldı' : '',
               pending.has(uid) ? 'davet bekliyor' : '',
               silenced.has(uid) ? 'senin için sessizde' : '',
@@ -188,11 +189,11 @@ export function ParticipantsSheet({
             return (
               <View style={[s.row, expanded && s.rowOpen]}>
                 <Pressable style={s.rowMain} onPress={() => setOpen(expanded ? null : uid)} accessibilityRole="button" accessibilityLabel={`${me ? 'Sen' : u.name}, ${status}. İşlemler`} aria-expanded={expanded}>
-                  <Image source={{ uri: u.avatar }} style={[s.av, blocked.has(uid) && { opacity: 0.45 }]} />
+                  <Photo uri={u.avatar} kind="face" style={[s.av, blocked.has(uid) && { opacity: 0.45 }]} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={s.name} numberOfLines={1}>
                       {me ? 'Sen' : u.name}
-                      {role === 'owner' ? ' 👑' : role === 'admin' ? ' 🛡️' : ''}
+                      {role === 'owner' ? ' · Kaptan' : role === 'admin' ? ' 🛡️' : ''}
                     </Text>
                     <Text style={s.dim} numberOfLines={1}>
                       {status}

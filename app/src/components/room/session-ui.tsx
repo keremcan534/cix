@@ -6,7 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Keyboard, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Keyboard, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -40,6 +40,7 @@ import {
 } from '@/lib/room-session';
 import { saveRoom } from '@/lib/room-session-persist';
 import { colors, radius, semantic, space, type } from '@/theme';
+import { Photo } from '@/components/photo';
 
 // --- Navigation helpers -----------------------------------------------------------------------------
 /** Opens the full room again: back to its route if it is still in the stack, else a new one. Never reconnects. */
@@ -206,7 +207,7 @@ export function MiniRoom({ session }: { session: RoomSession }) {
         accessibilityLabel={`Canlı oda: ${session.title}. ${st.text}. ${forced ? 'Odayı aç' : 'Mini odayı göster'}`}
         hitSlop={6}
       >
-        <Image source={{ uri: session.cover }} style={s.edgeCover} />
+        <Photo uri={session.cover} kind="cover" seed={session.roomId} style={s.edgeCover} />
         <View style={[s.edgeDot, { backgroundColor: TONE[st.tone] }]} />
       </Pressable>
     );
@@ -223,7 +224,7 @@ export function MiniRoom({ session }: { session: RoomSession }) {
         >
           {/* A room cover (rounded square with a live edge), so it never reads as a person's avatar. */}
           <View style={[s.coverWrap, { borderColor: TONE[st.tone] }]}>
-            <Image source={{ uri: session.cover }} style={s.cover} />
+            <Photo uri={session.cover} kind="cover" seed={session.roomId} style={s.cover} />
             {!ended && hearing(session) && (
               <View style={s.coverBadge}>
                 <Ionicons name="volume-high" size={10} color={semantic.liveInk} />

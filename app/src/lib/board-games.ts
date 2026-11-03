@@ -1,4 +1,4 @@
-// Bet-board games (Gece Yarısı Çarkı çarkı, Tatlı Tezgâh, Sihir Destesi): place chips on any of the options, one result is
+// Bet-board games (Gece Yarısı Çarkı çarkı, Liman Pazarı, Sihir Destesi): place chips on any of the options, one result is
 // drawn for the whole round and every bet on an option that the result pays wins its multiplier. Each option's
 // expected return is at most the house rule's 40 % on its own (weight of every result that pays it × multiplier),
 // so any mix of bets in a round returns at most 40 % too. Results that pay nobody hold the house share.
@@ -32,7 +32,7 @@ export const LUCKY77: Board = {
 export const LUCKY_WHEEL = ['seven', 'apple', 'lemon', 'melon', 'grape', 'apple', 'lemon', 'melon', 'grape', 'lemon', 'apple', 'melon', 'grape', 'lemon', 'apple', 'melon', 'grape', 'lemon', 'grape', 'lemon'];
 
 /**
- * Tatlı Tezgâh: eight dishes on a Ferris wheel. Salata pays every vegetable bet, Pizza every meat and sea bet; Boş
+ * Liman Pazarı: eight dishes on a Ferris wheel. Salata pays every vegetable bet, Pizza every meat and sea bet; Boş
  * Tabak pays nobody. Weights out of 9000: (540 + 180) × 5 = (324 + 36) × 10 = (204 + 36) × 15 = (108 + 36) × 25 =
  * (44 + 36) × 45 = 3600 → each option returns exactly 0.4.
  */

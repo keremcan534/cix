@@ -1,7 +1,7 @@
 // Admin: PK settings (Normal, Takım and cross-room PK), live PKs, history and integrity records. A running PK
 // keeps the settings and scoring it started with; changes here apply to new PKs only.
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -10,11 +10,12 @@ import { GIFTS, userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';
 import { PK_DURATIONS, cancelPk, finishNow, modeLabel, pointsFor, revokeGift, roomTitle, updateConfig, usePk, type PkSession } from '@/lib/pk';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type Tab = 'settings' | 'points' | 'live' | 'history' | 'integrity';
 
 function Chips<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+  const s = useStyles();
   return (
     <View style={s.chips}>
       {options.map(([v, l]) => (
@@ -26,6 +27,7 @@ function Chips<T extends string | number>({ value, options, onChange }: { value:
   );
 }
 function Row({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const s = useStyles();
   return (
     <View style={s.row}>
       <Text style={s.label}>{label}</Text>
@@ -50,6 +52,8 @@ export default function PkAdmin() {
   const [tab, setTab] = useState<Tab>('settings');
   const [restrict, setRestrict] = useState('');
   const can = resolve(rbac, 'me', 'pk.manage', { type: 'platform' });
+  const { colors } = useTheme();
+  const s = useStyles();
   if (!can.allowed)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -191,8 +195,8 @@ export default function PkAdmin() {
                       <Text style={s.chipText}>Süreyi bitir (test)</Text>
                     </Pressable>
                   )}
-                  <Pressable style={[s.small, { backgroundColor: 'rgba(217,58,69,0.2)' }]} onPress={() => cancelPk(p.id, 'Yönetici iptal etti')}>
-                    <Text style={[s.chipText, { color: '#FF7A82' }]}>İptal et</Text>
+                  <Pressable style={[s.small, s.cancel]} onPress={() => cancelPk(p.id, 'Yönetici iptal etti')}>
+                    <Text style={[s.chipText, s.cancelText]}>İptal et</Text>
                   </Pressable>
                   {p.kind === 'cross' && (
                     <Pressable style={s.small} onPress={() => cancelPk(p.id, `${roomTitle(p.opponentRoomId!)} kapandı`, 'Sistem')}>
@@ -257,15 +261,17 @@ export default function PkAdmin() {
   );
 }
 
-const s = StyleSheet.create({
-  title: { color: '#fff', fontWeight: '800', fontSize: 15 },
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
+  title: { color: colors.text, fontWeight: '800', fontSize: 15 },
   label: { color: colors.text, fontSize: 13, flex: 1 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
-  chipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.15)' },
+  chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   small: { borderRadius: 999, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7 },
-  input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
-});
+  cancel: { backgroundColor: dark ? 'rgba(217,58,69,0.2)' : 'rgba(204,46,58,0.1)' },
+  cancelText: { color: semantic.danger },
+  input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+}));

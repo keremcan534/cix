@@ -7,12 +7,14 @@ const RULES: [Risk, RegExp][] = [
   ['iban', /\bTR\s?\d{2}(?:\s?\d{4}){5}\s?\d{2}\b/i],
   ['phone', /(?:\+?90|0)?\s?5\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}\b/],
   ['link', /(https?:\/\/|www\.)\S+|\b\S+\.(com|net|org|xyz|link|ly)\b/i],
-  ['offplatform', /\b(whatsapp|wp'?den|telegram|tg'?den|insta(gram)?'?(dan|den)?|snap(chat)?|discord)\b/i],
-  ['money', /(para (gönder|yolla|at)|havale|\beft\b|papara|doğrulama kodu|sms kodu|ucuz jeton|jeton sat|hediye çeki|yatırım fırsatı|kripto)/i],
+  ['offplatform', /\b(whatsapp|wp['’]?den|telegram|tg['’]?den|insta(gram)?['’]?(dan|den)?|snap(chat)?|discord)\b/i],
+  ['money', /(para (gönder|yolla|at)|havale|\beft\b|papara|doğrulama kodu|sms kodu|ucuz jeton|jeton sat(?![ıi]n)|hediye çeki|yatırım fırsatı|kripto)/i],
 ];
 
 export function scanMessage(text: string): Risk[] {
-  return RULES.filter(([, re]) => re.test(text)).map(([k]) => k);
+  // `/i` doesn't pair the Turkish İ/i and I/ı, so also test the Turkish lower-case text ("İnstagram", "KRİPTO").
+  const lower = text.toLocaleLowerCase('tr-TR');
+  return RULES.filter(([, re]) => re.test(text) || re.test(lower)).map(([k]) => k);
 }
 
 /** Warning under someone else's message; null when it looks fine. */

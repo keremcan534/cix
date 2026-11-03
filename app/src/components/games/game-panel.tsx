@@ -14,7 +14,7 @@ import { FortunePlayer } from '@/components/games/fortune';
 import { GoldTreePlayer } from '@/components/games/gold-tree';
 import { BoardPlayer } from '@/components/games/board';
 import { LineSlotPlayer } from '@/components/games/line-slot';
-import { OlympusPlayer } from '@/components/games/olympus';
+import { FenerPlayer } from '@/components/games/fener';
 import { RocketPlayer } from '@/components/games/rocket';
 import { OkeyTable } from '@/components/games/okey';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
@@ -30,7 +30,7 @@ export type VoiceState = { seated: boolean; micOn: boolean; onToggleMic: () => v
 /** Casino games with their own screen; the old ones (wheel, dice, Ejder ile Kaplan) use the shared CasinoPlayer. */
 const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => React.JSX.Element>> = {
   fortune: FortunePlayer,
-  olympus: OlympusPlayer,
+  olympus: FenerPlayer,
   fish: FishPlayer,
   rocket: RocketPlayer,
   goldtree: GoldTreePlayer,
@@ -94,7 +94,7 @@ export function GamePanel({
         <Text style={p.title} numberOfLines={1}>
           {titleArt ? '' : `${titleEmoji} `}
           {title}
-          {casinoGame ? <Text style={p.badge}> Servet Lv.{casinoGame.minWealth}</Text> : <Text style={p.free}> Ücretsiz</Text>}
+          {casinoGame ? <Text style={p.badge}> Cömertlik Lv.{casinoGame.minWealth}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
         {onMinimize && (
           <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">

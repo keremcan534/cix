@@ -1,21 +1,23 @@
-import type Ionicons from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
+import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { CALLS_FROM_LABEL, DM_FROM_LABEL, type CallsFrom, type DmFrom } from '@/data/privacy';
 import { GATES } from '@/data/status';
-import { showAlert } from '@/lib/alert';
+import { confirmLogout, showAlert } from '@/lib/alert';
 import { useApp, type NotifyType, type Settings } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme, type Appearance } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { openLegal } from '@/lib/legal';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -41,8 +43,32 @@ const nowMs = () => Date.now();
 
 const coin = <Icon3D name="coin" size={14} />;
 
+const APPEARANCE: [Appearance, string, IconName][] = [
+  ['system', 'Sistem', 'phone-portrait-outline'],
+  ['light', 'Açık', 'sunny-outline'],
+  ['dark', 'Koyu', 'moon-outline'],
+];
+
+/** Sistem / Açık / Koyu: the app's color scheme. */
+function AppearancePicker() {
+  const { settings, setSetting } = useApp();
+  const t = useTheme();
+  return (
+    <ListBlock title="Tema">
+      <ChoiceChips
+        value={settings.appearance}
+        options={APPEARANCE.map(([v, label, icon]) => [v, label, <Ionicons key={v} name={icon} size={14} color={settings.appearance === v ? t.colors.text : t.colors.textDim} />])}
+        onChange={(v) => setSetting('appearance', v)}
+      />
+    </ListBlock>
+  );
+}
+
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
+  const [licenses, setLicenses] = useState(false);
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const snoozed = settings.snoozeUntil > nowMs();
   const snooze = (h: number) => {
     setSetting('snoozeUntil', h ? nowMs() + h * 3_600_000 : 0);
@@ -116,13 +142,13 @@ export default function SettingsScreen() {
           <Toggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" />
           <Toggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
           <Toggle k="showCurrentRoom" icon="mic-outline" title="Bulunduğum odayı profilimde göster" subtitle="Kapalıyken profilinden odana 'Git' ile gelinemez." />
-          <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Lucky ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
+          <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Uğurlu hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
           <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
           <Toggle
             k="invisibleEntry"
             leading={<Art name="oda-gizli-giris" size={32} />}
             title="Odalara gizli giriş"
-            subtitle="Asil Markiz+ (Gizli Oda Girişi) · Moderasyon kayıtlarından gizlenmez."
+            subtitle="Rütbe: Amiral ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
             disabled={!GATES.invisibleEntry(nobleTier)}
           />
         </ListGroup>
@@ -189,7 +215,8 @@ export default function SettingsScreen() {
           )}
         </ListGroup>
 
-        <ListGroup label="Görünüm ve erişilebilirlik">
+        <ListGroup label="Görünüm ve erişilebilirlik" footer="Sistem, telefonunun açık veya koyu ayarını izler. Odalar, oyunlar ve aramalar her temada koyu kalır.">
+          <AppearancePicker />
           <Toggle k="effectsOff" icon="sparkles-outline" title="Animasyon ve giriş efektlerini kapat" subtitle="Hediye animasyonları ve giriş efektleri gösterilmez; oda işlevleri devam eder." />
           <Toggle k="haptics" icon="pulse-outline" title="Dokunuş titreşimi" subtitle="Butona basınca, mikrofonu açınca ve hediye gönderince telefon hafifçe titrer." />
           <Toggle k="reduceMotion" icon="contrast-outline" title="Hareketi azalt" subtitle="Geçişler ve titreşimli efektler sadeleştirilir." />
@@ -218,7 +245,7 @@ export default function SettingsScreen() {
               ))}
               {snoozed && (
                 <Pressable onPress={() => snooze(0)} style={[styles.chip, styles.chipOn]}>
-                  <Text style={styles.chipText}>Ertelemeyi kaldır</Text>
+                  <Text style={[styles.chipText, styles.chipTextOn]}>Ertelemeyi kaldır</Text>
                 </Pressable>
               )}
             </View>
@@ -233,20 +260,22 @@ export default function SettingsScreen() {
             subtitle="Moderasyon, kısıtlama, transfer veya oyun kararı"
             onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Moderasyon kararı' } })}
           />
-          <ListRow icon="document-text-outline" title="Kullanım koşulları ve gizlilik" onPress={() => showAlert('Kullanım Koşulları', 'Demo metni.')} />
+          <ListRow icon="document-text-outline" title="Kullanım Koşulları" onPress={() => openLegal('terms')} />
+          <ListRow icon="shield-checkmark-outline" title="Gizlilik Politikası" onPress={() => openLegal('privacy')} />
+          <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => setLicenses(true)} />
         </ListGroup>
 
         <ListGroup
           footer={
             deletionRequested ? (
-              <Text style={[styles.footnote, { color: semantic.money }]}>
+              <Text style={[styles.footnote, { color: semantic.moneyText }]}>
                 Hesap silme talebin alındı. 30 gün içinde tamamlanacak; bu sürede giriş yaparak iptal edebilirsin. Yasal olarak saklanması gereken kayıtlar saklama süresi kadar tutulur.
               </Text>
             ) : undefined
           }
         >
           <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="KVKK kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
-          <ListRow icon="log-out-outline" tone="neutral" title="Çıkış yap" onPress={logout} chevron={false} />
+          <ListRow icon="log-out-outline" tone="neutral" title="Çıkış yap" onPress={() => confirmLogout(logout)} chevron={false} />
           {IS_DEMO && (
             <ListRow
               icon="refresh-outline"
@@ -277,19 +306,30 @@ export default function SettingsScreen() {
           )}
         </ListGroup>
       </ScrollView>
+      <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   page: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 48, gap: 22 },
   blockHint: { color: colors.textDim, fontSize: 12, marginTop: -6 },
   footnote: { fontSize: 12, lineHeight: 17, paddingHorizontal: 4 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: semantic.success, marginRight: 4 },
-  endBtn: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,122,130,0.5)', backgroundColor: 'rgba(255,122,130,0.1)' },
+  // Tinted with semantic.danger of each scheme.
+  endBtn: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: dark ? 'rgba(255,122,130,0.5)' : 'rgba(196,43,55,0.4)',
+    backgroundColor: dark ? 'rgba(255,122,130,0.1)' : 'rgba(196,43,55,0.07)',
+  },
   endText: { color: semantic.danger, fontWeight: '700', fontSize: 12 },
   snoozeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: colors.primary },
-  chipText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-});
+  chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
+  // White on the turquoise fill in both schemes.
+  chipTextOn: { color: '#fff' },
+}));
