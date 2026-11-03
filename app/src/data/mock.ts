@@ -186,8 +186,27 @@ function guestUser(id: string): User {
   return u;
 }
 
+// Live mode (lib/live): real people and rooms from our server join the same lookups, by their server ids.
+const serverUsers = new Map<string, User>();
+const serverRooms = new Map<string, Room>();
+/** A server id (uuid): a real account or room, not a sample one. */
+export const isServerId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+/** Adds or updates a real person; fields not given keep what was known. */
+export function putServerUser(p: Partial<User> & { id: string; name: string }): User {
+  const prev = serverUsers.get(p.id);
+  const u: User = { age: 0, city: '', distanceKm: 0, avatar: NO_PHOTO, verified: false, bio: '', online: true, country: 'TR', showGender: true, ...prev, ...p };
+  serverUsers.set(p.id, u);
+  return u;
+}
+export const putServerRoom = (r: Room) => void serverRooms.set(r.id, r);
+export const serverUserKnown = (id: string) => serverUsers.has(id);
+export const serverRoomKnown = (id: string) => serverRooms.has(id);
+
 export const userById = (id: string): User =>
-  id === 'me' ? ME : (USERS.find((u) => u.id === id) ?? (isGuestId(id) ? guestUser(id) : USERS[0]));
+  id === 'me'
+    ? ME
+    : (USERS.find((u) => u.id === id) ??
+      (isGuestId(id) ? guestUser(id) : (serverUsers.get(id) ?? (isServerId(id) ? putServerUser({ id, name: 'Üye' }) : USERS[0]))));
 
 export const ROOMS: Room[] = [
   { id: 'r1', title: 'Gece Sohbeti 🌙', category: 'Sohbet', cover: photo('night'), hostId: 'u1', listeners: 248, seatUserIds: ['u1', 'u2', 'u5', null, 'u7', null, 'u9', null, null], tags: ['Sohbet', 'Gece'], level: 6, roomType: 'free', announcement: 'Gece sohbetine hoş geldin, saygı her şeyden önce 🌙' },
@@ -199,7 +218,7 @@ export const ROOMS: Room[] = [
   { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', theme: 'pk', bossSeat: true, micPermission: 'members', layoutId: 'audio-9-team', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
 ];
 
-export const roomById = (id: string) => ROOMS.find((r) => r.id === id) ?? ROOMS[0];
+export const roomById = (id: string) => serverRooms.get(id) ?? ROOMS.find((r) => r.id === id) ?? ROOMS[0];
 
 export const MOMENTS: Moment[] = [
   { id: 'm1', userId: 'u5', text: 'Kapadokya sabahı 🎈 Burayı herkes bir kez görmeli!', image: photo('cappadocia', 600, 600) || undefined, likes: 342, comments: 28, time: '12 dk' },

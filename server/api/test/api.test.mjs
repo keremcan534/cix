@@ -28,6 +28,22 @@ describe('Giriş ve cüzdan', () => {
     assert.equal((await call('POST', '/api/wallet/gift', { to: a.user.id, amount: 1, ref: rnd(6) }, a.session))[0], 400);
   });
 
+  test('uygulama içi harcama: jeton düşer, tek kez, yetersiz bakiye ve geçersiz istek', async () => {
+    const a = await signUp('A');
+    await call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, a.session);
+    const ref = rnd(6);
+    const twice = await Promise.all([1, 2].map(() => call('POST', '/api/wallet/spend', { amount: 300, reason: 'VIP 7 gün', ref }, a.session)));
+    assert.deepEqual(twice.map(([st]) => st), [200, 200]);
+    assert.equal((await call('GET', '/api/me', null, a.session))[1].user.coins, 700);
+    const [short, why] = await call('POST', '/api/wallet/spend', { amount: 701, reason: 'Rütbe', ref: rnd(6) }, a.session);
+    assert.equal(short, 409);
+    assert.match(why.error, /Yetersiz/);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: -5, reason: 'x', ref: rnd(6) }, a.session))[0], 400);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 5, reason: ' ', ref: rnd(6) }, a.session))[0], 400);
+    const [, rows] = await call('GET', '/api/ledger', null, a.session);
+    assert.equal(rows.rows[0].reason, 'Uygulama içi: VIP 7 gün');
+  });
+
   test('elmas → jeton çevirisi: sunucunun kuru, tek kez, yetersiz bakiye ve alt sınır', async () => {
     const a = await signUp('A');
     const b = await signUp('B');

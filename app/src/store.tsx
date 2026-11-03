@@ -24,7 +24,10 @@ import { validIban } from '@/lib/bank';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
-import { CONVERSATIONS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import { CONVERSATIONS, GIFTS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import type { ServerEarnings, ServerUser } from '@/lib/api';
+import { follow } from '@/lib/api';
+import { bindWallet, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
@@ -254,6 +257,8 @@ type AppState = {
   conversations: Conversation[];
   /** `room` turns the message into a room invite card that opens the room. */
   sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard) => void;
+  /** A message from someone else arrived (live mode: from the server); counts as unread. */
+  receiveMessage: (userId: string, text: string) => void;
   /** Last "invite all followers" per room id (ms); managers can send it once every 24 hours. */
   followerInvites: Record<string, number>;
   markFollowerInvite: (roomId: string, at: number) => void;
@@ -629,6 +634,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setCoins((c) => c - n);
     setSpentTotal((t) => t + n);
     log('coin', -n, reason);
+    // Live mode: the server takes the same coins (expected here, so its answer doesn't take them twice).
+    if (liveMode() && myServerId() && serverBalRef.current) {
+      serverBalRef.current = { ...serverBalRef.current, coins: serverBalRef.current.coins - n };
+      liveSpend(n, reason);
+    }
     if (countsForWealth(reason)) {
       const before = wealthLevelOf(wealthRef.current);
       wealthRef.current += n;
@@ -638,6 +648,60 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     }
     return true;
   };
+
+  // Live mode (lib/live): the server's balances and Gelir locks. A new balance is applied as the change since the
+  // last one, so purchases already taken here (and mirrored with api.spend, see `spend`) aren't taken twice. The
+  // first balance after a start replaces the local one.
+  const serverBalRef = useRef<{ coins: number; diamonds: number } | null>(null);
+  const applyServer = (u: ServerUser, reason?: string) => {
+    const prev = serverBalRef.current;
+    serverBalRef.current = { coins: u.coins, diamonds: u.diamonds };
+    if (!prev) {
+      setCoins(() => u.coins);
+      diamondsRef.current = u.diamonds;
+      setDiamonds(u.diamonds);
+      return;
+    }
+    const dc = u.coins - prev.coins;
+    const dd = u.diamonds - prev.diamonds;
+    if (dc) {
+      setCoins((c) => Math.max(0, c + dc));
+      log('coin', dc, reason ?? (dc > 0 ? 'Jeton eklendi' : 'Harcama'));
+      if (dc < 0 && reason === 'Hediye gönderildi') setSpentTotal((t) => t - dc);
+    }
+    if (!dd) return;
+    diamondsRef.current = Math.max(0, diamondsRef.current + dd);
+    setDiamonds(diamondsRef.current);
+    if (dd < 0) return void log('diamond', dd, reason ?? 'Elmas düştü');
+    // More diamonds from the server: someone sent me a gift (the server wrote its lock; refreshEarnings reads it).
+    setTotalDiamonds((t) => t + dd);
+    setWeekly((w) => [...w.slice(0, 6), w[6] + dd]);
+    setEarnings((e) => [{ id: uid(), amount: dd, source: 'Hediye' as const, time: now(), day: today() }, ...e].slice(0, 100));
+    log('diamond', dd, 'Hediye');
+    charmRef.current += dd;
+    setCharmXp(charmRef.current);
+    notify({ kind: 'finance', icon: 'gift', title: 'Hediye aldın', body: `${dd.toLocaleString('tr-TR')} elmas kazandın. Kilidi açılınca çekebilir ya da jetona çevirebilirsin.`, href: '/gelir' });
+  };
+  const applyLocks = (e: ServerEarnings) => {
+    const at = Date.now();
+    setLockNow(at);
+    setDiamondLocks(() =>
+      e.locks.map((l): DiamondLock => {
+        if (l.from) rememberUser(l.from);
+        const g = l.gift ? GIFTS.find((x) => x.id === l.gift!.id) : undefined;
+        return {
+          id: `srv-${l.id}`,
+          amount: l.amount,
+          unlockAt: Date.parse(l.unlockAt),
+          channel: l.channel === 'jeton' ? 'jeton' : 'store',
+          source: 'Hediye',
+          ...(l.from && { fromId: toLocal(l.from.id) }),
+          ...(l.gift && { gift: { id: l.gift.id, name: g?.name ?? 'Hediye', emoji: g?.emoji ?? '🎁', count: l.gift.count } }),
+        };
+      }),
+    );
+  };
+  useEffect(() => bindWallet({ apply: applyServer, locks: applyLocks }));
 
   const value: AppState = {
     loggedIn,
@@ -977,7 +1041,16 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setFamily: setFamilyId,
 
     following,
-    toggleFollow: (id) => setFollowing((prev) => toggle(prev, id)),
+    toggleFollow: (id) => {
+      const on = !following.has(id);
+      setFollowing((prev) => toggle(prev, id));
+      // Live mode: real people are followed on the server (they get a notification); a refusal undoes it here.
+      const sid = liveMode() ? toServer(id) : null;
+      if (sid && id !== 'me') follow(sid, on).catch((e) => {
+        setFollowing((prev) => (prev.has(id) === on ? toggle(prev, id) : prev));
+        showAlert('Takip edilemedi', e instanceof Error ? e.message : String(e));
+      });
+    },
     blocked,
     toggleBlock: (id) => {
       logSafety(blocked.has(id) ? 'Engeli kaldırdı' : 'Engelledi', id);
@@ -1012,6 +1085,13 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
           { ...existing, messages: [...existing.messages, msg] },
           ...prev.filter((c) => c.userId !== userId),
         ];
+      }),
+    receiveMessage: (userId, text) =>
+      setConversations((prev) => {
+        const msg = { id: uid(), fromMe: false, text, time: now() };
+        const existing = prev.find((c) => c.userId === userId);
+        if (!existing) return [{ id: `c-${userId}`, userId, unread: 1, messages: [msg] }, ...prev];
+        return [{ ...existing, unread: existing.unread + 1, messages: [...existing.messages, msg] }, ...prev.filter((c) => c.userId !== userId)];
       }),
     followerInvites,
     markFollowerInvite: (roomId, at) => setFollowerInvites((m) => ({ ...m, [roomId]: at })),

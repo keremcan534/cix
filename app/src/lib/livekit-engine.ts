@@ -8,6 +8,7 @@
 import { ConnectionState, Room, RoomEvent, Track } from 'livekit-client';
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
+import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportSignal, type RoomSignal } from '@/lib/live/room-bus';
 
 export type LiveKitConfig = {
   /** wss:// address of the LiveKit server. */
@@ -28,6 +29,8 @@ const roomName = (roomId: string) => `oda-${roomId}`.replace(/[^A-Za-z0-9_-]/g, 
 export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   const s: EngineStats = { roomId: null, connects: 0, reconnects: 0, disconnects: 0, concurrent: 0, maxConcurrent: 0, publishing: false, publishStarts: 0, route: 'speaker' };
   let room: Room | null = null;
+  // The mic I sit on, shown to the other phones as my `seat` attribute (lib/live/room-bus); set again after a reconnect.
+  let seat: number | null = null;
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
 
   const setMic = (r: Room, on: boolean) => {
@@ -45,13 +48,41 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       // Browsers block sound until a user gesture; opening a room is one, so this usually succeeds at once.
       await r.startAudio().catch(() => {});
       if (s.publishing) setMic(r, true);
+      if (seat !== null) pushSeat(r);
+      snapshot(r);
     } catch (e) {
       if (room === r) fail('Ses bağlantısı', e);
     }
   }
 
+  const pushSeat = (r: Room) => {
+    if (r.state === ConnectionState.Connected) r.localParticipant.setAttributes({ seat: seat === null ? '' : String(seat) }).catch((e) => fail('Koltuk', e));
+  };
+  /** Everyone else in the room for the room screen (lib/live/room-bus). */
+  const snapshot = (r: Room) => {
+    if (room !== r || !s.roomId) return;
+    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking }));
+    reportPeers(s.roomId, peers, r.localParticipant.isSpeaking);
+  };
+  bindLink({
+    setSeat(next) {
+      if (next === seat) return;
+      seat = next;
+      if (room) pushSeat(room);
+    },
+    send(msg: RoomSignal) {
+      if (room?.state === ConnectionState.Connected) room.localParticipant.publishData(encodeSignal(msg), { reliable: true }).catch((e) => fail('Mesaj', e));
+    },
+  });
+
   function newRoom() {
     const r = new Room({ dynacast: true, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const update = () => snapshot(r);
+    [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ParticipantAttributesChanged, RoomEvent.ParticipantNameChanged, RoomEvent.ActiveSpeakersChanged, RoomEvent.Reconnected].forEach((ev) => r.on(ev, update));
+    r.on(RoomEvent.Reconnected, () => seat !== null && pushSeat(r));
+    r.on(RoomEvent.DataReceived, (payload, participant) => {
+      if (room === r && s.roomId && participant) reportSignal(s.roomId, participant.identity, decodeSignal(payload));
+    });
     if (cfg.attachAudio === false) return r;
     // Remote voices play through hidden <audio> elements, removed when the track goes away.
     r.on(RoomEvent.TrackSubscribed, (track) => {
@@ -90,6 +121,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       room = null;
       s.publishing = false;
       s.roomId = null;
+      seat = null;
+      reportPeers(null, []);
       s.concurrent--;
       s.disconnects++;
       if (r) {

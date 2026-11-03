@@ -24,6 +24,7 @@
 | `GET /api/ledger` | Son 50 işlem, her satırda işlem sonrası bakiye |
 | `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 jeton, günde en fazla 50.000. |
 | `POST /api/wallet/gift` `{to, amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): serbest miktarlı aktarım (Sunucu hesabı ekranı). Gerçek hediye `/api/gifts/send`. |
+| `POST /api/wallet/spend` `{amount, reason, ref}` | Uygulama içi jetonla alım (VIP, mağaza, oyun girişi): jetonu sunucu bir kez düşer, yetmezse 409. Ne alındığını (hak) henüz sunucu tutmaz; uygulama tutar. |
 
 **Giriş ve oturumlar (`auth.mjs`, `sms.mjs`)**
 | Çağrı | Ne yapar |
@@ -148,6 +149,12 @@ Kod kurulumla (`server.yml`) gider; şunlar sunucuda bir kez elle yapılır:
 3. `Caddyfile`'a webhook yolunu dışarıya kapatan blok (`server/infra/Caddyfile`).
 4. Hesaplar geldikçe `.env`'e: `SMS_PROVIDER` ve anahtarları, `GOOGLE_SERVICE_ACCOUNT`, `APPLE_IAP_*`, `S3_*`, `BACKUP_*`. Telefonla giriş açılınca `ALLOW_DEV_AUTH=0`, mağaza ödemesi açılınca `ALLOW_TEST_TOPUP=0`. Kilit süreleri değişecekse `LOCK_DAYS_STORE` (varsayılan 7) ve `LOCK_DAYS_JETON` (1).
 5. İlk Jeton Noktası hesabını bir yönetici açar (`POST /api/admin/jeton/bank`); yönetici hesabı şimdilik veritabanından atanır (`UPDATE users SET role = 'admin' …`).
+
+## Test APK'sı (canlı mod)
+`EXPO_PUBLIC_API_URL` dolu olan uygulama (EAS `preview` APK'sı) paylaşılması gerekenleri sunucudan yürütür (`app/src/lib/live`): hesap ve profil, jeton ve elmas bakiyesi, test yüklemesi, hediyeler, Gelir kilitleri ve Çevir, odalar, özel mesajlar, takip. Odada kimin olduğu, kimin hangi mikrofonda oturduğu (her telefonun kendi `seat` özelliği), kimin konuştuğu ve oda içi sohbet/hediye animasyonu LiveKit üzerinden telefonlar arasında gider; para hiçbir zaman bu yoldan geçmez, hediye önce `/api/gifts/send` ile ödenir. Bunun için sunucuda:
+- `.env`: `ALLOW_DEV_AUTH=1` (cihazla hesap) ve `ALLOW_TEST_TOPUP=1` (ücretsiz test jetonu). Yayında ikisi de 0.
+- API bu sürüme güncellenmiş olmalı (yeni `/api/wallet/spend`, token'da `canUpdateOwnMetadata`). GitHub'da `DEPLOY_SSH_KEY` sırrı yoksa otomatik kurulum çalışmaz; ya sır eklenir ya da `server/api` sunucuya elle kopyalanıp `docker compose up -d --build api` yapılır.
+- Dinleyici sayıları için yukarıdaki webhook adımı (yoksa oda listesinde sayı 0 görünür, odalar yine çalışır).
 
 ## Sırada
 1. Alan adı (ör. `rtc.<alan>`) → `.env` `DOMAIN`, `Caddyfile`, `livekit.yaml` `turn.domain`, `API_BASE_URL` değişkeni.

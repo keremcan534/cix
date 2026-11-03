@@ -35,7 +35,7 @@ export const newRef = () => randomId(12);
 let session: string | null = null;
 let signingIn: Promise<ServerUser> | null = null;
 
-async function call<T>(method: 'GET' | 'POST', path: string, body?: object): Promise<T> {
+async function call<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: object): Promise<T> {
   if (!BASE) throw new ApiError(0, 'Sunucu adresi ayarlı değil');
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -140,3 +140,34 @@ export const uploadUrl = (kind: 'avatar' | 'moment', contentType: string, size: 
 
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */
 export const liveRooms = () => call<{ rooms: { room: string; listeners: number }[] }>('GET', '/api/rooms/live').then((r) => r.rooms);
+
+// --- Live mode (lib/live): profile, people, rooms, messages, follows and the Gelir wallet on the server.
+export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null };
+export type ServerMe = ServerUser & ServerProfile & { role?: string };
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
+export type UserCard = { id: string; name: string; avatarUrl: string | null };
+export type ServerRoom = { id: string; owner: UserCard; title: string; announcement: string; roomType: string; hasPassword: boolean; createdAt: string; closed: boolean; listeners: number };
+export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
+export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
+export type ServerLock = { id: number; amount: number; channel: string; channelLabel: string; unlockAt: string; createdAt: string; from: { id: string; name: string } | null; gift: { id: string; count: number } | null };
+export type ServerEarnings = { diamonds: number; withdrawable: number; locked: number; lockDays: { store: number; jeton: number }; locks: ServerLock[] };
+
+export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDate?: string; city?: string; bio?: string; interests?: string[]; avatarUrl?: string | null };
+export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
+export const userProfile = (id: string) => call<{ user: PublicUser }>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => r.user);
+export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
+export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
+
+export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
+export const createRoom = (title: string, announcement = '', roomType = 'free') => call<{ room: ServerRoom }>('POST', '/api/rooms', { title, announcement, roomType }).then((r) => r.room);
+export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api/rooms/close', { id });
+
+export const sendDm = (to: string, text: string, ref = newRef()) => call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref }).then((r) => r.message);
+export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
+export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
+export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });
+
+export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
+/** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
+export const spend = (amount: number, reason: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/spend', { amount, reason, ref });
+export const exchange = (diamonds: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref });

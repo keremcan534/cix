@@ -18,6 +18,7 @@ import { RoomHost } from '@/components/room/room-host';
 import { ME } from '@/data/mock';
 import { installCrashGuard, markStarted } from '@/lib/crash-guard';
 import { setupVoice } from '@/lib/voice-setup';
+import { LiveSync } from '@/lib/live/sync';
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -131,6 +132,7 @@ function RootStack() {
           <Stack.Screen name="giris" />
         </Stack.Protected>
       </Stack>
+      {loggedIn && <LiveSync />}
       {loggedIn && <RoomHost />}
       {loggedIn && <MatchLayer />}
       {loggedIn && <GamesBridge />}

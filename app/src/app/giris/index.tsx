@@ -12,6 +12,7 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
+import { liveMode } from '@/lib/live';
 
 // The delivered brand mark (two people forming a heart); app icons are generated from the same file.
 const LOGO = require('../../../assets/brand/logo.png');
@@ -44,10 +45,15 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.actions}>
-          <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
-          <SocialButton icon="logo-google" title="Google ile devam et" />
-          <SocialButton icon="logo-apple" title="Apple ile devam et" />
-          {IS_DEMO && (
+          {/* Test server (live mode): no SMS provider yet, so the account is this phone's (one device, one account). */}
+          {liveMode() ? (
+            <GradientButton title="Hesap oluştur" icon="person-add" onPress={() => router.push('/giris/profil')} />
+          ) : (
+            <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
+          )}
+          {!liveMode() && <SocialButton icon="logo-google" title="Google ile devam et" />}
+          {!liveMode() && <SocialButton icon="logo-apple" title="Apple ile devam et" />}
+          {IS_DEMO && !liveMode() && (
             <Pressable onPress={demoLogin} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 4 }}>
               <Ionicons name="flash" size={14} color={semantic.tonalText} />
               <Text style={styles.link}>Demo hesabıyla hızlı giriş</Text>

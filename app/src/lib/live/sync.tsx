@@ -1,0 +1,56 @@
+// Live mode background sync (lib/live): while signed in, keeps the balance and the Gelir locks in step with the
+// server (a gift someone sends from another phone shows up here within seconds) and polls direct messages.
+// Mounted once above the stack (app/_layout); renders nothing and does nothing without a server address.
+import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
+
+import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
+import { pollMessages } from '@/lib/live/messages';
+import { useApp } from '@/store';
+
+const TICK_MS = 15_000;
+
+export function LiveSync() {
+  const app = useApp();
+  // Read by the timer, which outlives a render.
+  const appRef = useRef(app);
+  useEffect(() => {
+    appRef.current = app;
+  });
+  const name = app.me.name;
+
+  useEffect(() => {
+    if (!liveMode()) return;
+    let alive = true;
+    let tick = 0;
+    let signedIn = false;
+    const run = async () => {
+      try {
+        if (!signedIn) {
+          await liveSignIn(name);
+          signedIn = true;
+          await refreshEarnings();
+        } else {
+          await refreshWallet();
+          if (tick % 4 === 0) await refreshEarnings();
+        }
+        if (alive) await pollMessages(appRef.current);
+      } catch (e) {
+        // No network or the server is down: the next tick tries again; the screens keep the last state.
+        console.warn(`[canlı] ${message(e)}`);
+      }
+      tick++;
+    };
+    void run();
+    const t = setInterval(() => void run(), TICK_MS);
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && void run());
+    return () => {
+      alive = false;
+      clearInterval(t);
+      sub.remove();
+    };
+    // Signing in uses the name once; a later rename goes through the profile screen (saveProfile).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}

@@ -9,6 +9,7 @@ import { Text } from '@/components/text';
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -43,6 +44,12 @@ export default function VerifyScreen() {
   };
 
   const finish = () => {
+    // Test server (live mode): coins come from the server only; test packs are under Jeton Yükle.
+    if (liveMode()) {
+      login();
+      showAlert('Hoş geldin! 🎉', 'Hesabın açıldı. Jeton Yükle ekranından ücretsiz test jetonu ekleyebilirsin.');
+      return;
+    }
     addCoins(100);
     login();
     showAlert('Hoş geldin! 🎉', 'Hoş geldin hediyesi olarak 100 jeton hesabına eklendi.');

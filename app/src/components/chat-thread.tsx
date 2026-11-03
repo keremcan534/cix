@@ -17,6 +17,7 @@ import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from 
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
+import { isLiveUser, liveDm } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -26,7 +27,9 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
   const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
-  const mutual = following.has(user.id) && FOLLOWS_ME.has(user.id);
+  // A real person on the test server: messages are free and go through the server, no demo replies.
+  const real = isLiveUser(user.id);
+  const mutual = real || (following.has(user.id) && FOLLOWS_ME.has(user.id));
   const isBlocked = blocked.has(user.id);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const convo = conversations.find((c) => c.userId === user.id);
@@ -74,6 +77,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
     sendMessage(user.id, text);
     setEmojiOpen(false);
     if (!sticker) setDraft('');
+    if (real) return liveDm(user.id, text);
     // Fake reply so the prototype feels real.
     setTyping(true);
     replyTimer.current = setTimeout(() => {

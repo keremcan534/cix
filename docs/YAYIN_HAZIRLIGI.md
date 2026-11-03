@@ -41,10 +41,10 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | Otomatik test ve sunucu kurulumu (GitHub) | ✅ | Kurulum, madde 9'daki anahtar eklenince çalışır |
 | Uygulamada demo kısayollarını kapatan mağaza bayrağı (`EXPO_PUBLIC_DEMO=0`) | ✅ | |
 | Giriş koruması, Türkçe izin metinleri, sürüm numaraları | ✅ | |
-| **Uygulamanın sunucuya bağlanması** (profil, takip, mesaj, oda listesi, şikâyet, engelleme, hesap silme, cüzdan ve hediye) | ⏳ | Sıradaki en büyük iş. Şu an bu ekranlar telefondaki örnek veriyle çalışıyor. |
+| **Uygulamanın sunucuya bağlanması** (profil, takip, mesaj, oda listesi, şikâyet, engelleme, hesap silme, cüzdan ve hediye) | 🟡 | Test APK'sında (canlı mod, `EXPO_PUBLIC_API_URL` dolu) bağlı: kayıt, profil, takip, mesaj, oda listesi ve oda açma, cüzdan (ücretsiz test jetonu, elmas → jeton), odada hediye. Hâlâ telefonda kalanlar: kozmetik/VIP alımı, görev ödülleri, oyun kazançları, para çekme, şifreli oda, fotoğraf yükleme. Keşfet/arama/son odalar ekranlarından açılan demo odalarında botlar çalışmaya devam ediyor. |
 | Hediye kataloğu, fiyatlar, İnci sınırları ve sıralamalar sunucuda | ✅ | Bedeli sunucu hesaplıyor; uygulamadaki fiyatlarla eşitliği testle korunuyor |
 | Odadaki dinleyici sayısı (LiveKit'ten) ve oda listesinin doluluğa göre sıralanması | ✅ | LiveKit sunucuya kimin girip çıktığını bildiriyor |
-| Oda içi durum (kim hangi koltukta, mikrofon) sunucuda | ⏳ | Şu an her telefon kendi hesaplıyor |
+| Oda içi durum (kim hangi koltukta, mikrofon) sunucuda | 🟡 | Canlı modda LiveKit üzerinden: herkes kendi koltuğunu bildiriyor, konuşanlar halkayla görünüyor, sohbet ve hediye animasyonu odadakilere gidiyor. Sunucuda saklanmıyor; iki telefon aynı koltuğa aynı anda oturursa çakışabilir. Sahibi çıkınca oda sunucuda kapanmıyor (tekrar açınca aynı oda kullanılıyor) |
 | Telefonla giriş (SMS kodu, 5 yanlış denemede kilit, oturum listesi ve kapatma) | 🟡 | Sunucu hazır ve testli; madde 5'teki anahtar bekliyor. İnceleme hesabı için sabit numara ve kod ayarı var |
 | Apple ile giriş, Google ile giriş | ⛔ | Madde 3 |
 | Uygulama içi satın alma + sunucuda makbuz doğrulama | 🟡 | Google Play ve App Store doğrulaması sunucuda yazılı, ilk alım hediyesi ve çift kullanım koruması testli; madde 3 ve 8 bekliyor |
@@ -52,7 +52,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | Push bildirimleri (mesaj, yeni takipçi) | 🟡 | Sunucu gönderiyor, geçersiz cihazları siliyor; madde 4 bekliyor |
 | İstek sınırları, istek kaydı, sağlık kontrolü, sorunsuz yeniden başlatma | ✅ | Mobil operatörlerde aynı IP'yi paylaşanlar için IP sınırı geniş tutuldu |
 | Kurulumdan sonra sürüm kontrolü | ✅ | Kurulum işi, yeni sürüm canlıda cevap verene kadar bekliyor |
-| Telefonda gerçek ses (LiveKit React Native, arka planda ses) | ⛔ | Madde 4 (development build) |
+| Telefonda gerçek ses (LiveKit React Native, arka planda ses) | 🟡 | Kod hazır (APK'da LiveKit var); gerçek telefonda henüz denenmedi. Arka planda ses madde 4 |
 | Mağaza derlemesi (EAS, gerçek imza, AAB, otomatik sürüm) | ⛔ | Madde 3 ve 4 |
 | Yetkili (moderatör) web paneli | ⏳ | Sunucu uçları hazır |
 | Gecelik yedeğin sunucu dışına kopyası (rclone, 60 gün) | 🟡 | Betik hazır; madde 6 bekliyor |

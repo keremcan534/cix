@@ -6,6 +6,7 @@
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
 //   POST /api/wallet/gift       { to, amount, ref } (test only) → { user, replay }
 //   POST /api/wallet/exchange   { diamonds, ref }             → { user, replay, coins }
+//   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (in-app purchases: VIP, store items…)
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
 // Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
@@ -33,7 +34,7 @@ import { purchaseRoutes } from './purchases.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { socialRoutes } from './social.mjs';
-import { creditCoins, giftCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { creditCoins, giftCoins, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -52,6 +53,8 @@ const TOPUP_DAILY = 50000;
 const GIFT_MAX = 1_000_000;
 /** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
 const EXCHANGE_MAX = 1_000_000_000;
+/** Largest single in-app purchase (VIP, rank, store items, game entries). */
+const SPEND_MAX = 10_000_000;
 /**
  * Web origins allowed to call this: the dev server, the GitHub Pages preview, and the exact origins in
  * ALLOWED_ORIGINS (comma separated, e.g. the product's own domain). Native apps send no Origin.
@@ -134,6 +137,25 @@ const walletRoutes = {
    * one transaction and the ref, so a retry is applied once and a short balance (409) changes nothing. Locked
    * diamonds (wallet.mjs) can't be exchanged.
    */
+  /**
+   * An in-app purchase paid with coins (VIP, rank, store items, stickers, game entries). Coins only leave the
+   * account, so this can't create value; what was bought is kept by the app for now. A short balance is a 409.
+   */
+  async 'POST /api/wallet/spend'(req) {
+    const u = await auth(req);
+    const { amount, reason, ref } = await readJson(req);
+    const n = int(amount, 1, SPEND_MAX);
+    if (!n) throw new HttpError(400, 'Geçersiz miktar');
+    const why = typeof reason === 'string' ? reason.trim().slice(0, 80) : '';
+    if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
+    return once(u.id, 'coin', ref, async (c) => {
+      const row = await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id]);
+      await claimRef(c, u.id, 'coin', ref);
+      if (Number(row.rows[0].coins) < n) throw new HttpError(409, 'Yetersiz jeton');
+      await spendCoins(c, u.id, n, `Uygulama içi: ${why}`, ref);
+    });
+  },
+
   async 'POST /api/wallet/exchange'(req) {
     const u = await auth(req);
     const { diamonds, ref } = await readJson(req);

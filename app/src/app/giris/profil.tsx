@@ -10,7 +10,9 @@ import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
-import { INTERESTS } from '@/data/mock';
+import { INTERESTS, ME } from '@/data/mock';
+import { showAlert } from '@/lib/alert';
+import { liveMode, message, saveProfile } from '@/lib/live';
 import { GENDER_ART, interestParts } from '@/data/profile-art';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -27,6 +29,7 @@ export default function ProfileSetupScreen() {
   const [year, setYear] = useState('');
   const [city, setCity] = useState('İstanbul');
   const [interests, setInterests] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
 
   const age = year.length === 4 ? THIS_YEAR - Number(year) : null;
   const ageError = age !== null && (age < 18 || age > 99) ? 'Uygulamayı kullanmak için 18 yaşından büyük olmalısın.' : null;
@@ -40,8 +43,8 @@ export default function ProfileSetupScreen() {
   const toggleInterest = (i: string) =>
     setInterests((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : prev.length < 5 ? [...prev, i] : prev));
 
-  const submit = () => {
-    if (!valid) return;
+  const submit = async () => {
+    if (!valid || busy) return;
     updateMe({
       name: name.trim(),
       gender: gender!,
@@ -52,6 +55,18 @@ export default function ProfileSetupScreen() {
       verified: false,
       ...(photo ? { avatar: photo } : {}),
     });
+    // Live mode: the account is opened on the server now, so other phones see this name, age and city.
+    if (liveMode()) {
+      setBusy(true);
+      try {
+        await saveProfile({ ...ME }, Number(year));
+      } catch (e) {
+        showAlert('Hesap açılamadı', `${message(e)}\n\nİnternet bağlantını kontrol edip tekrar dene.`);
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
     router.push('/giris/dogrulama');
   };
 
@@ -117,7 +132,7 @@ export default function ProfileSetupScreen() {
           </Field>
         </ScrollView>
         <View style={{ padding: 20, paddingTop: 8 }}>
-          <GradientButton title="Devam" onPress={submit} style={{ opacity: valid ? 1 : 0.4 }} />
+          <GradientButton title={busy ? 'Hesabın açılıyor…' : 'Devam'} onPress={submit} style={{ opacity: valid && !busy ? 1 : 0.4 }} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

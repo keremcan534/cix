@@ -107,7 +107,8 @@ export const liveRoutes = {
     const room = url.searchParams.get('room') ?? '';
     if (!ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     await voiceAccess(room, u, url.searchParams.get('password'));
-    const token = liveKitJwt({ sub: u.id, name: u.name, video: { room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true } }, TOKEN_TTL);
+    // canUpdateOwnMetadata: each phone shows which mic it sits on as its own participant attribute (app lib/live).
+    const token = liveKitJwt({ sub: u.id, name: u.name, video: { room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } }, TOKEN_TTL);
     return { token, ttl: TOKEN_TTL };
   },
 

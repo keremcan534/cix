@@ -15,6 +15,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
+import { liveMode, liveTopup, message, TEST_PACKS } from '@/lib/live';
 import { openLegal } from '@/lib/legal';
 import { today } from '@/lib/persist';
 import { stampLabel } from '@/lib/tr';
@@ -24,6 +25,9 @@ export default function WalletScreen() {
   const [tab, setTab] = useState<'buy' | 'history'>('buy');
   const [filter, setFilter] = useState<'coin' | 'diamond'>('coin');
   const [processing, setProcessing] = useState<string | null>(null);
+  // Live mode (test APK): only the server's free test packs, at most 50.000 coins a day.
+  const live = liveMode();
+  const packs = live ? RECHARGE_PACKS.filter((p) => TEST_PACKS.includes(p.coins)) : RECHARGE_PACKS;
   const { colors, dark } = useTheme();
   const styles = useStyles();
 
@@ -31,6 +35,14 @@ export default function WalletScreen() {
     // A second tap while the store payment is pending must not charge twice.
     if (processing) return;
     setProcessing(pack.id);
+    // Live mode (test APK): the server credits a free test pack, so every phone sees the same balance.
+    if (liveMode()) {
+      liveTopup(pack.coins)
+        .then(() => showAlert('Jeton yüklendi', `${pack.coins.toLocaleString('tr-TR')} test jetonu hesabına eklendi. Gerçek ödeme alınmadı.`))
+        .catch((e) => showAlert('Yüklenemedi', message(e)))
+        .finally(() => setProcessing(null));
+      return;
+    }
     // Prototype: no real payment; simulate the store confirmation delay, then credit.
     setTimeout(() => {
       const total = buyPack(pack.id);
@@ -105,7 +117,7 @@ export default function WalletScreen() {
               <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
             </View>
             <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
-            {IS_DEMO && (
+            {IS_DEMO && !live && (
               <Pressable
                 onPress={() => {
                   addCoins(1_000_000, 'Demo test bakiyesi');
@@ -122,11 +134,11 @@ export default function WalletScreen() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
-            <Text style={styles.currency}>Fiyatlar TL</Text>
+            <Text style={styles.currency}>{live ? 'Test sürümü · ücretsiz' : 'Fiyatlar TL'}</Text>
           </View>
           <View style={styles.grid}>
-            {RECHARGE_PACKS.map((p: RechargePack) => {
-              const first = !!p.firstBonus && !firstBuys.has(p.id);
+            {packs.map((p: RechargePack) => {
+              const first = !live && !!p.firstBonus && !firstBuys.has(p.id);
               const bonus = first ? p.firstBonus : p.bonus;
               return (
                 <Pressable key={p.id} onPress={() => buy(p)} accessibilityLabel={`${p.coins} jeton paketi`} style={{ width: '31.3%', margin: '1%' }}>
@@ -142,7 +154,7 @@ export default function WalletScreen() {
                     <Icon3D name="coin" size={40} />
                     <Text style={styles.packCoins}>{p.coins.toLocaleString('tr-TR')}</Text>
                     {bonus ? <Text style={styles.packBonus}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
-                    <Text style={[styles.packPrice, first && { color: colors.text }]}>{processing === p.id ? 'Bekleniyor…' : p.price}</Text>
+                    <Text style={[styles.packPrice, first && { color: colors.text }]}>{processing === p.id ? 'Bekleniyor…' : live ? 'Ücretsiz' : p.price}</Text>
                   </LinearGradient>
                 </Pressable>
               );

@@ -9,7 +9,9 @@ import { Icon3D } from '@/components/Icon3D';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { RULES } from '@/data/rules';
+import { showAlert } from '@/lib/alert';
 import { successHaptic } from '@/lib/haptics';
+import { liveExchange, liveMode, message } from '@/lib/live';
 import { exchangeOwnDiamonds, selfExchangeRate } from '@/lib/coins-bank';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -30,6 +32,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
   const s = useStyles();
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
+  const [busy, setBusy] = useState(false);
   const amount = Number(raw || 0);
   const exchangeQuote = exchangeOwnDiamonds(amount, diamonds);
   // Same order as the store: the amount itself first, then whether the locked part is in it.
@@ -41,6 +44,20 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
     onClose();
   };
   const submit = () => {
+    // Live mode: the server exchanges (its own rate and locks); the new balance reaches the store from there.
+    if (liveMode()) {
+      if (busy) return;
+      setBusy(true);
+      liveExchange(amount)
+        .then((got) => {
+          successHaptic();
+          notify({ kind: 'finance', icon: 'swap-horizontal', title: 'Elmasların jetona çevrildi', body: `${fmt(amount)} elmas → ${fmt(got)} jeton cüzdanına eklendi.`, href: '/cuzdan' });
+          close();
+        })
+        .catch((e) => showAlert('Çevrilemedi', message(e)))
+        .finally(() => setBusy(false));
+      return;
+    }
     const r = exchangeDiamonds(amount);
     if (!r.ok) return;
     successHaptic();
@@ -125,7 +142,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
                 : `Çeviriden sonra: ${fmt(diamonds - (quote.ok ? amount : 0))} 💎 · ${fmt(coins + (quote.ok ? quote.coins : 0))} jeton`}
           </Text>
 
-          <Button title={quote.ok ? `${fmt(quote.coins)} jetona çevir` : 'Çevir'} icon="swap-horizontal" variant="money" disabled={!quote.ok} onPress={submit} />
+          <Button title={quote.ok ? `${fmt(quote.coins)} jetona çevir` : 'Çevir'} icon="swap-horizontal" variant="money" disabled={!quote.ok || busy} onPress={submit} />
           <Text style={s.fine}>Çevrilen elmas nakde dönmez; jetonları hediye, oyun ve mağazada kullanabilirsin.</Text>
         </View>
       </KeyboardAvoidingView>
