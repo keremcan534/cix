@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
+import { useReport } from '@/components/report-sheet';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import {
   ContributionModal,
@@ -173,6 +174,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // A room on our server (live mode, lib/live): real people only, no demo bots or demo gifts.
   const real = isLiveRoom(id);
   const app = useApp();
+  // Live mode: reporting a real room or person goes to the moderators (components/report-sheet).
+  const reporting = useReport();
   const { coins, spendCoins, spendBlock, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency, conversations, sendMessage, followerInvites, markFollowerInvite } = app;
 
   const base = isOwn ? null : roomById(id);
@@ -1582,10 +1585,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ]);
   };
 
-  const report = () => {
-    const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);
-    showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
-  };
+  const report = () =>
+    reporting.start({ type: 'room', id, name: title }, () => {
+      const no = createTicket('Şikâyet', `Oda şikâyeti: ${title} (${id})`);
+      showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
+    });
   // --- Games (Oyun Merkezi spec): opened over the room; never touch seats, mic or membership ------------
   const openRoomGame = (gid: string) => {
     const g = gameCatalog.roomGames.find((x) => x.id === gid);
@@ -1771,10 +1775,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setGiftOpen(true);
     },
     block: (uid) => app.toggleBlock(uid),
-    report: (uid) => {
-      const no = createTicket('Şikâyet', `Kullanıcı şikâyeti: ${userById(uid).name} (${uid}) · oda ${title} (${id})`);
-      showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
-    },
+    report: (uid) =>
+      reporting.start({ type: 'user', id: uid, name: userById(uid).name, note: `Oda: ${title}` }, () => {
+        const no = createTicket('Şikâyet', `Kullanıcı şikâyeti: ${userById(uid).name} (${uid}) · oda ${title} (${id})`);
+        showAlert('Şikâyet alındı', `Talep numaran #${no}. Durumu Destek ekranından izleyebilirsin.`);
+      }),
   };
 
   // PK end: the result once per viewer, then the crown screen (cancelled PKs have no crowns).
@@ -2115,6 +2120,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onSendLucky={sendLuckyGift}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
+      {reporting.sheet}
       <InboxSheet visible={inboxOpen} onClose={() => setInboxOpen(false)} />
       <ParticipantsSheet
         visible={peopleOpen}

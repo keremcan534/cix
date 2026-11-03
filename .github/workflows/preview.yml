@@ -90,6 +90,9 @@ jobs:
         env:
           EXPO_PUBLIC_API_URL: https://130-61-230-94.sslip.io
           EXPO_PUBLIC_LIVEKIT_URL: wss://130-61-230-94.sslip.io
+          # "Google ile devam et": the web client id from Google Cloud, kept as a repository variable
+          # (Settings → Secrets and variables → Actions → Variables). Empty → the APK keeps the device sign-in.
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
       - run: cp android/app/build/outputs/apk/release/app-release.apk similar-club.apk
       - uses: softprops/action-gh-release@v2
         with:

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,7 +24,9 @@ export default function ProfileSetupScreen() {
   const { colors, gradient } = useTheme();
   const styles = useStyles();
   const [photo, setPhoto] = useState<string | null>(null);
-  const [name, setName] = useState('');
+  // After Google sign-in: the name Google gave, to keep or change.
+  const { ad } = useLocalSearchParams<{ ad?: string }>();
+  const [name, setName] = useState(typeof ad === 'string' ? ad.slice(0, 20) : '');
   const [gender, setGender] = useState<'Kadın' | 'Erkek' | null>(null);
   const [year, setYear] = useState('');
   const [city, setCity] = useState('İstanbul');

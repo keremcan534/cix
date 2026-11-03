@@ -3,6 +3,7 @@
 //   POST /api/auth/dev         { deviceKey, name?, device? }               → { session, user }   (ALLOW_DEV_AUTH)
 //   POST /api/auth/otp/start   { phone }                                   → { sent, retryAfter }
 //   POST /api/auth/otp/verify  { phone, code, name?, deviceKey?, device? } → { session, user, isNew }
+//   POST /api/auth/google      { idToken, deviceKey?, device? }            → { session, user, isNew }   (GOOGLE_CLIENT_IDS)
 //   POST /api/auth/logout      { all? }                                    → { loggedOut }
 //   GET  /api/sessions                                                     → { sessions }
 //   POST /api/sessions/revoke  { id }                                      → { revoked }
@@ -12,9 +13,14 @@
 // can ask for a code, so nobody can make us pay for SMS to premium numbers abroad. A device that already has
 // a development account keeps it (and its wallet) when it signs in with a phone for the first time.
 // App Store / Play reviewers: OTP_REVIEW_PHONE + OTP_REVIEW_CODE sign in without an SMS.
+//
+// Google sign-in (free, no SMS): the app sends the ID token Google gave it; google.mjs checks it. The account is
+// found by the Google account's stable id (auth_identities). A device with a development account links the
+// Google account to it the first time, so testers keep their balance.
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, newSession, readJson, selfUser, sha, tx } from './core.mjs';
+import { googleClientIds, verifyGoogleIdToken } from './google.mjs';
 import { sendCode, smsProvider } from './sms.mjs';
 
 const DEV_AUTH = env.ALLOW_DEV_AUTH !== '0';
@@ -74,6 +80,42 @@ async function accountFor(phone, name, deviceKey) {
     // The same number verified twice at once: the other request created it.
     if (e.code !== '23505') throw e;
     return { u: (await db.query('SELECT * FROM users WHERE phone = $1', [phone])).rows[0], isNew: false };
+  }
+}
+
+/** The account for a checked Google account: its own, the device's development account, or a new one. */
+async function accountForGoogle(g, deviceKey, retried = false) {
+  const found = (
+    await db.query("SELECT u.* FROM auth_identities i JOIN users u ON u.id = i.user_id WHERE i.provider = 'google' AND i.subject = $1 AND u.deleted_at IS NULL", [g.sub])
+  ).rows[0];
+  if (found) {
+    await db.query("UPDATE auth_identities SET last_used_at = now(), email = coalesce($2, email) WHERE provider = 'google' AND subject = $1", [g.sub, g.email]);
+    return { u: found, isNew: false };
+  }
+  try {
+    return await tx(async (c) => {
+      const link = "INSERT INTO auth_identities (provider, subject, user_id, email) VALUES ('google', $1, $2, $3)";
+      if (typeof deviceKey === 'string' && DEVICE_KEY.test(deviceKey)) {
+        const dev = (
+          await c.query(
+            `SELECT * FROM users u WHERE device_key_hash = $1 AND deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'google') FOR UPDATE`,
+            [sha(`device:${deviceKey}`)],
+          )
+        ).rows[0];
+        if (dev) {
+          await c.query(link, [g.sub, dev.id, g.email]);
+          return { u: dev, isNew: false };
+        }
+      }
+      const u = (await c.query('INSERT INTO users (name) VALUES ($1) RETURNING *', [cleanName(g.givenName || g.name) || 'Yeni üye'])).rows[0];
+      await c.query(link, [g.sub, u.id, g.email]);
+      return { u, isNew: true };
+    });
+  } catch (e) {
+    // The same Google account signed in twice at once, or the device account was linked meanwhile: look again.
+    if (e.code !== '23505' || retried) throw e;
+    return accountForGoogle(g, deviceKey, true);
   }
 }
 
@@ -140,6 +182,16 @@ export const authRoutes = {
     if (!phone || !code) throw new HttpError(400, 'Telefon numarası ve 6 haneli kod gerekli');
     if (!(await checkCode(phone, code))) throw new HttpError(400, 'Kod yanlış');
     const { u, isNew } = await accountFor(phone, b.name, b.deviceKey);
+    notBanned(u);
+    return { session: await newSession(u.id, b.device), user: selfUser(u), isNew };
+  },
+
+  /** Sign in with Google. Off (503) until GOOGLE_CLIENT_IDS is set in .env (docs/SUNUCU.md). */
+  async 'POST /api/auth/google'(req) {
+    if (!googleClientIds().length) throw Object.assign(new HttpError(503, 'Google ile giriş henüz açık değil'), { feature: 'google' });
+    const b = await readJson(req);
+    const g = await verifyGoogleIdToken(b.idToken);
+    const { u, isNew } = await accountForGoogle(g, b.deviceKey);
     notBanned(u);
     return { session: await newSession(u.id, b.device), user: selfUser(u), isNew };
   },
