@@ -10,7 +10,7 @@
 // asks LiveKit's own API (LIVEKIT_API_URL, e.g. http://127.0.0.1:7880) which rooms are open and forgets the rest.
 import crypto from 'node:crypto';
 
-import { HttpError, auth, db, env, readRaw } from './core.mjs';
+import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
 import { voiceAccess } from './rooms.mjs';
 
 export const [LK_KEY, LK_SECRET] = (env.LIVEKIT_KEYS ?? '').split(/:\s*/);
@@ -49,6 +49,17 @@ export function verifyWebhook(raw, authorization) {
 
 const clip = (v) => (typeof v === 'string' ? v.slice(0, 64) : '');
 
+/** Time in a room feeds the agency's activity measure (agency-perf.mjs). Identities are user ids. */
+async function logPresence(gone) {
+  for (const x of gone.rows) {
+    if (!UUID.test(x.identity)) continue;
+    await db.query(
+      'INSERT INTO presence_log (user_id, room, joined_at, left_at, seconds) SELECT $1, $2, $3, now(), greatest(0, extract(epoch FROM now() - $3::timestamptz))::int WHERE EXISTS (SELECT 1 FROM users WHERE id = $1)',
+      [x.identity, x.room, x.joined_at],
+    );
+  }
+}
+
 async function onEvent(e) {
   const room = clip(e.room?.name);
   if (!room) return;
@@ -61,11 +72,11 @@ async function onEvent(e) {
     case 'participant_left':
     case 'participant_connection_aborted':
       // Only this connection: after a reconnect the new one has another sid.
-      if (who) await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '')", [room, who, sid]);
+      if (who) await logPresence(await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '') RETURNING room, identity, joined_at", [room, who, sid]));
       break;
     case 'room_started':
     case 'room_finished':
-      await db.query('DELETE FROM room_presence WHERE room = $1', [room]);
+      await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
       break;
     default:
   }
