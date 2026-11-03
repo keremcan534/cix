@@ -72,9 +72,9 @@ export const socialRoutes = {
 
   /**
    * Account deletion (Play and Apple require it in the app). Personal data goes: profile fields, phone number,
-   * sign-in key, sessions, push tokens, follows, blocks, messages, own rooms. The id, ledger, gifts and
-   * purchases stay, because financial records must be kept; they no longer point to anything personal. The
-   * phone number is free again for a new account.
+   * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, own rooms. The id,
+   * ledger, gifts and purchases stay, because financial records must be kept; they no longer point to anything
+   * personal. The phone number and the Google account are free again for a new account.
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
@@ -85,6 +85,7 @@ export const socialRoutes = {
         [u.id],
       );
       if (u.phone) await c.query('DELETE FROM otp_codes WHERE phone = $1', [u.phone]);
+      await c.query('DELETE FROM auth_identities WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM push_tokens WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM sessions WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [u.id]);

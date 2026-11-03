@@ -18,6 +18,8 @@ import { useApp, type NotifyType, type Settings } from '@/store';
 import { makeStyles, useTheme, type Appearance } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
+import { liveMode } from '@/lib/live';
+import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -275,7 +277,19 @@ export default function SettingsScreen() {
           }
         >
           <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="KVKK kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
-          <ListRow icon="log-out-outline" tone="neutral" title="Çıkış yap" onPress={() => confirmLogout(logout)} chevron={false} />
+          <ListRow
+            icon="log-out-outline"
+            tone="neutral"
+            title="Çıkış yap"
+            chevron={false}
+            onPress={() =>
+              confirmLogout(() => {
+                logout();
+                // Live mode: a Google account's session ends too, so the next sign-in picks an account again.
+                if (liveMode()) void liveSignOut().catch(() => {});
+              })
+            }
+          />
           {IS_DEMO && (
             <ListRow
               icon="refresh-outline"
@@ -297,10 +311,13 @@ export default function SettingsScreen() {
               title="Hesabı sil"
               chevron={false}
               onPress={() =>
-                showAlert('Hesabı sil', 'Hesabın ve kişisel verilerin silinecek. Aktif abonelikleri mağazadan ayrıca iptal etmen gerekir. Devam edilsin mi?', [
-                  { text: 'Vazgeç', style: 'cancel' },
-                  { text: 'Silme talebi oluştur', style: 'destructive', onPress: requestDeletion },
-                ])
+                // Live mode: deleted on the server right away (asked twice), then this phone starts over.
+                liveMode()
+                  ? confirmDeleteLiveAccount(resetAll)
+                  : showAlert('Hesabı sil', 'Hesabın ve kişisel verilerin silinecek. Aktif abonelikleri mağazadan ayrıca iptal etmen gerekir. Devam edilsin mi?', [
+                      { text: 'Vazgeç', style: 'cancel' },
+                      { text: 'Silme talebi oluştur', style: 'destructive', onPress: requestDeletion },
+                    ])
               }
             />
           )}

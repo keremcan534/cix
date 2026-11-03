@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 
+import { useReport } from '@/components/report-sheet';
 import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
@@ -32,6 +33,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   const real = isLiveUser(user.id);
   const mutual = real || (following.has(user.id) && FOLLOWS_ME.has(user.id));
   const isBlocked = blocked.has(user.id);
+  const report = useReport();
   const [emojiOpen, setEmojiOpen] = useState(false);
   const convo = conversations.find((c) => c.userId === user.id);
   const messages = convo?.messages ?? [];
@@ -143,14 +145,17 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
                 </View>
                 <SafetyNote
                   text={item.text}
-                  onReport={() => {
-                    const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Şüpheli mesaj: "${item.text}"`);
-                    logSafety('Şikâyet etti', user.id, `Şüpheli mesaj · #${no}`);
-                    showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`, [
-                      { text: 'Tamam', style: 'cancel' },
-                      { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => !isBlocked && toggleBlock(user.id) },
-                    ]);
-                  }}
+                  onReport={() =>
+                    // Live mode: a reason, then the moderators' queue (the message goes with it as the note).
+                    report.start({ type: 'user', id: user.id, name: user.name, note: `Mesaj: ${item.text}`, onBlock: isBlocked ? undefined : () => toggleBlock(user.id) }, () => {
+                      const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Şüpheli mesaj: "${item.text}"`);
+                      logSafety('Şikâyet etti', user.id, `Şüpheli mesaj · #${no}`);
+                      showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`, [
+                        { text: 'Tamam', style: 'cancel' },
+                        { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => !isBlocked && toggleBlock(user.id) },
+                      ]);
+                    })
+                  }
                 />
               </View>
             )
@@ -198,6 +203,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      {report.sheet}
     </>
   );
 }

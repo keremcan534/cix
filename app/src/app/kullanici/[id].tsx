@@ -49,6 +49,7 @@ import { useApp, type FanClub } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Art } from '@/components/Art';
 import { Photo } from '@/components/photo';
+import { useReport } from '@/components/report-sheet';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -87,6 +88,8 @@ export default function UserProfile() {
   const insets = useSafeAreaInsets();
   const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
+  // Live mode: a real person's report goes to the moderators (a reason sheet of its own).
+  const report = useReport();
 
   const club = fanClubs[user.id];
   const isFollowing = following.has(user.id);
@@ -657,7 +660,11 @@ export default function UserProfile() {
           { label: 'Odama davet et', icon: 'mic-outline', onPress: inviteToRoom },
           { label: 'Profili paylaş', icon: 'share-social-outline', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
           { label: 'Kullanıcı adını kopyala', icon: 'copy-outline', onPress: copyUsername },
-          { label: 'Şikâyet et', icon: 'flag-outline', onPress: () => setTimeout(() => setSheet('report'), 300) },
+          {
+            label: 'Şikâyet et',
+            icon: 'flag-outline',
+            onPress: () => report.start({ type: 'user', id: user.id, name: user.name, onBlock: isBlocked ? undefined : () => toggleBlock(user.id) }, () => setTimeout(() => setSheet('report'), 300)),
+          },
           { label: isBlocked ? 'Engeli kaldır' : 'Engelle', icon: 'ban-outline', destructive: true, onPress: () => toggleBlock(user.id) },
         ]}
       />
@@ -674,6 +681,7 @@ export default function UserProfile() {
           },
         }))}
       />
+      {report.sheet}
       <ActionSheet
         visible={sheet === 'call'}
         title={`${user.name} ile arama`}

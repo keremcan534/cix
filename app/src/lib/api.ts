@@ -4,7 +4,8 @@
 //
 // Sign-in: a random device key is created once and kept on the device; the server knows only its hash. The
 // session it returns is kept too, so the app stays signed in. Phone sign-in (otpStart / otpVerify) keeps the
-// device's development account and wallet when it is used for the first time.
+// device's development account and wallet when it is used for the first time. Google sign-in (googleSignIn,
+// lib/live/account) does the same; after it, an ended session asks for Google again instead of the device key.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
@@ -14,6 +15,8 @@ export type ServerLedgerRow = { id: number; currency: 'coin' | 'diamond' | 'game
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 const DEVICE_KEY = 'similarclub:device-key';
 const SESSION_KEY = 'similarclub:api-session';
+/** 'google' after a Google sign-in. */
+const PROVIDER_KEY = 'similarclub:sign-in';
 
 export const apiEnabled = () => !!BASE;
 export class ApiError extends Error {
@@ -24,6 +27,13 @@ export class ApiError extends Error {
     super(message);
   }
 }
+/** The Google account's session ended: the person signs in with Google again (no silent device account). */
+export class SignInAgain extends ApiError {
+  constructor() {
+    super(401, 'Oturumun sona erdi. Google ile yeniden giriş yap.');
+  }
+}
+const viaGoogle = async () => (await AsyncStorage.getItem(PROVIDER_KEY)) === 'google';
 
 // expo-crypto, not the global `crypto`: Android's JavaScript engine (Hermes) has no crypto.getRandomValues,
 // so sign-up and every wallet request id would fail on the phone.
@@ -41,7 +51,7 @@ const TIMEOUT_MS = 15_000;
  * busy). A 401 on a signed-in call means the session ended (expired, signed out elsewhere, server reset): the
  * session is dropped, the device signs in again once with its key, and the request is sent once more.
  */
-async function call<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: object, retried = false): Promise<T> {
+async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: object, retried = false): Promise<T> {
   if (!BASE) throw new ApiError(0, 'Sunucu adresi ayarlı değil');
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -80,6 +90,7 @@ let reSigning: Promise<void> | null = null;
 function reSignIn() {
   reSigning ??= (async () => {
     if (session) return; // another call already signed in again
+    if (await viaGoogle()) throw new SignInAgain();
     const key = await AsyncStorage.getItem(DEVICE_KEY);
     if (!key) throw new ApiError(401, 'Oturumun sona erdi. Uygulamayı yeniden açıp giriş yap.');
     const r = await call<{ session: string }>('POST', '/api/auth/dev', { deviceKey: key });
@@ -123,6 +134,7 @@ export function ensureSignedIn(name: string): Promise<ServerUser> {
         session = null;
       }
     }
+    if (await viaGoogle()) throw new SignInAgain();
     return signIn(name);
   })().finally(() => (signingIn = null));
   return signingIn;
@@ -153,11 +165,29 @@ export async function otpVerify(phone: string, code: string, name?: string, devi
   return { user: r.user, isNew: r.isNew };
 }
 
+/** Google sign-in: Google's ID token opens a session (a device development account is linked, not replaced). */
+export async function googleSignIn(idToken: string, device?: string) {
+  const deviceKey = (await AsyncStorage.getItem(DEVICE_KEY)) ?? undefined;
+  const r = await call<{ session: string; user: ServerMe; isNew: boolean }>('POST', '/api/auth/google', { idToken, deviceKey, device });
+  await keepSession(r.session);
+  await AsyncStorage.setItem(PROVIDER_KEY, 'google');
+  return { user: r.user, isNew: r.isNew };
+}
+/** True after a Google sign-in on this device. */
+export const signedInWithGoogle = viaGoogle;
+
 /** Ends this session (or every session of the account) and forgets it on the device. */
 export async function logout(all = false) {
   await call('POST', '/api/auth/logout', { all }).catch(() => {});
   session = null;
-  await AsyncStorage.removeItem(SESSION_KEY);
+  await AsyncStorage.multiRemove([SESSION_KEY, PROVIDER_KEY]);
+}
+
+/** Deletes the account on the server (DELETE /api/me), then forgets the session and the device key here. */
+export async function deleteAccount() {
+  await call<{ deleted: boolean }>('DELETE', '/api/me');
+  session = null;
+  await AsyncStorage.multiRemove([SESSION_KEY, PROVIDER_KEY, DEVICE_KEY]);
 }
 export const sessions = () => call<{ sessions: ServerSession[] }>('GET', '/api/sessions').then((r) => r.sessions);
 export const revokeSession = (id: string) => call<{ revoked: boolean }>('POST', '/api/sessions/revoke', { id });

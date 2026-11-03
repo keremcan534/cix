@@ -4,6 +4,8 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
+import { showAlert } from '@/lib/alert';
+import { SignInAgain } from '@/lib/api';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { pollMessages } from '@/lib/live/messages';
 import { useApp } from '@/store';
@@ -41,6 +43,15 @@ export function LiveSync() {
         }
         if (alive) await pollMessages(appRef.current);
       } catch (e) {
+        if (e instanceof SignInAgain) {
+          // A Google account's session ended (signed out on the server, or expired): back to the welcome screen.
+          signedIn = false;
+          if (alive && appRef.current.loggedIn) {
+            appRef.current.logout();
+            showAlert('Oturumun sona erdi', 'Devam etmek için Google ile yeniden giriş yap.');
+          }
+          return;
+        }
         // No network or the server is down: the next tick tries again; the screens keep the last state.
         console.warn(`[canlı] ${message(e)}`);
       } finally {
