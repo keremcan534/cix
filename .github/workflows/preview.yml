@@ -5,7 +5,8 @@ name: Preview builds
 #  - android: APK attached to the latest GitHub Release
 on:
   push:
-    branches: [ccr-0c79d9d5-0hfb46, main]
+    # canli-test only builds the APK (below), so testers get the live-mode app before a merge.
+    branches: [ccr-0c79d9d5-0hfb46, main, canli-test]
     paths: ['app/**', '.github/workflows/preview.yml']
   workflow_dispatch:
 
@@ -15,6 +16,7 @@ defaults:
 
 jobs:
   web:
+    if: github.ref_name != 'canli-test'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,6 +86,10 @@ jobs:
       - name: Build APK
         working-directory: app/android
         run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
+        # Gradle bundles the JS here; these public addresses switch the APK to live mode (docs/SUNUCU.md).
+        env:
+          EXPO_PUBLIC_API_URL: https://130-61-230-94.sslip.io
+          EXPO_PUBLIC_LIVEKIT_URL: wss://130-61-230-94.sslip.io
       - run: cp android/app/build/outputs/apk/release/app-release.apk similar-club.apk
       - uses: softprops/action-gh-release@v2
         with:
@@ -92,6 +98,7 @@ jobs:
           body: |
             Telefona kurmak için aşağıdaki **similar-club.apk** dosyasını indir ve aç.
             İlk kurulumda "Bilinmeyen kaynaklardan yüklemeye izin ver" demen gerekebilir.
-            Commit: ${{ github.sha }}
+            Dal: ${{ github.ref_name }} · Commit: ${{ github.sha }}
+            Bu APK gerçek sunucuya bağlanır (canlı mod).
           files: app/similar-club.apk
           make_latest: true
