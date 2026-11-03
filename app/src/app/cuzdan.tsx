@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +16,8 @@ import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, TEST_PACKS } from '@/lib/live';
+import { buyCoins, openShop, useShop } from '@/lib/live/billing';
+import { outcomeAlert, SHOP_NOTICE } from '@/lib/live/billing-core';
 import { openLegal } from '@/lib/legal';
 import { blockedFeature } from '@/lib/remote-control';
 import { today } from '@/lib/persist';
@@ -26,17 +28,34 @@ export default function WalletScreen() {
   const [tab, setTab] = useState<'buy' | 'history'>('buy');
   const [filter, setFilter] = useState<'coin' | 'diamond'>('coin');
   const [processing, setProcessing] = useState<string | null>(null);
-  // Live mode (test APK): only the server's free test packs, at most 50.000 coins a day.
+  // Live mode: the real packs through Google Play (lib/live/billing), and the server's free test packs only
+  // while the server allows them (ALLOW_TEST_TOPUP=1, at most 50.000 coins a day).
   const live = liveMode();
-  const packs = live ? RECHARGE_PACKS.filter((p) => TEST_PACKS.includes(p.coins)) : RECHARGE_PACKS;
-  const { colors, dark } = useTheme();
+  const shop = useShop();
+  const testPacks = RECHARGE_PACKS.filter((p) => TEST_PACKS.includes(p.coins));
+  useEffect(() => {
+    if (live) void openShop();
+  }, [live]);
+  const { colors } = useTheme();
   const styles = useStyles();
+
+  // Live mode: Google Play takes the payment; the coins arrive only with the server's answer.
+  const buyLive = (productId: string) => {
+    if (processing || blockedFeature('purchases')) return;
+    setProcessing(productId);
+    buyCoins(productId)
+      .then((o) => {
+        const a = outcomeAlert(o);
+        if (a) showAlert(a.title, a.body);
+      })
+      .finally(() => setProcessing(null));
+  };
 
   const buy = (pack: RechargePack) => {
     // A second tap while the store payment is pending must not charge twice.
     if (processing || blockedFeature('topup')) return;
     setProcessing(pack.id);
-    // Live mode (test APK): the server credits a free test pack, so every phone sees the same balance.
+    // Live mode, test packs: the server credits a free test pack, so every phone sees the same balance.
     if (liveMode()) {
       liveTopup(pack.coins)
         .then(() => showAlert('Jeton yüklendi', `${pack.coins.toLocaleString('tr-TR')} test jetonu hesabına eklendi. Gerçek ödeme alınmadı.`))
@@ -133,34 +152,41 @@ export default function WalletScreen() {
               </Pressable>
             )}
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 }}>
+          <View style={styles.packHead}>
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
-            <Text style={styles.currency}>{live ? 'Test sürümü · ücretsiz' : 'Fiyatlar TL'}</Text>
+            <Text style={styles.currency}>{!live ? 'Fiyatlar TL' : shop.status === 'ready' ? 'Google Play ile' : ''}</Text>
           </View>
-          <View style={styles.grid}>
-            {packs.map((p: RechargePack) => {
-              const first = !live && !!p.firstBonus && !firstBuys.has(p.id);
-              const bonus = first ? p.firstBonus : p.bonus;
-              return (
-                <Pressable key={p.id} onPress={() => buy(p)} accessibilityLabel={`${p.coins} jeton paketi`} style={{ width: '31.3%', margin: '1%' }}>
-                  <LinearGradient
-                    colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
-                    style={[styles.pack, first && styles.packFirst, processing === p.id && { opacity: 0.5 }]}
-                  >
-                    {first && (
-                      <View style={styles.firstTag}>
-                        <Text style={styles.firstTagText}>Hoş geldin paketi</Text>
-                      </View>
-                    )}
-                    <Icon3D name="coin" size={40} />
-                    <Text style={styles.packCoins}>{p.coins.toLocaleString('tr-TR')}</Text>
-                    {bonus ? <Text style={styles.packBonus}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
-                    <Text style={[styles.packPrice, first && { color: colors.text }]}>{processing === p.id ? 'Bekleniyor…' : live ? 'Ücretsiz' : p.price}</Text>
-                  </LinearGradient>
-                </Pressable>
-              );
-            })}
-          </View>
+          {live ? (
+            shop.status === 'ready' ? (
+              <View style={styles.grid}>
+                {shop.packs.map((p) => (
+                  <PackTile key={p.productId} coins={p.coins} price={p.price} busy={processing === p.productId} onPress={() => buyLive(p.productId)} />
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.shopNotice}>{SHOP_NOTICE[shop.status]}</Text>
+            )
+          ) : (
+            <View style={styles.grid}>
+              {RECHARGE_PACKS.map((p: RechargePack) => {
+                const first = !!p.firstBonus && !firstBuys.has(p.id);
+                return <PackTile key={p.id} coins={p.coins} bonus={first ? p.firstBonus : p.bonus} first={first} price={p.price} busy={processing === p.id} onPress={() => buy(p)} />;
+              })}
+            </View>
+          )}
+          {live && shop.testTopup && (
+            <>
+              <View style={styles.packHead}>
+                <Text style={[styles.title, { flex: 1, fontSize: 17 }]}>Test yüklemesi</Text>
+                <Text style={styles.currency}>Test sürümü · ücretsiz</Text>
+              </View>
+              <View style={styles.grid}>
+                {testPacks.map((p) => (
+                  <PackTile key={p.id} coins={p.coins} price="Ücretsiz" busy={processing === p.id} onPress={() => buy(p)} />
+                ))}
+              </View>
+            </>
+          )}
           <Pressable onPress={() => router.push('/vip')} style={styles.svipLink} accessibilityRole="link" accessibilityLabel="İnci seviyelerine bak">
             <Text style={styles.svipLinkText}>İnci seviyelerine bak →</Text>
             <Text style={styles.svipLinkSub}>{svipLevel ? `İnci ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
@@ -182,6 +208,30 @@ export default function WalletScreen() {
   );
 }
 
+/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). */
+function PackTile({ coins, bonus, first, price, busy, onPress }: { coins: number; bonus?: number; first?: boolean; price: string; busy: boolean; onPress: () => void }) {
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton, ${price}`} style={{ width: '31.3%', margin: '1%' }}>
+      <LinearGradient
+        colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
+        style={[styles.pack, first && styles.packFirst, busy && { opacity: 0.5 }]}
+      >
+        {first && (
+          <View style={styles.firstTag}>
+            <Text style={styles.firstTagText}>Hoş geldin paketi</Text>
+          </View>
+        )}
+        <Icon3D name="coin" size={40} />
+        <Text style={styles.packCoins}>{coins.toLocaleString('tr-TR')}</Text>
+        {bonus ? <Text style={styles.packBonus}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
+        <Text style={[styles.packPrice, first && { color: colors.text }]}>{busy ? 'Bekleniyor…' : price}</Text>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
 const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
   testBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
   testText: { color: colors.primaryText, fontWeight: '700', fontSize: 13 },
@@ -198,6 +248,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   balanceN: { color: colors.text, fontSize: 32, fontWeight: '800' },
   section: { color: colors.text, fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
+  packHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 },
+  shopNotice: { color: colors.textDim, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
   pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }) },
   packFirst: { borderColor: 'rgba(246,189,96,0.75)', paddingTop: 12 },
   svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },

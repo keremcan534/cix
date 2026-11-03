@@ -42,7 +42,7 @@ SMS sağlayıcısı `.env` içinde `SMS_PROVIDER`: `netgsm` (Netgsm REST v2, `NE
 **Hediye, sıralama, satın alma (`gifts.mjs`, `catalog.mjs`, `purchases.mjs`)**
 | Çağrı | Ne yapar |
 |---|---|
-| `GET /api/catalog` | Herkese açık: hediyeler (ad, fiyat, kategori, İnci sınırı), adetler, jeton paketleri, İnci eşikleri. Uygulamadaki veriyle aynı olduğu `app/tests/server-catalog.test.ts` ile denetlenir. |
+| `GET /api/catalog` | Herkese açık: hediyeler (ad, fiyat, kategori, İnci sınırı), adetler, jeton paketleri, İnci eşikleri ve `purchases` (`testTopup`: ücretsiz test paketleri açık mı, `stores.android` / `stores.ios`: bu sunucu o mağazanın ödemesini doğrulayabiliyor mu). Uygulama gerçek paketleri yalnız doğrulanabilen mağazada, test paketlerini yalnız `testTopup` açıkken gösterir. Uygulamadaki veriyle aynı olduğu `app/tests/server-catalog.test.ts` ile denetlenir. |
 | `POST /api/gifts/send` `{to, giftId, count, room?, ref}` | Fiyatı sunucu belirler; uygulama yalnız hangi hediye ve kaç adet olduğunu söyler. Jeton → alıcıya bire bir elmas, tek işlemde. İnci sınırlı hediyeler kontrol edilir. Oda dışındaki hediyede alıcıya bildirim gider. |
 | `GET /api/rankings?board=wealth\|charm&period=day\|week\|month` | Cömertlik (gönderilen) ve Yankı (alınan) sıralaması, Türkiye saatine göre gün/hafta/ay, ilk 50 |
 | `POST /api/wallet/purchase` | Mağaza satın alımı: Google Play (`token`, hizmet hesabıyla Play Developer API) veya App Store (`transactionId`, App Store Server API, önce üretim sonra sandbox). Her makbuz bir kez yüklenir; başka hesapta kullanılmış makbuz reddedilir; paketin ilk alımında ilk alım hediyesi eklenir; alınan jeton İnci puanı olur. Play ürünü tüketilir, paket tekrar alınabilir. Ürün kimlikleri `coins_<jeton>` (ör. `coins_1000`). |
