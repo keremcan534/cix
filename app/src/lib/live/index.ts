@@ -45,6 +45,9 @@ const applied = <T extends { user: api.ServerUser }>(r: T, reason?: string) => {
   return r;
 };
 
+/** A store purchase's server answer (lib/live/billing) reaches the wallet like every other live call. */
+export const applyServerUser = (r: { user: api.ServerUser }, reason?: string) => void applied(r, reason);
+
 export const TEST_PACKS = [1_000, 5_000, 10_000];
 export const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

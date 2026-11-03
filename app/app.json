@@ -74,6 +74,14 @@
         {
           "disableAutoUpload": true
         }
+      ],
+      [
+        "expo-iap",
+        {
+          "android": {
+            "store": "play"
+          }
+        }
       ]
     ],
     "scheme": "similarclub",

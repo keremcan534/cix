@@ -30,6 +30,19 @@ const BUNDLE = env.APPLE_BUNDLE_ID ?? 'com.similarclub.app';
 const b64url = (v) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
 const jwtPart = (jws, i) => JSON.parse(Buffer.from(jws.split('.')[i], 'base64url').toString('utf8'));
 
+/**
+ * What the app may offer (GET /api/catalog `purchases`): free test packs only with ALLOW_TEST_TOPUP=1, and a
+ * store's real packs only when this server can verify that store's payments. A store the server can't check
+ * stays hidden, so nobody pays for coins that would wait unverified until Google refunds them.
+ */
+export const purchaseOptions = (e = env) => ({
+  testTopup: e.ALLOW_TEST_TOPUP === '1',
+  stores: {
+    android: !!e.GOOGLE_SERVICE_ACCOUNT,
+    ios: !!(e.APPLE_IAP_KEY_ID && e.APPLE_IAP_ISSUER_ID && e.APPLE_IAP_PRIVATE_KEY),
+  },
+});
+
 // --- Google Play ------------------------------------------------------------------------------------------
 let googleToken = { value: '', until: 0 };
 

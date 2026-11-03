@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
+import { resumePurchases } from '@/lib/live/billing';
 import { pollMessages } from '@/lib/live/messages';
 import { useApp } from '@/store';
 
@@ -34,6 +35,8 @@ export function LiveSync() {
         if (!signedIn) {
           await liveSignIn(name);
           signedIn = true;
+          // A Play purchase whose server answer was lost last time is verified now.
+          resumePurchases();
           await refreshEarnings();
         } else {
           await refreshWallet();

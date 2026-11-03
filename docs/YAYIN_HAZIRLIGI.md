@@ -78,6 +78,17 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | İncelemeci hesabı, inceleme notları, ekran görüntüleri | ⏳ |
 | TestFlight ve Play kapalı test | ⏳ |
 
+### Google Play ile jeton satın alma
+
+Uygulama hazır (`app/src/lib/live/billing.ts`, expo-iap): cüzdan Play'deki paketleri Play'in yerel fiyatıyla gösterir, ödemeden sonra makbuzu sunucuya gönderir; jetonu yalnız sunucu yükler (`POST /api/wallet/purchase`). Cevap gelmezse makbuz telefonda saklanır, sonraki açılışta veya cüzdana girişte yeniden doğrulanır; sunucu her makbuzu bir kez yükler. Açmak için:
+
+1. **Play Console › Para kazanma › Uygulama içi ürünler**: her paket için *tek seferlik (tüketilebilir)* ürün oluştur, kimlikleri tam olarak şunlar olsun: `coins_1000`, `coins_5000`, `coins_10000`, `coins_20000`, `coins_50000`, `coins_100000`, `coins_200000`, `coins_500000`, `coins_1000000` (`server/api/catalog.mjs` PACKS). Fiyatları ver, ürünleri **etkin** yap. Play'de olmayan paket cüzdanda görünmez.
+2. Uygulama, ürünlerin görünmesi için Play'e en az bir kez (iç test kanalı yeterli) **imzalı** olarak yüklenmiş olmalı. GitHub'daki önizleme APK'sı hata ayıklama anahtarıyla imzalı; Play ödemesi onunla açılmaz, Play'den kurulan sürümle denenir.
+3. **Google Cloud**: Play Android Developer API'yi aç, bir hizmet hesabı oluştur, JSON anahtarını indir. **Play Console › Kullanıcılar ve izinler**'de bu hesaba uygulama için *finansal verileri görüntüleme* ve *siparişleri yönetme* izni ver.
+4. Sunucu `.env`: JSON'un tamamı tek satır olarak `GOOGLE_SERVICE_ACCOUNT=...`, paket adı farklıysa `GOOGLE_PLAY_PACKAGE`. Sonra `docker compose up -d api`. Bu olmadan uygulama paketleri göstermez ("çok yakında açılıyor").
+5. **Lisans testçileri** (Play Console › Ayarlar › Lisans testi): test edecek Google hesaplarını ekle; bu hesaplar ödeme alınmadan test kartıyla satın alır. Bekleyen ödemeyi de ("yavaş test kartı") buradan denersin.
+6. Yayında `.env`'de `ALLOW_TEST_TOPUP=0`: ücretsiz test paketleri cüzdandan kalkar, sunucu da reddeder.
+
 ---
 
 ## Yol haritası
