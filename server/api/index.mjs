@@ -6,6 +6,8 @@
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
 //   POST /api/wallet/gift       { to, amount, ref } (test only) → { user, replay }
 //   POST /api/wallet/exchange   { diamonds, ref }             → { user, replay, coins }
+// Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
+// audit view for disputes: jeton.mjs.
 // Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
 // purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
@@ -16,8 +18,9 @@ import http from 'node:http';
 import { adminRoutes } from './admin.mjs';
 import { authRoutes } from './auth.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
-import { HttpError, allow, auth, db, env, int, migrate, move, once, readJson, selfUser, sha, userId } from './core.mjs';
+import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
+import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { mediaRoutes } from './media.mjs';
 import { messageRoutes } from './messages.mjs';
@@ -25,6 +28,7 @@ import { purchaseRoutes } from './purchases.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { socialRoutes } from './social.mjs';
+import { creditCoins, giftCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -80,7 +84,7 @@ const walletRoutes = {
 
   async 'GET /api/ledger'(req) {
     const u = await auth(req);
-    const r = await db.query('SELECT id, currency, amount, balance, reason, ref, counterparty, created_at FROM ledger WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [u.id]);
+    const r = await db.query('SELECT id, currency, amount, balance, reason, ref, counterparty, channel, detail, created_at FROM ledger WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [u.id]);
     return { rows: r.rows.map((x) => ({ ...x, id: Number(x.id), amount: Number(x.amount), balance: Number(x.balance) })) };
   },
 
@@ -93,7 +97,7 @@ const walletRoutes = {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       const today = await c.query("SELECT coalesce(sum(amount), 0) AS n FROM ledger WHERE user_id = $1 AND reason = 'Test yüklemesi' AND created_at > date_trunc('day', now())", [u.id]);
       if (Number(today.rows[0].n) + amount > TOPUP_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TOPUP_DAILY}`);
-      await move(c, u.id, 'coin', amount, 'Test yüklemesi', ref);
+      await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
     });
   },
 
@@ -113,15 +117,16 @@ const walletRoutes = {
       // Lock both rows in id order so two people gifting each other at once can't deadlock.
       const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
       if (locked.rowCount < 2) throw new HttpError(404, 'Alıcı bulunamadı');
-      await move(c, u.id, 'coin', -n, 'Hediye gönderildi', ref, to);
-      await move(c, to, 'diamond', n, 'Hediye alındı', `${ref}-in`, u.id);
+      await claimRef(c, u.id, 'coin', ref);
+      await giftCoins(c, { sender: u.id, recipient: to, total: n, label: null, ref });
     });
   },
 
   /**
-   * Gelir > Çevir: the user's own diamonds become coins at the server's rate (catalog.mjs exchangeCoins). The
-   * client sends only the diamond amount; the coins are worked out here. Both moves share one transaction and
-   * the ref, so a retry is applied once and a short balance (409) changes nothing.
+   * Gelir > Çevir: the user's own unlocked diamonds become coins at the server's rate (catalog.mjs
+   * exchangeCoins). The client sends only the diamond amount; the coins are worked out here. Both moves share
+   * one transaction and the ref, so a retry is applied once and a short balance (409) changes nothing. Locked
+   * diamonds (wallet.mjs) can't be exchanged.
    */
   async 'POST /api/wallet/exchange'(req) {
     const u = await auth(req);
@@ -130,10 +135,12 @@ const walletRoutes = {
     if (!n) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas çevrilebilir`);
     const coins = exchangeCoins(n);
     const r = await once(u.id, 'diamond', ref, async (c) => {
-      // Coins first: a second copy of the same request waits on the row, then hits the unique ledger ref
-      // (a replay) instead of the diamond balance check (a false "not enough").
-      await move(c, u.id, 'coin', coins, 'Elmastan çevrildi', ref);
-      await move(c, u.id, 'diamond', -n, 'Jetona çevrildi', ref);
+      // A second copy of the same request waits on the row, then finds the ref (a replay) before the
+      // balance check (a false "not enough").
+      await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
+      await claimRef(c, u.id, 'diamond', ref);
+      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins } });
+      await creditCoins(c, u.id, [{ channel: 'cevir', amount: coins }], 'Elmastan çevrildi', ref, null, { detail: { diamonds: n } });
     });
     return { ...r, coins };
   },
@@ -141,6 +148,8 @@ const walletRoutes = {
 
 const routes = {
   ...walletRoutes,
+  ...walletInfoRoutes,
+  ...jetonRoutes,
   ...authRoutes,
   ...pushRoutes,
   ...giftRoutes,
@@ -191,8 +200,7 @@ const server = http.createServer(async (req, res) => {
   const route = routes[`${req.method} ${url.pathname}`];
   if (!route) return send(404, { error: 'Bulunamadı' });
 
-  // Caddy replaces X-Forwarded-For with the real client address, so its first entry can be trusted.
-  const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress).split(',')[0].trim();
+  const ip = clientIp(req);
   if (limited(req, url.pathname, ip)) return send(429, { error: 'Çok fazla istek, biraz bekle' });
 
   try {

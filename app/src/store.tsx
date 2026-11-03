@@ -18,6 +18,7 @@ import { countsForWealth, wealthLevelOf } from '@/data/wealth';
 import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
+import { addLock, diamondSplit, lockMs, lockedReason, locksFor, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { validIban } from '@/lib/bank';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
@@ -161,6 +162,12 @@ type AppState = {
   isHost: boolean;
   becomeHost: () => void;
   diamonds: number;
+  /** The balance in two parts (lib/diamond-locks): what may leave now (withdraw, Çevir, Jeton Noktası) and what
+   *  is still locked because the coins behind it can be refunded (store 7 days, Jeton Noktası 1 day). */
+  withdrawableDiamonds: number;
+  lockedDiamonds: number;
+  /** Open locks, newest first. */
+  diamondLocks: DiamondLock[];
   totalDiamonds: number;
   /** Yankı puanı (charm) and level (data/charm): drives the earnings bonus and Keşfet ranking. */
   charmXp: number;
@@ -349,6 +356,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   useEffect(() => {
     diamondsRef.current = diamonds;
   }, [diamonds]);
+  // Gift diamonds stay locked through the refund window (lib/diamond-locks), mirrored in a ref for the same
+  // synchronous reads as the balance. Locks that opened while the app was closed are dropped (with a notice) by the
+  // timer below; until then `lockNow` keeps them out of the locked part.
+  const [diamondLocks, setDiamondLocksState] = useState<DiamondLock[]>(s.diamondLocks ?? []);
+  const locksRef = useRef(diamondLocks);
+  const setDiamondLocks = (fn: (l: DiamondLock[]) => DiamondLock[]) => {
+    locksRef.current = fn(locksRef.current);
+    setDiamondLocksState(locksRef.current);
+  };
+  const [lockNow, setLockNow] = useState(() => Date.now());
+  const { locked: lockedDiamonds, withdrawable: withdrawableDiamonds } = diamondSplit(diamonds, diamondLocks, lockNow);
   const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
   const [charmXp, setCharmXp] = useState(s.charmXp ?? s.totalDiamonds ?? 0);
   const charmRef = useRef(charmXp);
@@ -533,7 +551,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const snapshot: Snapshot = {
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
-    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
+    myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     following: [...following], blocked: [...blocked], conversations, followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
@@ -549,6 +567,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setWeekly((w) => [...w.slice(0, 6), w[6] + n]);
     setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now(), day: today(), ...(gift && { gift }) }, ...e].slice(0, 100));
     log('diamond', n, source);
+    // The app can't see where the sender's coins came from, so it assumes the store (the longer lock); the server
+    // knows the real source and its locks are the ones that count.
+    if (locksFor(source)) setDiamondLocks((l) => addLock(l, { id: uid(), amount: n, unlockAt: Date.now() + lockMs('store'), channel: 'store', source, fromId, ...(gift && { gift }) }));
   };
   const receiveDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
     creditDiamonds(n, source, fromId, gift);
@@ -573,6 +594,22 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     if (muted) return;
     setNotifications((l) => [{ ...n, id: uid(), time: now(), read: false }, ...l].slice(0, 100));
   };
+
+  // Opens the locks when their time comes: drops them and tells the host the diamonds can now leave. Runs at once
+  // for locks that opened while the app was closed. `notify` only reads refs and setters, so a stale copy is fine.
+  useEffect(() => {
+    if (!diamondLocks.length) return;
+    const first = Math.min(...diamondLocks.map((l) => l.unlockAt));
+    // setTimeout holds at most ~24.8 days; a longer wait just re-arms when it fires.
+    const t = setTimeout(() => {
+      const at = Date.now();
+      const opened = locksRef.current.filter((l) => l.unlockAt <= at).reduce((sum, l) => sum + l.amount, 0);
+      setDiamondLocks((l) => l.filter((x) => x.unlockAt > at));
+      setLockNow(at);
+      if (opened > 0) notify({ kind: 'finance', icon: 'lock-open', title: 'Kilitli elmasların açıldı', body: `${opened.toLocaleString('tr-TR')} elmas artık çekilebilir; çekebilir ya da jetona çevirebilirsin.`, href: '/gelir' });
+    }, Math.min(2_000_000_000, Math.max(0, first - Date.now()) + 50));
+    return () => clearTimeout(t);
+  }, [diamondLocks]);
 
   const limitBlock = (n: number) => {
     const limit = settingsRef.current.dailySpendLimit;
@@ -707,8 +744,20 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setWeekly([1_240, 3_310, 860, 4_920, 2_150, 5_480, 0]);
       setDiamonds(12_450);
       setTotalDiamonds(17_960);
+      // …with part of it still locked: two store-coin gifts (7 days) and one paid with Jeton Noktası coins (1 day).
+      const at = Date.now();
+      const h = 3_600_000;
+      setLockNow(at);
+      setDiamondLocks(() => [
+        { id: uid(), amount: 640, unlockAt: at + 14 * h, channel: 'jeton', source: 'Hediye', fromId: 'u5' },
+        { id: uid(), amount: 3_200, unlockAt: at + 53 * h, channel: 'store', source: 'Hediye', fromId: 'u2' },
+        { id: uid(), amount: 1_150, unlockAt: at + 121 * h, channel: 'store', source: 'Arama', fromId: 'u7' },
+      ]);
     },
     diamonds,
+    withdrawableDiamonds,
+    lockedDiamonds,
+    diamondLocks,
     totalDiamonds,
     charmXp,
     charmLevel: charmLevelOf(charmXp),
@@ -718,9 +767,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     withdrawals,
     requestWithdraw: (amount, iban) => {
       if (amount < RULES.minWithdrawDiamonds) return `En az ${RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas çekebilirsin.`;
-      if (amount > diamonds) return 'Yetersiz elmas bakiyesi.';
+      if (amount > diamondsRef.current) return 'Yetersiz elmas bakiyesi.';
+      const locked = lockedReason(amount, diamondsRef.current, diamondSplit(diamondsRef.current, locksRef.current, Date.now()).locked);
+      if (locked) return locked;
       // Check digits too: a single mistyped digit would send the payout to a dead or wrong account.
       if (!validIban(iban)) return 'IBAN geçersiz. TR ile başlayan 26 karakteri tek tek kontrol et.';
+      diamondsRef.current -= amount;
       setDiamonds((d) => d - amount);
       const id = uid();
       setWithdrawals((w) => [{ id, diamonds: amount, iban, status: 'Beklemede', time: now() }, ...w]);
@@ -736,6 +788,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     exchangeDiamonds: (amount) => {
       const q = exchangeOwnDiamonds(amount, diamondsRef.current);
       if (!q.ok) return q;
+      // Locked diamonds can't become coins either: that would move refundable value out of the lock.
+      const locked = lockedReason(amount, diamondsRef.current, diamondSplit(diamondsRef.current, locksRef.current, Date.now()).locked);
+      if (locked) return { ok: false, reason: locked };
       diamondsRef.current -= amount;
       setDiamonds((d) => d - amount);
       setCoins((c) => c + q.coins);

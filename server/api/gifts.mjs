@@ -7,9 +7,10 @@
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
 // the app only says which gift and how many, never the price. Agency commission and bonuses are platform
 // liabilities settled separately, not moved here. Rankings follow Turkey's calendar (Europe/Istanbul).
-import { HttpError, auth, blockedBetween, db, int, move, once, readJson, userId } from './core.mjs';
+import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, svipLevel } from './catalog.mjs';
 import { notify } from './push.mjs';
+import { giftCoins } from './wallet.mjs';
 
 const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -45,9 +46,10 @@ export const giftRoutes = {
       // Lock both rows in id order so two people gifting each other at once can't deadlock.
       const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
       if (locked.rowCount < 2) throw new HttpError(404, 'Alıcı bulunamadı');
-      await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [u.id, to, gift.id, count, gift.price, total, room, b.ref]);
-      await move(c, u.id, 'coin', -total, `Hediye gönderildi: ${label}`, b.ref, to);
-      await move(c, to, 'diamond', total, `Hediye alındı: ${label}`, `${b.ref}-in`, u.id);
+      await claimRef(c, u.id, 'coin', b.ref);
+      const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [u.id, to, gift.id, count, gift.price, total, room, b.ref]);
+      // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
+      await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
     });
     // In a room the recipient sees it on stage; elsewhere (profile, chat) they get a notification.
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });

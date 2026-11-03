@@ -22,6 +22,20 @@ Finans yönetimi (kurallar, ödeme onayı/reddi, mutabakat) mobil uygulamada yer
 - **Toptan alım %2:** Jeton Noktası yönetimden jetonu satış fiyatının %2 altına alır.
 - Kur (`usdTry`) Finance Control'den güncellenir; testler: `app/tests/economy.test.ts`.
 
+## Sunucuda (`server/api/wallet.mjs`, `jeton.mjs`; ayrıntı `docs/SUNUCU.md`)
+- **Jetonun kaynağı tutulur:** her yükleme bir parti (Google Play, App Store, ilk alım hediyesi, Jeton Noktası, toptan, bozdurma, Çevir), tarihi ve kimden geldiği ile. Hediye edilen her elmas hangi partiden geldiğini bilir.
+- **Kilit:** mağazadan alınıp hediye edilen jetonun elması **7 gün**, Jeton Noktası'ndan alınanınki **1 gün** kilitli; sonra çekilebilir kazanca geçer. Gelir ekranında iki bölüm: **Çekilebilir kazanç** ve **Kilitli elmas**.
+- **Jeton Noktası hesabı** yalnız yönetici tarafından açılır; stok yönetimden toptan alınır (dekontla), satış kişiye aktarımla yapılır (dekont/havale numarası kaydedilir), yayıncının elması anında bozdurulabilir.
+- **Kayıtlar:** yükleyen, yüklenen, aktaran, alan, işlemi yapan, IP, dekont, tarih; defter, aktarımlar ve yönetici işlemleri değiştirilemez/silinemez. Bir hesabın bütün para kaydı yönetici denetim görünümünde.
+- **İade:** mağaza iadesinde harcanmamış jeton ve henüz kilitli elmas geri alınır; kilidi açılmış kısım raporlanır.
+- Yayıncı **para çekme** (IBAN) sunucuda henüz yok; ajans ödemeleri tasarımıyla birlikte gelecek.
+
+## Uygulamada kilitli elmas (`app/src/lib/diamond-locks.ts`)
+- **Gelir** ekranı: toplam elmasın altında iki parça (çubuk + iki kutu) **Çekilebilir kazanç** ve **Kilitli elmas**; ilk kilidin ne zaman açılacağı yazar. Altında **Kilitli elmas** listesi: tutar, gönderen, hangi jetonla (Mağaza jetonu · 7 gün / Jeton Noktası · 1 gün), kalan süre ve ilerleme çubuğu.
+- Çevir, Para çek, Anında bozdur ve Jeton Noktası > Yayıncı kazancı yalnız çekilebilir kısmı kullanır; kilitli tutar istenirse sunucuyla aynı mesaj çıkar ("… elmasın kilidi henüz açılmadı; çekilebilir bakiyen … elmas").
+- Kilit süresi dolunca elmas kendiliğinden çekilebilir kazanca geçer ve "Kilitli elmasların açıldı" bildirimi gelir (uygulama kapalıyken açılanlar için ilk açılışta).
+- Hediye, arama ve bunların bonusları kilitlenir; görev, ajans ve tayfa bonusu kilitlenmez. Uygulama gönderenin jetonunun kaynağını göremediği için yerel demoda hep 7 gün varsayar; gerçek kaynak ve kilit sunucudadır (`GET /api/wallet/earnings`). Süreler `rules.ts`: `pendingDays` (7), `jetonPendingDays` (1). Testler: `app/tests/diamond-locks.test.ts`.
+
 ## Komisyonlar (yayıncıdan kesilmez)
 - Ajans: `agencyCommission` (%40) × bağlı yayıncıların uygun kazancı.
 - BD: `bdCommission` (%5) × BD'nin getirdiği ajansın uygun yayıncı tabanı; her kazanç için **bir kez** hesaplanır (çift komisyon engeli). BD'ye varsayılan olarak ban yetkisi verilmez (Rol ve Yetki Merkezi).

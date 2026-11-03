@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,7 +17,8 @@ const formatIban = (raw: string) => {
 };
 
 export default function Withdraw() {
-  const { diamonds, requestWithdraw, withdrawals } = useApp();
+  // Only the withdrawable part can be paid out; locked diamonds (lib/diamond-locks) wait for their lock.
+  const { withdrawableDiamonds: diamonds, lockedDiamonds: locked, requestWithdraw, withdrawals } = useApp();
   const [amount, setAmount] = useState(String(Math.max(RULES.minWithdrawDiamonds, Math.floor(diamonds / 1000) * 1000)));
   const [iban, setIban] = useState('TR');
   const [name, setName] = useState('');
@@ -40,6 +42,12 @@ export default function Withdraw() {
           <Text style={styles.dim}>Çekilebilir bakiye</Text>
           <Text style={styles.big}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
           <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas</Text>
+          {locked > 0 && (
+            <View style={styles.locked}>
+              <Ionicons name="lock-closed" size={12} color={colors.textDim} />
+              <Text style={styles.dim}>Ayrıca {locked.toLocaleString('tr-TR')} elmas kilitli; süresi dolunca buraya eklenir.</Text>
+            </View>
+          )}
         </Card>
 
         <Text style={styles.label}>Çekilecek elmas</Text>
@@ -96,4 +104,5 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   chipText: { color: colors.text, fontWeight: '600' },
   receive: { color: colors.green, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  locked: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
 }));

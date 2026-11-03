@@ -33,6 +33,10 @@ describe('Giriş ve cüzdan', () => {
     const b = await signUp('B');
     await call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(6) }, a.session);
     await call('POST', '/api/wallet/gift', { to: b.user.id, amount: 1200, ref: rnd(6) }, a.session);
+    const [locked, why] = await call('POST', '/api/wallet/exchange', { diamonds: 1000, ref: rnd(6) }, b.session);
+    assert.equal(locked, 409, 'mağaza jetonuyla gelen elmas 7 gün kilitli');
+    assert.match(why.error, /kilidi henüz açılmadı/);
+    await h.sql.query('UPDATE diamond_locks SET unlock_at = now()');
     const ref = rnd(6);
     const both = await Promise.all([1, 2].map(() => call('POST', '/api/wallet/exchange', { diamonds: 1000, ref, coins: 999999 }, b.session)));
     for (const [st, j] of both) assert.equal(st, 200, j.error);

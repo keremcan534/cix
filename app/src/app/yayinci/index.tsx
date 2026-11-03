@@ -87,7 +87,7 @@ export default function HostCenter() {
 }
 
 function Dashboard() {
-  const { diamonds, totalDiamonds, weekly, earnings, agencyId, withdrawals, me } = useApp();
+  const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, totalDiamonds, weekly, earnings, agencyId, withdrawals, me } = useApp();
   // The join window runs from sign-up; once it has passed the host is already on the management account.
   const [joinedDays] = useState(() => (me.joinedAt ? Math.floor((Date.now() - new Date(me.joinedAt).getTime()) / 86_400_000) : 0));
   const joinDaysLeft = Math.max(0, RULES.hostAgencyJoinDays - joinedDays);
@@ -101,7 +101,8 @@ function Dashboard() {
 
   const exchange = () =>
     // Diamonds turn into coins only in the main Coins Bank account (lib/coins-bank); hosts cash out instead.
-    showAlert('Anında bozdur', `Jeton Noktası elmasını resmi değerinden hemen öder: ${diamonds.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(diamonds)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.`, [
+    // Only the withdrawable part: locked diamonds (lib/diamond-locks) wait for their lock.
+    showAlert('Anında bozdur', `Jeton Noktası çekilebilir elmasını resmi değerinden hemen öder: ${free.toLocaleString('tr-TR')} elmas ≈ ${Math.floor(diamondValueTl(free)).toLocaleString('tr-TR')} TL. Senden ücret kesilmez.${locked > 0 ? `\n\n${locked.toLocaleString('tr-TR')} elmasın kilidi henüz açılmadı.` : ''}`, [
       { text: 'Kapat', style: 'cancel' },
       { text: "Jeton Noktası'na git", onPress: () => router.push('/coins-bank') },
     ]);
@@ -114,6 +115,16 @@ function Dashboard() {
           <Text style={styles.balanceLabel}>Elmas bakiyesi</Text>
           <Text style={styles.balanceN}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
           <Text style={styles.balanceLabel}>≈ {usd(diamonds)}</Text>
+          <View style={styles.balanceSplit}>
+            <View style={styles.balancePart}>
+              <Ionicons name="lock-open" size={13} color="#fff" />
+              <Text style={styles.balancePartText} numberOfLines={1}>Çekilebilir {free.toLocaleString('tr-TR')}</Text>
+            </View>
+            <View style={styles.balancePart}>
+              <Ionicons name="lock-closed" size={13} color="#fff" />
+              <Text style={styles.balancePartText} numberOfLines={1}>Kilitli {locked.toLocaleString('tr-TR')}</Text>
+            </View>
+          </View>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
             <Pressable style={styles.balanceBtn} onPress={() => router.push('/yayinci/cek')}>
               <Ionicons name="cash-outline" size={18} color="#fff" />
@@ -312,6 +323,9 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   balanceN: { color: '#fff', fontSize: 34, fontWeight: '900' },
   balanceBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingVertical: 10 },
   balanceBtnText: { color: '#fff', fontWeight: '700' },
+  balanceSplit: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  balancePart: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(4,22,29,0.22)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 1 },
+  balancePartText: { color: '#fff', fontSize: 12, fontWeight: '700', flexShrink: 1 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

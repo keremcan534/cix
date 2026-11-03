@@ -5,6 +5,7 @@ import { AGENCIES, type AgencyRole } from '@/data/agency';
 import type { CosmeticKind } from '@/data/catalog';
 import type { TaskKey } from '@/data/economy';
 import { ME, type Conversation, type User } from '@/data/mock';
+import type { DiamondLock } from '@/lib/diamond-locks';
 import { entriesWhere, isFiniteNumber, isRecord, itemsShaped, oneOf, pickValid, withDefaults, type Kind } from '@/lib/saved-state';
 import type { Earning, FanClub, LedgerRow, MyRoom, Notice, OwnedAgency, SafetyLog, Settings, Withdrawal } from '@/store';
 
@@ -31,6 +32,8 @@ export type Snapshot = {
   charmXp?: number;
   weekly: number[];
   earnings: Earning[];
+  /** Diamonds not yet withdrawable (lib/diamond-locks); saves from before the locks have none. */
+  diamondLocks?: DiamondLock[];
   withdrawals: Withdrawal[];
   stats: Record<TaskKey, number>;
   giftWall?: Record<string, Record<string, number>>;
@@ -69,7 +72,7 @@ const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
   loggedIn: 'boolean', me: 'object', coins: 'number', gameCoins: 'number', spentTotal: 'number', wealthXp: 'number', ledger: 'objects',
   spentDay: 'object', inventory: 'strings', equipped: 'object', emojiPacks: 'strings', recentEmojis: 'strings', settings: 'object',
   notifications: 'objects', myRoom: 'object', isHost: 'boolean', diamonds: 'number', totalDiamonds: 'number', charmXp: 'number',
-  weekly: 'numbers', earnings: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings',
+  weekly: 'numbers', earnings: 'objects', diamondLocks: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings',
   checkInDay: 'number', checkInDate: 'string', svipXp: 'number', firstBuys: 'strings', nobleTier: 'number', nobleDays: 'number',
   vipDays: 'number', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
   fanClubs: 'object', recentRooms: 'strings', following: 'strings', blocked: 'strings', conversations: 'objects',
@@ -88,6 +91,14 @@ export function readSnapshot(raw: unknown): Partial<Snapshot> | null {
   if (s.earnings) {
     s.earnings = itemsShaped<Earning>(s.earnings, { id: 'string', amount: 'number', source: 'string', time: 'string' }).filter(
       (e) => e.gift === undefined || itemsShaped([e.gift], { name: 'string', emoji: 'string', count: 'number' }).length === 1,
+    );
+  }
+  if (s.diamondLocks) {
+    s.diamondLocks = itemsShaped<DiamondLock>(s.diamondLocks, { id: 'string', amount: 'number', unlockAt: 'number', channel: 'string', source: 'string' }).filter(
+      (l) =>
+        (l.channel === 'store' || l.channel === 'jeton') &&
+        l.amount > 0 &&
+        (l.gift === undefined || itemsShaped([l.gift], { name: 'string', emoji: 'string', count: 'number' }).length === 1),
     );
   }
   if (s.withdrawals) s.withdrawals = itemsShaped(s.withdrawals, { id: 'string', diamonds: 'number', iban: 'string', status: 'string', time: 'string' });
