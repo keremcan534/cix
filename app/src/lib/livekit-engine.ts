@@ -1,6 +1,6 @@
-// Real voice engine on LiveKit (docs/SUNUCU.md), for the web build: livekit-client uses the browser's WebRTC.
-// Native needs @livekit/react-native, its config plugin and a development build; until then native keeps the
-// simulated engine (lib/voice-setup.ts).
+// Real voice engine on LiveKit (docs/SUNUCU.md). The web build uses the browser's WebRTC (voice-setup.web.ts);
+// the phone build uses @livekit/react-native's WebRTC (voice-setup.ts), which plays remote voices by itself and
+// needs its audio session started while in a room.
 //
 // The AudioEngine calls are synchronous while joining is not: connect() updates the counters at once and joins
 // in the background (token from our API, then the room). Every async step checks that the room is
@@ -15,6 +15,11 @@ export type LiveKitConfig = {
   /** Access token for a LiveKit room name, from our API (signed-in users only). */
   getToken: (room: string) => Promise<string>;
   onError?: (message: string) => void;
+  /** Web: remote voices need hidden <audio> elements. Native plays them without any. */
+  attachAudio?: boolean;
+  /** Native: start / stop the phone's audio session around a room. */
+  onRoomOpen?: () => Promise<void> | void;
+  onRoomClosed?: () => Promise<void> | void;
 };
 
 /** LiveKit room names allow what the token service allows: letters, digits, _ and -. */
@@ -33,6 +38,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     try {
       const token = await cfg.getToken(roomName(roomId));
       if (room !== r) return;
+      await cfg.onRoomOpen?.();
+      if (room !== r) return;
       await r.connect(cfg.url, token);
       if (room !== r) return void r.disconnect();
       // Browsers block sound until a user gesture; opening a room is one, so this usually succeeds at once.
@@ -45,6 +52,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
 
   function newRoom() {
     const r = new Room({ dynacast: true, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (cfg.attachAudio === false) return r;
     // Remote voices play through hidden <audio> elements, removed when the track goes away.
     r.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
@@ -70,7 +78,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       void join(roomId, room);
     },
     reconnect() {
-      if (!room || !s.roomId || (typeof navigator !== 'undefined' && !navigator.onLine)) return false;
+      if (!room || !s.roomId || (typeof navigator !== 'undefined' && navigator.onLine === false)) return false;
       s.reconnects++;
       // LiveKit retries a dropped transport by itself; only a fully closed room needs a new join.
       if (room.state === ConnectionState.Disconnected) void join(s.roomId, room);
@@ -85,8 +93,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       s.concurrent--;
       s.disconnects++;
       if (r) {
-        r.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => pub.track?.detach().forEach((el) => el.remove())));
-        void r.disconnect();
+        if (cfg.attachAudio !== false) r.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => pub.track?.detach().forEach((el) => el.remove())));
+        void r.disconnect().finally(() => cfg.onRoomClosed?.());
       }
     },
     setPublishing(on) {
@@ -97,7 +105,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room) setMic(room, on);
     },
     setRoute(route) {
-      // The browser picks the output device; the route is kept for the session's state only.
+      // The system picks the output device; the route is kept for the session's state only.
       s.route = route;
     },
     stats: () => ({ ...s }),

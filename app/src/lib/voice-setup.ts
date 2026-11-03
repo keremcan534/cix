@@ -1,3 +1,29 @@
-// Native: the simulated engine stays until @livekit/react-native and a development build are added
-// (lib/livekit-engine.ts, docs/ODA_OTURUMU.md). The web build has its own setup (voice-setup.web.ts).
-export function setupVoice(_name: () => string) {}
+// Phone build: plug the LiveKit engine (lib/livekit-engine.ts) into the room session when the server is configured
+// (EXPO_PUBLIC_LIVEKIT_URL and EXPO_PUBLIC_API_URL, set in eas.json for the APK). @livekit/react-native brings
+// WebRTC to React Native; it needs a built app (EAS), not Expo Go. Without the addresses the simulated engine stays.
+// The web build has its own setup (voice-setup.web.ts).
+import { AudioSession, registerGlobals } from '@livekit/react-native';
+
+import { apiEnabled, ensureSignedIn, voiceToken } from '@/lib/api';
+import { createLiveKitEngine } from '@/lib/livekit-engine';
+import { setEngine } from '@/lib/room-session';
+
+export function setupVoice(name: () => string) {
+  const url = process.env.EXPO_PUBLIC_LIVEKIT_URL;
+  if (!url || !apiEnabled()) return;
+  registerGlobals();
+  setEngine(
+    createLiveKitEngine({
+      url,
+      // Rooms are joined as the signed-in server user; the first room signs this device in if needed.
+      getToken: async (room) => {
+        await ensureSignedIn(name());
+        return voiceToken(room);
+      },
+      onError: (m) => console.warn(`[ses] ${m}`),
+      attachAudio: false,
+      onRoomOpen: () => AudioSession.startAudioSession(),
+      onRoomClosed: () => AudioSession.stopAudioSession(),
+    }),
+  );
+}

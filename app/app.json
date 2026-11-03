@@ -51,7 +51,21 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication"
+          }
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Sesli odalarda konuşabilmen için mikrofonuna erişmemiz gerekiyor."
+        }
+      ]
     ],
     "scheme": "similarclub",
     "experiments": {
