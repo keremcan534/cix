@@ -6,6 +6,7 @@
 // session it returns is kept too, so the app stays signed in. Phone sign-in (otpStart / otpVerify) keeps the
 // device's development account and wallet when it is used for the first time.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getRandomBytes } from 'expo-crypto';
 
 export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number };
 export type ServerLedgerRow = { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; ref: string; counterparty: string | null; created_at: string };
@@ -24,11 +25,9 @@ export class ApiError extends Error {
   }
 }
 
-const randomId = (bytes: number) => {
-  const a = new Uint8Array(bytes);
-  crypto.getRandomValues(a);
-  return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
-};
+// expo-crypto, not the global `crypto`: Android's JavaScript engine (Hermes) has no crypto.getRandomValues,
+// so sign-up and every wallet request id would fail on the phone.
+const randomId = (bytes: number) => Array.from(getRandomBytes(bytes), (b) => b.toString(16).padStart(2, '0')).join('');
 /** Request id for a wallet change; sending the same id again is applied once by the server. */
 export const newRef = () => randomId(12);
 
