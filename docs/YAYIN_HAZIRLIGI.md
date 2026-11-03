@@ -57,7 +57,8 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | Yetkili (moderatör) web paneli | ⏳ | Sunucu uçları hazır |
 | Gecelik yedeğin sunucu dışına kopyası (rclone, 60 gün) | 🟡 | Betik hazır; madde 6 bekliyor |
 | Yedekten geri yükleme ve aylık deneme (`restore.sh --check`) | ✅ | |
-| İzleme ve alarm | ✅ | GitHub her 15 dakikada API, veritabanı ve LiveKit'i yokluyor; düşerse e-posta |
+| İzleme ve alarm | 🟡 | GitHub her 15 dakikada API, veritabanı ve LiveKit'i yokluyor; düşerse e-posta. Uygulama çökmeleri ve sunucu hataları için anlık bildirim (Sentry benzeri) yok; hatalar yalnızca kayıtlarda |
+| Finans paneli (Finance Control) sunucuda, para hareketleri otomatik aktarılıyor | 🟡 | `https://panel.<adres>`; API işlem kaydını panele gönderiyor (satış, hediye, harcama, iade, Jeton Noktası, çevirme), panel kapalıyken kaybolmuyor, testli ve gerçek panelle denendi. Kurulum madde 9'daki anahtarla gelir; sonra panelde ödeme kanalları ve anahtar bir kez tanımlanır (`docs/SUNUCU.md` → Finans paneli) |
 | Yeni sunucuyu tek komutla kurma (`server/infra/setup.sh`) | ✅ | Alan adı gelince taşınma için |
 | Test (staging) ortamı | ⏳ | |
 | Yasal metin sayfaları ve kayıtta onay kutusu | ⛔ | Madde 7 |

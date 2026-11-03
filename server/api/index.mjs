@@ -24,6 +24,7 @@ import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes } from './auth.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
+import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
@@ -188,6 +189,7 @@ const routes = {
   ...messageRoutes,
   ...roomRoutes,
   ...adminRoutes,
+  ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
 };
@@ -252,6 +254,7 @@ process.on('unhandledRejection', (e) => console.error('unhandled rejection', e))
 /** docker compose stop / deploy: finish the requests in flight (up to 10 s), then close the pool. */
 function shutdown(signal) {
   console.log(`${signal}: shutting down`);
+  stopFinanceSync();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -266,3 +269,4 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 await migrate();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
+startFinanceSync();

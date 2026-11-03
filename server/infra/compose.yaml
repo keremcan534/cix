@@ -1,5 +1,5 @@
-# /opt/similar/compose.yaml: the four services of the server (docs/SUNUCU.md). setup.sh copies it to a new
-# server; on the running server compare it with the live file before replacing that one.
+# /opt/similar/compose.yaml: the services of the server (docs/SUNUCU.md). setup.sh copies it to a new
+# server and the deploy job (server.yml) keeps it current, keeping the previous copy as compose.yaml.bak.
 #
 # Everything except Postgres runs on the host network: Caddy reaches LiveKit (7880) and the API (7890) on
 # 127.0.0.1, LiveKit needs its UDP ports directly, and LiveKit calls the API's webhook on 127.0.0.1.
@@ -52,6 +52,28 @@ services:
     volumes: ['./livekit.yaml:/etc/livekit.yaml:ro']
     logging: *logging
 
+  # Finance Control, the finance panel (docs/SUNUCU.md, "Finans paneli"). Its source comes from its own repo:
+  # the deploy job copies it into ./finance next to the Dockerfile. Until then the service stays off: it is in
+  # the "finance" profile, which the deploy job turns on in .env (COMPOSE_PROFILES=finance) once the source
+  # is there. Only Caddy reaches it (panel.DOMAIN → 127.0.0.1:4300); the API posts events to it on 127.0.0.1.
+  finance:
+    build: ./finance
+    profiles: [finance]
+    restart: unless-stopped
+    network_mode: host
+    # Only the panel's own settings, not the whole .env: the panel never needs the server's other secrets.
+    environment:
+      FC_HOST: 127.0.0.1
+      FC_PORT: '4300'
+      FC_DATA_DIR: /data
+      FC_COOKIE_SECURE: '1'
+      # The first admin. Empty → the panel makes one and writes it to /data/giris-bilgileri.txt.
+      FC_ADMIN_EMAIL: ${FC_ADMIN_EMAIL:-}
+      FC_ADMIN_PASSWORD: ${FC_ADMIN_PASSWORD:-}
+    volumes: ['financedata:/data']
+    stop_grace_period: 15s
+    logging: *logging
+
   caddy:
     image: caddy:2.10
     restart: unless-stopped
@@ -66,5 +88,6 @@ services:
 
 volumes:
   pgdata:
+  financedata:
   caddy_data:
   caddy_config:

@@ -7,14 +7,15 @@
 | Adres | `130.61.230.94` · HTTPS: `https://130-61-230-94.sslip.io` (alan adı alınınca değişecek) |
 | Makine | VM.Standard.A1.Flex, 1 OCPU / 6 GB, Ubuntu 24.04 ARM (ücretsiz sınır 4 OCPU / 24 GB) |
 | Giriş | `ssh -i ~/.ssh/oracle.key ubuntu@130.61.230.94` |
-| Dosyalar | `/opt/similar`: `compose.yaml`, `livekit.yaml`, `Caddyfile`, `.env` (anahtarlar, yalnızca sunucuda), `backup.sh`, `restore.sh`, `backups/`, `api/` |
-| Şablonlar | `server/infra/`: bu dosyaların git'teki hali ve yeni sunucu kurulumu (`setup.sh`). Canlı sunucudaki dosyayı değiştirmeden önce şablonla karşılaştır. |
+| Dosyalar | `/opt/similar`: `compose.yaml`, `livekit.yaml`, `Caddyfile`, `.env` (anahtarlar, yalnızca sunucuda), `backup.sh`, `restore.sh`, `backups/`, `api/`, `finance/` (finans paneli) |
+| Şablonlar | `server/infra/`: bu dosyaların git'teki hali ve yeni sunucu kurulumu (`setup.sh`). `compose.yaml`, `Caddyfile` ve `backup.sh` otomatik kurulumla (`server.yml`) git'teki hale getirilir; önceki hali `<dosya>.bak` olarak kalır. `.env` ve `livekit.yaml`'a dokunulmaz. |
 
 ## Servisler (`docker compose`, `/opt/similar`)
 - **livekit** (`livekit/livekit-server:v1.9.1`, host ağı): HTTP 7880 yalnızca Caddy arkasında; RTC TCP 7881, medya UDP 50000–54999, TURN UDP 3478 ve TURN aktarma UDP 55000–60000.
 - **caddy** (`caddy:2.10`): 443'te Let's Encrypt sertifikası, `wss://130-61-230-94.sslip.io` → LiveKit.
 - **postgres** (`postgres:17`): yalnızca `127.0.0.1:5432`, dışarıya kapalı.
 - **api** (`server/api`, Node 22 + `pg`, `127.0.0.1:7890`): Caddy `/api/*` ve `/token` yollarını buna yollar. Açılışta `migrations/*.sql` dosyalarını sırayla bir kez uygular (`schema_migrations`). Sırlar yalnızca sunucudaki `.env` içinde.
+- **finance** (Finance Control, Node 24 + SQLite, `127.0.0.1:4300`, `financedata` birimi): finans paneli, `https://panel.130-61-230-94.sslip.io`. Ayrıntı: aşağıda **Finans paneli**.
 
 ## API
 | Çağrı | Ne yapar |
@@ -105,11 +106,26 @@ Bakiye yalnızca aynı veritabanı işleminde ledger satırıyla birlikte deği�
 
 ## Testler ve kurulum
 - `server/api/test/`: her dosya boş bir veritabanı açar, API'yi ayrı bir süreç olarak başlatır (`harness.mjs`), HTTP üzerinden dener, sonra veritabanını siler. `api.test.mjs`: giriş, cüzdan, profil, takip/engel, mesaj, oda/ses token'ı, şikâyet/moderasyon, hesap silme. `launch.test.mjs`: sağlık, telefonla giriş (kod API kaydından okunur), oturumlar, mağaza satın alımı, hediye ve sıralama, push (sahte Expo sunucusuyla), LiveKit webhook, imzalı yükleme adresi (AWS'nin örnek imzasıyla), telefonlu hesap silme. `coins.test.mjs`: jeton kanalı ve partiler, 7 gün / 1 gün elmas kilidi, Çevir'in kilitli elmasa kapalı olması, Jeton Noktası açma (yalnız yönetici), toptan alım, Jeton Noktası satışı (aynı anda iki kopya dahil), kilit mirası, harcama sırası, anında bozdur, iade (Jeton Noktası üzerinden geçen dahil), değiştirilemez kayıtlar, denetim görünümü, partilerin bakiyeye eşitliği. Yerelde: `cd server/api && PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test`.
-- `.github/workflows/server.yml`: `server/**` değişince testler Postgres 17 ile çalışır. Ana dala birleşince API sunucuya kurulur (`/opt/similar/api` + `docker compose up -d --build api`); commit kimliği `version.txt`'ye yazılır ve `/api/health` yeni sürümü bildirene kadar beklenir.
+- `.github/workflows/server.yml`: `server/**` değişince testler Postgres 17 ile çalışır. Ana dala birleşince sunucuya kurulur: `compose.yaml`, `Caddyfile`, `backup.sh`, API (`/opt/similar/api`) ve finans paneli (`/opt/similar/finance`), sonra `docker compose up -d --build` ve Caddy yeniden yüklenir; commit kimliği `version.txt`'ye yazılır ve `/api/health` yeni sürümü bildirene kadar beklenir.
 - `.github/workflows/uptime.yml`: 15 dakikada bir canlı API'yi (`/api/health`, veritabanı dahil) ve LiveKit'i (`/` → `OK`) yoklar; düşerse GitHub e-posta atar. Alan adı gelince `API_BASE_URL` depo değişkeni. **Bunun için bir kez** GitHub → Settings → Secrets and variables → Actions → `DEPLOY_SSH_KEY` olarak `~/.ssh/oracle.key` içeriği eklenmeli (adres değişirse `DEPLOY_HOST` değişkeni). Anahtar yoksa kurulum adımı atlanır ve elle kurulum (aşağıda) geçerlidir.
 - Bütün ayarlar ve açıklamaları: `server/infra/.env.example` (SMS, ödeme, depolama, yedek, sınırlar). Canlı sunucudaki `.env`'e eksik olanlar eklenir; boş bırakılan özellik kapalı kalır.
 
 Kod değişince: `scp -r -i ~/.ssh/oracle.key server/api ubuntu@130.61.230.94:/opt/similar/` ve sunucuda `sudo docker compose up -d --build api`. Uçtan uca kontrol: `node server/api/smoke-test.mjs` (iki atılabilir test hesabı açar).
+
+## Finans paneli (Finance Control)
+Ayrı depodaki panel (`keremcan534/similarclup-finance-control`) aynı sunucuda çalışır ve API'deki bütün para hareketlerini otomatik alır.
+
+- **Adres:** `https://panel.130-61-230-94.sslip.io` (alan adı gelince `panel.<alan>`). Caddy dışarıya yalnızca bunu açar; panelin kendi girişi (iki adımlı doğrulama açılmalı) korur.
+- **Kurulum:** otomatik kurulum (`server.yml`) panel deposunu indirir, `server/infra/finance/Dockerfile` ile birlikte `/opt/similar/finance`'e koyar, `.env`'e `COMPOSE_PROFILES=finance` ekler (panel servisi bundan önce kapalı durur) ve `docker compose up -d --build` yapar; sonunda panelin açıldığını yoklar. Panel deposu gizliyse GitHub'da `FINANCE_REPO_TOKEN` sırrı (o depoyu okuyabilen bir anahtar) gerekir.
+- **İlk giriş:** `.env`'de `FC_ADMIN_EMAIL` / `FC_ADMIN_PASSWORD` doluysa o hesap açılır. Boşsa panel kendisi üretir: `sudo docker compose exec finance cat /data/giris-bilgileri.txt`. Girince şifre değiştirilip iki adımlı doğrulama açılır, sonra bu dosya silinir (`sudo docker compose exec finance rm /data/giris-bilgileri.txt`).
+- **Bağlantı (bir kez):**
+  1. Panelde **Ödeme kanalları**na `google` (Google Play), `apple` (App Store) ve `jeton_noktasi` (Jeton Noktası toptan satışı) kodlarıyla kanal tanımlanır. Tanımsız kanaldaki satış panelde reddedilir; API onu bekletir ve kanal açılınca kendisi yeniden gönderir.
+  2. **Entegrasyonlar → similarclub → Anahtar üret**; anahtar bir kez gösterilir.
+  3. Sunucuda `.env`'e `FINANCE_API_KEY=<anahtar>`, sonra `sudo docker compose up -d api`. API kaydında `finance sync on` görünür.
+- **Ne gider** (`server/api/finance-sync.mjs`): mağaza satın alımı (paket liste fiyatı, TL) ve ilk alım hediyesi, hediye (gönderen, alan yayıncı olarak, jeton), uygulama içi harcama, mağaza iadesi, Jeton Noktası toptan alımı (bankanın ödediği fiyat), elmas → jeton çevirme/bozdurma, test yüklemeleri (gelir sayılmaz, "promosyon" olarak). Jeton Noktası → kullanıcı aktarımları gitmez: yeni jeton yaratmaz, yalnızca el değiştirir.
+- **Nasıl** gider: API işlem kaydını (ledger) sırayla okur, 30 sn'de bir, 60 sn'den eski satırları paketler (`finance_sync` imleci). Panel kapalıysa hiçbir şey kaybolmaz, sıradaki turda kaldığı yerden devam eder. Reddedilen olay `finance_sync_failed`'a girer ve artan aralıkla (en çok 6 saatte bir) yeniden denenir. Her olayın kendi anahtarı var, iki kez giderse panel ikinciyi "zaten var" diye geçer.
+- **Durum:** yönetici hesabıyla `GET /api/admin/finance-sync` → açık mı, son başarılı tur, geride kalan satır sayısı, son hata, bekleyen reddedilmiş olaylar.
+- **Yedek:** `backup.sh` her gece panelin kendi yedek aracıyla tutarlı bir kopya alır, bütünlüğünü ve denetim zincirini kontrol eder → `backups/finance-YYYY-MM-DD.db.gz` (14 gün; R2 açılınca dışarıya da).
 
 ## Uygulama bağlantısı
 - `app/.env.local`: `EXPO_PUBLIC_API_URL=https://130-61-230-94.sslip.io` ve `EXPO_PUBLIC_LIVEKIT_URL=wss://130-61-230-94.sslip.io`. Bu dosya git'e girmez; yoksa uygulama tamamen yerel prototip verisiyle çalışır. GitHub Pages yayınında açmak için değişkenlerin derlemeye verilmesi gerekir.
@@ -122,7 +138,7 @@ Kod değişince: `scp -r -i ~/.ssh/oracle.key server/api ubuntu@130.61.230.94:/o
 Portlar iki yerde açık olmalı: Oracle'da **similar-vcn → Default Security List** ve sunucunun iptables'ı (`netfilter-persistent` ile kalıcı). Açık: TCP 22, 80, 443, 7881, 5349; UDP 3478, 50000–60000.
 
 ## Yedek
-`/etc/cron.d/similar-backup` her gece 03:30 UTC'de `backup.sh` çalıştırır: `pg_dump` → `backups/similar-YYYY-MM-DD.sql.gz` (bütünlüğü denetlenir), 14 gün saklanır. Yeni `backup.sh` (`server/infra/`): `.env`'de `BACKUP_RCLONE_REMOTE` varsa (ör. `r2:similar-yedek`, `rclone config` ile bir kez tanımlanır) dosya sunucu dışına da kopyalanır ve orada 60 gün durur; `BACKUP_PING_URL` varsa (healthchecks.io gibi) yedek gelmeyince haber verir. **Canlı sunucuda henüz eski betik var**; R2 açılınca yenisiyle değiştirilecek.
+`/etc/cron.d/similar-backup` her gece 03:30 UTC'de `backup.sh` çalıştırır: `pg_dump` → `backups/similar-YYYY-MM-DD.sql.gz` (bütünlüğü denetlenir), 14 gün saklanır; finans paneli çalışıyorsa onun veritabanı da → `backups/finance-YYYY-MM-DD.db.gz`. Yeni `backup.sh` (`server/infra/`): `.env`'de `BACKUP_RCLONE_REMOTE` varsa (ör. `r2:similar-yedek`, `rclone config` ile bir kez tanımlanır) dosya sunucu dışına da kopyalanır ve orada 60 gün durur; `BACKUP_PING_URL` varsa (healthchecks.io gibi) yedek gelmeyince haber verir. **Canlı sunucuda henüz eski betik var**; otomatik kurulum ilk çalıştığında yenisiyle değişir.
 
 Geri yükleme (`restore.sh`): `./restore.sh --check backups/…sql.gz` yedeği geçici bir veritabanına açıp sayar ve siler (ayda bir denenmeli); `./restore.sh backups/…sql.gz` canlı veritabanını değiştirir (önce onay ister ve şimdiki hali ayrı bir dosyaya saklar).
 
@@ -145,8 +161,8 @@ Sistem güvenlik güncellemeleri `unattended-upgrades` ile otomatik.
 ## Canlı sunucuya bu sürümle gelecekler
 Kod kurulumla (`server.yml`) gider; şunlar sunucuda bir kez elle yapılır:
 1. `livekit.yaml`'a webhook bölümü (dinleyici sayıları için): `webhook: {api_key: <LIVEKIT_KEYS'teki anahtar adı>, urls: [http://127.0.0.1:7890/api/livekit/webhook]}`, sonra `docker compose restart livekit`.
-2. `compose.yaml`'da API'ye `LIVEKIT_API_URL: http://127.0.0.1:7880` (kaçırılan webhook'ları temizler) ve servislere kayıt sınırı (`server/infra/compose.yaml`'daki `logging`).
-3. `Caddyfile`'a webhook yolunu dışarıya kapatan blok (`server/infra/Caddyfile`).
+2. `compose.yaml` ve `Caddyfile` artık otomatik kurulumla gelir (`LIVEKIT_API_URL`, kayıt sınırı, webhook yolunun kapatılması, finans paneli). `DEPLOY_SSH_KEY` yoksa bu iki dosya `server/infra/`'dan elle kopyalanır, sonra `sudo docker compose up -d --build` ve `sudo docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+3. Finans paneli bağlantısı (yukarıda **Finans paneli**: kanallar, anahtar, `FINANCE_API_KEY`).
 4. Hesaplar geldikçe `.env`'e: `SMS_PROVIDER` ve anahtarları, `GOOGLE_SERVICE_ACCOUNT`, `APPLE_IAP_*`, `S3_*`, `BACKUP_*`. Telefonla giriş açılınca `ALLOW_DEV_AUTH=0`, mağaza ödemesi açılınca `ALLOW_TEST_TOPUP=0`. Kilit süreleri değişecekse `LOCK_DAYS_STORE` (varsayılan 7) ve `LOCK_DAYS_JETON` (1).
 5. İlk Jeton Noktası hesabını bir yönetici açar (`POST /api/admin/jeton/bank`); yönetici hesabı şimdilik veritabanından atanır (`UPDATE users SET role = 'admin' …`).
 
