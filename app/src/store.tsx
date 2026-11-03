@@ -1,8 +1,8 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, FREE_PACK_IDS, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { AGENCIES, agencyByCode, type AgencyRole } from '@/data/agency';
+import { COSMETICS, FREE_PACK_IDS, ROOM_THEMES, ROOM_TYPES, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -16,6 +16,7 @@ import { countsForWealth, wealthLevelOf } from '@/data/wealth';
 import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
+import { entriesWhere, isFiniteNumber, isRecord, itemsShaped, oneOf, pickValid, withDefaults, type Kind } from '@/lib/saved-state';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
@@ -319,16 +320,85 @@ const toggle = (set: Set<string>, id: string) => {
 };
 
 const ME_DEFAULT = { ...ME };
+const AGENCY_ROLES: readonly AgencyRole[] = ['owner', 'assistant', 'member'];
+const FAMILY_ROLES = ['owner', 'helper', 'member'] as const;
+
+/** The kind of value each saved field must hold (lib/saved-state); anything else is dropped on load. */
+const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
+  loggedIn: 'boolean', me: 'object', coins: 'number', gameCoins: 'number', spentTotal: 'number', wealthXp: 'number', ledger: 'objects',
+  spentDay: 'object', inventory: 'strings', equipped: 'object', emojiPacks: 'strings', recentEmojis: 'strings', settings: 'object',
+  notifications: 'objects', myRoom: 'object', isHost: 'boolean', diamonds: 'number', totalDiamonds: 'number', charmXp: 'number',
+  weekly: 'numbers', earnings: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings',
+  checkInDay: 'number', checkInDate: 'string', svipXp: 'number', firstBuys: 'strings', nobleTier: 'number', nobleDays: 'number',
+  vipDays: 'number', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
+  fanClubs: 'object', recentRooms: 'strings', following: 'strings', blocked: 'strings', conversations: 'objects',
+  followerInvites: 'object', starter: 'object', safetyLog: 'objects', ownedAnims: 'strings', micFx: 'string?',
+};
+
+/** The saved state with every field checked; null when nothing usable was saved. */
+export function readSnapshot(raw: unknown): Partial<Snapshot> | null {
+  const s = pickValid<Snapshot>(raw, SNAPSHOT_SPEC);
+  if (!s) return null;
+  if (s.me) s.me = withDefaults(ME_DEFAULT, s.me);
+  if (s.weekly && s.weekly.length !== 7) delete s.weekly;
+  // A row missing a field the list draws (or one a later version renamed) would crash that list's screen.
+  if (s.ledger) s.ledger = itemsShaped(s.ledger, { id: 'string', ref: 'string', currency: 'string', amount: 'number', reason: 'string', time: 'string', status: 'string' });
+  if (s.notifications) s.notifications = itemsShaped(s.notifications, { id: 'string', kind: 'string', icon: 'string', title: 'string', body: 'string', time: 'string', read: 'boolean' });
+  if (s.earnings) {
+    s.earnings = itemsShaped<Earning>(s.earnings, { id: 'string', amount: 'number', source: 'string', time: 'string' }).filter(
+      (e) => e.gift === undefined || itemsShaped([e.gift], { name: 'string', emoji: 'string', count: 'number' }).length === 1,
+    );
+  }
+  if (s.withdrawals) s.withdrawals = itemsShaped(s.withdrawals, { id: 'string', diamonds: 'number', iban: 'string', status: 'string', time: 'string' });
+  if (s.safetyLog) s.safetyLog = itemsShaped(s.safetyLog, { id: 'string', action: 'string', time: 'string' });
+  // A chat without its message list (or with a broken message) would crash the inbox and the chat screen.
+  if (s.conversations) {
+    s.conversations = itemsShaped<Conversation>(s.conversations, { id: 'string', userId: 'string', messages: 'objects' }).map((c) => ({
+      ...c,
+      unread: isFiniteNumber(c.unread) ? c.unread : 0,
+      messages: itemsShaped(c.messages, { text: 'string' }),
+    }));
+  }
+  if (s.fanClubs) {
+    s.fanClubs = entriesWhere(s.fanClubs, (v): v is FanClub => isRecord(v) && isFiniteNumber(v.points) && Array.isArray(v.history));
+    for (const club of Object.values(s.fanClubs)) club.history = itemsShaped(club.history, { text: 'string', pts: 'number', time: 'string' });
+  }
+  if (s.giftWall) s.giftWall = entriesWhere(s.giftWall, (v): v is Record<string, number> => isRecord(v) && Object.values(v).every(isFiniteNumber));
+  if (s.followerInvites) s.followerInvites = entriesWhere(s.followerInvites, isFiniteNumber);
+  if (s.equipped) s.equipped = entriesWhere(s.equipped, (v): v is string => typeof v === 'string');
+  if (s.ownedAgency && itemsShaped([s.ownedAgency], { name: 'string', code: 'string', status: 'string' }).length === 0) s.ownedAgency = null;
+  // Membership must point at an agency the app knows ('own' = the user's own, which needs its record).
+  if (s.agencyId && (s.agencyId === 'own' ? !s.ownedAgency : !AGENCIES.some((a) => a.id === s.agencyId))) {
+    s.agencyId = null;
+    s.agencyRole = null;
+  }
+  // Choices from a fixed list: an unknown value (renamed in a later version) is dropped, so its default is used.
+  if (s.agencyRole !== undefined && s.agencyRole !== null) s.agencyRole = oneOf(s.agencyRole, AGENCY_ROLES) ?? null;
+  if (s.familyRole !== undefined && s.familyRole !== null) s.familyRole = oneOf(s.familyRole, FAMILY_ROLES) ?? null;
+  return s;
+}
+
+/** Forgets everything saved on this device (the store's reset and the crash screen's way out). */
+export async function resetLocalData() {
+  await clearState();
+  for (const key of Object.keys(ME)) if (!(key in ME_DEFAULT)) delete (ME as Record<string, unknown>)[key];
+  Object.assign(ME, ME_DEFAULT);
+}
 
 /** Loads the saved state first (the splash screen stays up meanwhile), then mounts the store. */
 export function AppProvider({ children, onReady }: { children: ReactNode; onReady?: () => void }) {
   const [boot, setBoot] = useState<{ gen: number; initial: Partial<Snapshot> | null } | null>(null);
   useEffect(() => {
-    loadState<Partial<Snapshot>>().then((initial) => {
-      // Prototype shortcut: mock lookups (userById('me')) read the shared ME object.
-      if (initial?.me) Object.assign(ME, initial.me);
-      setBoot({ gen: 0, initial });
-    });
+    // Whatever goes wrong reading the save, the app still starts (with the defaults); a rejected promise here
+    // would leave the splash screen up for good.
+    loadState<unknown>()
+      .then(readSnapshot)
+      .catch(() => null)
+      .then((initial) => {
+        // Prototype shortcut: mock lookups (userById('me')) read the shared ME object.
+        if (initial?.me) Object.assign(ME, initial.me);
+        setBoot({ gen: 0, initial });
+      });
   }, []);
   const ready = !!boot;
   useEffect(() => {
@@ -336,8 +406,7 @@ export function AppProvider({ children, onReady }: { children: ReactNode; onRead
   }, [ready, onReady]);
   if (!boot) return null;
   const reset = () => {
-    clearState();
-    Object.assign(ME, ME_DEFAULT);
+    resetLocalData();
     setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: null }));
   };
   return (
@@ -377,7 +446,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [earnings, setEarnings] = useState<Earning[]>(s.earnings ?? []);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
 
-  const [stats, setStats] = useState<Record<TaskKey, number>>(s.stats ?? { roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 });
+  // Merged with the defaults: a save from before a counter existed would otherwise make it NaN on the first bump.
+  const [stats, setStats] = useState<Record<TaskKey, number>>(() => withDefaults({ roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 }, s.stats));
   const [giftWall, setGiftWall] = useState<Record<string, Record<string, number>>>(s.giftWall ?? {});
   const recordGift = (toId: string, giftId: string, count: number) =>
     setGiftWall((w) => ({ ...w, [toId]: { ...w[toId], [giftId]: (w[toId]?.[giftId] ?? 0) + count } }));
@@ -393,7 +463,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [ledger, setLedger] = useState<LedgerRow[]>(s.ledger ?? []);
   const log = (currency: LedgerRow['currency'], amount: number, reason: string, status: LedgerRow['status'] = 'Başarılı') =>
     setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), status }, ...l].slice(0, 200));
-  const spentStart = s.spentDay?.date === today() ? s.spentDay.amount : 0;
+  const spentStart = s.spentDay?.date === today() && Number.isFinite(s.spentDay.amount) ? s.spentDay.amount : 0;
   const spentTodayRef = useRef(spentStart);
   const [spentToday, setSpentToday] = useState(spentStart);
 
@@ -426,37 +496,40 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set([...FREE_PACK_IDS, ...(s.emojiPacks ?? [])]));
   const [recentEmojis, setRecentEmojis] = useState<string[]>(s.recentEmojis ?? []);
 
-  const [settings, setSettings] = useState<Settings>(() => ({
-    effectsOff: false,
-    haptics: true,
-    invisibleEntry: false,
-    cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
-    showOnline: true,
-    showLastSeen: true,
-    showCurrentRoom: true,
-    dmFrom: 'everyone',
-    callsFrom: 'everyone',
-    profilePublic: true,
-    notifySocial: true,
-    notifyFinance: true,
-    roomBot: true,
-    reduceMotion: false,
-    lowData: false,
-    notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
-    snoozeUntil: 0,
-    roomMuted: false,
-    musicVolume: 0.7,
-    gameVolume: 0.4,
-    voiceVolume: 1,
-    giftSounds: true,
-    bigGiftsOnly: false, micDenoise: true,
-    invitesFrom: 'everyone',
-    dailySpendLimit: 0,
-    luckyAnnounce: true,
-    hideWealth: false,
-    hideCharm: false,
-    ...s.settings,
-  }));
+  const [settings, setSettings] = useState<Settings>(() => {
+    const defaults: Settings = {
+      effectsOff: false,
+      haptics: true,
+      invisibleEntry: false,
+      cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
+      showOnline: true,
+      showLastSeen: true,
+      showCurrentRoom: true,
+      dmFrom: 'everyone',
+      callsFrom: 'everyone',
+      profilePublic: true,
+      notifySocial: true,
+      notifyFinance: true,
+      roomBot: true,
+      reduceMotion: false,
+      lowData: false,
+      notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
+      snoozeUntil: 0,
+      roomMuted: false,
+      musicVolume: 0.7,
+      gameVolume: 0.4,
+      voiceVolume: 1,
+      giftSounds: true,
+      bigGiftsOnly: false, micDenoise: true,
+      invitesFrom: 'everyone',
+      dailySpendLimit: 0,
+      luckyAnnounce: true,
+      hideWealth: false,
+      hideCharm: false,
+    };
+    const saved = withDefaults(defaults, s.settings);
+    return { ...saved, notifyTypes: withDefaults(defaults.notifyTypes, saved.notifyTypes) };
+  });
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
@@ -470,36 +543,46 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [deletionRequested, setDeletionRequested] = useState(false);
 
-  const [myRoom, setMyRoom] = useState<MyRoom>(() => ({
-    title: 'Benim Odam 🎙️',
-    announcement: 'Hoş geldiniz! Saygılı olalım 💜',
-    cover: 'https://picsum.photos/seed/myroom/600/400',
-    password: '',
-    locked: false,
-    limit: 50,
-    xp: 600, // starts at Lv.4 so lock / mic permission / boss seat can be tried in the demo
-    adminIds: [],
-    // Saves from before the switch kept "Mikrofon kontrolü" (micMode); only "Serbest" meant no queue.
-    micQueue: (s.myRoom as { micMode?: string } | undefined)?.micMode !== 'free',
-    roomType: 'stage',
-    giftEffects: true,
-    joinSounds: true,
-    lockedSeats: [],
-    theme: 'chat',
-    micCount: 10,
-    layoutId: null,
-    micPermission: 'everyone',
-    bossSeat: true,
-    joinMode: 'apply',
-    manageMembers: 'admins',
-    manageFunctions: 'admins',
-    autoRemoveDays: 14,
-    profileVisible: true,
-    videoPrivacy: true,
-    memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
-    blacklist: ['u6'],
-    ...s.myRoom,
-  }));
+  const [myRoom, setMyRoom] = useState<MyRoom>(() => {
+    const room = withDefaults<MyRoom>(
+      {
+        title: 'Benim Odam 🎙️',
+        announcement: 'Hoş geldiniz! Saygılı olalım 💜',
+        cover: 'https://picsum.photos/seed/myroom/600/400',
+        password: '',
+        locked: false,
+        limit: 50,
+        xp: 600, // starts at Lv.4 so lock / mic permission / boss seat can be tried in the demo
+        adminIds: [],
+        // Saves from before the switch kept "Mikrofon kontrolü" (micMode); only "Serbest" meant no queue.
+        micQueue: (s.myRoom as { micMode?: string } | undefined)?.micMode !== 'free',
+        roomType: 'stage',
+        giftEffects: true,
+        joinSounds: true,
+        lockedSeats: [],
+        theme: 'chat',
+        micCount: 10,
+        layoutId: null,
+        micPermission: 'everyone',
+        bossSeat: true,
+        joinMode: 'apply',
+        manageMembers: 'admins',
+        manageFunctions: 'admins',
+        autoRemoveDays: 14,
+        profileVisible: true,
+        videoPrivacy: true,
+        memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
+        blacklist: ['u6'],
+      },
+      s.myRoom,
+    );
+    // The room screen looks these up in fixed lists; a saved value the lists no longer have falls back.
+    room.roomType = oneOf(room.roomType, ROOM_TYPES.map((t) => t.id)) ?? 'stage';
+    room.theme = oneOf(room.theme, ROOM_THEMES.map((t) => t.id)) ?? 'chat';
+    for (const key of ['adminIds', 'memberIds', 'blacklist'] as const) room[key] = room[key].filter((id) => typeof id === 'string');
+    room.lockedSeats = room.lockedSeats.filter(isFiniteNumber);
+    return room;
+  });
 
   // Demo account starts at VIP 3 (SVIP 3 threshold) so VIP-gated features and their limits can be tested;
   // older saves below it are raised once, higher saves are kept.
@@ -522,7 +605,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
   const [conversations, setConversations] = useState(s.conversations ?? CONVERSATIONS);
   const [followerInvites, setFollowerInvites] = useState<Record<string, number>>(s.followerInvites ?? {});
-  const [starter, setStarter] = useState(s.starter ?? { claimed: false, hidden: false });
+  const [starter, setStarter] = useState(() => withDefaults({ claimed: false, hidden: false }, s.starter));
   const [safetyLog, setSafetyLog] = useState<SafetyLog[]>(s.safetyLog ?? []);
   const logSafety = (action: SafetyLog['action'], targetId?: string, detail?: string) =>
     setSafetyLog((l) => [{ id: uid(), action, targetId, detail, time: `${new Date().toLocaleDateString('tr-TR')} ${now()}` }, ...l].slice(0, 100));
