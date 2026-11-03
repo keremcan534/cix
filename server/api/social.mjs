@@ -135,6 +135,23 @@ export const socialRoutes = {
     return { following: true };
   },
 
+  /** Keşfet: real people, most recently active first; blocks either way and deleted accounts are left out. */
+  async 'GET /api/discover'(req) {
+    const me = await auth(req);
+    const r = await db.query(
+      `SELECT u.*, a.seen
+         FROM users u
+         JOIN LATERAL (SELECT max(s.last_seen_at) AS seen FROM sessions s WHERE s.user_id = u.id) a ON true
+        WHERE u.id <> $1 AND u.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
+        ORDER BY a.seen DESC NULLS LAST, u.created_at DESC
+        LIMIT 60`,
+      [me.id],
+    );
+    const fresh = Date.now() - 5 * 60_000;
+    return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };
+  },
+
   async 'GET /api/following'(req) {
     const me = await auth(req);
     const r = await db.query('SELECT u.* FROM follows f JOIN users u ON u.id = f.followee WHERE f.follower = $1 AND u.deleted_at IS NULL ORDER BY f.created_at DESC LIMIT 500', [me.id]);

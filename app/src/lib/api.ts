@@ -34,16 +34,58 @@ export const newRef = () => randomId(12);
 let session: string | null = null;
 let signingIn: Promise<ServerUser> | null = null;
 
-async function call<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: object): Promise<T> {
+const TIMEOUT_MS = 15_000;
+
+/**
+ * One request. It gives up after 15 s (a phone network can otherwise hang a request forever, leaving a screen
+ * busy). A 401 on a signed-in call means the session ended (expired, signed out elsewhere, server reset): the
+ * session is dropped, the device signs in again once with its key, and the request is sent once more.
+ */
+async function call<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: object, retried = false): Promise<T> {
   if (!BASE) throw new ApiError(0, 'Sunucu adresi ayarlı değil');
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session}` } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const sent = session;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(sent ? { Authorization: `Bearer ${sent}` } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+  } catch {
+    if (ctrl.signal.aborted) throw new ApiError(0, 'Bağlantı zaman aşımına uğradı. İnternetini kontrol edip tekrar dene.');
+    throw new ApiError(0, 'Sunucuya ulaşılamadı. İnternetini kontrol edip tekrar dene.');
+  } finally {
+    clearTimeout(timer);
+  }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && sent && !retried && !path.startsWith('/api/auth/')) {
+    if (session === sent) await forgetSession();
+    await reSignIn();
+    return call<T>(method, path, body, true);
+  }
   if (!res.ok) throw new ApiError(res.status, data.error ?? `Sunucu hatası (${res.status})`);
   return data as T;
+}
+
+async function forgetSession() {
+  session = null;
+  await AsyncStorage.removeItem(SESSION_KEY);
+}
+
+/** A new session with this device's key (shared by calls that hit a 401 at the same time). */
+let reSigning: Promise<void> | null = null;
+function reSignIn() {
+  reSigning ??= (async () => {
+    if (session) return; // another call already signed in again
+    const key = await AsyncStorage.getItem(DEVICE_KEY);
+    if (!key) throw new ApiError(401, 'Oturumun sona erdi. Uygulamayı yeniden açıp giriş yap.');
+    const r = await call<{ session: string }>('POST', '/api/auth/dev', { deviceKey: key });
+    await keepSession(r.session);
+  })().finally(() => (reSigning = null));
+  return reSigning;
 }
 
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
@@ -155,6 +197,11 @@ export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDa
 export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
 export const userProfile = (id: string) => call<{ user: PublicUser }>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => r.user);
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
+/** Keşfet: real people, most recently active first (no distance on the server: city only). */
+export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };
+export const discover = () => call<{ users: DiscoverUser[] }>('GET', '/api/discover').then((r) => r.users);
+/** Blocking also ends follows both ways on the server; the other person is not told. */
+export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('POST', '/api/block', { to, block: on }).then((r) => r.blocked);
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
 
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);

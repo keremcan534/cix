@@ -18,6 +18,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
+import { callsAvailable } from '@/lib/live';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean };
@@ -29,7 +30,7 @@ const GROWTH: Item[] = [
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
   { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
-  { icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
+  ...(callsAvailable() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true },

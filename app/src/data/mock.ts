@@ -88,7 +88,17 @@ export type RoomInviteCard = { roomId: string; title: string; cover: string };
 export type Conversation = {
   id: string;
   userId: string;
-  messages: { id: string; fromMe: boolean; text: string; time: string; room?: RoomInviteCard }[];
+  messages: {
+    id: string;
+    fromMe: boolean;
+    text: string;
+    time: string;
+    room?: RoomInviteCard;
+    /** Live mode: the request id sent with it (a retry reuses it, so the server keeps one copy). */
+    ref?: string;
+    /** Live mode: the server didn't take it; the bubble offers "tekrar dene". */
+    failed?: string;
+  }[];
   unread: number;
 };
 

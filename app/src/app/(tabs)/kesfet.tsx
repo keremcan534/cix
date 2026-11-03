@@ -21,6 +21,7 @@ import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
+import { callsAvailable, liveMode, useDiscoverPeople } from '@/lib/live';
 
 const TABS = ['Benzer', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
@@ -36,18 +37,24 @@ export default function DiscoverScreen() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const { hasGreeted, greet } = useGreet();
-  const { blocked, settings, setSetting, following, toggleFollow } = useApp();
+  const { blocked, settings, setSetting, following, toggleFollow, me } = useApp();
+  // A live build lists real people from the server (no sample profiles, no distances: the server knows cities only).
+  const live = liveMode();
+  const serverPeople = useDiscoverPeople();
+  const pool = live ? (serverPeople ?? []) : USERS;
   const { colors, dark } = useTheme();
   const styles = useStyles();
   // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
   const needsOptIn = tab === 'Yakındaki' && !settings.cityDiscovery;
-  const showDistance = tab === 'Yakındaki' || settings.cityDiscovery;
+  const showDistance = !live && (tab === 'Yakındaki' || settings.cityDiscovery);
 
   let users =
     tab === 'Yakındaki'
-      ? USERS.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
+      ? live
+        ? pool.filter((u) => !!me.city && u.city.toLocaleLowerCase('tr-TR') === me.city.toLocaleLowerCase('tr-TR'))
+        : pool.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
       : // Online first, then Yankı level: charm is what lifts a profile in discovery.
-        [...USERS].sort((a, b) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm));
+        [...pool].sort((a, b) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm));
   if (filters.newest) users = [...users].reverse();
   users = users.filter(
     (u) =>
@@ -58,7 +65,7 @@ export default function DiscoverScreen() {
   );
 
   const rows: Row[] = needsOptIn ? [] : users.map((user) => ({ kind: 'user', user }));
-  if (rows.length > 0) rows.splice(Math.min(DISCOVER_PROMO.afterIndex, rows.length), 0, { kind: 'promo' });
+  if (rows.length > 0 && !live) rows.splice(Math.min(DISCOVER_PROMO.afterIndex, rows.length), 0, { kind: 'promo' });
 
   const country = COUNTRIES.find((c) => c.code === filters.country) ?? COUNTRIES[0];
 
@@ -72,7 +79,7 @@ export default function DiscoverScreen() {
         ListHeaderComponent={
           <View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
-              {DISCOVER_SHORTCUTS.map((s) => (
+              {DISCOVER_SHORTCUTS.filter((s) => s.id !== 'call' || callsAvailable()).map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
                   {/* The shortcut's color lights a navy card from the top instead of filling it. */}
                   <LinearGradient colors={[`${s.colors[1]}${dark ? '5C' : '33'}`, dark ? 'rgba(22,37,60,0.94)' : 'rgba(255,255,255,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
@@ -146,7 +153,13 @@ export default function DiscoverScreen() {
           ) : (
             <View style={styles.optIn}>
               <StateIcon name="search-outline" size={56} />
-              <Text style={{ color: colors.textDim, textAlign: 'center' }}>Bu filtrelerle şu an kimse yok. Filtreleri değiştirmeyi dene.</Text>
+              <Text style={{ color: colors.textDim, textAlign: 'center' }}>
+                {live && serverPeople === null
+                  ? 'Kişiler yükleniyor…'
+                  : live && tab === 'Yakındaki' && !me.city
+                    ? 'Yakındakileri görmek için profiline şehrini ekle.'
+                    : 'Bu filtrelerle şu an kimse yok. Filtreleri değiştirmeyi dene.'}
+              </Text>
             </View>
           )
         }

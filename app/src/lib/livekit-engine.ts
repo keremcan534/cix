@@ -5,10 +5,11 @@
 // The AudioEngine calls are synchronous while joining is not: connect() updates the counters at once and joins
 // in the background (token from our API, then the room). Every async step checks that the room is
 // still the current one, so leaving or switching rooms mid-join never leaves a second connection open.
-import { ConnectionState, Room, RoomEvent, Track } from 'livekit-client';
+import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client';
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
 import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportSignal, type RoomSignal } from '@/lib/live/room-bus';
+import type { EngineEvent } from '@/lib/room-session';
 
 export type LiveKitConfig = {
   /** wss:// address of the LiveKit server. */
@@ -16,6 +17,8 @@ export type LiveKitConfig = {
   /** Access token for a LiveKit room name, from our API (signed-in users only). */
   getToken: (room: string) => Promise<string>;
   onError?: (message: string) => void;
+  /** The room's real state for the session (room-session engineEvent): joined, dropped, refused, mic blocked. */
+  onEvent?: (roomId: string, e: EngineEvent) => void;
   /** Web: remote voices need hidden <audio> elements. Native plays them without any. */
   attachAudio?: boolean;
   /** Native: start / stop the phone's audio session around a room. */
@@ -32,9 +35,19 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   // The mic I sit on, shown to the other phones as my `seat` attribute (lib/live/room-bus); set again after a reconnect.
   let seat: number | null = null;
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
+  /** Only for the room still current: a late answer from a room we already left says nothing. */
+  const tell = (r: Room, e: EngineEvent) => {
+    if (room === r && s.roomId) cfg.onEvent?.(s.roomId, e);
+  };
 
   const setMic = (r: Room, on: boolean) => {
-    if (r.state === ConnectionState.Connected) r.localParticipant.setMicrophoneEnabled(on).catch((e) => fail('Mikrofon', e));
+    if (r.state !== ConnectionState.Connected) return;
+    r.localParticipant.setMicrophoneEnabled(on).catch((e) => {
+      // The phone said no to the microphone: the session shows "Mikrofon izni yok" and keeps the room playing.
+      const name = e instanceof Error ? e.name : '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || /permission/i.test(String(e))) tell(r, { type: 'mic_denied' });
+      else fail('Mikrofon', e);
+    });
   };
 
   async function join(roomId: string, r: Room) {
@@ -50,8 +63,17 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (s.publishing) setMic(r, true);
       if (seat !== null) pushSeat(r);
       snapshot(r);
+      tell(r, { type: 'connected' });
     } catch (e) {
-      if (room === r) fail('Ses bağlantısı', e);
+      if (room !== r) return;
+      fail('Ses bağlantısı', e);
+      // Our API refused the token for good: closed or unknown room (410, 404), banned or wrong password (403).
+      const status = (e as { status?: unknown } | null)?.status;
+      if (status === 403 || status === 404 || status === 410) {
+        tell(r, { type: 'failed', final: true, reason: status === 403 ? 'kicked' : 'server', message: e instanceof Error ? e.message : 'Odaya girilemedi' });
+      } else {
+        tell(r, { type: 'failed', final: false, message: 'Ses bağlantısı kurulamadı' });
+      }
     }
   }
 
@@ -79,7 +101,18 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     const r = new Room({ dynacast: true, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const update = () => snapshot(r);
     [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ParticipantAttributesChanged, RoomEvent.ParticipantNameChanged, RoomEvent.ActiveSpeakersChanged, RoomEvent.Reconnected].forEach((ev) => r.on(ev, update));
-    r.on(RoomEvent.Reconnected, () => seat !== null && pushSeat(r));
+    r.on(RoomEvent.Reconnected, () => {
+      if (seat !== null) pushSeat(r);
+      tell(r, { type: 'connected' });
+    });
+    r.on(RoomEvent.Reconnecting, () => tell(r, { type: 'lost' }));
+    // Our own leave sets `room` to null first, so this only reports drops we didn't ask for.
+    r.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+      if (reason === DisconnectReason.PARTICIPANT_REMOVED) tell(r, { type: 'removed', reason: 'kicked' });
+      else if (reason === DisconnectReason.ROOM_DELETED) tell(r, { type: 'removed', reason: 'server' });
+      else if (reason === DisconnectReason.DUPLICATE_IDENTITY) tell(r, { type: 'failed', final: true, reason: 'server', message: 'Bu hesapla başka bir cihazdan odaya girildi' });
+      else tell(r, { type: 'lost' });
+    });
     r.on(RoomEvent.DataReceived, (payload, participant) => {
       if (room === r && s.roomId && participant) reportSignal(s.roomId, participant.identity, decodeSignal(payload));
     });
@@ -97,7 +130,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
 
   const engine: AudioEngine = {
     name: 'LiveKit (gerçek ses)',
-    capabilities: { realAudio: true, backgroundAudio: false },
+    capabilities: { realAudio: true, backgroundAudio: false, reportsState: true },
     connect(roomId) {
       if (s.roomId === roomId) return;
       if (s.roomId) engine.disconnect();

@@ -33,7 +33,7 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
-import { loadProfile } from '@/lib/live';
+import { callsAvailable, loadProfile } from '@/lib/live';
 import { isLiveUser } from '@/lib/live/messages';
 import { copyText } from '@/lib/clipboard';
 import { goBack } from '@/lib/nav';
@@ -644,7 +644,7 @@ export default function UserProfile() {
             <Text style={[styles.followText, isFollowing && styles.followingText]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
           </Pressable>
           <BarButton icon="chatbubble-ellipses" label="Mesaj" off={!can('message').ok} onPress={() => guard('message', () => router.push(`/sohbet/${user.id}`))} />
-          <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />
+          {callsAvailable() && <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />}
           <BarButton icon="gift" label="Hediye" highlight off={!can('gift').ok} onPress={() => guard('gift', () => setSheet('gift'))} />
         </SafeAreaView>
       )}

@@ -15,6 +15,11 @@ import * as api from '@/lib/api';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
 
 export const liveMode = api.apiEnabled;
+/**
+ * One-to-one calls and Hemen Tanış only run on this phone (simulated peer, local per-minute charge): the server
+ * has no matching, call signalling or call billing yet. A live build hides them instead of charging for a fake call.
+ */
+export const callsAvailable = () => !liveMode();
 
 let myId: string | null = null;
 /** My server id once signed in. */
@@ -72,15 +77,35 @@ export async function refreshEarnings() {
   wallet?.locks(await api.earnings());
 }
 
+/**
+ * Money requests carry a request id (ref) the server keeps once. When the answer never arrived (no network,
+ * time-out) the server may still have done it, so trying the same thing again reuses that ref: the server
+ * then answers "already done" instead of doing it twice. Any answer from the server starts a fresh ref.
+ */
+const unsure = new Map<string, string>();
+async function once<T>(key: string, run: (ref: string) => Promise<T>): Promise<T> {
+  const ref = unsure.get(key) ?? api.newRef();
+  try {
+    const r = await run(ref);
+    unsure.delete(key);
+    return r;
+  } catch (e) {
+    // 0: no answer; 502–504: the proxy lost the API's answer. Both may hide a request that went through.
+    if (e instanceof api.ApiError && (e.status === 0 || (e.status >= 502 && e.status <= 504))) unsure.set(key, ref);
+    else unsure.delete(key);
+    throw e;
+  }
+}
+
 /** Test top-up (no payment): the server credits one of the test packs, at most 50.000 coins a day. */
 export async function liveTopup(coins: number) {
   if (!TEST_PACKS.includes(coins)) throw new Error('Test sürümünde 1.000, 5.000 ve 10.000 jetonluk paketler denenebilir.');
-  applied(await api.testTopup(coins), 'Jeton yükleme (test)');
+  applied(await once(`topup:${coins}`, (ref) => api.testTopup(coins, ref)), 'Jeton yükleme (test)');
 }
 
 /** Gelir > Çevir on the server; returns the coins received. */
 export async function liveExchange(diamonds: number) {
-  const r = applied(await api.exchange(diamonds), 'Elmas → jeton çevirme');
+  const r = applied(await once(`exchange:${diamonds}`, (ref) => api.exchange(diamonds, ref)), 'Elmas → jeton çevirme');
   await refreshEarnings().catch(() => {});
   return r.coins;
 }
@@ -89,7 +114,7 @@ export async function liveExchange(diamonds: number) {
 export async function liveGift(to: string, giftId: string, count: number, room?: string) {
   const id = toServer(to);
   if (!id) throw new Error('Bu kişi test sunucusunda yok');
-  return applied(await api.sendGift(id, giftId, count, room), 'Hediye gönderildi');
+  return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref)), 'Hediye gönderildi');
 }
 
 /** Mirrors a purchase the store already took locally; a refusal re-reads the real balance. */
@@ -122,6 +147,45 @@ export async function loadProfile(id: string) {
     ...(p.username && { username: p.username }),
     ...(p.avatarUrl && { avatar: p.avatarUrl }),
   });
+}
+
+let people: User[] | null = null;
+const peopleListeners = new Set<() => void>();
+const subscribePeople = (l: () => void) => {
+  peopleListeners.add(l);
+  return () => peopleListeners.delete(l);
+};
+/** Keşfet in a live build: real people from the server, re-read every 30 seconds; null until the first answer. */
+export function useDiscoverPeople(): User[] | null {
+  const list = useSyncExternalStore(subscribePeople, () => people, () => people);
+  useEffect(() => {
+    if (!liveMode()) return;
+    const tick = () =>
+      void api
+        .discover()
+        .then((rows) => {
+          people = rows.map((p) =>
+            putServerUser({
+              id: p.id,
+              name: p.name,
+              age: p.age ?? 0,
+              city: p.city ?? '',
+              bio: p.bio,
+              interests: p.interests,
+              online: p.online,
+              ...(p.gender && { gender: p.gender }),
+              ...(p.username && { username: p.username }),
+              ...(p.avatarUrl && { avatar: p.avatarUrl }),
+            }),
+          );
+          peopleListeners.forEach((l) => l());
+        })
+        .catch(() => {});
+    tick();
+    const t = setInterval(tick, 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return list;
 }
 
 // --- Rooms -----------------------------------------------------------------------------------------------
@@ -187,6 +251,14 @@ export async function openServerRoom(title: string, announcement: string) {
     if (!mine) throw e;
     return mine;
   }
+}
+
+/** My own server room, which only I can close for everyone. */
+export const isMyServerRoom = (id: string) => liveMode() && isServerId(id) && rooms.some((r) => r.id === id && r.hostId === 'me');
+/** Closes my room on the server for everyone (it leaves the lists; a new one can be opened later). */
+export async function closeServerRoom(id: string) {
+  await api.closeRoom(id);
+  setRooms(rooms.filter((r) => r.id !== id));
 }
 
 /** True for a room that lives on the server (real people, no demo bots or demo gifts). */

@@ -24,7 +24,12 @@ export function LiveSync() {
     let alive = true;
     let tick = 0;
     let signedIn = false;
+    // The timer and a return to the foreground can fire together: two runs at once would read the same
+    // "last seen" message id and add the same messages twice.
+    let running = false;
     const run = async () => {
+      if (running) return;
+      running = true;
       try {
         if (!signedIn) {
           await liveSignIn(name);
@@ -38,6 +43,8 @@ export function LiveSync() {
       } catch (e) {
         // No network or the server is down: the next tick tries again; the screens keep the last state.
         console.warn(`[canlı] ${message(e)}`);
+      } finally {
+        running = false;
       }
       tick++;
     };

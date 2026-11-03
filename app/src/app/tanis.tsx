@@ -21,11 +21,17 @@ import { PHASE_LABEL, cancelMatch, dropConnection, hangUp, modeLabel, nextMatch,
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
+import { CallsUnavailable } from '@/components/calls-unavailable';
+import { callsAvailable } from '@/lib/live';
 
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const REPORT_REASONS = ['Uygunsuz görüntü', 'Taciz / hakaret', 'Reşit değil', 'Dolandırıcılık', 'Sahte profil'];
 
-export default function MatchCall() {
+export default function MatchCallRoute() {
+  return callsAvailable() ? <MatchCall /> : <CallsUnavailable title="Hemen Tanış" />;
+}
+
+function MatchCall() {
   const m = useMatch();
   const media = useMedia();
   const { me, toggleBlock, createTicket, logSafety } = useApp();

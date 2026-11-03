@@ -39,6 +39,8 @@ import {
   type RoomSession,
 } from '@/lib/room-session';
 import { saveRoom } from '@/lib/room-session-persist';
+import { showAlert } from '@/lib/alert';
+import { closeServerRoom, isMyServerRoom, message as errorText } from '@/lib/live';
 import { colors, radius, semantic, space, type } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -82,7 +84,7 @@ export function sessionStatus(s: RoomSession, invited = false): { text: string; 
 // --- Two-choice sheet -----------------------------------------------------------------------------------
 type Choice = { label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void };
 /** Primary (filled turquoise) and exit (outlined red) never look alike, so a wrong tap is unlikely. */
-function ChoiceSheet({ visible, title, primary, exit, onCancel }: { visible: boolean; title: string; primary: Choice; exit: Choice; onCancel: () => void }) {
+function ChoiceSheet({ visible, title, primary, exit, extra, onCancel }: { visible: boolean; title: string; primary: Choice; exit: Choice; /** A rarer third choice, shown as a quiet text button. */ extra?: Choice; onCancel: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
@@ -106,6 +108,11 @@ function ChoiceSheet({ visible, title, primary, exit, onCancel }: { visible: boo
             <Text style={s.choiceDesc}>{exit.desc}</Text>
           </View>
         </Pressable>
+        {extra && (
+          <Pressable style={s.cancel} onPress={extra.onPress} accessibilityRole="button" accessibilityLabel={`${extra.label}. ${extra.desc}`}>
+            <Text style={[s.cancelText, { color: semantic.danger }]}>{extra.label}</Text>
+          </Pressable>
+        )}
         <Pressable style={s.cancel} onPress={onCancel} accessibilityRole="button">
           <Text style={s.cancelText}>Vazgeç</Text>
         </Pressable>
@@ -131,6 +138,32 @@ export function LeaveSheet() {
           continueLeave();
         },
       }}
+      extra={
+        session && isMyServerRoom(session.roomId)
+          ? {
+              label: 'Odayı herkes için kapat',
+              desc: 'Odan listelerden kalkar ve artık kimse giremez.',
+              icon: 'power-outline',
+              onPress: () => {
+                const id = session.roomId;
+                showAlert('Odayı kapat', 'Odan listelerden kalkacak ve artık kimse giremeyecek. Daha sonra yeni bir oda açabilirsin.', [
+                  { text: 'Vazgeç', style: 'cancel' },
+                  {
+                    text: 'Kapat',
+                    style: 'destructive',
+                    onPress: () =>
+                      closeServerRoom(id)
+                        .then(() => {
+                          endRoom('left');
+                          continueLeave();
+                        })
+                        .catch((e) => showAlert('Oda kapatılamadı', errorText(e))),
+                  },
+                ]);
+              },
+            }
+          : undefined
+      }
       onCancel={closeLeaveDialog}
     />
   );
@@ -335,7 +368,9 @@ export function EndedDialog({ session }: { session: RoomSession }) {
           <Ionicons name={kicked ? 'remove-circle' : 'radio'} size={28} color={semantic.danger} />
           <Text style={s.dialogTitle}>{kicked ? ENDED_TEXT.kicked : ENDED_TEXT.server}</Text>
           <Text style={s.dialogText}>
-            {kicked
+            {session.endText
+              ? `${session.endText}. Mikrofonun ve ses bağlantın kapatıldı.`
+              : kicked
               ? `Oda yönetimi seni “${session.title}” odasından çıkardı. Mikrofonun ve ses bağlantın kapatıldı.`
               : `“${session.title}” odası sunucu tarafından kapatıldı. Mikrofonun ve ses bağlantın kapatıldı.`}
           </Text>

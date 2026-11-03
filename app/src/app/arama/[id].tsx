@@ -17,12 +17,18 @@ import { beginCall, endCall } from '@/lib/media';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Photo } from '@/components/photo';
+import { CallsUnavailable } from '@/components/calls-unavailable';
+import { callsAvailable } from '@/lib/live';
 
 type Phase = 'ringing' | 'connected' | 'ended';
 
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-export default function CallScreen() {
+export default function CallScreenRoute() {
+  return callsAvailable() ? <CallScreen /> : <CallsUnavailable title="Arama" />;
+}
+
+function CallScreen() {
   const { id, mode } = useLocalSearchParams<{ id: string; mode?: 'sesli' | 'goruntulu' }>();
   const user = userById(id);
   const video = mode !== 'sesli';

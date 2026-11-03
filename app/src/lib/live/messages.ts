@@ -5,7 +5,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as api from '@/lib/api';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
-import { showAlert } from '@/lib/alert';
 import { isServerId } from '@/data/mock';
 
 const SEEN_KEY = 'similarclub:dm-seen';
@@ -27,16 +26,21 @@ const saveSeen = () => AsyncStorage.setItem(SEEN_KEY, JSON.stringify(seen ?? {})
 /** A chat with a real person (free, no demo replies, sent through the server). */
 export const isLiveUser = (id: string) => liveMode() && isServerId(id);
 
-/** Sends a message I already put in the local thread; tells me if the server refuses it. */
-export function liveDm(to: string, text: string) {
+/**
+ * Sends a message I already put in the local thread. `ref` is its request id: a retry sends the same one, so
+ * the server never stores it twice. `done` gets null when it went through, or the reason it didn't (shown on
+ * the bubble with "tekrar dene", not as one alert per message).
+ */
+export function liveDm(to: string, text: string, ref: string, done: (failed: string | null) => void) {
   const id = toServer(to);
   if (!id) return;
   api
-    .sendDm(id, text)
+    .sendDm(id, text, ref)
     .then((m) => {
       if (seen) seen[id] = Math.max(seen[id] ?? 0, m.id);
+      done(null);
     })
-    .catch((e) => showAlert('Mesaj gönderilemedi', message(e)));
+    .catch((e) => done(message(e)));
 }
 
 type Inbox = { receiveMessage: (userId: string, text: string) => void };

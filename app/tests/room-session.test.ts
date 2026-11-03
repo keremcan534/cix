@@ -5,7 +5,8 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resetPresence, setConnection } from '@/lib/room-presence';
+import { createSimulatedEngine } from '@/lib/audio-engine';
+import { isOnline, resetPresence, setConnection } from '@/lib/room-presence';
 import {
   CONNECT_MS,
   RECONNECT_DELAYS,
@@ -16,6 +17,7 @@ import {
   continueLeave,
   dismissEnded,
   endRoom,
+  engineEvent,
   engineInfo,
   getSession,
   hasOpener,
@@ -34,6 +36,7 @@ import {
   setPermission,
   setPersist,
   setMiniHidden,
+  setEngine,
   setRoute,
 } from '@/lib/room-session';
 
@@ -261,5 +264,53 @@ describe('Bağlantı kopması', () => {
     setConnection('online');
     retryNow();
     assert.equal(s().status, 'connected');
+  });
+});
+
+describe('Gerçek ses motoru durumu bildirir', () => {
+  /** Like the LiveKit engine: joins in the background and reports the result through engineEvent. */
+  const reporting = () => {
+    const e = createSimulatedEngine(() => isOnline());
+    setEngine({ ...e, name: e.name, capabilities: { ...e.capabilities, reportsState: true } });
+  };
+
+  test('katılım bitmeden "bağlı" gösterilmez; motor bağlandı deyince bağlı', () => {
+    reporting();
+    openRoom('r1', info);
+    mock.timers.tick(CONNECT_MS * 10);
+    assert.equal(s().status, 'connecting');
+    engineEvent('r1', { type: 'connected' });
+    assert.equal(s().status, 'connected');
+  });
+
+  test('bağlantı kurulamazsa bekleyerek yeniden dener; sonunda bağlanınca "yeniden kuruldu"', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'failed', final: false, message: 'Ses bağlantısı kurulamadı' });
+    assert.equal(s().status, 'reconnecting');
+    mock.timers.tick(RECONNECT_DELAYS[0]);
+    assert.equal(s().status, 'reconnecting', 'motor bağlandı demeden bağlı gösterilmez');
+    assert.equal(stats().reconnects, 1);
+    engineEvent('r1', { type: 'connected' });
+    assert.deepEqual([s().status, s().reconnectAttempt, getSession().notice?.text], ['connected', 0, 'Oda bağlantısı yeniden kuruldu.']);
+  });
+
+  test('sunucu kesin reddederse (oda kapandı) oda sunucunun sözüyle kapanır, tekrar denenmez', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'failed', final: true, reason: 'server', message: 'Oda kapandı' });
+    assert.deepEqual([s().status, s().endReason, s().endText, stats().roomId], ['ended', 'server', 'Oda kapandı', null]);
+  });
+
+  test('odadan atılma ve mikrofon izni reddi doğru gösterilir; eski odanın haberi yok sayılır', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    engineEvent('r1', { type: 'mic_denied' });
+    assert.equal(s().permission, 'denied');
+    engineEvent('r2', { type: 'removed', reason: 'kicked' });
+    assert.equal(s().status, 'connected');
+    engineEvent('r1', { type: 'removed', reason: 'kicked' });
+    assert.deepEqual([s().status, s().endReason], ['ended', 'kicked']);
   });
 });

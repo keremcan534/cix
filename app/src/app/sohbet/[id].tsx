@@ -9,6 +9,7 @@ import { Avatar, VerifiedBadge } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { makeStyles, useTheme } from '@/theme';
 import { goBack } from '@/lib/nav';
+import { callsAvailable } from '@/lib/live';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,16 +39,20 @@ export default function ChatScreen() {
                 <Text style={styles.status}>{typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : `${user.city}`}</Text>
               </View>
             </Pressable>
-            <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={8}>
-              <Ionicons name="call-outline" size={22} color={colors.text} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'goruntulu' } })}
-              hitSlop={8}
-              style={{ marginLeft: 14 }}
-            >
-              <Ionicons name="videocam-outline" size={24} color={colors.text} />
-            </Pressable>
+            {callsAvailable() && (
+              <>
+                <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={8}>
+                  <Ionicons name="call-outline" size={22} color={colors.text} />
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'goruntulu' } })}
+                  hitSlop={8}
+                  style={{ marginLeft: 14 }}
+                >
+                  <Ionicons name="videocam-outline" size={24} color={colors.text} />
+                </Pressable>
+              </>
+            )}
           </View>
         )}
       />

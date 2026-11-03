@@ -95,18 +95,19 @@ export function encodeSignal(msg: RoomSignal) {
   }
   return new Uint8Array(out);
 }
+// A broken or hostile packet (bad bytes, a code point out of range) gives null instead of throwing in the room.
 export function decodeSignal(bytes: Uint8Array): unknown {
-  let s = '';
-  for (let i = 0; i < bytes.length; ) {
-    const b = bytes[i++];
-    let c: number;
-    if (b < 0x80) c = b;
-    else if (b < 0xe0) c = ((b & 31) << 6) | (bytes[i++] & 63);
-    else if (b < 0xf0) c = ((b & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63);
-    else c = ((b & 7) << 18) | ((bytes[i++] & 63) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63);
-    s += String.fromCodePoint(c);
-  }
   try {
+    let s = '';
+    for (let i = 0; i < bytes.length; ) {
+      const b = bytes[i++];
+      let c: number;
+      if (b < 0x80) c = b;
+      else if (b < 0xe0) c = ((b & 31) << 6) | (bytes[i++] & 63);
+      else if (b < 0xf0) c = ((b & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63);
+      else c = ((b & 7) << 18) | ((bytes[i++] & 63) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63);
+      s += String.fromCodePoint(c);
+    }
     return JSON.parse(s);
   } catch {
     return null;

@@ -70,7 +70,7 @@ import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { isLiveRoom, liveGift, message as errorText, myServerId, toServer } from '@/lib/live';
+import { callsAvailable, isLiveRoom, liveGift, message as errorText, myServerId, toServer } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { sendSignal, type RoomSignal } from '@/lib/live/room-bus';
 import { showAlert } from '@/lib/alert';
@@ -1613,7 +1613,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       variant: 'round',
       items: [
         ...(myRole !== 'member' && !pk ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
-        { key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'], onPress: () => router.push('/eslesme') },
+        ...(callsAvailable() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
         { key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'], onPress: () => setPanel('envelope') },
         { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
         { key: 'events', label: 'Aktivite', emoji: '🎉', art: ROOM_ICON_ART.activity, colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },

@@ -118,6 +118,25 @@ describe('Takip ve engelleme', () => {
   });
 });
 
+describe('Keşfet', () => {
+  test('gerçek kişiler, en son aktif önce; ben ve engelli kişiler yok', async () => {
+    const a = await signUp('Irmak');
+    const b = await signUp('Jale');
+    const c = await signUp('Kaan');
+    let [st, j] = await call('GET', '/api/discover', null, a.session);
+    assert.equal(st, 200);
+    const ids = j.users.map((u) => u.id);
+    assert.ok(!ids.includes(a.user.id), 'kendimi görmem');
+    assert.ok(ids.includes(b.user.id) && ids.includes(c.user.id));
+    assert.equal(ids.indexOf(c.user.id) < ids.indexOf(b.user.id), true, 'son giren önce');
+    assert.equal(j.users.find((u) => u.id === c.user.id).online, true);
+    await call('POST', '/api/block', { to: a.user.id }, b.session);
+    [, j] = await call('GET', '/api/discover', null, a.session);
+    assert.ok(!j.users.some((u) => u.id === b.user.id), 'beni engelleyen görünmez');
+    assert.equal((await call('GET', '/api/discover'))[0], 401);
+  });
+});
+
 describe('Mesajlar', () => {
   test('gönderme bir kez, sohbet listesi, okunmamış ve okundu; engelde kapalı', async () => {
     const a = await signUp('Gül');

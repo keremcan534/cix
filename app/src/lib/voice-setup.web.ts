@@ -2,7 +2,7 @@
 // and EXPO_PUBLIC_API_URL, e.g. in app/.env.local). Without them the simulated engine stays.
 import { apiEnabled, ensureSignedIn, voiceToken } from '@/lib/api';
 import { createLiveKitEngine } from '@/lib/livekit-engine';
-import { setEngine } from '@/lib/room-session';
+import { engineEvent, setEngine } from '@/lib/room-session';
 
 export function setupVoice(name: () => string) {
   const url = process.env.EXPO_PUBLIC_LIVEKIT_URL;
@@ -16,6 +16,7 @@ export function setupVoice(name: () => string) {
         return voiceToken(room);
       },
       onError: (m) => console.warn(`[ses] ${m}`),
+      onEvent: engineEvent,
     }),
   );
 }

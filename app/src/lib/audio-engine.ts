@@ -14,6 +14,11 @@ export type EngineCapabilities = {
   realAudio: boolean;
   /** Keeps audio running while the app is in the background (iOS background audio, Android foreground service). */
   backgroundAudio: boolean;
+  /**
+   * Tells the session itself when the room is really joined, dropped or refused (room-session engineEvent).
+   * Without it (the simulated engine) the session counts a join or a reconnect as done at once.
+   */
+  reportsState?: boolean;
 };
 export type EngineStats = {
   roomId: string | null;
