@@ -3,6 +3,9 @@
     "name": "Similar Club",
     "slug": "similar-club",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -64,6 +67,12 @@
         "@config-plugins/react-native-webrtc",
         {
           "microphonePermission": "Sesli odalarda konuşabilmen için mikrofonuna erişmemiz gerekiyor."
+        }
+      ],
+      [
+        "@sentry/react-native",
+        {
+          "disableAutoUpload": true
         }
       ]
     ],

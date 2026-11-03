@@ -17,6 +17,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, TEST_PACKS } from '@/lib/live';
 import { openLegal } from '@/lib/legal';
+import { blockedFeature } from '@/lib/remote-control';
 import { today } from '@/lib/persist';
 import { stampLabel } from '@/lib/tr';
 
@@ -33,7 +34,7 @@ export default function WalletScreen() {
 
   const buy = (pack: RechargePack) => {
     // A second tap while the store payment is pending must not charge twice.
-    if (processing) return;
+    if (processing || blockedFeature('topup')) return;
     setProcessing(pack.id);
     // Live mode (test APK): the server credits a free test pack, so every phone sees the same balance.
     if (liveMode()) {

@@ -20,7 +20,9 @@
 ## API
 | Çağrı | Ne yapar |
 |---|---|
-| `GET /api/health` | Herkese açık: veritabanı yanıt veriyor mu, çalışan sürüm (commit), açık kalma süresi. Veritabanı yoksa 503. |
+| `GET /api/health` | Herkese açık: veritabanı yanıt veriyor mu, çalışan sürüm (commit), açık kalma süresi ve `warnings` (alarm kodları, yalnız kod; boşsa her şey yolunda). Veritabanı yoksa 503. Ayrıntı: **Hata izleme ve acil durum**. |
+| `GET /api/config` | Herkese açık, 30 sn önbellekli: uygulamanın en düşük sürümü (`APP_MIN_VERSION`), güncelleme adresi (`APP_UPDATE_URL`), duyuru (`APP_NOTICE`) ve geçici kapalı özellikler (`FEATURES_OFF`). Kapalı özelliğin çağrıları 503 "Bu özellik geçici olarak kapalı" döner (`features.mjs`). |
+| `GET /api/admin/alerts` | Yalnız yönetici: alarmların ayrıntısı (değer, eşik, hangi hesap), eşikler, finans aktarımının durumu, son 5xx hataları. |
 | `GET /api/me` | Hesap ve bakiyeler (jeton, elmas, oyun bakiyesi), telefon, İnci puanı |
 | `GET /api/ledger` | Son 50 işlem, her satırda işlem sonrası bakiye |
 | `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 jeton, günde en fazla 50.000. |
@@ -105,9 +107,9 @@ Bakiye yalnızca aynı veritabanı işleminde ledger satırıyla birlikte deği�
 - **006_coin_sources**: `users.role`'e `coins_bank`; `coin_lots` (jeton partileri: kanal, kalan, kilit, satın alma/aktarım/kaynak parti), `diamond_locks` (hediye elmasının kilidi, iade edilince `reversed`), `coin_transfers` (toptan, Jeton Noktası satışı, elmas bozdurma; dekont, işlemi yapan, IP), `audit_events` (yönetici işlemleri), `ledger`'a `channel`, `actor`, `detail`. Eski bakiyeler "Önceki bakiye" partisi olur (7 gün kilit). (`005` ajans göçü için ayrıldı.)
 
 ## Testler ve kurulum
-- `server/api/test/`: her dosya boş bir veritabanı açar, API'yi ayrı bir süreç olarak başlatır (`harness.mjs`), HTTP üzerinden dener, sonra veritabanını siler. `api.test.mjs`: giriş, cüzdan, profil, takip/engel, mesaj, oda/ses token'ı, şikâyet/moderasyon, hesap silme. `launch.test.mjs`: sağlık, telefonla giriş (kod API kaydından okunur), oturumlar, mağaza satın alımı, hediye ve sıralama, push (sahte Expo sunucusuyla), LiveKit webhook, imzalı yükleme adresi (AWS'nin örnek imzasıyla), telefonlu hesap silme. `coins.test.mjs`: jeton kanalı ve partiler, 7 gün / 1 gün elmas kilidi, Çevir'in kilitli elmasa kapalı olması, Jeton Noktası açma (yalnız yönetici), toptan alım, Jeton Noktası satışı (aynı anda iki kopya dahil), kilit mirası, harcama sırası, anında bozdur, iade (Jeton Noktası üzerinden geçen dahil), değiştirilemez kayıtlar, denetim görünümü, partilerin bakiyeye eşitliği. Yerelde: `cd server/api && PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test`.
+- `server/api/test/`: her dosya boş bir veritabanı açar, API'yi ayrı bir süreç olarak başlatır (`harness.mjs`), HTTP üzerinden dener, sonra veritabanını siler. `api.test.mjs`: giriş, cüzdan, profil, takip/engel, mesaj, oda/ses token'ı, şikâyet/moderasyon, hesap silme. `launch.test.mjs`: sağlık, telefonla giriş (kod API kaydından okunur), oturumlar, mağaza satın alımı, hediye ve sıralama, push (sahte Expo sunucusuyla), LiveKit webhook, imzalı yükleme adresi (AWS'nin örnek imzasıyla), telefonlu hesap silme. `coins.test.mjs`: jeton kanalı ve partiler, 7 gün / 1 gün elmas kilidi, Çevir'in kilitli elmasa kapalı olması, Jeton Noktası açma (yalnız yönetici), toptan alım, Jeton Noktası satışı (aynı anda iki kopya dahil), kilit mirası, harcama sırası, anında bozdur, iade (Jeton Noktası üzerinden geçen dahil), değiştirilemez kayıtlar, denetim görünümü, partilerin bakiyeye eşitliği. `config.test.mjs`: `/api/config` ve önbelleği, kapalı özelliklerin 503'ü, `warnings`, `/api/admin/alerts` yetkisi. `alerts.test.mjs`: disk, 5xx, finans aktarımı ve para alarmları; sahte bir Sentry sunucusuna giden raporlar (telefon, oturum anahtarı yok; aynı hata bir kez). `reporting.test.mjs`: Sentry adresi, maskeleme, hata satırları. Yerelde: `cd server/api && PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test`.
 - `.github/workflows/server.yml`: `server/**` değişince testler Postgres 17 ile çalışır. Ana dala birleşince sunucuya kurulur: `compose.yaml`, `Caddyfile`, `backup.sh`, API (`/opt/similar/api`) ve finans paneli (`/opt/similar/finance`), sonra `docker compose up -d --build` ve Caddy yeniden yüklenir; commit kimliği `version.txt`'ye yazılır ve `/api/health` yeni sürümü bildirene kadar beklenir.
-- `.github/workflows/uptime.yml`: 15 dakikada bir canlı API'yi (`/api/health`, veritabanı dahil) ve LiveKit'i (`/` → `OK`) yoklar; düşerse GitHub e-posta atar. Alan adı gelince `API_BASE_URL` depo değişkeni. **Bunun için bir kez** GitHub → Settings → Secrets and variables → Actions → `DEPLOY_SSH_KEY` olarak `~/.ssh/oracle.key` içeriği eklenmeli (adres değişirse `DEPLOY_HOST` değişkeni). Anahtar yoksa kurulum adımı atlanır ve elle kurulum (aşağıda) geçerlidir.
+- `.github/workflows/uptime.yml`: 15 dakikada bir canlı API'yi (`/api/health`, veritabanı dahil) ve LiveKit'i (`/` → `OK`) yoklar; düşerse ya da `warnings` boş değilse GitHub e-posta atar. Alan adı gelince `API_BASE_URL` depo değişkeni. **Bunun için bir kez** GitHub → Settings → Secrets and variables → Actions → `DEPLOY_SSH_KEY` olarak `~/.ssh/oracle.key` içeriği eklenmeli (adres değişirse `DEPLOY_HOST` değişkeni). Anahtar yoksa kurulum adımı atlanır ve elle kurulum (aşağıda) geçerlidir.
 - Bütün ayarlar ve açıklamaları: `server/infra/.env.example` (SMS, ödeme, depolama, yedek, sınırlar). Canlı sunucudaki `.env`'e eksik olanlar eklenir; boş bırakılan özellik kapalı kalır.
 
 Kod değişince: `scp -r -i ~/.ssh/oracle.key server/api ubuntu@130.61.230.94:/opt/similar/` ve sunucuda `sudo docker compose up -d --build api`. Uçtan uca kontrol: `node server/api/smoke-test.mjs` (iki atılabilir test hesabı açar).
@@ -141,6 +143,94 @@ Portlar iki yerde açık olmalı: Oracle'da **similar-vcn → Default Security L
 `/etc/cron.d/similar-backup` her gece 03:30 UTC'de `backup.sh` çalıştırır: `pg_dump` → `backups/similar-YYYY-MM-DD.sql.gz` (bütünlüğü denetlenir), 14 gün saklanır; finans paneli çalışıyorsa onun veritabanı da → `backups/finance-YYYY-MM-DD.db.gz`. Yeni `backup.sh` (`server/infra/`): `.env`'de `BACKUP_RCLONE_REMOTE` varsa (ör. `r2:similar-yedek`, `rclone config` ile bir kez tanımlanır) dosya sunucu dışına da kopyalanır ve orada 60 gün durur; `BACKUP_PING_URL` varsa (healthchecks.io gibi) yedek gelmeyince haber verir. **Canlı sunucuda henüz eski betik var**; otomatik kurulum ilk çalıştığında yenisiyle değişir.
 
 Geri yükleme (`restore.sh`): `./restore.sh --check backups/…sql.gz` yedeği geçici bir veritabanına açıp sayar ve siler (ayda bir denenmeli); `./restore.sh backups/…sql.gz` canlı veritabanını değiştirir (önce onay ister ve şimdiki hali ayrı bir dosyaya saklar).
+
+## Hata izleme ve acil durum
+Bir şey ters gittiğinde haber almak ve uygulamayı mağazaya yeni sürüm göndermeden yönetmek için. Hepsi isteğe bağlı: ayar boşsa ilgili parça kapalı durur, uygulama ve sunucu eskisi gibi çalışır.
+
+### Hangi e-postalar gelir
+| Kimden | Ne zaman | Kurulum |
+|---|---|---|
+| GitHub (Actions) | API veya LiveKit 15 dakikadır yanıt vermiyor ya da `/api/health` bir alarm kodu bildiriyor (aşağıdaki tablo). E-posta "Uptime" iş akışının başarısız olduğunu söyler; kodlar iş akışının kaydında yazar. | Hazır. E-posta, iş akışını en son değiştiren GitHub hesabına gider; GitHub → Settings → Notifications → Actions açık olmalı. |
+| Sentry | Uygulamada çökme veya yakalanan hata (hangi sürüm, hangi güncelleme, hangi hesap kimliği), sunucuda beklenmeyen hata, her 5xx yanıtı, finans aktarımı / bildirim / mağaza doğrulama hataları. Aynı hata sunucudan 10 dakikada bir kez gelir. | Bir kez: aşağıda **Sentry**. |
+| healthchecks.io | Gecelik yedek alınmadı veya hata verdi. | Bir kez: aşağıda **Yedek alarmı**. |
+
+Raporlarda telefon numarası, mesaj metni, oturum anahtarı ve adreslerin sorgu kısmı (oda şifresi gibi) yoktur; kişi yalnızca sunucu hesap kimliğiyle görünür.
+
+### Bir özelliği geçici kapatmak
+Bir hata para kaybettiriyorsa önce özelliği kapatın, sonra düzeltin. Sunucuda:
+```bash
+cd /opt/similar
+sudo nano .env                      # FEATURES_OFF=gifts,topup   (virgülle, boşluksuz)
+sudo docker compose up -d api       # yalnız API yeniden başlar, birkaç saniye
+```
+Sunucu o andan itibaren bu çağrıları "Bu özellik geçici olarak kapalı" (503) diye reddeder. Telefonlar en geç bir dakika içinde (uygulama öne gelince) öğrenir: ilgili düğme sakin bir açıklama gösterir, oda / oyun / Jeton Noktası ekranı yerine "kısa bir mola verdi" yazar; bakiye ve geçmiş görünmeye devam eder. Yeniden açmak için `FEATURES_OFF=` (boş) ve aynı komut.
+
+| Ad | Neyi kapatır |
+|---|---|
+| `gifts` | Hediye gönderme (oda içi ve profil) |
+| `purchases` | Mağazadan jeton satın alma (Google Play / App Store) |
+| `topup` | Test jetonu yükleme (test APK'sı) |
+| `exchange` | Elmas → jeton çevirme ve Jeton Noktası'na elmas bozdurma |
+| `jeton` | Jeton Noktası aktarımları ve toptan alım |
+| `games` | Oyun Salonu (yalnız uygulamada; oyunlar sunucudan geçmiyor) |
+| `dm` | Yeni özel mesaj gönderme (eski mesajlar okunur) |
+| `rooms` | Yeni oda açma ve odaya girme (içerideki kişi, bağlantısı kopmadıkça odada kalır) |
+
+Bilinmeyen ad yok sayılır ve API kaydında `FEATURES_OFF: unknown …` uyarısı çıkar.
+
+### Herkesi güncellemeye zorlamak
+`.env`'de `APP_MIN_VERSION=1.1.0` ve `APP_UPDATE_URL=https://…` (Google Play sayfası ya da APK'nın indirildiği GitHub sürüm sayfası), sonra `sudo docker compose up -d api`. Sürümü bundan düşük olan uygulama kapatılamayan bir "Güncelleme gerekli" penceresi gösterir, düğmesi bu adresi açar. Karşılaştırılan sürüm `app/app.json` içindeki `version`'dır. **Dikkat:** henüz yayınlanmamış bir sürümü yazarsanız herkes kilitlenir; önce yeni sürüm mağazada / GitHub'da olmalı. Kaldırmak için `APP_MIN_VERSION=` (boş).
+
+Herkese kısa bir duyuru için `APP_NOTICE=Bu gece 02:00–02:30 arası bakım var.` (en fazla 300 harf). Kişi kapatabilir; metin değişince yeniden görünür.
+
+### Hızlı düzeltme göndermek
+- **Sunucu hatası:** düzeltme ana dala birleşince otomatik kurulur (`server.yml`); acelesi varsa yukarıdaki elle kopyalama.
+- **Uygulama hatası (yalnız kod, yazı, resim):** mağazaya yeni sürüm göndermeden "uzaktan güncelleme" (Expo EAS Update). Telefon güncellemeyi arka planda indirir, uygulama bir sonraki açılışta yeni haliyle başlar.
+- **Yeni sürüm gerekir:** yeni bir paket (native modül), izin, `app.json` eklentisi ya da `version` değiştiyse. `version` değişince eski telefonlar yeni güncellemeleri almaz (`runtimeVersion` sürüme bağlı); onlara `APP_MIN_VERSION` ile yeni sürüm aldırılır.
+
+**Uzaktan güncellemeyi bir kez kurmak** (bilgisayarda, `app/` klasöründe):
+1. https://expo.dev adresinden ücretsiz hesap açın.
+2. `npx eas-cli@latest login` (hesabın e-postası ve şifresi).
+3. `npx eas-cli@latest init` → projeyi Expo'da açar ve `app.json`'a proje kimliğini yazar.
+4. `npx eas-cli@latest update:configure` → `app.json`'a güncelleme adresini yazar. `app.json` değişikliğini commit edin.
+5. Yeni APK: `npx eas-cli@latest build --profile preview --platform android` (mağaza için `--profile production`). Uzaktan güncelleme **yalnız bu adımdan sonra EAS ile derlenen** uygulamalara gelir; GitHub'daki önizleme APK'sı (`preview.yml`) güncelleme almaz.
+
+**Her düzeltmede:**
+```bash
+cd app
+npm run update -- preview "Hediye panelindeki hata düzeltildi"      # test telefonları
+npm run update -- production "Hediye panelindeki hata düzeltildi"   # mağaza sürümü
+```
+Bu komut `eas update`'i `eas.json`'daki profilin ayarlarıyla (sunucu adresi dahil) çalıştırır. Doğrudan `eas update` yazmayın: profil ayarlarını okumaz ve sunucu adresi olmayan bir güncelleme telefonları çevrimdışı prototipe düşürür. Yanlış giden bir güncelleme expo.dev → proje → Updates'ten ya da `npx eas-cli@latest update:republish` ile önceki güncellemeye döndürülür.
+
+### Sentry
+1. https://sentry.io adresinden ücretsiz hesap açın; iki proje oluşturun: **React Native** (uygulama) ve **Node.js** (sunucu). Her birinin **DSN** adresini kopyalayın (Settings → Client Keys). DSN gizli değildir.
+2. Sunucu: `.env`'e `SENTRY_DSN=<Node DSN>`, sonra `sudo docker compose up -d api`. API kaydında `error reporting on → …` görünür.
+3. Uygulama: `app/eas.json`'da `preview` ve `production` profillerinin `env` bölümüne `"EXPO_PUBLIC_SENTRY_DSN": "<React Native DSN>"`, sonra yeni derleme ya da `npm run update`. Ortam (`preview` / `production`) profilden gelir.
+4. Sentry'de proje → Alerts: "yeni hata" kuralı varsayılan olarak açık, e-posta hesabın adresine gider.
+
+Derlemeler Sentry hesabı olmadan da çalışır: kaynak haritası yükleme kapalı (`SENTRY_DISABLE_AUTO_UPLOAD`), bu yüzden uygulama hatalarında satır yerleri sıkıştırılmış kod gibi görünür. İleride istenirse EAS'a `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` sırları eklenip bu ayar kaldırılır.
+
+### Alarm kodları (`/api/health` → `warnings`)
+Herkese açık yanıtta yalnız kod vardır; değer, eşik ve ilgili hesaplar yönetici hesabıyla `GET /api/admin/alerts`'te. Eşikler `.env`'de (`server/infra/.env.example`); sonuç 60 sn önbellekte tutulur.
+
+| Kod | Anlamı | Eşik (varsayılan) |
+|---|---|---|
+| `disk_low` | Sunucu diskinde boş yer azaldı (eski yedekler, Docker kayıtları) | `ALERT_DISK_FREE_PCT` (%15 altı) |
+| `errors_5xx` | Son 15 dakikada çok sayıda sunucu hatası | `ALERT_5XX_15M` (20'den fazla) |
+| `finance_sync_stale` | Finans paneline aktarım uzun süredir başarılı olmadı (panel kapalı / anahtar yanlış) | `ALERT_FINANCE_STALE_MIN` (15 dk) |
+| `finance_sync_failed` | Panelin reddettiği para olayları bekliyor | 1 ve üstü |
+| `refunds_high` | Son bir saatte çok sayıda mağaza iadesi | `ALERT_REFUNDS_1H` (3'ten fazla) |
+| `diamonds_spike` | Bir hesaba son bir saatte olağandışı çok elmas geldi | `ALERT_DIAMONDS_1H` (500.000'den fazla) |
+| `test_topups_high` | Son bir saatte çok fazla test jetonu yüklendi | `ALERT_TEST_TOPUP_1H` (500.000'den fazla) |
+| `alerts_error` | Alarmlar okunamadı (çoğu zaman veritabanı) | — |
+
+Alarm geldiğinde: `GET /api/admin/alerts` ile ayrıntıya bakın; para alarmıysa ilgili özelliği kapatın, hesabı `GET /api/admin/wallet/audit?user=` ile inceleyin.
+
+### Yedek alarmı (healthchecks.io)
+1. https://healthchecks.io adresinden ücretsiz hesap açın → **Add Check**: ad `similar-yedek`, Period **1 day**, Grace **2 hours**.
+2. Verilen adresi (`https://hc-ping.com/…`) sunucuda `.env`'e `BACKUP_PING_URL=` olarak yazın. Yeniden başlatma gerekmez; `backup.sh` her gece okur.
+3. Yedek başarılıysa betik bu adrese, başarısızsa `…/fail`'e haber verir; hiç haber gelmezse ya da hata gelirse healthchecks.io e-posta atar. Bu yeni `backup.sh` ile çalışır (yukarıda **Yedek**).
 
 ## Doğrulama (28.10.2026)
 - `https://130-61-230-94.sslip.io` → `OK`; 7881 dışarıdan açık, 5432 kapalı.

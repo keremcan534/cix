@@ -1,6 +1,7 @@
 name: Uptime
 
-# Every 15 minutes: is the live API answering with its database, and is LiveKit up? A failed run is
+# Every 15 minutes: is the live API answering with its database, is LiveKit up, and does the API report any
+# warning (disk, server errors, finance sync, money anomalies: server/api/alerts.mjs)? A failed run is
 # e-mailed by GitHub to whoever last changed this schedule. Address: the API_BASE_URL repository variable
 # once the domain exists, the sslip.io address until then.
 on:
@@ -29,6 +30,13 @@ jobs:
             sleep 20
           done
           echo "::error::API is not answering (last status $code: $(cat health.json 2>/dev/null))"; exit 1
+      # Codes only (the details are behind GET /api/admin/alerts); docs/SUNUCU.md explains each one.
+      - name: Warnings
+        run: |
+          [ -s health.json ] || { echo "No health answer to read"; exit 0; }
+          codes=$(jq -r '(.warnings // []) | join(", ")' health.json)
+          if [ -n "$codes" ]; then echo "::error::Server warnings: $codes"; exit 1; fi
+          echo "No warnings"
       - name: LiveKit
         if: always()
         run: |

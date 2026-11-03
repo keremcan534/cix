@@ -1,6 +1,6 @@
 // Similar Club API on our server, behind Caddy next to Postgres and LiveKit (docs/SUNUCU.md). One dependency: pg.
 //
-//   GET  /api/health                                            → { ok, db, version, uptime }   (public)
+//   GET  /api/health                                            → { ok, db, version, uptime, warnings }   (public)
 //   GET  /api/me                                                → { user }
 //   GET  /api/ledger                                            → { rows }
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
@@ -15,10 +15,16 @@
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
+// Error reporting, the app's remote config and kill switches, and the health warnings: reporting.mjs,
+// features.mjs, alerts.mjs.
 import fs from 'node:fs';
 import http from 'node:http';
 
+// First, so its console.error hook is in place before anything else runs.
+import { failed } from './reporting.mjs';
 import { adminRoutes } from './admin.mjs';
+import { alertRoutes, warningCodes } from './alerts.mjs';
+import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
@@ -84,7 +90,7 @@ const walletRoutes = {
       ok = false;
     }
     if (!ok) throw new HttpError(503, 'Veritabanına ulaşılamıyor');
-    return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000) };
+    return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000), warnings: await warningCodes() };
   },
 
   async 'GET /api/me'(req) {
@@ -192,6 +198,8 @@ const routes = {
   ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
+  ...configRoutes,
+  ...alertRoutes,
 };
 
 // --- Server: CORS, security headers, rate limits, JSON errors, one log line per request ---------------------
@@ -235,9 +243,14 @@ const server = http.createServer(async (req, res) => {
   const ip = clientIp(req);
   if (limited(req, url.pathname, ip)) return send(429, { error: 'Çok fazla istek, biraz bekle' });
 
+  if (url.pathname === '/api/config') res.setHeader('Cache-Control', CONFIG_CACHE);
   try {
+    // A feature switched off in .env (FEATURES_OFF) is refused before its route runs.
+    gate(req.method, url.pathname);
     send(200, await route(req, url));
   } catch (e) {
+    // 5xx: counted for the health warnings and reported (SENTRY_DSN).
+    failed(e, req.method, url.pathname);
     if (e instanceof HttpError) return send(e.code, { error: e.message });
     console.error(e);
     send(500, { error: 'Sunucu hatası' });

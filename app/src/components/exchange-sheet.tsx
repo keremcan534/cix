@@ -13,6 +13,7 @@ import { showAlert } from '@/lib/alert';
 import { successHaptic } from '@/lib/haptics';
 import { liveExchange, liveMode, message } from '@/lib/live';
 import { exchangeOwnDiamonds, selfExchangeRate } from '@/lib/coins-bank';
+import { blockedFeature } from '@/lib/remote-control';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -46,7 +47,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
   const submit = () => {
     // Live mode: the server exchanges (its own rate and locks); the new balance reaches the store from there.
     if (liveMode()) {
-      if (busy) return;
+      if (busy || blockedFeature('exchange')) return;
       setBusy(true);
       liveExchange(amount)
         .then((got) => {

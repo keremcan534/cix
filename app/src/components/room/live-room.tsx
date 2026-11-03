@@ -111,6 +111,7 @@ import {
   type InviteStatus,
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
+import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
@@ -1365,7 +1366,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Product rule: gifts never ask for confirmation; one tap sends.
   const sendGift = (gift: Gift, toIds: string[], count: number) => {
     setGiftOpen(false);
-    if (offlineBlocked()) return false;
+    if (offlineBlocked() || blockedFeature('gifts')) return false;
     if (real) {
       void deliverLiveGifts(gift, toIds, count);
       return true;

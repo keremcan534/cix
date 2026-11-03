@@ -57,7 +57,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | Yetkili (moderatör) web paneli | ⏳ | Sunucu uçları hazır |
 | Gecelik yedeğin sunucu dışına kopyası (rclone, 60 gün) | 🟡 | Betik hazır; madde 6 bekliyor |
 | Yedekten geri yükleme ve aylık deneme (`restore.sh --check`) | ✅ | |
-| İzleme ve alarm | 🟡 | GitHub her 15 dakikada API, veritabanı ve LiveKit'i yokluyor; düşerse e-posta. Uygulama çökmeleri ve sunucu hataları için anlık bildirim (Sentry benzeri) yok; hatalar yalnızca kayıtlarda |
+| İzleme ve alarm | 🟡 | GitHub her 15 dakikada API, veritabanı ve LiveKit'i yokluyor; düşerse ya da sunucu alarm verirse (disk, 5xx, finans aktarımı, olağandışı iade / elmas / test jetonu) e-posta. Uygulama ve sunucu hataları için Sentry kodu hazır ama **Sentry hesabı ve DSN henüz yok**, yani şimdilik kapalı; yedek alarmı (healthchecks.io) da hesap bekliyor. Özellik kapatma, zorunlu güncelleme ve duyuru `.env`'den (`docs/SUNUCU.md` → Hata izleme ve acil durum). Uzaktan güncelleme (EAS Update) kodu hazır; Expo hesabı, `eas init` ve EAS ile yeni bir derleme bekliyor. Gerçek telefonda ve EAS derlemesinde henüz denenmedi |
 | Finans paneli (Finance Control) sunucuda, para hareketleri otomatik aktarılıyor | 🟡 | `https://panel.<adres>`; API işlem kaydını panele gönderiyor (satış, hediye, harcama, iade, Jeton Noktası, çevirme), panel kapalıyken kaybolmuyor, testli ve gerçek panelle denendi. Kurulum madde 9'daki anahtarla gelir; sonra panelde ödeme kanalları ve anahtar bir kez tanımlanır (`docs/SUNUCU.md` → Finans paneli) |
 | Yeni sunucuyu tek komutla kurma (`server/infra/setup.sh`) | ✅ | Alan adı gelince taşınma için |
 | Test (staging) ortamı | ⏳ | |

@@ -14,9 +14,11 @@ import { RootCrashScreen, ScreenCrashScreen } from '@/components/crash-screen';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
+import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
 import { ME } from '@/data/mock';
 import { installCrashGuard, markStarted } from '@/lib/crash-guard';
+import { initReporting } from '@/lib/reporting';
 import { setupVoice } from '@/lib/voice-setup';
 import { LiveSync } from '@/lib/live/sync';
 import { AppProvider, useApp } from '@/store';
@@ -25,6 +27,9 @@ import { colors } from '@/theme';
 // Real voice (LiveKit) on web when the server is configured; the simulated engine otherwise. The profile name
 // (shared ME object, kept current by the store) names the server account on first sign-in.
 setupVoice(() => ME.name);
+
+// Crash reports (Sentry) when the build has a DSN; first, so it sees everything after it (lib/reporting).
+initReporting();
 
 // A stray error in a timer or a button handler no longer closes the app once it is up (lib/crash-guard).
 installCrashGuard();
@@ -73,7 +78,12 @@ function RootStack() {
       <Stack
         // Pushed screens slide in from the right on both platforms; screens with their own animation keep it.
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right' }}
-        screenLayout={({ children }) => <ScreenEnter>{children}</ScreenEnter>}
+        // A screen whose feature the server switched off shows a calm notice instead (components/remote-control).
+        screenLayout={({ children }) => (
+          <ScreenEnter>
+            <FeatureGate>{children}</FeatureGate>
+          </ScreenEnter>
+        )}
         // A screen that fails to draw is replaced by its own error screen; tabs and the rest keep working.
         unstable_screenErrorBoundary={ScreenCrashScreen}
       >
@@ -136,6 +146,8 @@ function RootStack() {
       {loggedIn && <RoomHost />}
       {loggedIn && <MatchLayer />}
       {loggedIn && <GamesBridge />}
+      {/* The server's notice and required update, signed in or not. */}
+      <RemoteControl />
     </>
   );
 }
