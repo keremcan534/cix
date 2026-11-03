@@ -13,13 +13,18 @@
 // match the signed-in account.
 //
 // Each store transaction credits once (purchases.UNIQUE(platform, transaction_id)); the first purchase of a
-// pack adds its first-purchase bonus; purchased coins (not the bonus) count as SVIP points.
+// pack adds its first-purchase bonus; purchased coins (not the bonus) count as SVIP points. The coins are
+// lots with the store's channel (google / apple / test, and bonus): gifted, they lock the recipient's diamonds
+// for the store lock (wallet.mjs), and a refund (jeton.mjs) can follow them.
 import crypto from 'node:crypto';
 
-import { HttpError, auth, db, env, move, readJson, selfUser, sha, tx } from './core.mjs';
+import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
+import { creditCoins } from './wallet.mjs';
 
 const TEST = env.ALLOW_TEST_TOPUP === '1';
+/** The coin channel of each store (wallet.mjs CHANNELS): where the coins came from, in every record. */
+const STORE_CHANNEL = { android: 'google', ios: 'apple', test: 'test' };
 const PACKAGE = env.GOOGLE_PLAY_PACKAGE ?? 'com.similarclub.app';
 const BUNDLE = env.APPLE_BUNDLE_ID ?? 'com.similarclub.app';
 const b64url = (v) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
@@ -103,8 +108,21 @@ async function credit(u, platform, pack, transactionId) {
     }
     const first = !(await c.query('SELECT 1 FROM purchases WHERE user_id = $1 AND product_id = $2', [u.id, pack.productId])).rowCount;
     const bonus = first ? pack.firstBonus : 0;
-    await c.query('INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus) VALUES ($1,$2,$3,$4,$5,$6)', [u.id, platform, pack.productId, transactionId, pack.coins, bonus]);
-    await move(c, u.id, 'coin', pack.coins + bonus, bonus ? `Jeton satın alma (+${bonus} ilk alım hediyesi)` : 'Jeton satın alma', ref);
+    const p = await c.query('INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', [u.id, platform, pack.productId, transactionId, pack.coins, bonus]);
+    const purchaseId = Number(p.rows[0].id);
+    // Two lots: the store's coins and the first-purchase gift, both with the store lock (wallet.mjs).
+    await creditCoins(
+      c,
+      u.id,
+      [
+        { channel: STORE_CHANNEL[platform], amount: pack.coins, purchaseId },
+        { channel: 'bonus', amount: bonus, purchaseId },
+      ],
+      bonus ? `Jeton satın alma (+${bonus} ilk alım hediyesi)` : 'Jeton satın alma',
+      ref,
+      null,
+      { detail: { purchase: purchaseId, platform, product: pack.productId, transaction: transactionId } },
+    );
     await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
     return { replay: false, coins: pack.coins, bonus };
   });

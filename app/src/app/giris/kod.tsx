@@ -1,18 +1,20 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { AuthHeader } from '@/components/AuthHeader';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 
 const LENGTH = 6;
 
 export default function CodeScreen() {
   const { phone } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(60);
   const [checking, setChecking] = useState(false);
@@ -79,14 +81,25 @@ export default function CodeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, dark }) => ({
   boxes: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 32 },
-  box: { width: 48, height: 58, borderRadius: 14, backgroundColor: colors.card, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  // Light: white boxes need an outline and a soft shadow to stand off the paper (the active border replaces it).
+  box: {
+    width: 48,
+    height: 58,
+    borderRadius: 14,
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: dark ? 'transparent' : colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(dark ? null : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }),
+  },
   boxActive: { borderColor: colors.primaryText },
   boxFilled: { borderColor: colors.primary },
-  digit: { color: '#fff', fontSize: 24, fontWeight: '800' },
+  digit: { color: colors.text, fontSize: 24, fontWeight: '800' },
   hidden: { position: 'absolute', opacity: 0, width: 1, height: 1 },
   dim: { color: colors.textDim },
   link: { color: colors.primaryText, fontWeight: '700' },
   hint: { color: colors.textDim, fontSize: 12, opacity: 0.7 },
-});
+}));

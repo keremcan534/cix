@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { Animated, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
@@ -15,6 +15,8 @@ import { colors, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine } from '@/components/fx/surface';
+import { Photo } from '@/components/photo';
+import { SimilarityRing } from '@/components/similarity';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -43,6 +45,7 @@ export function Seat({
   slotWidth,
   modMuted,
   invitee,
+  similarity,
   onPress,
 }: {
   index: number;
@@ -78,6 +81,8 @@ export function Seat({
   modMuted?: boolean;
   /** Empty seat held for a pending mic invite (name of the invited person). */
   invitee?: string;
+  /** How much this person has in common with you (lib/similarity), drawn as a bead ring; not on your own seat. */
+  similarity?: number;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -96,7 +101,7 @@ export function Seat({
   const size = avatarSize ?? (host ? 70 : small ? 48 : 56);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
   const label = user
-    ? `${index + 1}. mikrofon, ${user.name}${muteText}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
+    ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
     : `${index + 1}. mikrofon, ${locked ? 'kilitli' : invitee ? `${invitee} için davet bekliyor` : 'boş'}`;
 
   return (
@@ -114,7 +119,7 @@ export function Seat({
         {user && (vipLevel > 0 || frameId) ? (
           <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
         ) : user ? (
-          <Image source={{ uri: user.avatar }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+          <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
         ) : (
           // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
           <LinearGradient
@@ -124,6 +129,7 @@ export function Seat({
             <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 16 : 19} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
           </LinearGradient>
         )}
+        {user && similarity !== undefined && !teamColor && <SimilarityRing score={similarity} size={size} />}
         {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
         {camera && user && (
           <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
@@ -270,7 +276,7 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
               <Text style={{ color: colors.textDim }}> → </Text>
               <Text style={styles.giftName}>{to}</Text>
               {giftArtOf(g.giftId) ? `  ${g.name}` : `  ${g.emoji} ${g.name}`}
-              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Lucky' : ''}`}
+              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Uğurlu' : ''}`}
             </Text>
             {giftArtOf(g.giftId) && <GiftArt giftId={g.giftId} emoji={g.emoji} size={24} />}
           </>

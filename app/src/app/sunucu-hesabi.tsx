@@ -3,7 +3,7 @@
 // where the server wallet can be seen and tried until the wallet screens move over.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon3D } from '@/components/Icon3D';
@@ -11,7 +11,7 @@ import { Text, TextInput } from '@/components/text';
 import { Card, Header, StateIcon } from '@/components/ui';
 import { apiEnabled, ensureSignedIn, gift, ledger, newRef, testTopup, type ServerLedgerRow, type ServerUser } from '@/lib/api';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 const CURRENCY = { coin: 'jeton', diamond: 'elmas', game: 'oyun jetonu' } as const;
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -26,6 +26,8 @@ export default function ServerAccount() {
   const [amount, setAmount] = useState('100');
   // One request id per gift attempt: a retry after a lost answer reuses it, so the gift is never sent twice.
   const [giftRef, setGiftRef] = useState(newRef);
+  const { colors, semantic } = useTheme();
+  const s = useStyles();
 
   const run = useCallback(async (fn: () => Promise<string | void>) => {
     setBusy(true);
@@ -156,12 +158,12 @@ export default function ServerAccount() {
           {rows.map((r) => (
             <View key={r.id} style={s.ledgerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: '#fff' }}>{r.reason}</Text>
+                <Text style={{ color: colors.text }}>{r.reason}</Text>
                 <Text style={s.dim}>
                   {new Date(r.created_at).toLocaleString('tr-TR')} · bakiye {fmt(r.balance)}
                 </Text>
               </View>
-              <Text style={[s.amount, { color: r.amount > 0 ? semantic.money : colors.textDim }]}>
+              <Text style={[s.amount, { color: r.amount > 0 ? semantic.moneyText : colors.textDim }]}>
                 {r.amount > 0 ? '+' : ''}
                 {fmt(r.amount)} {CURRENCY[r.currency]}
               </Text>
@@ -173,24 +175,24 @@ export default function ServerAccount() {
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic }) => ({
   page: { flex: 1, backgroundColor: colors.bg },
-  title: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  title: { color: colors.text, fontWeight: '700', fontSize: 15 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
-  msg: { color: semantic.money, fontWeight: '700', textAlign: 'center' },
+  msg: { color: semantic.moneyText, fontWeight: '700', textAlign: 'center' },
   empty: { alignItems: 'center', gap: 10, paddingTop: 96, paddingHorizontal: 32 },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   balances: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginVertical: 4 },
   balanceItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  balance: { color: '#fff', fontWeight: '900', fontSize: 20 },
+  balance: { color: colors.text, fontWeight: '900', fontSize: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: colors.border },
-  chipText: { color: '#fff', fontWeight: '800' },
-  input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.border },
+  chipText: { color: colors.text, fontWeight: '800' },
+  input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.border },
   btn: { backgroundColor: semantic.money, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   btnText: { color: semantic.moneyInk, fontWeight: '900' },
   off: { opacity: 0.5 },
-  link: { color: '#fff', fontWeight: '600' },
+  link: { color: colors.text, fontWeight: '600' },
   ledgerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border },
   amount: { fontWeight: '800', fontSize: 13 },
-});
+}));

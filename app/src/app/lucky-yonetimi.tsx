@@ -1,7 +1,7 @@
 // Admin: Lucky gift packages, odds, reward reserve, records (spec §8). Every change bumps the
 // config version; each send keeps the odds it was drawn with, so past results stay auditable.
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -32,12 +32,13 @@ import {
 } from '@/lib/lucky';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type Tab = 'packs' | 'budget' | 'history' | 'winners' | 'records';
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 function Chips<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+  const s = useStyles();
   return (
     <View style={s.chips}>
       {options.map(([v, l]) => (
@@ -55,11 +56,13 @@ export default function LuckyAdmin() {
   const [tab, setTab] = useState<Tab>('packs');
   const [editing, setEditing] = useState<LuckyGift | null>(null);
   const can = resolve(rbac, 'me', 'lucky.manage', { type: 'platform' });
+  const { colors } = useTheme();
+  const s = useStyles();
   if (!can.allowed)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Header title="Lucky hediye yönetimi" />
-        <Text style={[s.dim, { padding: 16 }]}>Bu ekran için Lucky yönetimi yetkisi gerekiyor. {can.reason}</Text>
+        <Header title="Uğurlu hediye yönetimi" />
+        <Text style={[s.dim, { padding: 16 }]}>Bu ekran için Uğurlu hediye yönetimi yetkisi gerekiyor. {can.reason}</Text>
       </SafeAreaView>
     );
   const { config } = lucky;
@@ -67,7 +70,7 @@ export default function LuckyAdmin() {
   // Replays the latest send with the same transaction id: must return the first result, no new charge.
   const replayLast = () => {
     const last = lucky.records[0];
-    if (!last) return showAlert('Kayıt yok', 'Önce odada bir Lucky hediye gönder.');
+    if (!last) return showAlert('Kayıt yok', 'Önce odada bir Uğurlu hediye gönder.');
     const before = getLucky().spentTotal;
     const r = sendLucky({ txId: last.txId, userId: last.userId, userAge: 99, roomId: last.roomId, giftId: last.giftId, toId: last.toId, toName: userById(last.toId).name }, { spend: spendCoins, credit: addCoins });
     showAlert('Tekrar gönderim testi', r.ok && r.replay && getLucky().spentTotal === before ? `İlk sonuç döndü (×${r.record.mult}). İkinci kez jeton düşülmedi, ödül verilmedi.` : 'Beklenmeyen sonuç.');
@@ -75,7 +78,7 @@ export default function LuckyAdmin() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title="Lucky hediye yönetimi" />
+      <Header title="Uğurlu hediye yönetimi" />
       <View style={{ paddingHorizontal: 16 }}>
         <Chips
           value={tab}
@@ -120,7 +123,7 @@ export default function LuckyAdmin() {
               );
             })}
             <Pressable style={s.small} onPress={() => setEditing(newGiftDraft())}>
-              <Text style={s.chipText}>+ Yeni Lucky paketi</Text>
+              <Text style={s.chipText}>+ Yeni Uğurlu paketi</Text>
             </Pressable>
           </>
         )}
@@ -225,6 +228,8 @@ export default function LuckyAdmin() {
 function Editor({ draft, onChange, onDone }: { draft: LuckyGift; onChange: (g: LuckyGift) => void; onDone: () => void }) {
   const sum = oddsSum(draft.tiers);
   const bad = validate(draft);
+  const { colors, semantic } = useTheme();
+  const s = useStyles();
   const pctText = (g: LuckyGift) => Object.fromEntries([0, ...LUCKY_MULTS].map((m) => [m, String((g.tiers.find((t) => t.mult === m)?.weight ?? 0) / 1000).replace('.', ',')]));
   // Inputs keep what was typed (e.g. "0," mid-entry); the draft always holds the parsed odds.
   const [texts, setTexts] = useState<Record<number, string>>(() => pctText(draft));
@@ -265,7 +270,7 @@ function Editor({ draft, onChange, onDone }: { draft: LuckyGift; onChange: (g: L
           <Text style={s.dim}>{m ? `${fmt(draft.price * m)} jeton` : ''}</Text>
         </View>
       ))}
-      <Text style={[s.dim, { color: sum === ODDS_TOTAL ? semantic.success : colors.gold }]}>Toplam {oddsLabel(sum)}{sum === ODDS_TOTAL ? ' ✓' : ' · %100 olmalı'}</Text>
+      <Text style={[s.dim, { color: sum === ODDS_TOTAL ? semantic.successText : colors.gold }]}>Toplam {oddsLabel(sum)}{sum === ODDS_TOTAL ? ' ✓' : ' · %100 olmalı'}</Text>
       <View style={s.row}>
         <Pressable style={s.small} onPress={() => applyPreset(STANDARD_TIERS)}>
           <Text style={s.chipText}>Standart oranlar</Text>
@@ -298,16 +303,16 @@ function Editor({ draft, onChange, onDone }: { draft: LuckyGift; onChange: (g: L
   );
 }
 
-const s = StyleSheet.create({
-  title: { color: '#fff', fontWeight: '800', fontSize: 15, flex: 1 },
-  big: { color: semantic.money, fontWeight: '900', fontSize: 24 },
+const useStyles = makeStyles(({ colors, semantic, dark, ink }) => ({
+  title: { color: colors.text, fontWeight: '800', fontSize: 15, flex: 1 },
+  big: { color: semantic.moneyText, fontWeight: '900', fontSize: 24 },
   label: { color: colors.text, fontSize: 13, flex: 1 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
-  chipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.15)' },
+  chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
-  small: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7 },
-  input: { backgroundColor: colors.cardAlt, color: '#fff', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
-});
+  small: { alignSelf: 'flex-start', borderRadius: 999, backgroundColor: dark ? colors.cardAlt : colors.card, paddingHorizontal: 12, paddingVertical: 7, ...(dark ? {} : { borderWidth: 1, borderColor: ink(0.12) }) },
+  input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+}));

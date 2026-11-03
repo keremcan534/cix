@@ -12,7 +12,7 @@ import { BOARDS, boardResult, boardTotal, optionOf, optionReturn, type BoardResu
 import { DRAW as ROCKET_DRAW, ROCKET_TARGETS, crashPoint, rocketMultiplier, rocketReturn } from '@/lib/crash-rocket';
 import { TREE_MAX, TREE_LABEL, playTree, treeReturn, type TreeSpin } from '@/lib/gold-tree';
 import { playSlot, slotMax, slotReturn, type SlotSpin } from '@/lib/line-slot';
-import { OLYMPUS_MAX, OSYMBOLS, olympusReturn, playOlympus, type OlympusRound } from '@/lib/olympus-slot';
+import { FENER_MAX, fenerReturn, playFener, type FenerRound } from '@/lib/fener-slot';
 import { SLOT_CONFIGS } from '@/lib/slot-configs';
 
 export const CASINO_HOUSE_SHARE = 0.6;
@@ -37,7 +37,7 @@ export type Outcome = {
   detail: string;
   fortune?: FortuneRound;
   slot?: SlotSpin;
-  olympus?: OlympusRound;
+  fener?: FenerRound;
   caught?: boolean;
   rocket?: { crash: number; target: number };
   tree?: TreeSpin;
@@ -125,16 +125,16 @@ export function outcomeOf(game: CasinoId, pick: string, rnd: (n: number) => numb
     const r = boardResult(b, rnd(boardTotal(b)));
     return { display: [r.id], multiplier: r.pays.includes(pick) ? optionOf(b, pick)!.mult : 0, detail: `Sonuç: ${r.label} ${r.name}`, board: r };
   }
+  // 'olympus' is Fener Kayalığı's stored id (limits, history and the server key on it); the engine is lib/fener-slot.
   if (game === 'olympus') {
-    const round = playOlympus(rnd);
-    const top = round.base.wins[0];
+    const round = playFener(rnd);
+    const ships = round.base.grid[round.base.lit[0]].filter((c) => c.kind === 'ship').length;
     const detail = [
-      top ? `${OSYMBOLS[top.sym].emoji}×${top.count}` : 'kazanç yok',
-      round.base.orbs ? `küre ×${round.base.orbs}` : '',
-      round.free.length ? `${round.free.length} bedava dönüş` : '',
+      ships ? `ışıkta ${ships} gemi · parlaklık ×${round.base.brightness}` : 'ışıkta gemi yok',
+      round.storm.length ? `Fırtına Gecesi ${round.storm.length} dönüş` : '',
       `${Math.round(round.multiplier * 10) / 10}x`,
     ];
-    return { display: round.base.grid.flat().map((c) => c.sym), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), olympus: round };
+    return { display: round.base.grid.flat().map((c) => (c.kind === 'ship' ? `ship${c.cargo}` : c.kind)), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), fener: round };
   }
   if (game === 'fish') {
     const f = fishById(pick)!;
@@ -192,7 +192,7 @@ export function expectedReturn(game: CasinoId | 'duel', pick = ''): number {
   if (game === 'goldtree') return treeReturn();
   if (game === 'rocket') return rocketReturn(Number(pick));
   if (isBoard(game)) return optionReturn(BOARDS[game], pick);
-  if (game === 'olympus') return olympusReturn().total;
+  if (game === 'olympus') return fenerReturn().total;
   if (game === 'fish') return fishReturn(fishById(pick)!);
   let sum = 0;
   let n = 0;
@@ -210,7 +210,7 @@ export function maxMultiplier(game: CasinoId | 'duel', pick = ''): number {
   if (game === 'goldtree') return TREE_MAX;
   if (game === 'rocket') return Number(pick);
   if (isBoard(game)) return optionOf(BOARDS[game], pick)!.mult;
-  if (game === 'olympus') return OLYMPUS_MAX;
+  if (game === 'olympus') return FENER_MAX;
   if (game === 'fish') return fishById(pick)!.mult;
   let max = 0;
   for (const d of combos(DRAWS[game])) max = Math.max(max, evaluate(game, pick, d).multiplier);

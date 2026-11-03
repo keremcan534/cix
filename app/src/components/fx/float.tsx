@@ -2,13 +2,13 @@
 // small contact shadow, and on cards it is bigger than the card and breaks out over its top edge. Each item
 // gets its own hue, so a grid reads as a set of different things instead of one repeated tile.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { memo, useEffect, useState, type ReactNode } from 'react';
+import { Animated, Easing, Image, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { EdgeLight, Gloss, PressableScale } from '@/components/fx/surface';
-import { useApp } from '@/store';
-import { fonts } from '@/theme';
+import { useSettings } from '@/store';
+import { fonts, makeStyles, useTheme } from '@/theme';
 
 const GLOW = require('../../../assets/fx/glow.png');
 
@@ -19,8 +19,11 @@ export const hueAt = (i: number) => HUES[i % HUES.length];
 export type IconSource = { source?: number; emoji?: string };
 
 /** A 3D icon (or emoji) floating on its own light. `bob` lets it hover gently (off with reduceMotion). */
-export function FloatIcon({ source, emoji, size = 48, hue = HUES[3], bob = false, delay = 0 }: IconSource & { size?: number; hue?: string; bob?: boolean; delay?: number }) {
-  const { settings } = useApp();
+// Memoized: plain-value props; settings come from their own context.
+export const FloatIcon = memo(FloatIconBase);
+function FloatIconBase({ source, emoji, size = 48, hue = HUES[3], bob = false, delay = 0 }: IconSource & { size?: number; hue?: string; bob?: boolean; delay?: number }) {
+  const settings = useSettings();
+  const s = useStyles();
   const still = !bob || settings.reduceMotion;
   const [t] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -54,6 +57,7 @@ export function FloatIcon({ source, emoji, size = 48, hue = HUES[3], bob = false
 
 /** A pool of colored light centered behind a `size` box (place it first inside that box). */
 export function Halo({ size, hue, strength = 0.5 }: { size: number; hue: string; strength?: number }) {
+  const s = useStyles();
   const g = size * 2.1;
   return <Image source={GLOW} style={[s.glow, { width: g, height: g, left: (size - g) / 2, top: (size - g) / 2, tintColor: hue, opacity: strength }]} />;
 }
@@ -85,15 +89,17 @@ export function BreakoutCard({
   delay?: number;
   children: ReactNode;
 }) {
+  const { dark } = useTheme();
+  const s = useStyles();
   const lift = iconSize * (featured ? 0.3 : 0.42);
   return (
     <PressableScale onPress={onPress} accessibilityLabel={label} accessibilityRole="button" style={[{ marginTop: lift }, dim && { opacity: 0.5 }, style]}>
       <LinearGradient
-        colors={[`${hue}59`, `${hue}14`, '#101C30']}
+        colors={[`${hue}59`, `${hue}14`, dark ? '#101C30' : '#FFFFFF']}
         locations={[0, 0.45, 1]}
         start={{ x: featured ? 1 : 0, y: 0 }}
         end={{ x: featured ? 0.1 : 0.7, y: 1 }}
-        style={[s.card, { borderColor: `${hue}40`, boxShadow: `0 10px 24px rgba(0,0,0,0.4), 0 0 18px ${hue}22` }, featured ? { paddingRight: iconSize * 0.8, minHeight: iconSize * 0.95 } : { paddingTop: iconSize - lift + 2 }]}
+        style={[s.card, { borderColor: `${hue}40`, boxShadow: `${dark ? '0 10px 24px rgba(0,0,0,0.4)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 18px ${hue}22` }, featured ? { paddingRight: iconSize * 0.8, minHeight: iconSize * 0.95 } : { paddingTop: iconSize - lift + 2 }]}
       >
         <EdgeLight inset={18} strength={0.4} />
         {children}
@@ -107,7 +113,9 @@ export function BreakoutCard({
 
 /** The primary call to action on a card: glossy, lit, in the display face. */
 export function GlossButton({ label, tone = 'money', small, icon }: { label: string; tone?: 'money' | 'action' | 'locked'; small?: boolean; /** Drawn before the label, e.g. a coin. */ icon?: ReactNode }) {
-  const look = TONES[tone];
+  const { dark } = useTheme();
+  const s = useStyles();
+  const look = (dark ? TONES : LIGHT_TONES)[tone];
   return (
     <LinearGradient colors={look.colors} style={[s.btn, small && s.btnSmall, tone !== 'locked' && { boxShadow: `0 4px 14px ${look.glow}` }]}>
       {tone !== 'locked' && <Gloss strength={0.2} />}
@@ -121,14 +129,17 @@ const TONES = {
   action: { colors: ['#6FF1F5', '#0FB8BE'] as const, ink: '#04161D', glow: 'rgba(19,217,223,0.45)' },
   locked: { colors: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.05)'] as const, ink: '#C7D2E5', glow: 'transparent' },
 };
+// The locked key is a faint wash of the scheme's ink; the bright fills look the same in both schemes.
+const LIGHT_TONES = { ...TONES, locked: { colors: ['rgba(11,26,46,0.08)', 'rgba(11,26,46,0.04)'] as const, ink: '#566580', glow: 'transparent' } };
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ dark }) => ({
   glow: { position: 'absolute', pointerEvents: 'none' },
-  contact: { position: 'absolute', alignSelf: 'center', borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.22)', boxShadow: '0 0 10px 5px rgba(0,0,0,0.28)' },
+  // The contact shadow is softer and navy on paper, where a black blot would look muddy.
+  contact: { position: 'absolute', alignSelf: 'center', borderRadius: 999, backgroundColor: dark ? 'rgba(0,0,0,0.22)' : 'rgba(16,36,64,0.12)', boxShadow: dark ? '0 0 10px 5px rgba(0,0,0,0.28)' : '0 0 10px 5px rgba(16,36,64,0.10)' },
   emoji: { textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 6 },
   card: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 6 },
   icon: { position: 'absolute', pointerEvents: 'none' },
   btn: { flexDirection: 'row', gap: 4, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', alignSelf: 'flex-start' },
   btnSmall: { paddingHorizontal: 14, paddingVertical: 5 },
   btnText: { fontFamily: fonts.displayBold, fontSize: 15, lineHeight: 21 },
-});
+}));

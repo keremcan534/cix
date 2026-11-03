@@ -1,5 +1,5 @@
-// Kabile (tribe/family) mock data + a small module-level progress store for the Kabile screens
-// (Görev Merkezi, Kasa, İlişki Meydanı, Sohbet). In production this lives on the server; here it is
+// Tayfa (crew; code name kabile) mock data + a small module-level progress store for the Tayfa screens
+// (Görevler, Kasa, Uyum Köşesi, Sohbet). In production this lives on the server; here it is
 // kept in memory so all Kabile screens see the same task progress without touching the app store.
 import type { Href } from 'expo-router';
 import { useSyncExternalStore } from 'react';
@@ -37,8 +37,8 @@ export type KabileMeta = {
   keep: number; // level-keeping progress this season
   weeklyPower: number;
   weeklyRank: number;
-  treasure: number; // Kabile Hazinesi (🔮)
-  chestValue: number; // Kabile Kasası value (🪙) distributed at the weekly close
+  treasure: number; // Tayfa Sandığı (🔮)
+  chestValue: number; // Tayfa Kasası value (🪙) distributed at the weekly close
   announcement: string;
   tags: { emoji: string; label: string }[];
   roomId: string;
@@ -55,15 +55,15 @@ const DEFAULT_META: KabileMeta = {
   weeklyRank: 0,
   treasure: 0,
   chestValue: 2_000,
-  announcement: 'Kabilemize hoş geldin! Günlük görevleri birlikte tamamlayalım 💜',
-  tags: [{ emoji: '🌱', label: 'Yeni Kabile' }],
+  announcement: 'Tayfamıza hoş geldin! Günlük görevleri birlikte tamamlayalım 💜',
+  tags: [{ emoji: '🌱', label: 'Yeni Tayfa' }],
   roomId: 'r1',
   online: 1,
 };
 
 export const KABILE_META: Record<string, KabileMeta> = {
-  f1: { tagId: 1_376_746, badge: 'Gece', multiplier: 3_114, power: 1_469_435, keep: 60_000, weeklyPower: 57_635, weeklyRank: 27, treasure: 166_523, chestValue: 220_998, announcement: 'Bu hafta hedefimiz bir üst seviye! Kabile odasında her Cuma 21:00 buluşuyoruz 🌙', tags: [{ emoji: '🎁', label: 'Premium Sandık' }, { emoji: '💬', label: 'Sohbet Tutkunu' }, { emoji: '💞', label: 'Çift Dolu' }], roomId: 'r1', online: 15 },
-  f2: { tagId: 1_208_310, badge: 'Karaoke', multiplier: 1_870, power: 842_500, keep: 41_200, weeklyPower: 38_420, weeklyRank: 41, treasure: 98_210, chestValue: 120_400, announcement: 'Her akşam 22:00 karaoke sırası kabile odasında 🎤', tags: [{ emoji: '🎤', label: 'Karaoke' }, { emoji: '🎶', label: 'Müzik Sever' }], roomId: 'r2', online: 9 },
+  f1: { tagId: 1_376_746, badge: 'Gece', multiplier: 3_114, power: 1_469_435, keep: 60_000, weeklyPower: 57_635, weeklyRank: 27, treasure: 166_523, chestValue: 220_998, announcement: 'Bu hafta hedefimiz bir üst seviye! Tayfa odasında her Cuma 21:00 buluşuyoruz 🌙', tags: [{ emoji: '🎁', label: 'Premium Sandık' }, { emoji: '💬', label: 'Sohbet Tutkunu' }, { emoji: '💞', label: 'Çift Dolu' }], roomId: 'r1', online: 15 },
+  f2: { tagId: 1_208_310, badge: 'Karaoke', multiplier: 1_870, power: 842_500, keep: 41_200, weeklyPower: 38_420, weeklyRank: 41, treasure: 98_210, chestValue: 120_400, announcement: 'Her akşam 22:00 karaoke sırası tayfa odasında 🎤', tags: [{ emoji: '🎤', label: 'Karaoke' }, { emoji: '🎶', label: 'Müzik Sever' }], roomId: 'r2', online: 9 },
   f3: { tagId: 1_154_022, badge: 'Kurt', multiplier: 940, power: 515_200, keep: 22_000, weeklyPower: 21_900, weeklyRank: 63, treasure: 54_800, chestValue: 61_300, announcement: 'Quiz turnuvası Pazar 20:00 · herkes takımını kursun 🐺', tags: [{ emoji: '🎮', label: 'Oyuncu' }, { emoji: '🧠', label: 'Quiz' }], roomId: 'r3', online: 6 },
   f4: { tagId: 1_098_455, badge: 'İstanbul', multiplier: 410, power: 230_900, keep: 12_500, weeklyPower: 9_800, weeklyRank: 112, treasure: 21_450, chestValue: 24_900, announcement: 'Yeni üyelerimize hoş geldin hediyesi göndermeyi unutmayın 🌉', tags: [{ emoji: '🌉', label: 'Şehir' }, { emoji: '☕', label: 'Sohbet' }], roomId: 'r4', online: 4 },
 };
@@ -78,18 +78,18 @@ export const kabileMemberIds = (f: KabileFamily) => {
 
 // --- Power tiers (season power) ---------------------------------------------
 export const POWER_TIERS = [
-  { name: 'Bronz I', min: 0 },
-  { name: 'Bronz II', min: 10_000 },
-  { name: 'Gümüş I', min: 40_000 },
-  { name: 'Gümüş II', min: 90_000 },
-  { name: 'Altın I', min: 160_000 },
-  { name: 'Altın II', min: 260_000 },
-  { name: 'Elmas I', min: 400_000 },
-  { name: 'Elmas II', min: 600_000 },
-  { name: 'Destansı I', min: 900_000 },
-  { name: 'Destansı II', min: 1_200_000 },
-  { name: 'Destansı III', min: 1_523_000 },
-  { name: 'Efsane', min: 2_000_000 },
+  { name: 'Sandal I', min: 0 },
+  { name: 'Sandal II', min: 10_000 },
+  { name: 'Kayık I', min: 40_000 },
+  { name: 'Kayık II', min: 90_000 },
+  { name: 'Yelkenli I', min: 160_000 },
+  { name: 'Yelkenli II', min: 260_000 },
+  { name: 'Gulet I', min: 400_000 },
+  { name: 'Gulet II', min: 600_000 },
+  { name: 'Fırkateyn I', min: 900_000 },
+  { name: 'Fırkateyn II', min: 1_200_000 },
+  { name: 'Fırkateyn III', min: 1_523_000 },
+  { name: 'Kalyon', min: 2_000_000 },
 ];
 export const KEEP_GOAL = 60_000; // weekly power needed to keep the current tier
 export const powerTier = (power: number) => {
@@ -98,7 +98,7 @@ export const powerTier = (power: number) => {
   return { tier: POWER_TIERS[i], next: POWER_TIERS[i + 1] ?? null };
 };
 
-// --- Treasury (🔮 Kabile Hazinesi) chest levels by total treasure -----------
+// --- Treasury (🔮 Tayfa Sandığı) chest levels by total treasure -----------
 export const TREASURY_LEVELS = [0, 20_000, 50_000, 100_000, 160_000, 429_108, 700_000, 1_000_000];
 export const treasuryLevel = (treasure: number) => {
   let lvl = 1;
@@ -107,7 +107,7 @@ export const treasuryLevel = (treasure: number) => {
   return { lvl, next };
 };
 
-/** Kabile Kasası: if weekly power reaches the goal, the chest value is split by contribution. */
+/** Tayfa Kasası: if weekly power reaches the goal, the chest value is split by contribution. */
 export const KASA_GOAL = 50_000;
 
 // --- Weekly milestone chests (FIXED rewards, never random) -------------------
@@ -115,8 +115,8 @@ export type ChestReward = { coins: number; item?: { label: string; days: number 
 export const KABILE_CHESTS: { id: string; emoji: string; name: string; need: number; reward: ChestReward }[] = [
   { id: 'c1', emoji: '🟫', name: 'Ahşap Sandık', need: 10_000, reward: { coins: 20 } },
   { id: 'c2', emoji: '🟩', name: 'Yeşil Sandık', need: 25_000, reward: { coins: 50 } },
-  { id: 'c3', emoji: '🟦', name: 'Mavi Sandık', need: 50_000, reward: { coins: 50, item: { label: 'Kabile çerçevesi', days: 3 } } },
-  { id: 'c4', emoji: '🟥', name: 'Kırmızı Sandık', need: 80_000, reward: { coins: 100, item: { label: 'Kabile sohbet balonu', days: 7 } } },
+  { id: 'c3', emoji: '🟦', name: 'Mavi Sandık', need: 50_000, reward: { coins: 50, item: { label: 'Tayfa çerçevesi', days: 3 } } },
+  { id: 'c4', emoji: '🟥', name: 'Kırmızı Sandık', need: 80_000, reward: { coins: 100, item: { label: 'Tayfa sohbet balonu', days: 7 } } },
 ];
 export const chestRewardText = (r: ChestReward) => `${r.coins} 🪙${r.item ? ` + ${r.item.label} (${r.item.days} gün)` : ''}`;
 /** At least this much personal power this week is needed to open milestone chests. */
@@ -138,7 +138,7 @@ export const contribLevel = (power: number) => {
 
 // --- Daily tasks -------------------------------------------------------------
 // 'count' tasks finish at `goal`; 'rate' tasks give `power` for every `per` coins, unlimited.
-// `source` says how progress is measured (see the Görev Merkezi screen).
+// `source` says how progress is measured (see the Görevler screen).
 export type TaskSource = 'chatMsgs' | 'roomMinutes' | 'giftsSent' | 'checkIn' | 'roomGiftCoins' | 'cpGiftCoins' | 'chatGiftCoins';
 export type KabileTask = {
   id: string;
@@ -154,20 +154,20 @@ export type KabileTask = {
   doneCount: number;
 };
 export const KABILE_TASKS: KabileTask[] = [
-  { id: 'k-chat', emoji: '💬', title: 'Kabile sohbet grubuna mesaj at', source: 'chatMsgs', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u1', 'u5', 'u7', 'u11', 'u2'], doneCount: 21 },
-  { id: 'k-room', emoji: '🎙️', title: 'Kabile odasında 15 dakika kal', source: 'roomMinutes', kind: 'count', goal: 15, per: 0, power: 1, treasure: 1, doneBy: ['u2', 'u4', 'u9', 'u7', 'u12'], doneCount: 18 },
-  { id: 'k-newbie', emoji: '🎁', title: 'Kabileye yeni katılan üyeye hediye gönder', source: 'giftsSent', kind: 'count', goal: 1, per: 0, power: 3, treasure: 3, doneBy: ['u5', 'u11', 'u1', 'u9'], doneCount: 10 },
-  { id: 'k-checkin', emoji: '📅', title: 'Kabile yoklamasına katıl', source: 'checkIn', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u4', 'u7', 'u1', 'u2', 'u11'], doneCount: 17 },
-  { id: 'k-roomgift', emoji: '🎉', title: 'Kabile odasında hediye gönder', source: 'roomGiftCoins', kind: 'rate', goal: 0, per: 500, power: 2, treasure: 2, doneBy: ['u1', 'u11'], doneCount: 6 },
-  { id: 'k-cp', emoji: '💞', title: 'Kabile üyeleriyle çift (CP) kur ve CP hediyesi gönder', source: 'cpGiftCoins', kind: 'rate', goal: 0, per: 350, power: 2, treasure: 2, doneBy: ['u5', 'u9'], doneCount: 4 },
-  { id: 'k-chatgift', emoji: '💌', title: 'Kabile sohbetinde hediye gönder', source: 'chatGiftCoins', kind: 'rate', goal: 0, per: 400, power: 2, treasure: 2, doneBy: ['u7'], doneCount: 3 },
+  { id: 'k-chat', emoji: '💬', title: 'Tayfa sohbetine mesaj at', source: 'chatMsgs', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u1', 'u5', 'u7', 'u11', 'u2'], doneCount: 21 },
+  { id: 'k-room', emoji: '🎙️', title: 'Tayfa odasında 15 dakika kal', source: 'roomMinutes', kind: 'count', goal: 15, per: 0, power: 1, treasure: 1, doneBy: ['u2', 'u4', 'u9', 'u7', 'u12'], doneCount: 18 },
+  { id: 'k-newbie', emoji: '🎁', title: 'Tayfaya yeni katılan üyeye hediye gönder', source: 'giftsSent', kind: 'count', goal: 1, per: 0, power: 3, treasure: 3, doneBy: ['u5', 'u11', 'u1', 'u9'], doneCount: 10 },
+  { id: 'k-checkin', emoji: '📅', title: 'Tayfa yoklamasına katıl', source: 'checkIn', kind: 'count', goal: 1, per: 0, power: 1, treasure: 1, doneBy: ['u4', 'u7', 'u1', 'u2', 'u11'], doneCount: 17 },
+  { id: 'k-roomgift', emoji: '🎉', title: 'Tayfa odasında hediye gönder', source: 'roomGiftCoins', kind: 'rate', goal: 0, per: 500, power: 2, treasure: 2, doneBy: ['u1', 'u11'], doneCount: 6 },
+  { id: 'k-cp', emoji: '💞', title: 'Tayfa üyelerinden biriyle ikili kur ve İkili hediyesi gönder', source: 'cpGiftCoins', kind: 'rate', goal: 0, per: 350, power: 2, treasure: 2, doneBy: ['u5', 'u9'], doneCount: 4 },
+  { id: 'k-chatgift', emoji: '💌', title: 'Tayfa sohbetinde hediye gönder', source: 'chatGiftCoins', kind: 'rate', goal: 0, per: 400, power: 2, treasure: 2, doneBy: ['u7'], doneCount: 3 },
 ];
 /** Gifts that can be sent in the kabile chat (fixed price, no random rewards). */
 export const CHAT_GIFT_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
-/** Couple (CP) gifts offered in İlişki Meydanı. */
+/** Pair (İkili) gifts offered in Uyum Köşesi. */
 export const CP_GIFT_IDS = ['c9', 'c12', 'c1'];
 
-// --- İlişki Meydanı ---------------------------------------------------------
+// --- Uyum Köşesi ---------------------------------------------------------
 export type Pair = { a: string; b: string; level: number; score: number };
 export const KABILE_COUPLES: Pair[] = [
   { a: 'u2', b: 'u1', level: 27, score: 126_510 },
@@ -196,10 +196,10 @@ export const KABILE_THEMES: { id: string; name: string; colors: readonly [string
 // --- Mock weekly contribution (power) per member -------------------------------
 export const memberPower = (id: string, i: number) => (id === 'me' ? 0 : Math.max(40, Math.round(((i * 7_919) % 97) * 61 + 300 - i * 37)));
 export const KASA_HISTORY_MOCK = [
-  { id: 'h1', userId: 'u1', text: 'Kabile odasında hediye', power: 24, treasure: 24, time: 'Bugün 14:20' },
+  { id: 'h1', userId: 'u1', text: 'Tayfa odasında hediye', power: 24, treasure: 24, time: 'Bugün 14:20' },
   { id: 'h2', userId: 'u5', text: 'Yoklama', power: 1, treasure: 1, time: 'Bugün 12:05' },
-  { id: 'h3', userId: 'u11', text: 'CP hediyesi', power: 12, treasure: 12, time: 'Dün 23:41' },
-  { id: 'h4', userId: 'u2', text: 'Kabile odasında 15 dakika', power: 1, treasure: 1, time: 'Dün 22:10' },
+  { id: 'h3', userId: 'u11', text: 'İkili hediyesi', power: 12, treasure: 12, time: 'Dün 23:41' },
+  { id: 'h4', userId: 'u2', text: 'Tayfa odasında 15 dakika', power: 1, treasure: 1, time: 'Dün 22:10' },
 ];
 
 // --- Module-level progress store ------------------------------------------------

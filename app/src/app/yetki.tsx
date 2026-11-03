@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -25,7 +25,7 @@ import {
 } from '@/data/rbac';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 type Tab = 'roles' | 'assign' | 'check' | 'mod' | 'audit' | 'model';
 const TABS: [Tab, string][] = [
@@ -53,6 +53,8 @@ export default function RoleCenter() {
   const { rbac, updateRbac } = useApp();
   const [tab, setTab] = useState<Tab>('roles');
   const [actor, setActor] = useState('me');
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Rol ve Yetki Merkezi" />
@@ -92,6 +94,8 @@ function Roles({ rbac, update, actor }: Props) {
   const [draft, setDraft] = useState<Role | null>(role ? { ...role } : null);
   const [newName, setNewName] = useState('');
   const [spec, setSpec] = useState<string | null>(null);
+  const { colors } = useTheme();
+  const styles = useStyles();
 
   const pick = (id: string) => {
     setSel(id);
@@ -140,7 +144,7 @@ function Roles({ rbac, update, actor }: Props) {
     <>
       <View style={styles.card}>
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-          <Ionicons name="options-outline" size={22} color="#fff" />
+          <Ionicons name="options-outline" size={22} color={colors.text} />
           <View style={{ flex: 1 }}>
             <Text style={styles.h1}>Rol ve Yetki Merkezi</Text>
             <Text style={styles.dim}>Roller, izinler, kapsamlar ve atamalar tek noktadan yönetilir.</Text>
@@ -149,7 +153,7 @@ function Roles({ rbac, update, actor }: Props) {
         <Text style={styles.label}>Rol seç</Text>
         {rbac.roles.map((r) => (
           <Pressable key={r.id} style={styles.optRow} onPress={() => pick(r.id)} accessibilityLabel={`Rol ${r.name}`}>
-            <Ionicons name={sel === r.id ? 'radio-button-on' : 'radio-button-off'} size={24} color={sel === r.id ? '#fff' : colors.textDim} />
+            <Ionicons name={sel === r.id ? 'radio-button-on' : 'radio-button-off'} size={24} color={sel === r.id ? colors.text : colors.textDim} />
             <Text style={styles.optText}>{r.name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {r.protected && <Ionicons name="lock-closed" size={12} color={colors.textDim} accessibilityLabel="Korumalı" />}
@@ -178,7 +182,7 @@ function Roles({ rbac, update, actor }: Props) {
             return (
               <View key={p.key} style={styles.optRow}>
                 <Pressable onPress={() => togglePerm(p.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} accessibilityLabel={`İzin ${p.label}`} disabled={draft.protected}>
-                  <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={26} color={on ? '#fff' : colors.textDim} />
+                  <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={26} color={on ? colors.text : colors.textDim} />
                   <Text style={[styles.optText, denied && { color: colors.red, textDecorationLine: 'line-through' }]}>{p.label}</Text>
                 </Pressable>
                 {p.critical && <Text style={styles.critical}>Kritik</Text>}
@@ -200,7 +204,7 @@ function Roles({ rbac, update, actor }: Props) {
               <Pressable onPress={() => !draft.protected && setDraft({ ...draft, priority: Math.max(1, draft.priority - 10) })}>
                 <Ionicons name="remove-circle" size={26} color={colors.textDim} />
               </Pressable>
-              <Text style={{ color: '#fff', fontWeight: '800', width: 34, textAlign: 'center' }}>{draft.priority}</Text>
+              <Text style={{ color: colors.text, fontWeight: '800', width: 34, textAlign: 'center' }}>{draft.priority}</Text>
               <Pressable onPress={() => !draft.protected && setDraft({ ...draft, priority: Math.min(99, draft.priority + 10) })}>
                 <Ionicons name="add-circle" size={26} color={colors.primaryText} />
               </Pressable>
@@ -218,7 +222,7 @@ function Roles({ rbac, update, actor }: Props) {
             {draft.protected && <Ionicons name="lock-closed" size={14} color="#fff" />}
             <Text style={styles.primaryText}>{draft.protected ? 'Korumalı rol' : 'Kaydet'}</Text>
           </Pressable>
-          <Pressable style={[styles.primaryBtn, { backgroundColor: '#fff' }]} onPress={() => setSpec(roleSpec(draft))} accessibilityLabel="Teknik şartname">
+          <Pressable style={[styles.primaryBtn, styles.specBtn]} onPress={() => setSpec(roleSpec(draft))} accessibilityLabel="Teknik şartname">
             <Text style={[styles.primaryText, { color: '#111' }]}>Seçimi teknik şartnameye dönüştür</Text>
           </Pressable>
           {!role?.system && (
@@ -246,6 +250,7 @@ function Roles({ rbac, update, actor }: Props) {
 
 // --- Assignments (user_roles + role_scopes) ------------------------------------------
 function ScopePicker({ types, value, onChange }: { types: ScopeType[]; value: Scope; onChange: (s: Scope) => void }) {
+  const styles = useStyles();
   const targets = value.type === 'region' ? REGIONS.map((r) => ({ id: r.id, name: r.name })) : value.type === 'agency' ? AGENCIES.map((a) => ({ id: a.id, name: a.name })) : value.type === 'room' ? ROOMS.map((r) => ({ id: r.id, name: r.title })) : [];
   return (
     <>
@@ -271,6 +276,8 @@ function Assignments({ rbac, update, actor }: Props) {
   const role = rbac.roles.find((r) => r.id === roleId) ?? rbac.roles[0];
   const [scope, setScope] = useState<Scope>({ type: 'region', id: 'marmara' });
   const validScope = role.scopeTypes.includes(scope.type) ? scope : { type: role.scopeTypes[0] } as Scope;
+  const { colors } = useTheme();
+  const styles = useStyles();
 
   const assign = () => {
     const { d, entry } = guard(rbac, actor, 'roles.edit', PLATFORM, 'Rol atama', `${userName(user)} → ${role.name} (${scopeName(validScope)})`);
@@ -305,7 +312,7 @@ function Assignments({ rbac, update, actor }: Props) {
               .filter((u) => u.userId === uid)
               .map((u) => (
                 <View key={u.id} style={styles.assignRow}>
-                  <Text style={{ color: '#fff', flex: 1 }}>
+                  <Text style={{ color: colors.text, flex: 1 }}>
                     {rbac.roles.find((r) => r.id === u.roleId)?.name} · {scopeName(u.scope)}
                   </Text>
                   <Text style={styles.dim}>{u.grantedBy}</Text>
@@ -348,6 +355,8 @@ function Checker({ rbac }: { rbac: RbacState }) {
   const [perm, setPerm] = useState<PermissionKey>('users.ban');
   const [scope, setScope] = useState<Scope>({ type: 'room', id: 'r1' });
   const d = resolve(rbac, user, perm, scope);
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.card}>
       <Text style={styles.h2}>Bu kullanıcı bu işlemi yapabilir mi?</Text>
@@ -379,6 +388,8 @@ function Moderation({ rbac, update, actor }: Props) {
   const [scope, setScope] = useState<Scope>({ type: 'room', id: 'r1' });
   const [duration, setDuration] = useState('24 sa');
   const [reason, setReason] = useState('');
+  const { colors } = useTheme();
+  const styles = useStyles();
   const apply = () => {
     if (reason.trim().length < 3) return showAlert('Gerekçe gerekli', 'Moderasyon işlemleri gerekçe ile kaydedilir.');
     const perm: PermissionKey = action === 'Ban' ? 'users.ban' : 'users.mute';
@@ -424,7 +435,7 @@ function Moderation({ rbac, update, actor }: Props) {
         <Text style={styles.h2}>moderation_actions</Text>
         {rbac.moderation.length === 0 && <Text style={styles.dim}>Henüz kayıt yok.</Text>}
         {rbac.moderation.map((m) => (
-          <Text key={m.id} style={[styles.dim, { color: m.result === 'Uygulandı' ? '#fff' : colors.red }]}>
+          <Text key={m.id} style={[styles.dim, { color: m.result === 'Uygulandı' ? colors.text : colors.red }]}>
             {m.at} · {m.actor} → {userName(m.userId)} · {m.action} {m.duration} · {scopeName(m.scope)} · “{m.reason}” · {m.result}
           </Text>
         ))}
@@ -434,13 +445,15 @@ function Moderation({ rbac, update, actor }: Props) {
 }
 
 function Audit({ rbac }: { rbac: RbacState }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.card}>
       <Text style={styles.h2}>permission_audit_logs</Text>
       {rbac.audit.length === 0 && <Text style={styles.dim}>Henüz kayıt yok. Rol, izin ve atama değişiklikleri (reddedilen denemeler dahil) burada görünür.</Text>}
       {rbac.audit.map((a) => (
         <View key={a.id} style={{ gap: 2, paddingVertical: 4 }}>
-          <Text style={{ color: a.result === 'Uygulandı' ? '#fff' : colors.red, fontWeight: '700' }}>
+          <Text style={{ color: a.result === 'Uygulandı' ? colors.text : colors.red, fontWeight: '700' }}>
             {a.result === 'Uygulandı' ? '✓' : '✕'} {a.action} · {a.target}
           </Text>
           <Text style={styles.dim}>
@@ -463,6 +476,8 @@ const TABLES: [string, string, string][] = [
   ['permissions (kod)', 'key, label, group, critical, min_scope', 'İşlem türleri kataloğu: yeni işlem türü yazılım desteği gerektirir.'],
 ];
 function DataModel() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <>
       <View style={styles.card}>
@@ -487,35 +502,44 @@ function DataModel() {
 }
 
 function Chip({ on, label, onPress, strong }: { on: boolean; label: string; onPress: () => void; strong?: boolean }) {
+  const styles = useStyles();
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on && { backgroundColor: strong ? '#fff' : colors.primary }]} accessibilityLabel={label}>
-      <Text style={[styles.chipText, on && strong && { color: '#111' }]}>{label}</Text>
+    <Pressable onPress={onPress} style={[styles.chip, on && (strong ? styles.chipStrongOn : styles.chipOn)]} accessibilityLabel={label}>
+      <Text style={[styles.chipText, on && (strong ? styles.chipStrongTextOn : styles.chipTextOn)]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+// The light scheme inverts the dark one's monochrome accents: white pills and buttons on night blue become navy
+// ones on white, so the selected tab and the main button keep the same weight.
+const useStyles = makeStyles(({ colors, lift, dark, ink }) => ({
   actorBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 44 },
-  card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 10 },
-  h1: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  h2: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 10, ...lift },
+  h1: { color: colors.text, fontSize: 20, fontWeight: '900' },
+  h2: { color: colors.text, fontSize: 17, fontWeight: '800' },
   label: { color: colors.textDim, fontWeight: '700', marginTop: 4 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   note: { color: colors.textDim, fontSize: 12, textAlign: 'center' },
   optRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
-  optText: { color: '#fff', fontSize: 16, flexShrink: 1 },
+  optText: { color: colors.text, fontSize: 16, flexShrink: 1 },
   critical: { color: colors.gold, fontSize: 11, fontWeight: '800', borderWidth: 1, borderColor: colors.gold, borderRadius: 6, paddingHorizontal: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  chipText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  input: { backgroundColor: colors.cardAlt, borderRadius: 12, color: '#fff', paddingHorizontal: 12, paddingVertical: 9 },
+  // Light: a white chip with a hairline, the pale fill alone melts into the paper.
+  chip: { backgroundColor: dark ? colors.cardAlt : colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, ...(dark ? {} : { borderWidth: 1, borderColor: ink(0.12) }) },
+  chipOn: { backgroundColor: colors.primary, ...(dark ? {} : { borderColor: colors.primary }) },
+  chipStrongOn: { backgroundColor: dark ? '#fff' : colors.text, ...(dark ? {} : { borderColor: colors.text }) },
+  chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
+  chipTextOn: { color: '#fff' },
+  chipStrongTextOn: { color: dark ? '#111' : '#fff' },
+  input: { backgroundColor: colors.cardAlt, borderRadius: 12, color: colors.text, paddingHorizontal: 12, paddingVertical: 9 },
   smallBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   smallBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   summary: { backgroundColor: colors.cardAlt, borderRadius: 16, padding: 14, gap: 6 },
-  sumText: { color: '#fff', fontSize: 14 },
-  primaryBtn: { backgroundColor: '#18181B', borderRadius: 999, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  sumText: { color: colors.text, fontSize: 14 },
+  primaryBtn: { backgroundColor: dark ? '#18181B' : colors.text, borderRadius: 999, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center', borderWidth: 1, borderColor: dark ? colors.border : colors.text },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  specBtn: { backgroundColor: '#fff', borderColor: colors.border },
   assignRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 8 },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10, paddingBottom: 30 },
-  mono: { color: '#E4E4E7', fontFamily: 'monospace', fontSize: 12, lineHeight: 18 },
-});
+  mono: { color: dark ? '#E4E4E7' : colors.text, fontFamily: 'monospace', fontSize: 12, lineHeight: 18 },
+}));

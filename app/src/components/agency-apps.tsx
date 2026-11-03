@@ -80,7 +80,7 @@ export function Field({
           accessibilityLabel={label}
           style={[s.input, multiline && { minHeight: 84, textAlignVertical: 'top' }, { flex: 1, minWidth: 0 }]}
         />
-        {right && <View style={{ flexShrink: 0 }}>{right}</View>}
+        {right ? <View style={{ flexShrink: 0 }}>{right}</View> : null}
       </View>
       {hint && <Text style={s.dim}>{hint}</Text>}
     </View>
@@ -106,10 +106,11 @@ export function Chips<T extends string>({ options, value, onChange, wrap = true 
 }
 
 export function KV({ k, v }: { k: string; v: string | ReactNode }) {
+  // A number outside <Text> closes the app on a phone, so plain values always go in a Text.
   return (
     <View style={s.kv}>
       <Text style={s.kvKey}>{k}</Text>
-      {typeof v === 'string' ? <Text style={s.kvVal}>{v || '—'}</Text> : <View style={{ flex: 1 }}>{v}</View>}
+      {typeof v === 'string' || typeof v === 'number' ? <Text style={s.kvVal}>{v === '' ? '—' : v}</Text> : <View style={{ flex: 1 }}>{v}</View>}
     </View>
   );
 }

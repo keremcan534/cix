@@ -1,5 +1,6 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -7,7 +8,7 @@ import { Card, GradientButton, Header } from '@/components/ui';
 import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 // "TR12 0006 ..." grouping for readability.
 const formatIban = (raw: string) => {
@@ -16,12 +17,15 @@ const formatIban = (raw: string) => {
 };
 
 export default function Withdraw() {
-  const { diamonds, requestWithdraw, withdrawals } = useApp();
+  // Only the withdrawable part can be paid out; locked diamonds (lib/diamond-locks) wait for their lock.
+  const { withdrawableDiamonds: diamonds, lockedDiamonds: locked, requestWithdraw, withdrawals } = useApp();
   const [amount, setAmount] = useState(String(Math.max(RULES.minWithdrawDiamonds, Math.floor(diamonds / 1000) * 1000)));
   const [iban, setIban] = useState('TR');
   const [name, setName] = useState('');
   const n = Number(amount) || 0;
   const presets = [10_000, 20_000, 50_000].filter((p) => p <= diamonds);
+  const { colors } = useTheme();
+  const styles = useStyles();
 
   const submit = () => {
     if (name.trim().length < 3) return showAlert('Hata', 'Hesap sahibinin adını gir.');
@@ -38,6 +42,12 @@ export default function Withdraw() {
           <Text style={styles.dim}>Çekilebilir bakiye</Text>
           <Text style={styles.big}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
           <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas</Text>
+          {locked > 0 && (
+            <View style={styles.locked}>
+              <Ionicons name="lock-closed" size={12} color={colors.textDim} />
+              <Text style={styles.dim}>Ayrıca {locked.toLocaleString('tr-TR')} elmas kilitli; süresi dolunca buraya eklenir.</Text>
+            </View>
+          )}
         </Card>
 
         <Text style={styles.label}>Çekilecek elmas</Text>
@@ -65,11 +75,11 @@ export default function Withdraw() {
 
         {withdrawals.length > 0 && (
           <Card style={{ gap: 8 }}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Geçmiş talepler</Text>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>Geçmiş talepler</Text>
             {withdrawals.map((w) => (
               <View key={w.id} style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#fff' }}>{usd(w.diamonds)}</Text>
+                  <Text style={{ color: colors.text }}>{usd(w.diamonds)}</Text>
                   <Text style={styles.dim}>
                     {w.time} · {w.iban.slice(0, 7)}…
                   </Text>
@@ -84,13 +94,15 @@ export default function Withdraw() {
   );
 }
 
-const styles = StyleSheet.create({
+// Inputs and preset chips sit on the screen background: white with a soft lift in the light scheme.
+const useStyles = makeStyles(({ colors, lift, dark }) => ({
   dim: { color: colors.textDim, fontSize: 13 },
-  big: { color: '#fff', fontSize: 30, fontWeight: '900' },
+  big: { color: colors.text, fontSize: 30, fontWeight: '900' },
   label: { color: colors.textDim, fontWeight: '600', marginBottom: -6 },
-  input: { backgroundColor: colors.card, borderRadius: 14, color: '#fff', fontSize: 16, paddingHorizontal: 16, paddingVertical: 13 },
-  chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  chipText: { color: '#fff', fontWeight: '600' },
+  input: { backgroundColor: colors.card, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 16, paddingVertical: 13, ...lift },
+  chip: { backgroundColor: dark ? colors.cardAlt : colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, ...lift },
+  chipText: { color: colors.text, fontWeight: '600' },
   receive: { color: colors.green, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-});
+  locked: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+}));

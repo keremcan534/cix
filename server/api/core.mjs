@@ -132,8 +132,13 @@ export async function blockedBetween(a, b) {
 // --- Wallet ------------------------------------------------------------------------------------------------
 const COLUMN = { coin: 'coins', diamond: 'diamonds', game: 'game_coins' };
 
-/** Changes one balance and writes its ledger row. The CHECK on users refuses an overdraft (23514). */
-export async function move(c, userId, currency, amount, reason, ref, counterparty = null) {
+/**
+ * Changes one balance and writes its ledger row. The CHECK on users refuses an overdraft (23514). `channel`
+ * (where the coins came from, wallet.mjs CHANNELS), `actor` (who did it, when not the account itself) and
+ * `detail` (lots, purchase, transfer, gift…) are kept with the row. Coins go through wallet.mjs creditCoins /
+ * spendCoins, which keep the lots in step.
+ */
+export async function move(c, userId, currency, amount, reason, ref, counterparty = null, { channel = null, actor = null, detail = {} } = {}) {
   const col = COLUMN[currency];
   let balance;
   try {
@@ -143,7 +148,27 @@ export async function move(c, userId, currency, amount, reason, ref, counterpart
     if (e.code === '23514') throw new HttpError(409, 'Bakiye yetersiz');
     throw e;
   }
-  await c.query('INSERT INTO ledger (user_id, currency, amount, balance, reason, ref, counterparty) VALUES ($1,$2,$3,$4,$5,$6,$7)', [userId, currency, amount, balance, reason, ref, counterparty]);
+  await c.query('INSERT INTO ledger (user_id, currency, amount, balance, reason, ref, counterparty, channel, actor, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [
+    userId,
+    currency,
+    amount,
+    balance,
+    reason,
+    ref,
+    counterparty,
+    channel,
+    actor,
+    JSON.stringify(detail),
+  ]);
+}
+
+/**
+ * Inside a wallet change, once the account row is locked: a ref already in the ledger means a copy of this
+ * request got there first, so once() answers it as a replay instead of a false "not enough".
+ */
+export async function claimRef(c, userId, currency, ref) {
+  const r = await c.query('SELECT 1 FROM ledger WHERE user_id = $1 AND currency = $2 AND ref = $3', [userId, currency, ref]);
+  if (r.rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
 }
 
 /** Runs a wallet change once per ref: a repeated ref returns the current state with replay = true. */
@@ -181,6 +206,9 @@ export function limit(key, max, message = 'Çok fazla istek, biraz bekle') {
 }
 
 // --- Input -------------------------------------------------------------------------------------------------
+/** The caller's address: Caddy replaces X-Forwarded-For with the real client address, so its first entry can be trusted. */
+export const clientIp = (req) => String(req.headers['x-forwarded-for'] ?? req.socket?.remoteAddress ?? '').split(',')[0].trim().slice(0, 64);
+
 export const REF = /^[A-Za-z0-9_-]{8,64}$/;
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

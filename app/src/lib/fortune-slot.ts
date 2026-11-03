@@ -5,7 +5,7 @@
 //  - Each reel has a fixed strip; the server draws one stop per reel, uniformly. The window shows the stop and the
 //    two symbols after it (circular).
 //  - The stake is spread evenly over the 10 lines (line bet = bet / 10). A line pays when 3+ of the same symbol run
-//    from the leftmost reel; Servet (Wild) stands in for every symbol except Kasa. Wild never sits on reel 1, so a
+//    from the leftmost reel; Kese (Wild) stands in for every symbol except Kasa. Wild never sits on reel 1, so a
 //    line's symbol is always the one on reel 1.
 //  - 3+ Kasa anywhere on the base spin give FREE_SPINS free spins that pay FREE_MULT×. Kasa does nothing during
 //    free spins (no retrigger), so a round always ends.
@@ -27,7 +27,7 @@ export const SYMBOLS: Record<Sym, { name: string; emoji: string }> = {
   crown: { name: 'Taç', emoji: '👑' },
   car: { name: 'Spor Araba', emoji: '🏎️' },
   yacht: { name: 'Yat', emoji: '🛥️' },
-  wild: { name: 'Servet', emoji: '💰' },
+  wild: { name: 'Kese', emoji: '💰' },
   vault: { name: 'Kasa', emoji: '🏦' },
 };
 

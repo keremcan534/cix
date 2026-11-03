@@ -1,12 +1,13 @@
-// Shared pieces of the launch casino games (Gece Yarısı Çarkı, Hazine Kulesi, Şimşek Dağı, Mercan Avı): the balance pill, the
+// Shared pieces of the launch casino games (Gece Yarısı Çarkı, Hazine Kulesi, Fener Kayalığı, Mercan Avı): the balance pill, the
 // bet stepper and the round helpers. Rounds always go through playCasino (lib/games); these only show them.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
+import { Photo } from '@/components/photo';
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
@@ -18,7 +19,7 @@ export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
   const { me, coins, gameCoins } = useApp();
   return (
     <View style={[k.pill, { backgroundColor: tint }]} accessibilityLabel={`Bakiye ${coins + gameCoins} jeton`}>
-      <Image source={{ uri: me.avatar }} style={k.avatar} />
+      <Photo uri={me.avatar} kind="face" style={k.avatar} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={k.name} numberOfLines={1}>
           {me.name}

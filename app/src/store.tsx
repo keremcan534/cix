@@ -1,8 +1,10 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
+import { StatusBar } from 'expo-status-bar';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Appearance as SystemAppearance, useColorScheme } from 'react-native';
 
 import { agencyByCode, type AgencyRole } from '@/data/agency';
-import { COSMETICS, FREE_PACK_IDS, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
+import { COSMETICS, FREE_PACK_IDS, ROOM_THEMES, ROOM_TYPES, STICKER_PACKS, type CosmeticKind, type RoomTheme, type RoomType, type TicketCategory } from '@/data/catalog';
 import {
   CHECKIN_REWARDS,
   TASKS,
@@ -15,24 +17,33 @@ import { RULES, type Rules } from '@/data/rules';
 import { countsForWealth, wealthLevelOf } from '@/data/wealth';
 import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
+import { exchangeOwnDiamonds } from '@/lib/coins-bank';
+import { addLock, diamondSplit, lockMs, lockedReason, locksFor, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
+import { validIban } from '@/lib/bank';
+import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
+import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
+import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
 /** The gift behind a gift earning, stored with it (a price can belong to several gifts; Lucky pays a share). */
 export type EarningGift = { id: string; name: string; emoji: string; count: number; lucky?: boolean };
-export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string; gift?: EarningGift };
+/** `day` is the local calendar day (persist.today); rows saved before it existed have only `time`. */
+export type Earning = { id: string; amount: number; source: EarningSource; fromId?: string; time: string; day?: string; gift?: EarningGift };
 export type Withdrawal = { id: string; diamonds: number; iban: string; status: 'Beklemede' | 'Onaylandı'; time: string };
-export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond' | 'game'; amount: number; reason: string; time: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
+export type LedgerRow = { id: string; ref: string; currency: 'coin' | 'diamond' | 'game'; amount: number; reason: string; time: string; day?: string; status: 'Başarılı' | 'Beklemede' | 'İade' };
 /** `icon` is an Ionicons glyph; notices saved before that held an emoji, and the list falls back to the kind's icon for them. */
 export type Notice = { id: string; kind: 'social' | 'finance' | 'security' | 'system'; icon: keyof typeof Ionicons.glyphMap; title: string; body: string; time: string; read: boolean; href?: string };
 export type Ticket = { id: string; number: string; category: TicketCategory; text: string; status: 'Açık' | 'Yanıtlandı' | 'Çözüldü' | 'Yeniden açıldı'; time: string; replies: { from: 'me' | 'support'; text: string; time: string }[] };
 export type NotifyType = 'live' | 'invite' | 'event' | 'agency' | 'fanclub' | 'game' | 'payment' | 'system';
 export type Settings = {
+  /** Ayarlar › Görünüm: follow the phone, or always light / dark. */
+  appearance: Appearance;
   effectsOff: boolean;
   haptics: boolean;
   reduceMotion: boolean;
@@ -65,7 +76,7 @@ export type Settings = {
   dailySpendLimit: number; // coins; 0 = no limit
   /** My wins (Lucky, games) are announced in every room with my name (off: "Bir kullanıcı"). */
   luckyAnnounce: boolean;
-  /** VIP "Seviyeyi Gizle": hide my Servet / Cazibe badges from others while VIP is active. */
+  /** VIP "Seviyeleri gizle": hide my Cömertlik / Yankı badges from others while VIP is active. */
   hideWealth: boolean;
   hideCharm: boolean;
 };
@@ -115,7 +126,7 @@ type AppState = {
   addGameCoins: (n: number, reason?: string) => void;
   spendGameCoins: (n: number, reason?: string) => boolean;
   spentTotal: number;
-  /** Servet puanı: qualifying spending only (data/wealth). */
+  /** Cömertlik puanı (wealth): qualifying spending only (data/wealth). */
   wealthXp: number;
   wealthLevel: number;
   ledger: LedgerRow[];
@@ -151,8 +162,14 @@ type AppState = {
   isHost: boolean;
   becomeHost: () => void;
   diamonds: number;
+  /** The balance in two parts (lib/diamond-locks): what may leave now (withdraw, Çevir, Jeton Noktası) and what
+   *  is still locked because the coins behind it can be refunded (store 7 days, Jeton Noktası 1 day). */
+  withdrawableDiamonds: number;
+  lockedDiamonds: number;
+  /** Open locks, newest first. */
+  diamondLocks: DiamondLock[];
   totalDiamonds: number;
-  /** Cazibe puanı and level (data/charm): drives the earnings bonus and Keşfet ranking. */
+  /** Yankı puanı (charm) and level (data/charm): drives the earnings bonus and Keşfet ranking. */
   charmXp: number;
   charmLevel: number;
   weekly: number[];
@@ -160,6 +177,8 @@ type AppState = {
   receiveDiamonds: (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => void;
   withdrawals: Withdrawal[];
   requestWithdraw: (diamonds: number, iban: string) => string | null;
+  /** Gelir > Çevir: own diamonds → coins at the in-app coin price (lib/coins-bank); the coins, or why not. */
+  exchangeDiamonds: (diamonds: number) => { ok: true; coins: number } | { ok: false; reason: string };
   // tasks & check-in
   stats: Record<TaskKey, number>;
   bump: (key: TaskKey, n?: number) => void;
@@ -174,7 +193,7 @@ type AppState = {
   checkIn: () => number;
   inviteCode: string;
   // vip, agency, family
-  /** Visual status level (frames/badges), derived from SVIP, Asil and VIP subscription. */
+  /** Visual status level (frames/badges), derived from İnci (SVIP), Rütbe (noble) and VIP subscription. */
   vipLevel: number;
   svipXp: number;
   svipLevel: number;
@@ -253,58 +272,11 @@ type AppState = {
   resetAll: () => void;
 };
 
-/** What survives an app restart (lib/persist). Sets are stored as arrays. */
-type Snapshot = {
-  loggedIn: boolean;
-  me: User;
-  coins: number;
-  gameCoins?: number;
-  spentTotal: number;
-  wealthXp?: number;
-  ledger: LedgerRow[];
-  spentDay: { date: string; amount: number };
-  inventory: string[];
-  equipped: Partial<Record<CosmeticKind, string>>;
-  emojiPacks: string[];
-  recentEmojis: string[];
-  settings: Partial<Settings>;
-  notifications: Notice[];
-  myRoom: Partial<MyRoom>;
-  isHost: boolean;
-  diamonds: number;
-  totalDiamonds: number;
-  charmXp?: number;
-  weekly: number[];
-  earnings: Earning[];
-  withdrawals: Withdrawal[];
-  stats: Record<TaskKey, number>;
-  giftWall?: Record<string, Record<string, number>>;
-  claimedTasks: string[];
-  checkInDay: number;
-  checkInDate: string;
-  svipXp: number;
-  firstBuys: string[];
-  nobleTier: number;
-  nobleDays: number;
-  vipDays: number;
-  agencyId: string | null;
-  agencyRole: AgencyRole | null;
-  ownedAgency: OwnedAgency | null;
-  familyRole: 'owner' | 'helper' | 'member' | null;
-  familyId: string | null;
-  fanClubs: Record<string, FanClub>;
-  recentRooms: string[];
-  following: string[];
-  blocked: string[];
-  conversations: Conversation[];
-  followerInvites: Record<string, number>;
-  starter: { claimed: boolean; hidden: boolean };
-  safetyLog: SafetyLog[];
-  ownedAnims: string[];
-  micFx: string | null;
-};
 
 const Ctx = createContext<AppState | null>(null);
+// Settings change rarely while the rest of the store changes often (coins, diamonds, room gifts). Animated
+// leaf components that only read settings subscribe here, so a balance tick doesn't re-render them.
+const SettingsCtx = createContext<Settings | null>(null);
 
 export const now = () => {
   const d = new Date();
@@ -318,17 +290,27 @@ const toggle = (set: Set<string>, id: string) => {
   return next;
 };
 
-const ME_DEFAULT = { ...ME };
+/** Forgets everything saved on this device (the store's reset and the crash screen's way out). */
+export async function resetLocalData() {
+  await clearState();
+  for (const key of Object.keys(ME)) if (!(key in ME_DEFAULT)) delete (ME as Record<string, unknown>)[key];
+  Object.assign(ME, ME_DEFAULT);
+}
 
 /** Loads the saved state first (the splash screen stays up meanwhile), then mounts the store. */
 export function AppProvider({ children, onReady }: { children: ReactNode; onReady?: () => void }) {
   const [boot, setBoot] = useState<{ gen: number; initial: Partial<Snapshot> | null } | null>(null);
   useEffect(() => {
-    loadState<Partial<Snapshot>>().then((initial) => {
-      // Prototype shortcut: mock lookups (userById('me')) read the shared ME object.
-      if (initial?.me) Object.assign(ME, initial.me);
-      setBoot({ gen: 0, initial });
-    });
+    // Whatever goes wrong reading the save, the app still starts (with the defaults); a rejected promise here
+    // would leave the splash screen up for good.
+    loadState<unknown>()
+      .then(readSnapshot)
+      .catch(() => null)
+      .then((initial) => {
+        // Prototype shortcut: mock lookups (userById('me')) read the shared ME object.
+        if (initial?.me) Object.assign(ME, initial.me);
+        setBoot({ gen: 0, initial });
+      });
   }, []);
   const ready = !!boot;
   useEffect(() => {
@@ -336,8 +318,7 @@ export function AppProvider({ children, onReady }: { children: ReactNode; onRead
   }, [ready, onReady]);
   if (!boot) return null;
   const reset = () => {
-    clearState();
-    Object.assign(ME, ME_DEFAULT);
+    resetLocalData();
     setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: null }));
   };
   return (
@@ -370,6 +351,22 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   const [isHost, setIsHost] = useState(s.isHost ?? false);
   const [diamonds, setDiamonds] = useState(s.diamonds ?? 0);
+  // Read by Çevir so two quick taps can't spend the same diamonds twice before the state updates.
+  const diamondsRef = useRef(diamonds);
+  useEffect(() => {
+    diamondsRef.current = diamonds;
+  }, [diamonds]);
+  // Gift diamonds stay locked through the refund window (lib/diamond-locks), mirrored in a ref for the same
+  // synchronous reads as the balance. Locks that opened while the app was closed are dropped (with a notice) by the
+  // timer below; until then `lockNow` keeps them out of the locked part.
+  const [diamondLocks, setDiamondLocksState] = useState<DiamondLock[]>(s.diamondLocks ?? []);
+  const locksRef = useRef(diamondLocks);
+  const setDiamondLocks = (fn: (l: DiamondLock[]) => DiamondLock[]) => {
+    locksRef.current = fn(locksRef.current);
+    setDiamondLocksState(locksRef.current);
+  };
+  const [lockNow, setLockNow] = useState(() => Date.now());
+  const { locked: lockedDiamonds, withdrawable: withdrawableDiamonds } = diamondSplit(diamonds, diamondLocks, lockNow);
   const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
   const [charmXp, setCharmXp] = useState(s.charmXp ?? s.totalDiamonds ?? 0);
   const charmRef = useRef(charmXp);
@@ -377,7 +374,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [earnings, setEarnings] = useState<Earning[]>(s.earnings ?? []);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(s.withdrawals ?? []);
 
-  const [stats, setStats] = useState<Record<TaskKey, number>>(s.stats ?? { roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 });
+  // Merged with the defaults: a save from before a counter existed would otherwise make it NaN on the first bump.
+  const [stats, setStats] = useState<Record<TaskKey, number>>(() => withDefaults({ roomMinutes: 0, giftsSent: 0, greetings: 0, moments: 0, calls: 0 }, s.stats));
   const [giftWall, setGiftWall] = useState<Record<string, Record<string, number>>>(s.giftWall ?? {});
   const recordGift = (toId: string, giftId: string, count: number) =>
     setGiftWall((w) => ({ ...w, [toId]: { ...w[toId], [giftId]: (w[toId]?.[giftId] ?? 0) + count } }));
@@ -392,8 +390,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const wealthRef = useRef(wealthXp);
   const [ledger, setLedger] = useState<LedgerRow[]>(s.ledger ?? []);
   const log = (currency: LedgerRow['currency'], amount: number, reason: string, status: LedgerRow['status'] = 'Başarılı') =>
-    setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), status }, ...l].slice(0, 200));
-  const spentStart = s.spentDay?.date === today() ? s.spentDay.amount : 0;
+    setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), day: today(), status }, ...l].slice(0, 200));
+  const spentStart = s.spentDay?.date === today() && Number.isFinite(s.spentDay.amount) ? s.spentDay.amount : 0;
   const spentTodayRef = useRef(spentStart);
   const [spentToday, setSpentToday] = useState(spentStart);
 
@@ -426,37 +424,45 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [emojiPacks, setEmojiPacks] = useState<Set<string>>(new Set([...FREE_PACK_IDS, ...(s.emojiPacks ?? [])]));
   const [recentEmojis, setRecentEmojis] = useState<string[]>(s.recentEmojis ?? []);
 
-  const [settings, setSettings] = useState<Settings>(() => ({
-    effectsOff: false,
-    haptics: true,
-    invisibleEntry: false,
-    cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
-    showOnline: true,
-    showLastSeen: true,
-    showCurrentRoom: true,
-    dmFrom: 'everyone',
-    callsFrom: 'everyone',
-    profilePublic: true,
-    notifySocial: true,
-    notifyFinance: true,
-    roomBot: true,
-    reduceMotion: false,
-    lowData: false,
-    notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
-    snoozeUntil: 0,
-    roomMuted: false,
-    musicVolume: 0.7,
-    gameVolume: 0.4,
-    voiceVolume: 1,
-    giftSounds: true,
-    bigGiftsOnly: false, micDenoise: true,
-    invitesFrom: 'everyone',
-    dailySpendLimit: 0,
-    luckyAnnounce: true,
-    hideWealth: false,
-    hideCharm: false,
-    ...s.settings,
-  }));
+  const [settings, setSettings] = useState<Settings>(() => {
+    const defaults: Settings = {
+      appearance: 'system',
+      effectsOff: false,
+      haptics: true,
+      invisibleEntry: false,
+      cityDiscovery: false, // location-based discovery is opt-in (spec §31.7)
+      showOnline: true,
+      showLastSeen: true,
+      showCurrentRoom: true,
+      dmFrom: 'everyone',
+      callsFrom: 'everyone',
+      profilePublic: true,
+      notifySocial: true,
+      notifyFinance: true,
+      roomBot: true,
+      reduceMotion: false,
+      lowData: false,
+      notifyTypes: { live: true, invite: true, event: true, agency: true, fanclub: true, game: true, payment: true, system: true },
+      snoozeUntil: 0,
+      roomMuted: false,
+      musicVolume: 0.7,
+      gameVolume: 0.4,
+      voiceVolume: 1,
+      giftSounds: true,
+      bigGiftsOnly: false, micDenoise: true,
+      invitesFrom: 'everyone',
+      dailySpendLimit: 0,
+      luckyAnnounce: true,
+      hideWealth: false,
+      hideCharm: false,
+    };
+    const saved = withDefaults(defaults, s.settings);
+    return {
+      ...saved,
+      appearance: oneOf(saved.appearance, APPEARANCES) ?? defaults.appearance,
+      notifyTypes: withDefaults(defaults.notifyTypes, saved.notifyTypes),
+    };
+  });
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
@@ -470,36 +476,46 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [deletionRequested, setDeletionRequested] = useState(false);
 
-  const [myRoom, setMyRoom] = useState<MyRoom>(() => ({
-    title: 'Benim Odam 🎙️',
-    announcement: 'Hoş geldiniz! Saygılı olalım 💜',
-    cover: 'https://picsum.photos/seed/myroom/600/400',
-    password: '',
-    locked: false,
-    limit: 50,
-    xp: 600, // starts at Lv.4 so lock / mic permission / boss seat can be tried in the demo
-    adminIds: [],
-    // Saves from before the switch kept "Mikrofon kontrolü" (micMode); only "Serbest" meant no queue.
-    micQueue: (s.myRoom as { micMode?: string } | undefined)?.micMode !== 'free',
-    roomType: 'stage',
-    giftEffects: true,
-    joinSounds: true,
-    lockedSeats: [],
-    theme: 'chat',
-    micCount: 10,
-    layoutId: null,
-    micPermission: 'everyone',
-    bossSeat: true,
-    joinMode: 'apply',
-    manageMembers: 'admins',
-    manageFunctions: 'admins',
-    autoRemoveDays: 14,
-    profileVisible: true,
-    videoPrivacy: true,
-    memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
-    blacklist: ['u6'],
-    ...s.myRoom,
-  }));
+  const [myRoom, setMyRoom] = useState<MyRoom>(() => {
+    const room = withDefaults<MyRoom>(
+      {
+        title: 'Benim Odam 🎙️',
+        announcement: 'Hoş geldiniz! Saygılı olalım 💜',
+        cover: 'https://picsum.photos/seed/myroom/600/400',
+        password: '',
+        locked: false,
+        limit: 50,
+        xp: 600, // starts at Lv.4 so lock / mic permission / boss seat can be tried in the demo
+        adminIds: [],
+        // Saves from before the switch kept "Mikrofon kontrolü" (micMode); only "Serbest" meant no queue.
+        micQueue: (s.myRoom as { micMode?: string } | undefined)?.micMode !== 'free',
+        roomType: 'stage',
+        giftEffects: true,
+        joinSounds: true,
+        lockedSeats: [],
+        theme: 'chat',
+        micCount: 10,
+        layoutId: null,
+        micPermission: 'everyone',
+        bossSeat: true,
+        joinMode: 'apply',
+        manageMembers: 'admins',
+        manageFunctions: 'admins',
+        autoRemoveDays: 14,
+        profileVisible: true,
+        videoPrivacy: true,
+        memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
+        blacklist: ['u6'],
+      },
+      s.myRoom,
+    );
+    // The room screen looks these up in fixed lists; a saved value the lists no longer have falls back.
+    room.roomType = oneOf(room.roomType, ROOM_TYPES.map((t) => t.id)) ?? 'stage';
+    room.theme = oneOf(room.theme, ROOM_THEMES.map((t) => t.id)) ?? 'chat';
+    for (const key of ['adminIds', 'memberIds', 'blacklist'] as const) room[key] = room[key].filter((id) => typeof id === 'string');
+    room.lockedSeats = room.lockedSeats.filter(isFiniteNumber);
+    return room;
+  });
 
   // Demo account starts at VIP 3 (SVIP 3 threshold) so VIP-gated features and their limits can be tested;
   // older saves below it are raised once, higher saves are kept.
@@ -522,7 +538,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
   const [conversations, setConversations] = useState(s.conversations ?? CONVERSATIONS);
   const [followerInvites, setFollowerInvites] = useState<Record<string, number>>(s.followerInvites ?? {});
-  const [starter, setStarter] = useState(s.starter ?? { claimed: false, hidden: false });
+  const [starter, setStarter] = useState(() => withDefaults({ claimed: false, hidden: false }, s.starter));
   const [safetyLog, setSafetyLog] = useState<SafetyLog[]>(s.safetyLog ?? []);
   const logSafety = (action: SafetyLog['action'], targetId?: string, detail?: string) =>
     setSafetyLog((l) => [{ id: uid(), action, targetId, detail, time: `${new Date().toLocaleDateString('tr-TR')} ${now()}` }, ...l].slice(0, 100));
@@ -535,7 +551,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const snapshot: Snapshot = {
     loggedIn, me, coins, gameCoins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
-    myRoom, isHost, diamonds, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
+    myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     following: [...following], blocked: [...blocked], conversations, followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
@@ -549,29 +565,51 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setDiamonds((d) => d + n);
     setTotalDiamonds((d) => d + n);
     setWeekly((w) => [...w.slice(0, 6), w[6] + n]);
-    setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now(), ...(gift && { gift }) }, ...e].slice(0, 100));
+    setEarnings((e) => [{ id: uid(), amount: n, source, fromId, time: now(), day: today(), ...(gift && { gift }) }, ...e].slice(0, 100));
     log('diamond', n, source);
+    // The app can't see where the sender's coins came from, so it assumes the store (the longer lock); the server
+    // knows the real source and its locks are the ones that count.
+    if (locksFor(source)) setDiamondLocks((l) => addLock(l, { id: uid(), amount: n, unlockAt: Date.now() + lockMs('store'), channel: 'store', source, fromId, ...(gift && { gift }) }));
   };
   const receiveDiamonds = (n: number, source: EarningSource, fromId?: string, gift?: EarningGift) => {
     creditDiamonds(n, source, fromId, gift);
     if (source === 'Hediye' && gift) recordGift('me', gift.id, gift.count);
     if (source !== 'Hediye' && source !== 'Arama') return;
-    // Cazibe: gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
+    // Yankı (charm): gifts and calls from others raise it; gift diamonds also earn the level's bonus (own row).
     const before = charmLevelOf(charmRef.current);
     const bonus = source === 'Hediye' ? Math.floor((n * charmBonusPct(before)) / 100) : 0;
     if (bonus > 0) creditDiamonds(bonus, 'Cazibe bonusu', fromId);
     charmRef.current += n;
     setCharmXp(charmRef.current);
     const after = charmLevelOf(charmRef.current);
-    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Cazibe seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
+    if (after > before) notify({ kind: 'system', icon: 'rose', title: `Yankı seviyen Lv.${after} oldu`, body: charmBonusPct(after) > charmBonusPct(before) ? `Hediye kazanç bonusun artık %${charmBonusPct(after)}.` : 'Keşfette daha üst sıralarda görüneceksin.', href: '/seviye?tab=charm' });
   };
 
+  // Read the ref, not `settings`: timers and room intervals call a notify captured renders ago, and a snooze or
+  // mute the user set since then must still hold.
   const notify = (n: Omit<Notice, 'id' | 'time' | 'read'>) => {
-    const snoozed = settings.snoozeUntil > Date.now() && n.kind !== 'security' && n.kind !== 'finance';
-    const muted = snoozed || (n.kind === 'social' && !settings.notifySocial) || (n.kind === 'finance' && !settings.notifyFinance);
+    const cur = settingsRef.current;
+    const snoozed = cur.snoozeUntil > Date.now() && n.kind !== 'security' && n.kind !== 'finance';
+    const muted = snoozed || (n.kind === 'social' && !cur.notifySocial) || (n.kind === 'finance' && !cur.notifyFinance);
     if (muted) return;
     setNotifications((l) => [{ ...n, id: uid(), time: now(), read: false }, ...l].slice(0, 100));
   };
+
+  // Opens the locks when their time comes: drops them and tells the host the diamonds can now leave. Runs at once
+  // for locks that opened while the app was closed. `notify` only reads refs and setters, so a stale copy is fine.
+  useEffect(() => {
+    if (!diamondLocks.length) return;
+    const first = Math.min(...diamondLocks.map((l) => l.unlockAt));
+    // setTimeout holds at most ~24.8 days; a longer wait just re-arms when it fires.
+    const t = setTimeout(() => {
+      const at = Date.now();
+      const opened = locksRef.current.filter((l) => l.unlockAt <= at).reduce((sum, l) => sum + l.amount, 0);
+      setDiamondLocks((l) => l.filter((x) => x.unlockAt > at));
+      setLockNow(at);
+      if (opened > 0) notify({ kind: 'finance', icon: 'lock-open', title: 'Kilitli elmasların açıldı', body: `${opened.toLocaleString('tr-TR')} elmas artık çekilebilir; çekebilir ya da jetona çevirebilirsin.`, href: '/gelir' });
+    }, Math.min(2_000_000_000, Math.max(0, first - Date.now()) + 50));
+    return () => clearTimeout(t);
+  }, [diamondLocks]);
 
   const limitBlock = (n: number) => {
     const limit = settingsRef.current.dailySpendLimit;
@@ -596,7 +634,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       wealthRef.current += n;
       setWealthXp(wealthRef.current);
       const after = wealthLevelOf(wealthRef.current);
-      if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Servet seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Servet Seviyesi sayfasında gör.', href: '/seviye' });
+      if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Cömertlik seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Cömertlik sayfasında gör.', href: '/seviye' });
     }
     return true;
   };
@@ -706,8 +744,20 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setWeekly([1_240, 3_310, 860, 4_920, 2_150, 5_480, 0]);
       setDiamonds(12_450);
       setTotalDiamonds(17_960);
+      // …with part of it still locked: two store-coin gifts (7 days) and one paid with Jeton Noktası coins (1 day).
+      const at = Date.now();
+      const h = 3_600_000;
+      setLockNow(at);
+      setDiamondLocks(() => [
+        { id: uid(), amount: 640, unlockAt: at + 14 * h, channel: 'jeton', source: 'Hediye', fromId: 'u5' },
+        { id: uid(), amount: 3_200, unlockAt: at + 53 * h, channel: 'store', source: 'Hediye', fromId: 'u2' },
+        { id: uid(), amount: 1_150, unlockAt: at + 121 * h, channel: 'store', source: 'Arama', fromId: 'u7' },
+      ]);
     },
     diamonds,
+    withdrawableDiamonds,
+    lockedDiamonds,
+    diamondLocks,
     totalDiamonds,
     charmXp,
     charmLevel: charmLevelOf(charmXp),
@@ -717,8 +767,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     withdrawals,
     requestWithdraw: (amount, iban) => {
       if (amount < RULES.minWithdrawDiamonds) return `En az ${RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas çekebilirsin.`;
-      if (amount > diamonds) return 'Yetersiz elmas bakiyesi.';
-      if (iban.replace(/\s/g, '').length !== 26) return 'Geçerli bir IBAN gir (TR + 24 hane).';
+      if (amount > diamondsRef.current) return 'Yetersiz elmas bakiyesi.';
+      const locked = lockedReason(amount, diamondsRef.current, diamondSplit(diamondsRef.current, locksRef.current, Date.now()).locked);
+      if (locked) return locked;
+      // Check digits too: a single mistyped digit would send the payout to a dead or wrong account.
+      if (!validIban(iban)) return 'IBAN geçersiz. TR ile başlayan 26 karakteri tek tek kontrol et.';
+      diamondsRef.current -= amount;
       setDiamonds((d) => d - amount);
       const id = uid();
       setWithdrawals((w) => [{ id, diamonds: amount, iban, status: 'Beklemede', time: now() }, ...w]);
@@ -729,6 +783,20 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         notify({ kind: 'finance', icon: 'card', title: 'Para çekme onaylandı', body: `${amount.toLocaleString('tr-TR')} elmas hesabına aktarılıyor.`, href: '/yayinci/cek' });
       }, 5000);
       return null;
+    },
+
+    exchangeDiamonds: (amount) => {
+      const q = exchangeOwnDiamonds(amount, diamondsRef.current);
+      if (!q.ok) return q;
+      // Locked diamonds can't become coins either: that would move refundable value out of the lock.
+      const locked = lockedReason(amount, diamondsRef.current, diamondSplit(diamondsRef.current, locksRef.current, Date.now()).locked);
+      if (locked) return { ok: false, reason: locked };
+      diamondsRef.current -= amount;
+      setDiamonds((d) => d - amount);
+      setCoins((c) => c + q.coins);
+      log('diamond', -amount, 'Jetona çevrildi');
+      log('coin', q.coins, 'Elmastan çevrildi');
+      return { ok: true, coins: q.coins };
     },
 
     stats,
@@ -775,7 +843,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     nobleDays,
     buyNoble: (tier) => {
       const t = nobleInfo(tier);
-      if (!t || !spend(t.price, `Asil: ${t.name} (${NOBLE_DAYS} gün)`)) return false;
+      if (!t || !spend(t.price, `Rütbe: ${t.name} (${NOBLE_DAYS} gün)`)) return false;
       setNobleTier(tier);
       setNobleDays(NOBLE_DAYS);
       return true;
@@ -973,11 +1041,46 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     resetAll: onReset,
   };
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      <SettingsCtx.Provider value={settings}>
+        <AppTheme appearance={settings.appearance}>{children}</AppTheme>
+      </SettingsCtx.Provider>
+    </Ctx.Provider>
+  );
+}
+
+const APPEARANCES = ['system', 'light', 'dark'] as const;
+
+/**
+ * The app's color scheme: the Görünüm setting, or the phone's when it is `system`. Native views (alerts, the
+ * keyboard) follow the same choice. The status bar here is mounted after the root layout's, so it decides the
+ * bar's style; rooms and calls, which stay dark, mount their own on top while they are open.
+ */
+function AppTheme({ appearance, children }: { appearance: Appearance; children: ReactNode }) {
+  const system = useColorScheme();
+  const scheme: Scheme = appearance === 'system' ? (system === 'light' ? 'light' : 'dark') : appearance;
+  useEffect(() => {
+    // Web has no app-level override; the browser's own setting is what `system` reads there.
+    SystemAppearance.setColorScheme?.(appearance === 'system' ? 'auto' : appearance);
+  }, [appearance]);
+  return (
+    <ThemeScope scheme={scheme}>
+      {children}
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    </ThemeScope>
+  );
 }
 
 export function useApp() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useApp must be used inside AppProvider');
+  return ctx;
+}
+
+/** Only the settings; re-renders when a setting changes, not on every store update. */
+export function useSettings() {
+  const ctx = useContext(SettingsCtx);
+  if (!ctx) throw new Error('useSettings must be used inside AppProvider');
   return ctx;
 }

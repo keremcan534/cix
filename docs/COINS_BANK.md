@@ -1,26 +1,40 @@
-# Coins Bank ve yayıncı/ajans yaşam döngüsü
+# Jeton Noktası ve yayıncı/ajans yaşam döngüsü
 
-Uygulamada: **Ben > Coins Bank** (`app/src/app/coins-bank.tsx`), kurallar `app/src/data/rules.ts` (uygulamada sabit varsayılanlar, salt okunur).
+Uygulamada: **Ben > Jeton Noktası** (`app/src/app/coins-bank.tsx`), kurallar `app/src/data/rules.ts` (uygulamada sabit varsayılanlar, salt okunur).
 
 Finans yönetimi (kurallar, ödeme onayı/reddi, mutabakat) mobil uygulamada yer almaz; ayrı Finance Control platformuna taşınıyor. Uygulamada kullanıcı bakiyesini görür, çekim talebi oluşturur ve talebin durumunu izler; manuel incelemedeki talepte "Finans ekibi inceliyor" notu görünür.
 
 ## Para birimleri
 - **Coins**: satın alınır, hediyede harcanır.
 - **Diamonds**: yayıncı kazanç ölçüsü; Coins ile aynı bakiye değildir (`creatorDiamondsPerCoin`, `diamondsPerUsd` = 5.000 💎 = 1 USD).
-- **Oyun bakiyesi**: casino ve Zar Düellosu kazançları. Bahisler önce buradan düşer; hediye edilemez, elmasa veya paraya çevrilemez.
+- **Oyun bakiyesi**: Oyun Salonu ve Zar Düellosu kazançları. Bahisler önce buradan düşer; hediye edilemez, elmasa veya paraya çevrilemez.
 - **Bonus Credits**: kampanya/davet bakiyesi; varsayılan olarak çekilemez (`bonusCashable = 0`).
 
 ## Akışlar
 1. Coins satın alma → ödeme sağlayıcısı doğrular → bakiye **bir kez** yansır (idempotent).
 2. Hediye → Coins düşer → dağıtım motoru yayıncı elmasını ve hak edişleri kurala göre hesaplar → her işlem benzersiz ref + denetim kaydı + kural sürümü.
-3. Yayıncı / Ajans / BD Coins Bank: toplam, bekleyen (`pendingDays`), kesinleşmiş, çekilebilir, ödeme sürecinde, tamamlanan/reddedilen, geçmiş.
+3. Yayıncı / Ajans / BD Jeton Noktası: toplam, bekleyen (`pendingDays`), kesinleşmiş, çekilebilir, ödeme sürecinde, tamamlanan/reddedilen, geçmiş.
 4. Para çekme: min `minWithdrawDiamonds`, max `maxWithdrawDiamonds`, haftalık `weeklyWithdrawLimitDiamonds`; doğrulanmış ödeme hesabı; talep anında bakiye **bloke**; başarısız ödeme doğrulanınca serbest; aynı bakiye iki talepte kullanılamaz; `autoApproveUnderDiamonds` altı otomatik, üstü manuel onay.
 
-## Coins Bank ana hesabı (`app/src/lib/coins-bank.ts`)
-- **Elmas → jeton yalnızca ana Coins Bank hesabında.** Diğer hesaplar (yayıncı, ajans, kullanıcı) sunucuda reddedilir; uygulamadaki "Dönüştür" düğmesi kaldırıldı, yerine "Anında bozdur" bilgisi geldi.
-- **Dönüşüm değere göre ve %3:** Coins Bank yayıncıya/ajansa elmasın resmi değerinin tamamını öder (`elmas ÷ diamondsPerUsd × usdTry`) ve karşılığında satış fiyatından (`coinsBankRetailCoinsPerTl`, 1.000.000 jeton = 23.599,99 TL) %3 fazla değerde jeton alır: **1 elmas = (1 ÷ 5.000) × 49,8 × 42,37 × 1,03 ≈ 0,4347 jeton.** Oran sabit sayı değildir; kur, elmas kuralı veya paket fiyatı değişince kendiliğinden değişir. Jeton aşağı yuvarlanır, Coins Bank %3'ü geçemez.
-- **Toptan alım %2:** Coins Bank yönetimden jetonu satış fiyatının %2 altına alır.
+## Jeton Noktası ana hesabı (`app/src/lib/coins-bank.ts`)
+- **Elmas → jeton yalnızca ana Jeton Noktası hesabında.** Diğer hesaplar (yayıncı, ajans, kullanıcı) sunucuda reddedilir; uygulamadaki "Dönüştür" düğmesi kaldırıldı, yerine "Anında bozdur" bilgisi geldi.
+- **Dönüşüm değere göre ve %3:** Jeton Noktası yayıncıya/ajansa elmasın resmi değerinin tamamını öder (`elmas ÷ diamondsPerUsd × usdTry`) ve karşılığında satış fiyatından (`coinsBankRetailCoinsPerTl`, 1.000.000 jeton = 23.599,99 TL) %3 fazla değerde jeton alır: **1 elmas = (1 ÷ 5.000) × 49,8 × 42,37 × 1,03 ≈ 0,4347 jeton.** Oran sabit sayı değildir; kur, elmas kuralı veya paket fiyatı değişince kendiliğinden değişir. Jeton aşağı yuvarlanır, Jeton Noktası %3'ü geçemez.
+- **Toptan alım %2:** Jeton Noktası yönetimden jetonu satış fiyatının %2 altına alır.
 - Kur (`usdTry`) Finance Control'den güncellenir; testler: `app/tests/economy.test.ts`.
+
+## Sunucuda (`server/api/wallet.mjs`, `jeton.mjs`; ayrıntı `docs/SUNUCU.md`)
+- **Jetonun kaynağı tutulur:** her yükleme bir parti (Google Play, App Store, ilk alım hediyesi, Jeton Noktası, toptan, bozdurma, Çevir), tarihi ve kimden geldiği ile. Hediye edilen her elmas hangi partiden geldiğini bilir.
+- **Kilit:** mağazadan alınıp hediye edilen jetonun elması **7 gün**, Jeton Noktası'ndan alınanınki **1 gün** kilitli; sonra çekilebilir kazanca geçer. Gelir ekranında iki bölüm: **Çekilebilir kazanç** ve **Kilitli elmas**.
+- **Jeton Noktası hesabı** yalnız yönetici tarafından açılır; stok yönetimden toptan alınır (dekontla), satış kişiye aktarımla yapılır (dekont/havale numarası kaydedilir), yayıncının elması anında bozdurulabilir.
+- **Kayıtlar:** yükleyen, yüklenen, aktaran, alan, işlemi yapan, IP, dekont, tarih; defter, aktarımlar ve yönetici işlemleri değiştirilemez/silinemez. Bir hesabın bütün para kaydı yönetici denetim görünümünde.
+- **İade:** mağaza iadesinde harcanmamış jeton ve henüz kilitli elmas geri alınır; kilidi açılmış kısım raporlanır.
+- Yayıncı **para çekme** (IBAN) sunucuda henüz yok; ajans ödemeleri tasarımıyla birlikte gelecek.
+
+## Uygulamada kilitli elmas (`app/src/lib/diamond-locks.ts`)
+- **Gelir** ekranı: toplam elmasın altında iki parça (çubuk + iki kutu) **Çekilebilir kazanç** ve **Kilitli elmas**; ilk kilidin ne zaman açılacağı yazar. Altında **Kilitli elmas** listesi: tutar, gönderen, hangi jetonla (Mağaza jetonu · 7 gün / Jeton Noktası · 1 gün), kalan süre ve ilerleme çubuğu.
+- Çevir, Para çek, Anında bozdur ve Jeton Noktası > Yayıncı kazancı yalnız çekilebilir kısmı kullanır; kilitli tutar istenirse sunucuyla aynı mesaj çıkar ("… elmasın kilidi henüz açılmadı; çekilebilir bakiyen … elmas").
+- Kilit süresi dolunca elmas kendiliğinden çekilebilir kazanca geçer ve "Kilitli elmasların açıldı" bildirimi gelir (uygulama kapalıyken açılanlar için ilk açılışta).
+- Hediye, arama ve bunların bonusları kilitlenir; görev, ajans ve tayfa bonusu kilitlenmez. Uygulama gönderenin jetonunun kaynağını göremediği için yerel demoda hep 7 gün varsayar; gerçek kaynak ve kilit sunucudadır (`GET /api/wallet/earnings`). Süreler `rules.ts`: `pendingDays` (7), `jetonPendingDays` (1). Testler: `app/tests/diamond-locks.test.ts`.
 
 ## Komisyonlar (yayıncıdan kesilmez)
 - Ajans: `agencyCommission` (%40) × bağlı yayıncıların uygun kazancı.

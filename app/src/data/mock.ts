@@ -1,4 +1,5 @@
 import type { RoomTheme, RoomType } from '@/data/catalog';
+import { IS_DEMO } from '@/lib/build';
 
 export type User = {
   id: string;
@@ -94,8 +95,11 @@ export type Conversation = {
 export const CATEGORIES = ['Popüler', 'Sohbet', 'Müzik', 'Oyun', 'Arkadaşlık'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-const avatar = (n: number) => `https://i.pravatar.cc/200?img=${n}`;
-const photo = (seed: string, w = 600, h = 400) => `https://picsum.photos/seed/${seed}/${w}/${h}`;
+// Sample people have no photo (no stock faces of real people): an empty avatar means "draw the initial-letter
+// circle". The illustrated avatar set replaces this when it is delivered.
+const NO_PHOTO = '';
+// Random stock photos for room covers and moments appear only in demo builds; a store build leaves them empty.
+const photo = (seed: string, w = 600, h = 400) => (IS_DEMO ? `https://picsum.photos/seed/${seed}/${w}/${h}` : NO_PHOTO);
 
 export const ME: User = {
   id: 'me',
@@ -103,7 +107,7 @@ export const ME: User = {
   age: 24,
   city: 'İstanbul',
   distanceKm: 0,
-  avatar: avatar(12),
+  avatar: NO_PHOTO,
   verified: true,
   bio: 'Müzik, kahve ve gece sohbetleri ☕🎧',
   online: true,
@@ -118,18 +122,18 @@ export const ME: User = {
 };
 
 export const USERS: User[] = [
-  { id: 'u1', name: 'Elif', age: 23, city: 'İstanbul', distanceKm: 2, avatar: avatar(5), verified: true, vip: true, bio: 'Karaoke kraliçesi 🎤', online: true, interests: ['🎤 Karaoke', '🎧 Müzik', '💃 Dans'] },
-  { id: 'u2', name: 'Mert', age: 26, city: 'İstanbul', distanceKm: 4, avatar: avatar(11), verified: true, bio: 'Oyun ve gece sohbetleri', online: true, interests: ['🎮 Oyun', '💬 Sohbet', '🎬 Film'] },
-  { id: 'u3', name: 'Zeynep', age: 22, city: 'Ankara', distanceKm: 350, avatar: avatar(9), verified: true, bio: 'Kitap kurdu 📚', online: false, interests: ['📚 Kitap', '☕ Kahve', '🎬 Film'] },
-  { id: 'u4', name: 'Can', age: 28, city: 'İzmir', distanceKm: 480, avatar: avatar(13), verified: false, bio: 'Gitar çalarım, istek alırım', online: true, interests: ['🎧 Müzik', '🎤 Karaoke', '✈️ Seyahat'] },
-  { id: 'u5', name: 'Selin', age: 25, city: 'İstanbul', distanceKm: 6, avatar: avatar(16), verified: true, vip: true, bio: 'Seyahat ✈️ fotoğraf 📷', online: true, interests: ['✈️ Seyahat', '🎬 Film', '☕ Kahve'] },
-  { id: 'u6', name: 'Burak', age: 27, city: 'Bursa', distanceKm: 150, avatar: avatar(14), verified: true, bio: 'Futbol muhabbeti ⚽', online: false, interests: ['⚽ Spor', '🎮 Oyun', '💬 Sohbet'] },
-  { id: 'u7', name: 'Ayşe', age: 21, city: 'İstanbul', distanceKm: 1, avatar: avatar(20), verified: true, bio: 'Yeni insanlar tanımayı seviyorum', online: true, interests: ['💬 Sohbet', '💃 Dans', '🎧 Müzik'] },
-  { id: 'u8', name: 'Emre', age: 29, city: 'Antalya', distanceKm: 700, avatar: avatar(33), verified: false, bio: 'Deniz, kum, müzik 🌊', online: true, interests: ['✈️ Seyahat', '🎧 Müzik', '⚽ Spor'] },
-  { id: 'u9', name: 'Deniz', age: 24, city: 'İstanbul', distanceKm: 8, avatar: avatar(25), verified: true, bio: 'Lo-fi dinlerken sohbet', online: true, interests: ['🎧 Müzik', '📚 Kitap', '💬 Sohbet'] },
-  { id: 'u10', name: 'Kaan', age: 30, city: 'Eskişehir', distanceKm: 230, avatar: avatar(51), verified: true, bio: 'Stand-up hayranı 😂', online: false, interests: ['🎬 Film', '💬 Sohbet', '🎮 Oyun'] },
-  { id: 'u11', name: 'Melis', age: 23, city: 'İstanbul', distanceKm: 3, avatar: avatar(44), verified: true, vip: true, bio: 'Dans ve pop müzik 💃', online: true, interests: ['💃 Dans', '🎧 Müzik', '🎤 Karaoke'] },
-  { id: 'u12', name: 'Onur', age: 26, city: 'Konya', distanceKm: 520, avatar: avatar(60), verified: false, bio: 'Kahve bağımlısı', online: true, interests: ['☕ Kahve', '📚 Kitap', '💬 Sohbet'] },
+  { id: 'u1', name: 'Elif', age: 23, city: 'İstanbul', distanceKm: 2, avatar: NO_PHOTO, verified: true, vip: true, bio: 'Karaoke kraliçesi 🎤', online: true, interests: ['🎤 Karaoke', '🎧 Müzik', '💃 Dans'] },
+  { id: 'u2', name: 'Mert', age: 26, city: 'İstanbul', distanceKm: 4, avatar: NO_PHOTO, verified: true, bio: 'Oyun ve gece sohbetleri', online: true, interests: ['🎮 Oyun', '💬 Sohbet', '🎬 Film'] },
+  { id: 'u3', name: 'Zeynep', age: 22, city: 'Ankara', distanceKm: 350, avatar: NO_PHOTO, verified: true, bio: 'Kitap kurdu 📚', online: false, interests: ['📚 Kitap', '☕ Kahve', '🎬 Film'] },
+  { id: 'u4', name: 'Can', age: 28, city: 'İzmir', distanceKm: 480, avatar: NO_PHOTO, verified: false, bio: 'Gitar çalarım, istek alırım', online: true, interests: ['🎧 Müzik', '🎤 Karaoke', '✈️ Seyahat'] },
+  { id: 'u5', name: 'Selin', age: 25, city: 'İstanbul', distanceKm: 6, avatar: NO_PHOTO, verified: true, vip: true, bio: 'Seyahat ✈️ fotoğraf 📷', online: true, interests: ['✈️ Seyahat', '🎬 Film', '☕ Kahve'] },
+  { id: 'u6', name: 'Burak', age: 27, city: 'Bursa', distanceKm: 150, avatar: NO_PHOTO, verified: true, bio: 'Futbol muhabbeti ⚽', online: false, interests: ['⚽ Spor', '🎮 Oyun', '💬 Sohbet'] },
+  { id: 'u7', name: 'Ayşe', age: 21, city: 'İstanbul', distanceKm: 1, avatar: NO_PHOTO, verified: true, bio: 'Yeni insanlar tanımayı seviyorum', online: true, interests: ['💬 Sohbet', '💃 Dans', '🎧 Müzik'] },
+  { id: 'u8', name: 'Emre', age: 29, city: 'Antalya', distanceKm: 700, avatar: NO_PHOTO, verified: false, bio: 'Deniz, kum, müzik 🌊', online: true, interests: ['✈️ Seyahat', '🎧 Müzik', '⚽ Spor'] },
+  { id: 'u9', name: 'Deniz', age: 24, city: 'İstanbul', distanceKm: 8, avatar: NO_PHOTO, verified: true, bio: 'Lo-fi dinlerken sohbet', online: true, interests: ['🎧 Müzik', '📚 Kitap', '💬 Sohbet'] },
+  { id: 'u10', name: 'Kaan', age: 30, city: 'Eskişehir', distanceKm: 230, avatar: NO_PHOTO, verified: true, bio: 'Stand-up hayranı 😂', online: false, interests: ['🎬 Film', '💬 Sohbet', '🎮 Oyun'] },
+  { id: 'u11', name: 'Melis', age: 23, city: 'İstanbul', distanceKm: 3, avatar: NO_PHOTO, verified: true, vip: true, bio: 'Dans ve pop müzik 💃', online: true, interests: ['💃 Dans', '🎧 Müzik', '🎤 Karaoke'] },
+  { id: 'u12', name: 'Onur', age: 26, city: 'Konya', distanceKm: 520, avatar: NO_PHOTO, verified: false, bio: 'Kahve bağımlısı', online: true, interests: ['☕ Kahve', '📚 Kitap', '💬 Sohbet'] },
 ];
 
 const WOMEN = new Set(['u1', 'u3', 'u5', 'u7', 'u9', 'u11']);
@@ -168,7 +172,7 @@ function guestUser(id: string): User {
     age: 19 + (h % 18),
     city: GUEST_CITIES[h % GUEST_CITIES.length],
     distanceKm: h % 900,
-    avatar: avatar(1 + (h % 70)),
+    avatar: NO_PHOTO,
     verified: h % 4 === 0,
     bio: 'Similar Club üyesi',
     online: true,
@@ -187,21 +191,21 @@ export const userById = (id: string): User =>
 
 export const ROOMS: Room[] = [
   { id: 'r1', title: 'Gece Sohbeti 🌙', category: 'Sohbet', cover: photo('night'), hostId: 'u1', listeners: 248, seatUserIds: ['u1', 'u2', 'u5', null, 'u7', null, 'u9', null, null], tags: ['Sohbet', 'Gece'], level: 6, roomType: 'free', announcement: 'Gece sohbetine hoş geldin, saygı her şeyden önce 🌙' },
-  { id: 'r2', title: 'Karaoke Akşamı 🎤', category: 'Müzik', cover: photo('karaoke'), hostId: 'u11', listeners: 512, seatUserIds: ['u11', 'u4', null, 'u1', null, null, 'u8', null, null], tags: ['Karaoke', 'Pop'], level: 11, agency: true, track: 'm4', roomType: 'music', theme: 'music', bossSeat: true, announcement: 'Star Ajans karaoke gecesi · sıraya girmek için koltuk iste 🎤' },
+  { id: 'r2', title: 'Karaoke Akşamı 🎤', category: 'Müzik', cover: photo('karaoke'), hostId: 'u11', listeners: 512, seatUserIds: ['u11', 'u4', null, 'u1', null, null, 'u8', null, null], tags: ['Karaoke', 'Pop'], level: 11, agency: true, track: 'm4', roomType: 'music', theme: 'music', bossSeat: true, announcement: 'Dalga Ajans karaoke gecesi · sıraya girmek için koltuk iste 🎤' },
   { id: 'r3', title: 'Kim Milyoner? Quiz', category: 'Oyun', cover: photo('quiz'), hostId: 'u2', listeners: 133, seatUserIds: ['u2', 'u6', 'u10', 'u12', null, null, null, null, null], tags: ['Oyun', 'Bilgi'], level: 4, roomType: 'qa', announcement: 'Bilgi yarışması · soruları ❓ ile gönder' },
   { id: 'r4', title: 'Yeni Arkadaşlar 💜', category: 'Arkadaşlık', cover: photo('friends'), hostId: 'u7', listeners: 389, seatUserIds: ['u7', 'u5', 'u9', null, null, 'u3', null, null, null], tags: ['Tanışma'], level: 8, adminIds: ['me'], roomType: 'stage', theme: 'friends', bossSeat: true, announcement: 'Sen bu odanın yöneticisisin 🛡️' },
   { id: 'r5', title: 'Lo-fi & Ders Çalışma', category: 'Müzik', cover: photo('lofi'), hostId: 'u9', listeners: 76, seatUserIds: ['u9', null, null, null, null, null, null, null, null], tags: ['Lo-fi', 'Sessiz'], level: 3, track: 'm3', roomType: 'music' },
-  { id: 'r6', title: 'Futbol Muhabbeti ⚽', category: 'Sohbet', cover: photo('football'), hostId: 'u6', listeners: 201, seatUserIds: ['u6', 'u2', 'u10', null, 'u12', null, null, null, null], tags: ['Spor'], level: 5, password: '1234', roomType: 'private', announcement: 'Özel oda · şifre: 1234 (demo)' },
+  { id: 'r6', title: 'Futbol Muhabbeti ⚽', category: 'Sohbet', cover: photo('football'), hostId: 'u6', listeners: 201, seatUserIds: ['u6', 'u2', 'u10', null, 'u12', null, null, null, null], tags: ['Spor'], level: 5, password: '1234', roomType: 'private', announcement: 'Özel oda · şifreyi oda sahibinden iste ⚽' },
   { id: 'r7', title: 'Doğruluk mu Cesaret mi?', category: 'Oyun', cover: photo('dare'), hostId: 'u5', listeners: 445, seatUserIds: ['u5', 'u1', 'u11', 'u7', 'u4', null, null, null, null], tags: ['Oyun', 'Eğlence'], level: 9, agency: true, roomType: 'event', theme: 'pk', bossSeat: true, micPermission: 'members', layoutId: 'audio-9-team', announcement: 'Etkinlik: Doğruluk mu Cesaret mi · Bu akşam 22:00' },
 ];
 
 export const roomById = (id: string) => ROOMS.find((r) => r.id === id) ?? ROOMS[0];
 
 export const MOMENTS: Moment[] = [
-  { id: 'm1', userId: 'u5', text: 'Kapadokya sabahı 🎈 Burayı herkes bir kez görmeli!', image: photo('cappadocia', 600, 600), likes: 342, comments: 28, time: '12 dk' },
+  { id: 'm1', userId: 'u5', text: 'Kapadokya sabahı 🎈 Burayı herkes bir kez görmeli!', image: photo('cappadocia', 600, 600) || undefined, likes: 342, comments: 28, time: '12 dk' },
   { id: 'm2', userId: 'u1', text: 'Dün akşamki karaoke odası efsaneydi, gelenlere teşekkürler 💜', likes: 128, comments: 15, time: '1 sa' },
-  { id: 'm3', userId: 'u4', text: 'Yeni şarkı üzerinde çalışıyorum, bu akşam odada çalacağım 🎸', image: photo('guitar', 600, 600), likes: 89, comments: 9, time: '3 sa' },
-  { id: 'm4', userId: 'u11', text: 'Pazar kahvaltısı ☕🥐', image: photo('breakfast', 600, 600), likes: 210, comments: 19, time: '5 sa' },
+  { id: 'm3', userId: 'u4', text: 'Yeni şarkı üzerinde çalışıyorum, bu akşam odada çalacağım 🎸', image: photo('guitar', 600, 600) || undefined, likes: 89, comments: 9, time: '3 sa' },
+  { id: 'm4', userId: 'u11', text: 'Pazar kahvaltısı ☕🥐', image: photo('breakfast', 600, 600) || undefined, likes: 210, comments: 19, time: '5 sa' },
   { id: 'm5', userId: 'u9', text: 'Bugün kim ders çalışıyor? Lo-fi odasındayım, gelin 📚', likes: 54, comments: 7, time: '8 sa' },
 ];
 

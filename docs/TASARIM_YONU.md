@@ -1,6 +1,6 @@
 # SimilarClub Tasarım Yönü ve Temel UX Kararları (v2)
 
-Bu belge SimilarClub'ın özgün tasarım dilini, her ekranda uygulanacak UX kurallarını ve ilk yeniden tasarlanan ekranı (Hediye gönder paneli) tanımlar. Referans ekranlar (Timo, BIGO, Clubhouse, Discord, TikTok LIVE, Twitch) yalnız **analiz girdisidir**; yerleşimleri, renkleri ve bileşenleri kopyalanmaz.
+Bu belge SimilarClub'ın özgün tasarım dilini, her ekranda uygulanacak UX kurallarını ve ilk yeniden tasarlanan ekranı (Hediye gönder paneli) tanımlar.
 
 Durum: **Palet v2 "Gece mavisi" uygulandı** (gece laciverti zemin, turkuaz marka rengi, mercan sosyal, altın para ve VIP; mor tamamen kaldırıldı). Sonraki ekranlar aynı sistemle tasarlanır (bkz. "Sonraki ekranlar").
 
@@ -12,7 +12,7 @@ SimilarClub'ın vaadi: *benzer insanlarla aynı anda, sesle buluşmak.* Görsel 
 
 | Karar | Gerekçe |
 | --- | --- |
-| **Gece laciverti zemin, tek marka rengi turkuaz.** Lacivert yüzeyler (`bg`, `card`, `cardAlt`), eylemler ve marka turkuaz. **Mor yok.** | Mürdüm/mor zemin ve mor→pembe gradyan kategorinin (Timo, Yalla) ortak paleti; mor olmadan SimilarClub ilk bakışta ayırt edilir. Lacivert sakin ve güven verir, gece kullanımında gözü yormaz. |
+| **Gece laciverti zemin, tek marka rengi turkuaz.** Lacivert yüzeyler (`bg`, `card`, `cardAlt`), eylemler ve marka turkuaz. **Mor yok.** | Tek marka rengi SimilarClub'ı ilk bakışta tanınır kılar. Lacivert sakin ve güven verir, gece kullanımında gözü yormaz. |
 | **Renk = anlam.** Turkuaz eylem + canlı/ses (çevrimiçi, konuşuyor, mikrofon açık), mercan **yalnız sosyal** (beğeni, takip, kalp, yakınlık, mesaj), altın **para ve değer** (jeton, hediye, VIP, ödül), yeşil başarılı/onaylandı, kırmızı yalnız hata ve okunmamış sayısı (her zaman ikonla). | Kullanıcı rengi bir kez öğrenir. Mercan ile hata kırmızısı birbirine yakın olduğu için hata durumları ayrıca ikon ve metin taşır. |
 | **Parlak dolgularda koyu yazı.** Turkuaz, mercan ve altın butonlarda yazı gece laciverti. Küçük dolgular (seçili çip, etiket) derin turkuaz `#087A80` + beyaz yazı. | Beyaz yazı parlak turkuaz üzerinde 1,75:1, mercanda 2,85:1, altında 1,7:1 ile okunmaz; lacivert yazı 6,7–11:1. |
 | **Turkuaz: sesin ve markanın rengi.** Konuşan kişi kalın, nabız atan turkuaz halkayla; açık mikrofon turkuaz ve "AÇIK" yazılı; ana butonlar düz turkuaz. Durum her zaman renk + ikon + yazıyla. | Sesli odalarda neredeyse kimse turkuaz kullanmıyor; tek renk hem markayı hem "canlılık" hissini taşıyor. |
@@ -72,26 +72,24 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
 
 ---
 
-## 3. Referans analizi: Hediye paneli (Timo ekranları)
+## 3. Kendi ilkelerimiz
 
-**İşlev.** Odadaki bir veya birden fazla kişiye ücretli sanal hediye göndermek; kataloğu gezmek, adet seçmek, bakiye görmek.
+1. **Benzerlik çekirdek fikirdir.** SimilarClub'ın sorusu "kime benziyorum, kiminle aynı dalgadayım?". Eşleşme, öneriler ve oda listeleri bu benzerlikten beslenir; ekranlar kişiyi önce kendine benzeyenlerle buluşturur.
+2. **Gece laciverti ve turkuaz.** Zemin lacivert, marka ve eylem rengi turkuaz. Diğer renkler yalnız anlam taşır (bkz. §1).
+3. **Deniz ve yolculuk ad ailesi.** Özellik adları tek bir dünyadan gelir; yeni bir özellik ad alırken önce bu aileye bakılır.
 
-**Kullanıcı amacı.** "Bu kişiye bu hediyeyi, bilerek ve doğru kişiye göndereyim." İkincil: ucuz/pahalı hediyeyi bulmak, ücretsiz hediyelerimi kullanmak.
+   | Ad | Ne anlatır |
+   | --- | --- |
+   | **İnci** (İnci 1–10) | Yüklemeyle büyüyen üyelik seviyesi |
+   | **Rütbe** (Gemici, Dümenci, Lostromo, Amiral, Kaptan-ı Derya) | 30 günlük ayrıcalık programı |
+   | **Tayfa** | Topluluk; Tayfa sohbeti, Tayfa kasası |
+   | **Güverte** | Odadaki ama mikrofonda olmayan dinleyiciler |
+   | **Dümen koltuğu** | Oturumun en çok hediye gönderen kişisinin koltuğu |
+   | **Fener** | Yol gösteren ışık; Fener Kayalığı oyunu, Fener Bekçisi rozeti |
+   | **Cömertlik** ve **Yankı** | Gönderilen ve alınan hediyelerden gelen iki seviye |
 
-**Deneyim analizi.**
-
-| İşe yarayan | Sorun yaratan |
-| --- | --- |
-| Alt panel olarak açılması; oda arkada görünür kalıyor | **Toplam maliyet görünmüyor.** Adet × fiyat × kişi hiçbir yerde yazmıyor; "Gönder" her tutarda tek dokunuş |
-| Kategoriler (popüler, etkileşimli, çift, ayrıcalık) | Alıcılar yalnız koltuk numarasıyla; iki ayrı "All" (ev ve mikrofon ikonlu) ne seçtiği belirsiz |
-| Favoriler ve çanta (ücretsiz hediyeler) | Seviye çubuğu "270.68k jeton göndererek Lv19'a yüksel" + "+155": harcamaya yönlendiren baskı |
-| Adet ön ayarları | Panel açıkken JACKPOT, SVIP, "%20 yakınlık" bantları odanın üstünü kaplıyor (reklam kalabalığı) |
-| Kilitli (SVIP) hediyelerin görünmesi | Kartlarda 2–3 küçük rozet (S5, 🎵, 3D, CP, taç, ????) açıklamasız; kilitli hediye seçilebilir gibi duruyor |
-| | Karışık dil (Hot, Gameplay, All), İngilizce sayı biçimi (4,950), düşük kontrastlı bakiye ("84 şarj") |
-| | "Gameplay" sekmesinde atış hediyeleriyle şans/jackpot hediyeleri aynı yerde (hukuki risk; SimilarClub'da şans hediyesi yok) |
-| | Sıralama gizli: "Hot" sekmesine tekrar dokununca sıralama değişiyor |
-
-**SimilarClub çözümü.** Panel üç soruya göre yukarıdan aşağı akar: **Kime → Ne → Ne kadar**, en altta tek eylem.
+4. **Sakin ekonomi.** Para ekranları sade; harcamaya iten bant, geri sayım ve sahte popülerlik yok (bkz. §2, kural 8).
+5. **Hediye paneli üç soruya göre akar:** **Kime → Ne → Ne kadar**, en altta tek eylem.
 
 ---
 
@@ -101,12 +99,12 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 
 1. **Amaç.** Seçilen kişiye/kişilere seçilen hediyeyi, toplam maliyeti görerek göndermek.
 2. **Hedef kullanıcı ve bağlam.** Sesli odadaki dinleyici veya konuşmacı; tek elle, oda akışını kaçırmadan.
-3. **Birincil eylem.** `Gönder · {toplam}` (altın `money` buton). Duruma göre `Onayla ve gönder`, `Jeton yükle`, `Ücretsiz gönder`, `SVIP ayrıcalıklarını gör`, `Önce alıcı seç` (devre dışı) olur. Aynı anda tek eylem.
+3. **Birincil eylem.** `Gönder · {toplam}` (altın `money` buton). Duruma göre `Onayla ve gönder`, `Jeton yükle`, `Ücretsiz gönder`, `İnci ayrıcalıklarını gör`, `Önce alıcı seç` (devre dışı) olur. Aynı anda tek eylem.
 4. **Bilgi hiyerarşisi.**
    - Başlık satırı: "Hediye gönder", sessiz hediye seviyesi, bakiye çipi (cüzdana gider), kapat.
    - **Kime:** "Herkes (n)" çipi + isimli avatar çipleri (çoklu seçim, seçilende onay işareti).
    - **Raflar:** Popüler · Eğlenceli · İkili · Özel · ★ Favoriler · Çantam (adet). Altında rafı açıklayan tek nötr satır ve görünür **Fiyat** sıralama düğmesi (varsayılan → ucuzdan → pahalıdan).
-   - **Izgara:** 4 sütun; görsel, ad, fiyat. En fazla bir köşe rozeti (3D / ♪). Kilitli hediyede fiyat yerine "🔒 SVIP n".
+   - **Izgara:** 4 sütun; görsel, ad, fiyat. En fazla bir köşe rozeti (3D / ♪). Kilitli hediyede fiyat yerine "🔒 İnci n".
    - **Özet:** hediye, `fiyat × adet × kişi`, yakınlık (ikili hediyelerde), sağda **Toplam**.
    - **Bildirim satırı:** kalan bakiye / eksik tutar / onay uyarısı / kilit nedeni / çanta kaynağı.
    - **Eylem satırı:** adet düğmesi (×1 ▾, ön ayarlar) + birincil buton.
@@ -114,7 +112,7 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 6. **Etkileşimler.**
    - Karoya dokun: seç.
    - Uzun bas: favoriye ekle/çıkar.
-   - Kilitli karo: seçilir, ama eylem "SVIP ayrıcalıklarını gör" olur.
+   - Kilitli karo: seçilir, ama eylem "İnci ayrıcalıklarını gör" olur.
    - Gönder tek dokunuşla gönderir. Kullanıcı Ayarlar'dan ek onay açtıysa eşik üstünde ilk dokunuş onay durumuna geçer; seçim değişince onay düşer.
    - Gönderimden sonra panel kapanır, odada animasyon ve sistem mesajı çıkar.
    - Bakiye çipi ve "Jeton yükle" cüzdana gider; geri tuşu odaya döner.
@@ -146,10 +144,10 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 10. **Bağlantılar.**
     - Oda alt çubuğundaki altın hediye butonu açar.
     - Koltuktaki kişiye "Hediye gönder" o kişi seçili açar.
-    - Cüzdan / jeton yükleme ve SVIP merkezi buradan açılır.
+    - Cüzdan / jeton yükleme ve İnci merkezi buradan açılır.
     - Gönderim, odadaki hediye animasyonuna ve sistem mesajına bağlanır.
 
-**Korunan işlevler.** Çoklu alıcı ve herkesi seçme, dört kategori, fiyat sıralama, favoriler (uzun basma), ücretsiz çanta ve stok düşümü, SVIP kilidi, adet ön ayarları ve etiketleri, ikili hediye yakınlığı, hediye seviyesi, cüzdan geçişi, oda tarafındaki bakiye düşümü, defter kaydı, PK puanı, katkı sıralaması ve efekt ayarları.
+**Korunan işlevler.** Çoklu alıcı ve herkesi seçme, dört kategori, fiyat sıralama, favoriler (uzun basma), ücretsiz çanta ve stok düşümü, İnci kilidi, adet ön ayarları ve etiketleri, ikili hediye yakınlığı, hediye seviyesi, cüzdan geçişi, oda tarafındaki bakiye düşümü, defter kaydı, PK puanı, katkı sıralaması ve efekt ayarları.
 
 **Kabul kriterleri.**
 - [ ] Gönder düğmesine basmadan önce toplam ve kalan bakiye görünür.

@@ -2,9 +2,10 @@
 // approval, status, streamer links, parent changes (independence, change of parent, closing a sub-agency),
 // transfers with their fee rule, and payouts. Each runs inside the caller's transaction, so a transfer either
 // happens completely or not at all.
-import { HttpError, move } from './core.mjs';
+import { HttpError } from './core.mjs';
 import { audit, d4, e4, fmt4, notice, periodOf, rateAt, settingsAt } from './agency-lib.mjs';
 import { applyTier } from './agency-perf.mjs';
+import { spendDiamonds } from './wallet.mjs';
 
 export async function setStatus(c, a, to, actor, note = '') {
   await c.query('UPDATE agencies SET status = $2, closed_at = CASE WHEN $2 = \'closed\' THEN now() ELSE closed_at END WHERE id = $1', [a.id, to]);
@@ -157,8 +158,9 @@ async function chargeFee(c, t) {
   const period = periodOf(new Date(), s.commission_period);
   const payee = t.fee_account === 'from_agency' ? t.from_agency_id : null;
   if (t.fee_payer === 'streamer') {
-    // The streamer pays from their diamonds (whole diamonds, rounded up).
-    await move(c, t.streamer_id, 'diamond', -Math.ceil(fee), 'Ajans transfer ücreti', `transfer-${t.id}`);
+    // The streamer pays from their unlocked diamonds (whole diamonds, rounded up); locked ones (wallet.mjs) can't.
+    await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [t.streamer_id]);
+    await spendDiamonds(c, t.streamer_id, Math.ceil(fee), 'Ajans transfer ücreti', `transfer-${t.id}`);
   } else if (t.fee_payer === 'to_agency') {
     await c.query("INSERT INTO agency_ledger (agency_id, kind, amount, transfer_id, ref, period, note) VALUES ($1,'transfer_fee',$2,$3,$4,$5,$6)", [t.to_agency_id, fmt4(-e4(fee)), t.id, `transfer:${t.id}:pay`, period, 'Transfer ücreti (ödenen)']);
   }

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -14,19 +14,21 @@ import { presenceOf } from '@/data/presence';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
 import { useApp, type GroupMsg } from '@/store';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 const LAST_ACTIVE = ['5 dk önce', '40 dk önce', 'Dün 21:15', '2 gün önce', '6 gün önce'];
 const CHAT_GIFTS = CHAT_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
 const QUICK: QuickAction[] = [
-  { key: 'iliski', label: 'İlişki Meydanı', emoji: '💞', art: 'iliski-cift-cp-en-tatli-cift', onPress: () => router.push(KABILE_ROUTES.iliski) },
-  { key: 'merkez', label: 'Kabile Merkezi', emoji: '🎯', tag: 'ücretsiz', onPress: () => router.push(KABILE_ROUTES.merkez) },
-  { key: 'kasa', label: 'Kabile Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
+  { key: 'iliski', label: 'Uyum Köşesi', emoji: '💞', art: 'iliski-cift-cp-en-tatli-cift', onPress: () => router.push(KABILE_ROUTES.iliski) },
+  { key: 'merkez', label: 'Görevler', emoji: '🎯', tag: 'ücretsiz', onPress: () => router.push(KABILE_ROUTES.merkez) },
+  { key: 'kasa', label: 'Tayfa Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];
 
 export default function KabileChat() {
   const { familyId, me, familyChat, sendFamilyMessage, familyMuted, setFamilyMuted, spendCoins } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [menu, setMenu] = useState(false);
   const [gifts, setGifts] = useState(false);
   const family = findKabile(familyId);
@@ -36,8 +38,8 @@ export default function KabileChat() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.locked}>
           <StateIcon name="lock-closed" />
-          <Text style={styles.title}>Kabile sohbetine sadece kabile üyeleri erişebilir</Text>
-          <GradientButton title="Kabile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+          <Text style={styles.title}>Tayfa sohbetine yalnızca tayfa üyeleri girebilir</Text>
+          <GradientButton title="Tayfa bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>
       </SafeAreaView>
     );
@@ -50,7 +52,7 @@ export default function KabileChat() {
   const welcome: GroupMsg = {
     id: 'kabile-welcome',
     userId: 'system',
-    text: `Hoş geldin @${me.name}! Kabilemize katıldığın için mutluyuz. Bu sıcak kabile ailemize hoş geldin. Günlük görevlerini tamamlamayı unutma~`,
+    text: `Hoş geldin @${me.name}! Tayfada bugün kimler var, bir selam ver. Günlük görevler Görevler sekmesinde.`,
     time: '',
     system: true,
     actionLabel: 'Tamamlamaya git',
@@ -63,7 +65,7 @@ export default function KabileChat() {
   };
 
   const sendGift = (g: Gift) => {
-    if (!spendCoins(g.price, `Kabile sohbeti hediyesi: ${g.name}`)) {
+    if (!spendCoins(g.price, `Tayfa sohbeti hediyesi: ${g.name}`)) {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
@@ -71,16 +73,16 @@ export default function KabileChat() {
       return;
     }
     kabile.trackChatGift(g.price);
-    sendFamilyMessage(`🎁 Kabileye ${g.emoji} ${g.name} gönderdi (${g.price} 🪙)`);
+    sendFamilyMessage(`🎁 Tayfaya ${g.emoji} ${g.name} gönderdi (${g.price} 🪙)`);
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-          <Ionicons name="chevron-back" size={26} color="#fff" />
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
-        <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.profile)} accessibilityLabel="Kabile profili">
+        <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.profile)} accessibilityLabel="Tayfa profili">
           <Text style={styles.headerTitle} numberOfLines={1}>
             {family.emoji} {family.name}({family.members})
           </Text>
@@ -88,18 +90,18 @@ export default function KabileChat() {
             📶 {online} kişi çevrimiçi{familyMuted ? ' · 🔕' : ''}
           </Text>
         </Pressable>
-        <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)} style={styles.iconBtn} accessibilityLabel="Kabile Kasası">
+        <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)} style={styles.iconBtn} accessibilityLabel="Tayfa Kasası">
           <Text style={{ fontSize: 20 }}>💰</Text>
         </Pressable>
         <Pressable onPress={() => setMenu(true)} style={styles.iconBtn} accessibilityLabel="Menü">
-          <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+          <Ionicons name="ellipsis-vertical" size={18} color={colors.text} />
         </Pressable>
       </View>
       <GroupChat
         members={members}
         messages={[welcome, ...familyChat]}
         onSend={send}
-        pinned={`Kabile Duyurusu: ${meta.announcement}`}
+        pinned={`Tayfa duyurusu: ${meta.announcement}`}
         roomId={meta.roomId}
         lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length] ?? LAST_ACTIVE[0]}
         quickActions={QUICK}
@@ -110,16 +112,16 @@ export default function KabileChat() {
         title={family.name}
         onClose={() => setMenu(false)}
         options={[
-          { label: familyMuted ? '🔔 Bildirimleri aç' : '🔕 Sohbeti sessize al', onPress: () => setFamilyMuted(!familyMuted) },
-          { label: '🏰 Kabile profili', onPress: () => router.push(KABILE_ROUTES.profile) },
-          { label: '🎯 Görev Merkezi', onPress: () => router.push(KABILE_ROUTES.merkez) },
-          { label: '💰 Kabile Kasası', onPress: () => router.push(KABILE_ROUTES.kasa) },
-          { label: '💞 İlişki Meydanı', onPress: () => router.push(KABILE_ROUTES.iliski) },
+          { label: familyMuted ? 'Bildirimleri aç' : 'Sohbeti sessize al', icon: familyMuted ? 'notifications-outline' : 'notifications-off-outline', onPress: () => setFamilyMuted(!familyMuted) },
+          { label: 'Tayfa profili', icon: 'shield-outline', onPress: () => router.push(KABILE_ROUTES.profile) },
+          { label: 'Görevler', icon: 'checkbox-outline', onPress: () => router.push(KABILE_ROUTES.merkez) },
+          { label: 'Tayfa Kasası', icon: 'wallet-outline', onPress: () => router.push(KABILE_ROUTES.kasa) },
+          { label: 'Uyum Köşesi', icon: 'heart-outline', onPress: () => router.push(KABILE_ROUTES.iliski) },
         ]}
       />
       <ActionSheet
         visible={gifts}
-        title="Kabile sohbetine hediye · her 400 🪙 için +2 Güç Puanı"
+        title="Tayfa sohbetine hediye · her 400 🪙 için +2 katkı puanı"
         onClose={() => setGifts(false)}
         options={CHAT_GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price} 🪙`, onPress: () => sendGift(g) }))}
       />
@@ -127,12 +129,12 @@ export default function KabileChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, lift }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  headerSub: { color: '#A5F3F5', fontSize: 12, fontWeight: '600', marginTop: 1 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  headerSub: { color: semantic.tonalText, fontSize: 12, fontWeight: '600', marginTop: 1 },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...lift },
   locked: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  title: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center' },
-});
+  title: { color: colors.text, fontWeight: '700', fontSize: 16, textAlign: 'center' },
+}));

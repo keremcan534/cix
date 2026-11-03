@@ -32,6 +32,7 @@ import {
 } from '@/lib/pk';
 import { showAlert } from '@/lib/alert';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 export const fmt = (n: number) => n.toLocaleString('tr-TR');
 export const nameOf = (uid: string) => (uid === 'me' ? 'Sen' : userById(uid).name);
@@ -214,7 +215,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                 <>
                   {micUsers.map((u) => (
                     <View key={u} style={st.member}>
-                      <Image source={{ uri: userById(u).avatar }} style={st.av} />
+                      <Photo uri={userById(u).avatar} kind="face" style={st.av} />
                       <Text style={st.memberName} numberOfLines={1}>
                         {nameOf(u)}
                       </Text>
@@ -250,7 +251,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               <TextInput value={query} onChangeText={setQuery} placeholder="Oda ID’si veya adı ara" placeholderTextColor={colors.textDim} style={st.input} />
               {rooms.map((r) => (
                 <View key={r.id} style={st.member}>
-                  <Image source={{ uri: r.cover }} style={[st.av, { borderRadius: 10 }]} />
+                  <Photo uri={r.cover} kind="cover" seed={r.id} style={[st.av, { borderRadius: 10 }]} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={st.memberName} numberOfLines={1}>
                       {r.title}
@@ -307,7 +308,7 @@ function Notice({ icon, text, warn }: { icon: keyof typeof Ionicons.glyphMap; te
 function Person({ uid, size = 34 }: { uid: string; size?: number }) {
   return (
     <View style={st.person}>
-      <Image source={{ uri: userById(uid).avatar }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+      <Photo uri={userById(uid).avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2 }} />
       <Text style={st.personName} numberOfLines={1}>
         {nameOf(uid)}
       </Text>
@@ -363,7 +364,7 @@ export function SoloBoard({ pk, canManage }: { pk: PkSession; canManage: boolean
             top.map((r, i) => (
               <View key={r.userId} style={st.soloChip}>
                 <Art name={(['derece-1', 'derece-2', 'derece-3'] as const)[i]} size={15} />
-                <Image source={{ uri: userById(r.userId).avatar }} style={st.mini} />
+                <Photo uri={userById(r.userId).avatar} kind="face" style={st.mini} />
                 <Text style={st.soloName} numberOfLines={1}>
                   {nameOf(r.userId)}
                 </Text>
@@ -487,10 +488,10 @@ export function TeamArena({
                 </View>
                 <View style={st.halfSeats}>{onMic.map((m) => <View key={m}>{renderSeat(seats.indexOf(m), { width: slotW, size })}</View>)}</View>
                 {onBoss && (
-                  <View style={st.awayRow} accessibilityLabel={`${nameOf(onBoss)} patron koltuğunda, ${fmt(pk.points[onBoss] ?? 0)} puan`}>
-                    <Image source={{ uri: userById(onBoss).avatar }} style={st.mini} />
+                  <View style={st.awayRow} accessibilityLabel={`${nameOf(onBoss)} dümen koltuğunda, ${fmt(pk.points[onBoss] ?? 0)} puan`}>
+                    <Photo uri={userById(onBoss).avatar} kind="face" style={st.mini} />
                     <Text style={[st.awayText, { color: colors.gold }]} numberOfLines={1}>
-                      👑 {nameOf(onBoss)} · {fmt(pk.points[onBoss] ?? 0)}
+                      Dümen · {nameOf(onBoss)} · {fmt(pk.points[onBoss] ?? 0)}
                     </Text>
                   </View>
                 )}
@@ -499,7 +500,7 @@ export function TeamArena({
                   <View style={st.awayRow}>
                     {away.map((m) => (
                       <View key={m} style={st.away} accessibilityLabel={`${nameOf(m)} mikrofonda değil, ${fmt(pk.points[m] ?? 0)} puan`}>
-                        <Image source={{ uri: userById(m).avatar }} style={[st.mini, { opacity: 0.45 }]} />
+                        <Photo uri={userById(m).avatar} kind="face" style={[st.mini, { opacity: 0.45 }]} />
                         <Text style={st.awayText} numberOfLines={1}>
                           {fmt(pk.points[m] ?? 0)}
                         </Text>
@@ -543,7 +544,7 @@ function OpponentRow({ roomId }: { roomId: string }) {
   const r = roomById(roomId);
   return (
     <View style={st.member}>
-      {r && <Image source={{ uri: r.cover }} style={[st.av, { borderRadius: 10 }]} />}
+      {r && <Photo uri={r.cover} kind="cover" seed={r.id} style={[st.av, { borderRadius: 10 }]} />}
       <Text style={st.memberName}>Rakip: {roomTitle(roomId)}</Text>
     </View>
   );
@@ -571,7 +572,7 @@ export function PkDetail({ pk, open, onClose, viewerRoomId, canManage }: { pk: P
                   return (
                     <View key={r.userId} style={st.member}>
                       <Text style={st.rank}>{i + 1}</Text>
-                      <Image source={{ uri: userById(r.userId).avatar }} style={st.av} />
+                      <Photo uri={userById(r.userId).avatar} kind="face" style={st.av} />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={st.memberName} numberOfLines={1}>
                           {nameOf(r.userId)}

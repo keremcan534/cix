@@ -1,12 +1,13 @@
 // Free room games, playable in the prototype with room participants (other players are simulated).
 // Pure game state: these components never touch the room, seats or microphones.
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import type { User } from '@/data/mock';
 import { colors, semantic } from '@/theme';
+import { Photo } from '@/components/photo';
 
 export type Player = Pick<User, 'id' | 'name' | 'avatar'>;
 const COLORS = ['#13D9DF', '#FF6576', '#F6BD60', '#22C55E'];
@@ -62,7 +63,7 @@ export function Ludo({ players }: { players: Player[] }) {
     <View style={{ gap: 10 }}>
       {players.map((p, i) => (
         <View key={p.id} style={g.lane}>
-          <Image source={{ uri: p.avatar }} style={[g.av, turn === i && winner === null && { borderColor: COLORS[i] }]} />
+          <Photo uri={p.avatar} kind="face" style={[g.av, turn === i && winner === null && { borderColor: COLORS[i] }]} />
           <View style={g.track}>
             {Array.from({ length: TRACK + 1 }, (_, c) => (
               <View key={c} style={[g.cell, c === TRACK && g.home, pos[i] === c && { backgroundColor: COLORS[i] }]} />
@@ -152,7 +153,7 @@ export function ColorCards({ players }: { players: Player[] }) {
       <View style={g.rowWrap}>
         {players.slice(1).map((p, i) => (
           <View key={p.id} style={[g.opp, turn === i + 1 && { borderColor: semantic.action }]}>
-            <Image source={{ uri: p.avatar }} style={g.avSmall} />
+            <Photo uri={p.avatar} kind="face" style={g.avSmall} />
             <Text style={g.small}>
               {p.name} · {hands[i + 1].length} kart
             </Text>

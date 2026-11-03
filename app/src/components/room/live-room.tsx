@@ -116,6 +116,7 @@ import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/m
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp } from '@/store';
+import { similarity } from '@/lib/similarity';
 import { colors, gradient, semantic } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 
@@ -213,9 +214,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const ride = cosmeticById(equipped.ride);
     const noble = nobleInfo(nobleTier);
     if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
-    const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `SVIP${svipLevel} ` : ''}${ME.name}`;
-    const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya katıldı!`;
-    const badge = [noble?.emoji, svipLevel ? `SVIP${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
+    const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `İnci ${svipLevel} · ` : ''}${ME.name}`;
+    const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} güverteye çıktı!`;
+    const badge = [noble?.emoji, svipLevel ? `İnci ${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
     const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
     const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
     return { text, show };
@@ -225,7 +226,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Entering a room while a one-to-one call is live: join as a listener, never on a mic (lib/media).
   const [joinedInCall] = useState(() => !!getMedia().call);
   // Room stage (lib/room-modes): mode, mic layout and the shared YouTube player. Seeded once, like the presence;
-  // it is module state, so minimizing the room or opening the Balkon never resets it.
+  // it is module state, so minimizing the room or opening the Güverte never resets it.
   useState(() => seedStage(id, { layoutId: isOwn ? myRoom.layoutId : base!.layoutId, info: stageInfo }));
   useEffect(() => setStageInfo(id, stageInfo), [id, stageInfo]);
   const stages = useStages();
@@ -233,7 +234,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const layout = layoutById(stage?.layoutId);
   const capacity = layout ? layout.microphoneCapacity : classicCapacity;
   // Room presence (lib/room-presence): who is in the room and on which mic. One model for the mics, the
-  // Balkon and every counter. Seeded the first time the room is opened (silent, before the first read).
+  // Güverte and every counter. Seeded the first time the room is opened (silent, before the first read).
   useState(() =>
     seedRoom(id, {
       ownerId: hostId,
@@ -291,7 +292,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
     ...(joinedInCall ? [{ id: 'incall', system: true, text: '📞 Bire bir görüşmedesin; odaya dinleyici olarak katıldın. Görüşme bitince mikrofon isteyebilirsin.' }] : []),
     // Arrived by following someone from a profile / agency / tribe chat.
-    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek odaya katıldı` }] : []),
+    ...(via && !invisible ? [{ id: 'via', system: true, text: `👣 ${ME.name}, ${userById(via).name} kişisini takip ederek güverteye çıktı` }] : []),
     ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girişle girdin. Diğer kullanıcılar katıldığını görmez; moderasyon kayıtlarında görünürsün.' }] : []),
   ]);
   const [draft, setDraft] = useState('');
@@ -393,6 +394,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const mySeat = allSeats.indexOf('me');
   const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
+  // "%82 benzer" for everyone else on a mic: the bead ring around their seat and the seat menu title
+  // (a handful of small set lookups, cheap enough to redo each render).
+  const simScores = new Map(seatedOthers.map((u) => [u, similarity(app.me, userById(u)).score]));
 
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
@@ -503,7 +507,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!camAllowed) setCamOn(false);
   }
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
-  // Balkon: people in the room who are not on a mic (from the presence model, never a separate list).
+  // Güverte: people in the room who are not on a mic (from the presence model, never a separate list).
   const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
@@ -601,7 +605,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     lastBoss.current = bossId;
     if (!bossId) return;
     const t = setTimeout(() => {
-      addMsg({ system: true, text: `👑 ${bossId === 'me' ? ME.name : userById(bossId).name} patron koltuğuna oturdu!` });
+      addMsg({ system: true, text: `${bossId === 'me' ? ME.name : userById(bossId).name} dümen koltuğuna oturdu!` });
       if (bossId === 'me') setMicOn(true);
     }, 0);
     return () => clearTimeout(t);
@@ -692,7 +696,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }, 3500);
     return () => clearInterval(t);
   }, [seatedKey, botReactions]);
-  // Room PK: people on the Balkon back the competitors with gifts (prototype stand-in for other people's sends).
+  // Room PK: people on the Güverte back the competitors with gifts (prototype stand-in for other people's sends).
   const roomPkActive = pk?.kind === 'room' && pk.status === 'active' ? pk.id : null;
   useEffect(() => {
     if (!roomPkActive) return;
@@ -734,7 +738,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const next = new Set<string>();
       seatedKey.split(',').forEach((uid) => uid && !mutedUsers.has(uid) && Math.random() < 0.35 && next.add(uid));
       if (amSeated && sending && Math.random() < 0.5) next.add('me');
-      setSpeaking(next);
+      // Same talkers as last tick (often nobody): keep the old Set so the whole room doesn't re-render.
+      setSpeaking((prev) => (prev.size === next.size && [...next].every((u) => prev.has(u)) ? prev : next));
     }, 900);
     return () => clearInterval(t);
   }, [seatedKey, amSeated, sending, mutedUsers, visible]);
@@ -755,7 +760,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         const guest = newGuest(id);
         if (!joinPresence(id, guest, { eventId: `join:${guest}` }).ok) return;
         const g = userById(guest);
-        addMsg({ system: true, text: `${g.name} odaya katıldı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
+        addMsg({ system: true, text: `${g.name} güverteye çıktı${isOwn && myRoom.joinSounds ? ' 🔔' : ''}` });
         // Some joiners own an entry effect; show it if nothing else is playing.
         if (visibleRef.current && !settings.effectsOff && Math.random() < 0.4) {
           const ride = Math.random() < 0.3 ? pick(BOT_RIDES) : undefined;
@@ -764,7 +769,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         gainXp(5);
         setGoal((gl) => (gl && gl.kind === 'join' ? { ...gl, progress: gl.progress + 1 } : gl));
       } else if (r < 0.28) {
-        // Someone on the Balkon leaves (never the owner or a manager; mics stay as they are).
+        // Someone on the Güverte leaves (never the owner or a manager; mics stay as they are).
         const leaving = deriveView(room).balconyIds.filter((m) => m !== 'me' && m !== room.ownerId && !room.adminIds.includes(m));
         if (leaving.length) leavePresence(id, pick(leaving), `leave:${msgId()}`);
       } else if (r < 0.32) {
@@ -804,7 +809,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         addContrib(from.id, lk.price);
         logGift(from.id, 'me', { id: lk.id, name: lk.name, emoji: lk.emoji, price: lk.price }, 1);
         flyGift(lk.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, lk.id);
-        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Lucky) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
+        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Uğurlu) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
         scorePk(tx, from.id, 'me', lk.id, luckyPkPoints(lk));
         return;
       }
@@ -832,7 +837,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOwn]);
 
-  // People on the Balkon want a mic now and then. Queue on: they ask, and the owner/admins approve in
+  // People on the Güverte want a mic now and then. Queue on: they ask, and the owner/admins approve in
   // "Konuşmacı kuyruğu". Queue off: they take a free mic themselves (one is always left for others).
   useEffect(() => {
     const t = setInterval(() => {
@@ -857,7 +862,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, micQueue, canManage]);
-  // Speak requests only for people still on the Balkon: whoever got a mic or left the room drops out.
+  // Speak requests only for people still on the Güverte: whoever got a mic or left the room drops out.
   const queue = balconyOnly(requests, view);
   if (queue.length !== requests.length) setRequests(queue);
 
@@ -1005,24 +1010,25 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (bossId && bossId !== 'me') {
       const u = userById(bossId);
       const options: SheetOption[] = [
-        { label: '👤 Profili gör', onPress: () => router.push(`/kullanici/${bossId}`) },
-        { label: '🎁 Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
-        { label: `ℹ️ Patron ol: 🪙 ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} daha gönder`, onPress: () => showAlert('👑 Patron Koltuğu', bossSeatInfo(bossId, mine, top)) },
+        { label: 'Profili gör', icon: 'person-outline', onPress: () => router.push(`/kullanici/${bossId}`) },
+        { label: 'Hediye gönder', icon: 'gift-outline', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
+        { label: `Dümene geç: ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} jeton daha gönder`, icon: 'information-circle-outline', onPress: () => showAlert('Dümen Koltuğu', bossSeatInfo(bossId, mine, top)) },
       ];
       if (myRole === 'owner')
         options.push({
-          label: '⬇️ Patron koltuğundan indir',
+          label: 'Dümen koltuğundan indir',
+          icon: 'arrow-down-circle-outline',
           destructive: true,
           onPress: () => {
             setBossRemoved((s) => new Set(s).add(bossId));
-            addMsg({ system: true, text: `${u.name} patron koltuğundan indirildi` });
-            logMod('Patron koltuğundan indirdi', u.name);
+            addMsg({ system: true, text: `${u.name} dümen koltuğundan indirildi` });
+            logMod('Dümen koltuğundan indirdi', u.name);
           },
         });
-      setSheet({ title: `👑 Patron · ${u.name} · 🪙 ${top.toLocaleString('tr-TR')}`, options });
+      setSheet({ title: `Dümen · ${u.name} · 🪙 ${top.toLocaleString('tr-TR')}`, options });
       return;
     }
-    showAlert('👑 Patron Koltuğu', bossSeatInfo(bossId, mine, top), bossId === 'me' ? undefined : [
+    showAlert('Dümen Koltuğu', bossSeatInfo(bossId, mine, top), bossId === 'me' ? undefined : [
       { text: 'Kapat', style: 'cancel' },
       { text: 'Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
     ]);
@@ -1209,7 +1215,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           },
         });
       const roleLabel = targetRole === 'owner' ? 'Oda sahibi' : targetRole === 'admin' ? 'Yönetici' : 'Üye';
-      return openSeatMenu(index, `${index + 1}. koltuk · ${u.name} · ${roleLabel}`, items);
+      // Plain members need no role word; the match fits in the menu's one-line title instead.
+      const sim = simScores.get(uid);
+      const parts = [`${index + 1}. koltuk`, u.name, targetRole !== 'member' && roleLabel, sim !== undefined && `%${sim} benzer`].filter(Boolean);
+      return openSeatMenu(index, parts.join(' · '), items);
     }
     if (index === 0) return isOwn ? sitMe(0) : undefined;
     if (canManage) {
@@ -1251,7 +1260,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addMsg({ system: true, text: `🙋 Mikrofon isteğin oda yönetimine gönderildi · sıran: ${pos + 1} · onay bekleniyor` });
   };
 
-  // The big mic button for a listener (Discord Stage style): take a free mic, or raise a hand when all are taken.
+  // The big mic button for a listener: take a free mic, or raise a hand when all are taken.
   const raiseHand = () => {
     if (devicesBusy()) return;
     if (isOwn && allSeats[0] === null) return sitMe(0);
@@ -1349,7 +1358,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const toIds = picked.filter((t) => inRoom.has(t));
     if (!toIds.length) {
       setCombo(null);
-      return showAlert('Lucky gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      return showAlert('Uğurlu hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
     }
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
@@ -1358,7 +1367,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     );
     if (!records.length) {
       errorHaptic();
-      return showAlert('Lucky gönderilemedi', error ?? 'Gönderilemedi.');
+      return showAlert('Uğurlu hediye gönderilemedi', error ?? 'Gönderilemedi.');
     }
     const cfg = getLucky().config;
     const first = records[0];
@@ -1383,20 +1392,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addMsg({
         id: `gift:${first.txId}`,
         system: true,
-        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Lucky) gönderdi`,
+        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Uğurlu) gönderdi`,
         gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count, lucky: true, giftId: first.giftId },
       });
-    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Lucky hediye gönderilemedi (jetonu iade edildi): ${error}` });
+    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Uğurlu hediye gönderilemedi (jetonu iade edildi): ${error}` });
     // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
     if (reward > 0) {
       const wins = records.filter((r) => r.reward > 0).length;
-      announceWin({ userName: ME.name, avatar: app.me.avatar, source: `Lucky › ${first.giftName}`, roomTitle: roomTitleOf(id), mult: best.mult, amount: reward, wins: wins > 1 ? wins : undefined }, { mine: true });
+      announceWin({ userName: ME.name, avatar: app.me.avatar, source: `Uğurlu › ${first.giftName}`, roomTitle: roomTitleOf(id), mult: best.mult, amount: reward, wins: wins > 1 ? wins : undefined }, { mine: true });
     }
     if (best.mult >= cfg.announceFrom)
       addMsg({
         system: true,
         kind: 'gift',
-        text: settings.luckyAnnounce ? `🎉 ${ME.name} Lucky’den ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Lucky’den ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
+        text: settings.luckyAnnounce ? `🎉 ${ME.name} Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
     // Restarts the combo wheel's timer: the time of this send's last draw.
@@ -1473,7 +1482,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // Some friends come right away (a demo stand-in for them opening the card).
     setTimeout(() => {
       if (Math.random() < 0.5 || getRoom(id)?.members.includes(uid)) return;
-      if (joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya katıldı` });
+      if (joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle güverteye çıktı` });
     }, 2500);
   };
   // "Odaya davet et" (owner/admins): every follower of the room's account, once every 24 hours per room.
@@ -1497,7 +1506,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             .slice(0, 2)
             .forEach((uid, i) =>
               setTimeout(() => {
-                if (joinPresence(id, uid, { eventId: `followers:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} takipçi davetiyle odaya katıldı` });
+                if (joinPresence(id, uid, { eventId: `followers:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} takipçi davetiyle güverteye çıktı` });
               }, 3000 * (i + 1)),
             );
         },
@@ -1526,7 +1535,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setPanel(null);
     const access = casinoAccess(g, gameEntry, app.wealthLevel);
     if (!access.ok)
-      return showAlert(g.name, access.reason, access.needWealth ? [{ text: 'Kapat', style: 'cancel' }, { text: 'Servet Seviyem', onPress: () => router.push('/seviye') }] : undefined);
+      return showAlert(g.name, access.reason, access.needWealth ? [{ text: 'Kapat', style: 'cancel' }, { text: 'Cömertlik Seviyem', onPress: () => router.push('/seviye') }] : undefined);
     setGame({ kind: 'casino', id: g.id });
     setGameMin(false);
   };
@@ -1559,9 +1568,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
     },
     {
-      title: 'Casino · Servet Lv.2',
+      title: 'Oyun Salonu · Cömertlik Lv.2',
       variant: 'tile',
-      note: app.wealthLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `Servet Seviyesi 2 ve üzeri üyelere açık · şu an Lv.${app.wealthLevel}`,
+      note: app.wealthLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `Cömertlik Seviyesi 2 ve üstü üyelere açık · şu an Lv.${app.wealthLevel}`,
       items: gameCatalog.casino
         .filter((g) => g.active && g.fromRoom)
         .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
@@ -1605,7 +1614,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
   const clan = isOwn
     ? familyId
-      ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : 'Ailem', href: '/aile' as const, ...(ownFamily ? {} : { art: artSource('oda-ailem') }) }
+      ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : 'Tayfam', href: '/aile' as const, ...(ownFamily ? {} : { art: artSource('oda-ailem') }) }
       : ownAgencyName
         ? { label: ownAgencyName, href: '/ajans' as const, art: ROOM_ICON_ART.agency }
         : null
@@ -1641,7 +1650,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.invites]);
-  // In someone else's room the host invites me to a mic once per visit while I'm on the Balkon (simulated).
+  // In someone else's room the host invites me to a mic once per visit while I'm on the Güverte (simulated).
   const onBalcony = unlocked && !isOwn && !amSeated && view.balconyIds.includes('me');
   const hostInvited = useRef(false);
   useEffect(() => {
@@ -1666,7 +1675,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Chat: personal mutes hide that person's lines on my screen; message settings apply to the Tümü tab.
   const feed = useMemo(() => (silenced.size ? messages.filter((m) => !(m.userId && silenced.has(m.userId) && kindOf(m) === 'chat')) : messages), [messages, silenced]);
   const visibleInAll = useCallback(
-    (m: FeedMsg) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('odaya katıldı'))) && (msgFilter.gifts || kindOf(m) !== 'gift'),
+    (m: FeedMsg) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('güverteye çıktı'))) && (msgFilter.gifts || kindOf(m) !== 'gift'),
     [msgFilter],
   );
 
@@ -1759,6 +1768,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         muted={uid === 'me' && !sending}
         modMuted={!!uid && mutedUsers.has(uid)}
         invitee={!uid && slots[i]?.state === 'invited' && slots[i].invitee ? userById(slots[i].invitee!).name : undefined}
+        similarity={uid ? simScores.get(uid) : undefined}
         role={uid ? roleOf(uid) : i === 0 && extra?.host ? 'owner' : undefined}
         locked={!uid && i > 0 && (lockedSeats.includes(i) || (!amSeated && seatAccess(micQueue, myRole) === 'request'))}
         compact={extra?.compact}
@@ -1776,7 +1786,27 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     );
   };
 
+  // The game keeps running while the room is minimized, so it is the one piece rendered in both states.
+  // Same root View and a fixed key in both returns, so React keeps the game's state across the switch.
+  const gamePanel = game ? (
+    <GamePanel
+      key="game"
+      open={game}
+      entry={gameEntry}
+      players={gamePlayers}
+      hidden={gameMin || !full}
+      voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
+      onSwitch={setGame}
+      onMinimize={() => setGameMin(true)}
+      onClose={() => setGame(null)}
+      onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
+    />
+  ) : null;
+
   if (!unlocked) return full ? <PasswordGate title={title} password={password} onPass={() => setUnlocked(true)} /> : null;
+  // Minimized: the host hides this view, so drawing seats, chat and effects would be wasted work on
+  // every room tick. Session, audio and timers live in hooks above and keep running.
+  if (!full) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{gamePanel}</View>;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StageBackdrop theme={theme} />
@@ -1844,7 +1874,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics. Capped so the Balkon and the chat always keep their space on small phones; scrolls when taller. */}
+          {/* Stage: boards and mics. Capped so the Güverte and the chat always keep their space on small phones; scrolls when taller. */}
           <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58) }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
@@ -2256,19 +2286,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         </Pressable>
       )}
       {flights.length > 0 && <GiftFlights flights={flights} onDone={(k) => setFlights((f) => f.filter((x) => x.key !== k))} />}
-      {game && (
-        <GamePanel
-          open={game}
-          entry={gameEntry}
-          players={gamePlayers}
-          hidden={gameMin || !full}
-          voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
-          onSwitch={setGame}
-          onMinimize={() => setGameMin(true)}
-          onClose={() => setGame(null)}
-          onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
-        />
-      )}
+      {gamePanel}
       {game && gameMin && (
         <Pressable style={styles.gameChip} onPress={() => setGameMin(false)} accessibilityLabel="Oyuna dön">
           <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>

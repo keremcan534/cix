@@ -62,12 +62,19 @@ export type BankState = {
   bdView: boolean;
 };
 
-let state: BankState = { accounts: {}, payouts: [], entries: [], audit: [], bdView: false };
+const initialState = (): BankState => ({ accounts: {}, payouts: [], entries: [], audit: [], bdView: false });
+let state: BankState = initialState();
 const listeners = new Set<() => void>();
 const emit = (next: BankState) => {
   state = next;
   listeners.forEach((l) => l());
 };
+/** The current state outside React (tests, like getGames/getMatch). */
+export const getBank = () => state;
+/** Back to the empty initial state (tests). The id counter keeps running so ids stay unique. */
+export function resetBank() {
+  emit(initialState());
+}
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => {
@@ -100,7 +107,20 @@ const auditRow = (actor: Actor, action: string, detail: string, ref: string): Au
 const sum = (xs: { diamonds: number }[]) => xs.reduce((s, x) => s + x.diamonds, 0);
 
 export const cleanIban = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
-export const validIban = (raw: string) => /^TR\d{24}$/.test(cleanIban(raw));
+/**
+ * TR + 24 digits with correct ISO 13616 check digits: with the first 4 characters moved to the end and letters
+ * read as 10–35, the number mod 97 must be 1. Worked out digit by digit, so no BigInt is needed.
+ */
+export const validIban = (raw: string) => {
+  const iban = cleanIban(raw);
+  if (!/^TR\d{24}$/.test(iban)) return false;
+  let rest = 0;
+  for (const ch of iban.slice(4) + iban.slice(0, 4)) {
+    const v = parseInt(ch, 36);
+    rest = (rest * (v > 9 ? 100 : 10) + v) % 97;
+  }
+  return rest === 1;
+};
 export const accountLabel = (a: Pick<PayoutAccount, 'kind' | 'iban' | 'provider' | 'handle'>) =>
   a.kind === 'bank' ? `IBAN ${cleanIban(a.iban ?? '').slice(0, 4)} •••• ${cleanIban(a.iban ?? '').slice(-4)}` : `${a.provider} · ${a.handle}`;
 

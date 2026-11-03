@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimac
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { colors, gradientDeep, semantic } from '@/theme';
+import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { messagePreview } from '@/components/ReactionArt';
 
@@ -34,19 +34,29 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'today', label: 'Bugün' },
 ];
 
-// Fallback cover for the "Parti Odası" row when no room was visited yet: the busiest room.
+// Fallback cover for the "Canlı Odalar" row when no room was visited yet: the busiest room.
 const POPULAR_ROOM = [...ROOMS].sort((a, b) => b.listeners - a.listeners)[0];
 
 type Friend = { user: User; iFollow: boolean; followsMe: boolean };
 
 export default function MessagesScreen() {
   const { conversations, blocked, following, recentRooms, vipDays, markRead, myRoom } = useApp();
-  const [tab, setTab] = useState<Tab>('messages');
+  // Profil › Arkadaşlar opens this tab on Arkadaşlarım (the tab stays mounted, so follow later visits too).
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const asked = params.tab === 'friends' || params.tab === 'calls' ? params.tab : null;
+  const [tab, setTab] = useState<Tab>(asked ?? 'messages');
+  const [lastAsked, setLastAsked] = useState(asked);
+  if (asked !== lastAsked) {
+    setLastAsked(asked);
+    if (asked) setTab(asked);
+  }
   const [filter, setFilter] = useState<Filter>('all');
   const [menuOpen, setMenuOpen] = useState(false);
   const [visitorsOpen, setVisitorsOpen] = useState(false);
   const [visitorsSeen, setVisitorsSeen] = useState(false);
   const [clearedCalls, setClearedCalls] = useState(false);
+  const { colors, gradientDeep } = useTheme();
+  const styles = useStyles();
 
   // Conversations (blocked users hidden), then the active chip filter.
   const visibleConvs = conversations.filter((c) => !blocked.has(c.userId));
@@ -70,7 +80,7 @@ export default function MessagesScreen() {
   const calls = clearedCalls ? [] : CALL_HISTORY.filter((c) => !blocked.has(c.userId));
   const visitors = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId));
 
-  // Last visited room for the "Parti Odası" row.
+  // Last visited room for the "Canlı Odalar" row.
   const lastRoomId = recentRooms[0];
   const lastRoom = lastRoomId ? ROOMS.find((r) => r.id === lastRoomId) : undefined;
   const partyCover = lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover);
@@ -135,8 +145,8 @@ export default function MessagesScreen() {
           <SystemRow
             icon={<Ionicons name="mic" size={22} color="#fff" />}
             iconColors={gradientDeep}
-            title="Parti Odası"
-            subtitle={lastRoom ? `Katıldığın oda çok aktif! · ${lastRoom.title}` : 'Katıldığın oda çok aktif!'}
+            title="Canlı Odalar"
+            subtitle={lastRoom ? `Son girdiğin oda · ${lastRoom.title}` : 'Şu an açık odalara göz at'}
             onPress={openParty}
             right={<Image source={{ uri: partyCover }} style={styles.roomCover} />}
           />
@@ -144,24 +154,29 @@ export default function MessagesScreen() {
           <SystemRow
             icon={<Icon3D name="coin" size={30} />}
             iconColors={['#F59E0B', '#FBBF24']}
-            title="Kabileye katıl, jeton kazan"
-            subtitle="Haydi birlikte ücretsiz sohbet edelim!"
+            title="Tayfanı bul"
+            subtitle="Birlikte konuşacak insanlar seni bekliyor"
             onPress={() => router.push('/aile')}
           />
-          <View style={styles.sep} />
-          <SystemRow
-            icon={<Ionicons name="eye" size={22} color="#fff" />}
-            iconColors={['#FF8A97', '#FF6576']}
-            title="Profil ziyaretçilerin"
-            subtitle="Biri seni sık sık gizlice ziyaret ediyor"
-            onPress={openVisitors}
-            right={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {!visitorsSeen && visitors.length > 0 && <CountBadge n={visitors.length} />}
-                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-              </View>
-            }
-          />
+          {/* Only shown when there are visitors to list; the count is the same list the sheet shows. */}
+          {visitors.length > 0 && (
+            <>
+              <View style={styles.sep} />
+              <SystemRow
+                icon={<Ionicons name="eye" size={22} color="#fff" />}
+                iconColors={['#FF8A97', '#FF6576']}
+                title="Profil ziyaretçilerin"
+                subtitle={`Son 7 günde ${visitors.length} kişi profiline baktı`}
+                onPress={openVisitors}
+                right={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {!visitorsSeen && <CountBadge n={visitors.length} />}
+                    <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+                  </View>
+                }
+              />
+            </>
+          )}
         </View>
       )}
     </View>
@@ -178,7 +193,7 @@ export default function MessagesScreen() {
           ))}
         </View>
         <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} accessibilityLabel="Menü">
-          <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
+          <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
         </Pressable>
       </View>
 
@@ -237,6 +252,8 @@ export default function MessagesScreen() {
 }
 
 function TabButton({ label, active, badge, onPress }: { label: string; active: boolean; badge: number; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={styles.tabBtn} accessibilityRole="tab" accessibilityState={{ selected: active }}>
       <View style={styles.tabLabel}>
@@ -253,6 +270,7 @@ function TabButton({ label, active, badge, onPress }: { label: string; active: b
 }
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
@@ -261,6 +279,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 }
 
 function CountBadge({ n }: { n: number }) {
+  const styles = useStyles();
   return (
     <View style={styles.badge}>
       <Text style={styles.badgeText}>{n > 99 ? '99+' : n}</Text>
@@ -283,6 +302,8 @@ function SystemRow({
   right?: ReactNode;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={({ pressed }) => [styles.sysRow, pressed && { opacity: 0.8 }]} onPress={onPress}>
       <LinearGradient colors={iconColors} style={styles.sysIcon}>
@@ -302,6 +323,7 @@ function SystemRow({
 }
 
 function AvatarWithBadge({ user, size, unread }: { user: User; size: number; unread: number }) {
+  const styles = useStyles();
   return (
     <View>
       <Avatar uri={user.avatar} size={size} online={user.online} />
@@ -317,6 +339,8 @@ function AvatarWithBadge({ user, size, unread }: { user: User; size: number; unr
 function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntimacy: boolean }) {
   const u = userById(conv.userId);
   const last = conv.messages[conv.messages.length - 1];
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/sohbet/${u.id}`)}>
       <AvatarWithBadge user={u} size={52} unread={conv.unread} />
@@ -334,7 +358,7 @@ function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntim
             </View>
           )}
         </View>
-        <Text style={[styles.last, conv.unread > 0 && { color: '#fff' }]} numberOfLines={1}>
+        <Text style={[styles.last, conv.unread > 0 && { color: colors.text }]} numberOfLines={1}>
           {last ? `${last.fromMe ? 'Sen: ' : ''}${messagePreview(last.text)}` : ''}
         </Text>
       </View>
@@ -346,6 +370,8 @@ function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntim
 function FriendRow({ friend }: { friend: Friend }) {
   const { user: u, iFollow, followsMe } = friend;
   const relation = iFollow && followsMe ? 'Karşılıklı takip' : iFollow ? 'Takip ediyorsun' : 'Seni takip ediyor';
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${u.id}`)}>
       <Avatar uri={u.avatar} size={50} online={u.online} />
@@ -358,7 +384,7 @@ function FriendRow({ friend }: { friend: Friend }) {
           {u.vip && <VipBadge />}
         </View>
         <Text style={styles.last} numberOfLines={1}>
-          <Text style={{ color: u.online ? semantic.live : colors.textDim }}>{u.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
+          <Text style={{ color: u.online ? semantic.actionText : colors.textDim }}>{u.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
           {` · ${relation}`}
         </Text>
       </View>
@@ -369,15 +395,18 @@ function FriendRow({ friend }: { friend: Friend }) {
   );
 }
 
-const CALL_DIR: Record<CallLog['direction'], { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+const callDirOf = ({ colors }: Theme): Record<CallLog['direction'], { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> => ({
   in: { label: 'Gelen', icon: 'arrow-down', color: colors.green },
   out: { label: 'Giden', icon: 'arrow-up', color: colors.primaryText },
   missed: { label: 'Cevapsız', icon: 'close', color: colors.red },
-};
+});
 
 function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }) {
   const u = userById(call.userId);
-  const dir = CALL_DIR[call.direction];
+  const t = useTheme();
+  const { colors, gradientDeep } = t;
+  const styles = useStyles();
+  const dir = callDirOf(t)[call.direction];
   const video = call.kind === 'video';
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${u.id}`)}>
@@ -408,6 +437,8 @@ function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }
 }
 
 function VisitorsSheet({ visible, visitors, onClose }: { visible: boolean; visitors: typeof PROFILE_VISITORS; onClose: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
@@ -457,7 +488,7 @@ function VisitorsSheet({ visible, visitors, onClose }: { visible: boolean; visit
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, lift, dark }) => ({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -468,7 +499,7 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 18, alignItems: 'flex-end' },
   tabBtn: { alignItems: 'center', gap: 5 },
   tabText: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
-  tabTextActive: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  tabTextActive: { color: colors.text, fontSize: 20, fontWeight: '800' },
   tabLine: {
     width: 18,
     height: 3,
@@ -510,6 +541,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 18,
     overflow: 'hidden',
+    ...lift,
   },
   sysRow: {
     flexDirection: 'row',
@@ -556,7 +588,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  name: { color: '#fff', fontWeight: '700', fontSize: 15, flexShrink: 1 },
+  name: { color: colors.text, fontWeight: '700', fontSize: 15, flexShrink: 1 },
   last: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
   time: { color: colors.textDim, fontSize: 12 },
   badge: {
@@ -583,7 +615,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: 'rgba(19,217,223,0.18)',
+    backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -615,7 +647,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginBottom: 10,
   },
-  sheetTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  sheetTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
   sheetSub: {
     color: colors.textDim,
     fontSize: 12,
@@ -631,4 +663,4 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 14,
   },
-});
+}));

@@ -8,26 +8,29 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
-import { colors, radius, semantic, space } from '@/theme';
+import { makeStyles, radius, space, useTheme, type Theme } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 export type ListTone = 'action' | 'social' | 'money' | 'success' | 'danger' | 'neutral';
 
-const TONE: Record<ListTone, string> = {
-  action: semantic.action,
-  social: semantic.social,
-  money: semantic.money,
-  success: semantic.success,
-  danger: semantic.danger,
-  neutral: colors.textDim,
-};
+/** The tone's color as an icon on the group's surface (also tints the tile behind it). */
+const toneColor = ({ semantic, colors }: Theme, t: ListTone): string =>
+  ({
+    action: semantic.actionText,
+    social: semantic.socialText,
+    money: semantic.moneyText,
+    success: semantic.successText,
+    danger: semantic.danger,
+    neutral: colors.textDim,
+  })[t];
 
 /** Section: label above, rows in one rounded surface, footnote below. Falsy children (conditional rows) are skipped. */
 export function ListGroup({ label, footer, children }: { label?: string; footer?: ReactNode; children: ReactNode }) {
+  const s = useStyles();
   const rows = Children.toArray(children).filter(isValidElement);
   return (
     <View style={s.section}>
-      {!!label && <Text style={s.label}>{label}</Text>}
+      {!!label && <Text style={s.label}>{label.toLocaleUpperCase('tr-TR')}</Text>}
       <View style={s.group}>
         {rows.map((row, i) => (
           <Fragment key={row.key ?? i}>
@@ -70,7 +73,9 @@ export function ListRow({
   chevron?: boolean;
   accessibilityLabel?: string;
 }) {
-  const c = destructive ? semantic.danger : TONE[tone];
+  const t = useTheme();
+  const s = useStyles();
+  const c = destructive ? t.semantic.danger : toneColor(t, tone);
   const body = (
     <>
       {leading ?? (icon && (
@@ -79,14 +84,14 @@ export function ListRow({
         </View>
       ))}
       <View style={s.text}>
-        <Text style={[s.title, destructive && { color: semantic.danger }]} numberOfLines={2}>
+        <Text style={[s.title, destructive && { color: t.semantic.danger }]} numberOfLines={2}>
           {title}
         </Text>
         {!!subtitle && <Text style={s.subtitle}>{subtitle}</Text>}
       </View>
       {!!value && <Text style={s.value} numberOfLines={1}>{value}</Text>}
       {right}
-      {chevron && <Ionicons name="chevron-forward" size={18} color={colors.textDim} style={{ opacity: 0.7 }} />}
+      {chevron && <Ionicons name="chevron-forward" size={18} color={t.colors.textDim} style={{ opacity: 0.7 }} />}
     </>
   );
   if (!onPress) return <View style={[s.row, disabled && s.disabled]}>{body}</View>;
@@ -113,6 +118,9 @@ export function ListSwitch({
   disabled,
   ...row
 }: Omit<Parameters<typeof ListRow>[0], 'right' | 'onPress' | 'chevron' | 'value'> & { value: boolean; onChange: (v: boolean) => void }) {
+  const { colors, dark } = useTheme();
+  // The off track is a step darker than the card in the light scheme, where cardAlt would vanish on white.
+  const off = dark ? colors.cardAlt : colors.border;
   return (
     <ListRow
       {...row}
@@ -122,9 +130,9 @@ export function ListSwitch({
           value={value}
           disabled={disabled}
           onValueChange={onChange}
-          trackColor={{ false: colors.cardAlt, true: colors.primary }}
+          trackColor={{ false: off, true: colors.primary }}
           thumbColor="#fff"
-          ios_backgroundColor={colors.cardAlt}
+          ios_backgroundColor={off}
           accessibilityLabel={row.title}
         />
       }
@@ -134,6 +142,7 @@ export function ListSwitch({
 
 /** Free content inside a group (chip pickers, explanations), padded like a row. */
 export function ListBlock({ title, children }: { title?: string; children: ReactNode }) {
+  const s = useStyles();
   return (
     <View style={s.block}>
       {!!title && <Text style={s.blockTitle}>{title}</Text>}
@@ -144,6 +153,7 @@ export function ListBlock({ title, children }: { title?: string; children: React
 
 /** Single-choice pills for short option lists inside a ListBlock; an option may lead with an icon. */
 export function ChoiceChips<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string, ReactNode?][]; onChange: (v: T) => void }) {
+  const s = useStyles();
   return (
     <View style={s.chips}>
       {options.map(([v, label, lead]) => {
@@ -165,14 +175,14 @@ export function ChoiceChips<T extends string | number>({ value, options, onChang
   );
 }
 
-const s = StyleSheet.create({
+const useStyles = makeStyles(({ colors, surface, dark }) => ({
   section: { gap: space.sm },
-  label: { color: colors.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingHorizontal: space.xs },
-  group: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.08)', marginLeft: 58 },
+  label: { color: colors.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, paddingHorizontal: space.xs },
+  group: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: surface.rim, overflow: 'hidden' },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: surface.hairline, marginLeft: 58 },
   footer: { color: colors.textDim, fontSize: 12, lineHeight: 17, paddingHorizontal: space.xs, opacity: 0.85 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 54, paddingHorizontal: 14, paddingVertical: 10 },
-  pressed: { backgroundColor: 'rgba(255,255,255,0.04)' },
+  pressed: { backgroundColor: surface.pressed },
   disabled: { opacity: 0.45 },
   tile: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   text: { flex: 1, gap: 2 },
@@ -183,7 +193,7 @@ const s = StyleSheet.create({
   blockTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  chipOn: { backgroundColor: 'rgba(19,217,223,0.16)', borderColor: 'rgba(19,217,223,0.55)' },
+  chipOn: { backgroundColor: dark ? 'rgba(19,217,223,0.16)' : 'rgba(0,140,148,0.10)', borderColor: dark ? 'rgba(19,217,223,0.55)' : 'rgba(0,117,123,0.45)' },
   chipText: { color: colors.textDim, fontWeight: '600', fontSize: 13 },
   chipTextOn: { color: colors.text },
-});
+}));

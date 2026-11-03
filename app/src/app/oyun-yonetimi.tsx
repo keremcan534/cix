@@ -1,7 +1,7 @@
 // Admin: the two independent game catalogs (spec §6). Changes apply to both entry points at once,
 // because profile and rooms read the same platform state (lib/games).
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Image, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -11,9 +11,10 @@ import type { CasinoGame } from '@/data/games';
 import { resolve } from '@/data/rbac';
 import { updateCasino, updateRoomGame, useGames } from '@/lib/games';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 
 function Chips<T extends string | number>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
+  const s = useStyles();
   return (
     <View style={s.chips}>
       {options.map(([v, l]) => (
@@ -25,6 +26,7 @@ function Chips<T extends string | number>({ value, options, onChange }: { value:
   );
 }
 function Row({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const s = useStyles();
   return (
     <View style={s.row}>
       <Text style={s.label}>{label}</Text>
@@ -36,6 +38,7 @@ function Row({ label, value, onChange }: { label: string; value: boolean; onChan
 /** Game name line: the game's 3D cover when it has one, otherwise its emoji. */
 function GameTitle({ id, emoji, children }: { id: string; emoji: string; children: React.ReactNode }) {
   const art = gameArtOf(id);
+  const s = useStyles();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       {art && <Image source={art} style={{ width: 22, height: 22 }} />}
@@ -52,6 +55,8 @@ export default function GameAdmin() {
   const { roomGames, casino, history, bank } = useGames();
   const [tab, setTab] = useState<'room' | 'casino'>('room');
   const can = resolve(rbac, 'me', 'games.manage', { type: 'platform' });
+  const { colors } = useTheme();
+  const s = useStyles();
 
   if (!can.allowed)
     return (
@@ -69,7 +74,7 @@ export default function GameAdmin() {
           value={tab}
           options={[
             ['room', 'Ücretsiz oda oyunları'],
-            ['casino', 'Casino (Servet Lv.2)'],
+            ['casino', 'Oyun Salonu (Cömertlik Lv.2)'],
           ]}
           onChange={setTab}
         />
@@ -109,11 +114,11 @@ export default function GameAdmin() {
                 </GameTitle>
                 <Row label="Aktif" value={g.active} onChange={(v) => updateCasino(g.id, { active: v })} />
                 <Text style={s.label}>Minimum VIP seviyesi</Text>
-                <Chips value={g.minWealth} options={[1, 2, 3, 5, 10].map((n) => [n, `Servet Lv.${n}`] as [number, string])} onChange={(v) => updateCasino(g.id, { minWealth: v })} />
-                <Row label="Profildeki Oyun Merkezi'nden" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />
+                <Chips value={g.minWealth} options={[1, 2, 3, 5, 10].map((n) => [n, `Cömertlik Lv.${n}`] as [number, string])} onChange={(v) => updateCasino(g.id, { minWealth: v })} />
+                <Row label="Profildeki Oyun Salonu'ndan" value={g.fromProfile} onChange={(v) => updateCasino(g.id, { fromProfile: v })} />
                 <Row label="Oda içinden" value={g.fromRoom} onChange={(v) => updateCasino(g.id, { fromRoom: v })} />
                 <Text style={s.label}>Günlük limit (kullanıcı başına)</Text>
-                <Chips value={g.dailyLimit} options={[1000, 3000, 5000, 20000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />
+                <Chips value={g.dailyLimit} options={[40_000, 200_000, 400_000, 1_000_000].map((n) => [n, `${n.toLocaleString('tr-TR')} jeton`] as [number, string])} onChange={(v) => updateCasino(g.id, { dailyLimit: v })} />
                 <Text style={s.label}>Sağlayıcı bağlantısı</Text>
                 <Chips<CasinoGame['providerStatus']>
                   value={g.providerStatus}
@@ -125,7 +130,7 @@ export default function GameAdmin() {
                   onChange={(v) => updateCasino(g.id, { providerStatus: v })}
                 />
                 <Text style={s.dim}>
-                  Bahisler: {g.bets.join(' / ')} jeton · {g.rules}
+                  Bahisler: {g.bets.map((b) => b.toLocaleString('tr-TR')).join(' / ')} jeton · {g.rules}
                 </Text>
                 <Text style={s.dim}>Lisans: {g.license}</Text>
               </Card>
@@ -156,13 +161,13 @@ export default function GameAdmin() {
   );
 }
 
-const s = StyleSheet.create({
-  title: { color: '#fff', fontWeight: '800', fontSize: 15 },
+const useStyles = makeStyles(({ colors, semantic, dark }) => ({
+  title: { color: colors.text, fontWeight: '800', fontSize: 15 },
   label: { color: colors.text, fontSize: 13, flex: 1 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
-  chipOn: { borderColor: semantic.action, backgroundColor: 'rgba(19,217,223,0.15)' },
+  chipOn: { borderColor: semantic.actionText, backgroundColor: dark ? 'rgba(19,217,223,0.15)' : 'rgba(0,140,148,0.09)' },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
-});
+}));

@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
@@ -18,10 +18,13 @@ import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
 import { useApp } from '@/store';
-import { colors, gradientDeep } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
+import { Photo } from '@/components/photo';
 
 export function ChatThread({ user, header, compact }: { user: User; /** Rendered above the thread; gets the "typing…" state. */ header: (typing: boolean) => ReactNode; /** Smaller intro, for sheets. */ compact?: boolean }) {
   const { conversations, sendMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
+  const { colors, gradientDeep } = useTheme();
+  const styles = useStyles();
   const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
   const mutual = following.has(user.id) && FOLLOWS_ME.has(user.id);
   const isBlocked = blocked.has(user.id);
@@ -110,9 +113,9 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
             ) : (
               <View style={{ gap: 6 }}>
                 <View style={[styles.bubble, styles.theirs]}>
-                  <MessageText text={item.text} style={styles.bubbleText} />
-                  {item.room && <RoomCard room={item.room} />}
-                  <Text style={styles.time}>{item.time}</Text>
+                  <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />
+                  {item.room && <RoomCard room={item.room} theirs />}
+                  <Text style={[styles.time, styles.theirsTime]}>{item.time}</Text>
                 </View>
                 <SafetyNote
                   text={item.text}
@@ -175,23 +178,27 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   );
 }
 
-/** Room invite sent from a room's "Paylaş": opens the room. */
-function RoomCard({ room }: { room: RoomInviteCard }) {
+/** Room invite sent from a room's "Paylaş": opens the room. `theirs` sits on the other side's themed bubble. */
+function RoomCard({ room, theirs }: { room: RoomInviteCard; theirs?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
-    <Pressable onPress={() => router.push(`/oda/${room.roomId}`)} style={styles.roomCard} accessibilityRole="button" accessibilityLabel={`${room.title} odasına katıl`}>
-      <Image source={{ uri: room.cover }} style={styles.roomCover} />
+    <Pressable onPress={() => router.push(`/oda/${room.roomId}`)} style={[styles.roomCard, theirs && styles.roomCardTheirs]} accessibilityRole="button" accessibilityLabel={`${room.title} odasına katıl`}>
+      <Photo uri={room.cover} kind="cover" seed={room.roomId} style={styles.roomCover} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={styles.roomTitle} numberOfLines={1}>
+        <Text style={[styles.roomTitle, theirs && styles.theirsText]} numberOfLines={1}>
           {room.title}
         </Text>
-        <Text style={styles.roomJoin}>🎙️ Odaya katıl</Text>
+        <Text style={[styles.roomJoin, theirs && styles.roomJoinTheirs]}>🎙️ Odaya katıl</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#fff" />
+      <Ionicons name="chevron-forward" size={18} color={theirs ? colors.text : '#fff'} />
     </Pressable>
   );
 }
 
 function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const warning = incomingWarning(scanMessage(text));
   if (!warning) return null;
   return (
@@ -205,22 +212,28 @@ function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   safety: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '88%', backgroundColor: 'rgba(246,189,96,0.12)', borderColor: 'rgba(246,189,96,0.4)', borderWidth: 1, borderRadius: 12, padding: 10 },
   safetyText: { color: colors.text, fontSize: 12, lineHeight: 17, flex: 1 },
   safetyLink: { color: colors.gold, fontWeight: '800', fontSize: 13 },
   status: { color: colors.textDim, fontSize: 12 },
   intro: { alignItems: 'center', gap: 6, paddingVertical: 24 },
-  introName: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  introName: { color: colors.text, fontSize: 18, fontWeight: '700' },
   bubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  theirs: { alignSelf: 'flex-start', backgroundColor: colors.cardAlt, borderBottomLeftRadius: 4 },
+  // The other side's bubble is a themed card (a white card with a rim and soft shadow in the light scheme); my own
+  // bubble stays on the deep turquoise gradient with white text.
+  theirs: { alignSelf: 'flex-start', backgroundColor: dark ? colors.cardAlt : colors.card, borderBottomLeftRadius: 4, ...lift },
   bubbleText: { color: '#fff', fontSize: 15 },
+  theirsText: { color: colors.text },
   time: { color: 'rgba(255,255,255,0.6)', fontSize: 11, alignSelf: 'flex-end', marginTop: 2 },
+  theirsTime: { color: ink(0.6) },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 200 },
+  roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },
   roomCover: { width: 44, height: 44, borderRadius: 10 },
   roomTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
   roomJoin: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
+  roomJoinTheirs: { color: ink(0.8) },
   notice: { paddingHorizontal: 16, paddingVertical: 6, color: colors.textDim, textAlign: 'center', fontSize: 12 },
   paywall: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, marginHorizontal: 16, marginVertical: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(246,189,96,0.1)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.3)' },
   paywallText: { color: colors.gold, fontSize: 12, fontWeight: '600', flexShrink: 1 },
@@ -228,11 +241,13 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     backgroundColor: colors.card,
-    color: '#fff',
+    color: colors.text,
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
+    // Light: a white pill on the paper needs a rim to read as a field.
+    ...(dark ? null : { borderWidth: 1, borderColor: colors.border }),
   },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-});
+}));

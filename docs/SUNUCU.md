@@ -20,7 +20,7 @@
 | Çağrı | Ne yapar |
 |---|---|
 | `GET /api/health` | Herkese açık: veritabanı yanıt veriyor mu, çalışan sürüm (commit), açık kalma süresi. Veritabanı yoksa 503. |
-| `GET /api/me` | Hesap ve bakiyeler (jeton, elmas, oyun bakiyesi), telefon, SVIP puanı |
+| `GET /api/me` | Hesap ve bakiyeler (jeton, elmas, oyun bakiyesi), telefon, İnci puanı |
 | `GET /api/ledger` | Son 50 işlem, her satırda işlem sonrası bakiye |
 | `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 jeton, günde en fazla 50.000. |
 | `POST /api/wallet/gift` `{to, amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): serbest miktarlı aktarım (Sunucu hesabı ekranı). Gerçek hediye `/api/gifts/send`. |
@@ -38,10 +38,29 @@ SMS sağlayıcısı `.env` içinde `SMS_PROVIDER`: `netgsm` (Netgsm REST v2, `NE
 **Hediye, sıralama, satın alma (`gifts.mjs`, `catalog.mjs`, `purchases.mjs`)**
 | Çağrı | Ne yapar |
 |---|---|
-| `GET /api/catalog` | Herkese açık: hediyeler (ad, fiyat, kategori, SVIP sınırı), adetler, jeton paketleri, SVIP eşikleri. Uygulamadaki veriyle aynı olduğu `app/tests/server-catalog.test.ts` ile denetlenir. |
-| `POST /api/gifts/send` `{to, giftId, count, room?, ref}` | Fiyatı sunucu belirler; uygulama yalnız hangi hediye ve kaç adet olduğunu söyler. Jeton → alıcıya bire bir elmas, tek işlemde. SVIP sınırlı hediyeler kontrol edilir. Oda dışındaki hediyede alıcıya bildirim gider. |
-| `GET /api/rankings?board=wealth\|charm&period=day\|week\|month` | Servet (gönderilen) ve cazibe (alınan) sıralaması, Türkiye saatine göre gün/hafta/ay, ilk 50 |
-| `POST /api/wallet/purchase` | Mağaza satın alımı: Google Play (`token`, hizmet hesabıyla Play Developer API) veya App Store (`transactionId`, App Store Server API, önce üretim sonra sandbox). Her makbuz bir kez yüklenir; başka hesapta kullanılmış makbuz reddedilir; paketin ilk alımında ilk alım hediyesi eklenir; alınan jeton SVIP puanı olur. Play ürünü tüketilir, paket tekrar alınabilir. Ürün kimlikleri `coins_<jeton>` (ör. `coins_1000`). |
+| `GET /api/catalog` | Herkese açık: hediyeler (ad, fiyat, kategori, İnci sınırı), adetler, jeton paketleri, İnci eşikleri. Uygulamadaki veriyle aynı olduğu `app/tests/server-catalog.test.ts` ile denetlenir. |
+| `POST /api/gifts/send` `{to, giftId, count, room?, ref}` | Fiyatı sunucu belirler; uygulama yalnız hangi hediye ve kaç adet olduğunu söyler. Jeton → alıcıya bire bir elmas, tek işlemde. İnci sınırlı hediyeler kontrol edilir. Oda dışındaki hediyede alıcıya bildirim gider. |
+| `GET /api/rankings?board=wealth\|charm&period=day\|week\|month` | Cömertlik (gönderilen) ve Yankı (alınan) sıralaması, Türkiye saatine göre gün/hafta/ay, ilk 50 |
+| `POST /api/wallet/purchase` | Mağaza satın alımı: Google Play (`token`, hizmet hesabıyla Play Developer API) veya App Store (`transactionId`, App Store Server API, önce üretim sonra sandbox). Her makbuz bir kez yüklenir; başka hesapta kullanılmış makbuz reddedilir; paketin ilk alımında ilk alım hediyesi eklenir; alınan jeton İnci puanı olur. Play ürünü tüketilir, paket tekrar alınabilir. Ürün kimlikleri `coins_<jeton>` (ör. `coins_1000`). |
+
+**Jeton kaynağı, elmas kilidi, Jeton Noktası (`wallet.mjs`, `jeton.mjs`)**
+
+Her jeton yüklemesi bir **parti** olur: kanal (Google Play, App Store, İlk alım hediyesi, Jeton Noktası, Toptan alım, Elmas bozdurma, Elmastan çevrildi, Önceki bakiye), tarih, kimden geldiği ve kilit süresi. Harcamada önce mağaza jetonu kullanılır (`COIN_SPEND_ORDER=fifo` ile en eski önce); defter satırı hangi partilerden düştüğünü yazar. Hediyede alıcının elması, ödeyen partinin kilidini alır: **mağaza jetonu 7 gün** (`LOCK_DAYS_STORE`, iade süresi), **Jeton Noktası jetonu 1 gün** (`LOCK_DAYS_JETON`). Jeton Noktası mağazadan aldığı jetonu satarsa kilit 7 gün kalır (mağaza jetonu bankadan geçirilerek kısaltılamaz). Kilitli elmas bakiyede görünür ama çevrilemez, bozdurulamaz, çekilemez.
+
+| Çağrı | Ne yapar |
+|---|---|
+| `GET /api/wallet/earnings` | Gelir: toplam elmas, **çekilebilir**, **kilitli** ve kilitlerin listesi (miktar, kanal, kimden, hangi hediye, açılış zamanı). |
+| `GET /api/wallet/coins` | Jetonlarım nereden geldi: kanal başına kalan, son 50 parti. |
+| `POST /api/wallet/exchange` `{diamonds, ref}` | Gelir > Çevir: yalnız çekilebilir elmas; çıkan jeton "Elmastan çevrildi" partisi (1 gün kilit). |
+| `GET /api/jeton/banks` · `GET /api/jeton/transfers` | Jeton Noktası hesapları; benim gönderdiğim/aldığım aktarımlar. |
+| `POST /api/jeton/transfer` `{to, coins, paymentRef?, note?, ref}` | Yalnız Jeton Noktası: parası dışarıda ödenmiş jetonu kişiye aktarır (`paymentRef`: dekont/havale no). |
+| `POST /api/jeton/sell-diamonds` `{bank, diamonds, ref}` | Anında bozdur: yayıncı çekilebilir elmasını Jeton Noktası'na satar; banka değer + %3 jeton alır, yayıncıya değeri (TL) öder. |
+| `POST /api/admin/jeton/bank` `{user, enabled}` | Yalnız yönetici (`admin`): hesabı Jeton Noktası yapar / geri alır. Moderatör paraya dokunamaz. |
+| `POST /api/admin/jeton/wholesale` `{bank, coins, paymentRef, ref}` | Yalnız yönetici: yönetimden Jeton Noktası'na toptan jeton (%2 indirimli fiyat sunucuda hesaplanır; dekont zorunlu). |
+| `POST /api/admin/purchases/refund` `{purchase}` | Yalnız yönetici: mağaza iadesi/ters ibraz. Satın alınan jetondan harcanmamış kısmı (Jeton Noktası üzerinden geçmiş olsa da) ve henüz kilitli elmasları geri alır; kilidi açılmış elmas `unrecoveredDiamonds` olarak raporlanır. İnci puanı düşer. |
+| `GET /api/admin/wallet/audit?user=` | Yalnız yönetici: bir hesabın bütün para kaydı (satın almalar, partiler, kilitler, aktarımlar, defter, yönetici işlemleri). Anlaşmazlıkta buradan bakılır. |
+
+Kim yükledi, kim aldı, kim aktardı, kimin adına, hangi IP'den, hangi dekontla: aktarımlar `coin_transfers`'ta, yönetici işlemleri `audit_events`'te, her bakiye değişikliği `ledger`'da (kanal, işlemi yapan, ayrıntı). Bu üç tablo **değiştirilemez ve silinemez** (veritabanı tetikleyicisi; API dahil).
 
 **Bildirim, yükleme, ses (`push.mjs`, `media.mjs`, `live.mjs`)**
 | Çağrı | Ne yapar |
@@ -81,9 +100,10 @@ Bakiye yalnızca aynı veritabanı işleminde ledger satırıyla birlikte deği�
 - **002_profiles_social**: `users` tablosuna profil alanları, `role`, `banned_until`, `deleted_at`; `follows`, `blocks`, `reports` (şikâyet kuyruğu).
 - **003_messages_rooms**: `messages` (gönderen + `ref` benzersiz, sohbet çifti dizini), `rooms` (sahip başına tek açık oda), `room_admins`, `room_bans`.
 - **004_launch**: `users.phone` (benzersiz, E.164) ve `users.svip_xp`; `sessions.device` ve `last_seen_at`; `otp_codes` (kod özeti, deneme ve gönderim sayısı), `push_tokens`, `gift_events` (her hediye, sunucu fiyatıyla; sıralamalar buradan), `purchases` (mağaza işlemi başına bir satır, `UNIQUE (platform, transaction_id)`), `room_presence` (LiveKit webhook'larından kim hangi odada).
+- **006_coin_sources**: `users.role`'e `coins_bank`; `coin_lots` (jeton partileri: kanal, kalan, kilit, satın alma/aktarım/kaynak parti), `diamond_locks` (hediye elmasının kilidi, iade edilince `reversed`), `coin_transfers` (toptan, Jeton Noktası satışı, elmas bozdurma; dekont, işlemi yapan, IP), `audit_events` (yönetici işlemleri), `ledger`'a `channel`, `actor`, `detail`. Eski bakiyeler "Önceki bakiye" partisi olur (7 gün kilit). (`005` ajans göçü için ayrıldı.)
 
 ## Testler ve kurulum
-- `server/api/test/`: her dosya boş bir veritabanı açar, API'yi ayrı bir süreç olarak başlatır (`harness.mjs`), HTTP üzerinden dener, sonra veritabanını siler. `api.test.mjs`: giriş, cüzdan, profil, takip/engel, mesaj, oda/ses token'ı, şikâyet/moderasyon, hesap silme. `launch.test.mjs`: sağlık, telefonla giriş (kod API kaydından okunur), oturumlar, mağaza satın alımı, hediye ve sıralama, push (sahte Expo sunucusuyla), LiveKit webhook, imzalı yükleme adresi (AWS'nin örnek imzasıyla), telefonlu hesap silme. Yerelde: `cd server/api && PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test`.
+- `server/api/test/`: her dosya boş bir veritabanı açar, API'yi ayrı bir süreç olarak başlatır (`harness.mjs`), HTTP üzerinden dener, sonra veritabanını siler. `api.test.mjs`: giriş, cüzdan, profil, takip/engel, mesaj, oda/ses token'ı, şikâyet/moderasyon, hesap silme. `launch.test.mjs`: sağlık, telefonla giriş (kod API kaydından okunur), oturumlar, mağaza satın alımı, hediye ve sıralama, push (sahte Expo sunucusuyla), LiveKit webhook, imzalı yükleme adresi (AWS'nin örnek imzasıyla), telefonlu hesap silme. `coins.test.mjs`: jeton kanalı ve partiler, 7 gün / 1 gün elmas kilidi, Çevir'in kilitli elmasa kapalı olması, Jeton Noktası açma (yalnız yönetici), toptan alım, Jeton Noktası satışı (aynı anda iki kopya dahil), kilit mirası, harcama sırası, anında bozdur, iade (Jeton Noktası üzerinden geçen dahil), değiştirilemez kayıtlar, denetim görünümü, partilerin bakiyeye eşitliği. Yerelde: `cd server/api && PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=… npm test`.
 - `.github/workflows/server.yml`: `server/**` değişince testler Postgres 17 ile çalışır. Ana dala birleşince API sunucuya kurulur (`/opt/similar/api` + `docker compose up -d --build api`); commit kimliği `version.txt`'ye yazılır ve `/api/health` yeni sürümü bildirene kadar beklenir.
 - `.github/workflows/uptime.yml`: 15 dakikada bir canlı API'yi (`/api/health`, veritabanı dahil) ve LiveKit'i (`/` → `OK`) yoklar; düşerse GitHub e-posta atar. Alan adı gelince `API_BASE_URL` depo değişkeni. **Bunun için bir kez** GitHub → Settings → Secrets and variables → Actions → `DEPLOY_SSH_KEY` olarak `~/.ssh/oracle.key` içeriği eklenmeli (adres değişirse `DEPLOY_HOST` değişkeni). Anahtar yoksa kurulum adımı atlanır ve elle kurulum (aşağıda) geçerlidir.
 - Bütün ayarlar ve açıklamaları: `server/infra/.env.example` (SMS, ödeme, depolama, yedek, sınırlar). Canlı sunucudaki `.env`'e eksik olanlar eklenir; boş bırakılan özellik kapalı kalır.
@@ -93,7 +113,7 @@ Kod değişince: `scp -r -i ~/.ssh/oracle.key server/api ubuntu@130.61.230.94:/o
 ## Uygulama bağlantısı
 - `app/.env.local`: `EXPO_PUBLIC_API_URL=https://130-61-230-94.sslip.io` ve `EXPO_PUBLIC_LIVEKIT_URL=wss://130-61-230-94.sslip.io`. Bu dosya git'e girmez; yoksa uygulama tamamen yerel prototip verisiyle çalışır. GitHub Pages yayınında açmak için değişkenlerin derlemeye verilmesi gerekir.
 - `lib/api.ts`: giriş (cihaz anahtarı ve oturum AsyncStorage'da), bakiye, işlem kaydı, test yüklemesi, hediye, ses token'ı.
-- Ayarlar → **Sunucu hesabı** (`app/sunucu-hesabi.tsx`): sunucudaki hesap, bakiye ve işlem kaydı; test yüklemesi ve hesap kimliğiyle hediye gönderme. Uygulamanın diğer ekranları (cüzdan, hediye paneli, casino) **henüz yerel bakiyeyi kullanıyor**.
+- Ayarlar → **Sunucu hesabı** (`app/sunucu-hesabi.tsx`): sunucudaki hesap, bakiye ve işlem kaydı; test yüklemesi ve hesap kimliğiyle hediye gönderme. Uygulamanın diğer ekranları (cüzdan, hediye paneli, Oyun Salonu) **henüz yerel bakiyeyi kullanıyor**.
 - Ses (web): `lib/voice-setup.web.ts` gerçek motoru (`lib/livekit-engine.ts`, `livekit-client`) takar; ilk odada cihaz sunucuya giriş yapar, odaya hesap kimliğiyle katılır. Oda adı LiveKit'te `oda-<oda id>`.
 - Native: ses henüz simülasyon. `@livekit/react-native` + config plugin + development build gerekiyor (`docs/ODA_OTURUMU.md`).
 
@@ -126,7 +146,8 @@ Kod kurulumla (`server.yml`) gider; şunlar sunucuda bir kez elle yapılır:
 1. `livekit.yaml`'a webhook bölümü (dinleyici sayıları için): `webhook: {api_key: <LIVEKIT_KEYS'teki anahtar adı>, urls: [http://127.0.0.1:7890/api/livekit/webhook]}`, sonra `docker compose restart livekit`.
 2. `compose.yaml`'da API'ye `LIVEKIT_API_URL: http://127.0.0.1:7880` (kaçırılan webhook'ları temizler) ve servislere kayıt sınırı (`server/infra/compose.yaml`'daki `logging`).
 3. `Caddyfile`'a webhook yolunu dışarıya kapatan blok (`server/infra/Caddyfile`).
-4. Hesaplar geldikçe `.env`'e: `SMS_PROVIDER` ve anahtarları, `GOOGLE_SERVICE_ACCOUNT`, `APPLE_IAP_*`, `S3_*`, `BACKUP_*`. Telefonla giriş açılınca `ALLOW_DEV_AUTH=0`, mağaza ödemesi açılınca `ALLOW_TEST_TOPUP=0`.
+4. Hesaplar geldikçe `.env`'e: `SMS_PROVIDER` ve anahtarları, `GOOGLE_SERVICE_ACCOUNT`, `APPLE_IAP_*`, `S3_*`, `BACKUP_*`. Telefonla giriş açılınca `ALLOW_DEV_AUTH=0`, mağaza ödemesi açılınca `ALLOW_TEST_TOPUP=0`. Kilit süreleri değişecekse `LOCK_DAYS_STORE` (varsayılan 7) ve `LOCK_DAYS_JETON` (1).
+5. İlk Jeton Noktası hesabını bir yönetici açar (`POST /api/admin/jeton/bank`); yönetici hesabı şimdilik veritabanından atanır (`UPDATE users SET role = 'admin' …`).
 
 ## Sırada
 1. Alan adı (ör. `rtc.<alan>`) → `.env` `DOMAIN`, `Caddyfile`, `livekit.yaml` `turn.domain`, `API_BASE_URL` değişkeni.

@@ -1,18 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { ChatThread } from '@/components/chat-thread';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { userById } from '@/data/mock';
-import { colors } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { goBack } from '@/lib/nav';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = userById(id);
+  const { colors } = useTheme();
+  const styles = useStyles();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -21,7 +23,7 @@ export default function ChatScreen() {
         header={(typing) => (
           <View style={styles.header}>
             <Pressable onPress={() => goBack()} hitSlop={10}>
-              <Ionicons name="chevron-back" size={26} color="#fff" />
+              <Ionicons name="chevron-back" size={26} color={colors.text} />
             </Pressable>
             <Pressable
               onPress={() => router.push(`/kullanici/${user.id}`)}
@@ -37,14 +39,14 @@ export default function ChatScreen() {
               </View>
             </Pressable>
             <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={8}>
-              <Ionicons name="call-outline" size={22} color="#fff" />
+              <Ionicons name="call-outline" size={22} color={colors.text} />
             </Pressable>
             <Pressable
               onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'goruntulu' } })}
               hitSlop={8}
               style={{ marginLeft: 14 }}
             >
-              <Ionicons name="videocam-outline" size={24} color="#fff" />
+              <Ionicons name="videocam-outline" size={24} color={colors.text} />
             </Pressable>
           </View>
         )}
@@ -53,7 +55,7 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -63,6 +65,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  name: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  name: { color: colors.text, fontWeight: '700', fontSize: 16 },
   status: { color: colors.textDim, fontSize: 12 },
-});
+}));

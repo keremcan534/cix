@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -14,13 +14,15 @@ import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { charmRankBoost } from '@/data/charm';
 import { wealthCharmOf } from '@/data/profile';
+import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
+import { Photo } from '@/components/photo';
 
-const TABS = ['Senin için', 'Yakındaki'] as const;
+const TABS = ['Benzer', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
 type Gender = 'Hepsi' | 'Kadın' | 'Erkek';
 type Filters = { country: string; gender: Gender; onlineOnly: boolean; newest: boolean };
@@ -30,11 +32,13 @@ const DEFAULT_FILTERS: Filters = { country: 'ALL', gender: 'Hepsi', onlineOnly: 
 const isDefault = (f: Filters) => f.country === 'ALL' && f.gender === 'Hepsi' && !f.onlineOnly && !f.newest;
 
 export default function DiscoverScreen() {
-  const [tab, setTab] = useState<Tab>('Senin için');
+  const [tab, setTab] = useState<Tab>('Benzer');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [greeted, setGreeted] = useState<Set<string>>(new Set());
-  const { blocked, settings, setSetting, sendMessage, bump, following, toggleFollow } = useApp();
+  const { hasGreeted, greet } = useGreet();
+  const { blocked, settings, setSetting, following, toggleFollow } = useApp();
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
   // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
   const needsOptIn = tab === 'Yakındaki' && !settings.cityDiscovery;
   const showDistance = tab === 'Yakındaki' || settings.cityDiscovery;
@@ -42,7 +46,7 @@ export default function DiscoverScreen() {
   let users =
     tab === 'Yakındaki'
       ? USERS.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
-      : // Online first, then Cazibe Seviyesi: charm is what lifts a profile in discovery.
+      : // Online first, then Yankı level: charm is what lifts a profile in discovery.
         [...USERS].sort((a, b) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm));
   if (filters.newest) users = [...users].reverse();
   users = users.filter(
@@ -55,14 +59,6 @@ export default function DiscoverScreen() {
 
   const rows: Row[] = needsOptIn ? [] : users.map((user) => ({ kind: 'user', user }));
   if (rows.length > 0) rows.splice(Math.min(DISCOVER_PROMO.afterIndex, rows.length), 0, { kind: 'promo' });
-
-  const greet = (user: User) => {
-    if (greeted.has(user.id)) return router.push(`/sohbet/${user.id}`);
-    // A greeting is a free icebreaker; follow-up DMs follow the paid-DM rule in the chat screen.
-    sendMessage(user.id, 'Selam! 👋');
-    bump('greetings');
-    setGreeted((prev) => new Set(prev).add(user.id));
-  };
 
   const country = COUNTRIES.find((c) => c.code === filters.country) ?? COUNTRIES[0];
 
@@ -79,7 +75,7 @@ export default function DiscoverScreen() {
               {DISCOVER_SHORTCUTS.map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
                   {/* The shortcut's color lights a navy card from the top instead of filling it. */}
-                  <LinearGradient colors={[`${s.colors[1]}5C`, 'rgba(22,37,60,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
+                  <LinearGradient colors={[`${s.colors[1]}${dark ? '5C' : '33'}`, dark ? 'rgba(22,37,60,0.94)' : 'rgba(255,255,255,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
                     <ShortcutArt id={s.id} emoji={s.emoji} />
                     <Text style={[styles.shortcutTitle, !s.wide && { textAlign: 'center' }]} numberOfLines={1}>
                       {s.title}
@@ -99,10 +95,10 @@ export default function DiscoverScreen() {
               ))}
               <View style={{ flex: 1 }} />
               <Pressable style={styles.iconBtn} onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
-                <Ionicons name="trophy-outline" size={24} color="#fff" />
+                <Ionicons name="trophy-outline" size={24} color={colors.text} />
               </Pressable>
-              <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Ülke ve filtreler">
-                <Text style={{ fontSize: 24 }}>🌍</Text>
+              <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Filtreler">
+                <Ionicons name="options-outline" size={24} color={colors.text} />
                 {!isDefault(filters) && <View style={styles.filterDot} />}
               </Pressable>
             </View>
@@ -136,14 +132,14 @@ export default function DiscoverScreen() {
           needsOptIn ? (
             <View style={styles.optIn}>
               <StateIcon name="location-outline" tone="social" />
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Yakındakileri görmek için şehir bazlı keşfi aç</Text>
+              <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Yakındakileri görmek için şehir bazlı keşfi aç</Text>
               <Text style={{ color: colors.textDim, textAlign: 'center', fontSize: 13 }}>
                 Kesin konumun paylaşılmaz; sadece şehrin kullanılır. Ayarlardan istediğin zaman kapatabilirsin.
               </Text>
               <Pressable style={styles.optInBtn} onPress={() => setSetting('cityDiscovery', true)}>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>Şehir bazlı keşfi aç</Text>
               </Pressable>
-              <Pressable onPress={() => setTab('Senin için')}>
+              <Pressable onPress={() => setTab('Benzer')}>
                 <Text style={{ color: colors.textDim }}>Şimdilik herkesi göster</Text>
               </Pressable>
             </View>
@@ -161,7 +157,7 @@ export default function DiscoverScreen() {
             <UserRow
               user={item.user}
               showDistance={showDistance}
-              greeted={greeted.has(item.user.id)}
+              greeted={hasGreeted(item.user.id)}
               onGreet={() => greet(item.user)}
               isFollowing={following.has(item.user.id)}
               onToggleFollow={() => toggleFollow(item.user.id)}
@@ -176,18 +172,20 @@ export default function DiscoverScreen() {
 }
 
 function ShortcutArt({ id, emoji }: { id: string; emoji: string }) {
+  const { colors, ink } = useTheme();
+  const styles = useStyles();
   if (id === 'call')
     return (
       <View style={styles.artRow}>
-        <Ionicons name="mic" size={26} color="rgba(255,255,255,0.9)" />
+        <Ionicons name="mic" size={26} color={ink(0.9)} />
         <Ionicons name="heart" size={22} color="#F87171" />
-        <Ionicons name="videocam" size={26} color="rgba(255,255,255,0.9)" />
+        <Ionicons name="videocam" size={26} color={ink(0.9)} />
       </View>
     );
   if (id === 'party')
     return (
       <View style={styles.artCenter}>
-        <Ionicons name="stats-chart" size={12} color="#fff" style={{ position: 'absolute', left: 0, top: 0 }} />
+        <Ionicons name="stats-chart" size={12} color={colors.text} style={{ position: 'absolute', left: 0, top: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {PARTY_AVATAR_IDS.map((uid, i) => (
             <Image
@@ -231,11 +229,13 @@ function UserRow({
 }) {
   const female = user.gender === 'Kadın';
   const { me } = useApp();
+  const { colors, semantic } = useTheme();
+  const styles = useStyles();
   const sim = similarity(me, user);
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
       <View>
-        <Image source={{ uri: user.avatar }} style={styles.photo} />
+        <Photo uri={user.avatar} kind="face" style={styles.photo} />
         {user.online && <View style={styles.onlineDot} />}
       </View>
       <View style={{ flex: 1, gap: 5 }}>
@@ -272,8 +272,8 @@ function UserRow({
       <View style={{ alignItems: 'center', gap: 8 }}>
         <Pressable onPress={onGreet} hitSlop={6}>
           <View style={[styles.hiBtn, { backgroundColor: greeted ? colors.cardAlt : semantic.socialFill }]} accessibilityRole="button" accessibilityLabel={greeted ? `${user.name} ile sohbet` : `${user.name} kişisine selam ver`}>
-            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color="#fff" />
-            <Text style={styles.hiText}>{greeted ? 'Sohbet' : 'Selam'}</Text>
+            <Ionicons name={greeted ? 'chatbubble-ellipses' : 'hand-left'} size={13} color={greeted ? colors.text : '#fff'} />
+            <Text style={[styles.hiText, greeted && { color: colors.text }]}>{greeted ? 'Sohbet' : 'Selam'}</Text>
           </View>
         </Pressable>
         <Pressable onPress={onToggleFollow} hitSlop={6} style={styles.followBtn}>
@@ -287,11 +287,12 @@ function UserRow({
 
 function PromoCard() {
   const room = roomById(DISCOVER_PROMO.roomId);
+  const styles = useStyles();
   return (
     <Pressable style={styles.promoWrap} onPress={() => router.push(`/oda/${room.id}`)}>
       <LinearGradient colors={['rgba(255,101,118,0.22)', 'rgba(19,217,223,0.22)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
         <View style={styles.promoTop}>
-          <Image source={{ uri: room.cover }} style={styles.promoCover} />
+          <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.promoCover} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.promoTitle} numberOfLines={1}>
               {room.title}
@@ -324,6 +325,10 @@ function FilterSheet({
   onClose: () => void;
 }) {
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => onChange({ ...filters, [k]: v });
+  const { colors, dark } = useTheme();
+  const styles = useStyles();
+  // The off track is a step darker than the sheet in the light scheme, where cardAlt would vanish on white.
+  const off = dark ? colors.cardAlt : colors.border;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
@@ -334,7 +339,7 @@ function FilterSheet({
         <View style={styles.optionWrap}>
           {COUNTRIES.map((c) => (
             <Pressable key={c.code} onPress={() => set('country', c.code)} style={[styles.option, filters.country === c.code && styles.optionActive]}>
-              <Text style={[styles.optionText, filters.country === c.code && { color: '#fff' }]}>
+              <Text style={[styles.optionText, filters.country === c.code && { color: colors.text }]}>
                 {c.flag} {c.name}
               </Text>
             </Pressable>
@@ -345,23 +350,23 @@ function FilterSheet({
         <View style={styles.optionWrap}>
           {(['Hepsi', 'Kadın', 'Erkek'] as const).map((g) => (
             <Pressable key={g} onPress={() => set('gender', g)} style={[styles.option, filters.gender === g && styles.optionActive]}>
-              <Text style={[styles.optionText, filters.gender === g && { color: '#fff' }]}>{g}</Text>
+              <Text style={[styles.optionText, filters.gender === g && { color: colors.text }]}>{g}</Text>
             </Pressable>
           ))}
         </View>
 
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Sadece çevrimiçi</Text>
-          <Switch value={filters.onlineOnly} onValueChange={(v) => set('onlineOnly', v)} trackColor={{ true: colors.primary, false: colors.cardAlt }} />
+          <Switch value={filters.onlineOnly} onValueChange={(v) => set('onlineOnly', v)} trackColor={{ true: colors.primary, false: off }} />
         </View>
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Yeni üyeler önce</Text>
-          <Switch value={filters.newest} onValueChange={(v) => set('newest', v)} trackColor={{ true: colors.primary, false: colors.cardAlt }} />
+          <Switch value={filters.newest} onValueChange={(v) => set('newest', v)} trackColor={{ true: colors.primary, false: off }} />
         </View>
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
           <Pressable style={[styles.sheetBtn, { backgroundColor: colors.cardAlt }]} onPress={() => onChange(DEFAULT_FILTERS)}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Sıfırla</Text>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>Sıfırla</Text>
           </Pressable>
           <Pressable style={[styles.sheetBtn, { backgroundColor: colors.primary }]} onPress={onClose}>
             <Text style={{ color: '#fff', fontWeight: '800' }}>Tamam</Text>
@@ -372,25 +377,26 @@ function FilterSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
-  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, borderWidth: 1, borderColor: surface.hairline, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   shortcutWide: { width: 150 },
-  shortcutTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  shortcutSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+  shortcutTitle: { color: colors.text, fontWeight: '800', fontSize: 15 },
+  shortcutSub: { color: ink(0.8), fontSize: 12 },
   artRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   artCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
-  partyAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff', backgroundColor: colors.cardAlt },
+  // White rings read on the navy card; on paper a soft shadow keeps the stacked faces apart.
+  partyAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff', backgroundColor: colors.cardAlt, ...(dark ? {} : { boxShadow: '0 1px 3px rgba(16,36,64,0.18)' }) },
   partyAvatarMid: { width: 34, height: 34, borderRadius: 17, zIndex: 1 },
   starCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
   tab: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
-  tabActive: { color: '#fff', fontSize: 19, fontWeight: '800' },
+  tabActive: { color: colors.text, fontSize: 19, fontWeight: '800' },
   underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
   iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   filterDot: { position: 'absolute', top: 2, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
-  activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  activeText: { flex: 1, color: '#fff', fontSize: 12 },
+  activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
+  activeText: { flex: 1, color: colors.text, fontSize: 12 },
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginTop: 4 },
   cityText: { flex: 1, color: colors.textDim, fontSize: 12 },
   optIn: { alignItems: 'center', gap: 10, padding: 24, marginTop: 20 },
@@ -399,10 +405,10 @@ const styles = StyleSheet.create({
   photo: { width: 92, height: 92, borderRadius: 16, backgroundColor: colors.cardAlt },
   onlineDot: { position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: semantic.live, borderWidth: 2, borderColor: colors.bg },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  name: { color: '#fff', fontWeight: '800', fontSize: 17, maxWidth: 140 },
+  name: { color: colors.text, fontWeight: '800', fontSize: 17, maxWidth: 140 },
   chips: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 2, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  chipText: { color: '#fff', fontSize: 12 },
+  chipText: { color: colors.text, fontSize: 12 },
   bio: { color: colors.textDim, fontSize: 13 },
   hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, minWidth: 76, justifyContent: 'center' },
   hiText: { color: '#fff', fontWeight: '700', fontSize: 13 },
@@ -420,13 +426,13 @@ const styles = StyleSheet.create({
   goText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10 },
-  sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17, textAlign: 'center' },
+  sheetTitle: { color: colors.text, fontWeight: '800', fontSize: 17, textAlign: 'center' },
   sheetLabel: { color: colors.textDim, fontWeight: '700', fontSize: 12, marginTop: 4 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  optionActive: { borderColor: colors.primaryText, backgroundColor: 'rgba(19,217,223,0.18)' },
+  optionActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
   optionText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchText: { color: '#fff', fontSize: 14 },
+  switchText: { color: colors.text, fontSize: 14 },
   sheetBtn: { flex: 1, alignItems: 'center', borderRadius: 999, paddingVertical: 12 },
-});
+}));

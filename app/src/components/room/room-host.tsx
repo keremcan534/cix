@@ -12,6 +12,7 @@ import { EndedDialog, LeaveSheet, MiniRoom, RecoveryCard, SessionToast, SwitchDi
 import { useOnline } from '@/lib/room-presence';
 import { endRoom, getSession, onAppState, onNetwork, setPersist, setRecovery, useRoomSession } from '@/lib/room-session';
 import { loadSavedRoom, saveRoom } from '@/lib/room-session-persist';
+import { ThemeScope } from '@/theme';
 
 export function RoomHost() {
   const { session, recovery } = useRoomSession();
@@ -48,8 +49,9 @@ export function RoomHost() {
     onNetwork(online);
   }, [online]);
 
+  // The room is a photo stage: dark in both modes, mini card and session dialogs included.
   return (
-    <>
+    <ThemeScope scheme="dark">
       {live && (
         <View style={full ? StyleSheet.absoluteFill : styles.hidden} pointerEvents={full ? 'auto' : 'none'}>
           <LiveRoom key={session.roomId} id={session.roomId} via={session.via} full={full} />
@@ -61,7 +63,7 @@ export function RoomHost() {
       <LeaveSheet />
       <SwitchDialog />
       <SessionToast />
-    </>
+    </ThemeScope>
   );
 }
 

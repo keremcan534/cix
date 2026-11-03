@@ -32,7 +32,8 @@ export const formatTrDate = (iso?: string) => (iso ? iso.split('-').reverse().jo
 export type ProfileDraft = { name: string; username: string; bio: string; city: string; birth: string };
 export type ProfileErrors = Partial<Record<keyof ProfileDraft, string>>;
 
-export function validateProfile(d: ProfileDraft, selfId = 'me'): ProfileErrors {
+/** `today` is only passed by tests, so the 18+ check doesn't depend on the day they run. */
+export function validateProfile(d: ProfileDraft, selfId = 'me', today = new Date()): ProfileErrors {
   const e: ProfileErrors = {};
   const name = d.name.trim();
   if (!name) e.name = 'Görünen ad boş olamaz.';
@@ -57,7 +58,7 @@ export function validateProfile(d: ProfileDraft, selfId = 'me'): ProfileErrors {
   const iso = parseTrDate(d.birth);
   if (!iso) e.birth = 'Tarihi GG.AA.YYYY biçiminde yaz (ör. 14.03.2002).';
   else {
-    const age = ageFrom(iso);
+    const age = ageFrom(iso, today);
     if (age < 18) e.birth = 'Similar Club 18 yaş ve üzeri içindir.';
     else if (age > 100) e.birth = 'Geçerli bir doğum tarihi gir.';
   }
