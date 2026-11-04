@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -65,7 +66,7 @@ export function GroupChat({
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid style={{ flex: 1 }}>
       <View style={styles.segment}>
         {(
           [
@@ -177,7 +178,7 @@ export function GroupChat({
           </View>
         </>
       )}
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }
 

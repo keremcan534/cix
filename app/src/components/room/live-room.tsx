@@ -2,7 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -1885,7 +1886,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       <StageBackdrop theme={theme} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoid style={{ flex: 1 }}>
           <View style={styles.header}>
             <Pressable onPress={() => setPanel('info')} accessibilityLabel="Oda kartı" hitSlop={4}>
               <Avatar uri={userById(hostId).avatar} size={36} />
@@ -2103,7 +2104,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               }}
             />
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardAvoid>
       </SafeAreaView>
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}

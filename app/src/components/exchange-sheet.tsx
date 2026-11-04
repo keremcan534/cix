@@ -3,7 +3,8 @@
 // Only the withdrawable part can be exchanged; locked diamonds (lib/diamond-locks) wait for their lock.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Icon3D } from '@/components/Icon3D';
 import { Text, TextInput } from '@/components/text';
@@ -68,7 +69,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
         <View style={s.sheet}>
           <View style={s.handle} />
@@ -146,7 +147,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
           <Button title={quote.ok ? `${fmt(quote.coins)} jetona çevir` : 'Çevir'} icon="swap-horizontal" variant="money" disabled={!quote.ok || busy} onPress={submit} />
           <Text style={s.fine}>Çevrilen elmas nakde dönmez; jetonları hediye, oyun ve mağazada kullanabilirsin.</Text>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </Modal>
   );
 }

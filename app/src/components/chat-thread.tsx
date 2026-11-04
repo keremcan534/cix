@@ -5,7 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { useReport } from '@/components/report-sheet';
 import { Text, TextInput } from '@/components/text';
@@ -24,7 +25,20 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
-export function ChatThread({ user, header, compact }: { user: User; /** Rendered above the thread; gets the "typing…" state. */ header: (typing: boolean) => ReactNode; /** Smaller intro, for sheets. */ compact?: boolean }) {
+export function ChatThread({
+  user,
+  header,
+  compact,
+  avoidKeyboard = true,
+}: {
+  user: User;
+  /** Rendered above the thread; gets the "typing…" state. */
+  header: (typing: boolean) => ReactNode;
+  /** Smaller intro, for sheets. */
+  compact?: boolean;
+  /** Off when the screen around it already keeps the composer above the keyboard (a bottom sheet rises as a whole). */
+  avoidKeyboard?: boolean;
+}) {
   const { conversations, sendMessage, setMessageFailed, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
@@ -40,6 +54,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState(false);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const Body = avoidKeyboard ? KeyboardAvoid : View;
 
   useEffect(() => {
     markRead(user.id);
@@ -100,7 +115,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
   return (
     <>
       {header(typing)}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Body style={{ flex: 1 }}>
         <FlatList
           data={[...messages].reverse()}
           inverted
@@ -202,7 +217,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
             </LinearGradient>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </Body>
       {report.sheet}
     </>
   );

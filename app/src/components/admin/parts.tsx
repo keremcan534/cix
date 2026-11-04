@@ -4,7 +4,8 @@
 // both schemes through makeStyles / useTheme.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Text, TextInput } from '@/components/text';
 import { Button, StateIcon } from '@/components/ui';
@@ -286,12 +287,12 @@ export function Overlay({ onClose, children, label }: { onClose: () => void; chi
   return (
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={s.dim} onPress={onClose} accessibilityRole="button" accessibilityLabel="Kapat" />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetWrap} pointerEvents="box-none">
+      <KeyboardAvoid style={s.sheetWrap} pointerEvents="box-none">
         <View style={s.sheet} accessibilityViewIsModal accessibilityLabel={label}>
           <View style={s.grabber} />
           {children}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </View>
   );
 }
