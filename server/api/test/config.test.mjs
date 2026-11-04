@@ -10,7 +10,7 @@ const h = startApi({
   APP_MIN_VERSION: '1.2.0',
   APP_UPDATE_URL: 'https://example.com/similar.apk',
   APP_NOTICE: '  Bu gece 02:00–02:15 bakım var.  ',
-  FEATURES_OFF: 'gifts, Topup,dm,rooms,exchange,jeton,purchases,unknown',
+  FEATURES_OFF: 'gifts, Topup,dm,rooms,exchange,jeton,purchases,withdraw,unknown',
   // Nothing should warn here: no disk check, and the refused features must not count as server errors.
   ALERT_DISK_FREE_PCT: '0',
   ALERT_5XX_15M: '0',
@@ -27,7 +27,7 @@ describe('app config', () => {
       minVersion: '1.2.0',
       updateUrl: 'https://example.com/similar.apk',
       notice: 'Bu gece 02:00–02:15 bakım var.',
-      featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases'],
+      featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases', 'withdraw'],
     });
   });
 
@@ -53,6 +53,7 @@ describe('switched-off features', () => {
       ['POST', '/api/messages', { to: b.user.id, text: 'selam', ref: rnd(6) }],
       ['POST', '/api/rooms', { title: 'Oda' }],
       ['GET', '/token?room=oda-r1'],
+      ['POST', '/api/wallet/withdraw', { diamonds: 50_000, method: 'other', details: { holder: 'Ada Yılmaz', account: 'hesap 12345' }, ref: rnd(6) }],
     ];
     for (const [m, p, body] of off) {
       const [st, j] = await call(m, p, body, a.session);
@@ -62,7 +63,7 @@ describe('switched-off features', () => {
     // Nothing moved.
     const [, me] = await call('GET', '/api/me', null, a.session);
     assert.equal(me.user.coins, 0);
-    for (const p of ['/api/ledger', '/api/rooms', '/api/conversations', '/api/wallet/earnings', '/api/catalog']) assert.equal((await call('GET', p, null, a.session))[0], 200, p);
+    for (const p of ['/api/ledger', '/api/rooms', '/api/conversations', '/api/wallet/earnings', '/api/wallet/withdrawals', '/api/catalog']) assert.equal((await call('GET', p, null, a.session))[0], 200, p);
     // Spending on in-app items is not one of the switches.
     assert.equal((await call('POST', '/api/wallet/spend', { amount: 5, reason: 'VIP', ref: rnd(6) }, a.session))[0], 409);
   });

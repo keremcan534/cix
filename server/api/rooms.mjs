@@ -1,5 +1,6 @@
 // Rooms on the server: who owns them, who manages them, who is kicked or blacklisted. The voice token
-// (GET /token) checks this, so a kick is enforced by LiveKit, not only hidden in the app.
+// (GET /token) checks this, so a kick is enforced by LiveKit, not only hidden in the app: closing a room ends it
+// in LiveKit and a kick or blacklist removes the person from the call (live.mjs RoomService).
 //
 //   POST /api/rooms        { title, announcement?, roomType?, password? }  → { room }
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
@@ -8,11 +9,15 @@
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
-import { HttpError, UUID, auth, blockedBetween, db, int, readJson, sha, text, userId } from './core.mjs';
+import { HttpError, UUID, auth, blockedBetween, db, env, int, readJson, sha, text, userId } from './core.mjs';
+// live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
-/** LiveKit room name of a server room. Prototype rooms (oda-r1 …) keep working without a row. */
+/** LiveKit room name of a server room. */
 export const liveKitName = (id) => `oda-${id}`;
+/** The app's sample rooms (oda-r1 …) have no row: voice for them only on a development server. */
+const PROTOTYPE_ROOMS = env.ALLOW_PROTOTYPE_ROOMS === '1';
 
 const out = (r) => ({
   id: r.id,
@@ -39,12 +44,15 @@ async function roomRow(id) {
 const isAdmin = async (roomId, uid) => (await db.query('SELECT 1 FROM room_admins WHERE room_id = $1 AND user_id = $2', [roomId, uid])).rowCount > 0;
 
 /**
- * Whether `u` may join the LiveKit room `name`. Server rooms: not closed, not banned there, the right
- * password for a private room (owner and admins skip it). Unknown names are prototype rooms and pass.
+ * Whether `u` may join the LiveKit room `name`: a server room that exists and is open, not banned there, the
+ * right password for a private room (owner and admins skip it). Other names only with ALLOW_PROTOTYPE_ROOMS=1.
  */
 export async function voiceAccess(name, u, password) {
-  const m = /^oda-([0-9a-f-]{36})$/.exec(name);
-  if (!m) return;
+  const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
+  if (!m) {
+    if (PROTOTYPE_ROOMS) return;
+    throw new HttpError(404, 'Oda bulunamadı');
+  }
   const r = await db.query('SELECT * FROM rooms WHERE id = $1', [m[1]]);
   if (!r.rowCount) throw new HttpError(404, 'Oda bulunamadı');
   const room = r.rows[0];
@@ -99,6 +107,8 @@ export const roomRoutes = {
     const room = await roomRow((await readJson(req)).id);
     if (room.owner !== me.id) throw new HttpError(403, 'Odayı yalnızca sahibi kapatabilir');
     await db.query('UPDATE rooms SET closed_at = now() WHERE id = $1 AND closed_at IS NULL', [room.id]);
+    // Everyone still in the call leaves now, not when their token runs out.
+    await deleteVoiceRoom(liveKitName(room.id));
     return { closed: true };
   },
 
@@ -134,6 +144,7 @@ export const roomRoutes = {
        ON CONFLICT (room_id, user_id) DO UPDATE SET until = EXCLUDED.until, by_user = EXCLUDED.by_user, created_at = now() RETURNING until`,
       [room.id, target, minutes, me.id],
     );
+    await removeFromVoice(liveKitName(room.id), target);
     return { until: r.rows[0].until };
   },
 

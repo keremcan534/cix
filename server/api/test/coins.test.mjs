@@ -285,6 +285,19 @@ describe('Kayıtlar', () => {
     assert.ok(bv.events.some((e) => e.action === 'jeton.wholesale'));
   });
 
+  test('test satın alması ve test yüklemesi aynı günlük sınırı paylaşır (hediye dahil)', async () => {
+    const u = await signUp('Sınır');
+    for (let i = 0; i < 4; i++) await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: rnd(6) }, u.session));
+    const [st, j] = await call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_20000', transactionId: rnd(8) }, u.session);
+    assert.equal(st, 429, '40.000 + 20.000 > 50.000');
+    assert.match(j.error, /Günlük test yüklemesi sınırı 50000/);
+    // 5.000 + its 2.500 first-purchase gift = 47.500.
+    await buy(u.session, 'coins_5000');
+    assert.equal((await call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(6) }, u.session))[0], 429, 'satın alma sınıra sayıldı');
+    assert.equal((await call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_5000', transactionId: rnd(8) }, u.session))[0], 429);
+    assert.equal((await me(u.session)).coins, 47_500);
+  });
+
   test('her hesabın partileri bakiyesine eşit', async () => {
     const r = await h.sql.query(
       `SELECT u.id, u.coins, coalesce(l.s, 0) AS lots FROM users u LEFT JOIN (SELECT user_id, sum(remaining) AS s FROM coin_lots GROUP BY 1) l ON l.user_id = u.id WHERE u.coins <> coalesce(l.s, 0)`,
