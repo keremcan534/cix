@@ -6,6 +6,7 @@
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
+//   POST /api/rooms/update { id, title?, announcement? }                    → { room }    (owner only)
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
@@ -133,6 +134,21 @@ export const roomRoutes = {
     // Everyone still in the call leaves now, not when their token runs out.
     await deleteVoiceRoom(liveKitName(room.id));
     return { closed: true };
+  },
+
+  /** The owner renames the room or changes its bulletin while it is open. */
+  async 'POST /api/rooms/update'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const room = await roomRow(b.id);
+    if (room.owner !== me.id) throw new HttpError(403, 'Odayı yalnızca sahibi düzenleyebilir');
+    if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
+    if (b.title === undefined && b.announcement === undefined) throw new HttpError(400, 'Değişiklik yok');
+    limit(`roomedit:${me.id}`, 20, 'Çok sık değiştirdin, biraz bekle');
+    const title = b.title === undefined ? room.title : text(b.title, 3, 40, 'Oda adı');
+    const announcement = b.announcement === undefined ? room.announcement : text(b.announcement, 0, 200, 'Duyuru');
+    await db.query('UPDATE rooms SET title = $2, announcement = $3 WHERE id = $1', [room.id, title, announcement]);
+    return { room: out(await roomRow(room.id)) };
   },
 
   async 'POST /api/rooms/admin'(req) {

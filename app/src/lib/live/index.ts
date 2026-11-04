@@ -286,6 +286,12 @@ export async function openServerRoom(title: string, announcement: string) {
 
 /** My own server room, which only I can close for everyone. */
 export const isMyServerRoom = (id: string) => liveMode() && isServerId(id) && rooms.some((r) => r.id === id && r.hostId === 'me');
+/** Renames my server room or changes its bulletin; the lists and the open room show it right away. */
+export async function updateServerRoom(id: string, patch: { title?: string; announcement?: string }) {
+  const r = roomOf(await api.updateRoom(id, patch));
+  setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
+  return r;
+}
 /** Closes my room on the server for everyone (it leaves the lists; a new one can be opened later). */
 export async function closeServerRoom(id: string) {
   await api.closeRoom(id);
