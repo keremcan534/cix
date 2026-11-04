@@ -107,8 +107,17 @@ jobs:
             echo "::warning::The finance panel repo could not be read (private? add FINANCE_REPO_TOKEN): panel not updated."
           fi
 
+          # The Caddyfile's site address is DOMAIN from .env; an empty or missing one makes Caddy crash-loop
+          # (the whole site goes down), so a server without it gets the sslip.io name of its address.
+          $SSH "cd /opt/similar && if ! sudo grep -qE '^DOMAIN=.+' .env; then
+              sudo sed -i '/^DOMAIN=/d' .env && echo 'DOMAIN=${HOST//./-}.sslip.io' | sudo tee -a .env >/dev/null && echo 'set DOMAIN in .env'; fi"
+
           # Only services whose image or settings changed are recreated (postgres and livekit normally stay up).
-          $SSH 'cd /opt/similar && sudo docker compose up -d --build && sudo docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile'
+          # A recreated Caddy already read the new Caddyfile; one that stayed up is told to reload it. Caddy
+          # can still be starting here, so the reload is retried, and the API check below has the last word.
+          $SSH 'cd /opt/similar && sudo docker compose up -d --build || exit 1
+            for i in 1 2 3 4 5 6 7 8 9 10; do sudo docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null && exit 0; sleep 3; done;
+            echo "::warning::caddy reload did not go through"'
       - name: Check the live API
         if: steps.key.outputs.ready == 'true'
         working-directory: .
@@ -120,6 +129,13 @@ jobs:
             sleep 3
           done
           echo "The new API did not answer (last answer: ${body:-none})"; exit 1
+      # On a failed deploy, show what the server's services say (state and recent logs; no settings or secrets).
+      - name: Show the server's service state
+        if: failure() && steps.key.outputs.ready == 'true'
+        working-directory: .
+        run: |
+          SSH="ssh -i ~/.ssh/deploy ubuntu@$HOST"
+          $SSH 'cd /opt/similar && sudo docker compose ps -a; for s in caddy api livekit finance; do echo "--- $s"; sudo docker compose logs --no-color --tail=30 $s 2>&1; done' || true
       - name: Check the finance panel
         if: steps.key.outputs.ready == 'true' && steps.finance.outcome == 'success'
         working-directory: .

@@ -2,7 +2,7 @@
 #   /api/* and /token → the API (127.0.0.1:7890)
 #   everything else   → LiveKit (127.0.0.1:7880, WebSocket signalling at /rtc; "/" answers OK)
 # panel.DOMAIN: the finance panel (127.0.0.1:4300).
-{$DOMAIN} {
+{$DOMAIN:130-61-230-94.sslip.io} {
 	encode zstd gzip
 
 	header {
@@ -32,7 +32,7 @@
 
 # The finance panel (Finance Control, compose service "finance"). Only reachable through here; its own
 # login (with 2FA) guards it. sslip.io answers for panel.<ip>.sslip.io too, so no DNS record is needed.
-panel.{$DOMAIN} {
+panel.{$DOMAIN:130-61-230-94.sslip.io} {
 	encode zstd gzip
 
 	header {
