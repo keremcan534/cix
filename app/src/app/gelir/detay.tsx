@@ -11,6 +11,8 @@ import { Icon3D } from '@/components/Icon3D';
 import { userById } from '@/data/mock';
 import { usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
+import { loadWithdrawals, useServerWithdrawals } from '@/lib/live/withdraw';
 import { useApp, type Earning, type EarningSource, type LedgerRow } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -33,15 +35,23 @@ export default function EarningsDetail() {
   const [main, setMain] = useState<Main>('diamonds');
   const [sub, setSub] = useState<Sub>('system');
   const [refreshing, setRefreshing] = useState(false);
+  const live = liveMode();
+  const server = useServerWithdrawals();
 
-  // Data is local state in this prototype; "refresh" only shows the spinner briefly.
+  // Live mode re-reads the server's withdrawals; otherwise the data is local and "refresh" only shows the spinner.
   const refresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 700);
+    if (live) void loadWithdrawals().catch(() => {}).finally(() => setRefreshing(false));
+    else setTimeout(() => setRefreshing(false), 700);
   };
 
-  const withdrawn = withdrawals.reduce((s, w) => s + w.diamonds, 0);
-  const pendingWithdraw = withdrawals.filter((w) => w.status === 'Beklemede').reduce((s, w) => s + w.diamonds, 0);
+  // Paid and pending requests (live: the server's list; a rejected or cancelled one gave its diamonds back).
+  const withdrawn = live
+    ? server.list.filter((w) => w.status === 'paid' || w.status === 'pending').reduce((s, w) => s + w.diamonds, 0)
+    : withdrawals.reduce((s, w) => s + w.diamonds, 0);
+  const pendingWithdraw = live
+    ? server.list.filter((w) => w.status === 'pending').reduce((s, w) => s + w.diamonds, 0)
+    : withdrawals.filter((w) => w.status === 'Beklemede').reduce((s, w) => s + w.diamonds, 0);
   // The store has no "uncollected income" concept yet (e.g. weekly bonuses awaiting settlement) → always 0.
   const uncollected = 0;
 

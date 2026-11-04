@@ -30,15 +30,23 @@ export const toLocal = (id: string) => (id === myId ? 'me' : id);
 export const toServer = (id: string): string | null => (id === 'me' ? myId : isServerId(id) ? id : null);
 
 // --- Wallet ----------------------------------------------------------------------------------------------
-/** `reason` names a change this phone asked for (for the wallet history); without it the change came from elsewhere. */
-type WalletHooks = { apply: (u: api.ServerUser, reason?: string) => void; locks: (e: api.ServerEarnings) => void };
+/**
+ * `reason` names a change this phone asked for (for the wallet history); without it the change came from
+ * elsewhere. `returned`: diamonds a rejected withdrawal gave back since the last balance (not a gift).
+ */
+type WalletHooks = { apply: (u: api.ServerUser, reason?: string, returned?: number) => void; locks: (e: api.ServerEarnings) => void };
 let wallet: WalletHooks | null = null;
 /** The store hands over how a server balance and the server's Gelir locks reach the screens. */
 export const bindWallet = (h: WalletHooks) => void (wallet = h);
 let lastDiamonds: number | null = null;
+let returning = 0;
+/** A rejected withdrawal (lib/live/withdraw) gave `n` diamonds back; the next balance carries them. */
+export const expectReturn = (n: number) => void (returning += n);
 const applied = <T extends { user: api.ServerUser }>(r: T, reason?: string) => {
   myId = r.user.id;
-  wallet?.apply(r.user, reason);
+  const returned = returning;
+  returning = 0;
+  wallet?.apply(r.user, reason, returned);
   // Diamonds moved (a gift came in, or Çevir): the Gelir locks changed with them.
   if (lastDiamonds !== null && r.user.diamonds !== lastDiamonds) void refreshEarnings().catch(() => {});
   lastDiamonds = r.user.diamonds;
@@ -86,7 +94,7 @@ export async function refreshEarnings() {
  * then answers "already done" instead of doing it twice. Any answer from the server starts a fresh ref.
  */
 const unsure = new Map<string, string>();
-async function once<T>(key: string, run: (ref: string) => Promise<T>): Promise<T> {
+export async function once<T>(key: string, run: (ref: string) => Promise<T>): Promise<T> {
   const ref = unsure.get(key) ?? api.newRef();
   try {
     const r = await run(ref);

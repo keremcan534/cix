@@ -2,7 +2,7 @@
 // to update, a notice banner, and features switched off for a while. Pure logic, no React; the fetching and the
 // hooks are in lib/remote-control, the screens in components/remote-control.
 
-export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms'] as const;
+export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export type RemoteConfig = { minVersion: string | null; updateUrl: string | null; notice: string | null; featuresOff: Feature[] };
@@ -55,6 +55,7 @@ const LABEL: Record<Feature, string> = {
   games: 'Oyunlar',
   dm: 'Özel mesajlar',
   rooms: 'Sesli odalar',
+  withdraw: 'Para çekme',
 };
 export const featureLabel = (f: Feature) => LABEL[f];
 
@@ -72,6 +73,8 @@ export const ROUTE_FEATURES: Record<string, { features: Feature[]; mode: 'block'
   'sohbet/[id]': { features: ['dm'], mode: 'banner' },
   cuzdan: { features: ['topup', 'purchases'], mode: 'banner' },
   'gelir/index': { features: ['exchange'], mode: 'banner' },
+  // New requests stop; the history and cancelling a pending one stay (server features.mjs).
+  'yayinci/cek': { features: ['withdraw'], mode: 'banner' },
 };
 
 /** The switched-off feature of a screen and how to show it, or null when the screen is fully on. */

@@ -20,7 +20,7 @@ import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
 import { addLock, diamondSplit, lockMs, lockedReason, locksFor, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
-import { validIban } from '@/lib/bank';
+import { validAnyIban } from '@/lib/withdraw-rules';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
@@ -661,7 +661,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // last one, so purchases already taken here (and mirrored with api.spend, see `spend`) aren't taken twice. The
   // first balance after a start replaces the local one.
   const serverBalRef = useRef<{ coins: number; diamonds: number } | null>(null);
-  const applyServer = (u: ServerUser, reason?: string) => {
+  const applyServer = (u: ServerUser, reason?: string, returned = 0) => {
     const prev = serverBalRef.current;
     serverBalRef.current = { coins: u.coins, diamonds: u.diamonds };
     if (!prev) {
@@ -671,7 +671,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       return;
     }
     const dc = u.coins - prev.coins;
-    const dd = u.diamonds - prev.diamonds;
+    let dd = u.diamonds - prev.diamonds;
     if (dc) {
       setCoins((c) => Math.max(0, c + dc));
       log('coin', dc, reason ?? (dc > 0 ? 'Jeton eklendi' : 'Harcama'));
@@ -680,7 +680,15 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     if (!dd) return;
     diamondsRef.current = Math.max(0, diamondsRef.current + dd);
     setDiamonds(diamondsRef.current);
-    if (dd < 0) return void log('diamond', dd, reason ?? 'Elmas düştü');
+    // A change this phone asked for (Çevir, a withdrawal and its cancel) is logged as it is, not as a gift.
+    if (dd < 0 || reason) return void log('diamond', dd, reason ?? 'Elmas düştü');
+    // A rejected withdrawal's diamonds came back (lib/live/withdraw): not earnings either.
+    const back = Math.min(dd, returned);
+    if (back > 0) {
+      log('diamond', back, 'Para çekme talebi reddedildi');
+      dd -= back;
+      if (!dd) return;
+    }
     // More diamonds from the server: someone sent me a gift (the server wrote its lock; refreshEarnings reads it).
     setTotalDiamonds((t) => t + dd);
     setWeekly((w) => [...w.slice(0, 6), w[6] + dd]);
@@ -843,7 +851,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       const locked = lockedReason(amount, diamondsRef.current, diamondSplit(diamondsRef.current, locksRef.current, Date.now()).locked);
       if (locked) return locked;
       // Check digits too: a single mistyped digit would send the payout to a dead or wrong account.
-      if (!validIban(iban)) return 'IBAN geçersiz. TR ile başlayan 26 karakteri tek tek kontrol et.';
+      if (!validAnyIban(iban)) return 'IBAN geçersiz. Harfleri ve rakamları tek tek kontrol et.';
       diamondsRef.current -= amount;
       setDiamonds((d) => d - amount);
       const id = uid();

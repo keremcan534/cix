@@ -86,6 +86,8 @@ describe('Uzaktan ayar: kapalı özelliğin ekranları', () => {
     assert.deepEqual(routeGate(off('purchases'), 'cuzdan'), { feature: 'purchases', mode: 'banner' });
     assert.deepEqual(routeGate(off('topup', 'purchases'), 'cuzdan'), { feature: 'topup', mode: 'banner' });
     assert.deepEqual(routeGate(off('exchange'), 'gelir/index'), { feature: 'exchange', mode: 'banner' });
+    assert.deepEqual(routeGate(off('withdraw'), 'yayinci/cek'), { feature: 'withdraw', mode: 'banner' });
+    assert.equal(routeGate(off('withdraw'), 'gelir/index'), null, 'Gelir ekranı para çekme kapalıyken de açık');
   });
 });
 
