@@ -16,6 +16,7 @@ import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
 import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
+import { SanctionLayer } from '@/components/sanction-screen';
 import { ME } from '@/data/mock';
 import { installCrashGuard, markStarted } from '@/lib/crash-guard';
 import { initReporting } from '@/lib/reporting';
@@ -146,6 +147,8 @@ function RootStack() {
       {loggedIn && <RoomHost />}
       {loggedIn && <MatchLayer />}
       {loggedIn && <GamesBridge />}
+      {/* Over everything, signed in or not: a ban refusal can come from the sign-in screen itself. */}
+      <SanctionLayer signedIn={loggedIn} />
       {/* The server's notice and required update, signed in or not. */}
       <RemoteControl />
     </>

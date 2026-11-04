@@ -4,6 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as api from '@/lib/api';
+import { noteRefusal } from '@/lib/sanctions';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { isServerId } from '@/data/mock';
 
@@ -44,7 +45,11 @@ export function liveDm(to: string, text: string, ref: string, done: (failed: str
     // "Last seen" stays where the poll left it: moving it up to my message would skip a reply with a lower id
     // that is already on the server (the poll skips my own messages anyway).
     .then(() => done(null))
-    .catch((e) => done(message(e)));
+    .catch((e) => {
+      // Muted for DMs (403 muted): the details and the appeal open, besides the note on the bubble.
+      noteRefusal(e, true);
+      done(message(e));
+    });
 }
 
 type Inbox = { receiveMessage: (userId: string, text: string) => void };

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { useReport } from '@/components/report-sheet';
+import { useRoomMute } from '@/components/room/room-mute';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import {
   ContributionModal,
@@ -127,6 +128,8 @@ import { useApp } from '@/store';
 import { similarity } from '@/lib/similarity';
 import { colors, gradient, semantic } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { MuteBanner, useStopped } from '@/components/sanction-screen';
+import { refreshSanctions, showSanction } from '@/lib/sanctions';
 
 const DAILY_DICE = 20;
 const BOT_TIPS = [
@@ -173,6 +176,7 @@ const BOT_RIDES = COSMETICS.filter((c) => c.kind === 'ride');
 /** Short mic-button captions for a mic that is on but not sending (lib/room-session micBlock). */
 const HELD_CAPTION: Record<Exclude<MicBlock, null>, string> = {
   not_seated: 'KAPALI',
+  sanctioned: 'SUSTURMA',
   mod_muted: 'SUSTURULDU',
   in_app_call: 'GÖRÜŞMEDE',
   permission: 'İZİN YOK',
@@ -298,6 +302,19 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const setMicOn = (v: boolean | ((m: boolean) => boolean)) => setMicWant(typeof v === 'function' ? v(getSession().session?.micWant ?? false) : v);
   const sending = micSending(session);
   const block = micOn ? micBlock(session) : null;
+  // Mutes from the server (lib/sanctions): a server room only; the voice token already enforces them.
+  const textStopped = useStopped('room_text', id);
+  const voiceStopped = useStopped('room_voice', id);
+  const chatMuted = real ? textStopped : null;
+  const voiceMuted = real ? voiceStopped : null;
+  const sanctionMic = session?.sanctionMuted ?? false;
+  const sanctionChat = session?.sanctionChat ?? false;
+  // The connection's own word counts too, before the list has loaded.
+  const chatBlocked = !!chatMuted || (real && sanctionChat);
+  // Ask the server again when the room opens and whenever it changes what this connection may do.
+  useEffect(() => {
+    if (real) void refreshSanctions().catch(() => {});
+  }, [real, id, sanctionMic, sanctionChat]);
   // Visual-only work (talk indicators, seat reactions, effects) runs only while the room is on screen.
   const visible = full && session?.appState !== 'background';
   // Read by the room's timers, which outlive a single render.
@@ -554,6 +571,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!isOnline()) offlineFeed.current.push(m);
     else setMessages((list) => mergeFeed(list, [m]));
   };
+  // Room staff's timed mutes (server room only); the note shows on my screen.
+  const roomMute = useRoomMute(id, myRole === 'owner', (text) => addMsg({ system: true, text }));
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
   useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
     onJoin: (_uid, name) => addMsg({ system: true, text: `${name} güverteye çıktı` }),
@@ -1233,6 +1252,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             },
           },
         );
+        // Server room: a timed mute the server keeps and enforces (components/room/room-mute).
+        if (real && toServer(uid))
+          items.push({ key: 'sanction', label: 'Süreli sustur', icon: 'timer-outline', onPress: () => roomMute.start(uid, u.name) });
       }
       items.push(
         { key: 'gift', label: 'Hediye gönder', icon: 'gift-outline', dividerBefore: !outranks, onPress: () => (setGiftTo(uid), setGiftOpen(true)) },
@@ -1341,6 +1363,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const send = (sticker?: string) => {
     const text = sticker ?? draft.trim();
     if (!text) return;
+    if (chatBlocked) return chatMuted ? showSanction(chatMuted) : undefined;
     if (!sticker) setDraft('');
     // Server room: the line goes out over the voice connection, which may still be joining or have dropped.
     if (!isOnline() || (real && !sendSignal({ t: 'chat', text: mask(text) }))) {
@@ -2132,6 +2155,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               }}
             />
           )}
+          {chatMuted || voiceMuted ? (
+            <View style={{ paddingHorizontal: 12, paddingBottom: 6, gap: 6 }}>
+              {chatMuted && <MuteBanner s={chatMuted} text="Yazılı susturma" />}
+              {voiceMuted && voiceMuted.id !== chatMuted?.id && <MuteBanner s={voiceMuted} text="Sesli susturma" />}
+            </View>
+          ) : null}
           <View style={styles.bottom}>
             <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />
             <View style={styles.inputWrap}>
@@ -2142,7 +2171,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 value={draft}
                 onChangeText={setDraft}
                 onSubmitEditing={() => send()}
-                placeholder="Yaz…"
+                editable={!chatBlocked}
+                placeholder={chatBlocked ? 'Sohbete yazman kısıtlı' : 'Yaz…'}
                 placeholderTextColor={colors.textDim}
                 style={styles.input}
                 returnKeyType="send"
@@ -2155,7 +2185,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 state={!micOn ? 'off' : sending ? 'on' : 'held'}
                 caption={block ? HELD_CAPTION[block] : undefined}
                 hint={heldHint}
-                onPress={() => !devicesBusy() && setMicOn((m) => !m)}
+                onPress={() => (voiceMuted && !micOn ? showSanction(voiceMuted) : !devicesBusy() && setMicOn((m) => !m))}
               />
             ) : (
               <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
@@ -2189,6 +2219,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
       {reporting.sheet}
+      {roomMute.sheet}
       <InboxSheet visible={inboxOpen} onClose={() => setInboxOpen(false)} />
       <ParticipantsSheet
         visible={peopleOpen}

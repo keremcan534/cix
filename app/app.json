@@ -83,7 +83,8 @@
           }
         }
       ],
-      "./plugins/with-android-release-build"
+      "./plugins/with-android-release-build",
+      "expo-secure-store"
     ],
     "scheme": "similarclub",
     "experiments": {
