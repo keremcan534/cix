@@ -5,6 +5,12 @@ export type LicenseEntry = { name: string; version: string; license: string; url
 
 export const LICENSES: LicenseEntry[] = [
   {
+    "name": "@config-plugins/react-native-webrtc",
+    "version": "15.0.2",
+    "license": "MIT",
+    "url": "https://github.com/expo/config-plugins"
+  },
+  {
     "name": "@expo-google-fonts/plus-jakarta-sans",
     "version": "0.4.2",
     "license": "MIT AND OFL-1.1",
@@ -15,6 +21,24 @@ export const LICENSES: LicenseEntry[] = [
     "version": "15.1.1",
     "license": "MIT",
     "url": "https://github.com/expo/vector-icons"
+  },
+  {
+    "name": "@livekit/react-native",
+    "version": "3.1.0",
+    "license": "Apache-2.0",
+    "url": "https://github.com/livekit/client-sdk-react-native"
+  },
+  {
+    "name": "@livekit/react-native-expo-plugin",
+    "version": "1.1.0",
+    "license": "Apache-2.0",
+    "url": "https://github.com/livekit/client-sdk-react-native-expo-plugin"
+  },
+  {
+    "name": "@livekit/react-native-webrtc",
+    "version": "150.1.0",
+    "license": "MIT",
+    "url": "https://github.com/livekit/react-native-webrtc"
   },
   {
     "name": "@react-native-async-storage/async-storage",
@@ -41,6 +65,12 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/react-navigation/react-navigation"
   },
   {
+    "name": "@sentry/react-native",
+    "version": "8.28.0",
+    "license": "MIT",
+    "url": "https://github.com/getsentry/sentry-react-native"
+  },
+  {
     "name": "expo",
     "version": "58.0.19",
     "license": "MIT",
@@ -53,8 +83,20 @@ export const LICENSES: LicenseEntry[] = [
     "url": "https://github.com/expo/expo"
   },
   {
+    "name": "expo-clipboard",
+    "version": "58.0.4",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
     "name": "expo-constants",
     "version": "58.0.13",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-crypto",
+    "version": "58.0.7",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },
@@ -103,6 +145,12 @@ export const LICENSES: LicenseEntry[] = [
   {
     "name": "expo-status-bar",
     "version": "58.0.4",
+    "license": "MIT",
+    "url": "https://github.com/expo/expo"
+  },
+  {
+    "name": "expo-updates",
+    "version": "58.0.20",
     "license": "MIT",
     "url": "https://github.com/expo/expo"
   },

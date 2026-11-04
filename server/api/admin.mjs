@@ -1,7 +1,7 @@
 // Moderation for staff (users.role = moderator or admin): the report queue and platform bans. Apple 1.2 and
-// Play's UGC policy expect reports to be acted on; this is the server half, a staff web panel uses it.
+// Play's UGC policy expect reports to be acted on; this is the server half, the app's Yönetim panel (components/admin) uses it.
 //
-//   GET  /api/admin/reports?status=open                 → { reports }
+//   GET  /api/admin/reports?status=open                 → { reports }  (each target with its name and ban state)
 //   POST /api/admin/reports/handle { id, status, banDays? } → { report }  (status: actioned | dismissed)
 //   POST /api/admin/ban    { user, days }  (null = lift)  → { bannedUntil }
 import { HttpError, auth, db, int, readJson, userId } from './core.mjs';
@@ -28,9 +28,11 @@ export const adminRoutes = {
     const status = url.searchParams.get('status') ?? 'open';
     if (!['open', 'actioned', 'dismissed'].includes(status)) throw new HttpError(400, 'Geçersiz durum');
     const r = await db.query(
-      `SELECT r.*, u.name AS reporter_name,
+      `SELECT r.*, u.name AS reporter_name, t.name AS target_name, t.role AS target_role, t.banned_until AS target_banned_until, ro.title AS room_title,
               (SELECT count(*) FROM reports x WHERE x.target_type = r.target_type AND x.target_id = r.target_id) AS reports_on_target
          FROM reports r JOIN users u ON u.id = r.reporter
+         LEFT JOIN users t ON r.target_type = 'user' AND t.id::text = r.target_id
+         LEFT JOIN rooms ro ON r.target_type = 'room' AND ro.id::text = r.target_id
         WHERE r.status = $1 ORDER BY r.created_at ${status === 'open' ? 'ASC' : 'DESC'} LIMIT 200`,
       [status],
     );
@@ -38,7 +40,15 @@ export const adminRoutes = {
       reports: r.rows.map((x) => ({
         id: Number(x.id),
         reporter: { id: x.reporter, name: x.reporter_name },
-        target: { type: x.target_type, id: x.target_id },
+        // name: the reported person's name or the room's title (null when it no longer exists or for messages);
+        // staff: a moderator or admin (can't be banned); bannedUntil: a ban still running.
+        target: {
+          type: x.target_type,
+          id: x.target_id,
+          name: x.target_name ?? x.room_title ?? null,
+          staff: x.target_role === 'moderator' || x.target_role === 'admin',
+          bannedUntil: x.target_banned_until && new Date(x.target_banned_until) > new Date() ? x.target_banned_until : null,
+        },
         reason: x.reason,
         note: x.note,
         status: x.status,

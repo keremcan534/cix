@@ -1,6 +1,6 @@
 // Gifts at the server's price, and the rankings they feed.
 //
-//   GET  /api/catalog                                             → { gifts, counts, packs, svipXp }
+//   GET  /api/catalog                                             → { gifts, counts, packs, svipXp, purchases }
 //   POST /api/gifts/send  { to, giftId, count, room?, ref }       → { user, replay, total }
 //   GET  /api/rankings?board=wealth|charm&period=day|week|month   → { rows }
 //
@@ -13,6 +13,7 @@ import { recordIncome } from './agency-lib.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, svipLevel } from './catalog.mjs';
 import { notify } from './push.mjs';
+import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
 
 const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
@@ -27,6 +28,8 @@ export const giftRoutes = {
       counts: GIFT_COUNTS,
       packs: PACKS.map(({ id, productId, coins, firstBonus }) => ({ id, productId, coins, firstBonus })),
       svipXp: SVIP_XP,
+      // Which packs the app may offer: free test packs, and the stores this server can verify.
+      purchases: purchaseOptions(),
     };
   },
 

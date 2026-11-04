@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://130-61-230-94.sslip.io",
+        "EXPO_PUBLIC_LIVEKIT_URL": "wss://130-61-230-94.sslip.io",
+        "EXPO_PUBLIC_DEMO": "1",
+        "EXPO_PUBLIC_APP_ENV": "preview",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_ALLOW_FAILURE": "true"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://130-61-230-94.sslip.io",
+        "EXPO_PUBLIC_LIVEKIT_URL": "wss://130-61-230-94.sslip.io",
+        "EXPO_PUBLIC_DEMO": "0",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_ALLOW_FAILURE": "true"
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@
 // replaces one screen; the tabs and the rest of the app keep working.
 // Colors come from the theme context only (never the store): outside the store's ThemeScope (the root boundary)
 // useTheme() falls back to the dark scheme, inside it (a screen boundary) the screen follows the active scheme.
+// Both report the error (lib/reporting) when crash reporting is on.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,6 +14,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { Text as T } from '@/components/text';
 import { showAlert } from '@/lib/alert';
 import { errorMessage } from '@/lib/crash-guard';
+import { reportError } from '@/lib/reporting';
 import { resetLocalData, useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -67,6 +69,7 @@ export function RootCrashScreen({ error, retry }: ErrorBoundaryProps) {
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
+  useEffect(() => reportError(error, { boundary: 'root' }), [error]);
   return (
     <CrashLayout
       error={error}
@@ -83,6 +86,7 @@ export function RootCrashScreen({ error, retry }: ErrorBoundaryProps) {
 /** Every screen's error boundary (root Stack): only this screen is replaced; the rest of the app keeps working. */
 export function ScreenCrashScreen({ error, retry }: ErrorBoundaryProps) {
   const { resetAll } = useApp();
+  useEffect(() => reportError(error, { boundary: 'screen' }), [error]);
   return (
     <CrashLayout
       error={error}

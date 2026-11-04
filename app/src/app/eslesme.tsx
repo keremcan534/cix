@@ -18,6 +18,8 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { Photo } from '@/components/photo';
+import { CallsUnavailable } from '@/components/calls-unavailable';
+import { callsAvailable } from '@/lib/live';
 
 const FILTERS: MatchFilter[] = ['Herkes', 'Kadın', 'Erkek'];
 const SCENARIOS: [Scenario, string][] = [
@@ -27,7 +29,11 @@ const SCENARIOS: [Scenario, string][] = [
   ['drop', 'Görüşme 5 sn sonra kopsun'],
 ];
 
-export default function HemenTanis() {
+export default function HemenTanisRoute() {
+  return callsAvailable() ? <HemenTanis /> : <CallsUnavailable title="Hemen Tanış" />;
+}
+
+function HemenTanis() {
   const { me, settings } = useApp();
   const { colors, gradient } = useTheme();
   const s = useStyles();

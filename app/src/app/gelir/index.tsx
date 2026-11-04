@@ -12,6 +12,8 @@ import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
+import { useServerWithdrawals } from '@/lib/live/withdraw';
 import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
 import { activeLocks, channelLabel, lockDays, lockProgress, nextUnlock, timeLeft, type DiamondLock } from '@/lib/diamond-locks';
 import { stampLabel } from '@/lib/tr';
@@ -60,6 +62,9 @@ function useMinuteClock() {
 
 export default function IncomeScreen() {
   const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, diamondLocks, earnings } = useApp();
+  // Live mode: a pending withdrawal holds its diamonds on the server (they are already out of the balance).
+  const withdrawState = useServerWithdrawals();
+  const pendingWithdraw = liveMode() ? withdrawState.list.find((w) => w.status === 'pending') : undefined;
   const { colors, semantic, ink } = useTheme();
   const styles = useStyles();
   const [exchange, setExchange] = useState(false);
@@ -149,6 +154,11 @@ export default function IncomeScreen() {
               <Text style={styles.outlineText}>Anında bozdur</Text>
             </Pressable>
           </View>
+          {pendingWithdraw && (
+            <Text style={[styles.exchangeSub, { marginTop: 8 }]} onPress={() => router.push('/yayinci/cek')}>
+              Bekleyen çekim talebi: {fmt(pendingWithdraw.diamonds)} elmas. Sonuçlanana kadar bakiyeden ayrı tutulur.
+            </Text>
+          )}
         </LinearGradient>
 
         <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">

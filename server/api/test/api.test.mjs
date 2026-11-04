@@ -28,6 +28,22 @@ describe('Giriş ve cüzdan', () => {
     assert.equal((await call('POST', '/api/wallet/gift', { to: a.user.id, amount: 1, ref: rnd(6) }, a.session))[0], 400);
   });
 
+  test('uygulama içi harcama: jeton düşer, tek kez, yetersiz bakiye ve geçersiz istek', async () => {
+    const a = await signUp('A');
+    await call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, a.session);
+    const ref = rnd(6);
+    const twice = await Promise.all([1, 2].map(() => call('POST', '/api/wallet/spend', { amount: 300, reason: 'VIP 7 gün', ref }, a.session)));
+    assert.deepEqual(twice.map(([st]) => st), [200, 200]);
+    assert.equal((await call('GET', '/api/me', null, a.session))[1].user.coins, 700);
+    const [short, why] = await call('POST', '/api/wallet/spend', { amount: 701, reason: 'Rütbe', ref: rnd(6) }, a.session);
+    assert.equal(short, 409);
+    assert.match(why.error, /Yetersiz/);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: -5, reason: 'x', ref: rnd(6) }, a.session))[0], 400);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 5, reason: ' ', ref: rnd(6) }, a.session))[0], 400);
+    const [, rows] = await call('GET', '/api/ledger', null, a.session);
+    assert.equal(rows.rows[0].reason, 'Uygulama içi: VIP 7 gün');
+  });
+
   test('elmas → jeton çevirisi: sunucunun kuru, tek kez, yetersiz bakiye ve alt sınır', async () => {
     const a = await signUp('A');
     const b = await signUp('B');
@@ -102,6 +118,25 @@ describe('Takip ve engelleme', () => {
   });
 });
 
+describe('Keşfet', () => {
+  test('gerçek kişiler, en son aktif önce; ben ve engelli kişiler yok', async () => {
+    const a = await signUp('Irmak');
+    const b = await signUp('Jale');
+    const c = await signUp('Kaan');
+    let [st, j] = await call('GET', '/api/discover', null, a.session);
+    assert.equal(st, 200);
+    const ids = j.users.map((u) => u.id);
+    assert.ok(!ids.includes(a.user.id), 'kendimi görmem');
+    assert.ok(ids.includes(b.user.id) && ids.includes(c.user.id));
+    assert.equal(ids.indexOf(c.user.id) < ids.indexOf(b.user.id), true, 'son giren önce');
+    assert.equal(j.users.find((u) => u.id === c.user.id).online, true);
+    await call('POST', '/api/block', { to: a.user.id }, b.session);
+    [, j] = await call('GET', '/api/discover', null, a.session);
+    assert.ok(!j.users.some((u) => u.id === b.user.id), 'beni engelleyen görünmez');
+    assert.equal((await call('GET', '/api/discover'))[0], 401);
+  });
+});
+
 describe('Mesajlar', () => {
   test('gönderme bir kez, sohbet listesi, okunmamış ve okundu; engelde kapalı', async () => {
     const a = await signUp('Gül');
@@ -150,7 +185,11 @@ describe('Odalar ve ses token’ı', () => {
     const [, t] = await call('GET', `/token?room=${lk}&password=1234`, null, guest.session);
     assert.equal(tokenOf(t.token).video.room, lk);
     assert.equal((await call('GET', `/token?room=${lk}`, null, owner.session))[0], 200, 'sahip şifresiz girer');
-    assert.equal((await call('GET', '/token?room=oda-r1', null, guest.session))[0], 200, 'prototip odaları etkilenmez');
+    assert.equal(t.ttl, 600, 'kısa ömürlü token');
+    assert.equal(tokenOf(t.token).sub, guest.user.id, 'kimlik oturumdan');
+    // Only open server rooms: the sample rooms and made-up names get no token (ALLOW_PROTOTYPE_ROOMS is off).
+    assert.equal((await call('GET', '/token?room=oda-r1', null, guest.session))[0], 404, 'prototip odası yok');
+    assert.equal((await call('GET', `/token?room=oda-${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}`, null, guest.session))[0], 404, 'olmayan oda');
 
     assert.equal((await call('POST', '/api/rooms/ban', { room: room.id, user: guest.user.id, minutes: 10 }, guest.session))[0], 403, 'yetkisiz');
     await call('POST', '/api/rooms/admin', { room: room.id, user: admin.user.id }, owner.session);
@@ -191,17 +230,36 @@ describe('Şikâyet ve moderasyon', () => {
     const [, q] = await call('GET', '/api/admin/reports', null, mod.session);
     const mine = q.reports.filter((r) => r.target.id === bad.user.id);
     assert.equal(mine.length, 1, 'aynı kişi aynı hedefi bir kez şikâyet eder');
+    assert.deepEqual([mine[0].target.name, mine[0].target.staff, mine[0].target.bannedUntil], [bad.user.name, false, null], 'şikâyet edilenin adı görünür');
     assert.equal((await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 0 }, mod.session))[0], 400);
     assert.equal((await call('GET', '/api/admin/reports', null, mod.session))[1].reports.some((r) => r.id === mine[0].id), true, 'geçersiz istek şikâyeti açık bırakır');
     const [st, handled] = await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 7 }, mod.session);
     assert.equal(st, 200, handled.error);
     assert.ok(handled.bannedUntil);
+    const [, done] = await call('GET', '/api/admin/reports?status=actioned', null, mod.session);
+    assert.ok(done.reports.find((r) => r.id === mine[0].id).target.bannedUntil, 'askı süresi listede görünür');
     const [code, err] = await call('GET', '/api/me', null, bad.session);
     assert.equal(code, 403);
     assert.match(err.error, /askıya alındı/);
     await call('POST', '/api/admin/ban', { user: bad.user.id, days: null }, mod.session);
     assert.equal((await call('GET', '/api/me', null, bad.session))[0], 200, 'yasak kaldırılınca açılır');
     assert.equal((await call('POST', '/api/admin/ban', { user: mod.user.id, days: 1 }, mod.session))[0], 404, 'yetkili askıya alınamaz');
+  });
+
+  test('oda şikâyetinde odanın adı görünür; rolü kişi kendi /api/me yanıtında görür', async () => {
+    const owner = await signUp('Oda Sahibi');
+    const reporter = await signUp('Şikâyetçi');
+    const mod = await signUp('Moderatör');
+    await h.sql.query("UPDATE users SET role = 'moderator' WHERE id = $1", [mod.user.id]);
+    const [, j] = await call('POST', '/api/rooms', { title: 'Gece Sohbeti' }, owner.session);
+    assert.equal((await call('POST', '/api/report', { type: 'room', id: j.room.id, reason: 'Spam' }, reporter.session))[0], 200);
+    assert.equal((await call('POST', '/api/report', { type: 'user', id: mod.user.id, reason: 'Spam' }, reporter.session))[0], 200);
+    const [, q] = await call('GET', '/api/admin/reports', null, mod.session);
+    const room = q.reports.find((r) => r.target.id === j.room.id);
+    assert.deepEqual([room.target.type, room.target.name, room.target.staff], ['room', 'Gece Sohbeti', false]);
+    assert.equal(q.reports.find((r) => r.target.id === mod.user.id).target.staff, true, 'yetkili hesabı işaretli');
+    assert.equal((await call('GET', '/api/me', null, mod.session))[1].user.role, 'moderator');
+    assert.equal((await call('GET', '/api/me', null, reporter.session))[1].user.role, 'user');
   });
 });
 

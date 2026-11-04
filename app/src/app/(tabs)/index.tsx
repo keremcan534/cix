@@ -37,6 +37,7 @@ import { StarterPath } from '@/components/starter';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
+import { callsAvailable, liveMode, useServerRooms } from '@/lib/live';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -62,7 +63,10 @@ export default function RoomsScreen() {
   const { colors, semantic, gradient } = useTheme();
   const styles = useStyles();
 
-  const visible = ROOMS.filter((r) => !blocked.has(r.hostId));
+  // Live mode (test APK): only the rooms real people opened on our server; the demo rooms and people stay out.
+  const live = liveMode();
+  const serverRooms = useServerRooms();
+  const visible = (live ? serverRooms : ROOMS).filter((r) => !blocked.has(r.hostId));
   // The home screen leads with the open room whose host has the most in common with you (lib/closest).
   const closest = closestRooms(me, visible, userById, { following, recent: recentRooms, blocked })[0];
 
@@ -100,7 +104,7 @@ export default function RoomsScreen() {
         : visible.filter((r) => following.has(r.hostId));
 
   // "Benzerlerin": people online right now, the closest matches first.
-  const similarPeople = USERS.filter((u) => u.online && !blocked.has(u.id) && u.id !== 'me')
+  const similarPeople = (live ? [] : USERS).filter((u) => u.online && !blocked.has(u.id) && u.id !== 'me')
     .map((u) => ({ u, score: similarity(me, u).score }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
@@ -109,7 +113,9 @@ export default function RoomsScreen() {
 
   const emptyText =
     main === 'rec'
-      ? 'Bu kategoride şu an açık oda yok.'
+      ? live
+        ? 'Şu an açık oda yok. Sağ alttaki + ile ilk odayı sen aç.'
+        : 'Bu kategoride şu an açık oda yok.'
       : mineTab === 'recent'
         ? 'Henüz bir odaya girmedin.'
         : mineTab === 'joined'
@@ -166,7 +172,7 @@ export default function RoomsScreen() {
               <StarterPath />
               {closest && <ClosestRoomCard match={closest} />}
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
-              <SimilarPeople people={similarPeople} rooms={visible} />
+              {similarPeople.length > 0 && <SimilarPeople people={similarPeople} rooms={visible} />}
               <SuggestionsRow items={suggestions} />
               <CategoryBar cat={cat} onCat={setCat} countryFlag={country === 'ALL' ? null : countryFlag(country)} onCountry={() => setSheet('country')} />
             </View>
@@ -279,7 +285,7 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
   const styles = useStyles();
   const items: { key: string; source: number | undefined; hue: string; label: string; a11y?: string; onPress: () => void; dot?: boolean }[] = [
     { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
-    { key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') },
+    ...(callsAvailable() ? [{ key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
     { key: 'games', source: artSource('ana-oyun-merkezi'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
     { key: 'tasks', source: artSource('ana-gorevler'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];

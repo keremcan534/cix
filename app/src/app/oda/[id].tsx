@@ -3,11 +3,12 @@
 // System back, the room's close button or any navigation that would remove this route asks first:
 // "Odayı küçült" (stay in the room, mini card) or "Odadan çık".
 import { router, useIsFocused, useLocalSearchParams, usePreventRemove } from 'expo-router';
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
-import { roomById } from '@/data/mock';
+import { isServerId, roomById, serverRoomKnown } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { liveMode, loadRooms, message, openServerRoom } from '@/lib/live';
 import { endRoom, getSession, openRoom, registerOpener, requestLeave, setLeaving, useRoomSession } from '@/lib/room-session';
 import { savedAtStart } from '@/lib/room-session-persist';
 import { useApp } from '@/store';
@@ -15,7 +16,43 @@ import { colors } from '@/theme';
 
 const stepBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
+/**
+ * Live mode (lib/live): "Oda aç" opens my room on the server first and comes back as /oda/<its id>; a server room
+ * this phone hasn't listed yet (a link, a restart) is read from the server before it opens.
+ */
 export default function RoomRoute() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { myRoom } = useApp();
+  const [, setLoaded] = useState(0);
+  const pending = liveMode() && (id === 'yeni' || (isServerId(id) && !serverRoomKnown(id)));
+  useEffect(() => {
+    if (!pending) return;
+    let alive = true;
+    const fail = (title: string, text: string) => {
+      if (!alive) return;
+      showAlert(title, text);
+      stepBack();
+    };
+    const work =
+      id === 'yeni'
+        ? openServerRoom(myRoom.title, myRoom.announcement).then((r) => alive && router.replace(`/oda/${r.id}`))
+        : loadRooms().then(() => (serverRoomKnown(id) ? alive && setLoaded((n) => n + 1) : fail('Oda bulunamadı', 'Bu oda kapanmış olabilir.')));
+    work.catch((e) => fail('Oda açılamadı', message(e)));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, pending]);
+  if (pending)
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  return <RoomOpen />;
+}
+
+function RoomOpen() {
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();
   const { myRoom } = useApp();
   const { session, switchTo, leaving } = useRoomSession();

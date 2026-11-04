@@ -3,6 +3,9 @@
     "name": "Similar Club",
     "slug": "similar-club",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -51,7 +54,36 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication"
+          }
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Sesli odalarda konuşabilmen için mikrofonuna erişmemiz gerekiyor."
+        }
+      ],
+      [
+        "@sentry/react-native",
+        {
+          "disableAutoUpload": true
+        }
+      ],
+      [
+        "expo-iap",
+        {
+          "android": {
+            "store": "play"
+          }
+        }
+      ],
+      "./plugins/with-android-release-build"
     ],
     "scheme": "similarclub",
     "experiments": {

@@ -12,7 +12,8 @@ const PG = { host: process.env.PGHOST ?? '127.0.0.1', port: Number(process.env.P
 
 /**
  * Registers before/after hooks that start the API with `extraEnv` on a fresh database. Returns helpers;
- * `sql` (a pool on the test database) and `logs` (the API's stdout lines) fill in once it is up.
+ * `sql` (a pool on the test database) and `logs` (the API's stdout lines) fill in once it is up. Development
+ * sign-in is on unless `extraEnv` sets ALLOW_DEV_AUTH; a value of undefined leaves a variable unset.
  */
 export function startApi(extraEnv = {}) {
   const DB = `similar_test_${process.pid}`;
@@ -26,25 +27,25 @@ export function startApi(extraEnv = {}) {
     await root.query(`CREATE DATABASE ${DB}`);
     await root.end();
     h.sql = new pg.Pool({ ...PG, database: DB });
-    h.api = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'index.mjs')], {
-      env: {
-        ...process.env,
-        PGHOST: PG.host,
-        PGPORT: String(PG.port),
-        POSTGRES_USER: PG.user,
-        POSTGRES_PASSWORD: PG.password,
-        POSTGRES_DB: DB,
-        LIVEKIT_KEYS: 'testkey: testsecret',
-        API_PORT: String(PORT),
-        ALLOW_TEST_TOPUP: '1',
-        RATE_AUTH: '100000',
-        RATE_ALL: '100000',
-        LOG_REQUESTS: '0',
-        PUSH_ENABLED: '0',
-        ...extraEnv,
-      },
-      stdio: ['ignore', 'pipe', 'inherit'],
-    });
+    const env = {
+      ...process.env,
+      PGHOST: PG.host,
+      PGPORT: String(PG.port),
+      POSTGRES_USER: PG.user,
+      POSTGRES_PASSWORD: PG.password,
+      POSTGRES_DB: DB,
+      LIVEKIT_KEYS: 'testkey: testsecret',
+      API_PORT: String(PORT),
+      ALLOW_TEST_TOPUP: '1',
+      RATE_AUTH: '100000',
+      RATE_ALL: '100000',
+      LOG_REQUESTS: '0',
+      PUSH_ENABLED: '0',
+      ALLOW_DEV_AUTH: '1',
+      ...extraEnv,
+    };
+    for (const k of Object.keys(env)) if (env[k] === undefined || env[k] === null) delete env[k];
+    h.api = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'index.mjs')], { env, stdio: ['ignore', 'pipe', 'inherit'] });
     let buf = '';
     h.api.stdout.on('data', (d) => {
       buf += String(d);
@@ -82,6 +83,14 @@ export function startApi(extraEnv = {}) {
     const [st, j] = await h.call('POST', '/api/auth/dev', { deviceKey, name });
     assert.equal(st, 200, j.error);
     return { ...j, deviceKey };
+  };
+
+  /** An account made straight in the database, with a session (for servers without development sign-in). */
+  h.account = async (name = `Test ${rnd(2)}`, role = 'user') => {
+    const u = (await h.sql.query('INSERT INTO users (name, role) VALUES ($1, $2) RETURNING *', [name, role])).rows[0];
+    const session = crypto.randomBytes(32).toString('base64url');
+    await h.sql.query("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '1 day')", [crypto.createHash('sha256').update(session).digest('hex'), u.id]);
+    return { user: { id: u.id, name: u.name }, session };
   };
 
   /** Waits for a line of the API's output that matches `re`, from line `from` on. */

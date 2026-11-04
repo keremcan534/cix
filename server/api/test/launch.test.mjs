@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 
 import { presign } from '../media.mjs';
+import { purchaseOptions } from '../purchases.mjs';
 import { rnd, startApi } from './harness.mjs';
 
 // A stand-in for Expo's push service: records what it gets; tokens with "Gone" are unknown devices.
@@ -139,6 +140,13 @@ describe('Mağaza satın alımı', () => {
     assert.equal((await call('POST', '/api/wallet/purchase', { platform: 'android', productId: 'coins_1000', token: 'x'.repeat(40) }, a.session))[0], 503, 'Play ayarlı değil');
     assert.equal((await call('POST', '/api/wallet/purchase', { platform: 'ios', productId: 'coins_1000', transactionId: '2000000123' }, a.session))[0], 503, 'App Store ayarlı değil');
   });
+
+  test('uygulamaya sunulan ödeme yolları .env\'den: test paketi ve doğrulanabilen mağazalar', () => {
+    assert.deepEqual(purchaseOptions({}), { testTopup: false, stores: { android: false, ios: false } });
+    assert.deepEqual(purchaseOptions({ ALLOW_TEST_TOPUP: '0', GOOGLE_SERVICE_ACCOUNT: '{"client_email":"x"}' }), { testTopup: false, stores: { android: true, ios: false } });
+    assert.deepEqual(purchaseOptions({ ALLOW_TEST_TOPUP: '1', APPLE_IAP_KEY_ID: 'k', APPLE_IAP_ISSUER_ID: 'i' }).stores, { android: false, ios: false }, 'Apple: üç anahtar birden');
+    assert.equal(purchaseOptions({ APPLE_IAP_KEY_ID: 'k', APPLE_IAP_ISSUER_ID: 'i', APPLE_IAP_PRIVATE_KEY: 'p' }).stores.ios, true);
+  });
 });
 
 describe('Hediyeler ve sıralama', () => {
@@ -146,6 +154,8 @@ describe('Hediyeler ve sıralama', () => {
     const [cs, cat] = await call('GET', '/api/catalog');
     assert.equal(cs, 200);
     assert.ok(cat.gifts.length > 50 && cat.counts.includes(250) && cat.packs[0].productId === 'coins_1000');
+    // The test server allows free test packs and has no store keys: the app offers no real payment.
+    assert.deepEqual(cat.purchases, { testTopup: true, stores: { android: false, ios: false } });
 
     const a = await signUp('Cömert');
     const b = await signUp('Yıldız');

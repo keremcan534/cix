@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,6 +15,12 @@ import { ROOMS, USERS, type User } from '@/data/mock';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { periodLabel } from '@/lib/tr';
+import { rankings, type RankingRow } from '@/lib/api';
+import { liveMode, rememberUser, toLocal, useServerRooms } from '@/lib/live';
+import { userById } from '@/data/mock';
+
+/** Boards the server can rank in a live build (gift totals, open rooms); the others are demo-only for now. */
+const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'oda'];
 
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
 type Unit = 'coin' | 'diamond' | 'people' | 'xp';
@@ -33,12 +39,41 @@ export default function Leaderboard() {
   const styles = useStyles();
   const [board, setBoard] = useState<Board>('zengin');
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const live = liveMode();
+  const boards = live ? BOARDS.filter((b) => LIVE_BOARDS.includes(b.key)) : BOARDS;
   const info = BOARDS.find((b) => b.key === board)!;
+  // Live: gift rankings come from the server (null while loading or when it can't be reached).
+  const serverRooms = useServerRooms();
+  // The answer is kept with the board and period it is for, so a tab change shows "loading" until its own answer.
+  const key = `${board}:${period}`;
+  const [answer, setAnswer] = useState<{ key: string; rows: RankingRow[] | null } | null>(null);
+  const serverRows = answer?.key === key ? answer.rows : null;
+  const rankError = answer?.key === key && answer.rows === null;
+  useEffect(() => {
+    if (!live || (board !== 'zengin' && board !== 'yayinci')) return;
+    let alive = true;
+    rankings(board === 'zengin' ? 'wealth' : 'charm', period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month')
+      .then((rows) => alive && setAnswer({ key: `${board}:${period}`, rows }))
+      .catch(() => alive && setAnswer({ key: `${board}:${period}`, rows: null }));
+    return () => {
+      alive = false;
+    };
+  }, [live, board, period]);
   const unit = info.unit;
   const mult = period === 'monthly' ? 4 : 1;
 
-  const rows: Row[] =
+  const liveRows = (): Row[] =>
     board === 'oda'
+      ? [...serverRooms].sort((a, b) => b.listeners - a.listeners).map((r) => ({ id: r.id, name: r.title, avatar: r.cover, score: r.listeners, roomId: r.id }))
+      : (serverRows ?? []).map((r) => {
+          rememberUser(r.user);
+          const id = toLocal(r.user.id);
+          const user = userById(id);
+          return { id, name: r.user.name, avatar: user.avatar, score: r.score, user };
+        });
+  const rows: Row[] = live
+    ? liveRows()
+    : board === 'oda'
       ? [...ROOMS]
           .sort((a, b) => b.listeners - a.listeners)
           .map((r) => ({ id: r.id, name: r.title, avatar: r.cover, score: r.listeners * (period === 'daily' ? 1 : 23) * mult, roomId: r.id }))
@@ -57,7 +92,7 @@ export default function Leaderboard() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Sıralama" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.tabs}>
-        {BOARDS.map((b) => (
+        {boards.map((b) => (
           <Pressable key={b.key} onPress={() => setBoard(b.key)} style={[styles.tab, board === b.key && styles.tabActive]} accessibilityLabel={b.label}>
             {b.art && <Art name={b.art} size={17} />}
             <Text style={[styles.tabText, board === b.key && styles.tabTextActive]}>{b.art ? b.label : `${b.emoji} ${b.label}`}</Text>
@@ -84,6 +119,11 @@ export default function Leaderboard() {
             {second && <Podium row={second} place={2} unit={unit} onPress={() => open(second)} />}
             {first && <Podium row={first} place={1} unit={unit} onPress={() => open(first)} />}
             {third && <Podium row={third} place={3} unit={unit} onPress={() => open(third)} />}
+            {!first && (
+              <Text style={[styles.how, { flex: 1, textAlign: 'center', paddingVertical: 28 }]}>
+                {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : live && board !== 'oda' && serverRows === null ? 'Yükleniyor…' : board === 'oda' ? 'Şu an açık oda yok.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
+              </Text>
+            )}
           </LinearGradient>
         }
         renderItem={({ item, index }) => (

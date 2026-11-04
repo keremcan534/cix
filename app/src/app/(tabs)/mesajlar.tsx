@@ -17,14 +17,16 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { messagePreview } from '@/components/ReactionArt';
+import { callsAvailable } from '@/lib/live';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
 
+// Aramalar is the simulated call history; a live build has no calls yet (lib/live callsAvailable).
 const TABS: { key: Tab; label: string }[] = [
   { key: 'messages', label: 'Mesajlar' },
   { key: 'friends', label: 'Arkadaşlarım' },
-  { key: 'calls', label: 'Aramalar' },
+  ...(callsAvailable() ? [{ key: 'calls' as const, label: 'Aramalar' }] : []),
 ];
 
 const FILTERS: { key: Filter; label: string }[] = [
@@ -43,7 +45,7 @@ export default function MessagesScreen() {
   const { conversations, blocked, following, recentRooms, vipDays, markRead, myRoom } = useApp();
   // Profil › Arkadaşlar opens this tab on Arkadaşlarım (the tab stays mounted, so follow later visits too).
   const params = useLocalSearchParams<{ tab?: string }>();
-  const asked = params.tab === 'friends' || params.tab === 'calls' ? params.tab : null;
+  const asked = params.tab === 'friends' || (params.tab === 'calls' && callsAvailable()) ? params.tab : null;
   const [tab, setTab] = useState<Tab>(asked ?? 'messages');
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {

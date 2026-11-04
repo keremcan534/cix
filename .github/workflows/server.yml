@@ -62,18 +62,53 @@ jobs:
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Copy the API and rebuild it on the server
+      # The finance panel lives in its own repo; its source goes next to server/infra/finance/Dockerfile.
+      # FINANCE_REPO_TOKEN (read access to that repo) is only needed while the repo is private.
+      - name: Get the finance panel
+        if: steps.key.outputs.ready == 'true'
+        id: finance
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: keremcan534/similarclup-finance-control
+          token: ${{ secrets.FINANCE_REPO_TOKEN || github.token }}
+          path: finance-src
+      - name: Copy the server files and rebuild on the server
         if: steps.key.outputs.ready == 'true'
         working-directory: .
+        env:
+          FINANCE_OK: ${{ steps.finance.outcome == 'success' }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           SSH="ssh -i ~/.ssh/deploy ubuntu@$HOST"
+
+          # compose.yaml, Caddyfile and backup.sh follow git; the previous copy stays as <file>.bak.
+          # (cp writes into the existing file, so Caddy's mounted Caddyfile sees the change.)
+          tar -C server/infra -czf - compose.yaml Caddyfile backup.sh | $SSH 'set -e; mkdir -p /tmp/similar-infra && tar -C /tmp/similar-infra -xzf - &&
+            cd /opt/similar && for f in compose.yaml Caddyfile backup.sh; do
+              if ! sudo cmp -s /tmp/similar-infra/$f $f; then sudo cp -p $f $f.bak 2>/dev/null || true; sudo cp /tmp/similar-infra/$f $f; echo "updated $f"; fi
+            done; sudo chmod 755 backup.sh; rm -rf /tmp/similar-infra'
+
           # /api/health reports this commit, so the check below knows the new version is the one answering.
           echo "$GITHUB_SHA" > server/api/version.txt
           tar -C server -czf - --exclude=node_modules --exclude=test api | $SSH 'tar -C /opt/similar -xzf -'
-          $SSH 'cd /opt/similar && sudo docker compose up -d --build api'
+
+          if [ "$FINANCE_OK" = true ]; then
+            mkdir -p finance-pkg
+            cp server/infra/finance/Dockerfile finance-pkg/
+            cp -r finance-src/package.json finance-src/package-lock.json finance-src/server finance-src/web finance-pkg/
+            $SSH 'sudo rm -rf /opt/similar/finance.new && sudo install -d -o ubuntu /opt/similar/finance.new'
+            tar -C finance-pkg -czf - . | $SSH 'tar -C /opt/similar/finance.new -xzf - &&
+              sudo rm -rf /opt/similar/finance && sudo mv /opt/similar/finance.new /opt/similar/finance &&
+              (sudo grep -q "^COMPOSE_PROFILES=" /opt/similar/.env || echo "COMPOSE_PROFILES=finance" | sudo tee -a /opt/similar/.env >/dev/null)'
+          else
+            echo "::warning::The finance panel repo could not be read (private? add FINANCE_REPO_TOKEN): panel not updated."
+          fi
+
+          # Only services whose image or settings changed are recreated (postgres and livekit normally stay up).
+          $SSH 'cd /opt/similar && sudo docker compose up -d --build && sudo docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile'
       - name: Check the live API
         if: steps.key.outputs.ready == 'true'
         working-directory: .
@@ -85,3 +120,14 @@ jobs:
             sleep 3
           done
           echo "The new API did not answer (last answer: ${body:-none})"; exit 1
+      - name: Check the finance panel
+        if: steps.key.outputs.ready == 'true' && steps.finance.outcome == 'success'
+        working-directory: .
+        run: |
+          url="https://panel.${HOST//./-}.sslip.io/"
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$url" || true)
+            if [ "$code" = 200 ]; then echo "Panel is up: $url"; exit 0; fi
+            sleep 3
+          done
+          echo "The panel did not answer at $url (last status: ${code:-none})"; exit 1

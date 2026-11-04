@@ -72,9 +72,9 @@ export const socialRoutes = {
 
   /**
    * Account deletion (Play and Apple require it in the app). Personal data goes: profile fields, phone number,
-   * sign-in key, sessions, push tokens, follows, blocks, messages, own rooms. The id, ledger, gifts and
-   * purchases stay, because financial records must be kept; they no longer point to anything personal. The
-   * phone number is free again for a new account.
+   * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, own rooms. The id,
+   * ledger, gifts and purchases stay, because financial records must be kept; they no longer point to anything
+   * personal. The phone number and the Google account are free again for a new account.
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
@@ -85,6 +85,7 @@ export const socialRoutes = {
         [u.id],
       );
       if (u.phone) await c.query('DELETE FROM otp_codes WHERE phone = $1', [u.phone]);
+      await c.query('DELETE FROM auth_identities WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM push_tokens WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM sessions WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [u.id]);
@@ -133,6 +134,23 @@ export const socialRoutes = {
       notify([to], { title: 'Yeni takipçi', body: `${me.name} seni takip etmeye başladı`, data: { type: 'follow', from: me.id } });
     }
     return { following: true };
+  },
+
+  /** Keşfet: real people, most recently active first; blocks either way and deleted accounts are left out. */
+  async 'GET /api/discover'(req) {
+    const me = await auth(req);
+    const r = await db.query(
+      `SELECT u.*, a.seen
+         FROM users u
+         JOIN LATERAL (SELECT max(s.last_seen_at) AS seen FROM sessions s WHERE s.user_id = u.id) a ON true
+        WHERE u.id <> $1 AND u.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
+        ORDER BY a.seen DESC NULLS LAST, u.created_at DESC
+        LIMIT 60`,
+      [me.id],
+    );
+    const fresh = Date.now() - 5 * 60_000;
+    return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };
   },
 
   async 'GET /api/following'(req) {

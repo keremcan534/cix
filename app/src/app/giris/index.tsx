@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,6 +13,9 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
+import { showAlert } from '@/lib/alert';
+import { liveMode, message } from '@/lib/live';
+import { googleSignInOffered, profileFromServer, signInWithGoogle } from '@/lib/live/account';
 
 // The delivered brand mark (two people forming a heart); app icons are generated from the same file.
 const LOGO = require('../../../assets/brand/logo.png');
@@ -31,6 +35,24 @@ export default function WelcomeScreen() {
     login();
   };
 
+  // Live mode with Google set up: Google's account picker, then a new account goes through the profile screen.
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const google = async () => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    try {
+      const r = await signInWithGoogle();
+      if (!r) return;
+      updateMe(profileFromServer(r.user));
+      if (r.needsProfile) router.push({ pathname: '/giris/profil', params: { ad: r.user.name === 'Yeni üye' ? '' : r.user.name } });
+      else login();
+    } catch (e) {
+      showAlert('Google ile giriş yapılamadı', message(e));
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
+
   return (
     <LinearGradient colors={[dark ? '#0B3B4A' : '#D9F1F3', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -44,10 +66,17 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.actions}>
-          <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
-          <SocialButton icon="logo-google" title="Google ile devam et" />
-          <SocialButton icon="logo-apple" title="Apple ile devam et" />
-          {IS_DEMO && (
+          {/* Test server (live mode): Google sign-in when it is set up; otherwise the account is this phone's (one device, one account). */}
+          {googleSignInOffered() ? (
+            <GradientButton title={googleBusy ? 'Google ile bağlanılıyor…' : 'Google ile devam et'} icon="logo-google" onPress={google} style={googleBusy ? { opacity: 0.6 } : undefined} />
+          ) : liveMode() ? (
+            <GradientButton title="Hesap oluştur" icon="person-add" onPress={() => router.push('/giris/profil')} />
+          ) : (
+            <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
+          )}
+          {!liveMode() && <SocialButton icon="logo-google" title="Google ile devam et" />}
+          {!liveMode() && <SocialButton icon="logo-apple" title="Apple ile devam et" />}
+          {IS_DEMO && !liveMode() && (
             <Pressable onPress={demoLogin} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 4 }}>
               <Ionicons name="flash" size={14} color={semantic.tonalText} />
               <Text style={styles.link}>Demo hesabıyla hızlı giriş</Text>

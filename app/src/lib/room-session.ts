@@ -24,6 +24,8 @@ export type RoomSession = {
   startedAt: number;
   status: SessionStatus;
   endReason?: EndReason;
+  /** The server's own words for an ended session (ör. "Oda kapandı", "Oda şifresi yanlış"). */
+  endText?: string;
   /** Opened again after the app was closed: the mic starts off. */
   recovered: boolean;
   /** Membership confirmed by the room (presence join succeeded). */
@@ -179,6 +181,8 @@ function start(roomId: string, info: { title: string; cover: string; via?: strin
   connectTimer = setTimeout(() => {
     connectTimer = undefined;
     if (state.session?.roomId !== roomId || state.session.status !== 'connecting') return;
+    // A real engine says when it joined (engineEvent); only a missing network is decided here.
+    if (engine.capabilities.reportsState) return void (isOnline() || lostConnection());
     if (isOnline()) patchSession({ status: 'connected' });
     else lostConnection();
   }, CONNECT_MS);
@@ -196,7 +200,7 @@ export const cancelSwitch = () => emit({ switchTo: null });
  * session (the room screen unmounts and leaves the presence membership). Ending for a reason the user
  * didn't choose (kicked, server) keeps an "ended" session so the mini card can say what happened.
  */
-export function endRoom(reason: EndReason) {
+export function endRoom(reason: EndReason, endText?: string) {
   const s = state.session;
   if (!s || s.status === 'ended') return;
   stopTimers();
@@ -206,7 +210,7 @@ export function endRoom(reason: EndReason) {
   persist(null);
   // Ended by the room (kicked, closed by the server): keep an "ended" session so the UI can say why.
   const shown = reason === 'kicked' || reason === 'server';
-  emit({ session: shown ? { ...s, micWant: false, status: 'ended', endReason: reason } : null, leaveDialog: false });
+  emit({ session: shown ? { ...s, micWant: false, status: 'ended', endReason: reason, endText } : null, leaveDialog: false });
 }
 /** Clears an ended session after the user read why it ended. */
 export function dismissEnded() {
@@ -306,7 +310,8 @@ function scheduleRetry() {
 function tryReconnect() {
   const s = state.session;
   if (!s || (s.status !== 'reconnecting' && s.status !== 'disconnected')) return;
-  if (engine.reconnect()) {
+  // A real engine reports the join itself (engineEvent 'connected'); until then the session stays "reconnecting".
+  if (engine.reconnect() && !engine.capabilities.reportsState) {
     patchSession({ status: 'connected', reconnectAttempt: 0 });
     notify('Oda bağlantısı yeniden kuruldu.');
     return;
@@ -330,6 +335,40 @@ export function retryNow() {
   patchSession({ status: 'reconnecting', reconnectAttempt: 0 });
   stopRetry();
   tryReconnect();
+}
+
+// --- Reported by a real voice engine (capabilities.reportsState) ----------------------------------------------
+export type EngineEvent =
+  | { type: 'connected' }
+  /** The voice connection dropped; LiveKit retries by itself and the session's backoff calls reconnect(). */
+  | { type: 'lost' }
+  /** Joining failed. `final`: the server refused for good (room closed, banned, wrong password): no retry. */
+  | { type: 'failed'; message: string; final: boolean; reason?: 'kicked' | 'server' }
+  | { type: 'mic_denied' }
+  /** The room removed us (kick) or was deleted on the voice server. */
+  | { type: 'removed'; reason: 'kicked' | 'server' };
+export function engineEvent(roomId: string, e: EngineEvent) {
+  const s = state.session;
+  if (!s || s.roomId !== roomId || s.status === 'ended') return;
+  switch (e.type) {
+    case 'connected': {
+      stopRetry();
+      if (s.status === 'connected') return;
+      patchSession({ status: 'connected', reconnectAttempt: 0 });
+      if (s.status === 'reconnecting' || s.status === 'disconnected') notify('Oda bağlantısı yeniden kuruldu.');
+      return;
+    }
+    case 'lost':
+      return lostConnection();
+    case 'failed':
+      if (e.final) return endRoom(e.reason ?? 'server', e.message);
+      // Not reachable right now (network, server busy): the backoff tries again, then offers "yeniden dene".
+      return lostConnection();
+    case 'mic_denied':
+      return setPermission(false);
+    case 'removed':
+      return endRoom(e.reason);
+  }
 }
 
 // --- Device events (from the OS in a real build; from the test panel in the prototype) ----------------

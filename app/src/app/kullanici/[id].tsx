@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type ColorValue } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,6 +33,8 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
+import { callsAvailable, loadProfile } from '@/lib/live';
+import { isLiveUser } from '@/lib/live/messages';
 import { copyText } from '@/lib/clipboard';
 import { goBack } from '@/lib/nav';
 import { successHaptic } from '@/lib/haptics';
@@ -47,6 +49,7 @@ import { useApp, type FanClub } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Art } from '@/components/Art';
 import { Photo } from '@/components/photo';
+import { useReport } from '@/components/report-sheet';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -69,10 +72,24 @@ export default function UserProfile() {
     rbac, coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
   const isMe = id === 'me';
+  // Live mode: a real person's profile (age, city, interests) is read from the server when it opens.
+  const [, setLoaded] = useState(0);
+  useEffect(() => {
+    if (!isLiveUser(id)) return;
+    let alive = true;
+    loadProfile(id)
+      .then(() => alive && setLoaded((n) => n + 1))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
   const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
+  // Live mode: a real person's report goes to the moderators (a reason sheet of its own).
+  const report = useReport();
 
   const club = fanClubs[user.id];
   const isFollowing = following.has(user.id);
@@ -630,7 +647,7 @@ export default function UserProfile() {
             <Text style={[styles.followText, isFollowing && styles.followingText]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
           </Pressable>
           <BarButton icon="chatbubble-ellipses" label="Mesaj" off={!can('message').ok} onPress={() => guard('message', () => router.push(`/sohbet/${user.id}`))} />
-          <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />
+          {callsAvailable() && <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />}
           <BarButton icon="gift" label="Hediye" highlight off={!can('gift').ok} onPress={() => guard('gift', () => setSheet('gift'))} />
         </SafeAreaView>
       )}
@@ -643,7 +660,11 @@ export default function UserProfile() {
           { label: 'Odama davet et', icon: 'mic-outline', onPress: inviteToRoom },
           { label: 'Profili paylaş', icon: 'share-social-outline', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
           { label: 'Kullanıcı adını kopyala', icon: 'copy-outline', onPress: copyUsername },
-          { label: 'Şikâyet et', icon: 'flag-outline', onPress: () => setTimeout(() => setSheet('report'), 300) },
+          {
+            label: 'Şikâyet et',
+            icon: 'flag-outline',
+            onPress: () => report.start({ type: 'user', id: user.id, name: user.name, onBlock: isBlocked ? undefined : () => toggleBlock(user.id) }, () => setTimeout(() => setSheet('report'), 300)),
+          },
           { label: isBlocked ? 'Engeli kaldır' : 'Engelle', icon: 'ban-outline', destructive: true, onPress: () => toggleBlock(user.id) },
         ]}
       />
@@ -660,6 +681,7 @@ export default function UserProfile() {
           },
         }))}
       />
+      {report.sheet}
       <ActionSheet
         visible={sheet === 'call'}
         title={`${user.name} ile arama`}

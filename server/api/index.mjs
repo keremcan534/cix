@@ -1,28 +1,37 @@
 // Similar Club API on our server, behind Caddy next to Postgres and LiveKit (docs/SUNUCU.md). One dependency: pg.
 //
-//   GET  /api/health                                            → { ok, db, version, uptime }   (public)
+//   GET  /api/health                                            → { ok, db, version, uptime, warnings }   (public)
 //   GET  /api/me                                                → { user }
 //   GET  /api/ledger                                            → { rows }
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
 //   POST /api/wallet/gift       { to, amount, ref } (test only) → { user, replay }
 //   POST /api/wallet/exchange   { diamonds, ref }             → { user, replay, coins }
+//   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (in-app purchases: VIP, store items…)
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
+// Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
 // purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
+// Error reporting, the app's remote config and kill switches, and the health warnings: reporting.mjs,
+// features.mjs, alerts.mjs.
 import fs from 'node:fs';
 import http from 'node:http';
 
+// First, so its console.error hook is in place before anything else runs.
+import { failed } from './reporting.mjs';
 import { adminRoutes } from './admin.mjs';
+import { alertRoutes, warningCodes } from './alerts.mjs';
+import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes } from './auth.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
+import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
@@ -33,7 +42,9 @@ import { purchaseRoutes } from './purchases.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { socialRoutes } from './social.mjs';
-import { creditCoins, giftCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { withdrawRoutes } from './withdraw.mjs';
+import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -46,12 +57,13 @@ const VERSION = (() => {
   }
 })();
 const STARTED = Date.now();
-/** Test top-ups: the coin pack sizes, at most this many coins per user per day. */
+/** Test top-ups: the coin pack sizes; at most TEST_DAILY play coins per user per day (wallet.mjs). */
 const TOPUP_PACKS = [1000, 5000, 10000];
-const TOPUP_DAILY = 50000;
 const GIFT_MAX = 1_000_000;
 /** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
 const EXCHANGE_MAX = 1_000_000_000;
+/** Largest single in-app purchase (VIP, rank, store items, game entries). */
+const SPEND_MAX = 10_000_000;
 /**
  * Web origins allowed to call this: the dev server, the GitHub Pages preview, and the exact origins in
  * ALLOWED_ORIGINS (comma separated, e.g. the product's own domain). Native apps send no Origin.
@@ -80,7 +92,7 @@ const walletRoutes = {
       ok = false;
     }
     if (!ok) throw new HttpError(503, 'Veritabanına ulaşılamıyor');
-    return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000) };
+    return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000), warnings: await warningCodes() };
   },
 
   async 'GET /api/me'(req) {
@@ -100,8 +112,8 @@ const walletRoutes = {
     if (!TOPUP_PACKS.includes(amount)) throw new HttpError(400, `Paket ${TOPUP_PACKS.join(', ')} olmalı`);
     return once(u.id, 'coin', ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
-      const today = await c.query("SELECT coalesce(sum(amount), 0) AS n FROM ledger WHERE user_id = $1 AND reason = 'Test yüklemesi' AND created_at > date_trunc('day', now())", [u.id]);
-      if (Number(today.rows[0].n) + amount > TOPUP_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TOPUP_DAILY}`);
+      // One daily cap for all play coins: test top-ups and test purchases together (wallet.mjs).
+      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
       await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
     });
   },
@@ -134,6 +146,25 @@ const walletRoutes = {
    * one transaction and the ref, so a retry is applied once and a short balance (409) changes nothing. Locked
    * diamonds (wallet.mjs) can't be exchanged.
    */
+  /**
+   * An in-app purchase paid with coins (VIP, rank, store items, stickers, game entries). Coins only leave the
+   * account, so this can't create value; what was bought is kept by the app for now. A short balance is a 409.
+   */
+  async 'POST /api/wallet/spend'(req) {
+    const u = await auth(req);
+    const { amount, reason, ref } = await readJson(req);
+    const n = int(amount, 1, SPEND_MAX);
+    if (!n) throw new HttpError(400, 'Geçersiz miktar');
+    const why = typeof reason === 'string' ? reason.trim().slice(0, 80) : '';
+    if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
+    return once(u.id, 'coin', ref, async (c) => {
+      const row = await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id]);
+      await claimRef(c, u.id, 'coin', ref);
+      if (Number(row.rows[0].coins) < n) throw new HttpError(409, 'Yetersiz jeton');
+      await spendCoins(c, u.id, n, `Uygulama içi: ${why}`, ref);
+    });
+  },
+
   async 'POST /api/wallet/exchange'(req) {
     const u = await auth(req);
     const { diamonds, ref } = await readJson(req);
@@ -155,7 +186,9 @@ const walletRoutes = {
 const routes = {
   ...walletRoutes,
   ...walletInfoRoutes,
+  ...withdrawRoutes,
   ...jetonRoutes,
+  ...refundSyncRoutes,
   ...authRoutes,
   ...pushRoutes,
   ...giftRoutes,
@@ -166,8 +199,11 @@ const routes = {
   ...messageRoutes,
   ...roomRoutes,
   ...adminRoutes,
+  ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
+  ...configRoutes,
+  ...alertRoutes,
 };
 
 // --- Server: CORS, security headers, rate limits, JSON errors, one log line per request ---------------------
@@ -211,9 +247,14 @@ const server = http.createServer(async (req, res) => {
   const ip = clientIp(req);
   if (limited(req, url.pathname, ip)) return send(429, { error: 'Çok fazla istek, biraz bekle' });
 
+  if (url.pathname === '/api/config') res.setHeader('Cache-Control', CONFIG_CACHE);
   try {
+    // A feature switched off in .env (FEATURES_OFF) is refused before its route runs.
+    gate(req.method, url.pathname);
     send(200, await route(req, url));
   } catch (e) {
+    // 5xx: counted for the health warnings and reported (SENTRY_DSN).
+    failed(e, req.method, url.pathname);
     if (e instanceof HttpError) return send(e.code, { error: e.message });
     console.error(e);
     send(500, { error: 'Sunucu hatası' });
@@ -230,6 +271,8 @@ process.on('unhandledRejection', (e) => console.error('unhandled rejection', e))
 /** docker compose stop / deploy: finish the requests in flight (up to 10 s), then close the pool. */
 function shutdown(signal) {
   console.log(`${signal}: shutting down`);
+  stopFinanceSync();
+  stopRefundSync();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -244,3 +287,5 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 await migrate();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
+startFinanceSync();
+startRefundSync();

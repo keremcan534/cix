@@ -20,11 +20,14 @@ import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
 import { addLock, diamondSplit, lockMs, lockedReason, locksFor, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
-import { validIban } from '@/lib/bank';
+import { validAnyIban } from '@/lib/withdraw-rules';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
-import { CONVERSATIONS, ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import type { ServerEarnings, ServerUser } from '@/lib/api';
+import { block as serverBlock, follow } from '@/lib/api';
+import { bindWallet, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
@@ -253,7 +256,11 @@ type AppState = {
   requestDataExport: () => void;
   conversations: Conversation[];
   /** `room` turns the message into a room invite card that opens the room. */
-  sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard) => void;
+  sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard, ref?: string) => void;
+  /** Live mode: marks my message (by its request id) as not sent with the reason, or sent again (null). */
+  setMessageFailed: (userId: string, ref: string, reason: string | null) => void;
+  /** A message from someone else arrived (live mode: from the server); counts as unread. */
+  receiveMessage: (userId: string, text: string) => void;
   /** Last "invite all followers" per room id (ms); managers can send it once every 24 hours. */
   followerInvites: Record<string, number>;
   markFollowerInvite: (roomId: string, at: number) => void;
@@ -283,6 +290,8 @@ export const now = () => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 const uid = () => String(Date.now() + Math.random());
+/** Messages kept on the phone per chat; older ones drop off the saved copy (the server keeps real chats). */
+const MAX_SAVED_MESSAGES = 200;
 const toggle = (set: Set<string>, id: string) => {
   const next = new Set(set);
   if (next.has(id)) next.delete(id);
@@ -536,7 +545,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
 
   const [following, setFollowing] = useState<Set<string>>(new Set(s.following ?? ['u1']));
   const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
-  const [conversations, setConversations] = useState(s.conversations ?? CONVERSATIONS);
+  // A live build starts with real chats only: the sample conversations belong to the demo.
+  const [conversations, setConversations] = useState(() => {
+    const saved = s.conversations ?? CONVERSATIONS;
+    return liveMode() ? saved.filter((c) => isServerId(c.userId)) : saved;
+  });
   const [followerInvites, setFollowerInvites] = useState<Record<string, number>>(s.followerInvites ?? {});
   const [starter, setStarter] = useState(() => withDefaults({ claimed: false, hidden: false }, s.starter));
   const [safetyLog, setSafetyLog] = useState<SafetyLog[]>(s.safetyLog ?? []);
@@ -554,7 +567,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
-    following: [...following], blocked: [...blocked], conversations, followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
+    following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -629,6 +642,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setCoins((c) => c - n);
     setSpentTotal((t) => t + n);
     log('coin', -n, reason);
+    // Live mode: the server takes the same coins (expected here, so its answer doesn't take them twice).
+    if (liveMode() && myServerId() && serverBalRef.current) {
+      serverBalRef.current = { ...serverBalRef.current, coins: serverBalRef.current.coins - n };
+      liveSpend(n, reason);
+    }
     if (countsForWealth(reason)) {
       const before = wealthLevelOf(wealthRef.current);
       wealthRef.current += n;
@@ -638,6 +656,68 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     }
     return true;
   };
+
+  // Live mode (lib/live): the server's balances and Gelir locks. A new balance is applied as the change since the
+  // last one, so purchases already taken here (and mirrored with api.spend, see `spend`) aren't taken twice. The
+  // first balance after a start replaces the local one.
+  const serverBalRef = useRef<{ coins: number; diamonds: number } | null>(null);
+  const applyServer = (u: ServerUser, reason?: string, returned = 0) => {
+    const prev = serverBalRef.current;
+    serverBalRef.current = { coins: u.coins, diamonds: u.diamonds };
+    if (!prev) {
+      setCoins(() => u.coins);
+      diamondsRef.current = u.diamonds;
+      setDiamonds(u.diamonds);
+      return;
+    }
+    const dc = u.coins - prev.coins;
+    let dd = u.diamonds - prev.diamonds;
+    if (dc) {
+      setCoins((c) => Math.max(0, c + dc));
+      log('coin', dc, reason ?? (dc > 0 ? 'Jeton eklendi' : 'Harcama'));
+      if (dc < 0 && reason === 'Hediye gönderildi') setSpentTotal((t) => t - dc);
+    }
+    if (!dd) return;
+    diamondsRef.current = Math.max(0, diamondsRef.current + dd);
+    setDiamonds(diamondsRef.current);
+    // A change this phone asked for (Çevir, a withdrawal and its cancel) is logged as it is, not as a gift.
+    if (dd < 0 || reason) return void log('diamond', dd, reason ?? 'Elmas düştü');
+    // A rejected withdrawal's diamonds came back (lib/live/withdraw): not earnings either.
+    const back = Math.min(dd, returned);
+    if (back > 0) {
+      log('diamond', back, 'Para çekme talebi reddedildi');
+      dd -= back;
+      if (!dd) return;
+    }
+    // More diamonds from the server: someone sent me a gift (the server wrote its lock; refreshEarnings reads it).
+    setTotalDiamonds((t) => t + dd);
+    setWeekly((w) => [...w.slice(0, 6), w[6] + dd]);
+    setEarnings((e) => [{ id: uid(), amount: dd, source: 'Hediye' as const, time: now(), day: today() }, ...e].slice(0, 100));
+    log('diamond', dd, 'Hediye');
+    charmRef.current += dd;
+    setCharmXp(charmRef.current);
+    notify({ kind: 'finance', icon: 'gift', title: 'Hediye aldın', body: `${dd.toLocaleString('tr-TR')} elmas kazandın. Kilidi açılınca çekebilir ya da jetona çevirebilirsin.`, href: '/gelir' });
+  };
+  const applyLocks = (e: ServerEarnings) => {
+    const at = Date.now();
+    setLockNow(at);
+    setDiamondLocks(() =>
+      e.locks.map((l): DiamondLock => {
+        if (l.from) rememberUser(l.from);
+        const g = l.gift ? GIFTS.find((x) => x.id === l.gift!.id) : undefined;
+        return {
+          id: `srv-${l.id}`,
+          amount: l.amount,
+          unlockAt: Date.parse(l.unlockAt),
+          channel: l.channel === 'jeton' ? 'jeton' : 'store',
+          source: 'Hediye',
+          ...(l.from && { fromId: toLocal(l.from.id) }),
+          ...(l.gift && { gift: { id: l.gift.id, name: g?.name ?? 'Hediye', emoji: g?.emoji ?? '🎁', count: l.gift.count } }),
+        };
+      }),
+    );
+  };
+  useEffect(() => bindWallet({ apply: applyServer, locks: applyLocks }));
 
   const value: AppState = {
     loggedIn,
@@ -771,7 +851,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       const locked = lockedReason(amount, diamondsRef.current, diamondSplit(diamondsRef.current, locksRef.current, Date.now()).locked);
       if (locked) return locked;
       // Check digits too: a single mistyped digit would send the payout to a dead or wrong account.
-      if (!validIban(iban)) return 'IBAN geçersiz. TR ile başlayan 26 karakteri tek tek kontrol et.';
+      if (!validAnyIban(iban)) return 'IBAN geçersiz. Harfleri ve rakamları tek tek kontrol et.';
       diamondsRef.current -= amount;
       setDiamonds((d) => d - amount);
       const id = uid();
@@ -977,11 +1057,30 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setFamily: setFamilyId,
 
     following,
-    toggleFollow: (id) => setFollowing((prev) => toggle(prev, id)),
+    toggleFollow: (id) => {
+      const on = !following.has(id);
+      setFollowing((prev) => toggle(prev, id));
+      // Live mode: real people are followed on the server (they get a notification); a refusal undoes it here.
+      const sid = liveMode() ? toServer(id) : null;
+      if (sid && id !== 'me') follow(sid, on).catch((e) => {
+        setFollowing((prev) => (prev.has(id) === on ? toggle(prev, id) : prev));
+        showAlert('Takip edilemedi', e instanceof Error ? e.message : String(e));
+      });
+    },
     blocked,
     toggleBlock: (id) => {
-      logSafety(blocked.has(id) ? 'Engeli kaldırdı' : 'Engelledi', id);
+      const on = !blocked.has(id);
+      logSafety(on ? 'Engelledi' : 'Engeli kaldırdı', id);
       setBlocked((prev) => toggle(prev, id));
+      // Live mode: the server keeps the block too (no messages, follows or room entry either way).
+      const sid = liveMode() ? toServer(id) : null;
+      if (sid && id !== 'me') {
+        if (on) setFollowing((prev) => (prev.has(id) ? toggle(prev, id) : prev));
+        serverBlock(sid, on).catch((e) => {
+          setBlocked((prev) => (prev.has(id) === on ? toggle(prev, id) : prev));
+          showAlert(on ? 'Engellenemedi' : 'Engel kaldırılamadı', e instanceof Error ? e.message : String(e));
+        });
+      }
     },
     safetyLog,
     logSafety,
@@ -1003,15 +1102,30 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       notify({ kind: 'security', icon: 'archive', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası 30 gün içinde kayıtlı e-postana gönderilir (KVKK md. 11).' });
     },
     conversations,
-    sendMessage: (userId, text, fromMe = true, room) =>
+    sendMessage: (userId, text, fromMe = true, room, ref) =>
       setConversations((prev) => {
-        const msg = { id: uid(), fromMe, text, time: now(), ...(room ? { room } : {}) };
+        const msg = { id: uid(), fromMe, text, time: now(), ...(room ? { room } : {}), ...(ref ? { ref } : {}) };
         const existing = prev.find((c) => c.userId === userId);
         if (!existing) return [{ id: `c-${userId}`, userId, unread: 0, messages: [msg] }, ...prev];
         return [
           { ...existing, messages: [...existing.messages, msg] },
           ...prev.filter((c) => c.userId !== userId),
         ];
+      }),
+    setMessageFailed: (userId, ref, reason) =>
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.userId !== userId
+            ? c
+            : { ...c, messages: c.messages.map((m) => (m.ref !== ref ? m : reason ? { ...m, failed: reason } : { id: m.id, fromMe: m.fromMe, text: m.text, time: m.time, ref: m.ref })) },
+        ),
+      ),
+    receiveMessage: (userId, text) =>
+      setConversations((prev) => {
+        const msg = { id: uid(), fromMe: false, text, time: now() };
+        const existing = prev.find((c) => c.userId === userId);
+        if (!existing) return [{ id: `c-${userId}`, userId, unread: 1, messages: [msg] }, ...prev];
+        return [{ ...existing, unread: existing.unread + 1, messages: [...existing.messages, msg] }, ...prev.filter((c) => c.userId !== userId)];
       }),
     followerInvites,
     markFollowerInvite: (roomId, at) => setFollowerInvites((m) => ({ ...m, [roomId]: at })),

@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 
+import { useReport } from '@/components/report-sheet';
 import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
@@ -17,17 +18,22 @@ import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from 
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
+import { newRef } from '@/lib/api';
+import { isLiveUser, liveDm } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export function ChatThread({ user, header, compact }: { user: User; /** Rendered above the thread; gets the "typing…" state. */ header: (typing: boolean) => ReactNode; /** Smaller intro, for sheets. */ compact?: boolean }) {
-  const { conversations, sendMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
+  const { conversations, sendMessage, setMessageFailed, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
   const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
-  const mutual = following.has(user.id) && FOLLOWS_ME.has(user.id);
+  // A real person on the test server: messages are free and go through the server, no demo replies.
+  const real = isLiveUser(user.id);
+  const mutual = real || (following.has(user.id) && FOLLOWS_ME.has(user.id));
   const isBlocked = blocked.has(user.id);
+  const report = useReport();
   const [emojiOpen, setEmojiOpen] = useState(false);
   const convo = conversations.find((c) => c.userId === user.id);
   const messages = convo?.messages ?? [];
@@ -47,8 +53,15 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
     [],
   );
 
-  // Index of the other person's latest message: everything I sent before it counts as read.
-  const lastTheirs = messages.map((m) => m.fromMe).lastIndexOf(false);
+  // Index of the other person's latest message: everything I sent before it counts as read. A chat with a real
+  // person has no read receipts yet, so it shows one tick ("sent") and never a made-up "read".
+  const lastTheirs = real ? -1 : messages.map((m) => m.fromMe).lastIndexOf(false);
+  const retry = (m: (typeof messages)[number]) => {
+    if (!m.ref) return;
+    const ref = m.ref;
+    setMessageFailed(user.id, ref, null);
+    liveDm(user.id, m.text, ref, (failed) => failed && setMessageFailed(user.id, ref, failed));
+  };
 
   // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
   const send = (checked = false, sticker?: string) => {
@@ -71,9 +84,11 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
       ]);
       return;
     }
-    sendMessage(user.id, text);
+    const ref = real ? newRef() : undefined;
+    sendMessage(user.id, text, true, undefined, ref);
     setEmojiOpen(false);
     if (!sticker) setDraft('');
+    if (ref) return liveDm(user.id, text, ref, (failed) => failed && setMessageFailed(user.id, ref, failed));
     // Fake reply so the prototype feels real.
     setTyping(true);
     replyTimer.current = setTimeout(() => {
@@ -107,8 +122,19 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
                 {item.room && <RoomCard room={item.room} />}
                 <Text style={styles.time}>
                   {item.time}{' '}
-                  <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
+                  {item.failed ? (
+                    <Text style={{ color: '#FECACA' }}>!</Text>
+                  ) : real ? (
+                    <Text style={{ color: 'rgba(255,255,255,0.7)' }}>✓</Text>
+                  ) : (
+                    <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
+                  )}
                 </Text>
+                {item.failed && (
+                  <Pressable onPress={() => retry(item)} accessibilityRole="button" accessibilityLabel="Mesajı tekrar gönder" hitSlop={8}>
+                    <Text style={[styles.time, { color: '#FECACA', fontWeight: '700' }]}>Gönderilemedi · tekrar dene</Text>
+                  </Pressable>
+                )}
               </LinearGradient>
             ) : (
               <View style={{ gap: 6 }}>
@@ -119,14 +145,17 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
                 </View>
                 <SafetyNote
                   text={item.text}
-                  onReport={() => {
-                    const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Şüpheli mesaj: "${item.text}"`);
-                    logSafety('Şikâyet etti', user.id, `Şüpheli mesaj · #${no}`);
-                    showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`, [
-                      { text: 'Tamam', style: 'cancel' },
-                      { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => !isBlocked && toggleBlock(user.id) },
-                    ]);
-                  }}
+                  onReport={() =>
+                    // Live mode: a reason, then the moderators' queue (the message goes with it as the note).
+                    report.start({ type: 'user', id: user.id, name: user.name, note: `Mesaj: ${item.text}`, onBlock: isBlocked ? undefined : () => toggleBlock(user.id) }, () => {
+                      const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Şüpheli mesaj: "${item.text}"`);
+                      logSafety('Şikâyet etti', user.id, `Şüpheli mesaj · #${no}`);
+                      showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`, [
+                        { text: 'Tamam', style: 'cancel' },
+                        { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => !isBlocked && toggleBlock(user.id) },
+                      ]);
+                    })
+                  }
                 />
               </View>
             )
@@ -174,6 +203,7 @@ export function ChatThread({ user, header, compact }: { user: User; /** Rendered
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      {report.sheet}
     </>
   );
 }
