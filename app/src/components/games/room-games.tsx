@@ -15,7 +15,10 @@ const rnd = (n: number) => Math.floor(Math.random() * n);
 
 // --- Ludo (quick version: one token each, 6 to leave base, exact roll to finish, landing on someone sends them home)
 const TRACK = 24;
-export function Ludo({ players }: { players: Player[] }) {
+export function Ludo({ players: roomPlayers }: { players: Player[] }) {
+  // The line-up is fixed when the game opens and on "Yeniden oyna": people joining or leaving the room mid-game
+  // don't reset the board or leave it out of step with the players.
+  const [players, setPlayers] = useState(roomPlayers);
   const [pos, setPos] = useState<number[]>(() => players.map(() => -1)); // -1 = base
   const [turn, setTurn] = useState(0);
   const [die, setDie] = useState<number | null>(null);
@@ -84,7 +87,8 @@ export function Ludo({ players }: { players: Player[] }) {
         <Pressable
           style={g.btn}
           onPress={() => {
-            setPos(players.map(() => -1));
+            setPlayers(roomPlayers);
+            setPos(roomPlayers.map(() => -1));
             setTurn(0);
             setWinner(null);
             setDie(null);
@@ -103,12 +107,16 @@ type Card = { color: number; value: number | '+2' | 'Atla' };
 const newCard = (): Card => ({ color: rnd(4), value: rnd(10) < 8 ? rnd(10) : rnd(2) ? '+2' : 'Atla' });
 const playable = (c: Card, top: Card) => c.color === top.color || c.value === top.value;
 
-export function ColorCards({ players }: { players: Player[] }) {
+export function ColorCards({ players: roomPlayers }: { players: Player[] }) {
+  // Fixed when the game opens and on "Yeniden oyna" (like Ludo): a hand per player, even if the room changes.
+  const [players, setPlayers] = useState(roomPlayers);
   const [hands, setHands] = useState<Card[][]>(() => players.map(() => Array.from({ length: 5 }, newCard)));
   const [top, setTop] = useState<Card>(() => ({ color: rnd(4), value: rnd(10) }));
   const [turn, setTurn] = useState(0);
   const [log, setLog] = useState('Rengi veya sayısı aynı kartı at. Atamazsan kart çek.');
   const [winner, setWinner] = useState<number | null>(null);
+  // Counts moves: with two players a skip gives the turn back to the same player, and the turn alone wouldn't change.
+  const [moves, setMoves] = useState(0);
 
   const play = (who: number, idx: number | null) => {
     const hand = hands[who];
@@ -136,6 +144,7 @@ export function ColorCards({ players }: { players: Player[] }) {
     }
     setHands(nextHands);
     setTurn((t) => (t + step) % players.length);
+    setMoves((m) => m + 1);
   };
 
   useEffect(() => {
@@ -146,7 +155,7 @@ export function ColorCards({ players }: { players: Player[] }) {
     }, 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turn, winner]);
+  }, [turn, winner, moves]);
 
   return (
     <View style={{ gap: 10 }}>
@@ -179,7 +188,8 @@ export function ColorCards({ players }: { players: Player[] }) {
         <Pressable
           style={g.btn}
           onPress={() => {
-            setHands(players.map(() => Array.from({ length: 5 }, newCard)));
+            setPlayers(roomPlayers);
+            setHands(roomPlayers.map(() => Array.from({ length: 5 }, newCard)));
             setTop({ color: rnd(4), value: rnd(10) });
             setTurn(0);
             setWinner(null);

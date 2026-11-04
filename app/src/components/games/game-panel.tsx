@@ -3,6 +3,7 @@
 // mic button only mirrors and toggles the user's own mic (an explicit user action), and opening,
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,6 +18,7 @@ import { LineSlotPlayer } from '@/components/games/line-slot';
 import { FenerPlayer } from '@/components/games/fener';
 import { RocketPlayer } from '@/components/games/rocket';
 import { OkeyTable } from '@/components/games/okey';
+import { GameNav } from '@/components/games/slot-kit';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
@@ -61,6 +63,7 @@ export function GamePanel({
   onMinimize,
   onClose,
   onInvite,
+  onLeave,
 }: {
   open: OpenGame;
   entry: Entry;
@@ -72,6 +75,8 @@ export function GamePanel({
   onMinimize?: () => void;
   onClose: () => void;
   onInvite?: (gameName: string) => void;
+  /** Before a game opens another screen: Oyun Merkezi closes its modal, which would otherwise cover that screen. */
+  onLeave?: () => void;
 }) {
   const { settings, setSetting } = useApp();
   const { roomGames, casino } = useGames();
@@ -133,7 +138,7 @@ export function GamePanel({
         {roomGame &&
           (roomGame.playable ? (
             <>
-              {open.id === 'ludo' && <Ludo key={players.map((x) => x.id).join()} players={players.slice(0, roomGame.maxPlayers)} />}
+              {open.id === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
               {open.id === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
               {open.id === 'xox' && <Xox players={players.slice(0, 2)} />}
               {open.id === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1)} />}
@@ -164,7 +169,11 @@ export function GamePanel({
       </ScrollView>
     </View>
   );
-  return inRoom ? body : <SafeAreaView style={{ flex: 1 }}>{body}</SafeAreaView>;
+  const go = (href: Parameters<typeof router.push>[0]) => {
+    onLeave?.();
+    router.push(href);
+  };
+  return <GameNav.Provider value={go}>{inRoom ? body : <SafeAreaView style={{ flex: 1 }}>{body}</SafeAreaView>}</GameNav.Provider>;
 }
 
 const p = StyleSheet.create({

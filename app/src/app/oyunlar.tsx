@@ -154,12 +154,13 @@ export default function GameCenter() {
               <Card key={h.requestId + h.txId} style={{ gap: 2 }}>
                 <View style={s.row}>
                   <Text style={[s.title, { flex: 1 }]}>{h.gameName}</Text>
-                  <Text style={[s.amount, { color: h.status === 'Reddedildi' ? t.colors.textDim : h.payout - h.bet >= 0 ? t.colors.green : t.colors.text }]}>
-                    {h.status === 'Reddedildi' ? '—' : `${h.payout - h.bet >= 0 ? '+' : ''}${(h.payout - h.bet).toLocaleString('tr-TR')}`}
+                  {/* A refund gave the bet back: no gain, so it isn't shown as a green +0. */}
+                  <Text style={[s.amount, { color: h.status !== 'Tamamlandı' ? t.colors.textDim : h.payout - h.bet >= 0 ? t.colors.green : t.colors.text }]}>
+                    {h.status === 'Reddedildi' ? '—' : h.status === 'İade edildi' ? 'İade' : `${h.payout - h.bet >= 0 ? '+' : ''}${(h.payout - h.bet).toLocaleString('tr-TR')}`}
                   </Text>
                 </View>
                 <Text style={s.dim}>
-                  {h.status} · bahis {h.bet} · ödeme {h.payout} · {h.detail}
+                  {h.status} · bahis {h.bet.toLocaleString('tr-TR')} · ödeme {h.payout.toLocaleString('tr-TR')} · {h.detail}
                 </Text>
                 <Text style={s.dim}>
                   {h.entry} · {h.time} · {h.txId}
@@ -173,7 +174,7 @@ export default function GameCenter() {
         {/* Games are dark in both schemes, as in the room. */}
         <ThemeScope scheme="dark">
           <View style={{ flex: 1, backgroundColor: colors.bg }}>
-            {open && <GamePanel open={open} entry={PROFILE} players={[{ id: 'me', name: me.name, avatar: me.avatar }, ...players.slice(1)]} onSwitch={setOpen} onClose={() => setOpen(null)} />}
+            {open && <GamePanel open={open} entry={PROFILE} players={[{ id: 'me', name: me.name, avatar: me.avatar }, ...players.slice(1)]} onSwitch={setOpen} onClose={() => setOpen(null)} onLeave={() => setOpen(null)} />}
           </View>
         </ThemeScope>
       </Modal>

@@ -1,6 +1,5 @@
 // Casino games UI (Servet Seviyesi 2+). Every round goes through playCasino (lib/games), the same path for profile and
 // room entry; this component only shows the result. It never touches the room or the microphone.
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
@@ -13,22 +12,23 @@ import { casinoAccess, newRequestId, playCasino, useGames, type Entry, type Outc
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { StateIcon } from '@/components/ui';
+import { useGameNav } from '@/components/games/slot-kit';
 
 const PICKS: Partial<Record<CasinoGame['id'], [key: string, label: string, art?: ArtName][]>> = {
   dice: [
-    ['small', 'Küçük (2–4) · 2.4x'],
-    ['big', 'Büyük (10–12) · 2.4x'],
+    ['small', 'Küçük (2–4) · 2,4x'],
+    ['big', 'Büyük (10–12) · 2,4x'],
   ],
   dragon: [
-    ['dragon', 'Ejder · 1.5x', 'casino-kart-ejder'],
-    ['tie', 'Beraberlik · 5.2x'],
-    ['tiger', 'Kaplan · 1.5x', 'casino-kart-kaplan'],
+    ['dragon', 'Ejder · 1,5x', 'casino-kart-ejder'],
+    ['tie', 'Beraberlik · 5,2x'],
+    ['tiger', 'Kaplan · 1,5x', 'casino-kart-kaplan'],
   ],
 };
 const DIE_ART: ArtName[] = ['zar-zar-yuzu-1', 'zar-zar-yuzu-2', 'zar-zar-yuzu-3', 'zar-zar-yuzu-4', 'zar-zar-yuzu-5', 'zar-zar-yuzu-6'];
 /** The picture for one face of the stage (a die), if there is one. */
 const faceArt = (gameId: CasinoGame['id'], f: string): ArtName | undefined => (gameId === 'dice' ? DIE_ART[Number(f) - 1] : undefined);
-const WHEEL_LABELS = WHEEL.map((s) => `${s.mult}x`);
+const WHEEL_LABELS = WHEEL.map((s) => `${s.mult.toLocaleString('tr-TR')}x`);
 /** Prize picture per wheel slice, by its multiplier: empty slice "tekrar dene", then growing coin prizes. */
 const wheelArt = (mult: number): ArtName =>
   mult === 0 ? 'cark-tekrar-dene' : mult < 2 ? 'cark-kucuk-jeton' : mult < 5 ? 'cark-jeton-kesesi' : mult < 10 ? 'cark-elmas-odul' : mult < 20 ? 'cark-roket-odul' : 'cark-buyuk-odul';
@@ -43,6 +43,8 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
   const [result, setResult] = useState<PlayResult | null>(null);
   const [lastReq, setLastReq] = useState<string | null>(null);
   const [spin] = useState(() => new Animated.Value(0));
+  // Where the wheel stops, known before it spins: the turn runs straight to it instead of jumping at the end.
+  const [landing, setLanding] = useState<Outcome | null>(null);
   const access = casinoAccess(game, entry, wealthLevel);
 
   const play = (requestId = newRequestId()) => {
@@ -54,6 +56,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
       setBusy(false);
       return;
     }
+    setLanding(r.outcome);
     spin.setValue(0);
     Animated.timing(spin, { toValue: 1, duration: r.replay ? 1 : 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => {
       setResult(r);
@@ -66,7 +69,7 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
   const outcome = result?.ok ? result.outcome : null;
   return (
     <View style={{ gap: 12 }}>
-      <Stage gameId={gameId} outcome={outcome} spin={spin} busy={busy} />
+      <Stage gameId={gameId} outcome={outcome} landing={landing} spin={spin} busy={busy} />
       {result && (
         <View style={[c.result, result.ok && result.row.payout > 0 && { borderColor: semantic.money }]} accessibilityLiveRegion="polite">
           {result.ok ? (
@@ -120,12 +123,13 @@ export function CasinoPlayer({ gameId, entry }: { gameId: CasinoGame['id']; entr
 
 /** Shown instead of a casino game when access is refused (e.g. Cömertlik level too low). */
 export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?: number }) {
+  const go = useGameNav();
   return (
     <View style={c.lock}>
       <StateIcon name="lock-closed" />
       <Text style={c.lockText}>{reason}</Text>
       {needWealth !== undefined ? (
-        <Pressable style={c.btn} onPress={() => router.push('/seviye')}>
+        <Pressable style={c.btn} onPress={() => go('/seviye')}>
           <Text style={c.btnText}>Cömertlik Seviyemi gör</Text>
         </Pressable>
       ) : null}
@@ -133,15 +137,15 @@ export function CasinoLock({ reason, needWealth }: { reason: string; needWealth?
   );
 }
 
-function Stage({ gameId, outcome, spin, busy }: { gameId: CasinoGame['id']; outcome: Outcome | null; spin: Animated.Value; busy: boolean }) {
+function Stage({ gameId, outcome, landing, spin, busy }: { gameId: CasinoGame['id']; outcome: Outcome | null; landing: Outcome | null; spin: Animated.Value; busy: boolean }) {
   if (gameId === 'wheel') {
-    const slice = outcome ? Number(outcome.display[0]) : 0;
+    const slice = landing ? Number(landing.display[0]) : 0;
     // Land the chosen slice under the pointer after three turns.
     const deg = 360 * 3 + (360 - slice * 45 - 22.5);
     return (
       <View style={{ alignItems: 'center' }}>
         <Text style={c.pointer}>▼</Text>
-        <Animated.View style={[c.wheel, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${busy ? 1080 : deg}deg`] }) }] }]}>
+        <Animated.View style={[c.wheel, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${deg}deg`] }) }] }]}>
           {WHEEL_LABELS.map((l, i) => (
             <View key={l} style={[StyleSheet.absoluteFill, { alignItems: 'center', transform: [{ rotate: `${i * 45 + 22.5}deg` }] }]}>
               <Text style={[c.wheelLabel, { color: i % 2 ? colors.gold : semantic.action }]}>{l}</Text>

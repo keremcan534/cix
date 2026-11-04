@@ -11,7 +11,8 @@ import { useSyncExternalStore } from 'react';
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean };
 export type RoomSignal = { t: 'chat'; text: string } | { t: 'gift'; giftId: string; count: number; to: string[] };
 
-type Link = { setSeat: (seat: number | null) => void; send: (msg: RoomSignal) => void };
+/** `send` is false when the voice connection isn't up and nothing went out. */
+type Link = { setSeat: (seat: number | null) => void; send: (msg: RoomSignal) => boolean };
 type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean };
 
 const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false };
@@ -79,7 +80,8 @@ export function onSignal(roomId: string, fn: (from: string, msg: RoomSignal) => 
 }
 /** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);
-export const sendSignal = (msg: RoomSignal) => link?.send(msg);
+/** False when it could not go out (no voice connection yet, or it dropped). */
+export const sendSignal = (msg: RoomSignal) => link?.send(msg) ?? false;
 
 // --- Wire format ------------------------------------------------------------------------------------
 // UTF-8 by hand: Turkish letters must survive, and not every phone JavaScript engine has TextEncoder/TextDecoder.

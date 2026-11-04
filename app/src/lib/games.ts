@@ -205,7 +205,7 @@ function settle(
   if (state.bank.pool < r.maxPayout()) return { ok: false, reason: POOL_LOW };
   const day = today();
   const spent = state.spentByDay[`${gameId}:${day}`] ?? 0;
-  if (spent + bet > game.dailyLimit) return { ok: false, reason: `${game.name} için günlük limit ${game.dailyLimit.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, game.dailyLimit - spent)}.` };
+  if (spent + bet > game.dailyLimit) return { ok: false, reason: `${game.name} için günlük limit ${game.dailyLimit.toLocaleString('tr-TR')} jeton. Bugün kalan: ${Math.max(0, game.dailyLimit - spent).toLocaleString('tr-TR')}.` };
   if (deps.coins() + deps.gameCoins() < bet) return { ok: false, reason: 'Yetersiz jeton.' };
 
   const id = txId();

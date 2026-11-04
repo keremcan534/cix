@@ -60,6 +60,8 @@ export type Snapshot = {
   safetyLog: SafetyLog[];
   ownedAnims: string[];
   micFx: string | null;
+  /** Live mode: the server account the rest belongs to. */
+  serverId?: string | null;
 };
 
 /** The built-in profile before any saved data is applied (the store's reset puts it back). */
@@ -76,7 +78,7 @@ const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
   checkInDay: 'number', checkInDate: 'string', svipXp: 'number', firstBuys: 'strings', nobleTier: 'number', nobleDays: 'number',
   vipDays: 'number', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
   fanClubs: 'object', recentRooms: 'strings', following: 'strings', blocked: 'strings', conversations: 'objects',
-  followerInvites: 'object', starter: 'object', safetyLog: 'objects', ownedAnims: 'strings', micFx: 'string?',
+  followerInvites: 'object', starter: 'object', safetyLog: 'objects', ownedAnims: 'strings', micFx: 'string?', serverId: 'string?',
 };
 
 /** The saved state with every field checked; null when nothing usable was saved. */

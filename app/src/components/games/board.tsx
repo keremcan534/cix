@@ -16,7 +16,8 @@ import { casinoAccess, newRequestId, playBoard, useGames, type Entry } from '@/l
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 
-const short = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}K` : String(n));
+/** 2.500 → "2,5K", 1.250.000 → "1,2M" (Turkish decimals, rounded down like the balance pill). */
+const short = (n: number) => (n >= 1_000_000 ? `${(Math.floor(n / 100_000) / 10).toLocaleString('tr-TR')}M` : n >= 1_000 ? `${(Math.floor(n / 100) / 10).toLocaleString('tr-TR')}K` : String(n));
 const CHIP_COLORS = ['#7C3AED', '#EA580C', '#65A30D', '#2563EB'];
 const WHEEL = 230;
 const SLICE = 360 / LUCKY_WHEEL.length;
@@ -136,7 +137,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
         <View style={s.topRow}>
           <Text style={s.round}>Tur: {round}</Text>
           <Text style={[s.title, { color: look.ink }]}>{look.title}</Text>
-          <Text style={s.round}>Bugün +{short(won)}</Text>
+          <Text style={s.round}>Bu oturum +{short(won)}</Text>
         </View>
 
         {id === 'slot' && (

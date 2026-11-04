@@ -78,6 +78,7 @@ export function GiftSheet({
   coins,
   onSend,
   onSendLucky,
+  noBag = false,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -91,6 +92,8 @@ export function GiftSheet({
   onSend: (g: Gift, to: string[], count: number) => boolean;
   /** `count` Lucky gifts to each person picked (one draw per gift). */
   onSendLucky: (giftId: string, toIds: string[], count: number) => void;
+  /** Server room: the server charges every gift at its price, so the free backpack (a local reward) is hidden. */
+  noBag?: boolean;
 }) {
   const { svipLevel, spentTotal, me, spendBlock } = useApp();
   const lucky = useLucky();
@@ -274,7 +277,7 @@ export function GiftSheet({
 
         {/* What: shelves */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={g.shelves}>
-          {SHELVES.map((s) => {
+          {SHELVES.filter((s) => !noBag || s.key !== 'bag').map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             return (

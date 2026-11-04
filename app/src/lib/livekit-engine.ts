@@ -50,10 +50,18 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     });
   };
 
+  // Rooms holding the phone's audio session. A left room closes only after its disconnect finishes, which can be
+  // after the next room opened the session: the session stops when the last room lets go, not on every close.
+  const audioRooms = new Set<Room>();
+  const releaseAudio = (r: Room) => {
+    if (audioRooms.delete(r) && audioRooms.size === 0) void cfg.onRoomClosed?.();
+  };
+
   async function join(roomId: string, r: Room) {
     try {
       const token = await cfg.getToken(roomName(roomId));
       if (room !== r) return;
+      audioRooms.add(r);
       await cfg.onRoomOpen?.();
       if (room !== r) return;
       await r.connect(cfg.url, token);
@@ -93,7 +101,9 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room) pushSeat(room);
     },
     send(msg: RoomSignal) {
-      if (room?.state === ConnectionState.Connected) room.localParticipant.publishData(encodeSignal(msg), { reliable: true }).catch((e) => fail('Mesaj', e));
+      if (room?.state !== ConnectionState.Connected) return false;
+      room.localParticipant.publishData(encodeSignal(msg), { reliable: true }).catch((e) => fail('Mesaj', e));
+      return true;
     },
   });
 
@@ -160,7 +170,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       s.disconnects++;
       if (r) {
         if (cfg.attachAudio !== false) r.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => pub.track?.detach().forEach((el) => el.remove())));
-        void r.disconnect().finally(() => cfg.onRoomClosed?.());
+        void r.disconnect().finally(() => releaseAudio(r));
       }
     },
     setPublishing(on) {

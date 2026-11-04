@@ -19,6 +19,7 @@ import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 import { callsAvailable, liveMode } from '@/lib/live';
+import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -200,7 +201,13 @@ export default function ProfileScreen() {
         <Group items={[...GROWTH.filter(visible), ...(isAdmin ? [CENTER] : [])]} />
         <Group items={SUPPORT} />
 
-        <Pressable style={styles.logout} onPress={() => confirmLogout(logout)} accessibilityRole="button">
+        <Pressable style={styles.logout} onPress={() =>
+            confirmLogout(() => {
+              logout();
+              // Live mode: as in Ayarlar, a Google account's session ends too.
+              if (liveMode()) void liveSignOut().catch(() => {});
+            })
+          } accessibilityRole="button">
           <Ionicons name="log-out-outline" size={18} color={colors.red} />
           <Text style={{ color: colors.red, fontWeight: '600' }}>Çıkış yap</Text>
         </Pressable>

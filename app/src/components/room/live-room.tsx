@@ -1299,21 +1299,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const text = sticker ?? draft.trim();
     if (!text) return;
     if (!sticker) setDraft('');
-    if (!isOnline()) {
+    // Server room: the line goes out over the voice connection, which may still be joining or have dropped.
+    if (!isOnline() || (real && !sendSignal({ t: 'chat', text: mask(text) }))) {
       // Not sent: kept on my screen only, marked as failed with a retry.
       setMessages((list) => mergeFeed(list, [{ id: msgId(), userId: 'me', text: mask(text), status: 'failed', at: Date.now() }]));
       return;
     }
     addMsg({ userId: 'me', text });
-    if (real) sendSignal({ t: 'chat', text: mask(text) });
     setEmojiOpen(false);
     gainXp(2);
   };
   // A failed message is sent again as a new event (its text was already filtered when it was written).
   const retrySend = useCallback((msg: ChatMsg) => {
     if (offlineBlocked()) return;
+    // Server room: it goes out again over the voice connection; while that is still down the line stays failed.
+    if (real && !sendSignal({ t: 'chat', text: msg.text })) return;
     setMessages((list) => mergeFeed(list.filter((m) => m.id !== msg.id), [{ id: msgId(), userId: 'me', text: msg.text, at: Date.now() }]));
-  }, []);
+  }, [real]);
   const renderChat = useCallback(({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} onRetry={retrySend} />, [equipped.bubble, retrySend]);
 
   /** True when at least one recipient got the gift. */
@@ -1383,6 +1385,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const sent: string[] = [];
     let error: string | null = null;
     for (const uid of toIds) {
+      // The daily limit holds here too (the balance is the server's to check); each answer counts toward it.
+      const limited = spendBlock(gift.price * count);
+      if (limited && limited !== 'Yetersiz bakiye.') {
+        error = limited;
+        break;
+      }
       try {
         await liveGift(uid, gift.id, count, id);
         sent.push(uid);
@@ -2118,6 +2126,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         coins={coins}
         onSend={sendGift}
         onSendLucky={sendLuckyGift}
+        noBag={real}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => setSheet(null)} />
       {reporting.sheet}

@@ -27,7 +27,8 @@ import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
-import { bindWallet, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
+import { bindWallet, forgetLiveAccount, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
+import { forgetSeen } from '@/lib/live/messages';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
@@ -151,6 +152,8 @@ type AppState = {
   notifications: Notice[];
   notify: (n: Omit<Notice, 'id' | 'time' | 'read'>) => void;
   markNotificationsRead: () => void;
+  /** One notice was opened. */
+  markNoticeRead: (id: string) => void;
   tickets: Ticket[];
   createTicket: (category: TicketCategory, text: string) => string;
   replyTicket: (id: string, text: string) => void;
@@ -301,9 +304,10 @@ const toggle = (set: Set<string>, id: string) => {
 
 /** Forgets everything saved on this device (the store's reset and the crash screen's way out). */
 export async function resetLocalData() {
-  await clearState();
+  // The profile first: a store mounted while the save is being removed must not read (and save) the old one.
   for (const key of Object.keys(ME)) if (!(key in ME_DEFAULT)) delete (ME as Record<string, unknown>)[key];
   Object.assign(ME, ME_DEFAULT);
+  await clearState();
 }
 
 /** Loads the saved state first (the splash screen stays up meanwhile), then mounts the store. */
@@ -326,10 +330,8 @@ export function AppProvider({ children, onReady }: { children: ReactNode; onRead
     if (ready) onReady?.();
   }, [ready, onReady]);
   if (!boot) return null;
-  const reset = () => {
-    resetLocalData();
-    setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: null }));
-  };
+  // The new store mounts only once the save is gone, so it starts from the defaults and saves those.
+  const reset = () => void resetLocalData().then(() => setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: null })));
   return (
     <StateProvider key={boot.gen} initial={boot.initial ?? {}} onReset={reset}>
       {children}
@@ -527,8 +529,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   });
 
   // Demo account starts at VIP 3 (SVIP 3 threshold) so VIP-gated features and their limits can be tested;
-  // older saves below it are raised once, higher saves are kept.
-  const [svipXp, setSvipXp] = useState(Math.max(s.svipXp ?? 0, DEMO_SVIP_XP));
+  // older saves below it are raised once, higher saves are kept. A live build shows the server's points only.
+  const [svipXp, setSvipXp] = useState(liveMode() ? (s.svipXp ?? 0) : Math.max(s.svipXp ?? 0, DEMO_SVIP_XP));
   const [firstBuys, setFirstBuys] = useState<Set<string>>(new Set(s.firstBuys));
   const [nobleTier, setNobleTier] = useState(s.nobleTier ?? 0);
   const [nobleDays, setNobleDays] = useState(s.nobleDays ?? 0);
@@ -559,6 +561,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [ownedAnims, setOwnedAnims] = useState<Set<string>>(new Set(s.ownedAnims));
   const [micFx, setMicFx] = useState<string | null>(s.micFx ?? null);
 
+  // The server account this phone's state belongs to (saved): another one must not inherit it.
+  const [serverId, setServerId] = useState<string | null>(s.serverId ?? null);
+  const serverIdRef = useRef(serverId);
+
+  /** Everything on this phone goes back to the defaults, including what lib/live remembers of the account. */
+  const forgetAccount = () => {
+    forgetLiveAccount();
+    forgetSeen();
+    onReset();
+  };
+
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
   // are not resumed after a restart; their records keep the last saved status.
   const snapshot: Snapshot = {
@@ -567,7 +580,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
-    following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
+    serverId, following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -637,16 +650,22 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       showAlert('Günlük harcama limiti', limited);
       return false;
     }
-    spentTodayRef.current += n;
-    setSpentToday(spentTodayRef.current);
     setCoins((c) => c - n);
-    setSpentTotal((t) => t + n);
     log('coin', -n, reason);
     // Live mode: the server takes the same coins (expected here, so its answer doesn't take them twice).
     if (liveMode() && myServerId() && serverBalRef.current) {
       serverBalRef.current = { ...serverBalRef.current, coins: serverBalRef.current.coins - n };
       liveSpend(n, reason);
     }
+    countSpend(n, reason);
+    return true;
+  };
+  // Coins that left the balance: today's spending (the daily limit), the total and Cömertlik. Shared by `spend`
+  // and live gifts, which the server takes without a local spend.
+  const countSpend = (n: number, reason: string) => {
+    spentTodayRef.current += n;
+    setSpentToday(spentTodayRef.current);
+    setSpentTotal((t) => t + n);
     if (countsForWealth(reason)) {
       const before = wealthLevelOf(wealthRef.current);
       wealthRef.current += n;
@@ -654,7 +673,6 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       const after = wealthLevelOf(wealthRef.current);
       if (after > before) notify({ kind: 'system', icon: 'trending-up', title: `Cömertlik seviyen Lv.${after} oldu`, body: 'Yeni ayrıcalıklarını Cömertlik sayfasında gör.', href: '/seviye' });
     }
-    return true;
   };
 
   // Live mode (lib/live): the server's balances and Gelir locks. A new balance is applied as the change since the
@@ -662,6 +680,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // first balance after a start replaces the local one.
   const serverBalRef = useRef<{ coins: number; diamonds: number } | null>(null);
   const applyServer = (u: ServerUser, reason?: string, returned = 0) => {
+    if (serverIdRef.current !== u.id) {
+      const switched = serverIdRef.current !== null;
+      serverIdRef.current = u.id;
+      setServerId(u.id);
+      // Another account's balance replaces the one held; as a change it would show up as a gift.
+      serverBalRef.current = null;
+      // Signed in as someone else: start over (the remounted store signs in again and reads its balance). While
+      // signed out the switch is the sign-in itself, on a phone that signing out already cleared.
+      if (switched && loggedIn) return forgetAccount();
+    }
+    if (isFiniteNumber(u.svipXp)) setSvipXp(u.svipXp);
     const prev = serverBalRef.current;
     serverBalRef.current = { coins: u.coins, diamonds: u.diamonds };
     if (!prev) {
@@ -675,7 +704,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     if (dc) {
       setCoins((c) => Math.max(0, c + dc));
       log('coin', dc, reason ?? (dc > 0 ? 'Jeton eklendi' : 'Harcama'));
-      if (dc < 0 && reason === 'Hediye gönderildi') setSpentTotal((t) => t - dc);
+      // Purchases the store took locally were expected above (dc is 0 for them); a live gift is only taken here.
+      if (dc < 0 && reason === 'Hediye gönderildi') countSpend(-dc, reason);
     }
     if (!dd) return;
     diamondsRef.current = Math.max(0, diamondsRef.current + dd);
@@ -728,7 +758,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setMe({ ...ME });
     },
     login: () => setLoggedIn(true),
-    logout: () => setLoggedIn(false),
+    // Live mode: the next account on this phone must not inherit this one's chats, follows, items or balance.
+    logout: () => (liveMode() ? forgetAccount() : setLoggedIn(false)),
     phone,
     setPhone,
 
@@ -790,6 +821,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     notifications,
     notify,
     markNotificationsRead: () => setNotifications((l) => l.map((n) => ({ ...n, read: true }))),
+    markNoticeRead: (id) => setNotifications((l) => l.map((n) => (n.id === id && !n.read ? { ...n, read: true } : n))),
     tickets,
     createTicket: (category, text) => {
       const number = `TK-${String(10_000 + Math.floor(Math.random() * 89_999))}`;
@@ -1152,7 +1184,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       log('coin', reward, 'İlk adımlar ödülü');
     },
     hideStarter: () => setStarter((st) => ({ ...st, hidden: true })),
-    resetAll: onReset,
+    resetAll: forgetAccount,
   };
 
   return (

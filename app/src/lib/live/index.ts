@@ -13,6 +13,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
+import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
 /**
@@ -42,14 +43,19 @@ let lastDiamonds: number | null = null;
 let returning = 0;
 /** A rejected withdrawal (lib/live/withdraw) gave `n` diamonds back; the next balance carries them. */
 export const expectReturn = (n: number) => void (returning += n);
-const applied = <T extends { user: api.ServerUser }>(r: T, reason?: string) => {
+const order = replyOrder();
+/** `readAt`: a balance read's start number (order.begin); without it the reply is a money action's answer. */
+const applied = <T extends { user: api.ServerUser }>(r: T, reason?: string, readAt?: number) => {
   myId = r.user.id;
+  // A read that started before the last money answer holds an older balance: applying it would be a fake change.
+  if (readAt !== undefined && order.stale(readAt)) return r;
   const returned = returning;
   returning = 0;
   wallet?.apply(r.user, reason, returned);
   // Diamonds moved (a gift came in, or Çevir): the Gelir locks changed with them.
   if (lastDiamonds !== null && r.user.diamonds !== lastDiamonds) void refreshEarnings().catch(() => {});
   lastDiamonds = r.user.diamonds;
+  if (readAt === undefined) order.moneyApplied();
   return r;
 };
 
@@ -61,8 +67,9 @@ export const message = (e: unknown) => (e instanceof Error ? e.message : String(
 
 /** Signs in with this device (the server account is created the first time) and reads the balance. */
 export async function liveSignIn(name: string) {
+  const at = order.begin();
   const u = await api.ensureSignedIn(name);
-  applied({ user: u });
+  applied({ user: u }, undefined, at);
   return u;
 }
 
@@ -82,7 +89,8 @@ export async function saveProfile(me: User, birthYear?: number) {
 }
 
 export async function refreshWallet() {
-  applied({ user: await api.me() });
+  const at = order.begin();
+  applied({ user: await api.me() }, undefined, at);
 }
 export async function refreshEarnings() {
   wallet?.locks(await api.earnings());
@@ -91,9 +99,10 @@ export async function refreshEarnings() {
 /**
  * Money requests carry a request id (ref) the server keeps once. When the answer never arrived (no network,
  * time-out) the server may still have done it, so trying the same thing again reuses that ref: the server
- * then answers "already done" instead of doing it twice. Any answer from the server starts a fresh ref.
+ * then answers "already done" instead of doing it twice. Any answer from the server starts a fresh ref, and so
+ * does a try after a few minutes (lib/live/requests).
  */
-const unsure = new Map<string, string>();
+const unsure = unsureRefs();
 export async function once<T>(key: string, run: (ref: string) => Promise<T>): Promise<T> {
   const ref = unsure.get(key) ?? api.newRef();
   try {
@@ -126,6 +135,17 @@ export async function liveGift(to: string, giftId: string, count: number, room?:
   const id = toServer(to);
   if (!id) throw new Error('Bu kişi test sunucusunda yok');
   return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref)), 'Hediye gönderildi');
+}
+
+/** Signed out: the next account on this phone starts without this one's id, balance or pending request ids. */
+export function forgetLiveAccount() {
+  myId = null;
+  lastDiamonds = null;
+  returning = 0;
+  unsure.clear();
+  order.reset();
+  people = null;
+  setRooms([]);
 }
 
 /** Mirrors a purchase the store already took locally; a refusal re-reads the real balance. */
