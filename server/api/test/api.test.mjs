@@ -230,17 +230,36 @@ describe('Şikâyet ve moderasyon', () => {
     const [, q] = await call('GET', '/api/admin/reports', null, mod.session);
     const mine = q.reports.filter((r) => r.target.id === bad.user.id);
     assert.equal(mine.length, 1, 'aynı kişi aynı hedefi bir kez şikâyet eder');
+    assert.deepEqual([mine[0].target.name, mine[0].target.staff, mine[0].target.bannedUntil], [bad.user.name, false, null], 'şikâyet edilenin adı görünür');
     assert.equal((await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 0 }, mod.session))[0], 400);
     assert.equal((await call('GET', '/api/admin/reports', null, mod.session))[1].reports.some((r) => r.id === mine[0].id), true, 'geçersiz istek şikâyeti açık bırakır');
     const [st, handled] = await call('POST', '/api/admin/reports/handle', { id: mine[0].id, status: 'actioned', banDays: 7 }, mod.session);
     assert.equal(st, 200, handled.error);
     assert.ok(handled.bannedUntil);
+    const [, done] = await call('GET', '/api/admin/reports?status=actioned', null, mod.session);
+    assert.ok(done.reports.find((r) => r.id === mine[0].id).target.bannedUntil, 'askı süresi listede görünür');
     const [code, err] = await call('GET', '/api/me', null, bad.session);
     assert.equal(code, 403);
     assert.match(err.error, /askıya alındı/);
     await call('POST', '/api/admin/ban', { user: bad.user.id, days: null }, mod.session);
     assert.equal((await call('GET', '/api/me', null, bad.session))[0], 200, 'yasak kaldırılınca açılır');
     assert.equal((await call('POST', '/api/admin/ban', { user: mod.user.id, days: 1 }, mod.session))[0], 404, 'yetkili askıya alınamaz');
+  });
+
+  test('oda şikâyetinde odanın adı görünür; rolü kişi kendi /api/me yanıtında görür', async () => {
+    const owner = await signUp('Oda Sahibi');
+    const reporter = await signUp('Şikâyetçi');
+    const mod = await signUp('Moderatör');
+    await h.sql.query("UPDATE users SET role = 'moderator' WHERE id = $1", [mod.user.id]);
+    const [, j] = await call('POST', '/api/rooms', { title: 'Gece Sohbeti' }, owner.session);
+    assert.equal((await call('POST', '/api/report', { type: 'room', id: j.room.id, reason: 'Spam' }, reporter.session))[0], 200);
+    assert.equal((await call('POST', '/api/report', { type: 'user', id: mod.user.id, reason: 'Spam' }, reporter.session))[0], 200);
+    const [, q] = await call('GET', '/api/admin/reports', null, mod.session);
+    const room = q.reports.find((r) => r.target.id === j.room.id);
+    assert.deepEqual([room.target.type, room.target.name, room.target.staff], ['room', 'Gece Sohbeti', false]);
+    assert.equal(q.reports.find((r) => r.target.id === mod.user.id).target.staff, true, 'yetkili hesabı işaretli');
+    assert.equal((await call('GET', '/api/me', null, mod.session))[1].user.role, 'moderator');
+    assert.equal((await call('GET', '/api/me', null, reporter.session))[1].user.role, 'user');
   });
 });
 

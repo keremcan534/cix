@@ -252,6 +252,31 @@ describe('İade', () => {
   });
 });
 
+describe('Yönetim paneli: satın alma bulma', () => {
+  test('numara, sipariş numarası veya hesapla bulunur; yalnız yönetici', async () => {
+    const admin = await staff('admin');
+    const mod = await staff('moderator');
+    const buyer = await signUp('Bulunan Alıcı');
+    const order = `GPA-${rnd(5)}`;
+    await ok(call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_5000', transactionId: order }, buyer.session));
+    const find = (q, s = admin.session) => call('GET', `/api/admin/purchases${q === undefined ? '' : `?q=${encodeURIComponent(q)}`}`, null, s);
+    for (const s of [buyer.session, mod.session]) assert.equal((await find('', s))[0], 403);
+
+    const byOrder = await ok(find(order));
+    assert.equal(byOrder.purchases.length, 1);
+    const p = byOrder.purchases[0];
+    assert.deepEqual([p.transactionId, p.productId, p.coins, p.status, p.user.id, p.user.name, p.priceTl], [order, 'coins_5000', 5000, 'credited', buyer.user.id, 'Bulunan Alıcı', 139.99]);
+    assert.deepEqual(byOrder.googleSync, { enabled: false, everyMin: 60, lastOkAt: null, lastError: null });
+    assert.deepEqual((await ok(find(String(p.id)))).purchases.map((x) => x.id), [p.id]);
+    assert.deepEqual((await ok(find(` ${buyer.user.id.toUpperCase()} `))).purchases.map((x) => x.id), [p.id], 'hesap kimliğiyle, boşluk ve büyük harf önemsiz');
+    assert.equal((await ok(find('yok-boyle-bir-siparis'))).purchases.length, 0);
+    assert.ok((await ok(find())).purchases.some((x) => x.id === p.id), 'boş arama son alımları verir');
+
+    await ok(call('POST', '/api/admin/purchases/refund', { purchase: p.id }, admin.session));
+    assert.equal((await ok(find(order))).purchases[0].status, 'refunded');
+  });
+});
+
 describe('Kayıtlar', () => {
   test('defter, aktarımlar ve yönetici günlüğü değiştirilemez, silinemez', async () => {
     for (const sql of ['UPDATE ledger SET amount = 1', 'DELETE FROM ledger', 'TRUNCATE ledger', 'UPDATE coin_transfers SET coins = 1', 'DELETE FROM coin_transfers', 'DELETE FROM audit_events', 'TRUNCATE audit_events']) {
