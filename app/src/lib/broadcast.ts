@@ -18,6 +18,8 @@ export type WinNews = {
   wins?: number;
   /** When it was announced (ms); old news is skipped instead of shown late. */
   at: number;
+  /** An Oyun Salonu win: only shown to people who can see Oyun Salonu (Cömertlik Lv.2+). */
+  casino?: boolean;
 };
 export const NEWS_TTL_MS = 30_000;
 
@@ -57,12 +59,12 @@ export function announceWin(news: Omit<WinNews, 'id' | 'at'>, opts?: { mine?: bo
 export const roomTitleOf = (roomId: string) => (roomId === 'yeni' ? 'Benim Odam' : (roomById(roomId)?.title ?? ''));
 
 // --- Simulated wins from other rooms (prototype only) --------------------------------------------
-const FAKE_SOURCES: { source: string; price: number; mults: number[] }[] = [
+const FAKE_SOURCES: { source: string; price: number; mults: number[]; casino?: boolean }[] = [
   { source: 'Uğurlu › Şans Yoncası', price: 20, mults: [2, 5, 10, 20, 50, 100] },
   { source: 'Uğurlu › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
   { source: 'Uğurlu › Altın Nal', price: 500, mults: [2, 5, 10, 20] },
-  { source: 'Oyun Merkezi › Şans Çarkı', price: 100, mults: [2, 3, 5, 10] },
-  { source: 'Oyun Merkezi › Ejder ile Kaplan', price: 500, mults: [2, 8] },
+  { source: 'Oyun Merkezi › Şans Çarkı', price: 100, mults: [2, 3, 5, 10], casino: true },
+  { source: 'Oyun Merkezi › Ejder ile Kaplan', price: 500, mults: [2, 8], casino: true },
 ];
 let feed: ReturnType<typeof setTimeout> | undefined;
 export function startWinFeed() {
@@ -72,7 +74,7 @@ export function startWinFeed() {
     const s = FAKE_SOURCES[Math.floor(Math.random() * FAKE_SOURCES.length)];
     const mult = s.mults[Math.floor(Math.random() * s.mults.length)];
     const room = ROOMS[Math.floor(Math.random() * ROOMS.length)];
-    announceWin({ userName: u.name, avatar: u.avatar, source: s.source, roomTitle: room.title, mult, amount: s.price * mult });
+    announceWin({ userName: u.name, avatar: u.avatar, source: s.source, roomTitle: room.title, mult, amount: s.price * mult, casino: s.casino });
     feed = setTimeout(tick, 25_000 + Math.random() * 25_000);
   };
   feed = setTimeout(tick, 12_000);

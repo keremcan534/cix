@@ -7,6 +7,8 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { NEWS_TTL_MS, shiftWinNews, useWinNews, type WinNews } from '@/lib/broadcast';
+import { casinoVisible } from '@/lib/games';
+import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -15,8 +17,14 @@ const HOLD_MS = 3400;
 
 export function WinBanner({ top = 96, still }: { top?: number; /** reduce motion: no sweep or sparkle */ still?: boolean }) {
   const queue = useWinNews();
+  const { wealthLevel } = useApp();
   const news = queue[0];
-  if (!news) return null;
+  // Oyun Salonu wins are not news for someone who cannot see Oyun Salonu: skipped, never shown.
+  const hidden = !!news?.casino && !casinoVisible(wealthLevel);
+  useEffect(() => {
+    if (news && hidden) shiftWinNews(news.id);
+  }, [news, hidden]);
+  if (!news || hidden) return null;
   return <Banner key={news.id} news={news} top={top} still={still} />;
 }
 

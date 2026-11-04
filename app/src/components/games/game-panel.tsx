@@ -22,7 +22,7 @@ import { GameNav } from '@/components/games/slot-kit';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
-import { useGames, type Entry } from '@/lib/games';
+import { casinoVisible, useGames, type Entry } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -78,7 +78,7 @@ export function GamePanel({
   /** Before a game opens another screen: Oyun Merkezi closes its modal, which would otherwise cover that screen. */
   onLeave?: () => void;
 }) {
-  const { settings, setSetting } = useApp();
+  const { settings, setSetting, wealthLevel } = useApp();
   const { roomGames, casino } = useGames();
   const inRoom = entry.from === 'room';
   const roomGame = open.kind === 'room' ? roomGames.find((g) => g.id === open.id) : undefined;
@@ -86,7 +86,7 @@ export function GamePanel({
   const title = roomGame?.name ?? casinoGame?.name ?? '';
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
-    ...casino.filter((g) => g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
+    ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = open.kind === 'room' ? `r:${open.id}` : `c:${open.id}`;
   const titleEmoji = roomGame?.emoji ?? casinoGame?.emoji;
