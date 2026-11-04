@@ -50,6 +50,10 @@ jobs:
       cancel-in-progress: false
     env:
       HOST: ${{ vars.DEPLOY_HOST || '130.61.230.94' }}
+      # Test server switch (repository variable TEST_MODE, default 1): while 1, the deploy keeps device sign-in
+      # and free test coins on (ALLOW_DEV_AUTH=1, ALLOW_TEST_TOPUP=1) so the test APK works; set it to 0 for
+      # launch and both go to 0. Paid withdrawals stay impossible while test coins are on (docs/SUNUCU.md).
+      TEST_MODE: ${{ vars.TEST_MODE || '1' }}
       SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -111,6 +115,11 @@ jobs:
           # (the whole site goes down), so a server without it gets the sslip.io name of its address.
           $SSH "cd /opt/similar && if ! sudo grep -qE '^DOMAIN=.+' .env; then
               sudo sed -i '/^DOMAIN=/d' .env && echo 'DOMAIN=${HOST//./-}.sslip.io' | sudo tee -a .env >/dev/null && echo 'set DOMAIN in .env'; fi"
+
+          # Test server switch (TEST_MODE above). Changing .env recreates the services that read it.
+          if [ "$TEST_MODE" = 1 ]; then v=1; else v=0; fi
+          $SSH "cd /opt/similar && for k in ALLOW_DEV_AUTH ALLOW_TEST_TOPUP; do
+              if ! sudo grep -qx \"\$k=$v\" .env; then sudo sed -i \"/^\$k=/d\" .env; echo \"\$k=$v\" | sudo tee -a .env >/dev/null; echo \"set \$k=$v\"; fi; done"
 
           # Only services whose image or settings changed are recreated (postgres and livekit normally stay up).
           # A recreated Caddy already read the new Caddyfile; one that stayed up is told to reload it. Caddy
