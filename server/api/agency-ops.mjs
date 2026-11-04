@@ -160,7 +160,7 @@ async function chargeFee(c, t) {
   if (t.fee_payer === 'streamer') {
     // The streamer pays from their unlocked diamonds (whole diamonds, rounded up); locked ones (wallet.mjs) can't.
     await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [t.streamer_id]);
-    await spendDiamonds(c, t.streamer_id, Math.ceil(fee), 'Ajans transfer ücreti', `transfer-${t.id}`);
+    await spendDiamonds(c, t.streamer_id, Math.ceil(fee), 'Ajans transfer ücreti', `transfer:${t.id}`);
   } else if (t.fee_payer === 'to_agency') {
     await c.query("INSERT INTO agency_ledger (agency_id, kind, amount, transfer_id, ref, period, note) VALUES ($1,'transfer_fee',$2,$3,$4,$5,$6)", [t.to_agency_id, fmt4(-e4(fee)), t.id, `transfer:${t.id}:pay`, period, 'Transfer ücreti (ödenen)']);
   }

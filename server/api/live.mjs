@@ -16,7 +16,7 @@
 import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
-import { voiceAccess } from './rooms.mjs';
+import { mayStay, voiceAccess } from './rooms.mjs';
 
 export const [LK_KEY, LK_SECRET] = (env.LIVEKIT_KEYS ?? '').split(/:\s*/);
 if (!LK_KEY || !LK_SECRET) throw new Error('LIVEKIT_KEYS missing');
@@ -74,15 +74,33 @@ async function onEvent(e) {
   const who = clip(e.participant?.identity);
   const sid = clip(e.participant?.sid);
   switch (e.event) {
-    case 'participant_joined':
-      if (who) await db.query('INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, $3) ON CONFLICT (room, identity) DO UPDATE SET sid = EXCLUDED.sid, joined_at = now()', [room, who, sid]);
+    case 'participant_joined': {
+      if (!who) break;
+      // LiveKit renews a connected person's token on its own: a ban, a closed room or a block since then
+      // is enforced here.
+      const ok = await mayStay(room, who);
+      if (ok === 'closed') {
+        await deleteVoiceRoom(room);
+        break;
+      }
+      if (ok === 'no') {
+        await removeFromVoice(room, who);
+        break;
+      }
+      // A reconnect keeps the first join time, so the time in the room isn't cut short.
+      await db.query('INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, $3) ON CONFLICT (room, identity) DO UPDATE SET sid = EXCLUDED.sid', [room, who, sid]);
       break;
+    }
     case 'participant_left':
     case 'participant_connection_aborted':
       // Only this connection: after a reconnect the new one has another sid.
       if (who) await logPresence(await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '') RETURNING room, identity, joined_at", [room, who, sid]));
       break;
     case 'room_started':
+      // Someone with a still-valid token can start a room again after it was closed.
+      if ((await mayStay(room, '')) === 'closed') await deleteVoiceRoom(room);
+      await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
+      break;
     case 'room_finished':
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
       break;
@@ -125,7 +143,7 @@ async function cleanup() {
   });
   if (!r.ok) throw new Error(`livekit ListRooms ${r.status}`);
   const open = ((await r.json()).rooms ?? []).map((x) => x.name);
-  await db.query('DELETE FROM room_presence WHERE NOT (room = ANY($1::text[]))', [open]);
+  await logPresence(await db.query('DELETE FROM room_presence WHERE NOT (room = ANY($1::text[])) RETURNING room, identity, joined_at', [open]));
 }
 if (env.LIVEKIT_API_URL) {
   const run = () => cleanup().catch((e) => console.error('presence cleanup', String(e).slice(0, 200)));
@@ -141,8 +159,9 @@ export const liveRoutes = {
     if (!ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     await voiceAccess(room, u, url.searchParams.get('password'));
     // The identity is the signed-in account, never a value from the request, so nobody can join as someone else.
+    // Voice only: no camera or screen share (the app publishes just the microphone).
     // canUpdateOwnMetadata: each phone shows which mic it sits on as its own participant attribute (app lib/live).
-    const token = liveKitJwt({ sub: u.id, name: u.name, video: { room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } }, TOKEN_TTL);
+    const token = liveKitJwt({ sub: u.id, name: u.name, video: { room, roomJoin: true, canPublish: true, canPublishSources: ['microphone'], canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } }, TOKEN_TTL);
     return { token, ttl: TOKEN_TTL };
   },
 

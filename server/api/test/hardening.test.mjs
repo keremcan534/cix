@@ -148,7 +148,7 @@ describe('yayın sunucusu', () => {
         return true;
       }),
     );
-    assert.deepEqual(again, { checked: 2, refunded: 0, unknown: 1 });
+    assert.deepEqual(again, { checked: 2, refunded: 0, unknown: 1, failed: 0 });
     assert.equal((await q("SELECT count(*)::int AS n FROM income_events WHERE source_type = 'refund'"))[0].n, 1);
     assert.equal((await call('POST', '/api/admin/purchases/refund', { purchase: Number(p.id) }, admin.session))[0], 409, 'elle ikinci iade');
     assert.equal((await call('POST', '/api/admin/purchases/voided-sync', null, buyer.session))[0], 403);

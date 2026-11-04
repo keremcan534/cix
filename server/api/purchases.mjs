@@ -138,6 +138,12 @@ async function verifyApple(u, productId, transactionId) {
 /** `play`: a test or sandbox purchase, credited as play money on the 'test' channel (wallet.mjs PLAY_MONEY). */
 async function credit(u, platform, pack, transactionId, play) {
   const ref = `buy_${sha(`${platform}:${transactionId}`).slice(0, 40)}`;
+  // The same store transaction sent by two accounts at once: each locks only its own row, so the second one
+  // trips the unique (platform, transaction_id). Same answer as when the first had already committed.
+  const taken = (e) => {
+    if (e.code === '23505' && /transaction/.test(e.constraint ?? e.detail ?? '')) throw new HttpError(409, 'Bu satın alma başka bir hesapta kullanıldı');
+    throw e;
+  };
   return tx(async (c) => {
     await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
     const prev = (await c.query('SELECT user_id, coins, bonus FROM purchases WHERE platform = $1 AND transaction_id = $2', [platform, transactionId])).rows[0];
@@ -176,7 +182,7 @@ async function credit(u, platform, pack, transactionId, play) {
     // SVIP points are for coins someone paid for.
     if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
     return { replay: false, coins: pack.coins, bonus };
-  });
+  }).catch(taken);
 }
 
 export const purchaseRoutes = {

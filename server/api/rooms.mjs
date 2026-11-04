@@ -9,7 +9,7 @@
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
-import { HttpError, UUID, auth, blockedBetween, db, env, int, readJson, sha, text, userId } from './core.mjs';
+import { HttpError, UUID, auth, blockedBetween, db, env, int, limit, readJson, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
 
@@ -61,7 +61,30 @@ export async function voiceAccess(name, u, password) {
   if (ban.rowCount) throw new HttpError(403, ban.rows[0].until ? 'Bu odadan geçici olarak çıkarıldın' : 'Bu odaya giremezsin');
   if (await blockedBetween(room.owner, u.id)) throw new HttpError(403, 'Bu odaya giremezsin');
   const staff = room.owner === u.id || (await isAdmin(room.id, u.id));
-  if (room.password_hash && !staff && sha(`room:${room.id}:${password ?? ''}`) !== room.password_hash) throw new HttpError(403, 'Oda şifresi yanlış');
+  if (room.password_hash && !staff) {
+    // A short password can't be guessed by trying them all: 10 tries a minute per person and room.
+    limit(`roompw:${room.id}:${u.id}`, 10, 'Çok fazla şifre denemesi, bir dakika sonra tekrar dene');
+    if (sha(`room:${room.id}:${password ?? ''}`) !== room.password_hash) throw new HttpError(403, 'Oda şifresi yanlış');
+  }
+}
+
+/**
+ * Whether someone already in the LiveKit room `name` may stay (checked when LiveKit says they joined, since
+ * LiveKit renews a connected person's token without asking us): the room is still open, they aren't banned
+ * from it or from the app, and the owner hasn't blocked them. 'closed' when the room itself should end.
+ */
+export async function mayStay(name, identity) {
+  const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
+  if (!m) return PROTOTYPE_ROOMS ? 'yes' : 'closed';
+  const r = await db.query('SELECT id, owner, closed_at FROM rooms WHERE id = $1', [m[1]]);
+  if (!r.rowCount || r.rows[0].closed_at) return 'closed';
+  if (!UUID.test(identity)) return 'no';
+  const room = r.rows[0];
+  const u = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND (banned_until IS NULL OR banned_until <= now())', [identity]);
+  if (!u.rowCount) return 'no';
+  const ban = await db.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND user_id = $2 AND (until IS NULL OR until > now())', [room.id, identity]);
+  if (ban.rowCount || (await blockedBetween(room.owner, identity))) return 'no';
+  return 'yes';
 }
 
 export const roomRoutes = {

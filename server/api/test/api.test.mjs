@@ -244,6 +244,18 @@ describe('Şikâyet ve moderasyon', () => {
     await call('POST', '/api/admin/ban', { user: bad.user.id, days: null }, mod.session);
     assert.equal((await call('GET', '/api/me', null, bad.session))[0], 200, 'yasak kaldırılınca açılır');
     assert.equal((await call('POST', '/api/admin/ban', { user: mod.user.id, days: 1 }, mod.session))[0], 404, 'yetkili askıya alınamaz');
+
+    // Handled: a new report of the same person is a new item in the queue, not dropped.
+    assert.equal((await call('POST', '/api/report', { type: 'user', id: bad.user.id, reason: 'Yine taciz' }, reporter.session))[0], 200);
+    const again = (await call('GET', '/api/admin/reports', null, mod.session))[1].reports.filter((r) => r.target.id === bad.user.id);
+    assert.equal(again.length, 1, 'yeni şikâyet kuyrukta');
+    assert.notEqual(again[0].id, mine[0].id);
+
+    // A ban closes the person's own room at once.
+    const [, room] = await call('POST', '/api/rooms', { title: 'Kötünün Odası' }, bad.session);
+    assert.equal((await call('POST', '/api/admin/ban', { user: bad.user.id, days: 3 }, mod.session))[0], 200);
+    assert.ok((await h.sql.query('SELECT closed_at FROM rooms WHERE id = $1', [room.room.id])).rows[0].closed_at, 'odası kapandı');
+    assert.equal((await call('GET', '/api/room?id=not-a-uuid', null, mod.session))[0], 400);
   });
 
   test('oda şikâyetinde odanın adı görünür; rolü kişi kendi /api/me yanıtında görür', async () => {

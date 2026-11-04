@@ -246,6 +246,29 @@ describe('Ses odası katılımı (LiveKit webhook)', () => {
     [, live] = await call('GET', '/api/rooms/live', null, owner.session);
     assert.ok(!live.rooms.some((r) => r.room === lk || r.room === 'oda-r1'));
   });
+
+  test('kapalı odaya, askıdaki ya da odadan atılmış kişi katılınca sayılmaz; yeniden bağlanma süreyi sıfırlamaz', async () => {
+    const owner = await signUp('Sahip');
+    const guest = await signUp('Misafir');
+    const banned = await signUp('Askıda');
+    const [, j] = await call('POST', '/api/rooms', { title: 'Kontrol Odası' }, owner.session);
+    const lk = `oda-${j.room.id}`;
+    const n = async (who) => (await h.sql.query('SELECT count(*)::int AS n FROM room_presence WHERE room = $1 AND identity = $2', [lk, who])).rows[0].n;
+
+    await hook('participant_joined', { room: { name: lk }, participant: { identity: guest.user.id, sid: 'PA_1' } });
+    await h.sql.query("UPDATE room_presence SET joined_at = now() - interval '10 minutes' WHERE room = $1", [lk]);
+    await hook('participant_joined', { room: { name: lk }, participant: { identity: guest.user.id, sid: 'PA_2' } });
+    const [row] = (await h.sql.query('SELECT sid, joined_at < now() - interval \'9 minutes\' AS kept FROM room_presence WHERE room = $1', [lk])).rows;
+    assert.deepEqual([row.sid, row.kept], ['PA_2', true], 'yeniden bağlanan ilk giriş zamanını korur');
+
+    await h.sql.query("UPDATE users SET banned_until = now() + interval '1 day' WHERE id = $1", [banned.user.id]);
+    await hook('participant_joined', { room: { name: lk }, participant: { identity: banned.user.id, sid: 'PA_3' } });
+    assert.equal(await n(banned.user.id), 0, 'askıdaki hesap sayılmaz');
+
+    await call('POST', '/api/rooms/close', { id: j.room.id }, owner.session);
+    await hook('participant_joined', { room: { name: lk }, participant: { identity: owner.user.id, sid: 'PA_4' } });
+    assert.equal(await n(owner.user.id), 0, 'kapalı odaya katılım sayılmaz');
+  });
 });
 
 describe('Fotoğraf yükleme', () => {

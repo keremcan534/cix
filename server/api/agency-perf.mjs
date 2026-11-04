@@ -36,7 +36,7 @@ async function metrics(c, s, asOf, from) {
        (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.agency_id = a.id AND k.occurred_at >= $2 AND k.occurred_at < $1) AS volume,
        (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.agency_id = a.id AND k.occurred_at >= $3 AND k.occurred_at < $2) AS prev_volume,
        (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.agency_id = a.id AND k.occurred_at >= $4 AND k.occurred_at < $1) AS last_month,
-       (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE a.id = ANY(k.chain) AND k.occurred_at >= $2 AND k.occurred_at < $1) AS org_volume,
+       (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.chain @> ARRAY[a.id] AND k.occurred_at >= $2 AND k.occurred_at < $1) AS org_volume,
        (SELECT count(DISTINCT k.streamer_id) FROM agency_commissions k WHERE k.agency_id = a.id AND k.occurred_at >= $2 AND k.occurred_at < $1 AND k.base_diamonds > 0) AS earners,
        (SELECT count(*) FROM agency_streamers m JOIN users u ON u.id = m.streamer_id
          WHERE m.agency_id = a.id AND m.joined_at <= $1 AND (m.ended_at IS NULL OR m.ended_at > $1) AND m.contract = 'approved'

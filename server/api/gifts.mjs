@@ -66,7 +66,9 @@ export const giftRoutes = {
 
   async 'GET /api/rankings'(req, url) {
     await auth(req);
-    const side = BOARDS[url.searchParams.get('board') ?? 'wealth'];
+    const board = url.searchParams.get('board') ?? 'wealth';
+    // Own keys only: 'constructor' or '__proto__' would otherwise reach the SQL as a column name.
+    const side = Object.hasOwn(BOARDS, board) ? BOARDS[board] : null;
     const period = url.searchParams.get('period') ?? 'week';
     if (!side || !PERIODS.includes(period)) throw new HttpError(400, 'Geçersiz sıralama');
     const r = await db.query(

@@ -135,7 +135,7 @@ export async function runJobs(now = new Date()) {
       out.timeouts++;
     });
   }
-  out.expired = (await db.query("UPDATE agency_transfers SET status = 'cancelled', decided_at = now(), decision_note = 'Süresi doldu' WHERE status = 'pending' AND created_at < now() - interval '30 days'")).rowCount;
+  out.expired = (await db.query("UPDATE agency_transfers SET status = 'cancelled', decided_at = now(), decision_note = 'Süresi doldu' WHERE status = 'pending' AND created_at < now() - make_interval(days => greatest(30, $1::int + 1))", [s.transfer_policy.decision_days])).rowCount;
   return out;
 }
 
@@ -155,7 +155,7 @@ export const agencyAdminRoutes = {
       `SELECT a.*, u.name AS owner_name,
          (SELECT count(*) FROM agency_streamers m WHERE m.agency_id = a.id AND m.ended_at IS NULL)::int AS streamers,
          (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.agency_id = a.id AND k.occurred_at > now() - interval '30 days') AS volume30,
-         (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE a.id = ANY(k.chain) AND k.occurred_at > now() - interval '30 days') AS org_volume30,
+         (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.chain @> ARRAY[a.id] AND k.occurred_at > now() - interval '30 days') AS org_volume30,
          (SELECT coalesce(sum(l.amount), 0) FROM agency_ledger l WHERE l.agency_id = a.id AND l.created_at > now() - interval '30 days') AS earned30,
          (SELECT row_to_json(z) FROM (SELECT sc.score, sc.rank, sc.overtakes, sc.flags FROM agency_perf_scores sc JOIN agency_perf_runs pr ON pr.id = sc.run_id
              WHERE sc.agency_id = a.id AND pr.dry_run = false ORDER BY sc.run_id DESC LIMIT 1) z) AS perf,
@@ -843,7 +843,7 @@ export const agencyAdminRoutes = {
     const vals = [from, to];
     const where = ['k.occurred_at >= $1', 'k.occurred_at < $2'];
     if (q.get('top')) where.push(`k.top_agency_id = $${vals.push(uuid(q.get('top')))}`);
-    if (q.get('agency')) where.push(`$${vals.push(uuid(q.get('agency')))} = ANY(k.chain)`);
+    if (q.get('agency')) where.push(`k.chain @> ARRAY[$${vals.push(uuid(q.get('agency')))}::uuid]`);
     if (q.get('sub')) where.push(`k.agency_id = $${vals.push(uuid(q.get('sub')))}`);
     if (q.get('streamer')) where.push(`k.streamer_id = $${vals.push(uuid(q.get('streamer')))}`);
     if (!all) where.push(`k.chain && $${vals.push([...x.acc.bd])}::uuid[]`);
@@ -905,8 +905,8 @@ export const agencyAdminRoutes = {
     const bd = other ? uuid(other, 'BD') : x.u.id;
     const ag = await db.query(
       `SELECT a.id, a.name, a.level, a.status, b.assigned_at,
-         (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE a.id = ANY(k.chain) AND k.occurred_at > now() - interval '30 days') AS org30,
-         (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE a.id = ANY(k.chain) AND k.occurred_at > now() - interval '60 days' AND k.occurred_at <= now() - interval '30 days') AS org_prev30
+         (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.chain @> ARRAY[a.id] AND k.occurred_at > now() - interval '30 days') AS org30,
+         (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.chain @> ARRAY[a.id] AND k.occurred_at > now() - interval '60 days' AND k.occurred_at <= now() - interval '30 days') AS org_prev30
        FROM bd_assignments b JOIN agencies a ON a.id = b.agency_id WHERE b.bd_id = $1 AND b.ended_at IS NULL ORDER BY a.name`,
       [bd],
     );

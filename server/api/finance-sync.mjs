@@ -21,7 +21,7 @@
 //   wholesale to a Jeton Noktası   → purchase on channel "jeton_noktasi" (the price the bank paid)
 //   diamonds → coins (Çevir/bozdurma) → bonus_grant (campaign elmas_cevirme / elmas_bozdurma)
 //   test top-up / test purchase    → promotion (campaign test_yukleme / test_satin_alma); store sandbox the same
-//   not sent: Jeton Noktası → user transfers (coins change hands, none are created), diamond debits other than
+//   not sent: Jeton Noktası → user transfers (coins change hands, none are created), diamond debits other than refunds
 //   gifts (withdrawals included: the panel has no payout event type and records payouts itself), game coins.
 import { HttpError, auth, db, env } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
@@ -45,6 +45,8 @@ export function eventsOf(r) {
   const store = r.p_sandbox ? undefined : STORE[r.platform];
 
   if (r.currency === 'diamond') {
+    // A refund whose coins were already spent takes back only gift diamonds: it is still the purchase's refund.
+    if (amount < 0 && r.reason.startsWith('İade') && d.purchase && store) return [refundOf(d.purchase, at)];
     if (amount > 0 && r.counterparty && r.ref.endsWith('-in') && r.reason.startsWith('Hediye alındı'))
       return [{ ...base, type: 'gift', sender_ref: r.counterparty, publisher_ref: r.user_id, coins: amount, gift_ref: r.gift_id ?? 'aktarim', room_ref: r.gift_room ?? null }];
     return [];
@@ -69,9 +71,11 @@ export function eventsOf(r) {
   }
 
   if (r.reason.startsWith('Uygulama içi:')) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: r.reason.slice(13).trim().slice(0, 100) }];
-  if (r.reason.startsWith('İade') && d.purchase && store) return [{ type: 'refund', idempotency_key: `refund-${d.purchase}`, occurred_at: at, original_key: `purchase-${d.purchase}`, reason: 'Mağaza iadesi' }];
+  if (r.reason.startsWith('İade') && d.purchase && store) return [refundOf(d.purchase, at)];
   return [];
 }
+
+const refundOf = (purchase, at) => ({ type: 'refund', idempotency_key: `refund-${purchase}`, occurred_at: at, original_key: `purchase-${purchase}`, reason: 'Mağaza iadesi' });
 
 /** Posts events; returns the panel's per-event results. Throws when the panel can't be reached or says no. */
 async function post(events) {
