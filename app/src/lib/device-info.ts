@@ -7,9 +7,20 @@
 //
 // None of these can be read by a web page, so the web build sends only the install id (device-info.web.ts).
 // They are one input of several: the server also flags reinstalls and changed ids for staff to look at.
-import * as Application from 'expo-application';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+
+// Loaded lazily: an older APK without these native modules must not crash at start when it gets this code.
+/* eslint-disable @typescript-eslint/no-require-imports */
+function load<T>(get: () => T): T | null {
+  try {
+    return get();
+  } catch {
+    return null;
+  }
+}
+const Application = load(() => require('expo-application') as typeof import('expo-application'));
+const SecureStore = load(() => require('expo-secure-store') as typeof import('expo-secure-store'));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 export type DeviceInfo = { installId: string; hardwareId?: string; keychainId?: string; platform: 'android' | 'ios' | 'web'; model?: string; os?: string; app?: string };
 
@@ -19,6 +30,7 @@ let keychain: Promise<string | undefined> | null = null;
 /** A random id kept in the keychain (iOS keeps it after a reinstall; Android clears it with the app). */
 function keychainId(newId: () => string) {
   keychain ??= (async () => {
+    if (!SecureStore) return undefined;
     try {
       const saved = await SecureStore.getItemAsync(KEYCHAIN_KEY);
       if (saved) return saved;
@@ -36,7 +48,7 @@ export async function deviceInfo(installId: string, newId: () => string): Promis
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   let hardwareId: string | undefined;
   try {
-    hardwareId = platform === 'android' ? Application.getAndroidId() || undefined : undefined;
+    hardwareId = platform === 'android' ? Application?.getAndroidId() || undefined : undefined;
   } catch {
     hardwareId = undefined;
   }
@@ -48,6 +60,6 @@ export async function deviceInfo(installId: string, newId: () => string): Promis
     platform,
     model: [c?.Brand, c?.Model].filter(Boolean).join(' ') || undefined,
     os: String(Platform.Version),
-    app: Application.nativeApplicationVersion ?? undefined,
+    app: Application?.nativeApplicationVersion ?? undefined,
   };
 }
