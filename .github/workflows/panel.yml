@@ -5,6 +5,10 @@ name: Panel girişi
 #   sifirla: gives the panel's super admin a new random password (also unlocks it, ends its sessions) and
 #            hands it over encrypted. Two-step verification, if turned on, stays on.
 #   sil    : deletes /data/giris-bilgileri.txt once the password has been changed in the panel.
+#   bagla  : connects the app's server to the panel (docs/SUNUCU.md "Bağlantı"): adds the payment channels
+#            google, apple and jeton_noktasi when missing, gives the "similarclub" integration a new key, writes
+#            it to the server's .env as FINANCE_API_KEY and restarts the API. The key goes straight from the
+#            panel into .env on the server; it never reaches this runner or the log. Running it again rotates it.
 # Logs are public, so a login never appears in plain text: oku and sifirla need public_key, the base64 of an
 # RSA public key (PEM, at least 3072 bits) whose private half only the person running this has. The log then
 # shows KEY (a random key, RSA-OAEP-SHA256 encrypted) and DATA (the login, AES-256-CBC with that key, PBKDF2).
@@ -16,7 +20,7 @@ on:
       action:
         description: 'İşlem'
         type: choice
-        options: [oku, sifirla, sil]
+        options: [oku, sifirla, sil, bagla]
         default: oku
       public_key:
         description: 'Açık anahtar (base64, oku ve sifirla için)'
@@ -36,9 +40,9 @@ jobs:
     steps:
       - name: Check the input
         run: |
-          case "$ACTION" in oku|sifirla|sil) ;; *) echo "::error::Bilinmeyen işlem"; exit 1 ;; esac
+          case "$ACTION" in oku|sifirla|sil|bagla) ;; *) echo "::error::Bilinmeyen işlem"; exit 1 ;; esac
           if [ -z "$SSH_KEY" ]; then echo "::error::DEPLOY_SSH_KEY secret is not set (docs/SUNUCU.md)."; exit 1; fi
-          if [ "$ACTION" != sil ]; then
+          if [ "$ACTION" = oku ] || [ "$ACTION" = sifirla ]; then
             printf '%s' "$PUBKEY" | base64 -d > "$RUNNER_TEMP/pub.pem" 2>/dev/null || { echo "::error::public_key base64 değil"; exit 1; }
             bits=$(openssl pkey -pubin -in "$RUNNER_TEMP/pub.pem" -text -noout 2>/dev/null | sed -n 's/.*Public-Key: (\([0-9]*\) bit).*/\1/p')
             if [ -z "$bits" ] || [ "$bits" -lt 3072 ]; then echo "::error::public_key en az 3072 bitlik bir RSA açık anahtarı olmalı"; exit 1; fi
@@ -54,6 +58,47 @@ jobs:
           if [ "$ACTION" = sil ]; then
             $SSH "$EXEC rm -f /data/giris-bilgileri.txt"
             echo "Giriş bilgileri dosyası silindi." >> "$GITHUB_STEP_SUMMARY"; echo "Deleted"; exit 0
+          fi
+
+          if [ "$ACTION" = bagla ]; then
+            # Same key format and hash as the panel's newApiKey (server/auth.ts). Prints only the key, which the
+            # server-side shell below puts in .env without echoing it.
+            cat > "$RUNNER_TEMP/link.mjs" <<'JS'
+          import { DatabaseSync } from 'node:sqlite';
+          import { randomBytes, createHash } from 'node:crypto';
+          const db = new DatabaseSync(`${process.env.FC_DATA_DIR || '/data'}/${process.env.FC_DB_FILE || 'finance.db'}`);
+          db.exec('PRAGMA busy_timeout = 5000');
+          const ch = db.prepare('INSERT OR IGNORE INTO payment_channels (code, name, kind) VALUES (?, ?, ?)');
+          for (const c of [['google', 'Google Play', 'store'], ['apple', 'Apple App Store', 'store'], ['jeton_noktasi', 'Jeton Noktası (toptan)', 'bank']]) ch.run(...c);
+          const i = db.prepare("SELECT id FROM integration_connections WHERE code = 'similarclub'").get();
+          if (!i) { console.error('no similarclub integration'); process.exit(2); }
+          const prefix = randomBytes(4).toString('hex');
+          const key = `fc_${prefix}_${randomBytes(24).toString('base64url')}`;
+          db.prepare("UPDATE integration_connections SET key_prefix = ?, key_hash = ?, status = CASE WHEN status = 'disabled' THEN 'not_connected' ELSE status END WHERE id = ?")
+            .run(prefix, createHash('sha256').update(key).digest('hex'), i.id);
+          process.stdout.write(key);
+          JS
+            $SSH 'set -e; cd /opt/similar
+              k=$(sudo docker compose exec -T finance node --no-warnings --input-type=module -)
+              case "$k" in fc_*) ;; *) echo "no key from the panel"; exit 1 ;; esac
+              sudo sed -i "/^FINANCE_API_KEY=/d" .env
+              printf "FINANCE_API_KEY=%s\n" "$k" | sudo tee -a .env >/dev/null
+              sudo docker compose up -d --no-deps --force-recreate api' < "$RUNNER_TEMP/link.mjs"
+
+            # The API sends every 30 s what is older than 60 s; wait for its first round to finish.
+            # Prints: last sent ledger id | a round finished in the last 45 s | last error | events waiting to retry
+            SQL="SELECT last_id, coalesce(last_ok_at > now() - interval '45 seconds', false), coalesce(last_error, ''),
+                   (SELECT count(*) FROM finance_sync_failed) FROM finance_sync WHERE id = 1;"
+            ok=
+            for i in $(seq 1 30); do
+              sleep 10
+              s=$(printf '%s\n' "$SQL" | $SSH "cd /opt/similar && sudo docker compose exec -T postgres sh -c 'psql -X -q -tA -U \"\$POSTGRES_USER\" -d \"\${POSTGRES_DB:-\$POSTGRES_USER}\"'" 2>/dev/null || true)
+              echo "sync: $s"
+              case "$s" in *"|t|"*) ok=1; break ;; esac
+            done
+            if [ -z "$ok" ]; then echo "::error::API panele henüz gönderemedi (son durum: ${s:-yok})"; exit 1; fi
+            echo "Panel bağlandı: uygulamadaki para hareketleri 1-2 dakika içinde panelde (İşlem defteri) görünür." >> "$GITHUB_STEP_SUMMARY"
+            echo "Linked: $s"; exit 0
           fi
 
           if [ "$ACTION" = oku ]; then
