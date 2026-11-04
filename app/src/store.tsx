@@ -33,6 +33,8 @@ import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
+/** Coins the server takes without a local spend (the answer's balance shows it): count them as today's spending. */
+const SERVER_TAKES = /^(Hediye gönderildi|Rüzgâr Gülü)/;
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
 /** The gift behind a gift earning, stored with it (a price can belong to several gifts; Lucky pays a share). */
@@ -678,7 +680,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // Live mode (lib/live): the server's balances and Gelir locks. A new balance is applied as the change since the
   // last one, so purchases already taken here (and mirrored with api.spend, see `spend`) aren't taken twice. The
   // first balance after a start replaces the local one.
-  const serverBalRef = useRef<{ coins: number; diamonds: number } | null>(null);
+  const serverBalRef = useRef<{ coins: number; diamonds: number; gameCoins: number } | null>(null);
   const applyServer = (u: ServerUser, reason?: string, returned = 0) => {
     if (serverIdRef.current !== u.id) {
       const switched = serverIdRef.current !== null;
@@ -692,7 +694,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     }
     if (isFiniteNumber(u.svipXp)) setSvipXp(u.svipXp);
     const prev = serverBalRef.current;
-    serverBalRef.current = { coins: u.coins, diamonds: u.diamonds };
+    serverBalRef.current = { coins: u.coins, diamonds: u.diamonds, gameCoins: u.gameCoins ?? 0 };
+    // Game coins: only server games (Rüzgâr Gülü) move them there, the other games here, so the server's change
+    // is added to the local balance (the first balance after a start is only noted, not taken over).
+    const dg = prev ? (u.gameCoins ?? 0) - prev.gameCoins : 0;
+    if (dg) {
+      setGameCoins((c) => Math.max(0, c + dg));
+      log('game', dg, reason ?? (dg > 0 ? 'Oyun kazancı' : 'Oyun'));
+    }
     if (!prev) {
       setCoins(() => u.coins);
       diamondsRef.current = u.diamonds;
@@ -704,8 +713,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     if (dc) {
       setCoins((c) => Math.max(0, c + dc));
       log('coin', dc, reason ?? (dc > 0 ? 'Jeton eklendi' : 'Harcama'));
-      // Purchases the store took locally were expected above (dc is 0 for them); a live gift is only taken here.
-      if (dc < 0 && reason === 'Hediye gönderildi') countSpend(-dc, reason);
+      // Purchases the store took locally were expected above (dc is 0 for them); a live gift or a Rüzgâr Gülü spin
+      // is only taken here.
+      if (dc < 0 && reason && SERVER_TAKES.test(reason)) countSpend(-dc, reason);
     }
     if (!dd) return;
     diamondsRef.current = Math.max(0, diamondsRef.current + dd);

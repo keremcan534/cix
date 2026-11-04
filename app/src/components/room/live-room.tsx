@@ -79,7 +79,7 @@ import { useLiveRoomSync } from '@/lib/live/room';
 import { sendSignal, type RoomSignal } from '@/lib/live/room-bus';
 import { showAlert } from '@/lib/alert';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
-import { casinoAccess, playDuel, useGames } from '@/lib/games';
+import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
@@ -1693,14 +1693,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         .filter((g) => g.active)
         .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('NEW' as const), onPress: () => openRoomGame(g.id) })),
     },
-    {
-      title: 'Oyun Salonu · Cömertlik Lv.2',
-      variant: 'tile',
-      note: app.wealthLevel >= 2 ? 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir' : `Cömertlik Seviyesi 2 ve üstü üyelere açık · şu an Lv.${app.wealthLevel}`,
-      items: gameCatalog.casino
-        .filter((g) => g.active && g.fromRoom)
-        .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
-    },
+    // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it.
+    ...(casinoVisible(app.wealthLevel)
+      ? [
+          {
+            title: 'Oyun Salonu',
+            variant: 'tile',
+            note: 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir',
+            items: [
+              // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
+              { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
+              ...gameCatalog.casino
+                .filter((g) => g.active && g.fromRoom)
+                .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
+            ],
+          } satisfies MenuSection,
+        ]
+      : []),
     {
       title: 'Oda Araçları',
       variant: 'tool',

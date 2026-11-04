@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { FloatIcon, hueAt } from '@/components/fx/float';
+import { FloatIcon, Halo, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
 import { colors, fonts, semantic } from '@/theme';
@@ -91,7 +91,15 @@ function Tile({ item, hue, index, onPress }: { item: MenuItem; hue: string; inde
           </Text>
         </LinearGradient>
         <View style={styles.tileIcon}>
-          <FloatIcon source={item.art ?? icon3dSourceFor(item.emoji)} emoji={item.emoji} size={58} hue={hue} bob delay={index * 230} />
+          {item.icon && !item.art ? (
+            // No picture yet (e.g. Rüzgâr Gülü until its art arrives): the line icon on the game's light.
+            <View style={styles.tileGlyph}>
+              <Halo size={58} hue={hue} />
+              <Ionicons name={item.icon} size={40} color={hue} />
+            </View>
+          ) : (
+            <FloatIcon source={item.art ?? icon3dSourceFor(item.emoji)} emoji={item.emoji} size={58} hue={hue} bob delay={index * 230} />
+          )}
         </View>
         <View style={{ position: 'absolute', top: 4, left: 8 }}>
           <Badge badge={item.badge} />
@@ -128,6 +136,7 @@ const styles = StyleSheet.create({
   tileCell: { width: '33.33%', padding: 5, paddingTop: 24 },
   plate: { borderRadius: 18, borderWidth: 1, paddingTop: 44, paddingBottom: 10, paddingHorizontal: 6, alignItems: 'center' },
   tileLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 14, lineHeight: 18 },
+  tileGlyph: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center' },
   tileIcon: { position: 'absolute', top: -24, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' },
   state: { position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: SHEET },
   ribbon: { position: 'absolute', top: -6, left: -4, color: '#fff', fontSize: 11, fontWeight: '900', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },

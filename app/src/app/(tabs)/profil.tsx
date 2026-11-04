@@ -18,6 +18,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
+import { casinoVisible } from '@/lib/games';
 import { callsAvailable, liveMode } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
@@ -166,36 +167,35 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        <View style={styles.gameCard}>
-          <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
-            <Icon3D name="wheel" size={30} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>Oyun Salonu</Text>
-              <Text style={{ color: colors.textDim, fontSize: 12 }}>
-                Cömertlik Lv.2 ve üstü · {wealthLevel >= 2 ? 'erişimin açık' : `şu an Lv.${wealthLevel}`} · odaya girmeden oyna
-              </Text>
+        {casinoVisible(wealthLevel) && (
+          <View style={styles.gameCard}>
+            <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
+              <Icon3D name="wheel" size={30} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>Oyun Salonu</Text>
+                <Text style={{ color: colors.textDim, fontSize: 12 }}>Odaya girmeden oyna</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+            </Pressable>
+            <View style={styles.gameRow}>
+              {(
+                [
+                  ['slot', '🎰', 'Gece Yarısı Çarkı'],
+                  ['jackpot', '💰', 'Hazine Kulesi'],
+                  ['olympus', '🔦', 'Fener Kayalığı'],
+                  ['fish', '🐟', 'Mercan Avı'],
+                ] as const
+              ).map(([id, e, l]) => (
+                <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
+                  <GameIcon id={id} emoji={e} size={26} />
+                  <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
+                    {l}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-          </Pressable>
-          <View style={styles.gameRow}>
-            {(
-              [
-                ['slot', '🎰', 'Gece Yarısı Çarkı'],
-                ['jackpot', '💰', 'Hazine Kulesi'],
-                ['olympus', '🔦', 'Fener Kayalığı'],
-                ['fish', '🐟', 'Mercan Avı'],
-              ] as const
-            ).map(([id, e, l]) => (
-              <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
-                <GameIcon id={id} emoji={e} size={26} />
-                <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
-                  {l}
-                </Text>
-                {wealthLevel < 2 && <Ionicons name="lock-closed" size={11} color={colors.textDim} style={styles.gameLock} />}
-              </Pressable>
-            ))}
           </View>
-        </View>
+        )}
 
         <Group items={main} />
         <Group items={[...GROWTH.filter(visible), ...(isAdmin ? [CENTER] : [])]} />
@@ -300,7 +300,6 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   gameHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   gameRow: { flexDirection: 'row', gap: 8 },
   gameTile: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 8 },
-  gameLock: { position: 'absolute', top: 4, right: 6, fontSize: 10 },
   roomCta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(56,189,248,0.4)', ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

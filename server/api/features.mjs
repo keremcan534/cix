@@ -15,7 +15,7 @@
 // feature inside a handler.
 import { HttpError, env } from './core.mjs';
 
-/** Every feature that can be switched off. `games` exists only in the app (the games run there). */
+/** Every feature that can be switched off. `games` is mostly in the app (most games run there); Rüzgâr Gülü is here. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'];
 
 /** "METHOD /path" → the features that turn it off. */
@@ -30,6 +30,7 @@ export const ROUTES = {
   'POST /api/admin/jeton/wholesale': ['jeton'],
   // New requests only: cancelling, the list and the owner's decision stay open, so held diamonds can come back.
   'POST /api/wallet/withdraw': ['withdraw'],
+  'POST /api/wheel/spin': ['games'],
   'POST /api/messages': ['dm'],
   'POST /api/rooms': ['rooms'],
   // The voice token: without it nobody joins a room.
