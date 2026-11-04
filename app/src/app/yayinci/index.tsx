@@ -179,7 +179,7 @@ function Dashboard() {
           <View style={styles.chart}>
             {weekly.map((v, i) => (
               <View key={i} style={styles.barCol}>
-                <Text style={styles.barValue}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</Text>
+                <Text style={styles.barValue}>{v >= 1000 ? `${(v / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : v}</Text>
                 <View style={[styles.bar, { height: Math.max(4, (v / max) * 110) }, i === 6 && { backgroundColor: semantic.action }]} />
                 <Text style={styles.barLabel}>{DAYS[i]}</Text>
               </View>

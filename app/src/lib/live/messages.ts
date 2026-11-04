@@ -22,6 +22,11 @@ async function loadSeen() {
   return seen;
 }
 const saveSeen = () => AsyncStorage.setItem(SEEN_KEY, JSON.stringify(seen ?? {})).catch(() => {});
+/** Signed out: the next account on this phone reads its chats from the start. */
+export function forgetSeen() {
+  seen = {};
+  void AsyncStorage.removeItem(SEEN_KEY).catch(() => {});
+}
 
 /** A chat with a real person (free, no demo replies, sent through the server). */
 export const isLiveUser = (id: string) => liveMode() && isServerId(id);
@@ -36,10 +41,9 @@ export function liveDm(to: string, text: string, ref: string, done: (failed: str
   if (!id) return;
   api
     .sendDm(id, text, ref)
-    .then((m) => {
-      if (seen) seen[id] = Math.max(seen[id] ?? 0, m.id);
-      done(null);
-    })
+    // "Last seen" stays where the poll left it: moving it up to my message would skip a reply with a lower id
+    // that is already on the server (the poll skips my own messages anyway).
+    .then(() => done(null))
     .catch((e) => done(message(e)));
 }
 

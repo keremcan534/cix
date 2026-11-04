@@ -67,7 +67,8 @@ export function MatchLayer() {
           </Pressable>
         </View>
       )}
-      <Modal visible={incoming} transparent animationType="fade" onRequestClose={declineMatch}>
+      {/* Android back does what the card's button does: "Reddet" on a new match, "İptal" while it connects. */}
+      <Modal visible={incoming} transparent animationType="fade" onRequestClose={m.phase === 'found' ? declineMatch : cancelMatch}>
         {incoming && <IncomingCard />}
       </Modal>
     </ThemeScope>

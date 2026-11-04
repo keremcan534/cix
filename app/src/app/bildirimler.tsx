@@ -26,13 +26,17 @@ const KIND: Record<Notice['kind'], { icon: keyof typeof Ionicons.glyphMap; tone:
 const iconOf = (n: Notice) => (n.icon in Ionicons.glyphMap ? n.icon : KIND[n.kind].icon);
 
 export default function NotificationsScreen() {
-  const { notifications, markNotificationsRead } = useApp();
+  const { notifications, markNotificationsRead, markNoticeRead } = useApp();
   const { colors } = useTheme();
   const styles = useStyles();
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('all');
   const list = notifications.filter((n) => tab === 'all' || (tab === 'social' ? n.kind === 'social' : n.kind !== 'social'));
 
-  const open = (n: Notice) => n.href && router.push(n.href as Href);
+  // Opening a notice reads it, even one without a link.
+  const open = (n: Notice) => {
+    markNoticeRead(n.id);
+    if (n.href) router.push(n.href as Href);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>

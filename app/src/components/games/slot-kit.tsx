@@ -1,13 +1,21 @@
 // Shared pieces of the launch casino games (Gece Yarısı Çarkı, Hazine Kulesi, Fener Kayalığı, Mercan Avı): the balance pill, the
 // bet stepper and the round helpers. Rounds always go through playCasino (lib/games); these only show them.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
+import { createContext, useContext } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { Photo } from '@/components/photo';
+
+/**
+ * How a game opens another screen (Jeton yükle, Cömertlik). Oyun Merkezi shows the games in a modal, which has to
+ * close first or the screen opens underneath it; GamePanel provides that.
+ */
+export const GameNav = createContext<(href: Href) => void>((href) => router.push(href));
+export const useGameNav = () => useContext(GameNav);
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
@@ -17,6 +25,7 @@ const compact = (n: number) => (n >= 1_000_000 ? `${(Math.floor(n / 100_000) / 1
 /** Avatar, coins you can play with (wallet + game balance) and a + that opens the wallet. */
 export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
   const { me, coins, gameCoins } = useApp();
+  const go = useGameNav();
   return (
     <View style={[k.pill, { backgroundColor: tint }]} accessibilityLabel={`Bakiye ${coins + gameCoins} jeton`}>
       <Photo uri={me.avatar} kind="face" style={k.avatar} />
@@ -28,7 +37,7 @@ export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
           🪙 {compact(coins + gameCoins)}
         </Text>
       </View>
-      <Pressable onPress={() => router.push('/cuzdan')} hitSlop={8} accessibilityLabel="Jeton yükle">
+      <Pressable onPress={() => go('/cuzdan')} hitSlop={8} accessibilityLabel="Jeton yükle">
         <Ionicons name="add-circle" size={24} color="#FACC15" />
       </Pressable>
     </View>

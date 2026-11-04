@@ -757,7 +757,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
       </LinearGradient>
       {g && guardian && (
         <Text style={[styles.meta, { fontSize: 12, marginTop: 4 }]} numberOfLines={1}>
-          {g.name} · {(guardian.points / 1000).toFixed(1)}K
+          {g.name} · {(guardian.points / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}K
         </Text>
       )}
     </Pressable>
