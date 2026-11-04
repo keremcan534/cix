@@ -17,7 +17,7 @@ import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { ME, USERS } from '@/data/mock';
-import { casinoAccess, useGames } from '@/lib/games';
+import { casinoAccess, casinoVisible, useGames } from '@/lib/games';
 import { useApp } from '@/store';
 // Static `colors` is the dark scheme: only for the game panel modal, which is dark in both schemes.
 import { ThemeScope, colors, fonts, makeStyles, useTheme } from '@/theme';
@@ -31,8 +31,10 @@ export default function GameCenter() {
   const { casino, roomGames, history } = useGames();
   const t = useTheme();
   const s = useStyles();
-  const [tab, setTab] = useState<Tab>('casino');
-  const [open, setOpen] = useState<OpenGame | null>(oyun ? { kind: 'casino', id: oyun } : null);
+  // Below Cömertlik Lv.2 Oyun Salonu is not shown at all: no tab, and an old link to one of its games opens nothing.
+  const showCasino = casinoVisible(wealthLevel);
+  const [tab, setTab] = useState<Tab>(showCasino ? 'casino' : 'room');
+  const [open, setOpen] = useState<OpenGame | null>(oyun && showCasino ? { kind: 'casino', id: oyun } : null);
   // Room games from the profile: the game's own matchmaking fills the table with online players.
   const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...USERS.filter((u) => u.online).slice(0, 5)]);
 
@@ -43,7 +45,7 @@ export default function GameCenter() {
       <View style={s.tabs}>
         {(
           [
-            ['casino', 'Oyun Salonu'],
+            ...(showCasino ? [['casino', 'Oyun Salonu']] : []),
             ['room', 'Oda oyunları'],
             ['history', 'Geçmiş'],
           ] as [Tab, string][]
@@ -54,7 +56,7 @@ export default function GameCenter() {
         ))}
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90 }}>
-        {tab === 'casino' && (
+        {tab === 'casino' && showCasino && (
           <>
             <DepthCard style={s.banner}>
               <FloatIcon source={icon3dSourceFor('👑')} size={36} hue={t.semantic.money} />
@@ -148,7 +150,7 @@ export default function GameCenter() {
 
         {tab === 'history' &&
           (history.length === 0 ? (
-            <Text style={s.dim}>Henüz oyun hareketi yok. Oyun Salonu turları, iadeler ve reddedilen istekler burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.</Text>
+            <Text style={s.dim}>{showCasino ? 'Henüz oyun hareketi yok. Oyun Salonu turları, iadeler ve reddedilen istekler burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.' : 'Henüz oyun hareketi yok.'}</Text>
           ) : (
             history.map((h) => (
               <Card key={h.requestId + h.txId} style={{ gap: 2 }}>
