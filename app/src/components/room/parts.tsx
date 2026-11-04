@@ -17,6 +17,8 @@ import { Art } from '@/components/Art';
 import { Gloss, Shine } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { SimilarityRing } from '@/components/similarity';
+import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
+import type { RoomBond } from '@/data/bonds';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -46,6 +48,7 @@ export function Seat({
   modMuted,
   invitee,
   similarity,
+  bondLink,
   onPress,
 }: {
   index: number;
@@ -83,6 +86,8 @@ export function Seat({
   invitee?: string;
   /** How much this person has in common with you (lib/similarity), drawn as a bead ring; not on your own seat. */
   similarity?: number;
+  /** Lv4 bond with the person on the next seat of the row: a line to their avatar (`gap`: the row's gap). */
+  bondLink?: { bond: RoomBond; gap: number } | null;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -161,6 +166,7 @@ export function Seat({
         {user?.verified && !small && <VerifiedBadge size={11} />}
       </View>
       {user && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} />}
+      {user && bondLink && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
     </Pressable>
   );
 }
@@ -253,7 +259,7 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
   );
 }
 
-export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: string; onRetry?: (msg: ChatMsg) => void }) {
+export function ChatLine({ msg, bubbleId, bond, onRetry }: { msg: ChatMsg; bubbleId?: string; /** Lv10 bond: the special bubble (a bubble I equipped wins). */ bond?: RoomBond | null; onRetry?: (msg: ChatMsg) => void }) {
   if (msg.bot) {
     return (
       <View style={styles.botMsg}>
@@ -313,6 +319,8 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
     <LinearGradient colors={bubble.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chatBubble}>
       {body}
     </LinearGradient>
+  ) : bond ? (
+    <BondBubble bond={bond}>{body}</BondBubble>
   ) : (
     <View style={[styles.chatBubble, styles.chatGlass]}>{body}</View>
   );
@@ -325,6 +333,7 @@ export function ChatLine({ msg, bubbleId, onRetry }: { msg: ChatMsg; bubbleId?: 
             {u.name}
           </Text>
           {u.vip && <Text style={styles.chatVip}>VIP</Text>}
+          {bond && <BondChip bond={bond} />}
         </View>
         {bubbleView}
       </View>

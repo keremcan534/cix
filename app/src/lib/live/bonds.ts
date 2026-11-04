@@ -2,7 +2,7 @@
 // holds the bond gift's coins; the answer that moves them (accept, refuse, withdraw) re-reads the balance.
 import * as api from '@/lib/api';
 import { applyServerUser, liveMode, once, refreshWallet, rememberUser, toLocal, toServer } from '@/lib/live';
-import { BOND_KINDS, isBondKind, type Bond, type BondKind } from '@/data/bonds';
+import { BOND_KINDS, isBondKind, type Bond, type BondKind, type RoomBond } from '@/data/bonds';
 import { isServerId } from '@/data/mock';
 
 /** Whose bonds come from the server: me (signed in) and real people. Demo people (u1…) keep demo data. */
@@ -66,6 +66,14 @@ export async function liveWithdrawBond(id: string) {
   } finally {
     void refreshWallet().catch(() => {});
   }
+}
+
+/** Bonds of the people in a room (local ids; people only in the demo are skipped). */
+export async function loadRoomBonds(ids: readonly string[]): Promise<RoomBond[]> {
+  const server = ids.map(toServer).filter((x): x is string => !!x);
+  if (!server.length) return [];
+  const list = await api.bondsAmong(server);
+  return list.filter((r) => isBondKind(r.kind)).map((r) => ({ a: toLocal(r.a), b: toLocal(r.b), kind: r.kind as BondKind, level: r.level }));
 }
 
 export const liveEndBond = async (id: string) => toBond(await api.endBond(Number(id)));

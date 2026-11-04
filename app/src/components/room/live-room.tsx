@@ -64,6 +64,8 @@ import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
 import { StageBackdrop } from '@/components/room/stage-backdrop';
 import { StageLayout } from '@/components/room/stage-layout';
+import { useRoomBonds } from '@/components/room/room-bonds';
+import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
@@ -150,6 +152,21 @@ const offlineBlocked = () => {
 // Bots mix free Temel stickers with standard emoji.
 const BOT_REACTIONS = [stickerToken('temel-kahkaha'), stickerToken('temel-asik'), stickerToken('oda-alkis'), '🔥', '😎', '🥳', '❤️', stickerToken('temel-begendim'), stickerToken('oda-saskin'), '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
+const NO_BONDS: RoomBond[] = [];
+/** Lv8 joint entrance banner: both photos, the bond named ("Çift Lv8"); me first when I am one of the two. */
+function jointShowOf(b: RoomBond, myAvatar: string): EntryShow {
+  const [x, y] = b.b === 'me' ? [b.b, b.a] : [b.a, b.b];
+  const face = (uid: string) => (uid === 'me' ? myAvatar : userById(uid).avatar);
+  const [, c2] = bondTint(b.kind);
+  return {
+    name: userById(x).name,
+    avatar: face(x),
+    partner: { name: userById(y).name, avatar: face(y) },
+    fx: 'bond',
+    colors: b.kind === 'cift' ? undefined : ['#0E1F4D', c2],
+    badge: `${BOND_KINDS[b.kind].label} Lv${b.level}`,
+  };
+}
 const BOT_RIDES = COSMETICS.filter((c) => c.kind === 'ride');
 
 /** Short mic-button captions for a mic that is on but not sending (lib/room-session micBlock). */
@@ -521,6 +538,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   // Güverte: people in the room who are not on a mic (from the presence model, never a separate list).
   const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
+
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
   const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
@@ -547,7 +565,28 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (gift) showGift(from, msg.to.map((t) => (t === myServerId() ? 'me' : t)), gift, msg.count);
     },
   });
-  // Taking a video seat turns the camera on (after the permission prompt on phones).
+  // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
+  const roomBondsNow = useRoomBonds(live.members, real);
+  const roomBonds = roomBondsNow ?? NO_BONDS;
+  const [entryQueue, setEntryQueue] = useState<EntryShow[]>([]);
+  const [joint, setJoint] = useState<{ list: RoomBond[] | null; state: JointState | null }>({ list: null, state: null });
+  if (roomBondsNow && joint.list !== roomBondsNow) {
+    // Derived transition: a new answer about the room's bonds; announce pairs that just came in together.
+    const r = jointEntries(roomBondsNow, new Set(live.members), joint.state);
+    setJoint({ list: roomBondsNow, state: r.state });
+    const shows = invisible || settings.effectsOff ? [] : r.show.filter((b) => !blocked.has(b.a) && !blocked.has(b.b)).map((b) => jointShowOf(b, app.me.avatar));
+    if (shows.length) {
+      if (entry) setEntryQueue((q) => [...q, ...shows].slice(-3));
+      else {
+        setEntry(shows[0]);
+        if (shows.length > 1) setEntryQueue((q) => [...q, ...shows.slice(1)].slice(-3));
+      }
+    }
+  }
+  const nextEntry = () => {
+    setEntry(entryQueue[0] ?? null);
+    setEntryQueue((q) => q.slice(1));
+  };  // Taking a video seat turns the camera on (after the permission prompt on phones).
   useEffect(() => {
     if (!camAllowed || getMedia().call) return;
     let live = true;
@@ -1319,7 +1358,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (real && !sendSignal({ t: 'chat', text: msg.text })) return;
     setMessages((list) => mergeFeed(list.filter((m) => m.id !== msg.id), [{ id: msgId(), userId: 'me', text: msg.text, at: Date.now() }]));
   }, [real]);
-  const renderChat = useCallback(({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} onRetry={retrySend} />, [equipped.bubble, retrySend]);
+  const renderChat = useCallback(
+    ({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null} onRetry={retrySend} />,
+    [equipped.bubble, retrySend, roomBonds],
+  );
 
   /** True when at least one recipient got the gift. */
   const deliverGifts = (gift: Gift, toIds: string[], count: number): boolean => {
@@ -1824,6 +1866,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setLuckyFx(null);
       setCombo(null);
       setEntry(null);
+      setEntryQueue([]);
       if (game) setGameMin(true);
     }
   }
@@ -1837,8 +1880,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const small = capacity > 10;
   // Empty / locked / invite pending / mic on / mic off / muted by the room, per numbered mic.
   const slots = useMemo(() => slotStates(live, (uid) => uid === 'me' && !sending), [live, sending]);
-  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot }) => {
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; next?: { index: number; gap: number } }) => {
     const uid = allSeats[i];
+    const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
     return (
       <Seat
         key={i}
@@ -1865,6 +1909,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         silenced={!!uid && silenced.has(uid)}
         avatarSize={extra?.slot?.size}
         slotWidth={extra?.slot?.width}
+        bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
         onPress={() => onSeatPress(i)}
       />
     );
@@ -2037,7 +2082,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
                   </View>
                 )}
-                <StageLayout layout={layout} width={win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot) => renderSeat(i, { slot })} />
+                <StageLayout layout={layout} width={win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
               </>
             ) : (
               <View style={styles.seatGrid}>
@@ -2047,7 +2092,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
                   </View>
                 )}
-                {allSeats.map((_, i) => (bossOn && i === 0 ? null : renderSeat(i)))}
+                {/* Seat 0 has its own row; the others wrap five to a row (20 % each, no gap). */}
+                {allSeats.map((_, i) => (bossOn && i === 0 ? null : renderSeat(i, i >= 1 && i + 1 < allSeats.length && (i - 1) % 5 !== 4 ? { next: { index: i + 1, gap: 0 } } : undefined)))}
               </View>
             )}
           </ScrollView>
@@ -2403,7 +2449,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {luckyFx && <LuckyResult key={luckyFx[0].txId} records={luckyFx} still={settings.effectsOff || settings.reduceMotion} onDone={() => setLuckyFx(null)} />}
       {/* Platform-wide win announcements (every room shows every win). */}
       {visible && <WinBanner top={110} still={settings.reduceMotion} />}
-      {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={() => setEntry(null)} />}
+      {entry && <EntryEffect key={`${entry.name}-${entry.fx}-${entry.avatar}`} show={entry} still={settings.reduceMotion} onDone={nextEntry} />}
     </View>
   );
 }

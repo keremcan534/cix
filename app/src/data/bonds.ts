@@ -72,6 +72,66 @@ export const sortBonds = (l: Bond[]) => [...l].sort((x, y) => Number(y.kind === 
 /** The highest level among active bonds (profile badge and frame). */
 export const topBond = (l: Bond[]) => sortBonds(l.filter((b) => b.status === 'active')).sort((x, y) => y.level - x.level)[0] ?? null;
 
+/** Bond colors: rose for Çift, blue for the others (badge, dot, mic line, bubble). */
+export const bondTint = (kind: BondKind): readonly [string, string] => (kind === 'cift' ? ['#FF8AA6', '#D81B60'] : ['#5ED3E6', '#3B5BDB']);
+
+// --- Room effects ---------------------------------------------------------------------------------------
+/** An active bond as a room sees it: two local ids ('me', u1… or server ids). */
+export type RoomBond = { a: string; b: string; kind: BondKind; level: number };
+const pairKey = (x: string, y: string) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+export const roomBondKey = (r: RoomBond) => pairKey(r.a, r.b);
+
+/** The bond between two people, if any. */
+export const bondBetween = (list: RoomBond[], x: string | null | undefined, y: string | null | undefined) =>
+  x && y && x !== y ? (list.find((r) => (r.a === x && r.b === y) || (r.a === y && r.b === x)) ?? null) : null;
+
+/** Lv4: the line between two people sitting side by side on the mics. */
+export const micLinkOf = (list: RoomBond[], x: string | null | undefined, y: string | null | undefined) => {
+  const r = bondBetween(list, x, y);
+  return r && hasReward(r.level, 'mikrofon') ? r : null;
+};
+
+/** Lv10: someone's highest bond with the special chat bubble (Çift first), partner anywhere. */
+export function bubbleBondOf(list: RoomBond[], uid: string | undefined) {
+  if (!uid) return null;
+  const mine = list.filter((r) => (r.a === uid || r.b === uid) && hasReward(r.level, 'balon'));
+  return mine.sort((x, y) => Number(y.kind === 'cift') - Number(x.kind === 'cift') || y.level - x.level)[0] ?? null;
+}
+
+export type JointState = { seen: ReadonlySet<string>; present: ReadonlySet<string> };
+/**
+ * Lv8 joint entrance: the pairs to announce now (both in the room) and the state for the next call. The first
+ * call (`prev` null, as I come in) announces only my own pairs, since the others were here before me. Later a
+ * pair is announced when it completes because one of the two came in since the last call (`prev.present`), not
+ * when an old pair just reaches Lv8. Each pair once per visit.
+ */
+export function jointEntries(list: RoomBond[], present: ReadonlySet<string>, prev: JointState | null): { show: RoomBond[]; state: JointState } {
+  const seen = new Set(prev?.seen ?? []);
+  const show: RoomBond[] = [];
+  for (const r of list) {
+    if (!hasReward(r.level, 'giris') || !present.has(r.a) || !present.has(r.b)) continue;
+    const k = roomBondKey(r);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const arrived = prev ? !prev.present.has(r.a) || !prev.present.has(r.b) : r.a === 'me' || r.b === 'me';
+    if (arrived) show.push(r);
+  }
+  return { show, state: { seen, present } };
+}
+
+/** Offline demo: the bonds of the people in a room (each person's demo bonds, partners anywhere). */
+export function demoRoomBonds(ids: readonly string[], now: number): RoomBond[] {
+  const out = new Map<string, RoomBond>();
+  for (const id of ids) {
+    for (const b of demoBondsOf(id, now)) {
+      const r: RoomBond = { a: id, b: b.partnerId, kind: b.kind, level: b.level };
+      const k = roomBondKey(r);
+      if ((out.get(k)?.level ?? 0) < r.level) out.set(k, r);
+    }
+  }
+  return [...out.values()];
+}
+
 const demoBond = (id: string, partnerId: string, kind: BondKind, score: number, days: number, now: number): Bond => {
   const level = bondLevel(score);
   return { id, kind, status: 'active', requester: false, partnerId, price: BOND_KINDS[kind].price, score, level, nextLevelAt: nextLevelAt(level), since: new Date(now - days * 86_400_000).toISOString(), expiresAt: null };

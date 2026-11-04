@@ -8,6 +8,7 @@
 //   POST /api/bonds/withdraw { id }              → { bond }                             (the requester takes it back)
 //   POST /api/bonds/end      { id }              → { bond }                             (either side, any time)
 //   POST /api/bonds/privacy  { hidden }          → { hidden }
+//   POST /api/bonds/among    { ids }             → { bonds: [{ a, b, kind, level }] }   (room effects; hidden ones left out)
 //
 // Money: a request takes the bond gift's price from the requester at once (spendCoins, the lots it used kept on
 // the bond). Accepted: those coins become the other person's diamonds like any gift (giftDiamonds, gift_events,
@@ -26,6 +27,8 @@ export { KINDS, LEVELS, REWARDS, levelOf };
 const TALK_DAILY = 10;
 const PENDING_MAX = 10;
 const COOLDOWN_DAYS = 7;
+/** People asked about at once by /api/bonds/among (a room's mics and Güverte). */
+const AMONG_MAX = 80;
 
 export const scoreOf = (b) => Math.floor(Number(b.gift_coins) / 100) + Number(b.talk_points);
 
@@ -296,6 +299,25 @@ export const bondRoutes = {
     const bond = await view(id, me.id);
     notify([bond.partner.id], { title: 'Bağ bitti', body: `${me.name} ${bond.label} bağını bitirdi`, data: { type: 'bond', id } });
     return { bond };
+  },
+
+  // Room effects (mic line, joint entrance, chat bubble): the active bonds of the people in a room, with their
+  // partners anywhere. A bond either side hid is left out, unless I am in it.
+  async 'POST /api/bonds/among'(req) {
+    const me = await auth(req);
+    limit(`bondamong:${me.id}`, 60);
+    const body = await readJson(req);
+    if (!Array.isArray(body.ids)) throw new HttpError(400, 'Geçersiz liste');
+    const ids = [...new Set(body.ids)].slice(0, AMONG_MAX).map((x) => userId(x, 'kişi'));
+    if (!ids.length) return { bonds: [] };
+    const r = await db.query(
+      `SELECT x.a, x.b, x.kind, x.gift_coins, x.talk_points FROM bonds x JOIN users ua ON ua.id = x.a JOIN users ub ON ub.id = x.b
+        WHERE x.status = 'active' AND (x.a = ANY($1::uuid[]) OR x.b = ANY($1::uuid[])) AND ua.deleted_at IS NULL AND ub.deleted_at IS NULL
+          AND ((NOT ua.bonds_hidden AND NOT ub.bonds_hidden) OR $2 IN (x.a, x.b))
+        LIMIT 500`,
+      [ids, me.id],
+    );
+    return { bonds: r.rows.map((b) => ({ a: b.a, b: b.b, kind: b.kind, level: levelOf(scoreOf(b)) })) };
   },
 
   async 'POST /api/bonds/privacy'(req) {
