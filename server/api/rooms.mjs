@@ -242,7 +242,7 @@ export const roomRoutes = {
     return { sanction: sanctionView(s) };
   },
 
-  /** The owner lifts any mute in the room; an admin the ones room staff gave (not the platform's). */
+  /** Room staff lift the mutes room staff gave (the owner any of them); the platform's stay with the platform. */
   async 'POST /api/rooms/unmute'(req) {
     const me = await auth(req);
     const b = await readJson(req);
@@ -252,7 +252,7 @@ export const roomRoutes = {
     const room = await roomRow(s.room_id);
     const owner = room.owner === me.id;
     if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
-    if (!owner && !['room_admin', 'room_owner'].includes(s.created_role)) throw new HttpError(403, 'Platform susturmasını oda yöneticisi kaldıramaz');
+    if (!['room_admin', 'room_owner'].includes(s.created_role)) throw new HttpError(403, 'Platform susturmasını oda yetkilisi kaldıramaz');
     const why = b.reason === undefined || b.reason === '' ? 'Oda yetkilisi kaldırdı' : text(b.reason, 3, 300, 'Gerekçe');
     await liftSanction({ id: me.id, role: owner ? 'room_owner' : 'room_admin' }, s, why);
     return { lifted: true };

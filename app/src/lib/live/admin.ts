@@ -41,9 +41,13 @@ export function readRole(force = false) {
 }
 /** True for an admin account in a live build. */
 export function useIsAdmin() {
+  return useStaffRole() === 'admin';
+}
+/** admin or moderator in a live build (a moderator's panel holds only Yaptırımlar); null for everyone else. */
+export function useStaffRole(): 'admin' | 'moderator' | null {
   const r = useSyncExternalStore(subscribeRole, () => role, () => role);
   useEffect(() => void readRole(), []);
-  return liveMode() && r === 'admin';
+  return liveMode() && (r === 'admin' || r === 'moderator') ? r : null;
 }
 
 // --- Health ------------------------------------------------------------------------------------------------

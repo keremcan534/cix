@@ -119,6 +119,8 @@ describe('Yaptırımlar', () => {
       assert.equal((await call('POST', '/api/rooms/mute', { room, user: helper.user.id, kind: 'text', minutes: 5 }, guest.session))[0], 403, 'yetkisiz kişi susturamaz');
       const [, list] = await call('GET', `/api/rooms/mutes?room=${room}`, null, helper.session);
       assert.equal(list.mutes.length, 2);
+      const [p] = await sanction(mod, { user: guest.user.id, type: 'mute_room_text', minutes: 60, roomId: room });
+      assert.equal((await call('POST', '/api/rooms/unmute', { sanction: p.id }, owner.session))[0], 403, 'platform susturmasını oda sahibi de kaldıramaz');
     });
 
     test('5, 6, 19: genel susturma tüm kanalları kapatır, yeniden girişte sürer, API’yi doğrudan çağırmak işe yaramaz', async () => {

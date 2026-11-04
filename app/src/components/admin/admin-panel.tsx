@@ -63,7 +63,8 @@ async function loadPending(): Promise<Partial<Pending>> {
   };
 }
 
-export function AdminPanel({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+/** `moderator`: only the sanctions tab (the other tabs are the admin's). */
+export function AdminPanel({ visible, onClose, moderator = false }: { visible: boolean; onClose: () => void; moderator?: boolean }) {
   const [sheet, setSheet] = useState<SheetSpec | null>(null);
   const [account, setAccount] = useState<Person | null>(null);
   const [custom, setCustom] = useState<ReactNode | null>(null);
@@ -80,6 +81,7 @@ export function AdminPanel({ visible, onClose }: { visible: boolean; onClose: ()
     <Modal visible={visible} animationType="slide" onRequestClose={back}>
       {visible && (
         <PanelBody
+          moderator={moderator}
           onClose={() => {
             setCustom(null);
             setPerson(null);
@@ -100,6 +102,7 @@ export function AdminPanel({ visible, onClose }: { visible: boolean; onClose: ()
 }
 
 function PanelBody({
+  moderator,
   onClose,
   sheet,
   setSheet,
@@ -110,6 +113,7 @@ function PanelBody({
   person,
   setPerson,
 }: {
+  moderator: boolean;
   onClose: () => void;
   sheet: SheetSpec | null;
   setSheet: (s: SheetSpec | null) => void;
@@ -122,14 +126,14 @@ function PanelBody({
 }) {
   const { colors } = useTheme();
   const s = useStyles();
-  const [tab, setTab] = useState<Tab>('ozet');
+  const [tab, setTab] = useState<Tab>(moderator ? 'yaptirim' : 'ozet');
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
   const pending = useLoad(loadPending);
   const sanctions = useLoad(loadSanctionMeta);
   const meta = sanctions.data?.meta ?? null;
   // Shown once the meta answers, or after a failure other than 403 (the tab offers Tekrar dene); hidden on a 403.
   const showSanctions = !!meta || !!sanctions.error;
-  const tabs = TABS.filter((t) => t.key !== 'yaptirim' || showSanctions);
+  const tabs = moderator ? TABS.filter((t) => t.key === 'yaptirim') : TABS.filter((t) => t.key !== 'yaptirim' || showSanctions);
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
