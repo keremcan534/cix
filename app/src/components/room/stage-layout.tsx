@@ -31,7 +31,8 @@ export function StageLayout({
   pkRoom: boolean;
   /** Whether a seat holder's camera is on (prototype: only the viewer's own). */
   cameraOf: (uid: string) => boolean;
-  renderSeat: (index: number, slot: ArenaSlot) => ReactNode;
+  /** `next`: the seat beside it on the same mic row (and the gap between them), for the Lv4 bond line. */
+  renderSeat: (index: number, slot: ArenaSlot, next?: { index: number; gap: number }) => ReactNode;
 }) {
   const s = layout.layoutSchema;
   const inner = Math.max(240, Math.min(width, 640) - PAD * 2);
@@ -83,8 +84,9 @@ export function StageLayout({
         {xs.map((x, k) => {
           const next = xs[k + 1];
           const linked = paired.has(x.index) && next && s.pairs.some(([a, b]) => a === x.index && b === next.index);
+          const beside = x.kind === 'mic' && next?.kind === 'mic' && !x.host && !next.host ? { index: next.index, gap: micGap } : undefined;
           return [
-            <View key={x.index}>{x.kind === 'main' ? mainSeat(x) : renderSeat(x.index, x.host && xs.length === 1 ? { width: Math.max(micW, 96), size: 64 } : micSlot)}</View>,
+            <View key={x.index}>{x.kind === 'main' ? mainSeat(x) : renderSeat(x.index, x.host && xs.length === 1 ? { width: Math.max(micW, 96), size: 64 } : micSlot, beside)}</View>,
             linked ? heart(x.index, next.index) : null,
           ];
         })}

@@ -145,4 +145,24 @@ describe('Bağlar', () => {
     const [, info] = await call('GET', '/api/bonds/info');
     assert.equal(info.kinds.find((k) => k.id === 'cift').price, 5000);
   });
+
+  test('odadaki bağlar: gizli olan başkasına gelmez, kendine gelir', async () => {
+    const [a, b, c, d] = await Promise.all(['A', 'B', 'C', 'D'].map((n) => signUp(n)));
+    await topUp(a.session, 6000);
+    await topUp(c.session, 1000);
+    const [, r1] = await ask(a.session, b.user.id, 'cift');
+    const [, r2] = await ask(c.session, d.user.id, 'kanka');
+    await call('POST', '/api/bonds/respond', { id: r1.bond.id, accept: true }, b.session);
+    await call('POST', '/api/bonds/respond', { id: r2.bond.id, accept: true }, d.session);
+    const among = (s, ids) => call('POST', '/api/bonds/among', { ids }, s);
+    const [st, all] = await among(d.session, [a.user.id, c.user.id]);
+    assert.equal(st, 200, all.error);
+    const key = (x) => `${x.kind}:${x.level}:${[x.a, x.b].sort().join()}`;
+    assert.deepEqual(all.bonds.map(key).sort(), [key({ kind: 'cift', level: 3, a: a.user.id, b: b.user.id }), key({ kind: 'kanka', level: 1, a: c.user.id, b: d.user.id })].sort(), 'odadakilerin bağları, eşi dışarıda olsa da');
+    await call('POST', '/api/bonds/privacy', { hidden: true }, b.session);
+    assert.deepEqual((await among(d.session, [a.user.id]))[1].bonds, [], 'B gizledi: başkası görmez');
+    assert.equal((await among(a.session, [a.user.id, b.user.id]))[1].bonds.length, 1, 'kendi bağını görür');
+    assert.equal((await among(a.session, ['x']))[0], 400);
+    assert.deepEqual((await among(a.session, []))[1].bonds, []);
+  });
 });

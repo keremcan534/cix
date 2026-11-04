@@ -12,9 +12,19 @@ import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-n
 import { Text } from '@/components/text';
 import { Photo } from '@/components/photo';
 
-export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip';
+export type EntryFx = 'sparkle' | 'thunder' | 'dragon' | 'comet' | 'vip' | 'bond';
 /** `ride` is the ride's emoji (also used in the text); `rideArt` its picture, drawn instead when there is one. */
-export type EntryShow = { name: string; avatar: string; fx: EntryFx; ride?: string; rideArt?: number; colors?: readonly [string, string]; badge?: string };
+export type EntryShow = {
+  name: string;
+  avatar: string;
+  fx: EntryFx;
+  ride?: string;
+  rideArt?: number;
+  colors?: readonly [string, string];
+  badge?: string;
+  /** Lv8 bond: the two come in together ("Ada & Deniz", both photos); `badge` then names the bond. */
+  partner?: { name: string; avatar: string };
+};
 
 /** `mark` is the emoji at the banner's end; empty for none. */
 type Look = { colors: readonly [string, string, string]; particle: string[]; mark: string; creature?: string; flash?: boolean };
@@ -24,6 +34,7 @@ export const ENTRY_LOOKS: Record<EntryFx, Look> = {
   dragon: { colors: ['#450A0A', '#B91C1C', '#EA580C'], particle: ['#FDE047', '#F97316', '#FECACA'], mark: '🔥', creature: '🐉' },
   comet: { colors: ['#080F1E', '#12304A', '#0A8F95'], particle: ['#CFFAFE', '#FFFFFF', '#13D9DF'], mark: '🌠', creature: '☄️' },
   vip: { colors: ['#3B2A12', '#8A5A1C', '#C98A2E'], particle: ['#FDE68A', '#FFFFFF', '#F6BD60'], mark: '' },
+  bond: { colors: ['#3A0A22', '#A3134A', '#FF6F91'], particle: ['#FFC1D3', '#FFFFFF', '#F6BD60'], mark: '' },
 };
 const TOTAL_MS = 3200;
 const BURST = 12;
@@ -76,11 +87,12 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
 
   const bannerW = Math.min(width - 24, 420);
   // A status badge (e.g. "İnci 3") leads the line: "İnci 3 · Ada güverteye çıktı".
-  const who = show.badge ? `${show.badge} · ${show.name}` : show.name;
+  const who = show.partner ? `${show.name} & ${show.partner.name}` : show.badge ? `${show.badge} · ${show.name}` : show.name;
+  const sub = `${show.partner ? `${show.badge ? `${show.badge} · ` : ''}birlikte ` : show.ride ? `${show.ride} ile ` : ''}güverteye çıktı`;
   const opacity = exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   return (
-    <View pointerEvents="none" style={[s.band, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${who}${show.ride ? ` ${show.ride} ile` : ''} güverteye çıktı`}>
+    <View pointerEvents="none" style={[s.band, { top }]} accessibilityLiveRegion="polite" accessibilityLabel={`${who} ${sub}`}>
       {/* Ride / creature crossing behind the banner */}
       {traveller && !still && (() => {
         const motion = {
@@ -119,12 +131,17 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
           <View style={s.avatarRing}>
             <Photo uri={show.avatar} kind="face" style={s.avatar} />
           </View>
+          {show.partner && (
+            <View style={[s.avatarRing, s.partnerRing]}>
+              <Photo uri={show.partner.avatar} kind="face" style={s.avatar} />
+            </View>
+          )}
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.name} numberOfLines={1}>
               {who}
             </Text>
             <Text style={s.sub} numberOfLines={1}>
-              {show.ride ? `${show.ride} ile ` : ''}güverteye çıktı
+              {sub}
             </Text>
           </View>
           {!!look.mark && <Text style={s.mark}>{look.mark}</Text>}
@@ -169,6 +186,7 @@ const s = StyleSheet.create({
   shine: { position: 'absolute', top: -30, bottom: -30, width: 70 },
   avatarRing: { width: 50, height: 50, borderRadius: 25, padding: 2, backgroundColor: 'rgba(255,255,255,0.85)' },
   avatar: { flex: 1, borderRadius: 23 },
+  partnerRing: { marginLeft: -26 },
   name: { color: '#fff', fontWeight: '900', fontSize: 15 },
   sub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
   mark: { fontSize: 24 },
