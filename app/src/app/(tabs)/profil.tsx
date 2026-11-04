@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,10 +18,11 @@ import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
-import { callsAvailable } from '@/lib/live';
+import { callsAvailable, liveMode } from '@/lib/live';
+import { useIsAdmin } from '@/lib/live/admin';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean };
+type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean; /** Example data only: hidden when the app talks to the server. */ localOnly?: boolean };
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
@@ -37,7 +38,7 @@ const GROWTH: Item[] = [
   { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true },
   { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true },
-  { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (BD / Admin)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true },
+  { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (demo)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true, localOnly: true },
 ];
 const SUPPORT: Item[] = [
   { icon: 'headset-outline', label: 'Müşteri hizmetleri', onPress: () => router.push('/destek') },
@@ -46,10 +47,14 @@ const SUPPORT: Item[] = [
 ];
 const COMPLETION = 46;
 
+/** Agency applications on the server are approved in Ajans Merkezi › Onaylar (platform admins). */
+const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
+
 export default function ProfileScreen() {
   const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
+  const isAdmin = useIsAdmin();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
   // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through.
@@ -70,7 +75,7 @@ export default function ProfileScreen() {
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
   ];
-  const visible = (m: Item) => (m.demoOnly && !IS_DEMO ? false : m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
+  const visible = (m: Item) => ((m.demoOnly && !IS_DEMO) || (m.localOnly && liveMode()) ? false : m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -192,7 +197,7 @@ export default function ProfileScreen() {
         </View>
 
         <Group items={main} />
-        <Group items={GROWTH.filter(visible)} />
+        <Group items={[...GROWTH.filter(visible), ...(isAdmin ? [CENTER] : [])]} />
         <Group items={SUPPORT} />
 
         <Pressable style={styles.logout} onPress={() => confirmLogout(logout)} accessibilityRole="button">
