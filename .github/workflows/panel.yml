@@ -1,0 +1,87 @@
+name: Panel girişi
+
+# The finance panel's first login (docs/SUNUCU.md, "Finans paneli"). Run by hand from Actions › "Panel girişi".
+#   oku    : reads the generated login (/data/giris-bilgileri.txt) and hands it over encrypted.
+#   sifirla: gives the panel's super admin a new random password (also unlocks it, ends its sessions) and
+#            hands it over encrypted. Two-step verification, if turned on, stays on.
+#   sil    : deletes /data/giris-bilgileri.txt once the password has been changed in the panel.
+# Logs are public, so a login never appears in plain text: oku and sifirla need public_key, the base64 of an
+# RSA public key (PEM, at least 3072 bits) whose private half only the person running this has. The log then
+# shows KEY (a random key, RSA-OAEP-SHA256 encrypted) and DATA (the login, AES-256-CBC with that key, PBKDF2).
+# Open with: KEY | base64 -d | openssl pkeyutl -decrypt -inkey priv.pem -pkeyopt rsa_padding_mode:oaep
+#   -pkeyopt rsa_oaep_md:sha256 → K; DATA | base64 -d | K=... openssl enc -d -aes-256-cbc -pbkdf2 -pass env:K
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'İşlem'
+        type: choice
+        options: [oku, sifirla, sil]
+        default: oku
+      public_key:
+        description: 'Açık anahtar (base64, oku ve sifirla için)'
+        required: false
+
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: server-deploy
+      cancel-in-progress: false
+    env:
+      HOST: ${{ vars.DEPLOY_HOST || '130.61.230.94' }}
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      ACTION: ${{ inputs.action }}
+      PUBKEY: ${{ inputs.public_key }}
+    steps:
+      - name: Check the input
+        run: |
+          case "$ACTION" in oku|sifirla|sil) ;; *) echo "::error::Bilinmeyen işlem"; exit 1 ;; esac
+          if [ -z "$SSH_KEY" ]; then echo "::error::DEPLOY_SSH_KEY secret is not set (docs/SUNUCU.md)."; exit 1; fi
+          if [ "$ACTION" != sil ]; then
+            printf '%s' "$PUBKEY" | base64 -d > "$RUNNER_TEMP/pub.pem" 2>/dev/null || { echo "::error::public_key base64 değil"; exit 1; }
+            bits=$(openssl pkey -pubin -in "$RUNNER_TEMP/pub.pem" -text -noout 2>/dev/null | sed -n 's/.*Public-Key: (\([0-9]*\) bit).*/\1/p')
+            if [ -z "$bits" ] || [ "$bits" -lt 3072 ]; then echo "::error::public_key en az 3072 bitlik bir RSA açık anahtarı olmalı"; exit 1; fi
+          fi
+      - name: Run on the server
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i $HOME/.ssh/deploy ubuntu@$HOST"
+          EXEC="cd /opt/similar && sudo docker compose exec -T finance"
+
+          if [ "$ACTION" = sil ]; then
+            $SSH "$EXEC rm -f /data/giris-bilgileri.txt"
+            echo "Giriş bilgileri dosyası silindi." >> "$GITHUB_STEP_SUMMARY"; echo "Deleted"; exit 0
+          fi
+
+          if [ "$ACTION" = oku ]; then
+            login=$($SSH "$EXEC sh -c 'cat /data/giris-bilgileri.txt 2>/dev/null || true'" | grep -v '^#' | sed '/^[[:space:]]*$/d')
+            if [ -z "$login" ]; then echo "::error::Panelde giriş bilgileri dosyası yok (silinmiş ya da giriş .env'den geldi). 'sifirla' ile yeni parola alınabilir."; exit 1; fi
+          else
+            # Same hash format as the panel's hashPassword (server/auth.ts).
+            cat > "$RUNNER_TEMP/reset.mjs" <<'JS'
+          import { DatabaseSync } from 'node:sqlite';
+          import { randomBytes, scryptSync } from 'node:crypto';
+          const db = new DatabaseSync(`${process.env.FC_DATA_DIR || '/data'}/${process.env.FC_DB_FILE || 'finance.db'}`);
+          db.exec('PRAGMA busy_timeout = 5000');
+          const u = db.prepare("SELECT u.id, u.email FROM users u JOIN roles r ON r.id = u.role_id WHERE r.key = 'super_admin' ORDER BY u.id LIMIT 1").get();
+          if (!u) { console.error('no super admin'); process.exit(2); }
+          const pw = randomBytes(12).toString('base64url');
+          const salt = randomBytes(16);
+          const hash = `scrypt$16384$${salt.toString('base64')}$${scryptSync(pw, salt, 64, { N: 16384, r: 8, p: 1 }).toString('base64')}`;
+          db.prepare('UPDATE users SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?').run(hash, u.id);
+          db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
+          console.log(`Süper yönetici  ${u.email}  ${pw}`);
+          JS
+            login=$($SSH "$EXEC node --no-warnings --input-type=module -" < "$RUNNER_TEMP/reset.mjs")
+            if [ -z "$login" ]; then echo "::error::Parola sıfırlanamadı"; exit 1; fi
+          fi
+
+          K=$(openssl rand -hex 32)
+          key=$(printf '%s' "$K" | openssl pkeyutl -encrypt -pubin -inkey "$RUNNER_TEMP/pub.pem" -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 -w0)
+          data=$(printf '%s\n' "$login" | K="$K" openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:K | base64 -w0)
+          echo "KEY:$key"
+          echo "DATA:$data"
+          echo "Giriş bilgisi şifreli olarak logda (KEY / DATA)." >> "$GITHUB_STEP_SUMMARY"
