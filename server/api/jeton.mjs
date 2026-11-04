@@ -18,10 +18,12 @@
 //
 // A refund (the store refunded a purchase, or a chargeback) takes back the purchase's coins still unspent,
 // wherever a Jeton Noktası passed them, and the diamonds they became that are still locked. Diamonds already
-// unlocked are reported as unrecovered. Admin only: moderators don't touch money.
+// unlocked are reported as unrecovered. The agency commission those gifts earned is reversed. Admin only:
+// moderators don't touch money. Google Play refunds also arrive on their own (refunds.mjs).
 import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
+import { recordIncome } from './agency-lib.mjs';
 
 const TRANSFER_MAX = 100_000_000;
 const DIAMONDS_MAX = 1_000_000_000;
@@ -73,6 +75,66 @@ async function insertTransfer(c, sql, params) {
 async function lockUsers(c, ids) {
   const r = await c.query('SELECT id, role FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [ids]);
   return new Map(r.rows.map((x) => [x.id, x]));
+}
+
+/**
+ * Takes a refunded store purchase back, in the caller's transaction: its coins still unspent wherever they went,
+ * the diamonds they became that are still locked, and the agency commission those gifts earned (a 'refund'
+ * income event per gift portion, at the gift's time, so each agency gives back what it got). Returns the
+ * totals, or null when the purchase was already refunded (a second call changes nothing). `actor` is the admin,
+ * or null for the store's own refund list (refunds.mjs).
+ */
+export async function refundPurchase(c, id, { actor = null, ip = '', source = 'admin' } = {}) {
+  const p = (await c.query('SELECT * FROM purchases WHERE id = $1 FOR UPDATE', [id])).rows[0];
+  if (!p) throw new HttpError(404, 'Satın alma bulunamadı');
+  if (p.status === 'refunded') return null;
+  const lots = (
+    await c.query(
+      `WITH RECURSIVE t AS (SELECT id, user_id, channel FROM coin_lots WHERE purchase_id = $1
+                            UNION ALL SELECT l.id, l.user_id, l.channel FROM coin_lots l JOIN t ON l.source_lot = t.id)
+       SELECT id, user_id, channel FROM t`,
+      [id],
+    )
+  ).rows;
+  const lotIds = lots.map((l) => l.id);
+  const locks = (
+    await c.query("SELECT id, user_id, amount, channel, created_at, unlock_at > now() AS locked FROM diamond_locks WHERE coin_lot = ANY($1::bigint[]) AND status = 'active' ORDER BY id", [lotIds])
+  ).rows;
+  await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id)])]]);
+  let coins = 0;
+  let diamonds = 0;
+  let unrecoveredDiamonds = 0;
+  let commissionDiamonds = 0;
+  // Remaining is read after the rows are locked, so a spend can't slip in between.
+  for (const l of lots) {
+    const left = Number((await c.query('SELECT remaining FROM coin_lots WHERE id = $1', [l.id])).rows[0].remaining);
+    if (!left) continue;
+    const balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [l.user_id])).rows[0].coins);
+    const take = Math.min(left, balance);
+    await c.query('UPDATE coin_lots SET remaining = 0 WHERE id = $1', [l.id]);
+    if (take > 0) await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund_${id}_c${l.id}`, null, { channel: l.channel, actor, detail: { purchase: id, lot: Number(l.id) } });
+    coins += take;
+  }
+  for (const k of locks) {
+    const amount = Number(k.amount);
+    // The agency share of this gift goes back whether or not its diamonds can still be taken. Once per lock:
+    // the income event's source_ref is unique.
+    if (await recordIncome(c, k.user_id, 'refund', `refund:${id}:${k.id}`, -amount, k.created_at)) commissionDiamonds += amount;
+    if (!k.locked) {
+      unrecoveredDiamonds += amount;
+      continue;
+    }
+    const balance = Number((await c.query('SELECT diamonds FROM users WHERE id = $1', [k.user_id])).rows[0].diamonds);
+    const take = Math.min(amount, balance);
+    await c.query("UPDATE diamond_locks SET status = 'reversed' WHERE id = $1", [k.id]);
+    if (take > 0) await move(c, k.user_id, 'diamond', -take, 'İade: hediye elması geri alındı', `refund_${id}_d${k.id}`, p.user_id, { channel: k.channel, actor, detail: { purchase: id, lock: Number(k.id) } });
+    diamonds += take;
+    unrecoveredDiamonds += amount - take;
+  }
+  await c.query("UPDATE purchases SET status = 'refunded' WHERE id = $1", [id]);
+  await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
+  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, diamonds, unrecoveredDiamonds, commissionDiamonds, source }, ip);
+  return { coins, diamonds, unrecoveredDiamonds };
 }
 
 export const jetonRoutes = {
@@ -203,50 +265,9 @@ export const jetonRoutes = {
     if (!id) throw new HttpError(400, 'Geçersiz satın alma');
     const ip = clientIp(req);
     return tx(async (c) => {
-      const p = (await c.query('SELECT * FROM purchases WHERE id = $1 FOR UPDATE', [id])).rows[0];
-      if (!p) throw new HttpError(404, 'Satın alma bulunamadı');
-      if (p.status === 'refunded') throw new HttpError(409, 'Bu satın alma zaten iade edildi');
-      const lots = (
-        await c.query(
-          `WITH RECURSIVE t AS (SELECT id, user_id, channel FROM coin_lots WHERE purchase_id = $1
-                                UNION ALL SELECT l.id, l.user_id, l.channel FROM coin_lots l JOIN t ON l.source_lot = t.id)
-           SELECT id, user_id, channel FROM t`,
-          [id],
-        )
-      ).rows;
-      const lotIds = lots.map((l) => l.id);
-      const locks = (await c.query("SELECT id, user_id, amount, channel, unlock_at > now() AS locked FROM diamond_locks WHERE coin_lot = ANY($1::bigint[]) AND status = 'active' ORDER BY id", [lotIds])).rows;
-      await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id)])]]);
-      let coins = 0;
-      let diamonds = 0;
-      let unrecoveredDiamonds = 0;
-      // Remaining is read after the rows are locked, so a spend can't slip in between.
-      for (const l of lots) {
-        const left = Number((await c.query('SELECT remaining FROM coin_lots WHERE id = $1', [l.id])).rows[0].remaining);
-        if (!left) continue;
-        const balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [l.user_id])).rows[0].coins);
-        const take = Math.min(left, balance);
-        await c.query('UPDATE coin_lots SET remaining = 0 WHERE id = $1', [l.id]);
-        if (take > 0) await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund_${id}_c${l.id}`, null, { channel: l.channel, actor: a.id, detail: { purchase: id, lot: Number(l.id) } });
-        coins += take;
-      }
-      for (const k of locks) {
-        const amount = Number(k.amount);
-        if (!k.locked) {
-          unrecoveredDiamonds += amount;
-          continue;
-        }
-        const balance = Number((await c.query('SELECT diamonds FROM users WHERE id = $1', [k.user_id])).rows[0].diamonds);
-        const take = Math.min(amount, balance);
-        await c.query("UPDATE diamond_locks SET status = 'reversed' WHERE id = $1", [k.id]);
-        if (take > 0) await move(c, k.user_id, 'diamond', -take, 'İade: hediye elması geri alındı', `refund_${id}_d${k.id}`, p.user_id, { channel: k.channel, actor: a.id, detail: { purchase: id, lock: Number(k.id) } });
-        diamonds += take;
-        unrecoveredDiamonds += amount - take;
-      }
-      await c.query("UPDATE purchases SET status = 'refunded' WHERE id = $1", [id]);
-      await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
-      await audit(c, a.id, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, diamonds, unrecoveredDiamonds }, ip);
-      return { coins, diamonds, unrecoveredDiamonds };
+      const r = await refundPurchase(c, id, { actor: a.id, ip });
+      if (!r) throw new HttpError(409, 'Bu satın alma zaten iade edildi');
+      return r;
     });
   },
 

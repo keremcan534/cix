@@ -8,6 +8,11 @@
 // (server/infra/livekit.yaml). Each one carries a JWT signed with the API secret whose sha256 claim is the
 // body's hash, so nobody else can fake presence. If LiveKit restarts and misses "left" events, the cleanup
 // asks LiveKit's own API (LIVEKIT_API_URL, e.g. http://127.0.0.1:7880) which rooms are open and forgets the rest.
+//
+// A token is only for an open server room the person may enter (rooms.mjs voiceAccess), with their own account
+// as the identity, and lives LIVEKIT_TOKEN_TTL_S seconds (default 600; LiveKit renews it for a connected
+// participant). Closing a room deletes it in LiveKit and a kick or blacklist removes the person at once
+// (RoomService over Twirp, LIVEKIT_API_URL), so nobody stays in with a token they already had.
 import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
@@ -15,7 +20,10 @@ import { voiceAccess } from './rooms.mjs';
 
 export const [LK_KEY, LK_SECRET] = (env.LIVEKIT_KEYS ?? '').split(/:\s*/);
 if (!LK_KEY || !LK_SECRET) throw new Error('LIVEKIT_KEYS missing');
-const TOKEN_TTL = 2 * 60 * 60;
+const TOKEN_TTL = (() => {
+  const n = Number(env.LIVEKIT_TOKEN_TTL_S ?? 600);
+  return Number.isSafeInteger(n) && n >= 60 && n <= 24 * 3600 ? n : 600;
+})();
 const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const b64 = (v) => Buffer.from(JSON.stringify(v)).toString('base64url');
 const sign = (body) => crypto.createHmac('sha256', LK_SECRET).update(body).digest('base64url');
@@ -82,6 +90,31 @@ async function onEvent(e) {
   }
 }
 
+/**
+ * One RoomService call on LiveKit's own API, signed with a short token carrying `grant`. False when
+ * LIVEKIT_API_URL isn't set or LiveKit doesn't know the room or person (already gone).
+ */
+export async function roomService(method, body, grant) {
+  if (!env.LIVEKIT_API_URL) return false;
+  const r = await fetch(`${env.LIVEKIT_API_URL.replace(/\/$/, '')}/twirp/livekit.RoomService/${method}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${liveKitJwt({ video: grant }, 60)}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (r.status === 404) return false;
+  if (!r.ok) throw new Error(`livekit ${method} ${r.status}`);
+  return true;
+}
+
+/** Ends a voice room for everyone in it. Never fails the caller: the room is closed in our records either way. */
+export const deleteVoiceRoom = (room) =>
+  roomService('DeleteRoom', { room }, { roomCreate: true }).catch((e) => (console.error('livekit DeleteRoom', room, String(e).slice(0, 200)), false));
+
+/** Takes one person out of a voice room now (a kick or blacklist); the token route refuses them a new one. */
+export const removeFromVoice = (room, identity) =>
+  roomService('RemoveParticipant', { room, identity }, { roomAdmin: true, room }).catch((e) => (console.error('livekit RemoveParticipant', room, String(e).slice(0, 200)), false));
+
 /** Forgets presence in rooms LiveKit no longer has open (missed webhooks after a restart). */
 async function cleanup() {
   const r = await fetch(`${env.LIVEKIT_API_URL.replace(/\/$/, '')}/twirp/livekit.RoomService/ListRooms`, {
@@ -101,12 +134,13 @@ if (env.LIVEKIT_API_URL) {
 }
 
 export const liveRoutes = {
-  /** Voice token. Server rooms check kicks, blacklist, blocks and the password (rooms.mjs voiceAccess). */
+  /** Voice token for an open server room: kicks, blacklist, blocks and the password (rooms.mjs voiceAccess). */
   async 'GET /token'(req, url) {
     const u = await auth(req);
     const room = url.searchParams.get('room') ?? '';
     if (!ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     await voiceAccess(room, u, url.searchParams.get('password'));
+    // The identity is the signed-in account, never a value from the request, so nobody can join as someone else.
     // canUpdateOwnMetadata: each phone shows which mic it sits on as its own participant attribute (app lib/live).
     const token = liveKitJwt({ sub: u.id, name: u.name, video: { room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } }, TOKEN_TTL);
     return { token, ttl: TOKEN_TTL };

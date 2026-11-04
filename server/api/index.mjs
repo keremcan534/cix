@@ -9,6 +9,7 @@
 //   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (in-app purchases: VIP, store items…)
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
+// Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
 // purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
@@ -41,7 +42,9 @@ import { purchaseRoutes } from './purchases.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { socialRoutes } from './social.mjs';
-import { creditCoins, giftCoins, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { withdrawRoutes } from './withdraw.mjs';
+import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -54,9 +57,8 @@ const VERSION = (() => {
   }
 })();
 const STARTED = Date.now();
-/** Test top-ups: the coin pack sizes, at most this many coins per user per day. */
+/** Test top-ups: the coin pack sizes; at most TEST_DAILY play coins per user per day (wallet.mjs). */
 const TOPUP_PACKS = [1000, 5000, 10000];
-const TOPUP_DAILY = 50000;
 const GIFT_MAX = 1_000_000;
 /** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
 const EXCHANGE_MAX = 1_000_000_000;
@@ -110,8 +112,8 @@ const walletRoutes = {
     if (!TOPUP_PACKS.includes(amount)) throw new HttpError(400, `Paket ${TOPUP_PACKS.join(', ')} olmalı`);
     return once(u.id, 'coin', ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
-      const today = await c.query("SELECT coalesce(sum(amount), 0) AS n FROM ledger WHERE user_id = $1 AND reason = 'Test yüklemesi' AND created_at > date_trunc('day', now())", [u.id]);
-      if (Number(today.rows[0].n) + amount > TOPUP_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TOPUP_DAILY}`);
+      // One daily cap for all play coins: test top-ups and test purchases together (wallet.mjs).
+      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
       await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
     });
   },
@@ -184,7 +186,9 @@ const walletRoutes = {
 const routes = {
   ...walletRoutes,
   ...walletInfoRoutes,
+  ...withdrawRoutes,
   ...jetonRoutes,
+  ...refundSyncRoutes,
   ...authRoutes,
   ...pushRoutes,
   ...giftRoutes,
@@ -268,6 +272,7 @@ process.on('unhandledRejection', (e) => console.error('unhandled rejection', e))
 function shutdown(signal) {
   console.log(`${signal}: shutting down`);
   stopFinanceSync();
+  stopRefundSync();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -283,3 +288,4 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 await migrate();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
+startRefundSync();

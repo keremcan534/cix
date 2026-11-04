@@ -4,6 +4,12 @@
 //   POST /api/wallet/purchase { platform: 'ios', productId, transactionId }
 //   POST /api/wallet/purchase { platform: 'test', productId, transactionId }     (ALLOW_TEST_TOPUP=1 only)
 //
+// Test and sandbox purchases are play money (wallet.mjs PLAY_MONEY): a test purchase only with
+// ALLOW_TEST_TOPUP=1, a store test purchase (Google Play purchaseType 0 = test, 1 = promo; App Store sandbox)
+// only with ALLOW_SANDBOX_PURCHASES=1. Both credit coins on the 'test' channel and share the daily cap of test
+// top-ups (TEST_TOPUP_DAILY, bonus included). Without the switch a store test purchase is refused and not
+// consumed, so Google Play refunds it on its own.
+//
 // Google Play: the purchase token is looked up with the Play Developer API (service account in
 // GOOGLE_SERVICE_ACCOUNT, JSON), must be "purchased", and is consumed after crediting so the pack can be
 // bought again. App Store: the transaction is fetched from the App Store Server API (In-App Purchase key:
@@ -20,9 +26,16 @@ import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
-import { creditCoins } from './wallet.mjs';
+import { TEST_DAILY, creditCoins, playCoinsToday } from './wallet.mjs';
 
 const TEST = env.ALLOW_TEST_TOPUP === '1';
+const SANDBOX = env.ALLOW_SANDBOX_PURCHASES === '1';
+/** Store addresses. An override is for the tests only and honoured just for a local stand-in (like google.mjs). */
+const local = (v, real) => (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/.test(v ?? '') ? v : real).replace(/\/$/, '');
+const GOOGLE_API = local(env.GOOGLE_API_URL, 'https://androidpublisher.googleapis.com');
+const GOOGLE_TOKEN_URL = local(env.GOOGLE_TOKEN_URL, 'https://oauth2.googleapis.com/token');
+const APPLE_API = local(env.APPLE_API_URL, 'https://api.storekit.itunes.apple.com');
+const APPLE_SANDBOX_API = local(env.APPLE_SANDBOX_API_URL, 'https://api.storekit-sandbox.itunes.apple.com');
 /** The coin channel of each store (wallet.mjs CHANNELS): where the coins came from, in every record. */
 const STORE_CHANNEL = { android: 'google', ios: 'apple', test: 'test' };
 const PACKAGE = env.GOOGLE_PLAY_PACKAGE ?? 'com.similarclub.app';
@@ -46,13 +59,16 @@ export const purchaseOptions = (e = env) => ({
 // --- Google Play ------------------------------------------------------------------------------------------
 let googleToken = { value: '', until: 0 };
 
-async function googleAccessToken() {
+/** The Play Developer API base for our app (purchases, voided purchases). */
+export const googleAppUrl = () => `${GOOGLE_API}/androidpublisher/v3/applications/${PACKAGE}`;
+
+export async function googleAccessToken() {
   if (googleToken.until > Date.now()) return googleToken.value;
   const sa = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
   const now = Math.floor(Date.now() / 1000);
   const body = `${b64url({ alg: 'RS256', typ: 'JWT' })}.${b64url({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/androidpublisher', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })}`;
   const assertion = `${body}.${crypto.sign('sha256', Buffer.from(body), sa.private_key).toString('base64url')}`;
-  const r = await fetch('https://oauth2.googleapis.com/token', {
+  const r = await fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
@@ -67,7 +83,7 @@ async function googleAccessToken() {
 async function verifyGoogle(u, productId, token) {
   if (!env.GOOGLE_SERVICE_ACCOUNT) throw new HttpError(503, 'Google Play ödemesi henüz ayarlı değil');
   if (typeof token !== 'string' || token.length < 20 || token.length > 500) throw new HttpError(400, 'Geçersiz satın alma');
-  const base = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}/purchases/products/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(token)}`;
+  const base = `${googleAppUrl()}/purchases/products/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(token)}`;
   const headers = { authorization: `Bearer ${await googleAccessToken()}` };
   const r = await fetch(base, { headers, signal: AbortSignal.timeout(10_000) });
   if (r.status === 404 || r.status === 400) throw new HttpError(400, 'Satın alma bulunamadı');
@@ -75,7 +91,11 @@ async function verifyGoogle(u, productId, token) {
   const p = await r.json();
   if (p.purchaseState !== 0) throw new HttpError(402, p.purchaseState === 2 ? 'Ödeme bekleniyor; tamamlanınca jetonlar yüklenir' : 'Ödeme tamamlanmadı');
   if (p.obfuscatedExternalAccountId && p.obfuscatedExternalAccountId !== sha(u.id)) throw new HttpError(403, 'Bu satın alma başka bir hesaba ait');
+  // purchaseType is only there for purchases nobody paid for: 0 = license tester, 1 = promo code, 2 = rewarded.
+  const sandbox = p.purchaseType !== undefined && p.purchaseType !== null;
+  if (sandbox && !SANDBOX) throw new HttpError(402, 'Test satın alması bu sunucuda kapalı');
   return {
+    sandbox,
     transactionId: p.orderId || `token-${sha(token)}`,
     // Consumed after crediting; a failure only means the next purchase of this pack waits for a retry.
     finish: () => fetch(`${base}:consume`, { method: 'POST', headers, signal: AbortSignal.timeout(10_000) }).then((x) => !x.ok && console.error('google consume', x.status)),
@@ -95,22 +115,28 @@ async function verifyApple(u, productId, transactionId) {
   if (typeof transactionId !== 'string' || !/^\d{1,30}$/.test(transactionId)) throw new HttpError(400, 'Geçersiz satın alma');
   const headers = { authorization: `Bearer ${appleJwt()}` };
   let info = null;
-  for (const host of ['api.storekit.itunes.apple.com', 'api.storekit-sandbox.itunes.apple.com']) {
-    const r = await fetch(`https://${host}/inApps/v1/transactions/${transactionId}`, { headers, signal: AbortSignal.timeout(10_000) });
+  let sandbox = false;
+  for (const host of [APPLE_API, APPLE_SANDBOX_API]) {
+    const r = await fetch(`${host}/inApps/v1/transactions/${transactionId}`, { headers, signal: AbortSignal.timeout(10_000) });
     if (r.status === 404) continue;
     if (!r.ok) throw new Error(`apple verify ${r.status}`);
     info = jwtPart((await r.json()).signedTransactionInfo, 1);
+    sandbox = host === APPLE_SANDBOX_API;
     break;
   }
   if (!info) throw new HttpError(400, 'Satın alma bulunamadı');
+  // TestFlight, review and sandbox testers: no money was paid.
+  sandbox ||= info.environment !== undefined && info.environment !== 'Production';
+  if (sandbox && !SANDBOX) throw new HttpError(402, 'Test satın alması bu sunucuda kapalı');
   if (info.bundleId !== BUNDLE || info.productId !== productId) throw new HttpError(400, 'Satın alma bu ürüne ait değil');
   if (info.revocationDate) throw new HttpError(402, 'Bu satın alma iade edilmiş');
   if (info.appAccountToken && info.appAccountToken.toLowerCase() !== u.id) throw new HttpError(403, 'Bu satın alma başka bir hesaba ait');
-  return { transactionId: String(info.transactionId), finish: () => {} };
+  return { sandbox, transactionId: String(info.transactionId), finish: () => {} };
 }
 
 // --- Crediting --------------------------------------------------------------------------------------------
-async function credit(u, platform, pack, transactionId) {
+/** `play`: a test or sandbox purchase, credited as play money on the 'test' channel (wallet.mjs PLAY_MONEY). */
+async function credit(u, platform, pack, transactionId, play) {
   const ref = `buy_${sha(`${platform}:${transactionId}`).slice(0, 40)}`;
   return tx(async (c) => {
     await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
@@ -121,22 +147,34 @@ async function credit(u, platform, pack, transactionId) {
     }
     const first = !(await c.query('SELECT 1 FROM purchases WHERE user_id = $1 AND product_id = $2', [u.id, pack.productId])).rowCount;
     const bonus = first ? pack.firstBonus : 0;
-    const p = await c.query('INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', [u.id, platform, pack.productId, transactionId, pack.coins, bonus]);
+    // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
+    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+    const sandbox = play && platform !== 'test';
+    const p = await c.query('INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id', [
+      u.id,
+      platform,
+      pack.productId,
+      transactionId,
+      pack.coins,
+      bonus,
+      sandbox,
+    ]);
     const purchaseId = Number(p.rows[0].id);
     // Two lots: the store's coins and the first-purchase gift, both with the store lock (wallet.mjs).
     await creditCoins(
       c,
       u.id,
       [
-        { channel: STORE_CHANNEL[platform], amount: pack.coins, purchaseId },
+        { channel: play ? 'test' : STORE_CHANNEL[platform], amount: pack.coins, purchaseId },
         { channel: 'bonus', amount: bonus, purchaseId },
       ],
       bonus ? `Jeton satın alma (+${bonus} ilk alım hediyesi)` : 'Jeton satın alma',
       ref,
       null,
-      { detail: { purchase: purchaseId, platform, product: pack.productId, transaction: transactionId } },
+      { detail: { purchase: purchaseId, platform, product: pack.productId, transaction: transactionId, ...(sandbox && { sandbox }) } },
     );
-    await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
+    // SVIP points are for coins someone paid for.
+    if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
     return { replay: false, coins: pack.coins, bonus };
   });
 }
@@ -150,11 +188,12 @@ export const purchaseRoutes = {
     let proof;
     if (b.platform === 'android') proof = await verifyGoogle(u, pack.productId, b.token);
     else if (b.platform === 'ios') proof = await verifyApple(u, pack.productId, b.transactionId);
-    else if (b.platform === 'test' && TEST) {
+    else if (b.platform === 'test') {
+      if (!TEST) throw new HttpError(403, 'Test satın alması kapalı');
       if (typeof b.transactionId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(b.transactionId)) throw new HttpError(400, 'Geçersiz satın alma');
-      proof = { transactionId: b.transactionId, finish: () => {} };
+      proof = { sandbox: true, transactionId: b.transactionId, finish: () => {} };
     } else throw new HttpError(400, 'Geçersiz platform');
-    const out = await credit(u, b.platform, pack, proof.transactionId);
+    const out = await credit(u, b.platform, pack, proof.transactionId, proof.sandbox);
     await proof.finish();
     const me = (await db.query('SELECT * FROM users WHERE id = $1', [u.id])).rows[0];
     return { user: selfUser(me), ...out };

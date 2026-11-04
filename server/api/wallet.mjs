@@ -41,6 +41,43 @@ const channelOf = (parts) => {
 const fmt = (n) => n.toLocaleString('tr-TR');
 
 /**
+ * Play money: coins nobody paid for. Test top-ups (ALLOW_TEST_TOPUP=1), test purchases and store sandbox
+ * purchases (ALLOW_SANDBOX_PURCHASES=1) credit them on the 'test' channel. A server with either switch on runs
+ * on play money, and none of its diamonds can ever be paid out (withdraw.mjs).
+ */
+export const PLAY_MONEY = env.ALLOW_TEST_TOPUP === '1' || env.ALLOW_SANDBOX_PURCHASES === '1';
+/** Most play coins one account gets per day: test top-ups and test or sandbox purchases together, bonus included. */
+export const TEST_DAILY = (() => {
+  const n = Number(env.TEST_TOPUP_DAILY ?? 50_000);
+  return Number.isSafeInteger(n) && n > 0 ? n : 50_000;
+})();
+
+/** Play coins credited to `userId` today (UTC day), the first-purchase gift of a test purchase included. */
+export async function playCoinsToday(c, userId) {
+  const r = await c.query(
+    `SELECT coalesce(sum(l.amount), 0) AS n FROM coin_lots l LEFT JOIN purchases p ON p.id = l.purchase_id
+      WHERE l.user_id = $1 AND l.created_at > date_trunc('day', now())
+        AND (l.channel = 'test' OR (l.channel = 'bonus' AND (p.platform = 'test' OR p.sandbox)))`,
+    [userId],
+  );
+  return Number(r.rows[0].n);
+}
+
+/**
+ * Whether this database ever held play money. Coins and diamonds are fungible: gifts, Çevir and Jeton Noktası
+ * mix them, so a diamond can't be traced back to the coins that paid for it. One play coin anywhere means no
+ * diamond here is provably real money, so no withdrawal may be paid.
+ */
+export async function everHadPlayMoney(c) {
+  const r = await c.query(
+    `SELECT EXISTS (SELECT 1 FROM coin_lots WHERE channel = 'test')
+         OR EXISTS (SELECT 1 FROM purchases WHERE platform = 'test' OR sandbox)
+         OR EXISTS (SELECT 1 FROM ledger WHERE currency = 'coin' AND reason = 'Test yüklemesi') AS play`,
+  );
+  return r.rows[0].play;
+}
+
+/**
  * Credits coins from `portions` ([{ channel, amount, lockHours?, purchaseId?, transferId?, sourceLot?,
  * sourceUser? }]): one lot each and one ledger row. A portion's lock is its channel's, or longer if given.
  */

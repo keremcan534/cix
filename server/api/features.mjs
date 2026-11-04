@@ -16,7 +16,7 @@
 import { HttpError, env } from './core.mjs';
 
 /** Every feature that can be switched off. `games` exists only in the app (the games run there). */
-export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms'];
+export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'];
 
 /** "METHOD /path" → the features that turn it off. */
 export const ROUTES = {
@@ -28,6 +28,8 @@ export const ROUTES = {
   'POST /api/jeton/transfer': ['jeton'],
   'POST /api/jeton/sell-diamonds': ['jeton', 'exchange'],
   'POST /api/admin/jeton/wholesale': ['jeton'],
+  // New requests only: cancelling, the list and the owner's decision stay open, so held diamonds can come back.
+  'POST /api/wallet/withdraw': ['withdraw'],
   'POST /api/messages': ['dm'],
   'POST /api/rooms': ['rooms'],
   // The voice token: without it nobody joins a room.

@@ -1,6 +1,6 @@
 // Signing in and sessions.
 //
-//   POST /api/auth/dev         { deviceKey, name?, device? }               → { session, user }   (ALLOW_DEV_AUTH)
+//   POST /api/auth/dev         { deviceKey, name?, device? }               → { session, user }   (ALLOW_DEV_AUTH=1 only)
 //   POST /api/auth/otp/start   { phone }                                   → { sent, retryAfter }
 //   POST /api/auth/otp/verify  { phone, code, name?, deviceKey?, device? } → { session, user, isNew }
 //   POST /api/auth/google      { idToken, deviceKey?, device? }            → { session, user, isNew }   (GOOGLE_CLIENT_IDS)
@@ -10,20 +10,24 @@
 //
 // Phone sign-in: a 6-digit code by SMS (sms.mjs), kept only as a hash, valid 5 minutes, 5 tries, a new code
 // every 60 seconds and at most 5 per hour per number. Only numbers starting with OTP_COUNTRIES (default +90)
-// can ask for a code, so nobody can make us pay for SMS to premium numbers abroad. A device that already has
-// a development account keeps it (and its wallet) when it signs in with a phone for the first time.
-// App Store / Play reviewers: OTP_REVIEW_PHONE + OTP_REVIEW_CODE sign in without an SMS.
+// can ask for a code, so nobody can make us pay for SMS to premium numbers abroad. On top of that, at most
+// OTP_GLOBAL_PER_HOUR codes (default 300) go out per hour over all numbers, so a script rotating numbers and
+// addresses can't run up the SMS bill. A device that already has a development account keeps it (and its
+// wallet) when it signs in with a phone for the first time.
+// App Store / Play reviewers: OTP_REVIEW_PHONE + OTP_REVIEW_CODE sign in without an SMS. That code never
+// changes, so OTP_REVIEW_MAX_TRIES wrong codes in an hour (default 10) lock the number for an hour.
+// Development sign-in (a device key, no phone) is off unless ALLOW_DEV_AUTH=1.
 //
 // Google sign-in (free, no SMS): the app sends the ID token Google gave it; google.mjs checks it. The account is
 // found by the Google account's stable id (auth_identities). A device with a development account links the
 // Google account to it the first time, so testers keep their balance.
 import crypto from 'node:crypto';
 
-import { HttpError, auth, db, env, newSession, readJson, selfUser, sha, tx } from './core.mjs';
+import { HttpError, auth, clientIp, db, env, newSession, readJson, selfUser, sha, tx } from './core.mjs';
 import { googleClientIds, verifyGoogleIdToken } from './google.mjs';
 import { sendCode, smsProvider } from './sms.mjs';
 
-const DEV_AUTH = env.ALLOW_DEV_AUTH !== '0';
+const DEV_AUTH = env.ALLOW_DEV_AUTH === '1';
 const COUNTRIES = (env.OTP_COUNTRIES ?? '+90').split(',').map((s) => s.trim()).filter(Boolean);
 const REVIEW_PHONE = env.OTP_REVIEW_PHONE ?? '';
 const REVIEW_CODE = env.OTP_REVIEW_CODE ?? '';
@@ -31,6 +35,12 @@ const CODE_MINUTES = 5;
 const MAX_TRIES = 5;
 const RESEND_SECONDS = 60;
 const MAX_PER_HOUR = 5;
+const positive = (v, d) => {
+  const n = Number(v ?? d);
+  return Number.isSafeInteger(n) && n > 0 ? n : d;
+};
+const GLOBAL_PER_HOUR = positive(env.OTP_GLOBAL_PER_HOUR, 300);
+const REVIEW_MAX_TRIES = positive(env.OTP_REVIEW_MAX_TRIES, 10);
 const DEVICE_KEY = /^[A-Za-z0-9_-]{32,128}$/;
 
 /** A phone number as E.164, or null. Turkish forms (0532…, 532…, 90532…) become +90…. */
@@ -51,9 +61,33 @@ function notBanned(u) {
   if (u.banned_until && new Date(u.banned_until) > new Date()) throw new HttpError(403, `Hesabın ${new Date(u.banned_until).toISOString().slice(0, 10)} tarihine kadar askıya alındı`);
 }
 
+/** The review number's fixed code: wrong codes are counted per hour, and too many lock it for an hour. */
+async function checkReviewCode(phone, code) {
+  return tx(async (c) => {
+    await c.query('INSERT INTO otp_review_lock (phone) VALUES ($1) ON CONFLICT DO NOTHING', [phone]);
+    const row = (await c.query('SELECT * FROM otp_review_lock WHERE phone = $1 FOR UPDATE', [phone])).rows[0];
+    if (row.locked_until && new Date(row.locked_until) > new Date()) throw new HttpError(429, 'Çok fazla yanlış deneme, bir saat sonra tekrar dene');
+    const good = !!REVIEW_CODE && same(code, REVIEW_CODE);
+    if (good) {
+      await c.query('UPDATE otp_review_lock SET fails = 0, locked_until = NULL WHERE phone = $1', [phone]);
+      return true;
+    }
+    const inWindow = Date.now() - new Date(row.window_start).getTime() < 3_600_000;
+    const fails = inWindow ? row.fails + 1 : 1;
+    const lock = fails >= REVIEW_MAX_TRIES;
+    await c.query(
+      `UPDATE otp_review_lock SET fails = $2, window_start = CASE WHEN $3 THEN window_start ELSE now() END,
+         locked_until = CASE WHEN $4 THEN now() + interval '1 hour' ELSE locked_until END WHERE phone = $1`,
+      [phone, lock ? 0 : fails, inWindow, lock],
+    );
+    if (lock) console.error(`otp review number locked for an hour after ${REVIEW_MAX_TRIES} wrong codes`);
+    return false;
+  });
+}
+
 /** Checks the code. A wrong code counts a try (and is committed); an expired or used-up one is refused. */
 async function checkCode(phone, code) {
-  if (REVIEW_PHONE && phone === REVIEW_PHONE) return !!REVIEW_CODE && same(code, REVIEW_CODE);
+  if (REVIEW_PHONE && phone === REVIEW_PHONE) return checkReviewCode(phone, code);
   return tx(async (c) => {
     const row = (await c.query('SELECT * FROM otp_codes WHERE phone = $1 FOR UPDATE', [phone])).rows[0];
     if (!row || new Date(row.expires_at) < new Date()) throw new HttpError(400, 'Kodun süresi doldu, yeni kod iste');
@@ -120,7 +154,7 @@ async function accountForGoogle(g, deviceKey, retried = false) {
 }
 
 export const authRoutes = {
-  /** Development sign-in with a random key kept on the device. Closed at launch with ALLOW_DEV_AUTH=0. */
+  /** Development sign-in with a random key kept on the device. Open only with ALLOW_DEV_AUTH=1 (test servers). */
   async 'POST /api/auth/dev'(req) {
     if (!DEV_AUTH) throw new HttpError(403, 'Bu giriş yöntemi kapalı');
     const { deviceKey, name, device } = await readJson(req);
@@ -137,16 +171,29 @@ export const authRoutes = {
   },
 
   async 'POST /api/auth/otp/start'(req) {
+    const ip = clientIp(req);
     const phone = normalizePhone((await readJson(req)).phone);
     if (!phone) throw new HttpError(400, 'Geçerli bir telefon numarası yaz');
     if (REVIEW_PHONE && phone === REVIEW_PHONE) return { sent: true, retryAfter: RESEND_SECONDS };
     if (!COUNTRIES.some((p) => phone.startsWith(p))) throw new HttpError(400, 'Bu ülkenin numaralarıyla giriş henüz açık değil');
     if (!smsProvider) throw new HttpError(503, 'Telefonla giriş henüz açık değil');
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    /** The hourly cap over all numbers, counted under one lock so two requests can't both take the last code. */
+    const globalCap = async (c) => {
+      await c.query("SELECT pg_advisory_xact_lock(hashtext('otp_global'))");
+      await c.query("DELETE FROM otp_sends WHERE sent_at < now() - interval '1 day'");
+      const n = Number((await c.query("SELECT count(*) AS n FROM otp_sends WHERE sent_at > now() - interval '1 hour'")).rows[0].n);
+      if (n >= GLOBAL_PER_HOUR) {
+        console.error(`otp global cap reached: ${n} codes in the last hour (OTP_GLOBAL_PER_HOUR=${GLOBAL_PER_HOUR})`);
+        throw new HttpError(429, 'Şu an çok fazla kod isteniyor, biraz sonra tekrar dene');
+      }
+      await c.query('INSERT INTO otp_sends (phone, ip) VALUES ($1, $2)', [phone, ip]);
+    };
     try {
       await tx(async (c) => {
         const row = (await c.query('SELECT * FROM otp_codes WHERE phone = $1 FOR UPDATE', [phone])).rows[0];
         if (!row) {
+          await globalCap(c);
           await c.query(`INSERT INTO otp_codes (phone, code_hash, expires_at) VALUES ($1, $2, now() + interval '${CODE_MINUTES} minutes')`, [phone, codeHash(phone, code)]);
           return;
         }
@@ -154,6 +201,7 @@ export const authRoutes = {
         if (wait > 0) throw new HttpError(429, `Yeni kod için ${Math.ceil(wait)} saniye bekle`);
         const inWindow = Date.now() - new Date(row.window_start).getTime() < 3_600_000;
         if (inWindow && row.sent_count >= MAX_PER_HOUR) throw new HttpError(429, 'Bu numaraya çok fazla kod gönderildi, bir saat sonra tekrar dene');
+        await globalCap(c);
         await c.query(
           `UPDATE otp_codes SET code_hash = $2, expires_at = now() + interval '${CODE_MINUTES} minutes', attempts = 0, sent_at = now(),
              sent_count = CASE WHEN $3 THEN sent_count + 1 ELSE 1 END, window_start = CASE WHEN $3 THEN window_start ELSE now() END

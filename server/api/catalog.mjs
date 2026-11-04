@@ -101,6 +101,13 @@ export const bankExchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHA
 /** What a Jeton Noktası pays management for coins: the best pack's price minus its fee (2 %). app wholesaleQuote. */
 export const wholesaleTl = (coins) => Math.round((coins / COINS_PER_TL) * (1 - EXCHANGE.wholesaleFee) * 100) / 100;
 
+/**
+ * Withdrawals (withdraw.mjs): the smallest and largest request and the most diamonds one person may ask for in
+ * 7 days. Same as app/src/data/rules.ts minWithdrawDiamonds, maxWithdrawDiamonds, weeklyWithdrawLimitDiamonds.
+ */
+export const WITHDRAW = { minDiamonds: 50_000, maxDiamonds: 5_000_000, weeklyDiamonds: 10_000_000 };
+export const diamondValueUsd = (diamonds) => Math.floor((diamonds / EXCHANGE.diamondsPerUsd) * 100) / 100;
+
 /** SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point). */
 export const SVIP_XP = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
 export const svipLevel = (xp) => SVIP_XP.filter((t) => xp >= t).length;

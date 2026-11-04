@@ -9,6 +9,7 @@ import { SignInAgain } from '@/lib/api';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
 import { pollMessages } from '@/lib/live/messages';
+import { settleWithdrawals } from '@/lib/live/withdraw';
 import { useApp } from '@/store';
 
 const TICK_MS = 15_000;
@@ -41,6 +42,8 @@ export function LiveSync() {
           resumePurchases();
           await refreshEarnings();
         } else {
+          // A rejected withdrawal gives diamonds back: known before the balance is read, so it isn't a gift.
+          await settleWithdrawals().catch(() => {});
           await refreshWallet();
           if (tick % 4 === 0) await refreshEarnings();
         }

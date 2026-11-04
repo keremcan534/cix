@@ -185,7 +185,11 @@ describe('Odalar ve ses token’ı', () => {
     const [, t] = await call('GET', `/token?room=${lk}&password=1234`, null, guest.session);
     assert.equal(tokenOf(t.token).video.room, lk);
     assert.equal((await call('GET', `/token?room=${lk}`, null, owner.session))[0], 200, 'sahip şifresiz girer');
-    assert.equal((await call('GET', '/token?room=oda-r1', null, guest.session))[0], 200, 'prototip odaları etkilenmez');
+    assert.equal(t.ttl, 600, 'kısa ömürlü token');
+    assert.equal(tokenOf(t.token).sub, guest.user.id, 'kimlik oturumdan');
+    // Only open server rooms: the sample rooms and made-up names get no token (ALLOW_PROTOTYPE_ROOMS is off).
+    assert.equal((await call('GET', '/token?room=oda-r1', null, guest.session))[0], 404, 'prototip odası yok');
+    assert.equal((await call('GET', `/token?room=oda-${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}`, null, guest.session))[0], 404, 'olmayan oda');
 
     assert.equal((await call('POST', '/api/rooms/ban', { room: room.id, user: guest.user.id, minutes: 10 }, guest.session))[0], 403, 'yetkisiz');
     await call('POST', '/api/rooms/admin', { room: room.id, user: admin.user.id }, owner.session);

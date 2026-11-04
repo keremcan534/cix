@@ -4,35 +4,80 @@ import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { Card, GradientButton, Header } from '@/components/ui';
+import { Button, Card, GradientButton, Header } from '@/components/ui';
 import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { liveMode, message } from '@/lib/live';
+import { cancelWithdraw, liveWithdraw, useServerWithdrawals, type ServerWithdrawal } from '@/lib/live/withdraw';
+import { blockedFeature } from '@/lib/remote-control';
+import { checkWithdraw, formatIban, maskAccount, withdrawUsd, type WithdrawMethod } from '@/lib/withdraw-rules';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
-// "TR12 0006 ..." grouping for readability.
-const formatIban = (raw: string) => {
-  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 26);
-  return clean.replace(/(.{4})/g, '$1 ').trim();
-};
+const fmt = (n: number) => n.toLocaleString('tr-TR');
+const METHODS: [WithdrawMethod, string][] = [
+  ['iban', 'IBAN'],
+  ['other', 'Diğer'],
+];
+/** A USD amount as the server sends it ("$10.01"). */
+const money = (v: number) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const dateOf = (iso: string) => new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export default function Withdraw() {
   // Only the withdrawable part can be paid out; locked diamonds (lib/diamond-locks) wait for their lock.
-  const { withdrawableDiamonds: diamonds, lockedDiamonds: locked, requestWithdraw, withdrawals } = useApp();
+  const app = useApp();
+  const { requestWithdraw, withdrawals } = app;
+  const live = liveMode();
+  const server = useServerWithdrawals();
+  // Live mode: the server's numbers once its answer is in (the store's balance until then).
+  const fromServer = live && server.loaded;
+  const diamonds = fromServer ? server.withdrawable : app.withdrawableDiamonds;
+  const locked = fromServer ? server.locked : app.lockedDiamonds;
   const [amount, setAmount] = useState(String(Math.max(RULES.minWithdrawDiamonds, Math.floor(diamonds / 1000) * 1000)));
-  const [iban, setIban] = useState('TR');
+  const [method, setMethod] = useState<WithdrawMethod>('iban');
+  const [account, setAccount] = useState('');
   const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
   const n = Number(amount) || 0;
   const presets = [10_000, 20_000, 50_000].filter((p) => p <= diamonds);
   const { colors } = useTheme();
   const styles = useStyles();
+  // Live mode: one request at a time; a new one waits until the pending one is settled or cancelled.
+  const pending = live ? server.list.find((w) => w.status === 'pending') : undefined;
 
   const submit = () => {
+    if (live) {
+      if (busy || blockedFeature('withdraw')) return;
+      if (pending) return showAlert('Bekleyen talebin var', 'Bekleyen talebin sonuçlanınca ya da onu iptal edince yenisini açabilirsin.');
+      const err = checkWithdraw({ diamonds: n, withdrawable: diamonds, method, holder: name, account: method === 'iban' ? formatIban(account) : account });
+      if (err) return showAlert('Hata', err);
+      setBusy(true);
+      liveWithdraw({ diamonds: n, method, holder: name, account: method === 'iban' ? formatIban(account) : account })
+        .then((w) => showAlert('Talep alındı', `${fmt(w.diamonds)} elmas (${money(w.usd)}) için talebin alındı. Ödeme yapılınca haber vereceğiz.`))
+        .catch((e) => showAlert('Talep gönderilemedi', message(e)))
+        .finally(() => setBusy(false));
+      return;
+    }
     if (name.trim().length < 3) return showAlert('Hata', 'Hesap sahibinin adını gir.');
-    const err = requestWithdraw(n, iban);
+    const err = requestWithdraw(n, account);
     if (err) return showAlert('Hata', err);
     showAlert('Talep alındı', `${usd(n)} en geç 3 iş günü içinde hesabına yatırılacak. (Demo)`);
   };
+
+  const cancel = (w: ServerWithdrawal) =>
+    showAlert('Talebi iptal et', `${fmt(w.diamonds)} elmas bakiyene geri dönsün mü?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'İptal et',
+        style: 'destructive',
+        onPress: () => {
+          setBusy(true);
+          cancelWithdraw(w.id)
+            .catch((e) => showAlert('İptal edilemedi', message(e)))
+            .finally(() => setBusy(false));
+        },
+      },
+    ]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -64,31 +109,73 @@ export default function Withdraw() {
             </Pressable>
           )}
         </View>
-        <Text style={styles.receive}>Hesabına geçecek: {usd(n)}</Text>
+        <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n)) : usd(n)}</Text>
 
+        {live && (
+          <View style={{ flexDirection: 'row', gap: 8 }} accessibilityRole="radiogroup">
+            {METHODS.map(([k, l]) => (
+              <Pressable key={k} style={[styles.chip, method === k && styles.chipOn]} onPress={() => setMethod(k)} accessibilityRole="radio" accessibilityState={{ selected: method === k }}>
+                <Text style={[styles.chipText, method === k && styles.chipTextOn]}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <Text style={styles.label}>Hesap sahibi</Text>
         <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.textDim} style={styles.input} />
-        <Text style={styles.label}>IBAN</Text>
-        <TextInput value={formatIban(iban)} onChangeText={setIban} autoCapitalize="characters" style={styles.input} placeholder="TR00 0000 0000 0000 0000 0000 00" placeholderTextColor={colors.textDim} />
-
-        <GradientButton title="Çekim talebi oluştur" icon="cash" onPress={submit} />
-
-        {withdrawals.length > 0 && (
-          <Card style={{ gap: 8 }}>
-            <Text style={{ color: colors.text, fontWeight: '700' }}>Geçmiş talepler</Text>
-            {withdrawals.map((w) => (
-              <View key={w.id} style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text }}>{usd(w.diamonds)}</Text>
-                  <Text style={styles.dim}>
-                    {w.time} · {w.iban.slice(0, 7)}…
-                  </Text>
-                </View>
-                <Text style={{ color: w.status === 'Onaylandı' ? colors.green : colors.gold, fontWeight: '700' }}>{w.status}</Text>
-              </View>
-            ))}
-          </Card>
+        {method === 'iban' ? (
+          <>
+            <Text style={styles.label}>IBAN</Text>
+            <TextInput value={formatIban(account)} onChangeText={setAccount} autoCapitalize="characters" autoCorrect={false} style={styles.input} placeholder="Ülke kodu ile, ör. GB82 WEST 1234 …" placeholderTextColor={colors.textDim} />
+          </>
+        ) : (
+          <>
+            <Text style={styles.label}>Hesap bilgisi</Text>
+            <TextInput value={account} onChangeText={setAccount} autoCapitalize="none" autoCorrect={false} maxLength={120} style={styles.input} placeholder="Ödemenin gideceği hesap (ör. hesap no, e-posta)" placeholderTextColor={colors.textDim} />
+          </>
         )}
+
+        <GradientButton title={busy ? 'Gönderiliyor…' : 'Çekim talebi oluştur'} icon="cash" onPress={submit} />
+        {live && <Text style={styles.dim}>Talep açılınca elmaslar bakiyenden düşer. Ödeme yapılınca ya da talep reddedilirse haber verilir; reddedilen veya iptal edilen talebin elmasları geri gelir.</Text>}
+
+        {live
+          ? server.list.length > 0 && (
+              <Card style={{ gap: 8 }}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Geçmiş talepler</Text>
+                {server.list.map((w) => (
+                  <View key={w.id} style={styles.histRow}>
+                    <View style={styles.row}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text }}>
+                          {money(w.usd)} · {fmt(w.diamonds)} elmas
+                        </Text>
+                        <Text style={styles.dim}>
+                          {dateOf(w.createdAt)} · {maskAccount(w.method, w.account)}
+                        </Text>
+                      </View>
+                      <Text style={{ color: w.status === 'paid' ? colors.green : w.status === 'pending' ? colors.gold : colors.textDim, fontWeight: '700' }}>{w.statusLabel}</Text>
+                    </View>
+                    {w.status === 'rejected' && !!w.note && <Text style={styles.dim}>Neden: {w.note}</Text>}
+                    {w.status === 'pending' && <Button title="Talebi iptal et" variant="ghost" small disabled={busy} onPress={() => cancel(w)} style={{ alignSelf: 'flex-start' }} />}
+                  </View>
+                ))}
+              </Card>
+            )
+          : withdrawals.length > 0 && (
+              <Card style={{ gap: 8 }}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Geçmiş talepler</Text>
+                {withdrawals.map((w) => (
+                  <View key={w.id} style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text }}>{usd(w.diamonds)}</Text>
+                      <Text style={styles.dim}>
+                        {w.time} · {w.iban.slice(0, 7)}…
+                      </Text>
+                    </View>
+                    <Text style={{ color: w.status === 'Onaylandı' ? colors.green : colors.gold, fontWeight: '700' }}>{w.status}</Text>
+                  </View>
+                ))}
+              </Card>
+            )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -101,8 +188,11 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   label: { color: colors.textDim, fontWeight: '600', marginBottom: -6 },
   input: { backgroundColor: colors.card, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 16, paddingVertical: 13, ...lift },
   chip: { backgroundColor: dark ? colors.cardAlt : colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, ...lift },
+  chipOn: { backgroundColor: colors.primary },
   chipText: { color: colors.text, fontWeight: '600' },
+  chipTextOn: { color: '#FFFFFF' },
   receive: { color: colors.green, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  histRow: { gap: 4, paddingVertical: 4 },
   locked: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
 }));

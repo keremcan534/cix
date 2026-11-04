@@ -20,9 +20,9 @@
 //   store refund                   → refund of that purchase
 //   wholesale to a Jeton Noktası   → purchase on channel "jeton_noktasi" (the price the bank paid)
 //   diamonds → coins (Çevir/bozdurma) → bonus_grant (campaign elmas_cevirme / elmas_bozdurma)
-//   test top-up / test purchase    → promotion (campaign test_yukleme / test_satin_alma)
+//   test top-up / test purchase    → promotion (campaign test_yukleme / test_satin_alma); store sandbox the same
 //   not sent: Jeton Noktası → user transfers (coins change hands, none are created), diamond debits other than
-//   gifts, game coins.
+//   gifts (withdrawals included: the panel has no payout event type and records payouts itself), game coins.
 import { HttpError, auth, db, env } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
 
@@ -41,7 +41,8 @@ export function eventsOf(r) {
   const base = { idempotency_key: `ledger-${r.id}`, occurred_at: at };
   const amount = Number(r.amount);
   const d = r.detail ?? {};
-  const store = STORE[r.platform];
+  // A store sandbox purchase (Play test or promo, App Store sandbox) paid nothing: play money like a test one.
+  const store = r.p_sandbox ? undefined : STORE[r.platform];
 
   if (r.currency === 'diamond') {
     if (amount > 0 && r.counterparty && r.ref.endsWith('-in') && r.reason.startsWith('Hediye alındı'))
@@ -99,7 +100,7 @@ export async function syncOnce() {
   const rows = (
     await db.query(
       `SELECT l.id, l.user_id, l.currency, l.amount, l.reason, l.ref, l.counterparty, l.channel, l.detail, l.created_at,
-              p.platform, p.product_id, p.coins AS p_coins, p.bonus AS p_bonus, g.gift_id, g.room AS gift_room
+              p.platform, p.product_id, p.coins AS p_coins, p.bonus AS p_bonus, p.sandbox AS p_sandbox, g.gift_id, g.room AS gift_room
          FROM ledger l
          LEFT JOIN purchases p ON p.id = (l.detail->>'purchase')::bigint
          LEFT JOIN gift_events g ON g.id = (l.detail->>'gift')::bigint
