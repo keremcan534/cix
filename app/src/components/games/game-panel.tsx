@@ -18,6 +18,7 @@ import { LineSlotPlayer } from '@/components/games/line-slot';
 import { FenerPlayer } from '@/components/games/fener';
 import { RocketPlayer } from '@/components/games/rocket';
 import { OkeyTable } from '@/components/games/okey';
+import { WheelPlayer } from '@/components/games/wheel';
 import { GameNav } from '@/components/games/slot-kit';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
@@ -26,7 +27,10 @@ import { casinoVisible, useGames, type Entry } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
-export type OpenGame = { kind: 'room'; id: string } | { kind: 'casino'; id: CasinoGame['id'] };
+/** `wheel`: Rüzgâr Gülü, the Oyun Salonu game the server plays (components/games/wheel). */
+export type OpenGame = { kind: 'room'; id: string } | { kind: 'casino'; id: CasinoGame['id'] } | { kind: 'wheel' };
+const WHEEL_NAME = 'Rüzgâr Gülü';
+const keyOf = (g: OpenGame) => (g.kind === 'room' ? `r:${g.id}` : g.kind === 'casino' ? `c:${g.id}` : 'w');
 export type VoiceState = { seated: boolean; micOn: boolean; onToggleMic: () => void };
 
 /** Casino games with their own screen; the old ones (wheel, dice, Ejder ile Kaplan) use the shared CasinoPlayer. */
@@ -44,7 +48,7 @@ function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
   return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
 }
 /** Games that need most of the screen in a room (Okey and every casino game with its own screen); the top row of seats stays visible. */
-const isTall = (id: string) => id === 'okey' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
+const isTall = (id: string) => id === 'wheel' || id === 'okey' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
 
 const VOLUMES: [number, string][] = [
   [0, 'Kapalı'],
@@ -83,23 +87,27 @@ export function GamePanel({
   const inRoom = entry.from === 'room';
   const roomGame = open.kind === 'room' ? roomGames.find((g) => g.id === open.id) : undefined;
   const casinoGame = open.kind === 'casino' ? casino.find((g) => g.id === open.id) : undefined;
-  const title = roomGame?.name ?? casinoGame?.name ?? '';
+  const wheel = open.kind === 'wheel';
+  const title = wheel ? WHEEL_NAME : (roomGame?.name ?? casinoGame?.name ?? '');
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
+    ...(casinoVisible(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
     ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
-  const current = open.kind === 'room' ? `r:${open.id}` : `c:${open.id}`;
+  const current = keyOf(open);
+  const openId = open.kind === 'wheel' ? 'wheel' : open.id;
   const titleEmoji = roomGame?.emoji ?? casinoGame?.emoji;
-  const titleArt = gameArtOf(open.id);
+  const titleArt = wheel ? undefined : gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(open.id) && p.tall, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(openId) && p.tall, hidden && { display: 'none' }]}>
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
+        {wheel && <Ionicons name="compass" size={24} color={colors.gold} style={{ marginRight: -6 }} />}
         <Text style={p.title} numberOfLines={1}>
-          {titleArt ? '' : `${titleEmoji} `}
+          {titleArt || wheel ? '' : `${titleEmoji} `}
           {title}
-          {casinoGame ? <Text style={p.badge}> Cömertlik Lv.{casinoGame.minWealth}</Text> : <Text style={p.free}> Ücretsiz</Text>}
+          {casinoGame || wheel ? <Text style={p.badge}> Cömertlik Lv.{casinoGame?.minWealth ?? 2}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
         {onMinimize && (
           <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">
@@ -129,7 +137,8 @@ export function GamePanel({
         {switchable.map((s) => (
           <Pressable key={s.key} onPress={() => onSwitch(s.go)} style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]} accessibilityLabel={`${s.name} oyununa geç`}>
             {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
-            <Text style={p.chipText}>{s.art ? s.name : `${s.emoji} ${s.name}`}</Text>
+            {s.key === 'w' && <Ionicons name="compass" size={15} color={colors.gold} />}
+            <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -138,10 +147,10 @@ export function GamePanel({
         {roomGame &&
           (roomGame.playable ? (
             <>
-              {open.id === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
-              {open.id === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
-              {open.id === 'xox' && <Xox players={players.slice(0, 2)} />}
-              {open.id === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1)} />}
+              {openId === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
+              {openId === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
+              {openId === 'xox' && <Xox players={players.slice(0, 2)} />}
+              {openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1)} />}
               <Text style={p.dim}>
                 {roomGame.minPlayers}–{roomGame.maxPlayers} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
                 {roomGame.note ? ` · ${roomGame.note}` : ''}
@@ -157,6 +166,7 @@ export function GamePanel({
             <Text style={p.dim}>{roomGame.name} için sağlayıcı entegrasyonu bekleniyor. Katalogda görünür, sağlayıcı bağlanınca bu alanda açılır.</Text>
           ))}
         {casinoGame && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
+        {wheel && casinoVisible(wealthLevel) && <WheelPlayer entry={entry} />}
         <View style={p.volume}>
           <Text style={p.dim}>Oyun sesi</Text>
           {VOLUMES.map(([v, l]) => (

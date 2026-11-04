@@ -253,6 +253,19 @@ export const withdrawBond = (id: number) => call<{ bond: ServerBond }>('POST', '
 export const endBond = (id: number) => call<{ bond: ServerBond }>('POST', '/api/bonds/end', { id }).then((r) => r.bond);
 export const setBondsHidden = (hidden: boolean) => call<{ hidden: boolean }>('POST', '/api/bonds/privacy', { hidden }).then((r) => r.hidden);
 
+// Rüzgâr Gülü (server/api/wheel.mjs): the server draws and pays; prizes are game coins.
+export type ServerWheelSpin = { id: number; tier: string; count: number; cost: number; fromGame: number; payout: number; jackpot: number; slices: number[]; wins: number[]; at: string };
+export type ServerWheelPerson = { id: string; name: string; avatarUrl: string | null };
+export type ServerWheel = {
+  tiers: { id: string; label: string; price: number; jackpot: number }[];
+  dailyLimit: number; playedToday: number; needLevel: number; allowed: boolean; gameCoins: number;
+  winners: (ServerWheelPerson & { tier: string; payout: number; jackpot: number; best: number; at: string })[];
+  board: (ServerWheelPerson & { total: number })[];
+  mine: ServerWheelSpin[];
+};
+export const wheel = () => call<ServerWheel>('GET', '/api/wheel');
+export const wheelSpin = (tier: string, count: number, ref = newRef()) => call<{ spin: ServerWheelSpin; user: ServerUser; replay: boolean }>('POST', '/api/wheel/spin', { tier, count, ref });
+
 export const sendDm = (to: string, text: string, ref = newRef()) => call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref }).then((r) => r.message);
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);

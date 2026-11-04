@@ -1657,9 +1657,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             title: 'Oyun Salonu',
             variant: 'tile',
             note: 'Sonuçlar sunucuda doğrulanır · jeton harcaması günlük limite dahildir',
-            items: gameCatalog.casino
-              .filter((g) => g.active && g.fromRoom)
-              .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
+            items: [
+              // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
+              { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
+              ...gameCatalog.casino
+                .filter((g) => g.active && g.fromRoom)
+                .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
+            ],
           } satisfies MenuSection,
         ]
       : []),

@@ -2,6 +2,7 @@
 // can be tried with online players and are meant to be played inside rooms. Same platform, wallet and
 // history as the in-room entry (lib/games).
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
@@ -26,7 +27,7 @@ type Tab = 'casino' | 'room' | 'history';
 const PROFILE = { from: 'profile' } as const;
 
 export default function GameCenter() {
-  const { oyun } = useLocalSearchParams<{ oyun?: CasinoGame['id'] }>();
+  const { oyun } = useLocalSearchParams<{ oyun?: CasinoGame['id'] | 'ruzgar' }>();
   const { wealthLevel, me } = useApp();
   const { casino, roomGames, history } = useGames();
   const t = useTheme();
@@ -34,7 +35,7 @@ export default function GameCenter() {
   // Below Cömertlik Lv.2 Oyun Salonu is not shown at all: no tab, and an old link to one of its games opens nothing.
   const showCasino = casinoVisible(wealthLevel);
   const [tab, setTab] = useState<Tab>(showCasino ? 'casino' : 'room');
-  const [open, setOpen] = useState<OpenGame | null>(oyun && showCasino ? { kind: 'casino', id: oyun } : null);
+  const [open, setOpen] = useState<OpenGame | null>(oyun && showCasino ? (oyun === 'ruzgar' ? { kind: 'wheel' } : { kind: 'casino', id: oyun }) : null);
   // Room games from the profile: the game's own matchmaking fills the table with online players.
   const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...USERS.filter((u) => u.online).slice(0, 5)]);
 
@@ -65,6 +66,21 @@ export default function GameCenter() {
                 <Text style={s.dim}>Cömertlik Lv.2 ve üzerine açık, erişim her turda sunucuda kontrol edilir. Odaya girmen gerekmez.</Text>
               </View>
             </DepthCard>
+            <Pressable onPress={() => setOpen({ kind: 'wheel' })} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü aç">
+              <LinearGradient colors={['#3B2300', '#16253C', '#0A3A4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.wheelCard}>
+                <View style={s.wheelBadge}>
+                  <Ionicons name="compass" size={54} color="#F6BD60" />
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={s.wheelTag}>YENİ · JACKPOT</Text>
+                  <Text style={s.wheelName}>Rüzgâr Gülü</Text>
+                  <Text style={s.wheelDim}>Kıyı, Açık Deniz, Derin Okyanus · ×1, ×10, ×50 çevir · her dilim kazandırır</Text>
+                  <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                    <GlossButton label="Çevir" tone="money" small />
+                  </View>
+                </View>
+              </LinearGradient>
+            </Pressable>
             <View style={s.grid}>
               {casino
                 .filter((g) => g.active)
@@ -206,5 +222,11 @@ const useStyles = makeStyles((t) => ({
   dim: { color: t.colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   amount: { fontWeight: '900', fontSize: 15 },
+  // Rüzgâr Gülü's card is dark in both schemes, like the game itself.
+  wheelCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: 'rgba(246,189,96,0.45)', boxShadow: '0 8px 24px rgba(246,189,96,0.18)' },
+  wheelBadge: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: '#F6BD60', backgroundColor: '#080F1E', alignItems: 'center', justifyContent: 'center' },
+  wheelTag: { color: '#FF8E9A', fontWeight: '900', fontSize: 11, letterSpacing: 1.2 },
+  wheelName: { color: '#FFFFFF', fontFamily: fonts.display, fontSize: 24, lineHeight: 30 },
+  wheelDim: { color: '#C7D2E5', fontSize: 12, lineHeight: 17 },
   fab: { position: 'absolute', right: 20, bottom: 30, width: 48, height: 48, borderRadius: 24, backgroundColor: t.semantic.action, alignItems: 'center', justifyContent: 'center' },
 }));

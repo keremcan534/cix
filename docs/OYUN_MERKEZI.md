@@ -11,6 +11,7 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
 | `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları, XOX. |
 | `src/components/games/casino.tsx` | Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan. |
+| `src/components/games/wheel.tsx` | **Rüzgâr Gülü**: 3 alanlı, JACKPOT fonlu çark. Sonuç sunucuda belirlenir, kazanç oyun jetonudur. Ayrıntılar: `docs/RUZGAR_GULU.md`. |
 | `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |
 | `src/lib/fortune-slot.ts` | Altın Kasa matematiği: makara şeritleri, ödeme tablosu, 10 çizgi, tam beklenen geri ödeme hesabı. |
 | `src/app/oyunlar.tsx` | Profildeki **Oyun Merkezi**: Oyun Salonu · Oda oyunları · Geçmiş. |
@@ -134,5 +135,6 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 | `pinata` · `spellbook` · `neon` | Konfeti Kutusu · Kayıp Parşömen · Neon Bulvar |
 | `dragon` | Ejder ile Kaplan |
 | oda menüsü `c2` | Meyve Bahçesi |
+| `wheel` (oda menüsü `cg-ruzgar`) | Rüzgâr Gülü |
 
 Yayından önce bu adlar için TÜRKPATENT'te marka taraması yapılmalı.
