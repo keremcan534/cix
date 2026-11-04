@@ -4,11 +4,13 @@
 // admin's button (jeton.mjs refundPurchase): coins and still-locked diamonds back, agency commission reversed.
 //
 //   POST /api/admin/purchases/voided-sync (admin) → { checked, refunded, unknown }   (one round now)
+//   GET  /api/admin/purchases?q=          (admin) → { purchases, googleSync }   (find one to refund by hand)
 //
 // A purchase already refunded is skipped, so reading the same voided purchase twice changes nothing. The
 // cursor (store_refund_sync) is the newest voided time seen, read again with a day of overlap; Google keeps 30
 // days, the first round reads them all. A voided purchase we never credited (refused, another app) is counted as unknown and left alone.
-import { HttpError, auth, db, env, sha, tx } from './core.mjs';
+import { HttpError, UUID, auth, db, env, sha, tx } from './core.mjs';
+import { PACK_BY_PRODUCT } from './catalog.mjs';
 import { refundPurchase } from './jeton.mjs';
 import { googleAccessToken, googleAppUrl } from './purchases.mjs';
 
@@ -88,10 +90,53 @@ export function startRefundSync() {
 }
 export const stopRefundSync = () => timer && (clearInterval(timer), (timer = null));
 
+async function admin(req) {
+  const u = await auth(req);
+  if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+  return u;
+}
+
+/**
+ * `q`: a purchase number, a store order id (Google's GPA.…, as Play Console shows it) or an account id; empty =
+ * the latest purchases. With the state of the automatic Google refund check, for the admin panel's İadeler.
+ */
+async function findPurchases(q) {
+  const term = String(q ?? '').trim().slice(0, 200);
+  const [where, args] = /^\d{1,15}$/.test(term)
+    ? ['p.id = $1 OR p.transaction_id = $2', [Number(term), term]]
+    : UUID.test(term.toLowerCase())
+      ? ['p.user_id = $1', [term.toLowerCase()]]
+      : term
+        ? ['p.transaction_id = $1', [term]]
+        : ['TRUE', []];
+  const r = await db.query(`SELECT p.*, u.name FROM purchases p JOIN users u ON u.id = p.user_id WHERE ${where} ORDER BY p.id DESC LIMIT 50`, args);
+  return r.rows.map((p) => ({
+    id: Number(p.id),
+    platform: p.platform,
+    productId: p.product_id,
+    transactionId: p.transaction_id,
+    coins: Number(p.coins),
+    bonus: Number(p.bonus),
+    priceTl: PACK_BY_PRODUCT.get(p.product_id)?.tl ?? null,
+    status: p.status,
+    sandbox: p.sandbox,
+    createdAt: p.created_at,
+    user: { id: p.user_id, name: p.name },
+  }));
+}
+
 export const refundSyncRoutes = {
   async 'POST /api/admin/purchases/voided-sync'(req) {
-    const u = await auth(req);
-    if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    await admin(req);
     return syncVoidedOnce();
+  },
+
+  async 'GET /api/admin/purchases'(req, url) {
+    await admin(req);
+    const s = (await db.query("SELECT last_ok_at, last_error FROM store_refund_sync WHERE store = 'google'")).rows[0];
+    return {
+      purchases: await findPurchases(url.searchParams.get('q')),
+      googleSync: { enabled: !!env.GOOGLE_SERVICE_ACCOUNT, everyMin: EVERY_MIN, lastOkAt: s?.last_ok_at ?? null, lastError: s?.last_error ?? null },
+    };
   },
 };
