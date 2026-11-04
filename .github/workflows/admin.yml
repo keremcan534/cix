@@ -1,0 +1,65 @@
+name: Yetki ver
+
+# Gives a server account a staff role. Staff accounts are set in the database (docs/SUNUCU.md); this runs
+# that one UPDATE on the server, so nobody needs SSH. Run by hand: Actions › "Yetki ver" › Run workflow, with
+# the account's "Hesap kimliği" (app: Ayarlar › Sunucu hesabı). The server checks the role on every call; the
+# app reads it at start, so the account restarts the app to see Ayarlar › Yönetim.
+# Logs are public: nothing from .env or the server's secrets is printed.
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Hesap kimliği (Ayarlar › Sunucu hesabı)'
+        required: true
+      role:
+        description: 'Yetki'
+        type: choice
+        options: [admin, moderator, user]
+        default: admin
+
+jobs:
+  set-role:
+    runs-on: ubuntu-latest
+    # Not while a deploy is rebuilding the server.
+    concurrency:
+      group: server-deploy
+      cancel-in-progress: false
+    env:
+      HOST: ${{ vars.DEPLOY_HOST || '130.61.230.94' }}
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      USER_ID: ${{ inputs.user_id }}
+      ROLE: ${{ inputs.role }}
+      ACTOR: ${{ github.actor }}
+    steps:
+      # Only a well-formed id and a known role go any further, so nothing else reaches the server's shell or SQL.
+      - name: Check the input
+        run: |
+          USER_ID=$(printf '%s' "$USER_ID" | tr -d '[:space:]')
+          if ! printf '%s' "$USER_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "::error::Hesap kimliği geçersiz: Ayarlar › Sunucu hesabı'ndaki kimliği aynen yapıştır."; exit 1
+          fi
+          case "$ROLE" in admin|moderator|user) ;; *) echo "::error::Bilinmeyen yetki"; exit 1 ;; esac
+          if ! printf '%s' "$ACTOR" | grep -Eq '^[A-Za-z0-9-]{1,39}(\[bot\])?$'; then echo "::error::Unexpected actor"; exit 1; fi
+          if [ -z "$SSH_KEY" ]; then echo "::error::DEPLOY_SSH_KEY secret is not set (docs/SUNUCU.md)."; exit 1; fi
+          echo "ACCOUNT_ID=$USER_ID" >> "$GITHUB_ENV"
+      # One statement: the role changes only for a live (not deleted) account, and the change is written to the
+      # append-only audit log with who ran it.
+      - name: Set the role on the server
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SQL="WITH u AS (
+                 UPDATE users SET role = :'role' WHERE id = :'uid'::uuid AND deleted_at IS NULL RETURNING id
+               ), a AS (
+                 INSERT INTO audit_events (action, target, detail)
+                 SELECT 'role_set', id, jsonb_build_object('role', :'role', 'via', 'github-actions', 'by', :'by') FROM u
+               )
+               SELECT count(*) FROM u;"
+          n=$(printf '%s\n' "$SQL" | ssh -i ~/.ssh/deploy "ubuntu@$HOST" "cd /opt/similar && sudo docker compose exec -T postgres sh -c 'psql -X -q -tA -v ON_ERROR_STOP=1 -v uid=$ACCOUNT_ID -v role=$ROLE -v by=$ACTOR -U \"\$POSTGRES_USER\" -d \"\${POSTGRES_DB:-\$POSTGRES_USER}\"'")
+          if [ "$n" = 1 ]; then
+            echo "Yetki verildi: $ROLE. Hesap uygulamayı kapatıp açınca Ayarlar › Yönetim görünür." >> "$GITHUB_STEP_SUMMARY"
+            echo "Done: role set to $ROLE"
+          else
+            echo "::error::Bu kimlikle açık bir hesap bulunamadı (sonuç: ${n:-boş}). Kimliği kontrol et."; exit 1
+          fi
