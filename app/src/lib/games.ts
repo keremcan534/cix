@@ -90,6 +90,10 @@ export const updateRoomGame = (id: string, patch: Partial<RoomGame>) => emit({ r
 export const updateCasino = (id: string, patch: Partial<CasinoGame>) => emit({ casino: state.casino.map((g) => (g.id === id ? { ...g, ...patch } : g)) });
 
 // --- Access ----------------------------------------------------------------------------------
+/** Below this Cömertlik level Oyun Salonu does not exist for the user: no tab, tile, link, banner or mention.
+ *  A game's own minWealth can only raise it. */
+export const CASINO_MIN_WEALTH = 2;
+export const casinoVisible = (wealthLevel: number) => wealthLevel >= CASINO_MIN_WEALTH;
 export type Access = { ok: true } | { ok: false; reason: string; needWealth?: number };
 /** Same check the server runs on every launch and every round; the UI only uses it to explain. */
 export function casinoAccess(game: CasinoGame, entry: Entry, wealthLevel: number): Access {
@@ -97,7 +101,8 @@ export function casinoAccess(game: CasinoGame, entry: Entry, wealthLevel: number
   if (game.providerStatus === 'down') return { ok: false, reason: `${game.name} sağlayıcısı bakımda. Bakiyen etkilenmez; oda ve sesli sohbetin devam eder.` };
   if (entry.from === 'profile' && !game.fromProfile) return { ok: false, reason: `${game.name} yalnızca oda içinden açılabilir.` };
   if (entry.from === 'room' && !game.fromRoom) return { ok: false, reason: `${game.name} oda içinden açılamaz; profilindeki Oyun Merkezi'nden oynayabilirsin.` };
-  if (wealthLevel < game.minWealth) return { ok: false, reason: `${game.name}, Cömertlik Seviyesi ${game.minWealth} ve üstü üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`, needWealth: game.minWealth };
+  const need = Math.max(CASINO_MIN_WEALTH, game.minWealth);
+  if (wealthLevel < need) return { ok: false, reason: `${game.name}, Cömertlik Seviyesi ${need} ve üstü üyeler içindir. Senin seviyen: Lv.${wealthLevel}.`, needWealth: need };
   return { ok: true };
 }
 
