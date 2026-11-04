@@ -1,5 +1,6 @@
 // Yönetim › Şikâyetler: the report queue, oldest open first. A report is closed as handled (optionally banning
-// the reported person for a while) or as "sorun yok". A running ban can be lifted from the same card.
+// the reported person for a while) or as "sorun yok". A running ban can be lifted from the same card, and staff
+// with Yaptırımlar open the reported person's full sanction record from it.
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -49,6 +50,7 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
   const isUser = r.target.type === 'user';
   const name = targetName(r);
   const canBan = isUser && !r.target.staff && !!r.target.name;
+  const banned = !!r.target.bannedUntil || r.target.bannedForever;
   const [label, tone] = STATUS[r.status];
 
   return (
@@ -57,11 +59,15 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
       <Line label="Şikâyet eden" value={r.reporter.name} />
       <Line label="Tarih" value={`${fmtDate(r.createdAt)} · ${ago(r.createdAt)}`} />
       {r.reportsOnTarget > 1 && <Line label="Toplam" value={`Bu ${isUser ? 'kişi' : 'kayıt'} ${r.reportsOnTarget} kez şikâyet edildi`} />}
-      {r.target.bannedUntil && <Line label="Askıda" value={`${fmtDate(r.target.bannedUntil)} tarihine kadar`} />}
+      {r.target.bannedForever ? (
+        <Line label="Askıda" value="Ömür boyu banlı" />
+      ) : (
+        r.target.bannedUntil && <Line label="Askıda" value={`${fmtDate(r.target.bannedUntil)} tarihine kadar`} />
+      )}
       {r.target.staff && <Line label="Not" value="Yetkili hesabı; askıya alınamaz" />}
       {!!r.note && <Quote text={r.note} />}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
-        {r.status === 'open' && canBan && !r.target.bannedUntil && (
+        {r.status === 'open' && canBan && !banned && (
           <Button title="Askıya al" icon="ban-outline" variant="danger" small disabled={busy} onPress={() => askBan(ctx, r, name, onDone, setBusy)} />
         )}
         {r.status === 'open' && (
@@ -101,7 +107,10 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
             }
           />
         )}
-        {isUser && r.target.bannedUntil && (
+        {isUser && r.target.name && ctx.canSanction && (
+          <Button title="Yaptırımlar" icon="shield-half-outline" variant="tonal" small disabled={busy} onPress={() => ctx.openSanctions(r.target.id, name)} />
+        )}
+        {isUser && banned && (
           <Button
             title="Askıyı kaldır"
             icon="lock-open-outline"
@@ -111,7 +120,12 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
             onPress={() =>
               confirmThen(
                 ctx,
-                { title: 'Askıyı kaldır', message: `${name} hemen yeniden giriş yapabilir.`, confirm: 'Kaldır' },
+                {
+                  title: 'Askıyı kaldır',
+                  message: r.target.bannedForever ? `${name} için ömür boyu ban da kaldırılır ve hemen yeniden giriş yapabilir.` : `${name} hemen yeniden giriş yapabilir.`,
+                  confirm: 'Kaldır',
+                  destructive: r.target.bannedForever,
+                },
                 () => admin.ban(r.target.id, null),
                 () => `${name} için askı kaldırıldı`,
                 onDone,
