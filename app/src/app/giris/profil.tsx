@@ -3,7 +3,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -74,7 +75,7 @@ export default function ProfileSetupScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid style={{ flex: 1 }}>
         <AuthHeader step={3} title="Profilini oluştur" subtitle="Diğer kullanıcılar seni böyle görecek." />
         <ScrollView contentContainerStyle={{ padding: 20, gap: 22 }} keyboardShouldPersistTaps="handled">
           <Pressable style={{ alignSelf: 'center' }} onPress={pickPhoto}>
@@ -136,7 +137,7 @@ export default function ProfileSetupScreen() {
         <View style={{ padding: 20, paddingTop: 8 }}>
           <GradientButton title={busy ? 'Hesabın açılıyor…' : 'Devam'} onPress={submit} style={{ opacity: valid && !busy ? 1 : 0.4 }} />
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

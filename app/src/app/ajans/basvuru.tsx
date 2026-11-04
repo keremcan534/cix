@@ -2,7 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -173,7 +174,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
   return (
     <SafeAreaView style={s.safe}>
       <Header title="Ajans Başvurusu" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <Note text="Yıldızlı (*) alanlar zorunlu, diğerleri isteğe bağlı. Vergi numarası gerekmez. Taslağı kaydedip sonra devam edebilirsin." />
 
@@ -266,7 +267,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
           <Button title="Kontrol et ve gönder" icon="arrow-forward" onPress={toReview} />
           <Button title="Taslak olarak kaydet" variant="tonal" icon="save-outline" onPress={save} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

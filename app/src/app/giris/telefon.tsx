@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -28,7 +29,7 @@ export default function PhoneScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid style={{ flex: 1 }}>
         <AuthHeader step={1} title="Telefon numaran" subtitle="Sana bir doğrulama kodu göndereceğiz." />
         <View style={styles.row}>
           <View style={styles.prefix}>
@@ -51,7 +52,7 @@ export default function PhoneScreen() {
         <View style={{ padding: 20 }}>
           <GradientButton title="Kod gönder" onPress={submit} style={{ opacity: valid ? 1 : 0.4 }} />
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

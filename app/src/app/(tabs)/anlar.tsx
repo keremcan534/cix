@@ -3,7 +3,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, ScrollView, Share, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -321,7 +322,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.sheetWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>Yeni an paylaş</Text>
@@ -362,7 +363,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
             </View>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </Modal>
   );
 }
@@ -391,7 +392,7 @@ function CommentsSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.sheetWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.sheet, { maxHeight: '70%' }]}>
           <Text style={styles.sheetTitle}>Yorumlar ({comments.length})</Text>
@@ -435,7 +436,7 @@ function CommentsSheet({
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </Modal>
   );
 }

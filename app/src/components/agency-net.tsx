@@ -6,7 +6,8 @@
 // #C27F1C, the rest neutral. Text never wears a series color; legends always name the series.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { DepthCard } from '@/components/fx/surface';
 import { Text, TextInput } from '@/components/text';
@@ -320,7 +321,7 @@ export function useAsk(): [ReactNode, (a: Ask) => Promise<AskResult | null>] {
   const ok = reason.trim().length >= min && (!ask?.field || field.trim().length > 0);
   const node = (
     <Modal visible={!!ask} transparent animationType="fade" onRequestClose={() => close(null)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetWrap}>
+      <KeyboardAvoid style={s.sheetWrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => close(null)} accessibilityLabel="Kapat" />
         <DepthCard style={s.sheet}>
           <Text style={s.sheetTitle}>{ask?.title}</Text>
@@ -341,7 +342,7 @@ export function useAsk(): [ReactNode, (a: Ask) => Promise<AskResult | null>] {
             <Button title={ask?.confirm ?? 'Gönder'} variant={ask?.danger ? 'danger' : 'hero'} disabled={!ok} onPress={() => close({ reason: reason.trim(), field: field.trim() })} style={{ flex: 1 }} />
           </View>
         </DepthCard>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </Modal>
   );
   return [node, open];
