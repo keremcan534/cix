@@ -226,11 +226,15 @@ export async function readRaw(req, max = 10_000) {
 
 export async function readJson(req, max) {
   const raw = await readRaw(req, max);
+  let v;
   try {
-    return raw ? JSON.parse(raw) : {};
+    v = raw ? JSON.parse(raw) : {};
   } catch {
     throw new HttpError(400, 'Geçersiz JSON');
   }
+  // Handlers read fields off the body: null, an array or a bare value is a bad request, not a crash.
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, 'Geçersiz istek');
+  return v;
 }
 export const int = (v, min, max) => (Number.isSafeInteger(v) && v >= min && v <= max ? v : null);
 /** A user id from input, or a 400 with `what` in the message. */

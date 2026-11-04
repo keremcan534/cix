@@ -507,7 +507,7 @@ export const agencyRoutes = {
     const bucket = `to_char(date_trunc('${group}', %s AT TIME ZONE 'Europe/Istanbul'), 'YYYY-MM-DD')`;
     const vol = await db.query(
       `SELECT ${bucket.replace('%s', 'k.occurred_at')} AS b, coalesce(sum(k.base_diamonds) FILTER (WHERE k.agency_id = $1), 0) AS direct, coalesce(sum(k.base_diamonds), 0) AS org
-         FROM agency_commissions k WHERE $1 = ANY(k.chain) AND k.occurred_at >= $2 AND k.occurred_at < $3 GROUP BY 1 ORDER BY 1`,
+         FROM agency_commissions k WHERE k.chain @> ARRAY[$1::uuid] AND k.occurred_at >= $2 AND k.occurred_at < $3 GROUP BY 1 ORDER BY 1`,
       [a.id, from, to],
     );
     const joins = await db.query(`SELECT ${bucket.replace('%s', 'joined_at')} AS b, count(*)::int AS n FROM agency_streamers WHERE agency_id = $1 AND joined_at >= $2 AND joined_at < $3 GROUP BY 1 ORDER BY 1`, [a.id, from, to]);

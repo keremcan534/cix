@@ -50,11 +50,17 @@ export const messageRoutes = {
   async 'GET /api/conversations'(req) {
     const me = await auth(req);
     const r = await db.query(
-      `SELECT DISTINCT ON (peer) peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar,
-              (SELECT count(*) FROM messages x WHERE x.sender = peer AND x.recipient = $1 AND x.read_at IS NULL) AS unread
-         FROM (SELECT *, CASE WHEN sender = $1 THEN recipient ELSE sender END AS peer FROM messages WHERE sender = $1 OR recipient = $1) m
-         JOIN users u ON u.id = m.peer
-        ORDER BY peer, m.id DESC`,
+      // The newest message with each person (from the sender and recipient indexes), the 200 latest talks.
+      `SELECT l.peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar,
+              (SELECT count(*) FROM messages x WHERE x.recipient = $1 AND x.sender = l.peer AND x.read_at IS NULL) AS unread
+         FROM (SELECT peer, max(id) AS id FROM (
+                 SELECT recipient AS peer, id FROM messages WHERE sender = $1
+                 UNION ALL
+                 SELECT sender AS peer, id FROM messages WHERE recipient = $1) t
+               GROUP BY peer ORDER BY max(id) DESC LIMIT 200) l
+         JOIN messages m ON m.id = l.id
+         JOIN users u ON u.id = l.peer
+        ORDER BY m.id DESC`,
       [me.id],
     );
     const conversations = r.rows

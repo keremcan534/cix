@@ -126,6 +126,9 @@ describe('Defter satırı → panel olayı', () => {
     );
     const back = eventsOf(row({ currency: 'coin', amount: -800, reason: 'İade: satın alınan jeton geri alındı', detail: { purchase: 42 }, platform: 'ios' }));
     assert.deepEqual(back.map((e) => [e.type, e.idempotency_key, e.original_key]), [['refund', 'refund-42', 'purchase-42']]);
+    // Coins already spent: only gift diamonds come back, and it is still the purchase's refund.
+    const dia = eventsOf(row({ currency: 'diamond', amount: -500, reason: 'İade: hediye elması geri alındı', counterparty: 'u2', detail: { purchase: 42 }, platform: 'android' }));
+    assert.deepEqual(dia.map((e) => [e.type, e.idempotency_key]), [['refund', 'refund-42']]);
   });
 
   test('toptan alım satıştır; Jeton Noktası → kullanıcı aktarımı ve elmas düşüşleri gönderilmez', () => {

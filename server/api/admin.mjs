@@ -5,6 +5,8 @@
 //   POST /api/admin/reports/handle { id, status, banDays? } → { report }  (status: actioned | dismissed)
 //   POST /api/admin/ban    { user, days }  (null = lift)  → { bannedUntil }
 import { HttpError, auth, db, int, readJson, userId } from './core.mjs';
+import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
+import { liveKitName } from './rooms.mjs';
 
 async function staff(req) {
   const u = await auth(req);
@@ -15,10 +17,17 @@ async function staff(req) {
 async function ban(target, days) {
   const r = await db.query(
     `UPDATE users SET banned_until = CASE WHEN $2::int IS NULL THEN NULL ELSE now() + make_interval(days => $2::int) END
-      WHERE id = $1 AND role = 'user' RETURNING banned_until`,
+      WHERE id = $1 AND role IN ('user', 'coins_bank') RETURNING banned_until`,
     [target, days],
   );
   if (!r.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı veya yetkili hesabı');
+  if (days) {
+    // The ban takes effect now: out of every voice call, and their own room closes.
+    const rooms = await db.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL RETURNING id', [target]);
+    for (const x of rooms.rows) await deleteVoiceRoom(liveKitName(x.id));
+    const calls = await db.query('SELECT room FROM room_presence WHERE identity = $1', [target]);
+    for (const x of calls.rows) await removeFromVoice(x.room, target);
+  }
   return r.rows[0].banned_until;
 }
 

@@ -51,23 +51,36 @@ export async function syncVoidedOnce() {
     let refunded = 0;
     let unknown = 0;
     let newest = cursor;
+    let failedAt = Infinity; // the oldest void that failed: the cursor stays behind it, so the next round tries it again
+    let failed = 0;
+    let lastError = null;
     for (const v of list) {
-      newest = Math.max(newest, Number(v.voidedTimeMillis) || 0);
-      const keys = [v.orderId, v.purchaseToken && `token-${sha(v.purchaseToken)}`].filter((k) => typeof k === 'string' && k);
-      const p = keys.length ? (await db.query("SELECT id, status FROM purchases WHERE platform = 'android' AND transaction_id = ANY($1::text[]) ORDER BY id LIMIT 1", [keys])).rows[0] : null;
-      if (!p) {
-        unknown++;
-        continue;
-      }
-      if (p.status === 'refunded') continue;
-      const r = await tx((c) => refundPurchase(c, Number(p.id), { source: 'google_voided' }));
-      if (r) {
-        refunded++;
-        console.log(`google voided purchase ${p.id} refunded (${r.coins} coins, ${r.diamonds} diamonds back, ${r.unrecoveredDiamonds} unrecovered)`);
+      const at = Number(v.voidedTimeMillis) || 0;
+      newest = Math.max(newest, at);
+      try {
+        const keys = [v.orderId, v.purchaseToken && `token-${sha(v.purchaseToken)}`].filter((k) => typeof k === 'string' && k);
+        const p = keys.length ? (await db.query("SELECT id, status FROM purchases WHERE platform = 'android' AND transaction_id = ANY($1::text[]) ORDER BY id LIMIT 1", [keys])).rows[0] : null;
+        if (!p) {
+          unknown++;
+          continue;
+        }
+        if (p.status === 'refunded') continue;
+        const r = await tx((c) => refundPurchase(c, Number(p.id), { source: 'google_voided' }));
+        if (r) {
+          refunded++;
+          console.log(`google voided purchase ${p.id} refunded (${r.coins} coins, ${r.diamonds} diamonds back, ${r.unrecoveredDiamonds} unrecovered)`);
+        }
+      } catch (e) {
+        // One bad purchase must not stop the others; it is retried next round.
+        failed++;
+        failedAt = Math.min(failedAt, at);
+        lastError = String(e.message ?? e).slice(0, 500);
+        console.error('google voided refund', lastError.slice(0, 200));
       }
     }
-    await db.query("UPDATE store_refund_sync SET cursor_ms = $1, last_ok_at = now(), last_error = NULL WHERE store = 'google'", [newest]);
-    return { checked: list.length, refunded, unknown };
+    const next = failed ? Math.max(cursor, Math.min(newest, failedAt)) : newest;
+    await db.query("UPDATE store_refund_sync SET cursor_ms = $1, last_ok_at = now(), last_error = $2 WHERE store = 'google'", [next, lastError]);
+    return { checked: list.length, refunded, unknown, failed };
   } catch (e) {
     await db.query("UPDATE store_refund_sync SET last_error = $1 WHERE store = 'google'", [String(e.message ?? e).slice(0, 500)]).catch(() => {});
     throw e;

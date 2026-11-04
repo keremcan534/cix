@@ -88,19 +88,31 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
   const p = (await c.query('SELECT * FROM purchases WHERE id = $1 FOR UPDATE', [id])).rows[0];
   if (!p) throw new HttpError(404, 'Satın alma bulunamadı');
   if (p.status === 'refunded') return null;
-  const lots = (
-    await c.query(
-      `WITH RECURSIVE t AS (SELECT id, user_id, channel FROM coin_lots WHERE purchase_id = $1
-                            UNION ALL SELECT l.id, l.user_id, l.channel FROM coin_lots l JOIN t ON l.source_lot = t.id)
-       SELECT id, user_id, channel FROM t`,
-      [id],
-    )
-  ).rows;
-  const lotIds = lots.map((l) => l.id);
-  const locks = (
-    await c.query("SELECT id, user_id, amount, channel, created_at, unlock_at > now() AS locked FROM diamond_locks WHERE coin_lot = ANY($1::bigint[]) AND status = 'active' ORDER BY id", [lotIds])
-  ).rows;
-  await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id)])]]);
+  // The coins' trail (lots passed on, the diamond locks gifts made) is read only once every account on it is
+  // locked: a gift or a transfer that commits while we wait for a lock would otherwise be missed. Locking can
+  // reveal more of the trail, so read again until the set of accounts stops growing.
+  let lots;
+  let locks;
+  const held = new Set();
+  for (;;) {
+    lots = (
+      await c.query(
+        `WITH RECURSIVE t AS (SELECT id, user_id, channel FROM coin_lots WHERE purchase_id = $1
+                              UNION ALL SELECT l.id, l.user_id, l.channel FROM coin_lots l JOIN t ON l.source_lot = t.id)
+         SELECT id, user_id, channel FROM t`,
+        [id],
+      )
+    ).rows;
+    locks = (
+      await c.query("SELECT id, user_id, amount, channel, created_at, unlock_at > now() AS locked FROM diamond_locks WHERE coin_lot = ANY($1::bigint[]) AND status = 'active' ORDER BY id", [
+        lots.map((l) => l.id),
+      ])
+    ).rows;
+    const more = [...new Set([...lots.map((l) => l.user_id), ...locks.map((k) => k.user_id)])].filter((u) => !held.has(u));
+    if (!more.length) break;
+    await c.query('SELECT 1 FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [more]);
+    more.forEach((u) => held.add(u));
+  }
   let coins = 0;
   let diamonds = 0;
   let unrecoveredDiamonds = 0;
@@ -112,7 +124,7 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
     const balance = Number((await c.query('SELECT coins FROM users WHERE id = $1', [l.user_id])).rows[0].coins);
     const take = Math.min(left, balance);
     await c.query('UPDATE coin_lots SET remaining = 0 WHERE id = $1', [l.id]);
-    if (take > 0) await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund_${id}_c${l.id}`, null, { channel: l.channel, actor, detail: { purchase: id, lot: Number(l.id) } });
+    if (take > 0) await move(c, l.user_id, 'coin', -take, 'İade: satın alınan jeton geri alındı', `refund:${id}:c${l.id}`, null, { channel: l.channel, actor, detail: { purchase: id, lot: Number(l.id) } });
     coins += take;
   }
   for (const k of locks) {
@@ -127,7 +139,7 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
     const balance = Number((await c.query('SELECT diamonds FROM users WHERE id = $1', [k.user_id])).rows[0].diamonds);
     const take = Math.min(amount, balance);
     await c.query("UPDATE diamond_locks SET status = 'reversed' WHERE id = $1", [k.id]);
-    if (take > 0) await move(c, k.user_id, 'diamond', -take, 'İade: hediye elması geri alındı', `refund_${id}_d${k.id}`, p.user_id, { channel: k.channel, actor, detail: { purchase: id, lock: Number(k.id) } });
+    if (take > 0) await move(c, k.user_id, 'diamond', -take, 'İade: hediye elması geri alındı', `refund:${id}:d${k.id}`, p.user_id, { channel: k.channel, actor, detail: { purchase: id, lock: Number(k.id) } });
     diamonds += take;
     unrecoveredDiamonds += amount - take;
   }

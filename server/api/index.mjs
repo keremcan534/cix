@@ -252,7 +252,10 @@ const server = http.createServer(async (req, res) => {
     // A feature switched off in .env (FEATURES_OFF) is refused before its route runs.
     gate(req.method, url.pathname);
     send(200, await route(req, url));
-  } catch (e) {
+  } catch (err) {
+    // A malformed value that only Postgres caught (an id that isn't a uuid, a number or date out of range) is the
+    // request's fault: 400, not a server error.
+    const e = ['22P02', '22003', '22007', '22008'].includes(err?.code) && !(err instanceof HttpError) ? new HttpError(400, 'Geçersiz istek') : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);
     if (e instanceof HttpError) return send(e.code, { error: e.message });
