@@ -223,6 +223,7 @@ export function RoomInfoSheet({
   stats,
   giftLog,
   announcement,
+  canEditText = false,
   onSave,
   onSettings,
   onShare,
@@ -251,6 +252,8 @@ export function RoomInfoSheet({
   stats: { coins: number; peak: number; minutes: number };
   giftLog: GiftLogRow[];
   announcement: string;
+  /** Name and bulletin can be edited without the other owner tools (my live-mode server room). */
+  canEditText?: boolean;
   onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement' | 'cover'>>) => void;
   onSettings: () => void;
   onShare: () => void;
@@ -259,6 +262,7 @@ export function RoomInfoSheet({
   const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
+  const textEditor = owner || canEditText;
   const editText = (which: 'title' | 'bulletin') => {
     setDraft(which === 'title' ? title : announcement);
     setSub(which);
@@ -275,11 +279,11 @@ export function RoomInfoSheet({
               {owner && <Text style={styles.coverLabel}>Kapak Seç</Text>}
             </Pressable>
             <View style={{ flex: 1, gap: 6 }}>
-              <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => owner && editText('title')} accessibilityLabel="Oda adını düzenle">
+              <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => textEditor && editText('title')} accessibilityLabel="Oda adını düzenle">
                 <Text style={styles.bigTitle} numberOfLines={1}>
                   {title}
                 </Text>
-                {owner && <Ionicons name="create-outline" size={18} color={colors.textDim} />}
+                {textEditor && <Ionicons name="create-outline" size={18} color={colors.textDim} />}
               </Pressable>
               <Text style={styles.dim}>
                 🇹🇷 │ {th.emoji} {th.name} │ ID {roomCode(roomId)}
@@ -381,7 +385,7 @@ export function RoomInfoSheet({
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={[styles.h2, { flex: 1 }]}>Bülten</Text>
-              {owner && (
+              {textEditor && (
                 <Pressable onPress={() => editText('bulletin')} hitSlop={8} accessibilityLabel="Bülteni düzenle">
                   <Ionicons name="create-outline" size={20} color="#fff" />
                 </Pressable>

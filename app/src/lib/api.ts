@@ -237,6 +237,8 @@ export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/foll
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
 export const createRoom = (title: string, announcement = '', roomType = 'free') => call<{ room: ServerRoom }>('POST', '/api/rooms', { title, announcement, roomType }).then((r) => r.room);
 export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api/rooms/close', { id });
+/** The owner renames the room or changes its bulletin. */
+export const updateRoom = (id: string, patch: { title?: string; announcement?: string }) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
 
 export const sendDm = (to: string, text: string, ref = newRef()) => call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref }).then((r) => r.message);
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);

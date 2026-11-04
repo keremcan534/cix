@@ -71,7 +71,7 @@ import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { callsAvailable, isLiveRoom, liveGift, message as errorText, myServerId, toServer } from '@/lib/live';
+import { callsAvailable, isLiveRoom, liveGift, message as errorText, myServerId, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { sendSignal, type RoomSignal } from '@/lib/live/room-bus';
 import { showAlert } from '@/lib/alert';
@@ -179,6 +179,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const { coins, spendCoins, spendBlock, addCoins, receiveDiamonds, bump, vipLevel, svipLevel, nobleTier, blocked, settings, setSetting, equipped, myRoom, updateMyRoom, addRoomXp, agencyId, createTicket, visitRoom, addFanPoints, following, notify, familyId, ownedAgency, conversations, sendMessage, followerInvites, markFollowerInvite } = app;
 
   const base = isOwn ? null : roomById(id);
+  // Live mode: my own room is a server room (not 'yeni'); its name and bulletin are saved on the server.
+  const myServerRoom = real && !isOwn && base!.hostId === 'me';
+  const [, setRoomEdits] = useState(0);
   const hostId = isOwn ? 'me' : base!.hostId;
   const title = isOwn ? myRoom.title : base!.title;
   const cover = isOwn ? myRoom.cover : base!.cover;
@@ -2180,7 +2183,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         stats={{ coins: Object.entries(contrib).reduce((sum, [uid, v]) => (uid === 'me' && isOwn ? sum : sum + v), 0), peak, minutes }}
         giftLog={giftLog}
         announcement={announcement ?? ''}
-        onSave={(p) => updateMyRoom(p)}
+        canEditText={myServerRoom}
+        onSave={(p) => {
+          if (!myServerRoom) return updateMyRoom(p);
+          const patch = { ...(p.title !== undefined && { title: p.title }), ...(p.announcement !== undefined && { announcement: p.announcement }) };
+          if (!Object.keys(patch).length) return;
+          updateServerRoom(id, patch)
+            .then(() => setRoomEdits((n) => n + 1))
+            .catch((e) => showAlert('Kaydedilemedi', errorText(e)));
+        }}
         onSettings={() => setPanel('settings')}
         onShare={shareRoom}
         onInvite={() => setPanel('invite')}

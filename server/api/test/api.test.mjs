@@ -201,9 +201,21 @@ describe('Odalar ve ses token’ı', () => {
     await call('POST', '/api/rooms/ban', { room: room.id, user: guest.user.id, minutes: null }, owner.session);
     assert.equal((await call('GET', `/token?room=${lk}&password=1234`, null, guest.session))[1].error, 'Bu odaya giremezsin', 'kara liste');
 
+    // Renaming: the owner only, 3–40 characters; the list shows the new name.
+    assert.equal((await call('POST', '/api/rooms/update', { id: room.id, title: 'Başka ad' }, admin.session))[0], 403, 'adı sahip değiştirir');
+    assert.equal((await call('POST', '/api/rooms/update', { id: room.id, title: 'ab' }, owner.session))[0], 400, 'çok kısa ad');
+    const [renameStatus, renamed] = await call('POST', '/api/rooms/update', { id: room.id, title: '  Yeni Adım  ', announcement: 'Hoş geldin' }, owner.session);
+    assert.equal(renameStatus, 200);
+    assert.equal(renamed.room.title, 'Yeni Adım');
+    assert.equal(renamed.room.announcement, 'Hoş geldin');
+    const [, bulletinOnly] = await call('POST', '/api/rooms/update', { id: room.id, announcement: '' }, owner.session);
+    assert.equal(bulletinOnly.room.title, 'Yeni Adım', 'yalnız bülten değişince ad kalır');
+    assert.equal((await call('GET', `/api/room?id=${room.id}`, null, guest.session))[1].room.title, 'Yeni Adım');
+
     assert.equal((await call('POST', '/api/rooms/close', { id: room.id }, admin.session))[0], 403, 'kapatmak sahibin işi');
     await call('POST', '/api/rooms/close', { id: room.id }, owner.session);
     assert.equal((await call('GET', `/token?room=${lk}`, null, owner.session))[0], 410);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room.id, title: 'Kapalı oda' }, owner.session))[0], 410, 'kapanan oda düzenlenmez');
     assert.equal((await call('POST', '/api/rooms', { title: 'Yeni oda' }, owner.session))[0], 200, 'kapanınca yeni oda açılır');
   });
 
