@@ -9,6 +9,8 @@ name: Panel girişi
 #            google, apple and jeton_noktasi when missing, gives the "similarclub" integration a new key, writes
 #            it to the server's .env as FINANCE_API_KEY and restarts the API. The key goes straight from the
 #            panel into .env on the server; it never reaches this runner or the log. Running it again rotates it.
+#   durum  : shows whether the API's sending to the panel works (no secrets): the last round, its error, the
+#            events waiting to retry, and what the panel received in the last day.
 # Logs are public, so a login never appears in plain text: oku and sifirla need public_key, the base64 of an
 # RSA public key (PEM, at least 3072 bits) whose private half only the person running this has. The log then
 # shows KEY (a random key, RSA-OAEP-SHA256 encrypted) and DATA (the login, AES-256-CBC with that key, PBKDF2).
@@ -20,7 +22,7 @@ on:
       action:
         description: 'İşlem'
         type: choice
-        options: [oku, sifirla, sil, bagla]
+        options: [oku, sifirla, sil, bagla, durum]
         default: oku
       public_key:
         description: 'Açık anahtar (base64, oku ve sifirla için)'
@@ -40,7 +42,7 @@ jobs:
     steps:
       - name: Check the input
         run: |
-          case "$ACTION" in oku|sifirla|sil|bagla) ;; *) echo "::error::Bilinmeyen işlem"; exit 1 ;; esac
+          case "$ACTION" in oku|sifirla|sil|bagla|durum) ;; *) echo "::error::Bilinmeyen işlem"; exit 1 ;; esac
           if [ -z "$SSH_KEY" ]; then echo "::error::DEPLOY_SSH_KEY secret is not set (docs/SUNUCU.md)."; exit 1; fi
           if [ "$ACTION" = oku ] || [ "$ACTION" = sifirla ]; then
             printf '%s' "$PUBKEY" | base64 -d > "$RUNNER_TEMP/pub.pem" 2>/dev/null || { echo "::error::public_key base64 değil"; exit 1; }
@@ -58,6 +60,30 @@ jobs:
           if [ "$ACTION" = sil ]; then
             $SSH "$EXEC rm -f /data/giris-bilgileri.txt"
             echo "Giriş bilgileri dosyası silindi." >> "$GITHUB_STEP_SUMMARY"; echo "Deleted"; exit 0
+          fi
+
+          if [ "$ACTION" = durum ]; then
+            cat > "$RUNNER_TEMP/status.sql" <<'SQL'
+          SELECT 'gonderilen son kayit: ' || last_id FROM finance_sync WHERE id = 1;
+          SELECT 'defterdeki son kayit: ' || coalesce(max(id), 0) FROM ledger;
+          SELECT 'son basarili tur: ' || coalesce(last_ok_at::text, 'yok') FROM finance_sync WHERE id = 1;
+          SELECT 'son hata: ' || coalesce(last_error, 'yok') FROM finance_sync WHERE id = 1;
+          SELECT 'bekleyen yeniden deneme: ' || count(*) FROM finance_sync_failed;
+          SELECT '  ' || key || '  ' || left(error, 200) FROM finance_sync_failed ORDER BY next_try LIMIT 10;
+          SQL
+            $SSH "cd /opt/similar && sudo docker compose exec -T postgres sh -c 'psql -X -q -tA -U \"\$POSTGRES_USER\" -d \"\${POSTGRES_DB:-\$POSTGRES_USER}\"'" < "$RUNNER_TEMP/status.sql"
+            cat > "$RUNNER_TEMP/status.mjs" <<'JS'
+          import { DatabaseSync } from 'node:sqlite';
+          const db = new DatabaseSync(`${process.env.FC_DATA_DIR || '/data'}/${process.env.FC_DB_FILE || 'finance.db'}`, { readOnly: true });
+          const since = new Date(Date.now() - 86400000).toISOString();
+          const q = (sql, ...a) => db.prepare(sql).all(...a);
+          console.log('panel, son 24 saat:');
+          for (const r of q('SELECT type, count(*) AS n FROM financial_transactions WHERE recorded_at > ? GROUP BY type', since)) console.log(`  para: ${r.type} ${r.n} kayit`);
+          for (const r of q('SELECT type, count(*) AS n, sum(units) AS u FROM wallet_transactions WHERE recorded_at > ? GROUP BY type', since)) console.log(`  jeton: ${r.type} ${r.n} kayit, toplam ${r.u}`);
+          for (const r of q("SELECT status, last_sync_at, last_error FROM integration_connections WHERE code = 'similarclub'")) console.log(`  baglanti: ${r.status}, son: ${r.last_sync_at ?? 'yok'}, hata: ${r.last_error ?? 'yok'}`);
+          JS
+            $SSH "cd /opt/similar && sudo docker compose exec -T finance node --no-warnings --input-type=module -" < "$RUNNER_TEMP/status.mjs"
+            exit 0
           fi
 
           if [ "$ACTION" = bagla ]; then
