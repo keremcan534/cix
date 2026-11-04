@@ -82,7 +82,8 @@
             "store": "play"
           }
         }
-      ]
+      ],
+      "./plugins/with-android-release-build"
     ],
     "scheme": "similarclub",
     "experiments": {
