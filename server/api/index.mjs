@@ -30,6 +30,7 @@ import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes } from './auth.mjs';
+import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
@@ -192,6 +193,7 @@ const routes = {
   ...authRoutes,
   ...pushRoutes,
   ...giftRoutes,
+  ...bondRoutes,
   ...purchaseRoutes,
   ...mediaRoutes,
   ...liveRoutes,
@@ -276,6 +278,7 @@ function shutdown(signal) {
   console.log(`${signal}: shutting down`);
   stopFinanceSync();
   stopRefundSync();
+  stopBondSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -292,3 +295,4 @@ await migrate();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
+startBondSweep();

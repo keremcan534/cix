@@ -25,11 +25,9 @@ import {
   medalsOf,
   profileCompletion,
   profileExtras,
-  relationsOf,
   titlesOf,
   vehiclesOf,
   wealthCharmOf,
-  type Relation,
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
@@ -50,6 +48,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { Art } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
+import { BondBadge, BondFrame, BondsTab, shownTopBond, useBonds } from '@/components/bonds';
 
 const REPORT_REASONS = ['Sahte profil', 'Taciz / hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Reşit değil'];
 
@@ -61,7 +60,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'iliski', label: 'Bağlar' },
 ];
 type Sheet = 'none' | 'more' | 'report' | 'call' | 'gift';
-type InviteKind = 'cp' | 'dost' | 'meet';
 const BAR_H = 52;
 const TAB_H = 48;
 
@@ -101,7 +99,8 @@ export default function UserProfile() {
   // Others: demo values; me: my real Cömertlik (wealth) and Yankı (charm) levels.
   const levels = user.id === 'me' ? { wealth: wealthLevel, charm: charmLevel } : wealthCharmOf(user.id);
   const guardian = guardianOf(user.id);
-  const relations = relationsOf(user.id);
+  const bondState = useBonds(user.id);
+  const topBondShown = shownTopBond(bondState, isMe);
 
   // What this viewer may see and do (profile spec §3, §5). Others' choices come with their profile; mine from Settings.
   const priv = isMe ? { ...privacyOf('me'), showOnline: settings.showOnline, showLastSeen: settings.showLastSeen, showCurrentRoom: settings.showCurrentRoom } : privacyOf(user.id);
@@ -136,7 +135,6 @@ export default function UserProfile() {
   const [tab, setTab] = useState<Tab>('profil');
   const [sheet, setSheet] = useState<Sheet>('none');
   const [editOpen, setEditOpen] = useState(false);
-  const [pickerKind, setPickerKind] = useState<InviteKind | null>(null);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
   const [tabY, setTabY] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
@@ -182,33 +180,6 @@ export default function UserProfile() {
     deliverGift(g);
   };
 
-  const sendInvite = (kind: InviteKind, targetId: string) => {
-    const target = userById(targetId);
-    const key = `${kind}:${targetId}`;
-    if (sentInvites.includes(key)) return showAlert('Davet zaten gönderildi', `${target.name} henüz yanıt vermedi.`);
-    setSentInvites((l) => [...l, key]);
-    const copy = {
-      cp: { icon: 'heart' as const, title: 'İkili daveti gönderildi', body: `${target.name} kişisine İkili daveti gönderdin. Kabul ederse Bağlar sekmesinde görünecek.` },
-      dost: { icon: 'people' as const, title: 'Dost daveti gönderildi', body: `${target.name} kişisine dostluk daveti gönderdin.` },
-      meet: { icon: 'home' as const, title: 'Buluşma odası daveti', body: `${target.name} kişisini buluşma odana davet ettin.` },
-    }[kind];
-    notify({ kind: 'social', ...copy });
-    showAlert(copy.title, copy.body);
-  };
-  const startInvite = (kind: InviteKind) => {
-    if (isBlocked) return showAlert('Engelli kullanıcı');
-    if (isMe) {
-      if (kind === 'meet') return router.push('/oda/yeni');
-      setPickerKind(kind);
-      return;
-    }
-    const label = kind === 'cp' ? 'İkili daveti' : kind === 'dost' ? 'Dost daveti' : 'Buluşma odası daveti';
-    showAlert(label, `${user.name} kişisine ${label.toLocaleLowerCase('tr-TR')} gönderilsin mi?`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Gönder', onPress: () => sendInvite(kind, user.id) },
-    ]);
-  };
-
   const copyId = () => copyText(displayId(user.id), 'ID');
   const copyUsername = () => copyText(`@${user.username ?? ''}`, 'Kullanıcı adı');
 
@@ -230,7 +201,6 @@ export default function UserProfile() {
   const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
   // The collapsed bar is solid background: the light scheme swaps the photo's dark chip for a soft ink one.
   const onBar = collapsed && !dark;
-  const pickerUsers = USERS.filter((u) => following.has(u.id) && !blocked.has(u.id));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -259,13 +229,18 @@ export default function UserProfile() {
               <View style={styles.avatarWrap}>
                 {isMe ? (
                   <Pressable onPress={() => pickPhoto(false)} accessibilityLabel="Profil fotoğrafını değiştir">
-                    <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
+                    {/* A frame from the store wins over the bond frame. */}
+                    <BondFrame bond={equipped.frame ? null : topBondShown} size={96}>
+                      <FramedAvatar uri={pendingAvatar ?? user.avatar} size={96} vipLevel={vipLevel} frameId={equipped.frame} artScale={2.2} />
+                    </BondFrame>
                     <View style={styles.cameraBadge}>
                       <Ionicons name="camera" size={14} color="#fff" />
                     </View>
                   </Pressable>
                 ) : (
-                  <Avatar uri={user.avatar} size={96} ring={user.vip} />
+                  <BondFrame bond={topBondShown} size={96}>
+                    <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                  </BondFrame>
                 )}
               </View>
               {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
@@ -297,6 +272,7 @@ export default function UserProfile() {
                   </View>
                 )}
                 {user.verified && <VerifiedBadge size={18} />}
+                <BondBadge bond={topBondShown} onPress={() => setTab('iliski')} />
               </View>
               <AffiliationPills user={user} />
               <View style={styles.row}>
@@ -607,15 +583,7 @@ export default function UserProfile() {
           />
         )}
 
-        {tab === 'iliski' && (
-          <RelationsTab
-            user={user}
-            isMe={isMe}
-            relations={relations}
-            pending={sentInvites}
-            onInvite={startInvite}
-          />
-        )}
+        {tab === 'iliski' && <BondsTab user={user} isMe={isMe} state={bondState} isBlocked={isBlocked} onMeetInvite={() => router.push('/oda/yeni')} />}
       </ScrollView>
 
       {/* Fixed top bar; collapses into a solid bar with the tabs once scrolled past the header. */}
@@ -710,18 +678,6 @@ export default function UserProfile() {
         />
       )}
 
-      <UserPicker
-        visible={pickerKind !== null}
-        title={pickerKind === 'dost' ? 'Dost daveti gönder' : 'İkili daveti gönder'}
-        users={pickerUsers}
-        pending={pickerKind ? sentInvites.filter((k) => k.startsWith(`${pickerKind}:`)).map((k) => k.split(':')[1]) : []}
-        onClose={() => setPickerKind(null)}
-        onPick={(uid) => {
-          const kind = pickerKind;
-          setPickerKind(null);
-          if (kind) sendInvite(kind, uid);
-        }}
-      />
     </View>
   );
 }
@@ -1129,151 +1085,6 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
   );
 }
 
-// --- Bağlar (iliski) tab ----------------------------------------------------------------------
-
-function RelationsTab({ user, isMe, relations, pending, onInvite }: { user: User; isMe: boolean; relations: { cp: Relation[]; dost: Relation[] }; pending: string[]; onInvite: (k: InviteKind) => void }) {
-  const { colors, semantic, dark } = useTheme();
-  const styles = useStyles();
-  const [kind, setKind] = useState<'cp' | 'dost'>('cp');
-  const [top1Only, setTop1Only] = useState(false);
-  const [hidden, setHidden] = useState(false);
-  const all = relations[kind];
-  const list = top1Only ? all.slice(0, 1) : all;
-  const waiting = pending.filter((k) => k.startsWith(`${kind}:`)).map((k) => userById(k.split(':')[1]));
-  const showList = isMe || !hidden;
-
-  return (
-    <View style={{ padding: 16 }}>
-      <LinearGradient colors={dark ? ['#5A2232', '#2A1A24', colors.card] : ['#FDE6EA', '#FFF4F6', colors.card]} style={styles.relCard}>
-        <View style={styles.row}>
-          <Pressable style={styles.relIcon} onPress={() => router.push('/magaza')} accessibilityLabel="Mağaza">
-            <Ionicons name="storefront" size={18} color={colors.text} />
-          </Pressable>
-          <View style={styles.segment}>
-            {(['cp', 'dost'] as const).map((k) => (
-              <Pressable key={k} style={[styles.segmentItem, kind === k && styles.segmentActive]} onPress={() => setKind(k)}>
-                <Text style={[styles.segmentText, kind === k && { color: '#fff' }]}>{k === 'cp' ? 'İkili' : 'Dost'}</Text>
-              </Pressable>
-            ))}
-          </View>
-          {isMe ? (
-            <Pressable style={styles.relIcon} onPress={() => setHidden((v) => !v)} accessibilityLabel="Görünürlük">
-              <Ionicons name={hidden ? 'eye-off' : 'eye'} size={18} color={colors.primaryText} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 34 }} />
-          )}
-          <Pressable
-            style={styles.relIcon}
-            onPress={() =>
-              showAlert(
-                kind === 'cp' ? 'İkili nedir?' : 'Dost nedir?',
-                kind === 'cp'
-                  ? 'İkili, iki kişinin karşılıklı kabul ettiği özel bağdır. Birlikte geçen günler ve hediyelerle seviye atlar; İkili Lv.5 ile tören hakkı açılır.'
-                  : 'Dost ilişkisi en yakın arkadaşların için. Kanka, Kardeş, Sırdaş gibi etiketler seçebilirsin.',
-              )
-            }
-            accessibilityLabel="Yardım"
-          >
-            <Ionicons name="help" size={18} color={colors.primaryText} />
-          </Pressable>
-        </View>
-        {isMe && (
-          <Pressable style={[styles.row, { alignSelf: 'flex-end', marginTop: 10 }]} onPress={() => setTop1Only((v) => !v)}>
-            <Ionicons name={top1Only ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={colors.primaryText} />
-            <Text style={{ color: semantic.tonalText, fontSize: 13 }}>Yalnızca TOP1 gösterilsin</Text>
-          </Pressable>
-        )}
-        {isMe && hidden && <Text style={[styles.meta, { marginTop: 6, textAlign: 'right', fontSize: 12 }]}>Bağların diğer kullanıcılardan gizli.</Text>}
-
-        <View style={{ gap: 12, marginTop: 14 }}>
-          {showList &&
-            list.map((r) => (
-              <RelationRow key={r.partnerId} user={user} relation={r} kind={kind} canWed={isMe && kind === 'cp'} />
-            ))}
-          {showList && list.length === 0 && (
-            <Text style={[styles.meta, { textAlign: 'center', paddingVertical: 12 }]}>{kind === 'cp' ? 'Henüz İkili yok.' : 'Henüz dost yok.'}</Text>
-          )}
-          {waiting.map((w) => (
-            <View key={w.id} style={[styles.row, styles.pendingRow]}>
-              <Avatar uri={w.avatar} size={30} />
-              <Text style={{ color: colors.text, flex: 1 }}>{w.name}</Text>
-              <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700' }}>Davet bekleniyor</Text>
-            </View>
-          ))}
-          <View style={styles.slot}>
-            <Text style={styles.slotNo}>{list.length + 1}</Text>
-            <InviteButton icon="add-circle" title={kind === 'cp' ? 'İkili daveti gönder' : 'Dost daveti gönder'} onPress={() => onInvite(kind)} />
-          </View>
-          <View style={styles.slot}>
-            <Text style={styles.slotNo}>{list.length + 2}</Text>
-            <InviteButton icon="home" title="Buluşma Odasına Davet Et" onPress={() => onInvite('meet')} />
-          </View>
-        </View>
-      </LinearGradient>
-    </View>
-  );
-}
-
-function RelationRow({ user, relation, kind, canWed }: { user: User; relation: Relation; kind: 'cp' | 'dost'; canWed: boolean }) {
-  const styles = useStyles();
-  const partner = userById(relation.partnerId);
-  return (
-    <View style={styles.relRow}>
-      <View style={styles.relLv}>
-        <Text style={styles.relLvText}>Lv.{relation.level}</Text>
-      </View>
-      <View style={styles.relPair}>
-        <View style={{ alignItems: 'center', gap: 4, flex: 1 }}>
-          <Avatar uri={user.avatar} size={58} />
-          <Text style={styles.relName} numberOfLines={1}>
-            {user.name}
-          </Text>
-        </View>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 40 }}>{kind === 'cp' ? '💖' : '🤝'}</Text>
-          <LinearGradient colors={['#FF8A97', '#0FB8BE']} style={styles.daysPill}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{relation.days} gün</Text>
-          </LinearGradient>
-          {relation.label && <Text style={[styles.meta, { fontSize: 12, marginTop: 2 }]}>{relation.label}</Text>}
-        </View>
-        <Pressable style={{ alignItems: 'center', gap: 4, flex: 1 }} onPress={() => router.push(`/kullanici/${partner.id}`)}>
-          <Avatar uri={partner.avatar} size={58} />
-          <Text style={styles.relName} numberOfLines={1}>
-            {partner.name}
-          </Text>
-        </Pressable>
-      </View>
-      {canWed && (
-        <Pressable
-          style={styles.wedPill}
-          onPress={() =>
-            relation.level >= 5
-              ? showAlert('Tören hakkı', `${partner.name} ile tören salonu ayrıldı 💒`)
-              : showAlert('Tören hakkı', `Tören hakkı İkili Lv.5 ile açılır. ${partner.name} ile şu an Lv.${relation.level}. Birlikte odada vakit geçirip hediyeleşerek seviye atlayın.`)
-          }
-        >
-          <Text style={{ fontSize: 12 }}>💒</Text>
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Tören hakkı</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-function InviteButton({ icon, title, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; onPress: () => void }) {
-  const { semantic } = useTheme();
-  const styles = useStyles();
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}>
-      <LinearGradient colors={[semantic.socialFill, '#A82F42']} style={styles.inviteBtn}>
-        <Ionicons name={icon} size={18} color="#fff" />
-        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{title}</Text>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
 // --- Sheets ----------------------------------------------------------------------------
 
 const GENDERS: [User['gender'] | 'hidden', string][] = [
@@ -1437,43 +1248,6 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
   );
 }
 
-function UserPicker({ visible, title, users, pending, onPick, onClose }: { visible: boolean; title: string; users: User[]; pending: string[]; onPick: (id: string) => void; onClose: () => void }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.modalSheet, { maxHeight: '70%' }]}>
-        <Text style={styles.modalTitle}>{title}</Text>
-        <Text style={[styles.meta, { textAlign: 'center', marginBottom: 8 }]}>Takip ettiğin kişilerden birini seç</Text>
-        {users.length === 0 ? (
-          <Text style={[styles.meta, { textAlign: 'center', paddingVertical: 24 }]}>Henüz kimseyi takip etmiyorsun. Önce birini takip et.</Text>
-        ) : (
-          <ScrollView contentContainerStyle={{ gap: 4 }}>
-            {users.map((u) => {
-              const sent = pending.includes(u.id);
-              return (
-                <Pressable key={u.id} style={({ pressed }) => [styles.pickRow, pressed && { backgroundColor: colors.cardAlt }]} onPress={() => onPick(u.id)}>
-                  <Avatar uri={u.avatar} size={40} online={u.online} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.text, fontWeight: '700' }}>{u.name}</Text>
-                    <Text style={[styles.meta, { fontSize: 12 }]}>
-                      {u.age} · {u.city}
-                    </Text>
-                  </View>
-                  <Text style={{ color: sent ? colors.gold : colors.pink, fontWeight: '700', fontSize: 13 }}>{sent ? 'Gönderildi' : 'Davet et'}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
-        <Pressable style={[styles.cancelBtn, { marginTop: 10 }]} onPress={onClose}>
-          <Text style={{ color: colors.textDim, fontWeight: '700' }}>Kapat</Text>
-        </Pressable>
-      </View>
-    </Modal>
-  );
-}
 
 const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   cover: { width: '100%', height: 240, backgroundColor: colors.card },

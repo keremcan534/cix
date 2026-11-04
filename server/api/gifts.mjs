@@ -10,6 +10,7 @@
 // in the same transaction; the commission is a platform liability paid on top, the diamonds aren't touched.
 // Rankings follow Turkey's calendar (Europe/Istanbul).
 import { recordIncome } from './agency-lib.mjs';
+import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, svipLevel } from './catalog.mjs';
 import { notify } from './push.mjs';
@@ -56,6 +57,7 @@ export const giftRoutes = {
       const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [u.id, to, gift.id, count, gift.price, total, room, b.ref]);
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
+      await addBondCoins(c, u.id, to, total);
       // Never fails the gift: runs in a savepoint, and the agency job backfills a missed one from gift_events.
       await recordIncome(c, to, 'gift', `gift:${g.rows[0].id}`, total);
     });

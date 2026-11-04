@@ -7,6 +7,7 @@
 // Messages to or from someone either side has blocked are refused. A new message rings the recipient's
 // phone (push.mjs); an open app polls. At most 30 messages a minute per person, against spam.
 import { HttpError, REF, auth, blockedBetween, db, limit, readJson, text, userId } from './core.mjs';
+import { bondTalk } from './bonds.mjs';
 import { notify } from './push.mjs';
 
 const PAGE = 50;
@@ -27,6 +28,8 @@ export const messageRoutes = {
     const r = await db.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, b.ref]);
     if (r.rowCount) {
       notify([to], { title: me.name, body, data: { type: 'message', from: me.id } });
+      // Talking back and forth raises a bond; never fails the message.
+      bondTalk(me.id, to, Number(r.rows[0].id)).catch((e) => console.error('bond talk', e.message));
       return { message: out(r.rows[0]), replay: false };
     }
     const prev = await db.query('SELECT * FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref]);

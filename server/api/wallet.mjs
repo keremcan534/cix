@@ -126,6 +126,16 @@ export async function spendCoins(c, userId, amount, reason, ref, counterparty = 
 export async function giftCoins(c, { sender, recipient, total, label, ref, giftEvent = null }) {
   const what = label ? `: ${label}` : '';
   const parts = await spendCoins(c, sender, total, `Hediye gönderildi${what}`, ref, recipient, { detail: giftEvent ? { gift: giftEvent } : {} });
+  return giftDiamonds(c, { sender, recipient, parts, total, label, ref, giftEvent });
+}
+
+/**
+ * The recipient's half of a gift: diamonds for coins already taken from the sender (`parts`, from spendCoins),
+ * each portion locked by its channel. A bond gift (bonds.mjs) takes the coins when it is asked and pays them
+ * here when it is accepted. The recipient's row must be locked.
+ */
+export async function giftDiamonds(c, { sender, recipient, parts, total, label, ref, giftEvent = null }) {
+  const what = label ? `: ${label}` : '';
   const locks = [];
   for (const p of parts) {
     const r = await c.query(
