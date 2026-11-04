@@ -166,32 +166,6 @@ export const GIFT_COLLECTIONS: GiftCollection[] = [
 ];
 export const collectionProgress = (id: string, col: GiftCollection) => (id === 'me' ? 0 : (seedOf(id + col.id) % (col.total + 1)) >> 1);
 
-// --- Relations (İlişki) ----------------------------------------------------------
-export type Relation = { partnerId: string; level: number; days: number; label?: string };
-export const DOST_LABELS = ['Kanka', 'Kardeş', 'Sırdaş', 'Yol arkadaşı'] as const;
-
-export const relationsOf = (id: string): { cp: Relation[]; dost: Relation[] } => {
-  const s = seedOf(id);
-  const others = USERS.filter((u) => u.id !== id);
-  const at = (k: number) => others[(s + k) % others.length].id;
-  if (id === 'me') {
-    return {
-      cp: [{ partnerId: 'u1', level: 4, days: 8 }],
-      dost: [
-        { partnerId: 'u2', level: 2, days: 21, label: 'Kanka' },
-        { partnerId: 'u9', level: 1, days: 5, label: 'Sırdaş' },
-      ],
-    };
-  }
-  return {
-    cp: s % 3 === 0 ? [] : [{ partnerId: at(1), level: (s % 6) + 1, days: (s % 90) + 1 }],
-    dost: [
-      { partnerId: at(3), level: (s % 4) + 1, days: (s % 40) + 3, label: DOST_LABELS[s % DOST_LABELS.length] },
-      ...(s % 2 === 0 ? [{ partnerId: at(5), level: 1, days: (s % 12) + 1, label: DOST_LABELS[(s + 1) % DOST_LABELS.length] }] : []),
-    ],
-  };
-};
-
 // --- Family (Kabile) -------------------------------------------------------------
 /** Family of another user: real membership first, otherwise a deterministic pick (or none). */
 export const familyOf = (id: string) => {
