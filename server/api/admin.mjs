@@ -4,9 +4,10 @@
 //   GET  /api/admin/reports?status=open                 → { reports }  (each target with its name and ban state)
 //   POST /api/admin/reports/handle { id, status, banDays? } → { report }  (status: actioned | dismissed)
 //   POST /api/admin/ban    { user, days }  (null = lift)  → { bannedUntil }
-import { HttpError, auth, db, int, readJson, userId } from './core.mjs';
-import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
-import { liveKitName } from './rooms.mjs';
+// Bans are sanctions (sanctions.mjs): days become an account ban of that length (more than 90 days needs the
+// lifetime-ban permission), null lifts the running account bans. Every step is audited there.
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, readJson, userId } from './core.mjs';
+import { applySanction, audit, liftSanction, permsOf } from './sanctions.mjs';
 
 async function staff(req) {
   const u = await auth(req);
@@ -14,21 +15,31 @@ async function staff(req) {
   return u;
 }
 
-async function ban(target, days) {
-  const r = await db.query(
-    `UPDATE users SET banned_until = CASE WHEN $2::int IS NULL THEN NULL ELSE now() + make_interval(days => $2::int) END
-      WHERE id = $1 AND role IN ('user', 'coins_bank') RETURNING banned_until`,
-    [target, days],
-  );
-  if (!r.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı veya yetkili hesabı');
-  if (days) {
-    // The ban takes effect now: out of every voice call, and their own room closes.
-    const rooms = await db.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL RETURNING id', [target]);
-    for (const x of rooms.rows) await deleteVoiceRoom(liveKitName(x.id));
-    const calls = await db.query('SELECT room FROM room_presence WHERE identity = $1', [target]);
-    for (const x of calls.rows) await removeFromVoice(x.room, target);
+const RANK = { user: 0, coins_bank: 0, moderator: 1, admin: 2 };
+
+/** An account ban of `days` (null: lift the running ones) by `me`. Returns when it ends (null when none runs). */
+async function ban(me, target, days, reportId = null) {
+  const t = (await db.query('SELECT id, role FROM users WHERE id = $1 AND deleted_at IS NULL', [target])).rows[0];
+  if (!t || RANK[t.role] >= 1) throw new HttpError(404, 'Kullanıcı bulunamadı veya yetkili hesabı');
+  const perms = await permsOf(me);
+  const actor = { id: me.id, role: me.role === 'admin' ? 'admin' : 'moderator' };
+  if (days === null) {
+    const live = await db.query(`${SANCTION_SELECT} WHERE s.user_id = $1 AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}`, [target]);
+    const need = live.rows.some((s) => s.is_permanent) ? 'sanction.ban_permanent' : 'sanction.lift';
+    if (!perms.has('sanction.lift') || !perms.has(need)) {
+      await audit(db, { actor: me.id, role: me.role, action: 'lift', target, result: 'denied' });
+      throw new HttpError(403, 'Bu işlem için yaptırım yetkin yok');
+    }
+    for (const s of live.rows) await liftSanction(actor, s, 'Yönetim panelinden kaldırıldı');
+    return null;
   }
-  return r.rows[0].banned_until;
+  const need = days > 90 ? 'sanction.ban_permanent' : 'sanction.ban';
+  if (!perms.has(need)) {
+    await audit(db, { actor: me.id, role: me.role, action: 'apply', target, result: 'denied', detail: { type: 'account_ban', days } });
+    throw new HttpError(403, 'Bu süre için yaptırım yetkin yok');
+  }
+  const [s] = await applySanction(actor, { user: target, type: 'account_ban', reason: 'other', minutes: days * 1440, source: reportId ? 'report' : 'manual', reportId, note: 'Yönetim panelinden askıya alma' });
+  return s.expires_at;
 }
 
 export const adminRoutes = {
@@ -37,7 +48,8 @@ export const adminRoutes = {
     const status = url.searchParams.get('status') ?? 'open';
     if (!['open', 'actioned', 'dismissed'].includes(status)) throw new HttpError(400, 'Geçersiz durum');
     const r = await db.query(
-      `SELECT r.*, u.name AS reporter_name, t.name AS target_name, t.role AS target_role, t.banned_until AS target_banned_until, ro.title AS room_title,
+      `SELECT r.*, u.name AS reporter_name, t.name AS target_name, t.role AS target_role, (SELECT max(s.expires_at) FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS target_banned_until,
+              EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND s.is_permanent AND ${LIVE_SANCTION}) AS target_banned_forever, ro.title AS room_title,
               (SELECT count(*) FROM reports x WHERE x.target_type = r.target_type AND x.target_id = r.target_id) AS reports_on_target
          FROM reports r JOIN users u ON u.id = r.reporter
          LEFT JOIN users t ON r.target_type = 'user' AND t.id::text = r.target_id
@@ -56,7 +68,8 @@ export const adminRoutes = {
           id: x.target_id,
           name: x.target_name ?? x.room_title ?? null,
           staff: x.target_role === 'moderator' || x.target_role === 'admin',
-          bannedUntil: x.target_banned_until && new Date(x.target_banned_until) > new Date() ? x.target_banned_until : null,
+          bannedUntil: x.target_banned_until ?? null,
+          bannedForever: !!x.target_banned_forever,
         },
         reason: x.reason,
         note: x.note,
@@ -84,17 +97,17 @@ export const adminRoutes = {
       if (!days) throw new HttpError(400, 'Gün 1–3650 olmalı');
       userId(found.rows[0].target_id);
     }
-    const bannedUntil = days ? await ban(found.rows[0].target_id, days) : null;
+    const bannedUntil = days ? await ban(me, found.rows[0].target_id, days, id) : null;
     const r = await db.query('UPDATE reports SET status = $2, handled_by = $3, handled_at = now() WHERE id = $1 RETURNING *', [id, b.status, me.id]);
     const rep = r.rows[0];
     return { report: { id: Number(rep.id), status: rep.status, handledAt: rep.handled_at }, bannedUntil };
   },
 
   async 'POST /api/admin/ban'(req) {
-    await staff(req);
+    const me = await staff(req);
     const b = await readJson(req);
     const days = b.days === null ? null : int(b.days, 1, 3650);
     if (b.days !== null && !days) throw new HttpError(400, 'Gün 1–3650 olmalı');
-    return { bannedUntil: await ban(userId(b.user), days) };
+    return { bannedUntil: await ban(me, userId(b.user), days) };
   },
 };

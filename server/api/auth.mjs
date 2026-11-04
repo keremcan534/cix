@@ -1,5 +1,8 @@
 // Signing in and sessions.
 //
+// Every sign-in also takes `deviceInfo` (sanctions.mjs deviceSignals). A banned account or device gets 403 with
+// { code: account_banned | device_banned, sanction, serverNow, appealSession? } instead of a session.
+//
 //   POST /api/auth/dev         { deviceKey, name?, device? }               → { session, user }   (ALLOW_DEV_AUTH=1 only)
 //   POST /api/auth/otp/start   { phone }                                   → { sent, retryAfter }
 //   POST /api/auth/otp/verify  { phone, code, name?, deviceKey?, device? } → { session, user, isNew }
@@ -23,8 +26,9 @@
 // Google account to it the first time, so testers keep their balance.
 import crypto from 'node:crypto';
 
-import { HttpError, auth, clientIp, db, env, newSession, readJson, selfUser, sha, tx } from './core.mjs';
+import { HttpError, auth, bannedError, clientIp, db, env, liveBan, newSession, readJson, selfUser, sha, tx } from './core.mjs';
 import { googleClientIds, verifyGoogleIdToken } from './google.mjs';
+import { audit, deviceSignals, linkDevice, registerDevice } from './sanctions.mjs';
 import { sendCode, smsProvider } from './sms.mjs';
 
 const DEV_AUTH = env.ALLOW_DEV_AUTH === '1';
@@ -57,8 +61,39 @@ const same = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.fr
 const codeHash = (phone, code) => sha(`otp:${phone}:${code}`);
 const cleanName = (v) => (typeof v === 'string' ? v.trim().slice(0, 40) : '');
 
-function notBanned(u) {
-  if (u.banned_until && new Date(u.banned_until) > new Date()) throw new HttpError(403, `Hesabın ${new Date(u.banned_until).toISOString().slice(0, 10)} tarihine kadar askıya alındı`);
+/**
+ * The device a sign-in comes from (deviceInfo, or the old deviceKey), recorded before any account is found or
+ * made: a banned device can't sign in or sign up, whichever account it uses. Null without device signals.
+ */
+async function deviceOf(b) {
+  const sig = deviceSignals(b);
+  return sig ? registerDevice(sig) : null;
+}
+
+/**
+ * Refuses a banned device before an account is made. `existing()` looks the account up without creating it: a
+ * known account gets an appeal session with the refusal, so the person can read the ban and appeal it.
+ */
+async function deviceGate(dev, b, existing) {
+  if (!dev) return;
+  const ban = await liveBan(db, null, dev.matched);
+  if (!ban) return;
+  const u = await existing();
+  await audit(db, { actor: u?.id ?? null, role: 'user', action: 'sign_in', sanction: ban.id, target: u?.id ?? null, device: dev.id, result: 'blocked' });
+  if (!u) throw bannedError(ban);
+  await linkDevice(dev, u.id);
+  throw bannedError(ban, { appealSession: await newSession(u.id, b.device, { deviceId: dev.id, scope: 'appeal' }) });
+}
+
+/** The end of every sign-in: a banned account (or device) gets the ban and an appeal session, everyone else a session. */
+async function signedIn(u, dev, b, more = {}) {
+  const ban = await liveBan(db, u.id, dev?.matched ?? []);
+  if (dev) await linkDevice(dev, u.id);
+  if (ban) {
+    await audit(db, { actor: u.id, role: 'user', action: 'sign_in', sanction: ban.id, target: u.id, device: dev?.id ?? null, result: 'blocked' });
+    throw bannedError(ban, { appealSession: await newSession(u.id, b.device, { deviceId: dev?.id ?? null, scope: 'appeal' }) });
+  }
+  return { session: await newSession(u.id, b.device, { deviceId: dev?.id ?? null }), user: selfUser(u), ...more };
 }
 
 /** The review number's fixed code: wrong codes are counted per hour, and too many lock it for an hour. */
@@ -157,17 +192,20 @@ export const authRoutes = {
   /** Development sign-in with a random key kept on the device. Open only with ALLOW_DEV_AUTH=1 (test servers). */
   async 'POST /api/auth/dev'(req) {
     if (!DEV_AUTH) throw new HttpError(403, 'Bu giriş yöntemi kapalı');
-    const { deviceKey, name, device } = await readJson(req);
+    const b = await readJson(req);
+    const { deviceKey, name } = b;
     if (typeof deviceKey !== 'string' || !DEVICE_KEY.test(deviceKey)) throw new HttpError(400, 'Geçersiz cihaz anahtarı');
     const clean = cleanName(name);
     const hash = sha(`device:${deviceKey}`);
-    let u = (await db.query('SELECT * FROM users WHERE device_key_hash = $1', [hash])).rows[0];
+    const find = async () => (await db.query('SELECT * FROM users WHERE device_key_hash = $1 AND deleted_at IS NULL', [hash])).rows[0] ?? null;
+    const dev = await deviceOf(b);
+    await deviceGate(dev, b, find);
+    let u = await find();
     if (!u) {
       if (!clean) throw new HttpError(400, 'Ad gerekli');
       u = (await db.query('INSERT INTO users (name, device_key_hash) VALUES ($1, $2) ON CONFLICT (device_key_hash) DO UPDATE SET name = users.name RETURNING *', [clean, hash])).rows[0];
     }
-    notBanned(u);
-    return { session: await newSession(u.id, device), user: selfUser(u) };
+    return signedIn(u, dev, b);
   },
 
   async 'POST /api/auth/otp/start'(req) {
@@ -229,9 +267,14 @@ export const authRoutes = {
     const code = typeof b.code === 'string' && /^\d{6}$/.test(b.code) ? b.code : null;
     if (!phone || !code) throw new HttpError(400, 'Telefon numarası ve 6 haneli kod gerekli');
     if (!(await checkCode(phone, code))) throw new HttpError(400, 'Kod yanlış');
+    const dev = await deviceOf(b);
+    await deviceGate(dev, b, async () => {
+      const found = (await db.query('SELECT * FROM users WHERE phone = $1 AND deleted_at IS NULL', [phone])).rows[0];
+      if (found || typeof b.deviceKey !== 'string' || !DEVICE_KEY.test(b.deviceKey)) return found ?? null;
+      return (await db.query('SELECT * FROM users WHERE device_key_hash = $1 AND phone IS NULL AND deleted_at IS NULL', [sha(`device:${b.deviceKey}`)])).rows[0] ?? null;
+    });
     const { u, isNew } = await accountFor(phone, b.name, b.deviceKey);
-    notBanned(u);
-    return { session: await newSession(u.id, b.device), user: selfUser(u), isNew };
+    return signedIn(u, dev, b, { isNew });
   },
 
   /** Sign in with Google. Off (503) until GOOGLE_CLIENT_IDS is set in .env (docs/SUNUCU.md). */
@@ -239,9 +282,13 @@ export const authRoutes = {
     if (!googleClientIds().length) throw Object.assign(new HttpError(503, 'Google ile giriş henüz açık değil'), { feature: 'google' });
     const b = await readJson(req);
     const g = await verifyGoogleIdToken(b.idToken);
+    const dev = await deviceOf(b);
+    await deviceGate(dev, b, async () => {
+      const q = "SELECT u.* FROM auth_identities i JOIN users u ON u.id = i.user_id WHERE i.provider = 'google' AND i.subject = $1 AND u.deleted_at IS NULL";
+      return (await db.query(q, [g.sub])).rows[0] ?? null;
+    });
     const { u, isNew } = await accountForGoogle(g, b.deviceKey);
-    notBanned(u);
-    return { session: await newSession(u.id, b.device), user: selfUser(u), isNew };
+    return signedIn(u, dev, b, { isNew });
   },
 
   async 'POST /api/auth/logout'(req) {

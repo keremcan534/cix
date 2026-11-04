@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
 import { mayStay, voiceAccess } from './rooms.mjs';
+import { voiceGrant } from './sanctions.mjs';
 
 export const [LK_KEY, LK_SECRET] = (env.LIVEKIT_KEYS ?? '').split(/:\s*/);
 if (!LK_KEY || !LK_SECRET) throw new Error('LIVEKIT_KEYS missing');
@@ -161,8 +162,11 @@ export const liveRoutes = {
     // The identity is the signed-in account, never a value from the request, so nobody can join as someone else.
     // Voice only: no camera or screen share (the app publishes just the microphone).
     // canUpdateOwnMetadata: each phone shows which mic it sits on as its own participant attribute (app lib/live).
-    const token = liveKitJwt({ sub: u.id, name: u.name, video: { room, roomJoin: true, canPublish: true, canPublishSources: ['microphone'], canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } }, TOKEN_TTL);
-    return { token, ttl: TOKEN_TTL };
+    // A mute (sanctions.mjs) takes the mic (voice) or room chat (text) away; seat and role stay as they are.
+    const g = await voiceGrant(u.id, room);
+    const video = { room, roomJoin: true, canPublish: g.canPublish, canPublishSources: ['microphone'], canSubscribe: true, canPublishData: g.canPublishData, canUpdateOwnMetadata: true };
+    const token = liveKitJwt({ sub: u.id, name: u.name, video }, TOKEN_TTL);
+    return { token, ttl: TOKEN_TTL, canPublish: g.canPublish, canChat: g.canPublishData };
   },
 
   async 'POST /api/livekit/webhook'(req) {

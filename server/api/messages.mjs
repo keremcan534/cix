@@ -9,6 +9,7 @@
 import { HttpError, REF, auth, blockedBetween, db, limit, readJson, text, userId } from './core.mjs';
 import { bondTalk } from './bonds.mjs';
 import { notify } from './push.mjs';
+import { assertMay } from './sanctions.mjs';
 
 const PAGE = 50;
 const out = (m) => ({ id: Number(m.id), from: m.sender, to: m.recipient, text: m.body, createdAt: m.created_at, readAt: m.read_at });
@@ -16,6 +17,8 @@ const out = (m) => ({ id: Number(m.id), from: m.sender, to: m.recipient, text: m
 export const messageRoutes = {
   async 'POST /api/messages'(req) {
     const me = await auth(req);
+    // A mute that covers DMs (sanctions.mjs) stops them here, by the server's clock.
+    await assertMay(me, 'dm');
     limit(`msg:${me.id}`, 30, 'Çok hızlı mesaj gönderiyorsun, biraz bekle');
     const b = await readJson(req);
     const to = userId(b.to, 'alıcı');

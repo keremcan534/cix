@@ -138,10 +138,11 @@ describe('Google ile giriş', () => {
   test('askıya alınmış hesap giremez', async () => {
     const sub = String(crypto.randomInt(1e9, 9e9));
     const [, j] = await google_({ idToken: idToken({ sub }) });
-    await h.sql.query("UPDATE users SET banned_until = now() + interval '2 days' WHERE id = $1", [j.user.id]);
+    await h.sql.query("INSERT INTO user_sanctions (user_id, sanction_type, scope, reason_code, reason_description, expires_at, is_permanent, created_role) VALUES ($1, 'account_ban', 'account', 'other', 'test', now() + interval '2 days', false, 'admin')", [j.user.id]);
     const [st, err] = await google_({ idToken: idToken({ sub }) });
     assert.equal(st, 403);
-    assert.match(err.error, /askıya alındı/);
+    assert.equal(err.code, 'account_banned');
+    assert.ok(err.appealSession, 'itiraz için kısıtlı oturum');
   });
 
   test('hesap silinince Google bağlantısı kalkar, aynı Google hesabı yeni hesap açar', async () => {

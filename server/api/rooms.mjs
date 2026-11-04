@@ -10,9 +10,15 @@
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
-import { HttpError, UUID, auth, blockedBetween, db, env, int, limit, readJson, sha, text, userId } from './core.mjs';
+//   POST /api/rooms/mute   { room, user, kind: text|voice, minutes|null, reason, description? } → { sanction }
+//   POST /api/rooms/unmute { sanction, reason? }                            → { lifted }
+//   GET  /api/rooms/mutes?room=                                             → { mutes }    (owner or admin)
+// Room mutes are sanctions (sanctions.mjs): their own row, server time, audited. A room admin mutes for up to
+// 7 days; the owner also without an end. Nobody mutes the owner, platform staff or (unless owner) another admin.
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
+import { applySanction, audit, liftSanction } from './sanctions.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -81,7 +87,11 @@ export async function mayStay(name, identity) {
   if (!r.rowCount || r.rows[0].closed_at) return 'closed';
   if (!UUID.test(identity)) return 'no';
   const room = r.rows[0];
-  const u = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND (banned_until IS NULL OR banned_until <= now())', [identity]);
+  const u = await db.query(
+    `SELECT 1 FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = u.id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION})`,
+    [identity],
+  );
   if (!u.rowCount) return 'no';
   const ban = await db.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND user_id = $2 AND (until IS NULL OR until > now())', [room.id, identity]);
   if (ban.rowCount || (await blockedBetween(room.owner, identity))) return 'no';
@@ -184,6 +194,7 @@ export const roomRoutes = {
       [room.id, target, minutes, me.id],
     );
     await removeFromVoice(liveKitName(room.id), target);
+    await audit(db, { actor: me.id, role: owner ? 'room_owner' : 'room_admin', action: 'room_kick', target, detail: { room: room.id, minutes } });
     return { until: r.rows[0].until };
   },
 
@@ -192,7 +203,66 @@ export const roomRoutes = {
     const b = await readJson(req);
     const room = await roomRow(b.room);
     if (room.owner !== me.id && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
-    await db.query('DELETE FROM room_bans WHERE room_id = $1 AND user_id = $2', [room.id, userId(b.user)]);
+    const target = userId(b.user);
+    const r = await db.query('DELETE FROM room_bans WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+    if (r.rowCount) await audit(db, { actor: me.id, role: room.owner === me.id ? 'room_owner' : 'room_admin', action: 'room_unkick', target, detail: { room: room.id } });
     return { banned: false };
+  },
+
+  async 'POST /api/rooms/mute'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const room = await roomRow(b.room);
+    if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
+    const target = userId(b.user);
+    const owner = room.owner === me.id;
+    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    if (target === room.owner || target === me.id) throw new HttpError(400, 'Bu kişi susturulamaz');
+    if (!owner && (await isAdmin(room.id, target))) throw new HttpError(403, 'Yöneticiyi yalnızca oda sahibi susturabilir');
+    const t = (await db.query('SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL', [target])).rows[0];
+    if (!t) throw new HttpError(404, 'Kullanıcı bulunamadı');
+    if (t.role === 'admin' || t.role === 'moderator') throw new HttpError(403, 'Platform yetkilileri oda içinden susturulamaz');
+    if (b.kind !== 'text' && b.kind !== 'voice') throw new HttpError(400, 'Susturma türü: text veya voice');
+    const max = owner ? 60 * 24 * 3650 : 60 * 24 * 7;
+    const minutes = b.minutes === null && owner ? null : int(b.minutes, 1, max);
+    if (minutes === null && !(b.minutes === null && owner)) throw new HttpError(400, owner ? 'Süre 1 dakika ile 10 yıl arası olmalı (ya da süresiz)' : 'Oda yöneticisi en çok 7 gün susturabilir');
+    limit(`roommute:${me.id}`, 30, 'Çok sık susturma yaptın, biraz bekle');
+    const [s] = await applySanction(
+      { id: me.id, role: owner ? 'room_owner' : 'room_admin' },
+      {
+        user: target,
+        type: b.kind === 'text' ? 'mute_room_text' : 'mute_room_voice',
+        reason: typeof b.reason === 'string' ? b.reason : 'disruption',
+        minutes,
+        description: b.description === undefined || b.description === '' ? '' : text(b.description, 3, 300, 'Gerekçe'),
+        roomId: room.id,
+        source: 'manual',
+      },
+    );
+    return { sanction: sanctionView(s) };
+  },
+
+  /** The owner lifts any mute in the room; an admin the ones room staff gave (not the platform's). */
+  async 'POST /api/rooms/unmute'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const id = int(b.sanction, 1, Number.MAX_SAFE_INTEGER);
+    const s = id && (await db.query(`${SANCTION_SELECT} WHERE s.id = $1 AND s.scope = 'room'`, [id])).rows[0];
+    if (!s) throw new HttpError(404, 'Susturma bulunamadı');
+    const room = await roomRow(s.room_id);
+    const owner = room.owner === me.id;
+    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    if (!owner && !['room_admin', 'room_owner'].includes(s.created_role)) throw new HttpError(403, 'Platform susturmasını oda yöneticisi kaldıramaz');
+    const why = b.reason === undefined || b.reason === '' ? 'Oda yetkilisi kaldırdı' : text(b.reason, 3, 300, 'Gerekçe');
+    await liftSanction({ id: me.id, role: owner ? 'room_owner' : 'room_admin' }, s, why);
+    return { lifted: true };
+  },
+
+  async 'GET /api/rooms/mutes'(req, url) {
+    const me = await auth(req);
+    const room = await roomRow(url.searchParams.get('room'));
+    if (room.owner !== me.id && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    const r = await db.query(`${SANCTION_SELECT} JOIN users t ON t.id = s.user_id WHERE s.room_id = $1 AND ${LIVE_SANCTION} ORDER BY s.id DESC`.replace('SELECT s.*', 'SELECT t.name AS user_name, s.*'), [room.id]);
+    return { mutes: r.rows.map((s) => ({ ...sanctionView(s), userId: s.user_id, userName: s.user_name })) };
   },
 };
