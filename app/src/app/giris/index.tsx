@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,7 +15,8 @@ import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message } from '@/lib/live';
-import { googleSignInOffered, profileFromServer, signInWithGoogle } from '@/lib/live/account';
+import { hasDeviceAccount } from '@/lib/api';
+import { googleSignInOffered, profileFromServer, signInWithDevice, signInWithGoogle } from '@/lib/live/account';
 
 // The delivered brand mark (two people forming a heart); app icons are generated from the same file.
 const LOGO = require('../../../assets/brand/logo.png');
@@ -53,6 +54,29 @@ export default function WelcomeScreen() {
     }
   };
 
+  // Live mode without Google: a phone that already has its account (signed out with "Çıkış yap") signs back in
+  // to it. One phone holds one account, so "Hesap oluştur" is not offered again there.
+  const [hasAccount, setHasAccount] = useState<boolean | null>(liveMode() && !googleSignInOffered() ? null : false);
+  useEffect(() => {
+    if (hasAccount !== null) return;
+    hasDeviceAccount().then(setHasAccount, () => setHasAccount(false));
+  }, [hasAccount]);
+  const [deviceBusy, setDeviceBusy] = useState(false);
+  const deviceLogin = async () => {
+    if (deviceBusy) return;
+    setDeviceBusy(true);
+    try {
+      const r = await signInWithDevice();
+      updateMe(profileFromServer(r.user));
+      if (r.needsProfile) router.push({ pathname: '/giris/profil', params: { ad: r.user.name === 'Yeni üye' ? '' : r.user.name } });
+      else login();
+    } catch (e) {
+      showAlert('Giriş yapılamadı', message(e));
+    } finally {
+      setDeviceBusy(false);
+    }
+  };
+
   return (
     <LinearGradient colors={[dark ? '#0B3B4A' : '#D9F1F3', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -69,6 +93,13 @@ export default function WelcomeScreen() {
           {/* Test server (live mode): Google sign-in when it is set up; otherwise the account is this phone's (one device, one account). */}
           {googleSignInOffered() ? (
             <GradientButton title={googleBusy ? 'Google ile bağlanılıyor…' : 'Google ile devam et'} icon="logo-google" onPress={google} style={googleBusy ? { opacity: 0.6 } : undefined} />
+          ) : liveMode() && hasAccount === null ? (
+            <View style={styles.placeholder} />
+          ) : liveMode() && hasAccount ? (
+            <>
+              <GradientButton title={deviceBusy ? 'Giriş yapılıyor…' : 'Giriş yap'} icon="log-in" onPress={deviceLogin} style={deviceBusy ? { opacity: 0.6 } : undefined} />
+              <Text style={styles.terms}>Bu telefondaki hesabınla devam edersin. Bir telefonda tek hesap açılabilir.</Text>
+            </>
           ) : liveMode() ? (
             <GradientButton title="Hesap oluştur" icon="person-add" onPress={() => router.push('/giris/profil')} />
           ) : (
@@ -120,6 +151,7 @@ const useStyles = makeStyles(({ colors, semantic, dark, lift }) => ({
   // White with a soft shadow: the hero photo behind it is a bright sky.
   tagline: { color: colors.text, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 23, textShadowColor: dark ? 'rgba(8,15,30,0.85)' : 'rgba(243,246,251,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   actions: { paddingHorizontal: 20, paddingBottom: 16, gap: 12 },
+  placeholder: { height: 52 },
   social: {
     flexDirection: 'row',
     alignItems: 'center',
