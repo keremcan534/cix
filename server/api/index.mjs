@@ -44,6 +44,7 @@ import { messageRoutes } from './messages.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
+import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
 import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
@@ -209,6 +210,7 @@ const routes = {
   ...agencyAdminRoutes,
   ...configRoutes,
   ...alertRoutes,
+  ...sanctionRoutes,
 };
 
 // --- Server: CORS, security headers, rate limits, JSON errors, one log line per request ---------------------
@@ -263,7 +265,8 @@ const server = http.createServer(async (req, res) => {
     const e = ['22P02', '22003', '22007', '22008'].includes(err?.code) && !(err instanceof HttpError) ? new HttpError(400, 'Geçersiz istek') : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);
-    if (e instanceof HttpError) return send(e.code, { error: e.message });
+    // extra: structured detail for the app (a ban or mute for its screen, sanctions.mjs).
+    if (e instanceof HttpError) return send(e.code, { error: e.message, ...(e.extra ?? {}) });
     console.error(e);
     send(500, { error: 'Sunucu hatası' });
   }
@@ -282,6 +285,7 @@ function shutdown(signal) {
   stopFinanceSync();
   stopRefundSync();
   stopBondSweep();
+  stopSanctionSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -299,3 +303,4 @@ server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} ver
 startFinanceSync();
 startRefundSync();
 startBondSweep();
+startSanctionSweep();

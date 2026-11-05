@@ -14,7 +14,7 @@ export type SessionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disco
 export type EndReason = 'left' | 'switched' | 'kicked' | 'server' | 'denied';
 export type Interruption = 'phone_call' | 'focus_loss' | null;
 /** Why a microphone the user turned on isn't sending audio right now. */
-export type MicBlock = 'not_seated' | 'mod_muted' | 'in_app_call' | 'permission' | 'phone_call' | 'focus_loss' | 'background' | 'connection' | null;
+export type MicBlock = 'not_seated' | 'sanctioned' | 'mod_muted' | 'in_app_call' | 'permission' | 'phone_call' | 'focus_loss' | 'background' | 'connection' | null;
 
 export type RoomSession = {
   roomId: string;
@@ -34,6 +34,10 @@ export type RoomSession = {
   micWant: boolean;
   seated: boolean;
   modMuted: boolean;
+  /** The server took the mic (voice mute, lib/sanctions): LiveKit refuses to publish until it gives it back. */
+  sanctionMuted: boolean;
+  /** The server took room chat (text mute): messages cannot go out over the voice connection. */
+  sanctionChat: boolean;
   inAppCall: boolean;
   permission: 'granted' | 'denied';
   interruption: Interruption;
@@ -104,6 +108,7 @@ export function clearNotice(id: number) {
 export function micBlock(s: RoomSession | null): MicBlock {
   if (!s || s.status === 'ended') return 'connection';
   if (!s.seated) return 'not_seated';
+  if (s.sanctionMuted) return 'sanctioned';
   if (s.modMuted) return 'mod_muted';
   if (s.inAppCall) return 'in_app_call';
   if (s.permission === 'denied') return 'permission';
@@ -117,6 +122,7 @@ export const micSending = (s: RoomSession | null) => !!s && s.micWant && micBloc
 export const hearing = (s: RoomSession | null) => !!s && s.status === 'connected' && !s.audioSuspended && s.interruption === null;
 export const MIC_BLOCK_LABEL: Record<Exclude<MicBlock, null>, string> = {
   not_seated: 'Mikrofonda değilsin',
+  sanctioned: 'Sesli susturma uygulandı',
   mod_muted: 'Oda yönetimi mikrofonunu kapattı',
   in_app_call: 'Mikrofon bire bir görüşmende',
   permission: 'Mikrofon izni yok',
@@ -165,6 +171,8 @@ function start(roomId: string, info: { title: string; cover: string; via?: strin
     micWant: false,
     seated: false,
     modMuted: false,
+    sanctionMuted: false,
+    sanctionChat: false,
     inAppCall: false,
     permission: 'granted',
     interruption: null,
@@ -345,6 +353,8 @@ export type EngineEvent =
   /** Joining failed. `final`: the server refused for good (room closed, banned, wrong password): no retry. */
   | { type: 'failed'; message: string; final: boolean; reason?: 'kicked' | 'server' }
   | { type: 'mic_denied' }
+  /** What the server lets us do in this room (voice token / a live change): mic, and chat over data. */
+  | { type: 'grant'; canPublish: boolean; canChat: boolean }
   /** The room removed us (kick) or was deleted on the voice server. */
   | { type: 'removed'; reason: 'kicked' | 'server' };
 export function engineEvent(roomId: string, e: EngineEvent) {
@@ -366,6 +376,17 @@ export function engineEvent(roomId: string, e: EngineEvent) {
       return lostConnection();
     case 'mic_denied':
       return setPermission(false);
+    case 'grant': {
+      const mic = !e.canPublish;
+      const chat = !e.canChat;
+      if (s.sanctionMuted === mic && s.sanctionChat === chat) return;
+      patchSession({ sanctionMuted: mic, sanctionChat: chat });
+      if (mic && !s.sanctionMuted) notify('Sesli susturma uygulandı: bu sürede mikrofonun açılamaz.', 'warn');
+      else if (!mic && s.sanctionMuted) notify('Sesli susturman bitti. Mikrofonu yeniden açabilirsin.');
+      if (chat && !s.sanctionChat) notify('Yazılı susturma uygulandı: bu sürede oda sohbetine yazamazsın.', 'warn');
+      else if (!chat && s.sanctionChat) notify('Yazılı susturman bitti.');
+      return;
+    }
     case 'removed':
       return endRoom(e.reason);
   }

@@ -12,7 +12,7 @@ import { makeStyles, radius, space, useTheme } from '@/theme';
 import { LoadState, SectionScroll, useLoad, type Load } from './parts';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-export type Tab = 'ozet' | 'sikayet' | 'cekim' | 'ajans' | 'iade';
+export type Tab = 'ozet' | 'sikayet' | 'cekim' | 'ajans' | 'iade' | 'yaptirim';
 
 type Overview = {
   health: admin.Health | null;

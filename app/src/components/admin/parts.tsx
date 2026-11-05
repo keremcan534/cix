@@ -87,8 +87,21 @@ export type AdminCtx = {
   openAccount: (id: string, name: string) => void;
   /** Re-reads the pending counts (tab badges, Özet). */
   changed: () => void;
+  /** Whether Yaptırımlar is open to this staff member (sanction.view), and the way to one person's sanctions. */
+  canSanction: boolean;
+  openSanctions: (id: string, name: string) => void;
+  /** A custom sheet over the whole panel (null closes it); Android's back closes it first. */
+  present: (sheet: ReactNode | null) => void;
 };
-export const AdminContext = createContext<AdminCtx>({ toast: () => {}, ask: () => {}, openAccount: () => {}, changed: () => {} });
+export const AdminContext = createContext<AdminCtx>({
+  toast: () => {},
+  ask: () => {},
+  openAccount: () => {},
+  changed: () => {},
+  canSanction: false,
+  openSanctions: () => {},
+  present: () => {},
+});
 export const useAdmin = () => useContext(AdminContext);
 
 /**

@@ -250,11 +250,14 @@ describe('Şikâyet ve moderasyon', () => {
     assert.ok(handled.bannedUntil);
     const [, done] = await call('GET', '/api/admin/reports?status=actioned', null, mod.session);
     assert.ok(done.reports.find((r) => r.id === mine[0].id).target.bannedUntil, 'askı süresi listede görünür');
-    const [code, err] = await call('GET', '/api/me', null, bad.session);
+    assert.equal((await call('GET', '/api/me', null, bad.session))[0], 401, 'ban oturumları kapatır');
+    const [code, err] = await call('POST', '/api/auth/dev', { deviceKey: bad.deviceKey }, null);
     assert.equal(code, 403);
-    assert.match(err.error, /askıya alındı/);
+    assert.equal(err.code, 'account_banned');
     await call('POST', '/api/admin/ban', { user: bad.user.id, days: null }, mod.session);
-    assert.equal((await call('GET', '/api/me', null, bad.session))[0], 200, 'yasak kaldırılınca açılır');
+    const [back, again0] = await call('POST', '/api/auth/dev', { deviceKey: bad.deviceKey }, null);
+    assert.equal(back, 200, 'yasak kaldırılınca açılır');
+    bad.session = again0.session;
     assert.equal((await call('POST', '/api/admin/ban', { user: mod.user.id, days: 1 }, mod.session))[0], 404, 'yetkili askıya alınamaz');
 
     // Handled: a new report of the same person is a new item in the queue, not dropped.

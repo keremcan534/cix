@@ -6,8 +6,14 @@
 // session it returns is kept too, so the app stays signed in. Phone sign-in (otpStart / otpVerify) keeps the
 // device's development account and wallet when it is used for the first time. Google sign-in (googleSignIn,
 // lib/live/account) does the same; after it, an ended session asks for Google again instead of the device key.
+//
+// Sanctions (server/api/sanctions.mjs, lib/sanctions): every sign-in sends this phone's device signals
+// (lib/device-info). A banned account or device gets 403 with code account_banned / device_banned and a one-day
+// appeal session that can only read its sanctions and appeal; onBlocked() hears it and the app shows the ban.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
+
+import { deviceInfo } from '@/lib/device-info';
 
 export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number };
 export type ServerLedgerRow = { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; ref: string; counterparty: string | null; created_at: string };
@@ -19,14 +25,38 @@ const SESSION_KEY = 'similarclub:api-session';
 const PROVIDER_KEY = 'similarclub:sign-in';
 
 export const apiEnabled = () => !!BASE;
+/** What the server sends with a sanction refusal (403 code muted / account_banned / device_banned). */
+export type SanctionView = {
+  id: number;
+  type: 'mute_room_text' | 'mute_room_voice' | 'mute_global_text' | 'mute_global_voice' | 'mute_all' | 'account_ban' | 'device_ban';
+  label: string;
+  restricts: ('room_text' | 'room_voice' | 'dm' | 'call' | 'account' | 'device')[];
+  roomId: string | null;
+  reasonCode: string;
+  reason: string;
+  reasonText: string;
+  startAt: string;
+  endAt: string | null;
+  permanent: boolean;
+  appliedBy: string;
+  status: string;
+  appeal?: string | null;
+};
+export type SanctionCode = 'muted' | 'account_banned' | 'device_banned';
+export type ErrorData = { error?: string; code?: SanctionCode | string; sanction?: SanctionView; serverNow?: string; appealSession?: string };
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly data: ErrorData = {},
   ) {
     super(message);
   }
 }
+export type Block = { code: 'account_banned' | 'device_banned'; sanction: SanctionView; serverNow: string; appealSession: string | null };
+let blockListener: (b: Block) => void = () => {};
+/** The app's ban screen (lib/sanctions) hears every account / device ban refusal here. */
+export const onBlocked = (fn: (b: Block) => void) => (blockListener = fn);
 /** The Google account's session ended: the person signs in with Google again (no silent device account). */
 export class SignInAgain extends ApiError {
   constructor() {
@@ -76,7 +106,14 @@ async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string
     await reSignIn();
     return call<T>(method, path, body, true);
   }
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `Sunucu hatası (${res.status})`);
+  if (!res.ok) {
+    if (res.status === 403 && (data.code === 'account_banned' || data.code === 'device_banned') && data.sanction) {
+      // The server already ended the session; keep only the appeal session it gave.
+      if (session === sent) await forgetSession();
+      blockListener({ code: data.code, sanction: data.sanction, serverNow: data.serverNow ?? new Date().toISOString(), appealSession: data.appealSession ?? null });
+    }
+    throw new ApiError(res.status, data.error ?? `Sunucu hatası (${res.status})`, data);
+  }
   return data as T;
 }
 
@@ -93,10 +130,20 @@ function reSignIn() {
     if (await viaGoogle()) throw new SignInAgain();
     const key = await AsyncStorage.getItem(DEVICE_KEY);
     if (!key) throw new ApiError(401, 'Oturumun sona erdi. Uygulamayı yeniden açıp giriş yap.');
-    const r = await call<{ session: string }>('POST', '/api/auth/dev', { deviceKey: key });
+    const r = await call<{ session: string }>('POST', '/api/auth/dev', { deviceKey: key, deviceInfo: await myDevice() });
     await keepSession(r.session);
   })().finally(() => (reSigning = null));
   return reSigning;
+}
+
+/** Signs in again with this device's key. true: signed in (no ban any more); a ban refusal instead brings a fresh
+ *  appeal session through onBlocked. */
+export async function retrySignIn(): Promise<boolean> {
+  await forgetSession();
+  return reSignIn().then(
+    () => true,
+    () => false,
+  );
 }
 
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
@@ -104,14 +151,46 @@ export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: objec
 
 /** Signs in with this device (creating the account with `name` the first time). */
 export async function signIn(name: string): Promise<ServerUser> {
+  const key = await deviceKey();
+  const r = await call<{ session: string; user: ServerUser }>('POST', '/api/auth/dev', { deviceKey: key, name, deviceInfo: await myDevice() });
+  await keepSession(r.session);
+  return r.user;
+}
+
+/** This install's random key, made the first time it is needed. */
+async function deviceKey() {
   let key = await AsyncStorage.getItem(DEVICE_KEY);
   if (!key) {
     key = randomId(24);
     await AsyncStorage.setItem(DEVICE_KEY, key);
   }
-  const r = await call<{ session: string; user: ServerUser }>('POST', '/api/auth/dev', { deviceKey: key, name });
-  await keepSession(r.session);
-  return r.user;
+  return key;
+}
+/** The device signals for the server (lib/device-info); never fails a sign-in. */
+async function myDevice() {
+  try {
+    return await deviceInfo(await deviceKey(), () => randomId(24));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Once per app start, after the saved session worked: tells the server which device it is on. A device banned
+ * since is refused here (the ban screen opens through onBlocked).
+ */
+let registered = false;
+async function registerDevice() {
+  if (registered) return;
+  const info = await myDevice();
+  if (!info) return;
+  try {
+    await call('POST', '/api/devices/register', { deviceInfo: info });
+    registered = true;
+  } catch (e) {
+    // Banned: onBlocked already heard it. Anything else: try again on the next start.
+    if (e instanceof ApiError && e.data.code === 'device_banned') throw e;
+  }
 }
 
 async function keepSession(s: string) {
@@ -128,7 +207,9 @@ export function ensureSignedIn(name: string): Promise<ServerUser> {
     session ??= await AsyncStorage.getItem(SESSION_KEY);
     if (session) {
       try {
-        return (await call<{ user: ServerUser }>('GET', '/api/me')).user;
+        const u = (await call<{ user: ServerUser }>('GET', '/api/me')).user;
+        await registerDevice();
+        return u;
       } catch (e) {
         if (!(e instanceof ApiError && e.status === 401)) throw e;
         session = null;
@@ -159,16 +240,14 @@ export const otpStart = (phone: string) => call<{ sent: boolean; retryAfter: num
 
 /** Phone sign-in, step 2: the code opens a session. `isNew` = a new account (ask for the profile next). */
 export async function otpVerify(phone: string, code: string, name?: string, device?: string) {
-  const deviceKey = (await AsyncStorage.getItem(DEVICE_KEY)) ?? undefined;
-  const r = await call<{ session: string; user: ServerUser; isNew: boolean }>('POST', '/api/auth/otp/verify', { phone, code, name, deviceKey, device });
+  const r = await call<{ session: string; user: ServerUser; isNew: boolean }>('POST', '/api/auth/otp/verify', { phone, code, name, deviceKey: await deviceKey(), deviceInfo: await myDevice(), device });
   await keepSession(r.session);
   return { user: r.user, isNew: r.isNew };
 }
 
 /** Google sign-in: Google's ID token opens a session (a device development account is linked, not replaced). */
 export async function googleSignIn(idToken: string, device?: string) {
-  const deviceKey = (await AsyncStorage.getItem(DEVICE_KEY)) ?? undefined;
-  const r = await call<{ session: string; user: ServerMe; isNew: boolean }>('POST', '/api/auth/google', { idToken, deviceKey, device });
+  const r = await call<{ session: string; user: ServerMe; isNew: boolean }>('POST', '/api/auth/google', { idToken, deviceKey: await deviceKey(), deviceInfo: await myDevice(), device });
   await keepSession(r.session);
   await AsyncStorage.setItem(PROVIDER_KEY, 'google');
   return { user: r.user, isNew: r.isNew };
@@ -276,3 +355,25 @@ export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings'
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
 export const spend = (amount: number, reason: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/spend', { amount, reason, ref });
 export const exchange = (diamonds: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref });
+
+// --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
+export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
+/** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
+async function withSession<T>(as: string | null | undefined, run: () => Promise<T>) {
+  if (!as) return run();
+  const saved = session;
+  session = as;
+  try {
+    return await run();
+  } finally {
+    if (session === as) session = saved;
+  }
+}
+export const mySanctions = (as?: string | null) => withSession(as, () => call<{ serverNow: string; sanctions: SanctionView[]; appeals: MyAppeal[] }>('GET', '/api/sanctions/mine', undefined, !!as));
+export const appealSanction = (sanction: number, text: string, as?: string | null) =>
+  withSession(as, () => call<{ appeal: MyAppeal }>('POST', '/api/sanctions/appeal', { sanction, text }, !!as).then((r) => r.appeal));
+/** Room staff: mute someone in this room (text = chat, voice = mic); `minutes` null = until lifted (owner only). */
+export const roomMute = (room: string, user: string, kind: 'text' | 'voice', minutes: number | null, reason?: string) =>
+  call<{ sanction: SanctionView }>('POST', '/api/rooms/mute', { room, user, kind, minutes, ...(reason ? { reason } : {}) });
+export const roomUnmute = (sanction: number) => call<{ lifted: boolean }>('POST', '/api/rooms/unmute', { sanction });
+export const roomMutes = (room: string) => call<{ mutes: (SanctionView & { userId: string; userName: string })[] }>('GET', `/api/rooms/mutes?room=${encodeURIComponent(room)}`).then((r) => r.mutes);

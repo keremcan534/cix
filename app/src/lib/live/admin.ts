@@ -1,12 +1,14 @@
 // The owner's Yönetim panel (components/admin) on the server's admin routes: the report queue and bans
 // (admin.mjs), diamond withdrawals (withdraw.mjs), agency payouts (agency-admin.mjs), store refunds (jeton.mjs,
 // refunds.mjs), alarms (alerts.mjs), the finance panel feed (finance-sync.mjs) and one account's money record
-// (jeton.mjs wallet/audit). The server checks the role on every call; the phone only decides whether to show
-// the way in (useIsAdmin).
+// (jeton.mjs wallet/audit) and sanctions (sanctions.mjs: search, one person's record, apply / lift / approve,
+// appeals, policies, permissions, device review). The server checks the role or permission on every call; the
+// phone only decides whether to show the way in (useIsAdmin) and which sanction actions to offer (meta.perms).
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { liveMode } from '@/lib/live';
+import type { AppealOutcome, ApplyBody, DeviceRisk, SanctionAppeal, SanctionAudit, SanctionDevice, SanctionMeta, SanctionPolicy, SanctionType, StaffSanction } from '@/lib/sanction-format';
 
 const get = <T>(path: string) => api.apiRequest<T>('GET', path);
 const post = <T>(path: string, body: object) => api.apiRequest<T>('POST', path, body);
@@ -39,9 +41,13 @@ export function readRole(force = false) {
 }
 /** True for an admin account in a live build. */
 export function useIsAdmin() {
+  return useStaffRole() === 'admin';
+}
+/** admin or moderator in a live build (a moderator's panel holds only Yaptırımlar); null for everyone else. */
+export function useStaffRole(): 'admin' | 'moderator' | null {
   const r = useSyncExternalStore(subscribeRole, () => role, () => role);
   useEffect(() => void readRole(), []);
-  return liveMode() && r === 'admin';
+  return liveMode() && (r === 'admin' || r === 'moderator') ? r : null;
 }
 
 // --- Health ------------------------------------------------------------------------------------------------
@@ -59,7 +65,8 @@ export type ReportStatus = 'open' | 'actioned' | 'dismissed';
 export type Report = {
   id: number;
   reporter: { id: string; name: string };
-  target: { type: 'user' | 'room' | 'message' | 'moment'; id: string; name: string | null; staff: boolean; bannedUntil: string | null };
+  /** bannedUntil: when the running timed account ban ends; bannedForever: a lifetime ban runs (bannedUntil may be null then). */
+  target: { type: 'user' | 'room' | 'message' | 'moment'; id: string; name: string | null; staff: boolean; bannedUntil: string | null; bannedForever: boolean };
   reason: string;
   note: string;
   status: ReportStatus;
@@ -149,3 +156,39 @@ export type WalletAudit = {
   ledger: { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; created_at: string }[];
 };
 export const walletAudit = (user: string) => get<WalletAudit>(`/api/admin/wallet/audit${q({ user })}`);
+
+// --- Sanctions (sanctions.mjs; shapes and wording in lib/sanction-format) ---------------------------------------
+export type SanctionSearchUser = { id: string; name: string; phone: string | null; role: string; deleted: boolean; liveSanctions: number; totalSanctions: number };
+export type SanctionUserDetail = {
+  user: { id: string; name: string; phone: string | null; role: string; createdAt: string; deleted: boolean };
+  sanctions: StaffSanction[];
+  /** Device bans given over other accounts on this person's devices. */
+  deviceSanctions: StaffSanction[];
+  devices: SanctionDevice[];
+  appeals: SanctionAppeal[];
+  audit: SanctionAudit[];
+};
+export type StaffAppeal = SanctionAppeal & { sanction: StaffSanction };
+export type SanctionPerms = { role: string; permissions: string[]; granted: string[] };
+
+/** 403 when this staff member has no sanction.view (the panel then hides Yaptırımlar). */
+export const sanctionMeta = () => get<SanctionMeta>('/api/admin/sanctions/meta');
+/** By name, username, phone, e-mail, account id, #sanction id or #device id. */
+export const sanctionSearch = (text: string) => get<{ users: SanctionSearchUser[] }>(`/api/admin/sanctions/search${q({ q: text.trim() || undefined })}`).then((r) => r.users);
+export const sanctionUser = (id: string) => get<SanctionUserDetail>(`/api/admin/sanctions/user${q({ id })}`);
+export const pendingSanctions = () => get<{ sanctions: StaffSanction[] }>('/api/admin/sanctions/pending').then((r) => r.sanctions);
+/** The body is lib/sanction-format applyBody; a device ban comes back as one sanction per device. */
+export const applySanction = (body: ApplyBody) => post<{ sanctions: StaffSanction[] }>('/api/admin/sanctions', body).then((r) => r.sanctions);
+export const liftSanction = (id: number, reason: string) => post<{ sanction: StaffSanction }>('/api/admin/sanctions/lift', { id, reason }).then((r) => r.sanction);
+export const approveSanction = (id: number, approve: boolean, note: string) => post<{ sanction: StaffSanction }>('/api/admin/sanctions/approve', { id, approve, note }).then((r) => r.sanction);
+export const addEvidence = (id: number, kind: 'note' | 'link', content: string) => post<{ evidence: { id: number } }>('/api/admin/sanctions/evidence', { id, kind, content });
+export const appeals = (status: 'open' | 'decided') => get<{ appeals: StaffAppeal[] }>(`/api/admin/appeals${q({ status })}`).then((r) => r.appeals);
+/** minutes: the new total length from the sanction's start (outcome reduced only). */
+export const decideAppeal = (id: number, outcome: AppealOutcome, note: string, minutes?: number) =>
+  post<{ appeal: SanctionAppeal; sanction: StaffSanction }>('/api/admin/appeals/decide', { id, outcome, note, ...(outcome === 'reduced' ? { minutes } : {}) });
+export const savePolicy = (reason: string, steps: { type: SanctionType; minutes: number | null; auto: boolean; requiresApproval: boolean }[], windowDays: number) =>
+  post<{ policies: SanctionPolicy[] }>('/api/admin/sanction-policies', { reason, steps, windowDays }).then((r) => r.policies);
+export const sanctionPerms = (user: string) => get<SanctionPerms>(`/api/admin/sanction-permissions${q({ user })}`);
+export const setSanctionPerm = (user: string, permission: string, grant: boolean) =>
+  post<{ permissions: string[] }>('/api/admin/sanction-permissions', { user, permission, grant }).then((r) => r.permissions);
+export const reviewDevice = (device: number, status: DeviceRisk, note: string) => post<{ device: SanctionDevice }>('/api/admin/devices/risk', { device, status, note }).then((r) => r.device);

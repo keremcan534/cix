@@ -10,6 +10,7 @@
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true }
 import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
+import { autoFromReports } from './sanctions.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -191,6 +192,8 @@ export const socialRoutes = {
     const reason = text(b.reason, 1, 60, 'Sebep');
     const note = b.note === undefined ? '' : text(b.note, 0, 500, 'Not');
     await db.query('INSERT INTO reports (reporter, target_type, target_id, reason, note) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [me.id, b.type, b.id, reason, note]);
+    // Many people reporting one account: the category's policy step (sanctions.mjs). Never fails the report.
+    if (b.type === 'user' && b.id !== me.id) await autoFromReports(b.id, reason).catch((e) => console.error('auto sanction', e.message));
     return { reported: true };
   },
 };

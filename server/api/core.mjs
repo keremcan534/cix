@@ -98,29 +98,118 @@ export const ageOf = (birth, now = new Date()) => {
   return a;
 };
 
-/** The session's user. Deleted accounts have no sessions left; banned ones are refused until the ban ends. */
-export async function auth(req) {
+/**
+ * The session's user. Deleted accounts have no sessions left. An account ban, or a device ban on the device the
+ * session was opened on, refuses every call (403 with the ban for the ban screen, sanctions.mjs). An appeal
+ * session (scope 'appeal', given to a banned person at sign-in) only works where `appeal` is set: reading
+ * their sanctions and sending an appeal; once the ban is over it is refused, so the app signs in again.
+ */
+export async function auth(req, { appeal = false } = {}) {
   const m = /^Bearer ([A-Za-z0-9_-]{20,})$/.exec(req.headers.authorization ?? '');
   if (!m) throw new HttpError(401, 'Giriş gerekli');
   const hash = sha(m[1]);
-  const r = await db.query('SELECT u.*, s.last_seen_at AS session_seen FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL', [hash]);
+  const r = await db.query(
+    'SELECT u.*, s.last_seen_at AS session_seen, s.device_id AS session_device, s.scope AS session_scope FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL',
+    [hash],
+  );
   if (!r.rowCount) throw new HttpError(401, 'Oturum geçersiz veya süresi dolmuş');
   const u = r.rows[0];
   u.session_hash = hash;
   // "Last used" for the device list; written at most every 5 minutes per session.
   if (Date.now() - new Date(u.session_seen).getTime() > 5 * 60_000) db.query('UPDATE sessions SET last_seen_at = now() WHERE token_hash = $1', [hash]).catch(() => {});
-  if (u.banned_until && new Date(u.banned_until) > new Date()) throw new HttpError(403, `Hesabın ${new Date(u.banned_until).toISOString().slice(0, 10)} tarihine kadar askıya alındı`);
+  const ban = await liveBan(db, u.id, u.session_device ? [u.session_device] : []);
+  if (appeal) {
+    u.ban = ban;
+    if (u.session_scope === 'appeal' && !ban) throw new HttpError(401, 'Erişim yeniden açıldı, tekrar giriş yap');
+    return u;
+  }
+  if (ban) throw bannedError(ban);
+  if (u.session_scope !== 'full') throw new HttpError(401, 'Oturum geçersiz veya süresi dolmuş');
   return u;
 }
 
 export const SESSION_DAYS = 30;
 
-/** Opens a session for `userId` and returns its token (the server keeps only the hash). */
-export async function newSession(userId, device = '') {
+/**
+ * Opens a session for `userId` and returns its token (the server keeps only the hash). `deviceId`: the
+ * device_registry row it was opened on. scope 'appeal': one day, sanctions and appeals only.
+ */
+export async function newSession(userId, device = '', { deviceId = null, scope = 'full' } = {}) {
   const token = crypto.randomBytes(32).toString('base64url');
   const label = typeof device === 'string' ? device.trim().slice(0, 60) : '';
-  await db.query(`INSERT INTO sessions (token_hash, user_id, expires_at, device) VALUES ($1, $2, now() + interval '${SESSION_DAYS} days', $3)`, [sha(token), userId, label]);
+  const days = scope === 'appeal' ? 1 : SESSION_DAYS;
+  await db.query(`INSERT INTO sessions (token_hash, user_id, expires_at, device, device_id, scope) VALUES ($1, $2, now() + interval '${days} days', $3, $4, $5)`, [
+    sha(token),
+    userId,
+    label,
+    deviceId,
+    scope,
+  ]);
   return token;
+}
+
+// --- Sanctions: what every request needs (the rest is sanctions.mjs, docs/YAPTIRIM.md) -----------------------
+/** A sanction that is on right now, by the server's clock: approved, started, not lifted, not run out. */
+export const LIVE_SANCTION = "s.status = 'active' AND s.start_at <= now() AND (s.expires_at IS NULL OR s.expires_at > now())";
+export const SANCTION_SELECT = `SELECT s.*, r.title AS reason_title, m.include_dm, m.include_calls, d.device_registry_id
+  FROM user_sanctions s JOIN sanction_reasons r ON r.code = s.reason_code
+  LEFT JOIN user_mute_records m ON m.sanction_id = s.id LEFT JOIN device_bans d ON d.sanction_id = s.id`;
+
+/** The ban that keeps this account or one of these devices out right now (a lifetime one first), or null. */
+export async function liveBan(q, uid, deviceIds = []) {
+  const r = await q.query(
+    `${SANCTION_SELECT}
+      WHERE ${LIVE_SANCTION} AND ((s.sanction_type = 'account_ban' AND s.user_id = $1) OR (s.sanction_type = 'device_ban' AND d.device_registry_id = ANY($2::bigint[])))
+      ORDER BY s.is_permanent DESC, s.expires_at DESC NULLS FIRST, s.id DESC LIMIT 1`,
+    [uid, deviceIds],
+  );
+  return r.rows[0] ?? null;
+}
+
+export const SANCTION_LABEL = {
+  mute_room_text: 'Oda içi yazılı susturma',
+  mute_room_voice: 'Oda içi mikrofon susturma',
+  mute_global_text: 'Genel yazılı susturma',
+  mute_global_voice: 'Genel sesli iletişim susturma',
+  mute_all: 'Tüm iletişim susturması',
+  account_ban: 'Hesap banı',
+  device_ban: 'Cihaz banı',
+};
+const APPLIED_BY = { room_admin: 'Oda yöneticisi', room_owner: 'Oda sahibi', moderator: 'Platform moderatörü', admin: 'Platform yönetimi', system: 'Otomatik sistem' };
+
+/** What the sanctioned person may see: what is restricted, why, from when to when, by which role. Never notes or how a device was recognised. */
+export function sanctionView(s) {
+  const restricts = {
+    mute_room_text: ['room_text'],
+    mute_room_voice: ['room_voice'],
+    mute_global_text: ['room_text', ...(s.include_dm ? ['dm'] : [])],
+    mute_global_voice: ['room_voice', ...(s.include_calls ? ['call'] : [])],
+    mute_all: ['room_text', 'room_voice', 'dm', 'call'],
+    account_ban: ['account'],
+    device_ban: ['device'],
+  }[s.sanction_type];
+  return {
+    id: Number(s.id),
+    type: s.sanction_type,
+    label: SANCTION_LABEL[s.sanction_type],
+    restricts,
+    roomId: s.room_id ?? null,
+    reasonCode: s.reason_code,
+    reason: s.reason_title,
+    reasonText: s.reason_description,
+    startAt: s.start_at,
+    endAt: s.expires_at,
+    permanent: s.is_permanent,
+    appliedBy: APPLIED_BY[s.created_role] ?? 'Platform yönetimi',
+    status: s.status,
+  };
+}
+
+/** 403 for a banned account or device; the body carries the ban (and `extra`, e.g. an appeal session). */
+export function bannedError(s, extra = {}) {
+  const device = s.sanction_type === 'device_ban';
+  const msg = device ? 'Bu cihazın SimilarClub erişimi kapatıldı' : 'Hesabının erişimi kapatıldı';
+  return Object.assign(new HttpError(403, msg), { extra: { code: device ? 'device_banned' : 'account_banned', sanction: sanctionView(s), serverNow: new Date().toISOString(), ...extra } });
 }
 
 /** True when either of the two has blocked the other. */

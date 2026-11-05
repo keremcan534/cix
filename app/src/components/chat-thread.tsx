@@ -24,6 +24,8 @@ import { isLiveUser, liveDm } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
+import { MuteBanner, useStopped } from '@/components/sanction-screen';
+import { showSanction } from '@/lib/sanctions';
 
 export function ChatThread({
   user,
@@ -45,6 +47,9 @@ export function ChatThread({
   const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
   // A real person on the test server: messages are free and go through the server, no demo replies.
   const real = isLiveUser(user.id);
+  // Muted for DMs by the server (lib/sanctions): the composer stays closed until it ends.
+  const dmStopped = useStopped('dm');
+  const dmMuted = real ? dmStopped : null;
   const mutual = real || (following.has(user.id) && FOLLOWS_ME.has(user.id));
   const isBlocked = blocked.has(user.id);
   const report = useReport();
@@ -82,6 +87,7 @@ export function ChatThread({
   const send = (checked = false, sticker?: string) => {
     const text = sticker ?? draft.trim();
     if (!text || isBlocked) return;
+    if (dmMuted) return showSanction(dmMuted);
     if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
     const warning = checked ? null : outgoingWarning(scanMessage(text));
     if (warning) {
@@ -197,6 +203,11 @@ export function ChatThread({
             </Pressable>
           )
         )}
+        {dmMuted && (
+          <View style={{ paddingHorizontal: 12, paddingBottom: 6 }}>
+            <MuteBanner s={dmMuted} text="Mesaj gönderme kısıtlı" />
+          </View>
+        )}
         {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(false, e) : setDraft((d) => d + e))} />}
         <View style={styles.inputRow}>
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
@@ -206,7 +217,8 @@ export function ChatThread({
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={() => send()}
-            placeholder="Mesaj yaz..."
+            editable={!dmMuted}
+            placeholder={dmMuted ? 'Mesaj gönderemezsin' : 'Mesaj yaz...'}
             placeholderTextColor={colors.textDim}
             style={styles.input}
             returnKeyType="send"

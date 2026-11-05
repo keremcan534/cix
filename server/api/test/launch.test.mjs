@@ -261,7 +261,7 @@ describe('Ses odası katılımı (LiveKit webhook)', () => {
     const [row] = (await h.sql.query('SELECT sid, joined_at < now() - interval \'9 minutes\' AS kept FROM room_presence WHERE room = $1', [lk])).rows;
     assert.deepEqual([row.sid, row.kept], ['PA_2', true], 'yeniden bağlanan ilk giriş zamanını korur');
 
-    await h.sql.query("UPDATE users SET banned_until = now() + interval '1 day' WHERE id = $1", [banned.user.id]);
+    await h.sql.query("INSERT INTO user_sanctions (user_id, sanction_type, scope, reason_code, reason_description, expires_at, is_permanent, created_role) VALUES ($1, 'account_ban', 'account', 'other', 'test', now() + interval '1 day', false, 'admin')", [banned.user.id]);
     await hook('participant_joined', { room: { name: lk }, participant: { identity: banned.user.id, sid: 'PA_3' } });
     assert.equal(await n(banned.user.id), 0, 'askıdaki hesap sayılmaz');
 

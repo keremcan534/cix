@@ -313,4 +313,23 @@ describe('Gerçek ses motoru durumu bildirir', () => {
     engineEvent('r1', { type: 'removed', reason: 'kicked' });
     assert.deepEqual([s().status, s().endReason], ['ended', 'kicked']);
   });
+  test('sunucu sesli susturma uygularsa mikrofon gitmez, bitince geri gelir; yazılı susturma ayrı izlenir', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    reportRoomState('r1', { seated: true });
+    setMicWant(true);
+    assert.equal(micSending(s()), true);
+    engineEvent('r1', { type: 'grant', canPublish: false, canChat: true });
+    assert.deepEqual([micBlock(s()), micSending(s()), stats().publishing, s().micWant], ['sanctioned', false, false, true]);
+    assert.match(getSession().notice?.text ?? '', /Sesli susturma/);
+    engineEvent('r1', { type: 'grant', canPublish: false, canChat: false });
+    assert.deepEqual([s().sanctionMuted, s().sanctionChat], [true, true]);
+    engineEvent('r1', { type: 'grant', canPublish: true, canChat: true });
+    assert.deepEqual([micBlock(s()), micSending(s()), stats().publishing], [null, true, true]);
+    assert.equal(getSession().notice?.text, 'Yazılı susturman bitti.');
+    // Another room's word changes nothing here.
+    engineEvent('r2', { type: 'grant', canPublish: false, canChat: false });
+    assert.equal(s().sanctionMuted, false);
+  });
 });

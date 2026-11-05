@@ -40,8 +40,15 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     if (room === r && s.roomId) cfg.onEvent?.(s.roomId, e);
   };
 
+  /** The server's say on mic and chat (voice token, and live changes when a mute starts or ends). */
+  const grant = (r: Room) => {
+    const p = r.localParticipant.permissions;
+    return { canPublish: p?.canPublish !== false, canChat: p?.canPublishData !== false };
+  };
   const setMic = (r: Room, on: boolean) => {
     if (r.state !== ConnectionState.Connected) return;
+    // Voice muted by the server: asking LiveKit would only fail (and read as a missing phone permission).
+    if (on && !grant(r).canPublish) return;
     r.localParticipant.setMicrophoneEnabled(on).catch((e) => {
       // The phone said no to the microphone: the session shows "Mikrofon izni yok" and keeps the room playing.
       const name = e instanceof Error ? e.name : '';
@@ -72,6 +79,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (seat !== null) pushSeat(r);
       snapshot(r);
       tell(r, { type: 'connected' });
+      tell(r, { type: 'grant', ...grant(r) });
     } catch (e) {
       if (room !== r) return;
       fail('Ses bağlantısı', e);
@@ -116,6 +124,13 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       tell(r, { type: 'connected' });
     });
     r.on(RoomEvent.Reconnecting, () => tell(r, { type: 'lost' }));
+    // A mute starting or ending changes our permissions on the live connection (server/api/sanctions.mjs).
+    r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant) => {
+      if (participant !== r.localParticipant) return;
+      const g = grant(r);
+      tell(r, { type: 'grant', ...g });
+      if (g.canPublish && s.publishing) setMic(r, true);
+    });
     // Our own leave sets `room` to null first, so this only reports drops we didn't ask for.
     r.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
       if (reason === DisconnectReason.PARTICIPANT_REMOVED) tell(r, { type: 'removed', reason: 'kicked' });

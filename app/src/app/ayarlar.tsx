@@ -21,7 +21,7 @@ import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
 import { liveMode } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
-import { useIsAdmin } from '@/lib/live/admin';
+import { useStaffRole } from '@/lib/live/admin';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -71,7 +71,7 @@ function AppearancePicker() {
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
-  const isAdmin = useIsAdmin();
+  const staff = useStaffRole();
   const [adminOpen, setAdminOpen] = useState(false);
   const { colors, semantic } = useTheme();
   const styles = useStyles();
@@ -95,7 +95,14 @@ export default function SettingsScreen() {
           />
           <ListRow icon="receipt-outline" tone="money" title="İşlem geçmişi" subtitle="Satın almalar ve iadeler" onPress={() => router.push('/cuzdan')} />
           {IS_DEMO && <ListRow icon="server-outline" tone="neutral" title="Sunucu hesabı" subtitle="Veritabanı bağlantısı ve test" onPress={() => router.push('/sunucu-hesabi')} />}
-          {isAdmin && <ListRow icon="speedometer-outline" title="Yönetim" subtitle="Şikâyetler, para çekme, ajans ödemeleri ve iadeler" onPress={() => setAdminOpen(true)} />}
+          {staff && (
+            <ListRow
+              icon="speedometer-outline"
+              title="Yönetim"
+              subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar ve itirazlar'}
+              onPress={() => setAdminOpen(true)}
+            />
+          )}
         </ListGroup>
 
         <ListGroup
@@ -329,7 +336,7 @@ export default function SettingsScreen() {
         </ListGroup>
       </ScrollView>
       <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
-      {isAdmin && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} />}
+      {staff && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
     </SafeAreaView>
   );
 }

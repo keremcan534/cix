@@ -1,22 +1,28 @@
 // Yönetim: the owner's panel in a live build, opened from Ayarlar for admin accounts (lib/live/admin useIsAdmin).
-// A full-screen sheet, not a route: Özet, Şikâyetler, Para çekme, Ajans ödemeleri and İadeler on the server's
-// admin routes. Every money or account action asks first, then shows a short result and reloads its list.
-import { useState } from 'react';
+// A full-screen sheet, not a route: Özet, Şikâyetler, Para çekme, Ajans ödemeleri, İadeler and Yaptırımlar on
+// the server's admin routes. Every money or account action asks first, then shows a short result and reloads
+// its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
+// sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
+import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Header } from '@/components/ui';
 import { type Pending } from '@/lib/admin-format';
+import { ApiError } from '@/lib/api';
 import * as admin from '@/lib/live/admin';
+import { type SanctionMeta } from '@/lib/sanction-format';
 import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { AccountSheet } from './account-sheet';
 import { AgencyPayoutsSection } from './agency-payouts';
 import { OverviewSection, type Tab } from './overview';
-import { AdminContext, InputSheet, Toast, useLoad, type AdminCtx, type SheetSpec } from './parts';
+import { AdminContext, InputSheet, LoadState, SectionScroll, Toast, useLoad, type AdminCtx, type Load, type SheetSpec } from './parts';
 import { RefundsSection } from './refunds';
 import { ReportsSection } from './reports';
+import { SanctionUserScreen } from './sanction-user';
+import { SanctionsSection } from './sanctions';
 import { WithdrawalsSection } from './withdrawals';
 
 const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
@@ -25,7 +31,27 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
   { key: 'sikayet', label: 'Şikâyetler', count: 'reports' },
   { key: 'iade', label: 'İadeler' },
+  { key: 'yaptirim', label: 'Yaptırımlar' },
 ];
+
+/** The sanctions meta and what waits there (tab badge); meta null when this staff member has no sanction.view. */
+async function loadSanctionMeta(): Promise<{ meta: SanctionMeta | null; waiting?: number }> {
+  try {
+    const meta = await admin.sanctionMeta();
+    // What waits for this person: approvals they may give and open appeals they may review.
+    const [p, a] = await Promise.allSettled([
+      meta.perms.includes('sanction.approve') ? admin.pendingSanctions() : Promise.resolve([]),
+      meta.perms.includes('sanction.appeal') ? admin.appeals('open') : Promise.resolve([]),
+    ]);
+    const waiting = (p.status === 'fulfilled' ? p.value.length : 0) + (a.status === 'fulfilled' ? a.value.length : 0);
+    return { meta, waiting };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 403) return { meta: null };
+    throw e;
+  }
+}
+
+type Person = { id: string; name: string };
 
 /** What waits for the owner; a part that can't be read stays undefined (shown as –, no badge). */
 async function loadPending(): Promise<Partial<Pending>> {
@@ -37,92 +63,144 @@ async function loadPending(): Promise<Partial<Pending>> {
   };
 }
 
-export function AdminPanel({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+/** `moderator`: only the sanctions tab (the other tabs are the admin's). */
+export function AdminPanel({ visible, onClose, moderator = false }: { visible: boolean; onClose: () => void; moderator?: boolean }) {
   const [sheet, setSheet] = useState<SheetSpec | null>(null);
-  const [account, setAccount] = useState<{ id: string; name: string } | null>(null);
-  // Android's back button closes the sheet on top first, then the panel.
+  const [account, setAccount] = useState<Person | null>(null);
+  const [custom, setCustom] = useState<ReactNode | null>(null);
+  const [person, setPerson] = useState<Person | null>(null);
+  // Android's back button closes the sheet on top first, then one person's sanctions, then the panel.
   const back = () => {
     if (sheet) setSheet(null);
+    else if (custom) setCustom(null);
     else if (account) setAccount(null);
+    else if (person) setPerson(null);
     else onClose();
   };
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={back}>
-      {visible && <PanelBody onClose={onClose} sheet={sheet} setSheet={setSheet} account={account} setAccount={setAccount} />}
+      {visible && (
+        <PanelBody
+          moderator={moderator}
+          onClose={() => {
+            setCustom(null);
+            setPerson(null);
+            onClose();
+          }}
+          sheet={sheet}
+          setSheet={setSheet}
+          account={account}
+          setAccount={setAccount}
+          custom={custom}
+          setCustom={setCustom}
+          person={person}
+          setPerson={setPerson}
+        />
+      )}
     </Modal>
   );
 }
 
 function PanelBody({
+  moderator,
   onClose,
   sheet,
   setSheet,
   account,
   setAccount,
+  custom,
+  setCustom,
+  person,
+  setPerson,
 }: {
+  moderator: boolean;
   onClose: () => void;
   sheet: SheetSpec | null;
   setSheet: (s: SheetSpec | null) => void;
-  account: { id: string; name: string } | null;
-  setAccount: (a: { id: string; name: string } | null) => void;
+  account: Person | null;
+  setAccount: (a: Person | null) => void;
+  custom: ReactNode | null;
+  setCustom: (n: ReactNode | null) => void;
+  person: Person | null;
+  setPerson: (p: Person | null) => void;
 }) {
   const { colors } = useTheme();
   const s = useStyles();
-  const [tab, setTab] = useState<Tab>('ozet');
+  const [tab, setTab] = useState<Tab>(moderator ? 'yaptirim' : 'ozet');
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
   const pending = useLoad(loadPending);
+  const sanctions = useLoad(loadSanctionMeta);
+  const meta = sanctions.data?.meta ?? null;
+  // Shown once the meta answers, or after a failure other than 403 (the tab offers Tekrar dene); hidden on a 403.
+  const showSanctions = !!meta || !!sanctions.error;
+  const tabs = moderator ? TABS.filter((t) => t.key === 'yaptirim') : TABS.filter((t) => t.key !== 'yaptirim' || showSanctions);
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
     ask: setSheet,
     openAccount: (id, name) => setAccount({ id, name }),
-    changed: pending.reload,
+    changed: () => {
+      pending.reload();
+      sanctions.reload();
+    },
+    canSanction: !!meta,
+    openSanctions: (id, name) => {
+      setAccount(null);
+      setPerson({ id, name });
+    },
+    present: setCustom,
   };
 
   return (
     <AdminContext.Provider value={ctx}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Header
-          title="Yönetim"
-          onBack={() => {
-            setSheet(null);
-            setAccount(null);
-            onClose();
-          }}
-        />
-        <View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs} accessibilityRole="tablist">
-            {TABS.map((t) => {
-              const on = t.key === tab;
-              const n = t.count ? pending.data?.[t.count] : undefined;
-              return (
-                <Pressable
-                  key={t.key}
-                  onPress={() => setTab(t.key)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={n ? `${t.label}, ${n} bekliyor` : t.label}
-                  style={[s.tab, on && s.tabOn]}
-                >
-                  <Text style={[s.tabText, on && s.tabTextOn]}>{t.label}</Text>
-                  {!!n && (
-                    <View style={[s.badge, on && s.badgeOn]}>
-                      <Text style={[s.badgeText, on && s.badgeTextOn]}>{n > 99 ? '99+' : n}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-        <View style={{ flex: 1 }}>
-          {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
-          {tab === 'sikayet' && <ReportsSection />}
-          {tab === 'cekim' && <WithdrawalsSection />}
-          {tab === 'ajans' && <AgencyPayoutsSection />}
-          {tab === 'iade' && <RefundsSection />}
+        {person && meta && <SanctionUserScreen key={person.id} id={person.id} name={person.name} meta={meta} onClose={() => setPerson(null)} />}
+        {/* The tabs stay mounted under one person's screen, so a search or filter is still there after Geri. */}
+        <View style={[{ flex: 1 }, person && meta ? { display: 'none' } : null]}>
+          <Header
+            title="Yönetim"
+            onBack={() => {
+              setSheet(null);
+              setAccount(null);
+              onClose();
+            }}
+          />
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs} accessibilityRole="tablist">
+              {tabs.map((t) => {
+                const on = t.key === tab;
+                const n = t.key === 'yaptirim' ? sanctions.data?.waiting : t.count ? pending.data?.[t.count] : undefined;
+                return (
+                  <Pressable
+                    key={t.key}
+                    onPress={() => setTab(t.key)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={n ? `${t.label}, ${n} bekliyor` : t.label}
+                    style={[s.tab, on && s.tabOn]}
+                  >
+                    <Text style={[s.tabText, on && s.tabTextOn]}>{t.label}</Text>
+                    {!!n && (
+                      <View style={[s.badge, on && s.badgeOn]}>
+                        <Text style={[s.badgeText, on && s.badgeTextOn]}>{n > 99 ? '99+' : n}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+          <View style={{ flex: 1 }}>
+            {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
+            {tab === 'sikayet' && <ReportsSection />}
+            {tab === 'cekim' && <WithdrawalsSection />}
+            {tab === 'ajans' && <AgencyPayoutsSection />}
+            {tab === 'iade' && <RefundsSection />}
+            {tab === 'yaptirim' && <SanctionsTab load={sanctions} />}
+          </View>
         </View>
         {account && <AccountSheet key={account.id} id={account.id} name={account.name} onClose={() => setAccount(null)} />}
+        {custom}
         {sheet && <InputSheet key={sheet.title} spec={sheet} onClose={() => setSheet(null)} />}
         {toast && <Toast key={toast.n} text={toast.text} onDone={() => setToast(null)} />}
       </SafeAreaView>
@@ -130,8 +208,32 @@ function PanelBody({
   );
 }
 
+/** Yaptırımlar once its meta is read; the calm loading / error state until then (each view has its own scroll). */
+function SanctionsTab({ load }: { load: Load<{ meta: SanctionMeta | null }> }) {
+  if (load.data?.meta) return <SanctionsSection meta={load.data.meta} onMeta={load.reload} />;
+  return (
+    <SectionScroll load={load}>
+      <LoadState
+        load={load}
+        empty={() => ({
+          icon: 'lock-closed-outline',
+          title: 'Yaptırım yetkin yok',
+          text: 'Bu bölüm için yaptırım görüntüleme yetkisi gerekir.',
+        })}
+      >
+        {() => null}
+      </LoadState>
+    </SectionScroll>
+  );
+}
+
 const useStyles = makeStyles(({ colors, semantic, surface }) => ({
-  tabs: { paddingHorizontal: space.lg, paddingBottom: space.sm, gap: space.sm, borderBottomWidth: 0 },
+  tabs: {
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
+    gap: space.sm,
+    borderBottomWidth: 0,
+  },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -146,8 +248,21 @@ const useStyles = makeStyles(({ colors, semantic, surface }) => ({
   tabOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   tabText: { color: colors.textDim, fontSize: 14, fontWeight: '700' },
   tabTextOn: { color: '#FFFFFF' },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.money },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: semantic.money,
+  },
   badgeOn: { backgroundColor: '#FFFFFF' },
-  badgeText: { color: semantic.moneyInk, fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  badgeText: {
+    color: semantic.moneyInk,
+    fontSize: 11,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
   badgeTextOn: { color: colors.primary },
 }));
