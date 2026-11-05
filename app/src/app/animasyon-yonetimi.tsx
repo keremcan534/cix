@@ -8,6 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/components/text';
 import { ANIM_ART_NAMES, ANIM_CATEGORY_ART, type AnimArtName } from '@/components/fx/anim-art';
 import { AnimPlay, AssetView } from '@/components/fx/anim-player';
+import { GiftShowFx, showPartsReady } from '@/components/fx/gift-show';
+import { SHOW_PARTS } from '@/components/fx/gift-show-art';
+import { GiftArt } from '@/components/GiftArt';
+import { GIFT_SHOWS, showFiles, type GiftShow } from '@/data/gift-shows';
+import { GIFTS } from '@/data/mock';
 import { Card, Header } from '@/components/ui';
 import type { Icon3DName } from '@/components/Icon3D';
 import { ANIM_CATEGORIES, DISPLAY_LABEL, FORMAT_LABEL, MOTION_LABEL, type Animation, type Asset, type DisplayType, type LicenseStatus, type Motion } from '@/data/animations';
@@ -17,7 +22,7 @@ import { addAnimation, importItem, isLive, listProvider, setBusOnline, setProvid
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
-type Tab = 'catalog' | 'providers' | 'new' | 'audit';
+type Tab = 'catalog' | 'gifts' | 'providers' | 'new' | 'audit';
 const LICENSE_LABEL: Record<LicenseStatus, string> = { approved: 'Onaylı', pending: 'Beklemede', rejected: 'Uygun değil', expired: 'Süresi dolmuş' };
 const ICONS: Icon3DName[] = ['heart', 'crown', 'coin', 'diamond', 'gift', 'trophy', 'mic', 'bolt'];
 
@@ -42,6 +47,7 @@ export default function AnimationAdmin() {
   const [cat, setCat] = useState<string>('all');
   const [open, setOpen] = useState<string | null>(null);
   const [preview, setPreview] = useState<Animation | null>(null);
+  const [showPreview, setShowPreview] = useState<GiftShow | null>(null);
   const can = resolve(rbac, 'me', 'animations.manage', { type: 'platform' });
   const { colors } = useTheme();
   const s = useStyles();
@@ -68,6 +74,7 @@ export default function AnimationAdmin() {
           value={tab}
           options={[
             ['catalog', `Katalog · ${catalog.length}`],
+            ['gifts', `Büyük hediyeler · ${GIFT_SHOWS.length}`],
             ['providers', 'Sağlayıcılar'],
             ['new', 'Yeni ekle'],
             ['audit', 'Kayıtlar'],
@@ -127,6 +134,34 @@ export default function AnimationAdmin() {
           </>
         )}
 
+        {tab === 'gifts' && (
+          <>
+            <Text style={s.dim}>En pahalı hediyeler odada tam ekran gösteri olarak oynar. Parçalı görseller gelene kadar hediyenin kendi resmi aynı hareketle oynar (docs/BUYUK_HEDIYELER.md).</Text>
+            {GIFT_SHOWS.map((sh) => {
+              const g = GIFTS.find((x) => x.id === sh.giftId);
+              const files = showFiles(sh);
+              const have = files.filter((f) => SHOW_PARTS[f] !== undefined).length;
+              return (
+                <Card key={sh.giftId} style={{ gap: 8 }}>
+                  <View style={s.row}>
+                    <GiftArt giftId={sh.giftId} emoji={g?.emoji ?? '🎁'} size={40} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.title}>{g?.name ?? sh.giftId}</Text>
+                      <Text style={s.dim}>
+                        {(g?.price ?? 0).toLocaleString('tr-TR')} jeton · {(sh.durationMs / 1000).toLocaleString('tr-TR')} sn · parça {have}/{files.length}
+                      </Text>
+                    </View>
+                    <Text style={[s.badge, { color: showPartsReady(sh) ? colors.green : colors.textDim }]}>{showPartsReady(sh) ? 'Parçalı' : 'Tek resim'}</Text>
+                  </View>
+                  <Pressable style={s.btn} onPress={() => setShowPreview(sh)} accessibilityLabel={`${g?.name ?? sh.giftId} gösterisini test oynat`}>
+                    <Text style={s.btnText}>▶ Test oynat</Text>
+                  </Pressable>
+                </Card>
+              );
+            })}
+          </>
+        )}
+
         {tab === 'providers' && (
           <>
             <Card style={{ gap: 6 }}>
@@ -162,6 +197,11 @@ export default function AnimationAdmin() {
           <PreviewStage anim={preview} onClose={() => setPreview(null)} />
         </ThemeScope>
       </Modal>
+      <Modal visible={!!showPreview} transparent animationType="fade" onRequestClose={() => setShowPreview(null)}>
+        <ThemeScope scheme="dark">
+          <GiftShowStage show={showPreview} onClose={() => setShowPreview(null)} />
+        </ThemeScope>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -177,6 +217,19 @@ function PriceInput({ value, onSave }: { value: number; onSave: (n: number) => v
         <Text style={s.chipText}>Kaydet</Text>
       </Pressable>
     </View>
+  );
+}
+
+function GiftShowStage({ show, onClose }: { show: GiftShow | null; onClose: () => void }) {
+  const [run, setRun] = useState(0);
+  const s = useStyles();
+  const gift = GIFTS.find((g) => g.id === show?.giftId);
+  if (!show || !gift) return null;
+  return (
+    <Pressable style={s.stage} onPress={onClose} accessibilityLabel="Önizlemeyi kapat">
+      <GiftShowFx key={run} show={show} play={{ key: String(run), gift, fromName: 'Sen', toText: 'Oda sahibi', count: 1 }} onDone={() => setRun((n) => n + 1)} />
+      <Text style={s.stageText}>{gift.name} · tekrar oynuyor · kapatmak için dokun</Text>
+    </Pressable>
   );
 }
 

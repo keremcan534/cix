@@ -52,6 +52,8 @@ import { Art, artSource } from '@/components/Art';
 import { AnimLayer } from '@/components/fx/anim-layer';
 import { WinBanner } from '@/components/fx/win-banner';
 import { GiftFlights, type Flight, type Point } from '@/components/fx/gift-flight';
+import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
+import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, ROLE_RANK, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
@@ -331,7 +333,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftTo, setGiftTo] = useState<string | null>(null);
-  const [giftFx, setGiftFx] = useState<Gift | null>(null);
+  const [giftFx, setGiftFx] = useState<GiftShowPlay | null>(null);
+  /** The big effect for a gift: who sent it to whom goes on the full-screen show's banner. */
+  const playGiftFx = (gift: Gift, fromName: string, toIds: string[], count: number) =>
+    setGiftFx({ key: `${Date.now()}-${gift.id}`, gift, fromName, toText: toIds.length > 1 ? `${toIds.length} kişi` : toIds[0] === 'me' ? ME.name : userById(toIds[0]).name, count });
   const [luckyFx, setLuckyFx] = useState<LuckyRecord[] | null>(null);
   // Lucky combo wheel: same gift, same people, same count, one tap per repeat (×1, ×2, ×3 …).
   const [combo, setCombo] = useState<{ giftId: string; to: string[]; each: number; count: number; key: number } | null>(null);
@@ -888,7 +893,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addContrib(from.id, gift.price);
       logGift(from.id, 'me', gift, 1);
       flyGift(gift.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, gift.id);
-      if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) setGiftFx(gift);
+      if (gift.price >= 50 && showFx(gift.price) && visibleRef.current) playGiftFx(gift, from.name, ['me'], 1);
       addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} sana ${gift.emoji} ${gift.name} gönderdi! (+${gift.price} 💎)`, gift: { fromId: from.id, toIds: ['me'], emoji: gift.emoji, name: gift.name, count: 1, giftId: gift.id } });
       scorePk(tx, from.id, 'me', gift.id, gift.price);
     }, 6000);
@@ -1395,7 +1400,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     bump('giftsSent', count * delivered.length);
     addContrib('me', total);
     if (!isOwn) addFanPoints(hostId, Math.ceil(total / 10), `Hediye gönderdin (${total} jeton)`);
-    if (showFx(gift.price)) setGiftFx(gift);
+    if (showFx(gift.price)) playGiftFx(gift, ME.name, delivered.map((r) => r.userId), count);
     // From the gift button (bottom right) to each recipient's seat.
     flyGift(gift.emoji, count, delivered.map((r) => r.userId), { x: win.width - 60, y: win.height - 48 }, gift.id);
     const sendId = msgId();
@@ -1464,7 +1469,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const fromName = from === 'me' ? ME.name : userById(from).name;
     toIds.forEach((to) => logGift(from, to, gift, count));
     addContrib(from, gift.price * count * toIds.length);
-    if (showFx(gift.price) && visibleRef.current) setGiftFx(gift);
+    if (showFx(gift.price) && visibleRef.current) playGiftFx(gift, fromName, toIds, count);
     const origin = from === 'me' ? { x: win.width - 60, y: win.height - 48 } : { x: 36, y: win.height * 0.72 };
     flyGift(gift.emoji, count, toIds, origin, gift.id);
     const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
@@ -2442,7 +2447,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>
         </Pressable>
       )}
-      {giftFx && <GiftAnimation gift={giftFx} onDone={() => setGiftFx(null)} />}
+      {giftFx &&
+        (giftShowOf(giftFx.gift.id) ? (
+          <GiftShowFx key={giftFx.key} show={giftShowOf(giftFx.gift.id)!} play={giftFx} lite={settings.lowData} onDone={() => setGiftFx(null)} />
+        ) : (
+          <GiftAnimation key={giftFx.key} gift={giftFx.gift} onDone={() => setGiftFx(null)} />
+        ))}
       {combo && comboGift && (
         <LuckyCombo
           key={`${combo.giftId}-${combo.to.join()}`}
