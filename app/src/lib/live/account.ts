@@ -37,6 +37,15 @@ export async function signInWithGoogle() {
 }
 
 /**
+ * "Giriş yap" on the welcome screen: this phone's own account again after "Çıkış yap" (one phone, one account).
+ * An account that never finished its profile goes through the profile screen first.
+ */
+export async function signInWithDevice() {
+  const user = (await liveSignIn('Yeni üye')) as api.ServerMe;
+  return { user, needsProfile: !user.gender || user.age === null };
+}
+
+/**
  * After "Çıkış yap": a Google account's session ends on the server and on the phone, so the next person picks
  * their own account. A device account keeps its session (it is this phone's account either way).
  */

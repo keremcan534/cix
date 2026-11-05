@@ -254,6 +254,8 @@ export async function googleSignIn(idToken: string, device?: string) {
 }
 /** True after a Google sign-in on this device. */
 export const signedInWithGoogle = viaGoogle;
+/** This phone already has its account: the device key stays after "Çıkış yap" and goes only when the account is deleted. */
+export const hasDeviceAccount = async () => !!(await AsyncStorage.getItem(DEVICE_KEY));
 
 /** Ends this session (or every session of the account) and forgets it on the device. */
 export async function logout(all = false) {
