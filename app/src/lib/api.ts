@@ -447,7 +447,23 @@ export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek
 export type ServerMe = ServerUser & ServerProfile & { role?: string };
 export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
-export type ServerRoom = { id: string; owner: UserCard; title: string; announcement: string; roomType: string; hasPassword: boolean; createdAt: string; closed: boolean; listeners: number };
+/** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
+ *  the mics and layout the owner or a room admin chose (null = the default). */
+export type ServerRoom = {
+  id: string;
+  owner: UserCard;
+  title: string;
+  announcement: string;
+  roomType: string;
+  hasPassword: boolean;
+  createdAt: string;
+  closed: boolean;
+  listeners: number;
+  level?: number;
+  xp?: number;
+  micCount?: number | null;
+  layoutId?: string | null;
+};
 export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
 export type ServerLock = { id: number; amount: number; channel: string; channelLabel: string; unlockAt: string; createdAt: string; from: { id: string; name: string } | null; gift: { id: string; count: number } | null };
@@ -496,8 +512,12 @@ export const cancelServerPk = (room: string) => call<ServerPkAnswer>('POST', '/a
 export const createRoom = (title: string, announcement = '', roomType = 'free', password?: string) =>
   call<{ room: ServerRoom }>('POST', '/api/rooms', { title, announcement, roomType, ...(password ? { password } : {}) }).then((r) => r.room);
 export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api/rooms/close', { id });
-/** The owner renames the room or changes its bulletin. */
-export const updateRoom = (id: string, patch: { title?: string; announcement?: string }) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
+/** One room as everyone sees it now (listeners, level, mics, layout). */
+export const serverRoom = (id: string) => call<{ room: ServerRoom }>('GET', `/api/room?id=${encodeURIComponent(id)}`).then((r) => r.room);
+/** What the room screen can change on the server: the name and bulletin (owner only), the mics and the layout
+ *  (owner or a room admin; null = back to the default). */
+export type RoomPatch = { title?: string; announcement?: string; micCount?: number | null; layoutId?: string | null };
+export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
 export type ServerBond = {

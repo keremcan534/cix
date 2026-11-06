@@ -1,9 +1,10 @@
 // A server room on the room screen (lib/live): the room's presence model (lib/room-presence) follows the real
 // voice connection instead of the demo's simulated people. Everyone connected to the room's LiveKit room is in
 // it; the mic each one sits on is their own `seat` attribute; talking rings follow LiveKit's active speakers.
+// Returns who has switched their mic off, so their seat shows it on every phone.
 // My own seat goes out the same way, so every phone draws the same mics. When the owner or an admin moves me or
 // takes me off a mic (server/api/rooms.mjs), the server changes that attribute and this phone follows it.
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { getRoom, join, leave, leaveSeat, takeSeat } from '@/lib/room-presence';
 import { rememberUser, refreshWallet, toLocal } from '@/lib/live';
@@ -79,4 +80,6 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
       hooksRef.current.onSignal(sender, msg);
     });
   }, [enabled, roomId]);
+
+  return useMemo(() => new Set(enabled ? peers.filter((p) => !p.micOn).map((p) => toLocal(p.identity)) : []), [enabled, peers]);
 }

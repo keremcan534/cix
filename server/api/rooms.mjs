@@ -6,7 +6,8 @@
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
-//   POST /api/rooms/update { id, title?, announcement? }                    → { room }    (owner only)
+//   POST /api/rooms/update { id, title?, announcement?, micCount?, layoutId? } → { room } (title, bulletin: owner;
+//                          mic count and layout: owner or room admin; the room's phones are told to read it again)
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
@@ -22,7 +23,7 @@
 // set for someone else (taken off the mic or moved), and locked mics are the LiveKit room's metadata.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { deleteVoiceRoom, presenceTracked, removeFromVoice, roomService } from './live.mjs';
+import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
@@ -30,6 +31,15 @@ const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 export const liveKitName = (id) => `oda-${id}`;
 /** The app's sample rooms (oda-r1 …) have no row: voice for them only on a development server. */
 const PROTOTYPE_ROOMS = env.ALLOW_PROTOTYPE_ROOMS === '1';
+
+// Room levels 1–15 (app data/catalog ROOM_XP_THRESHOLDS; test/room-level checks they match). The XP is the
+// owner's (users.room_xp): coins of gifts sent in their open rooms, so a reopened room keeps its level.
+export const ROOM_XP_THRESHOLDS = [0, 100, 300, 600, 1_000, 1_600, 2_400, 3_400, 4_800, 6_500, 8_500, 11_000, 14_000, 18_000, 23_000];
+export const ROOM_MAX_LEVEL = ROOM_XP_THRESHOLDS.length;
+export const roomLevel = (xp) => ROOM_XP_THRESHOLDS.filter((t) => Number(xp) >= t).length || 1;
+/** The public room number the app shows as "ID" (app data/catalog roomCode). */
+export const roomCode = (id) => String(10_000_000 + [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7));
+const LAYOUT = /^[A-Za-z0-9_-]{1,40}$/;
 
 const out = (r) => ({
   id: r.id,
@@ -41,11 +51,23 @@ const out = (r) => ({
   createdAt: r.created_at,
   closed: !!r.closed_at,
   listeners: Number(r.listeners ?? 0),
+  level: roomLevel(r.owner_room_xp ?? 0),
+  xp: Number(r.owner_room_xp ?? 0),
+  // null: the classic grid with as many mics as the level gives.
+  micCount: r.mic_count ?? null,
+  layoutId: r.layout_id ?? null,
 });
-/** Listeners come from LiveKit's webhooks (live.mjs room_presence). */
-const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar,
+/** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
+const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
                        (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners
                   FROM rooms r JOIN users u ON u.id = r.owner`;
+
+/** Puts LiveKit's people count on the rows of rooms it has open now (rooms it doesn't have keep room_presence's). */
+async function withVoiceCounts(rows) {
+  const n = await voiceCounts();
+  if (!n) return rows;
+  return rows.map((r) => (n.has(liveKitName(r.id)) ? { ...r, listeners: n.get(liveKitName(r.id)) } : r));
+}
 
 async function roomRow(id) {
   if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(400, 'Geçersiz oda');
@@ -157,12 +179,15 @@ export const roomRoutes = {
        ORDER BY listeners DESC, r.created_at DESC LIMIT 100`,
       [me.id, presenceTracked()],
     );
-    return { rooms: r.rows.map(out) };
+    const rows = await withVoiceCounts(r.rows);
+    rows.sort((a, b) => Number(b.listeners) - Number(a.listeners) || new Date(b.created_at) - new Date(a.created_at));
+    return { rooms: rows.map(out) };
   },
 
   async 'GET /api/room'(req, url) {
     await auth(req);
-    return { room: out(await roomRow(url.searchParams.get('id'))) };
+    const [room] = await withVoiceCounts([await roomRow(url.searchParams.get('id'))]);
+    return { room: out(room) };
   },
 
   async 'POST /api/rooms/close'(req) {
@@ -175,19 +200,33 @@ export const roomRoutes = {
     return { closed: true };
   },
 
-  /** The owner renames the room or changes its bulletin while it is open. */
+  /**
+   * The owner renames the room or changes its bulletin while it is open. The owner or a room admin sets the
+   * classic grid's mic count (null = the level's most) and the stage layout (null = classic grid); everyone in
+   * the room's voice connection is told to read the room again, so all phones draw the same mics.
+   */
   async 'POST /api/rooms/update'(req) {
     const me = await auth(req);
     const b = await readJson(req);
     const room = await roomRow(b.id);
-    if (room.owner !== me.id) throw new HttpError(403, 'Odayı yalnızca sahibi düzenleyebilir');
+    const owner = room.owner === me.id;
+    const texts = b.title !== undefined || b.announcement !== undefined;
+    const stage = b.micCount !== undefined || b.layoutId !== undefined;
+    if (!texts && !stage) throw new HttpError(400, 'Değişiklik yok');
+    if (texts && !owner) throw new HttpError(403, 'Odayı yalnızca sahibi düzenleyebilir');
+    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Mikrofonları ve düzeni oda sahibi veya yöneticiler değiştirebilir');
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
-    if (b.title === undefined && b.announcement === undefined) throw new HttpError(400, 'Değişiklik yok');
-    limit(`roomedit:${me.id}`, 20, 'Çok sık değiştirdin, biraz bekle');
+    const micCount = b.micCount === undefined ? room.mic_count : b.micCount === null ? null : int(b.micCount, 1, 15);
+    if (b.micCount != null && micCount === null) throw new HttpError(400, 'Mikrofon sayısı 1 ile 15 arasında olmalı');
+    const layoutId = b.layoutId === undefined ? room.layout_id : b.layoutId;
+    if (layoutId !== null && (typeof layoutId !== 'string' || !LAYOUT.test(layoutId))) throw new HttpError(400, 'Geçersiz düzen');
+    limit(`roomedit:${me.id}`, 30, 'Çok sık değiştirdin, biraz bekle');
     const title = b.title === undefined ? room.title : await publicText(b.title, 3, 40, 'Oda adı', me, 'room.title', 'title');
     const announcement = b.announcement === undefined ? room.announcement : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
-    await db.query('UPDATE rooms SET title = $2, announcement = $3 WHERE id = $1', [room.id, title, announcement]);
-    return { room: out(await roomRow(room.id)) };
+    await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5 WHERE id = $1', [room.id, title, announcement, micCount, layoutId]);
+    if (stage) announceRoom(liveKitName(room.id));
+    const [fresh] = await withVoiceCounts([await roomRow(room.id)]);
+    return { room: out(fresh) };
   },
 
   async 'POST /api/rooms/admin'(req) {

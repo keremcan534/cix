@@ -1,12 +1,14 @@
 // Yönetim › Kullanıcılar (admins only): every account on the server, newest first, 50 at a time, with search.
 // An account opens its money record (AccountSheet); Sil deletes it the way the person's own "Hesabı sil" does.
 // The smoke-test accounts ("Test A" / "Test B", development sign-in only) are marked and go with one button.
+// A room's 8-digit ID finds its owner; "Oda Lv. MAX" raises the owner's room to the top level (or back to Lv.1).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
+import { ROOM_XP_THRESHOLDS } from '@/data/catalog';
 import { ago, fmtDate } from '@/lib/admin-format';
 import { copyText } from '@/lib/clipboard';
 import * as admin from '@/lib/live/admin';
@@ -16,6 +18,7 @@ import { ItemCard, Line, LoadState, Notice, SectionScroll, StatusPill, confirmTh
 
 const SIGN_IN: Record<string, string> = { google: 'Google', email: 'E-posta' };
 const ROLE: Record<string, string> = { admin: 'Yönetici', moderator: 'Moderatör' };
+const MAX_LEVEL = ROOM_XP_THRESHOLDS.length;
 
 export function UsersSection() {
   const ctx = useAdmin();
@@ -67,7 +70,7 @@ export function UsersSection() {
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={() => setSearch(draft)}
-            placeholder="Ad, kullanıcı adı, e-posta veya hesap kimliği"
+            placeholder="Ad, kullanıcı adı, e-posta, hesap kimliği veya oda ID"
             placeholderTextColor={colors.textDim}
             style={s.input}
             autoCapitalize="none"
@@ -132,6 +135,24 @@ function UserCard({ u, onDone }: { u: admin.AdminUser; onDone: () => void }) {
       onDone,
       setBusy,
     );
+  const roomLevel = u.roomLevel ?? 1;
+  const atMax = roomLevel >= MAX_LEVEL;
+  const setLevel = () =>
+    confirmThen(
+      ctx,
+      {
+        title: atMax ? 'Oda seviyesini sıfırla' : 'Odayı Lv. MAX yap',
+        message: atMax
+          ? `${u.name} kişisinin odası Lv.1'e döner. Mikrofon ve düzen hakları da Lv.1'e iner.`
+          : `${u.name} kişisinin odası Lv.${MAX_LEVEL} olur: en çok mikrofon ve bütün düzenler açılır. Odadaki herkes hemen görür.`,
+        confirm: atMax ? 'Lv.1 yap' : 'Lv. MAX yap',
+        destructive: atMax,
+      },
+      () => admin.setRoomLevel(u.id, atMax ? 1 : MAX_LEVEL),
+      (r) => `Oda seviyesi Lv.${r.level} oldu`,
+      onDone,
+      setBusy,
+    );
   return (
     <ItemCard
       title={u.name}
@@ -140,12 +161,14 @@ function UserCard({ u, onDone }: { u: admin.AdminUser; onDone: () => void }) {
       actions={
         <>
           <Button title="Hesap" icon="wallet-outline" variant="ghost" small onPress={() => ctx.openAccount(u.id, u.name)} />
+          <Button title={atMax ? 'Oda Lv.1' : 'Oda Lv. MAX'} icon="trending-up-outline" variant="tonal" small onPress={setLevel} disabled={busy} />
           {!staff && <Button title="Sil" icon="trash-outline" variant="danger" small onPress={remove} disabled={busy} />}
         </>
       }
     >
       <Line label="Giriş" value={signIn} />
       <Line label="Kayıt" value={`${fmtDate(u.createdAt)} · ${ago(u.createdAt)}`} />
+      <Line label="Oda" value={u.room ? `ID ${u.room.code} · Lv.${roomLevel}` : `Oda açmadı · Lv.${roomLevel}`} />
       <Line label="Kimlik" value={u.id} mono onCopy={() => copyText(u.id, 'Hesap kimliği')} />
     </ItemCard>
   );

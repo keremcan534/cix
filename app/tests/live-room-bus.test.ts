@@ -76,7 +76,7 @@ test('kilitli mikrofonlar oda bilgisinden gelir; kişi listesi değişince kalı
 
   reportRoomMeta('oda-k', '{"lockedSeats":[3]}');
   assert.deepEqual(getLivePeers('oda-k').lockedSeats, [3]);
-  reportPeers('oda-k', [{ identity: 'u1', name: 'Ali', seat: 1, speaking: false }]);
+  reportPeers('oda-k', [{ identity: 'u1', name: 'Ali', seat: 1, speaking: false, micOn: true }]);
   assert.deepEqual(getLivePeers('oda-k').lockedSeats, [3]);
   assert.equal(getLivePeers('oda-k').peers.length, 1);
   reportRoomMeta('oda-k', '{"lockedSeats":[]}');

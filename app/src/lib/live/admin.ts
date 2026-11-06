@@ -220,8 +220,21 @@ export const setSanctionPerm = (user: string, permission: string, grant: boolean
 export const reviewDevice = (device: number, status: DeviceRisk, note: string) => post<{ device: SanctionDevice }>('/api/admin/devices/risk', { device, status, note }).then((r) => r.device);
 
 // --- Kullanıcılar (admin.mjs) ------------------------------------------------------------------------------
-export type AdminUser = { id: string; name: string; username: string | null; role: string; createdAt: string; signIn: string[]; test: boolean };
+/** `room`: the person's open room (else their latest) with its 8-digit ID; `roomLevel`: their room level (1–15). */
+export type AdminUser = {
+  id: string;
+  name: string;
+  username: string | null;
+  role: string;
+  createdAt: string;
+  signIn: string[];
+  test: boolean;
+  room?: { id: string; code: string } | null;
+  roomLevel?: number;
+};
 export const users = (text = '', offset = 0) =>
   get<{ users: AdminUser[]; total: number; tests: number; next: number | null }>(`/api/admin/users${q({ q: text.trim() || undefined, offset: offset ? String(offset) : undefined })}`);
 export const deleteUser = (id: string) => post<{ deleted: number }>('/api/admin/users/delete', { id });
 export const deleteTestUsers = () => post<{ deleted: number }>('/api/admin/users/delete', { tests: true });
+/** Sets the person's room level (1–15; the room's phones are told at once); the change is in the audit log. */
+export const setRoomLevel = (id: string, level: number) => post<{ level: number; xp: number }>('/api/admin/users/room-level', { id, level });

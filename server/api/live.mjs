@@ -163,17 +163,57 @@ export const deleteVoiceRoom = (room) =>
 export const removeFromVoice = (room, identity) =>
   roomService('RemoveParticipant', { room, identity }, { roomAdmin: true, room }).catch((e) => (console.error('livekit RemoveParticipant', room, String(e).slice(0, 200)), false));
 
-/** Forgets presence in rooms LiveKit no longer has open (missed webhooks after a restart). */
-async function cleanup() {
+/** The voice rooms LiveKit has open now, with how many people are connected to each. */
+async function listVoiceRooms(timeout = 10_000) {
   const r = await fetch(`${env.LIVEKIT_API_URL.replace(/\/$/, '')}/twirp/livekit.RoomService/ListRooms`, {
     method: 'POST',
     headers: { authorization: `Bearer ${liveKitJwt({ video: { roomList: true } }, 60)}`, 'content-type': 'application/json' },
     body: '{}',
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(timeout),
   });
   if (!r.ok) throw new Error(`livekit ListRooms ${r.status}`);
-  const open = ((await r.json()).rooms ?? []).map((x) => x.name);
+  return ((await r.json()).rooms ?? []).map((x) => ({ name: String(x.name ?? ''), people: Math.max(0, Number(x.num_participants ?? x.numParticipants ?? 0) || 0) }));
+}
+
+/** Forgets presence in rooms LiveKit no longer has open (missed webhooks after a restart). */
+async function cleanup() {
+  const open = (await listVoiceRooms()).map((x) => x.name);
   await logPresence(await db.query('DELETE FROM room_presence WHERE NOT (room = ANY($1::text[])) RETURNING room, identity, joined_at', [open]));
+}
+
+/**
+ * How many people are in each voice room right now, as LiveKit counts them (room name → people), read at most
+ * every 10 s. The room lists show this, so the count is right even when LiveKit's webhooks don't reach us. null
+ * when LIVEKIT_API_URL isn't set or LiveKit can't be reached: the caller then uses room_presence.
+ */
+let counts = { at: 0, map: null };
+export async function voiceCounts() {
+  if (!env.LIVEKIT_API_URL) return null;
+  if (Date.now() - counts.at < 10_000) return counts.map;
+  try {
+    counts = { at: Date.now(), map: new Map((await listVoiceRooms(3_000)).map((x) => [x.name, x.people])) };
+  } catch (e) {
+    console.error('livekit ListRooms counts', String(e).slice(0, 200));
+    counts = { at: Date.now(), map: null };
+  }
+  return counts.map;
+}
+
+/** Names of the voice rooms LiveKit has open now; none when it isn't set up or can't be reached. */
+export async function openVoiceRooms() {
+  if (!env.LIVEKIT_API_URL) return [];
+  try {
+    return (await listVoiceRooms(3_000)).map((x) => x.name);
+  } catch (e) {
+    console.error('livekit ListRooms open', String(e).slice(0, 200));
+    return [];
+  }
+}
+
+/** Tells the phones in a server room to read the room again (level, mic count, layout). Best effort. */
+export function announceRoom(room) {
+  const data = Buffer.from(JSON.stringify({ type: 'room' })).toString('base64');
+  roomService('SendData', { room, data, kind: 'RELIABLE' }, { roomAdmin: true, room }).catch((e) => console.error('livekit SendData room', room, String(e).slice(0, 200)));
 }
 if (env.LIVEKIT_API_URL) {
   const run = () => cleanup().catch((e) => console.error('presence cleanup', String(e).slice(0, 200)));

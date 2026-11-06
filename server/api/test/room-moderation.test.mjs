@@ -34,6 +34,8 @@ const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}` });
 const { call, signUp } = h;
 
 const callsOf = (method, from) => lkCalls.slice(from).filter((c) => c.method === method);
+/** The gift announcements only (a gift can also raise the room's level, which sends `{ type: 'room' }`). */
+const giftsOf = (from) => callsOf('SendData', from).filter((c) => JSON.parse(Buffer.from(c.body.data, 'base64').toString('utf8')).type === 'gift');
 const openRoom = async (owner, title = `Oda ${rnd(2)}`) => {
   const [st, j] = await call('POST', '/api/rooms', { title }, owner.session);
   assert.equal(st, 200, j.error);
@@ -194,8 +196,8 @@ describe('Odada hediye duyurusu', () => {
     const ref = rnd(6);
     const [st, j] = await call('POST', '/api/gifts/send', { to: host.user.id, giftId: 'g4', count: 5, room, ref }, sender.session);
     assert.equal(st, 200, j.error);
-    assert.ok(await until(() => callsOf('SendData', from).length === 1), 'duyuru gitti');
-    const [sent] = callsOf('SendData', from);
+    assert.ok(await until(() => giftsOf(from).length === 1), 'duyuru gitti');
+    const [sent] = giftsOf(from);
     const lkName = `oda-${room}`;
     assert.equal(sent.body.room, lkName);
     assert.equal(sent.body.kind, 'RELIABLE');
@@ -210,7 +212,7 @@ describe('Odada hediye duyurusu', () => {
     for (const r of [undefined, 'oda-r1', 'baska-oda']) assert.equal((await call('POST', '/api/gifts/send', { to: host.user.id, giftId: 'g1', count: 1, room: r, ref: rnd(6) }, sender.session))[0], 200);
     await new Promise((r) => setTimeout(r, 200));
     assert.deepEqual(
-      callsOf('SendData', from).map((c) => c.body.room),
+      giftsOf(from).map((c) => c.body.room),
       [lkName, lkName],
       'yalnızca sunucu odalarında, tekrarda değil',
     );

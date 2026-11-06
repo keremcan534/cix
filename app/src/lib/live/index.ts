@@ -291,9 +291,11 @@ export function roomOf(r: api.ServerRoom): Room {
     listeners: r.listeners,
     seatUserIds: Array(9).fill(null),
     tags: ['Canlı'],
-    level: 1,
+    level: r.level ?? 1,
     roomType: (['free', 'stage', 'qa', 'music', 'event', 'private'].includes(r.roomType) ? r.roomType : 'free') as Room['roomType'],
     announcement: r.announcement || undefined,
+    micCount: r.micCount ?? undefined,
+    layoutId: r.layoutId ?? undefined,
   };
   putServerRoom(room);
   return room;
@@ -363,9 +365,16 @@ export async function openServerRoom(title: string, announcement: string, opts: 
 
 /** My own server room, which only I can close for everyone. */
 export const isMyServerRoom = (id: string) => liveMode() && isServerId(id) && rooms.some((r) => r.id === id && r.hostId === 'me');
-/** Renames my server room or changes its bulletin; the lists and the open room show it right away. */
-export async function updateServerRoom(id: string, patch: { title?: string; announcement?: string }) {
+/** Changes a server room (name and bulletin: mine; mics and layout: mine or one I'm an admin of); the lists and
+ *  the open room show it right away, and the server tells the phones in the room. */
+export async function updateServerRoom(id: string, patch: api.RoomPatch) {
   const r = roomOf(await api.updateRoom(id, patch));
+  setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
+  return r;
+}
+/** Reads one server room again (after the server says it changed: a new level, mics or layout). */
+export async function refreshServerRoom(id: string) {
+  const r = roomOf(await api.serverRoom(id));
   setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
   return r;
 }

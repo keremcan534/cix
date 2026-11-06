@@ -219,6 +219,31 @@ export function setClassicCapacity(roomId: string, actorId: string, capacity: nu
   return { ok: true };
 }
 
+/**
+ * A server room's layout and classic mic count as the server keeps them (chosen by the owner or a room admin on
+ * their phone; the server checked who may). Applied on every other phone without the permission and capacity
+ * checks: the mics grow or shrink to match, and an unknown layout id falls back to the classic grid.
+ */
+export function applyServerStage(roomId: string, opts: { layoutId: string | null; classicCapacity: number }, now = Date.now()) {
+  const s = state.stages[roomId];
+  const info = state.info[roomId];
+  if (!s || !info) return;
+  const target = layoutById(opts.layoutId) ?? null;
+  const capacity = target ? target.microphoneCapacity : opts.classicCapacity;
+  const r = getRoom(roomId);
+  if (r) {
+    resize(roomId, capacity);
+    if (r.locked.some((i) => i >= capacity)) setLocks(roomId, r.locked.filter((i) => i < capacity));
+  }
+  if (info.classicCapacity !== opts.classicCapacity) emit({ info: { ...state.info, [roomId]: { ...info, classicCapacity: opts.classicCapacity } } });
+  if (s.layoutId === (target?.id ?? null)) return;
+  let playback = s.playback;
+  if (playback && !target?.layoutSchema.content && playback.playbackStatus === 'playing') {
+    playback = { ...playback, playbackStatus: 'paused', position: expectedPosition(playback, now), updatedAt: now };
+  }
+  put({ ...s, modeId: target?.modeId ?? null, layoutId: target?.id ?? null, playback });
+}
+
 // --- Slot states --------------------------------------------------------------------------------------------
 export type SlotState = 'empty' | 'locked' | 'invited' | 'on' | 'mic_off' | 'mod_muted';
 export const SLOT_STATE_LABEL: Record<SlotState, string> = {

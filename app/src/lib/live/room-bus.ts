@@ -2,8 +2,8 @@
 // room, for the room screen. Kept apart from LiveKit itself so the room screen and the tests don't load it.
 //
 //  - peers: everyone else connected to the room's voice, with the mic they sit on (their own `seat` participant
-//    attribute: set by their phone, or by the server when the owner or an admin moves them) and whether they
-//    are talking right now;
+//    attribute: set by their phone, or by the server when the owner or an admin moves them), whether their mic
+//    is on (their LiveKit microphone track, muted when they switch it off) and whether they are talking right now;
 //  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
 //    later joiner doesn't. The phones send each other chat lines only. A gift is announced by the server after
 //    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
@@ -13,7 +13,7 @@
 //    the owner or an admin set for me (my own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
 
-export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean };
+export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
 /** What one phone may send the others. */
 export type PeerSignal = { t: 'chat'; text: string };
 /** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
@@ -31,6 +31,7 @@ const listeners = new Set<() => void>();
 const signalListeners = new Set<(roomId: string, from: string, msg: RoomSignal) => void>();
 const seatListeners = new Set<(roomId: string, seat: number | null) => void>();
 const pkListeners = new Set<(roomId: string) => void>();
+const roomListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 
@@ -49,7 +50,7 @@ export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking
     snap.roomId === roomId &&
     snap.meSpeaking === meSpeaking &&
     snap.peers.length === peers.length &&
-    snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.name === peers[i].name);
+    snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.micOn === peers[i].micOn && p.name === peers[i].name);
   if (same) return;
   // The locks belong to the room: a new list of people keeps them, another room starts without.
   snap = roomId ? { roomId, peers, meSpeaking, lockedSeats: snap.roomId === roomId ? snap.lockedSeats : [] } : EMPTY;
@@ -87,6 +88,7 @@ export function reportServerSeat(roomId: string, seat: number | null) {
 export function reportSignal(roomId: string, from: string | null, raw: unknown) {
   if (from === null) {
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
+    if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
     const g = parseServerGift(raw);
     if (!g || seenGifts.includes(g.msg.eventId)) return;
     seenGifts.push(g.msg.eventId);
@@ -118,6 +120,9 @@ export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal }
 
 /** The server's PK packet: a PK started or was cancelled in the room (server/api/pk.mjs); read it from the server. */
 export const isServerPk = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'pk';
+/** The server's room packet: the room's level, mics or layout changed (server/api/rooms.mjs, gifts.mjs, admin.mjs);
+ *  read the room from the server. */
+export const isServerRoom = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'room';
 
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
@@ -150,6 +155,12 @@ export function onServerPk(roomId: string, fn: () => void) {
   const l = (r: string) => r === roomId && fn();
   pkListeners.add(l);
   return () => void pkListeners.delete(l);
+}
+/** The server says this room changed (level, mics, layout); returns the unsubscribe. */
+export function onServerRoom(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  roomListeners.add(l);
+  return () => void roomListeners.delete(l);
 }
 /** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);

@@ -78,9 +78,9 @@ import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { callsAvailable, isLiveRoom, liveGift, liveMode, message as errorText, myServerId, toServer, updateServerRoom } from '@/lib/live';
+import { callsAvailable, isLiveRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
-import { sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
+import { onServerRoom, sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
 import { banLeft, roomBan, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type SeatAction } from '@/lib/live/room-staff';
 import { roomUnmute } from '@/lib/api';
@@ -127,7 +127,7 @@ import {
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
-import { ALL_FEATURES, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
+import { ALL_FEATURES, applyServerStage, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
@@ -196,6 +196,13 @@ const HELD_CAPTION: Record<Exclude<MicBlock, null>, string> = {
   connection: 'BAĞLANTI',
 };
 
+/** Reads a server room again and puts its layout and classic mic count (as the server keeps them) on this phone. */
+const syncServerStage = (id: string) =>
+  refreshServerRoom(id).then((r) => {
+    const max = micCapacity(!!r.agency, r.level ?? 1);
+    applyServerStage(id, { layoutId: r.layoutId ?? null, classicCapacity: Math.min(r.micCount ?? max, max) });
+  });
+
 /**
  * The live room. Rendered once by RoomHost for the session's room and kept mounted while the user is
  * elsewhere in the app (`full` false): the chat, mic, PK and timers keep going, but nothing is drawn,
@@ -223,11 +230,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const cover = isOwn ? myRoom.cover : base!.cover;
   const announcement = isOwn ? myRoom.announcement : base!.announcement;
   const password = isOwn ? '' : (base!.password ?? '');
+  // The classic grid's mic count (room settings; a server room: as the server keeps it, none = the level's most);
+  // a selected layout (lib/room-modes) replaces it.
+  const roomMics = isOwn ? myRoom.micCount : base!.micCount;
   const level = isOwn ? roomLevel(myRoom.xp) : (base!.level ?? 1);
   const agencyRoom = isOwn ? !!agencyId : !!base!.agency;
   const maxMics = micCapacity(agencyRoom, level);
-  /** The classic grid's mic count (room settings); a selected layout (lib/room-modes) replaces it. */
-  const classicCapacity = isOwn ? Math.min(myRoom.micCount, maxMics) : maxMics;
   const theme = isOwn ? myRoom.theme : (base!.theme ?? 'chat');
   const bossOn = isOwn ? myRoom.bossSeat && level >= BOSS_SEAT_MIN_LEVEL : !!base!.bossSeat;
   const micPermission = isOwn ? myRoom.micPermission : (base!.micPermission ?? 'everyone');
@@ -237,9 +245,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const adminIds = isOwn ? myRoom.adminIds : real ? staff.admins : (base!.adminIds ?? []);
   // What the stage server knows about the room: level, theme, who manages room functions, the classic mic count.
   const stageInfo: StageInfo = useMemo(
-    () => ({ level, theme, manageFunctions: functionsBy, classicCapacity, classicMax: maxMics, features: ALL_FEATURES }),
-    [level, theme, functionsBy, classicCapacity, maxMics],
+    () => ({ level, theme, manageFunctions: functionsBy, classicCapacity: Math.min(roomMics ?? maxMics, maxMics), classicMax: maxMics, features: ALL_FEATURES }),
+    [level, theme, functionsBy, roomMics, maxMics],
   );
+  const classicCapacity = stageInfo.classicCapacity;
   const myRole: RoomRole = hostId === 'me' ? 'owner' : adminIds.includes('me') ? 'admin' : 'member';
   const roleOf = (uid: string): RoomRole => (uid === hostId ? 'owner' : adminIds.includes(uid) ? 'admin' : 'member');
   const canManage = myRole !== 'member';
@@ -306,6 +315,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => {
     if (isOwn && stageLayoutId !== myRoom.layoutId) updateMyRoom({ layoutId: stageLayoutId });
   }, [isOwn, stageLayoutId, myRoom.layoutId, updateMyRoom]);
+  // A server room's level, mics and layout live on the server: read once on entry and again whenever the server
+  // says they changed (the owner or an admin picked a layout, a gift raised the level), so every phone matches.
+  useEffect(() => {
+    if (!real) return;
+    const sync = () =>
+      syncServerStage(id)
+        .then(() => setRoomEdits((n) => n + 1))
+        .catch(() => {});
+    sync();
+    return onServerRoom(id, sync);
+  }, [id, real]);
   const seats = live.seats;
   const mutedUsers = useMemo(() => new Set(live.micMuted), [live.micMuted]);
   // People who can't be in the room right now (running kick ban or blacklist); expired bans don't count.
@@ -330,6 +350,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => {
     if (real) void refreshSanctions().catch(() => {});
   }, [real, id, sanctionMic, sanctionChat]);
+  // A voice mute turns my mic off on this phone too, not only through the voice server's permission.
+  useEffect(() => {
+    if (voiceMuted && getSession().session?.micWant) setMicWant(false);
+  }, [voiceMuted]);
   // Visual-only work (talk indicators, seat reactions, effects) runs only while the room is on screen.
   const visible = full && session?.appState !== 'background';
   // Read by the room's timers, which outlive a single render.
@@ -342,8 +366,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [camOn, setCamOn] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const inboxUnread = useInboxUnread();
-  // People I muted for myself only: their voice and chat lines are hidden on my screen, nobody else's.
-  const [silenced, setSilenced] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<Set<string>>(new Set());
   // Entry effects on screen: mine when I join, then other people's (one at a time).
   const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || settings.effectsOff || !entryInfo ? null : entryInfo.show));
@@ -430,8 +452,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [pkSetup, setPkSetup] = useState(false);
   const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
   const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
-  /** PK points under a seat: everyone on a mic in Normal / cross PK, team members in Takım PK. */
-  const pkPointsOf = (uid: string | null) => (!uid || !pk || pk.status === 'invite' || (teamPk && !teamOf(teamPk, uid)) ? undefined : pkPointsFor(pk, id, uid));
+  /**
+   * PK points under a seat, only for people in the PK: team members in Takım PK, everyone on a mic in Normal /
+   * cross PK. A server room's Normal PK scores only the people it started with (server/api/pk.mjs), so a mic taken
+   * after the start shows no count instead of a 0 that never moves.
+   */
+  const pkPointsOf = (uid: string | null) => {
+    if (!uid || !pk || pk.status === 'invite') return undefined;
+    if (teamPk) return teamOf(teamPk, uid) ? pkPointsFor(pk, id, uid) : undefined;
+    if (real && pk.kind === 'room' && pk.mode === 'solo' && !pk.participants.includes(uid)) return undefined;
+    return pkPointsFor(pk, id, uid);
+  };
   // Profiles opened from the PK end screens: the room minimizes while away and shows them again on return.
   const openProfileFromPk = (uid: string) => router.push(`/kullanici/${uid}`);
   // Gifts score in a PK only through the PK server, once per transaction id. In a server room the server scored
@@ -476,8 +507,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
   // "%82 benzer" for everyone else on a mic: the bead ring around their seat and the seat menu title
-  // (a handful of small set lookups, cheap enough to redo each render).
-  const simScores = new Map(seatedOthers.map((u) => [u, similarity(app.me, userById(u)).score]));
+  // (a handful of small set lookups, cheap enough to redo each render). Not in a server room: the server keeps
+  // no interests, so everyone would get about the same score.
+  const simScores = new Map(real ? [] : seatedOthers.map((u) => [u, similarity(app.me, userById(u)).score]));
 
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
@@ -624,12 +656,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     staff.reload();
   });
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
-  useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
+  // Server room: who switched their own mic off, from the voice connection (drawn like my own mic-off badge).
+  const peersMicOff = useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
     onJoin: (_uid, name) => addMsg({ system: true, text: `${name} güverteye çıktı` }),
     onLeave: (_uid, name) => addMsg({ system: true, text: `${name} odadan ayrıldı` }),
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
     onSignal: (from, msg: RoomSignal) => {
-      if (blocked.has(from) || silenced.has(from)) return;
+      if (blocked.has(from)) return;
       // Room chat goes phone to phone and the server never reads it, so a line with contact details from an older
       // or modified app is dropped here. Not counted: the refusal would be mine, and I only received it.
       if (msg.t === 'chat') return checkText(msg.text).ok ? addMsg({ userId: from, text: msg.text }) : undefined;
@@ -698,6 +731,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       return r;
     }
     if (changed) {
+      // A server room: the server keeps the layout and tells the other phones; a refusal puts its layout back.
+      if (real)
+        updateServerRoom(id, { layoutId })
+          .catch((e) => {
+            showAlert(refusalTitle(e, 'Düzen kaydedilemedi'), errorText(e));
+            return syncServerStage(id);
+          })
+          .catch(() => {});
       const l = layoutById(layoutId);
       const name = l ? `${modeById(l.modeId).name} · ${l.name}` : `Klasik düzen · ${classicCapacity} mikrofon`;
       logMod('Oda düzenini değiştirdi', name);
@@ -1238,13 +1279,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Odadan çıkar', style: 'destructive', onPress: () => kickFromRoom(uid) },
     ]);
-  const toggleSilence = (uid: string) =>
-    setSilenced((s) => {
-      const n = new Set(s);
-      if (n.has(uid)) n.delete(uid);
-      else n.add(uid);
-      return n;
-    });
   // Server room: switching someone's mic off is a room voice mute the server enforces (components/room/room-mute,
   // asks for how long); switching it back on lifts that mute.
   const serverMicMute = (uid: string, name: string, mute: boolean) => {
@@ -1406,7 +1440,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items.push(
         { key: 'gift', label: 'Hediye gönder', icon: 'gift-outline', dividerBefore: !outranks, onPress: () => (setGiftTo(uid), setGiftOpen(true)) },
         { key: 'dm', label: 'Mesaj gönder', icon: 'chatbubble-outline', onPress: () => router.push(`/sohbet/${uid}`) },
-        { key: 'silence', label: silenced.has(uid) ? 'Sesini benim için aç' : 'Benim için sessize al', icon: silenced.has(uid) ? 'volume-high-outline' : 'volume-mute-outline', onPress: () => toggleSilence(uid) },
       );
       if (outranks && myRole === 'owner') {
         const isAdmin = adminIds.includes(uid);
@@ -2027,8 +2060,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addMsg({ system: true, text: `${ME.name} davetle ${(r.seat ?? 0) + 1}. mikrofona geçti` });
   };
 
-  // Chat: personal mutes hide that person's lines on my screen; message settings apply to the Tümü tab.
-  const feed = useMemo(() => (silenced.size ? messages.filter((m) => !(m.userId && silenced.has(m.userId) && kindOf(m) === 'chat')) : messages), [messages, silenced]);
+  // Chat: message settings apply to the Tümü tab.
   const visibleInAll = useCallback(
     (m: FeedMsg) => (msgFilter.bot || !m.bot) && (msgFilter.joins || !(m.system && m.text.includes('güverteye çıktı'))) && (msgFilter.gifts || kindOf(m) !== 'gift'),
     [msgFilter],
@@ -2050,7 +2082,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (!r.ok) return showAlert('Yapılamadı', r.reason);
       logMod(muted ? 'Mikrofonunu susturdu' : 'Mikrofonunu açtı', userById(uid).name);
     },
-    silence: toggleSilence,
     kick: confirmKick,
     profile: (uid) => {
       setPeopleOpen(false);
@@ -2126,8 +2157,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         small={small}
         vipLevel={uid === 'me' ? vipLevel : 0}
         frameId={uid === 'me' ? equipped.frame : undefined}
-        speaking={!!uid && speaking.has(uid) && !silenced.has(uid)}
-        muted={uid === 'me' && !sending}
+        speaking={!!uid && speaking.has(uid)}
+        muted={uid === 'me' ? !sending : !!uid && peersMicOff.has(uid)}
         modMuted={!!uid && mutedUsers.has(uid)}
         invitee={!uid && slots[i]?.state === 'invited' && slots[i].invitee ? userById(slots[i].invitee!).name : undefined}
         similarity={uid ? simScores.get(uid) : undefined}
@@ -2140,7 +2171,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         camera={uid === 'me' && camOn}
         teamColor={teamColorOf(uid)}
         pkPoints={pkPointsOf(uid)}
-        silenced={!!uid && silenced.has(uid)}
         avatarSize={extra?.slot?.size}
         slotWidth={extra?.slot?.width}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
@@ -2237,9 +2267,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics. Capped so the Güverte and the chat always keep their space on small phones; scrolls when taller.
-              Folded away (still mounted) while typing, so the chat keeps its lines above the keyboard. */}
-          <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58), display: typing ? 'none' : 'flex' }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+          {/* Stage: boards and mics, in what the chat leaves (the chat keeps the height the person chose, so it never
+              jumps when a banner comes or goes); scrolls when taller. Folded away (still mounted) while typing, so the
+              chat keeps its lines above the keyboard. */}
+          <ScrollView style={{ flex: 1, minHeight: 120, display: typing ? 'none' : 'flex' }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
@@ -2343,7 +2374,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             />
           )}
 
-          <ChatFeed messages={feed} visible={visibleInAll} renderItem={renderChat} />
+          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} />
 
           {emojiOpen && (
             <EmojiPanel
@@ -2451,7 +2482,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         myRole={myRole}
         offline={offline}
         inviteSeat={inviteSeat}
-        silenced={silenced}
         blocked={blocked}
         hiddenMe={invisible && !amSeated}
         actions={peopleActions}
