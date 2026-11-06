@@ -8,7 +8,8 @@
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true }
-import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, text, tx, userId } from './core.mjs';
+import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 
@@ -61,10 +62,10 @@ export const socialRoutes = {
       set.avatar_url = b.avatarUrl;
     }
     const keys = Object.keys(set);
-    if (!keys.length) return { user: selfUser(u) };
+    if (!keys.length) return { user: await withSignIn(u) };
     try {
       const r = await db.query(`UPDATE users SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`, [u.id, ...keys.map((k) => set[k])]);
-      return { user: selfUser(r.rows[0]) };
+      return { user: await withSignIn(r.rows[0]) };
     } catch (e) {
       if (e.code === '23505') throw new HttpError(409, 'Bu kullanıcı adı alınmış');
       throw e;
@@ -73,9 +74,10 @@ export const socialRoutes = {
 
   /**
    * Account deletion (Play and Apple require it in the app). Personal data goes: profile fields, phone number,
-   * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, own rooms. The id,
-   * ledger, gifts and purchases stay, because financial records must be kept; they no longer point to anything
-   * personal. The phone number and the Google account are free again for a new account.
+   * sign-in key, the linked Google account and e-mail address (with their pending codes and phone checks),
+   * sessions, push tokens, follows, blocks, messages, own rooms. The id, ledger, gifts and purchases stay,
+   * because financial records must be kept; they no longer point to anything personal. The phone number, the
+   * address, the Google account and the device are free again for a new account.
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
@@ -85,7 +87,9 @@ export const socialRoutes = {
            interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, deleted_at = now() WHERE id = $1`,
         [u.id],
       );
-      if (u.phone) await c.query('DELETE FROM otp_codes WHERE phone = $1', [u.phone]);
+      if (u.phone) await c.query("DELETE FROM otp_codes WHERE channel = 'sms' AND target = $1", [u.phone]);
+      await c.query("DELETE FROM otp_codes WHERE channel = 'email' AND target IN (SELECT subject FROM auth_identities WHERE user_id = $1 AND provider = 'email')", [u.id]);
+      await c.query('DELETE FROM phone_claims WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM auth_identities WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM push_tokens WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM sessions WHERE user_id = $1', [u.id]);

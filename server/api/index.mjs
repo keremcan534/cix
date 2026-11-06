@@ -10,8 +10,8 @@
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
-// Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
-// purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
+// Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
+// Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
@@ -30,12 +30,12 @@ import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
-import { authRoutes } from './auth.mjs';
+import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { wheelRoutes } from './wheel.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
-import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
+import { HttpError, RawText, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -47,6 +47,7 @@ import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
 import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 
@@ -100,7 +101,7 @@ const walletRoutes = {
   },
 
   async 'GET /api/me'(req) {
-    return { user: selfUser(await auth(req)) };
+    return { user: await withSignIn(await auth(req)) };
   },
 
   async 'GET /api/ledger'(req) {
@@ -194,6 +195,7 @@ const routes = {
   ...jetonRoutes,
   ...refundSyncRoutes,
   ...authRoutes,
+  ...whatsappRoutes,
   ...pushRoutes,
   ...giftRoutes,
   ...bondRoutes,
@@ -228,7 +230,8 @@ const server = http.createServer(async (req, res) => {
   inFlight++;
   const url = new URL(req.url ?? '/', 'http://x');
   const send = (code, data) => {
-    if (!res.headersSent) res.writeHead(code).end(JSON.stringify(data));
+    if (!res.headersSent && data instanceof RawText) res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }).end(data.text);
+    else if (!res.headersSent) res.writeHead(code).end(JSON.stringify(data));
     // Path only: query strings can hold a room password.
     if (LOG && url.pathname !== '/api/health') console.log(JSON.stringify({ t: new Date().toISOString(), m: req.method, p: url.pathname, s: code, ms: Math.round(performance.now() - t0) }));
   };
@@ -286,6 +289,7 @@ function shutdown(signal) {
   stopRefundSync();
   stopBondSweep();
   stopSanctionSweep();
+  stopOtpSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -304,3 +308,4 @@ startFinanceSync();
 startRefundSync();
 startBondSweep();
 startSanctionSweep();
+startOtpSweep();

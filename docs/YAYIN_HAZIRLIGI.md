@@ -72,7 +72,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | | Durum |
 |---|---|
 | Yaş derecesi anketleri (IARC, Apple): 18+, kullanıcı içeriği, varsa simüle şans oyunu | ⏳ |
-| Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar | ⏳ |
+| Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, e-posta adresi (giriş; Brevo, Resend ve WhatsApp açılırsa Meta veri işleyen olarak gizlilik politikasında), ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar | ⏳ |
 | Uygulama içi hesap silme | ✅ sunucu · ⏳ uygulama bağlantısı |
 | Web'den hesap silme bağlantısı (Play şartı) | ⏳ alan adıyla |
 | İncelemeci hesabı, inceleme notları, ekran görüntüleri | ⏳ |

@@ -235,12 +235,15 @@ export type RankingRow = { rank: number; user: { id: string; name: string; avata
 export type ServerSession = { id: string; device: string; createdAt: string; lastSeenAt: string; current: boolean };
 export type StoreProof = { platform: 'android'; productId: string; token: string } | { platform: 'ios' | 'test'; productId: string; transactionId: string };
 
-/** Phone sign-in, step 1: the server texts a 6-digit code (a new one every `retryAfter` seconds). */
-export const otpStart = (phone: string) => call<{ sent: boolean; retryAfter: number }>('POST', '/api/auth/otp/start', { phone });
+/**
+ * Phone sign-in, step 1 (off on the server unless PHONE_SIGN_IN=1): the server texts a 6-digit code (a new one
+ * every `retryAfter` seconds). `challenge` goes back with the code in step 2.
+ */
+export const otpStart = (phone: string) => call<{ sent: boolean; retryAfter: number; challenge: string }>('POST', '/api/auth/otp/start', { phone });
 
-/** Phone sign-in, step 2: the code opens a session. `isNew` = a new account (ask for the profile next). */
-export async function otpVerify(phone: string, code: string, name?: string, device?: string) {
-  const r = await call<{ session: string; user: ServerUser; isNew: boolean }>('POST', '/api/auth/otp/verify', { phone, code, name, deviceKey: await deviceKey(), deviceInfo: await myDevice(), device });
+/** Phone sign-in, step 2: the code and step 1's `challenge` open a session. `isNew` = a new account (ask for the profile next). */
+export async function otpVerify(phone: string, code: string, challenge: string, name?: string, device?: string) {
+  const r = await call<{ session: string; user: ServerUser; isNew: boolean }>('POST', '/api/auth/otp/verify', { phone, code, challenge, name, deviceKey: await deviceKey(), deviceInfo: await myDevice(), device });
   await keepSession(r.session);
   return { user: r.user, isNew: r.isNew };
 }

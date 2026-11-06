@@ -2,7 +2,7 @@
 // an update link, a notice banner, and a kill switch per feature. Changing .env needs only
 // `docker compose up -d api`.
 //
-//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff }
+//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, signIn, verify }
 //
 //   APP_MIN_VERSION  e.g. 1.0.3: older apps show a blocking "Güncelleme gerekli" screen
 //   APP_UPDATE_URL   where that screen sends people (store page or APK download), https only
@@ -14,6 +14,7 @@
 // ROUTES; reads stay open so balances and history still show. assertOn() is for code that needs to check a
 // feature inside a handler.
 import { HttpError, env } from './core.mjs';
+import { mailProvidersOf } from './mail.mjs';
 
 /** Every feature that can be switched off. `games` is mostly in the app (most games run there); Rüzgâr Gülü is here. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'];
@@ -56,6 +57,29 @@ export function configOf(e = env) {
     updateUrl: /^https:\/\/\S+$/.test(url) ? url : null,
     notice: String(e.APP_NOTICE ?? '').trim().slice(0, 300) || null,
     featuresOff: [...new Set(list(e.FEATURES_OFF).filter((f) => FEATURES.includes(f)))],
+    ...signInOf(e),
+  };
+}
+
+// --- Sign-in and phone-check methods (auth.mjs, mail.mjs, whatsapp.mjs): what the app may offer ---------------
+//   signIn: { dev, google, email, phone }   the welcome screen's buttons (development sign-in only on test servers)
+//   verify: { sms, whatsapp }               how Ayarlar can check a phone number
+/** WhatsApp phone check: on with our number and the Meta app secret (whatsapp.mjs). */
+export const whatsappOnOf = (e = env) => !!String(e.WHATSAPP_NUMBER ?? '').replace(/\D/g, '') && !!String(e.WHATSAPP_APP_SECRET ?? '').trim();
+/** OTP_GLOBAL_PER_HOUR: SMS codes per hour over everyone; empty or invalid = 300, 0 = no SMS at all. */
+export function smsPerHourOf(e = env) {
+  const v = String(e.OTP_GLOBAL_PER_HOUR ?? '').trim();
+  const n = v === '' ? 300 : Number(v);
+  return Number.isSafeInteger(n) && n >= 0 ? n : 300;
+}
+/** SMS codes can go out: a provider is set (SMS_PROVIDER) and OTP_GLOBAL_PER_HOUR is not 0. */
+export const smsOnOf = (e = env) => ['netgsm', 'twilio', 'log'].includes(e.SMS_PROVIDER ?? '') && smsPerHourOf(e) > 0;
+/** Signing in with a phone number by SMS: only with PHONE_SIGN_IN=1 as well (a checked phone is otherwise just a badge). */
+export const phoneSignInOf = (e = env) => e.PHONE_SIGN_IN === '1' && smsOnOf(e);
+export function signInOf(e = env) {
+  return {
+    signIn: { dev: e.ALLOW_DEV_AUTH === '1', google: list(e.GOOGLE_CLIENT_IDS).length > 0, email: mailProvidersOf(e).length > 0, phone: phoneSignInOf(e) },
+    verify: { sms: smsOnOf(e), whatsapp: whatsappOnOf(e) },
   };
 }
 
