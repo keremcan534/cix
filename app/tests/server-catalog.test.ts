@@ -8,7 +8,7 @@ import path from 'node:path';
 
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
-import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, wholesaleQuote } from '@/lib/coins-bank';
+import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
 import { RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
@@ -46,6 +46,22 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
       assert.ok(q.ok);
       if (q.ok) assert.equal((server.exchangeCoins as (n: number) => number)(d), q.coins, `${d} elmas`);
     }
+  });
+
+  test('Çevir canlı kurla: uygulamanın gösterdiği jeton sunucunun verdiğiyle aynı (yanlış "kur değişti" olmaz)', () => {
+    const coinsAt = server.exchangeCoins as (n: number, usdTry?: number) => number;
+    for (const usdTry of [40, 49.8, 55.55, 75]) {
+      const rules = { ...RULES, usdTry };
+      for (const d of [100, 101, 999, 5_000, 88_959, 1_000_000, 123_456_789]) {
+        const shown = Math.floor(d * selfExchangeRate(rules));
+        assert.equal(coinsAt(d, usdTry), shown, `${d} elmas, kur ${usdTry}`);
+        const q = exchangeOwnDiamonds(d, d, rules);
+        assert.ok(q.ok);
+        if (q.ok) assert.equal(q.coins, shown, `${d} elmas, kur ${usdTry} (Çevir ekranı)`);
+      }
+    }
+    // Without a rate the server uses the compiled one, as before.
+    assert.equal(coinsAt(10_000), coinsAt(10_000, RULES.usdTry));
   });
 
   test('Jeton Noktası: elmas bozdurma ve toptan fiyat sunucuyla aynı', () => {

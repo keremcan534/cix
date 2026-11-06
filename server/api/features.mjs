@@ -1,22 +1,26 @@
-// Remote control of the app from .env (docs/SUNUCU.md, "Hata izleme ve acil durum"): the minimum app version,
-// an update link, a notice banner, and a kill switch per feature. Changing .env needs only
-// `docker compose up -d api`.
+// Remote control of the app (docs/SUNUCU.md, "Hata izleme ve acil durum"): the minimum app version, an update
+// link, a notice banner, and a kill switch per feature. They come from .env (changing it needs only
+// `docker compose up -d api`) and from the live settings the owner changes in the admin panel
+// (live-settings.mjs): a feature is off when either switches it off, and the live notice and minimum version
+// replace .env's.
 //
-//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff }
+//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, v }
+//     v: the live settings' version; the app reloads the catalog when it changes.
 //
 //   APP_MIN_VERSION  e.g. 1.0.3: older apps show a blocking "Güncelleme gerekli" screen
 //   APP_UPDATE_URL   where that screen sends people (store page or APK download), https only
 //   APP_NOTICE       a short banner text shown in the app (empty = none)
-//   FEATURES_OFF     comma list of FEATURES, e.g. gifts,topup
+//   FEATURES_OFF     comma list of FEATURES, e.g. gifts,topup; the live settings can't switch these back on
 //
 // A switched-off feature is refused here as well, not only hidden in the app: the request handler calls
 // gate() before the route, so an old app (or a script) can't use it either. The money routes are listed in
-// ROUTES; reads stay open so balances and history still show. assertOn() is for code that needs to check a
-// feature inside a handler.
+// ROUTES; reads stay open so balances and history still show. The admin routes are in none, so a switch can't
+// lock the owner out. assertOn() is for code that needs to check a feature inside a handler.
 import { HttpError, env } from './core.mjs';
+import { FEATURES, OFF_MESSAGE, configOf, listOf } from './live-registry.mjs';
+import { live } from './live-settings.mjs';
 
-/** Every feature that can be switched off. `games` is mostly in the app (most games run there); Rüzgâr Gülü is here. */
-export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'];
+export { FEATURES, OFF_MESSAGE, configOf };
 
 /** "METHOD /path" → the features that turn it off. */
 export const ROUTES = {
@@ -37,42 +41,22 @@ export const ROUTES = {
   'GET /token': ['rooms'],
 };
 
-export const OFF_MESSAGE = 'Bu özellik geçici olarak kapalı';
-
-const list = (s) =>
-  String(s ?? '')
-    .split(',')
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
-
-const VERSION_RE = /^\d+(\.\d+){0,2}$/;
-
-/** The config as the app reads it, from `e` (the environment). Unknown feature names are left out. */
-export function configOf(e = env) {
-  const min = String(e.APP_MIN_VERSION ?? '').trim();
-  const url = String(e.APP_UPDATE_URL ?? '').trim();
-  return {
-    minVersion: VERSION_RE.test(min) ? min : null,
-    updateUrl: /^https:\/\/\S+$/.test(url) ? url : null,
-    notice: String(e.APP_NOTICE ?? '').trim().slice(0, 300) || null,
-    featuresOff: [...new Set(list(e.FEATURES_OFF).filter((f) => FEATURES.includes(f)))],
-  };
-}
-
-const CONFIG = configOf();
-const OFF = new Set(CONFIG.featuresOff);
+const CONFIG = configOf(env);
+const ENV_OFF = new Set(CONFIG.featuresOff);
 {
-  const unknown = list(env.FEATURES_OFF).filter((f) => !FEATURES.includes(f));
+  const unknown = listOf(env.FEATURES_OFF).filter((f) => !FEATURES.includes(f));
   if (unknown.length) console.warn(`FEATURES_OFF: unknown ${unknown.join(', ')} (known: ${FEATURES.join(', ')})`);
   if (String(env.APP_MIN_VERSION ?? '').trim() && !CONFIG.minVersion) console.warn('APP_MIN_VERSION ignored: use digits like 1.0.3');
-  if (OFF.size) console.log(`features off: ${[...OFF].join(', ')}`);
+  if (ENV_OFF.size) console.log(`features off: ${[...ENV_OFF].join(', ')}`);
 }
 
-export const isOn = (name) => !OFF.has(name);
+const off = (name) => ENV_OFF.has(name) || live().featuresOff.has(name);
+
+export const isOn = (name) => !off(name);
 
 /** Inside a handler: a 503 with the Turkish message when `name` is switched off. */
 export function assertOn(name) {
-  if (OFF.has(name)) throw Object.assign(new HttpError(503, OFF_MESSAGE), { feature: name });
+  if (off(name)) throw Object.assign(new HttpError(503, OFF_MESSAGE), { feature: name });
 }
 
 /** Called by the request handler before every route: refuses the routes of a switched-off feature. */
@@ -85,6 +69,8 @@ export const CONFIG_CACHE = 'public, max-age=30';
 
 export const configRoutes = {
   async 'GET /api/config'() {
-    return { ...CONFIG, featuresOff: [...CONFIG.featuresOff] };
+    const s = live();
+    // .env's switched-off features first, in .env's order, then the live ones.
+    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v };
   },
 };

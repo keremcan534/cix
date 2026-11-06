@@ -1,6 +1,6 @@
 // Coin purchases through the stores, verified by the server before any coin is credited.
 //
-//   POST /api/wallet/purchase { platform: 'android', productId, token }          → { user, replay, coins, bonus }
+//   POST /api/wallet/purchase { platform: 'android', productId, token }          → { user, replay, coins, bonus, campaignBonus }
 //   POST /api/wallet/purchase { platform: 'ios', productId, transactionId }
 //   POST /api/wallet/purchase { platform: 'test', productId, transactionId }     (ALLOW_TEST_TOPUP=1 only)
 //
@@ -22,10 +22,21 @@
 // pack adds its first-purchase bonus; purchased coins (not the bonus) count as SVIP points. The coins are
 // lots with the store's channel (google / apple / test, and bonus): gifted, they lock the recipient's diamonds
 // for the store lock (wallet.mjs), and a refund (jeton.mjs) can follow them.
+//
+// Campaign (Canlı ayarlar, live-settings.mjs): a purchase made while a campaign ran, by the store's purchase
+// time (a future time counts as now; a missing one gets no campaign), gets its percent of the pack's coins on
+// top, as a 'kampanya' lot with the store lock. `bonus` stays the first-purchase gift only, so old apps don't
+// mislabel it; the campaign coins are `campaignBonus`. Ending a campaign early never takes them back from
+// purchases made before the end, however late they are verified; a purchase made before the campaign was set
+// never gets them, even if verified later. Store sandbox purchases
+// get no campaign; test-store purchases do (to try it), inside the daily play-coin cap. A hidden pack
+// (packs_hidden) is only left out of the catalog: verifying one still credits it.
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
+import { campaignBonus, campaignRef } from './live-registry.mjs';
+import { campaignAt } from './live-settings.mjs';
 import { TEST_DAILY, creditCoins, playCoinsToday } from './wallet.mjs';
 
 const TEST = env.ALLOW_TEST_TOPUP === '1';
@@ -40,6 +51,12 @@ const APPLE_SANDBOX_API = local(env.APPLE_SANDBOX_API_URL, 'https://api.storekit
 const STORE_CHANNEL = { android: 'google', ios: 'apple', test: 'test' };
 const PACKAGE = env.GOOGLE_PLAY_PACKAGE ?? 'com.similarclub.app';
 const BUNDLE = env.APPLE_BUNDLE_ID ?? 'com.similarclub.app';
+/**
+ * The store's purchase time (ms) the campaign is decided by. A time in the future (clock skew) counts as now; any
+ * past time stays as it is, since live_settings rows are never changed or deleted and campaignAt() answers for
+ * any moment. A missing or broken time gives null: no campaign, rather than whatever runs at verify time.
+ */
+const purchaseTimeOf = (t, now = Date.now()) => (Number.isFinite(t) && t > 0 ? Math.min(now, t) : null);
 const b64url = (v) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
 const jwtPart = (jws, i) => JSON.parse(Buffer.from(jws.split('.')[i], 'base64url').toString('utf8'));
 
@@ -97,6 +114,7 @@ async function verifyGoogle(u, productId, token) {
   return {
     sandbox,
     transactionId: p.orderId || `token-${sha(token)}`,
+    purchaseTime: Number(p.purchaseTimeMillis),
     // Consumed after crediting; a failure only means the next purchase of this pack waits for a retry.
     finish: () => fetch(`${base}:consume`, { method: 'POST', headers, signal: AbortSignal.timeout(10_000) }).then((x) => !x.ok && console.error('google consume', x.status)),
   };
@@ -131,12 +149,15 @@ async function verifyApple(u, productId, transactionId) {
   if (info.bundleId !== BUNDLE || info.productId !== productId) throw new HttpError(400, 'Satın alma bu ürüne ait değil');
   if (info.revocationDate) throw new HttpError(402, 'Bu satın alma iade edilmiş');
   if (info.appAccountToken && info.appAccountToken.toLowerCase() !== u.id) throw new HttpError(403, 'Bu satın alma başka bir hesaba ait');
-  return { sandbox, transactionId: String(info.transactionId), finish: () => {} };
+  return { sandbox, transactionId: String(info.transactionId), purchaseTime: Number(info.purchaseDate), finish: () => {} };
 }
 
 // --- Crediting --------------------------------------------------------------------------------------------
-/** `play`: a test or sandbox purchase, credited as play money on the 'test' channel (wallet.mjs PLAY_MONEY). */
-async function credit(u, platform, pack, transactionId, play) {
+/**
+ * `play`: a test or sandbox purchase, credited as play money on the 'test' channel (wallet.mjs PLAY_MONEY).
+ * `purchaseTime`: when the store says it was bought (ms), which decides the campaign.
+ */
+async function credit(u, platform, pack, transactionId, play, purchaseTime) {
   const ref = `buy_${sha(`${platform}:${transactionId}`).slice(0, 40)}`;
   // The same store transaction sent by two accounts at once: each locks only its own row, so the second one
   // trips the unique (platform, transaction_id). Same answer as when the first had already committed.
@@ -146,42 +167,45 @@ async function credit(u, platform, pack, transactionId, play) {
   };
   return tx(async (c) => {
     await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
-    const prev = (await c.query('SELECT user_id, coins, bonus FROM purchases WHERE platform = $1 AND transaction_id = $2', [platform, transactionId])).rows[0];
+    const prev = (await c.query('SELECT user_id, coins, bonus, campaign_bonus FROM purchases WHERE platform = $1 AND transaction_id = $2', [platform, transactionId])).rows[0];
     if (prev) {
       if (prev.user_id !== u.id) throw new HttpError(409, 'Bu satın alma başka bir hesapta kullanıldı');
-      return { replay: true, coins: Number(prev.coins), bonus: Number(prev.bonus) };
+      return { replay: true, coins: Number(prev.coins), bonus: Number(prev.bonus), campaignBonus: Number(prev.campaign_bonus) };
     }
     const first = !(await c.query('SELECT 1 FROM purchases WHERE user_id = $1 AND product_id = $2', [u.id, pack.productId])).rowCount;
     const bonus = first ? pack.firstBonus : 0;
-    // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
-    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
     const sandbox = play && platform !== 'test';
-    const p = await c.query('INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id', [
-      u.id,
-      platform,
-      pack.productId,
-      transactionId,
-      pack.coins,
-      bonus,
-      sandbox,
-    ]);
+    // The campaign set at the purchase time and running then: one ended since still pays (however late the verify),
+    // one set later doesn't. No usable purchase time: no campaign.
+    const at = purchaseTimeOf(purchaseTime);
+    const campaign = sandbox || at === null ? null : await campaignAt(c, at);
+    const kampanya = campaign ? campaignBonus(pack.coins, campaign, at) : 0;
+    // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
+    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus + kampanya > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+    const p = await c.query(
+      'INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox, campaign_bonus, campaign_ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+      [u.id, platform, pack.productId, transactionId, pack.coins, bonus, sandbox, kampanya, kampanya ? campaignRef(campaign) : null],
+    );
     const purchaseId = Number(p.rows[0].id);
-    // Two lots: the store's coins and the first-purchase gift, both with the store lock (wallet.mjs).
+    const gifts = [bonus && `+${bonus} ilk alım hediyesi`, kampanya && `+${kampanya} kampanya`].filter(Boolean);
+    // Up to three lots, all with the store lock (wallet.mjs): the store's coins, the first-purchase gift and
+    // the campaign's.
     await creditCoins(
       c,
       u.id,
       [
         { channel: play ? 'test' : STORE_CHANNEL[platform], amount: pack.coins, purchaseId },
         { channel: 'bonus', amount: bonus, purchaseId },
+        { channel: 'kampanya', amount: kampanya, purchaseId },
       ],
-      bonus ? `Jeton satın alma (+${bonus} ilk alım hediyesi)` : 'Jeton satın alma',
+      gifts.length ? `Jeton satın alma (${gifts.join(', ')})` : 'Jeton satın alma',
       ref,
       null,
       { detail: { purchase: purchaseId, platform, product: pack.productId, transaction: transactionId, ...(sandbox && { sandbox }) } },
     );
-    // SVIP points are for coins someone paid for.
+    // SVIP points are for coins someone paid for: the pack only, not the first-purchase or campaign gift.
     if (!sandbox) await c.query('UPDATE users SET svip_xp = svip_xp + $2 WHERE id = $1', [u.id, pack.coins]);
-    return { replay: false, coins: pack.coins, bonus };
+    return { replay: false, coins: pack.coins, bonus, campaignBonus: kampanya };
   }).catch(taken);
 }
 
@@ -197,9 +221,9 @@ export const purchaseRoutes = {
     else if (b.platform === 'test') {
       if (!TEST) throw new HttpError(403, 'Test satın alması kapalı');
       if (typeof b.transactionId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(b.transactionId)) throw new HttpError(400, 'Geçersiz satın alma');
-      proof = { sandbox: true, transactionId: b.transactionId, finish: () => {} };
+      proof = { sandbox: true, transactionId: b.transactionId, purchaseTime: Date.now(), finish: () => {} };
     } else throw new HttpError(400, 'Geçersiz platform');
-    const out = await credit(u, b.platform, pack, proof.transactionId, proof.sandbox);
+    const out = await credit(u, b.platform, pack, proof.transactionId, proof.sandbox, proof.purchaseTime);
     await proof.finish();
     const me = (await db.query('SELECT * FROM users WHERE id = $1', [u.id])).rows[0];
     return { user: selfUser(me), ...out };

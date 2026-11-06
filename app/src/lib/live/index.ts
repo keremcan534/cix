@@ -13,6 +13,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
+import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
@@ -25,6 +26,20 @@ export const callsAvailable = () => !liveMode();
 let myId: string | null = null;
 /** My server id once signed in. */
 export const myServerId = () => myId;
+const accountListeners = new Set<() => void>();
+/**
+ * Called when this phone's server account changes: the first sign-in of a run, a sign-in as someone else, or a
+ * sign-out (myServerId() is null then). lib/live/admin drops the role it read for the one before.
+ */
+export const onAccountChange = (l: () => void) => {
+  accountListeners.add(l);
+  return () => void accountListeners.delete(l);
+};
+const setMyId = (id: string | null) => {
+  if (id === myId) return;
+  myId = id;
+  accountListeners.forEach((l) => l());
+};
 /** A server id as this phone names it: mine is 'me'. */
 export const toLocal = (id: string) => (id === myId ? 'me' : id);
 /** A local id as the server names it, or null for people who only exist in the demo (u1, gx-…). */
@@ -46,7 +61,7 @@ export const expectReturn = (n: number) => void (returning += n);
 const order = replyOrder();
 /** `readAt`: a balance read's start number (order.begin); without it the reply is a money action's answer. */
 const applied = <T extends { user: api.ServerUser }>(r: T, reason?: string, readAt?: number) => {
-  myId = r.user.id;
+  setMyId(r.user.id);
   // A read that started before the last money answer holds an older balance: applying it would be a fake change.
   if (readAt !== undefined && order.stale(readAt)) return r;
   const returned = returning;
@@ -123,9 +138,22 @@ export async function liveTopup(coins: number) {
   applied(await once(`topup:${coins}`, (ref) => api.testTopup(coins, ref)), 'Jeton yükleme (test)');
 }
 
-/** Gelir > Çevir on the server; returns the coins received. */
+/**
+ * Gelir > Çevir on the server; returns the coins received. The rate the screen showed goes with it (liveRules,
+ * lib/live/catalog-live), so the server never gives less than the screen said. When the server's rate is lower
+ * now (409 rate_changed) nothing was taken: the new rate reaches the screens and the error says the new amount.
+ */
 export async function liveExchange(diamonds: number) {
-  const r = applied(await once(`exchange:${diamonds}`, (ref) => api.exchange(diamonds, ref)), 'Elmas → jeton çevirme');
+  const usdTry = liveRules().usdTry;
+  let r: { user: api.ServerUser; coins: number };
+  try {
+    r = applied(await once(`exchange:${diamonds}`, (ref) => api.exchange(diamonds, ref, usdTry)), 'Elmas → jeton çevirme');
+  } catch (e) {
+    if (!(e instanceof api.ApiError && e.status === 409 && e.data.code === 'rate_changed')) throw e;
+    noteLiveRate(e.data.usdTry);
+    void refreshLiveCatalog();
+    throw new api.ApiError(409, rateChangedMessage(diamonds, e.data), e.data);
+  }
   await refreshEarnings().catch(() => {});
   return r.coins;
 }
@@ -139,7 +167,7 @@ export async function liveGift(to: string, giftId: string, count: number, room?:
 
 /** Signed out: the next account on this phone starts without this one's id, balance or pending request ids. */
 export function forgetLiveAccount() {
-  myId = null;
+  setMyId(null);
   lastDiamonds = null;
   returning = 0;
   unsure.clear();

@@ -13,6 +13,7 @@ import { Avatar, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBad
 import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type User } from '@/data/mock';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { privacyOf } from '@/data/privacy';
 import { staffBadgeOf } from '@/data/rbac';
 import { COUNTRIES } from '@/data/social-ui';
@@ -69,6 +70,8 @@ export default function UserProfile() {
     me, following, toggleFollow, blocked, toggleBlock, createTicket, fanClubs, addFanPoints, myRoom, notify, updateMe, spendCoins, bump, settings, vipLevel, svipLevel, equipped, inventory, giftWall: wallOf, recordGift,
     rbac, coins, diamonds, wealthXp, charmXp, wealthLevel, charmLevel, vipDays, stats, logSafety, pendingAvatar, submitAvatar,
   } = useApp();
+  // Gifts the owner hid in Canlı ayarlar are not offered here (the wall below still counts every gift).
+  const giftChoices = visibleGifts(GIFTS, useLiveCatalog());
   const isMe = id === 'me';
   // Live mode: a real person's profile (age, city, interests) is read from the server when it opens.
   const [, setLoaded] = useState(0);
@@ -663,7 +666,7 @@ export default function UserProfile() {
         visible={sheet === 'gift'}
         title={`${user.name} kişisine hediye gönder`}
         onClose={() => setSheet('none')}
-        options={GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}${(g.minSvip ?? 0) > svipLevel ? ` · 🔒 İnci ${g.minSvip}` : ''}`, onPress: () => sendGift(g) }))}
+        options={giftChoices.map((g) => ({ label: `${g.emoji} ${g.name} · 🪙 ${g.price}${(g.minSvip ?? 0) > svipLevel ? ` · 🔒 İnci ${g.minSvip}` : ''}`, onPress: () => sendGift(g) }))}
       />
 
       {editOpen && (

@@ -3,9 +3,10 @@
 //   GET /api/wallet/earnings   → { diamonds, withdrawable, locked, lockDays, locks }   (Gelir: çekilebilir / kilitli)
 //   GET /api/wallet/coins      → { coins, channels, lots }                             (where my coins came from)
 //
-// A credit of coins writes one lot per source (store purchase, first-purchase gift, Jeton Noktası sale,
-// wholesale, Çevir…) with its channel, date, supplier and lock. A spend takes coins from the account's open
-// lots, store coins first (COIN_SPEND_ORDER=fifo: oldest first), and the ledger row says which lots it used.
+// A credit of coins writes one lot per source (store purchase, first-purchase gift, campaign gift, Jeton
+// Noktası sale, wholesale, Çevir…) with its channel, date, supplier and lock. A spend takes coins from the
+// account's open lots, store coins first (COIN_SPEND_ORDER=fifo: oldest first), and the ledger row says which
+// lots it used.
 // A gift turns each portion into the recipient's diamonds with that lot's lock: store coins (Google Play, App
 // Store) 7 days, Jeton Noktası coins 1 day (LOCK_DAYS_STORE, LOCK_DAYS_JETON). Coins a Jeton Noktası passes on
 // keep the longer lock of where the bank got them, so store coins can't be washed through a bank. Locked
@@ -26,6 +27,8 @@ export const CHANNELS = {
   apple: { label: 'App Store', lock: 'store' },
   test: { label: 'Test satın alma', lock: 'store' },
   bonus: { label: 'İlk alım hediyesi', lock: 'store' },
+  // The campaign's extra coins on a store purchase (Canlı ayarlar, live-settings.mjs); a refund takes them back.
+  kampanya: { label: 'Kampanya hediyesi', lock: 'store' },
   legacy: { label: 'Önceki bakiye', lock: 'store' },
   jeton_noktasi: { label: 'Jeton Noktası', lock: 'jeton' },
   toptan: { label: 'Toptan alım', lock: 'jeton' },
@@ -46,18 +49,21 @@ const fmt = (n) => n.toLocaleString('tr-TR');
  * on play money, and none of its diamonds can ever be paid out (withdraw.mjs).
  */
 export const PLAY_MONEY = env.ALLOW_TEST_TOPUP === '1' || env.ALLOW_SANDBOX_PURCHASES === '1';
-/** Most play coins one account gets per day: test top-ups and test or sandbox purchases together, bonus included. */
+/**
+ * Most play coins one account gets per day: test top-ups and test or sandbox purchases together, the
+ * first-purchase and campaign gifts included.
+ */
 export const TEST_DAILY = (() => {
   const n = Number(env.TEST_TOPUP_DAILY ?? 50_000);
   return Number.isSafeInteger(n) && n > 0 ? n : 50_000;
 })();
 
-/** Play coins credited to `userId` today (UTC day), the first-purchase gift of a test purchase included. */
+/** Play coins credited to `userId` today (UTC day), the first-purchase and campaign gifts of test purchases included. */
 export async function playCoinsToday(c, userId) {
   const r = await c.query(
     `SELECT coalesce(sum(l.amount), 0) AS n FROM coin_lots l LEFT JOIN purchases p ON p.id = l.purchase_id
       WHERE l.user_id = $1 AND l.created_at > date_trunc('day', now())
-        AND (l.channel = 'test' OR (l.channel = 'bonus' AND (p.platform = 'test' OR p.sandbox)))`,
+        AND (l.channel = 'test' OR (l.channel IN ('bonus', 'kampanya') AND (p.platform = 'test' OR p.sandbox)))`,
     [userId],
   );
   return Number(r.rows[0].n);

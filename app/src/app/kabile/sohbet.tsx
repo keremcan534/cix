@@ -13,6 +13,7 @@ import { GIFTS, userById, type Gift } from '@/data/mock';
 import { presenceOf } from '@/data/presence';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { useApp, type GroupMsg } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -27,6 +28,9 @@ const QUICK: QuickAction[] = [
 
 export default function KabileChat() {
   const { familyId, me, familyChat, sendFamilyMessage, familyMuted, setFamilyMuted, spendCoins } = useApp();
+  // Only the chat gifts the server still offers (Canlı ayarlar can hide a gift); all of them if it hid every one,
+  // so the sheet never opens empty (these sends are local, the server never refuses them).
+  const chatGifts = visibleGifts(CHAT_GIFTS, useLiveCatalog());
   const { colors } = useTheme();
   const styles = useStyles();
   const [menu, setMenu] = useState(false);
@@ -123,7 +127,7 @@ export default function KabileChat() {
         visible={gifts}
         title="Tayfa sohbetine hediye · her 400 🪙 için +2 katkı puanı"
         onClose={() => setGifts(false)}
-        options={CHAT_GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price} 🪙`, onPress: () => sendGift(g) }))}
+        options={chatGifts.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price} 🪙`, onPress: () => sendGift(g) }))}
       />
     </SafeAreaView>
   );

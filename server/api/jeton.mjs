@@ -291,7 +291,7 @@ export const jetonRoutes = {
     if (!u) throw new HttpError(404, 'Kullanıcı bulunamadı');
     const q = (sql) => db.query(sql, [id]).then((r) => r.rows);
     const [purchases, lots, locks, transfers, ledger, events, lotSum] = await Promise.all([
-      q('SELECT id, platform, product_id, transaction_id, coins, bonus, status, created_at FROM purchases WHERE user_id = $1 ORDER BY id DESC LIMIT 100'),
+      q('SELECT id, platform, product_id, transaction_id, coins, bonus, campaign_bonus, campaign_ref, status, created_at FROM purchases WHERE user_id = $1 ORDER BY id DESC LIMIT 100'),
       q('SELECT id, channel, amount, remaining, lock_hours, purchase_id, transfer_id, source_lot, source_user, ref, created_at FROM coin_lots WHERE user_id = $1 ORDER BY id DESC LIMIT 200'),
       q('SELECT id, sender, amount, channel, unlock_at, gift_event, coin_lot, status, ref, created_at FROM diamond_locks WHERE user_id = $1 ORDER BY id DESC LIMIT 200'),
       db.query(`${TRANSFER_SELECT} WHERE t.from_user = $1 OR t.to_user = $1 OR t.actor = $1 ORDER BY t.id DESC LIMIT 200`, [id]).then((r) => r.rows.map(transferOf)),
@@ -303,7 +303,7 @@ export const jetonRoutes = {
     return {
       user: { ...selfUser(u), ...(await diamondState(db, id)), coinsInLots: Number(lotSum[0].n) },
       channels: Object.fromEntries(Object.entries(CHANNELS).map(([k, v]) => [k, v.label])),
-      purchases: nums(purchases, ['id', 'coins', 'bonus']),
+      purchases: nums(purchases, ['id', 'coins', 'bonus', 'campaign_bonus']),
       lots: nums(lots, ['id', 'amount', 'remaining', 'purchase_id', 'transfer_id', 'source_lot']),
       locks: nums(locks, ['id', 'amount', 'gift_event', 'coin_lot']),
       transfers,

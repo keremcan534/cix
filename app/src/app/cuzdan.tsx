@@ -17,6 +17,8 @@ import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, TEST_PACKS } from '@/lib/live';
 import { buyCoins, openShop, useShop } from '@/lib/live/billing';
+import { activeCampaign, campaignCoins, useLiveCatalog } from '@/lib/live/catalog-live';
+import { fmtIstanbul } from '@/lib/live-settings-format';
 import { outcomeAlert, SHOP_NOTICE } from '@/lib/live/billing-core';
 import { openLegal } from '@/lib/legal';
 import { blockedFeature } from '@/lib/remote-control';
@@ -33,10 +35,21 @@ export default function WalletScreen() {
   const live = liveMode();
   const shop = useShop();
   const testPacks = RECHARGE_PACKS.filter((p) => TEST_PACKS.includes(p.coins));
+  // Live mode: the campaign the owner runs from Canlı ayarlar (extra coins on every store pack, credited by the
+  // server at the store's purchase time; test packs never get it). Shown only while it runs.
+  const liveCat = useLiveCatalog();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!live) return;
+    // A minute is enough: the badge goes away soon after the campaign ends (the server decides either way).
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [live]);
+  const campaign = live ? activeCampaign(now, liveCat) : null;
   useEffect(() => {
     if (live) void openShop();
   }, [live]);
-  const { colors } = useTheme();
+  const { colors, semantic } = useTheme();
   const styles = useStyles();
 
   // Live mode: Google Play takes the payment; the coins arrive only with the server's answer.
@@ -156,11 +169,31 @@ export default function WalletScreen() {
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
             <Text style={styles.currency}>{!live ? 'Fiyatlar TL' : shop.status === 'ready' ? 'Google Play ile' : ''}</Text>
           </View>
+          {campaign && (
+            <View style={styles.campaign} accessibilityRole="summary">
+              <Ionicons name="gift" size={22} color={semantic.moneyText} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.campaignTitle}>
+                  {campaign.label} · +%{campaign.percent} ek jeton
+                </Text>
+                <Text style={styles.campaignText}>
+                  Google Play ile aldığın her pakete %{campaign.percent} fazla jeton eklenir. Bitiş: {fmtIstanbul(campaign.endsAt)} (İstanbul)
+                </Text>
+              </View>
+            </View>
+          )}
           {live ? (
             shop.status === 'ready' ? (
               <View style={styles.grid}>
                 {shop.packs.map((p) => (
-                  <PackTile key={p.productId} coins={p.coins} price={p.price} busy={processing === p.productId} onPress={() => buyLive(p.productId)} />
+                  <PackTile
+                    key={p.productId}
+                    coins={p.coins}
+                    price={p.price}
+                    busy={processing === p.productId}
+                    onPress={() => buyLive(p.productId)}
+                    campaign={campaign ? { percent: campaign.percent, extra: campaignCoins(p.coins, campaign.percent) } : undefined}
+                  />
                 ))}
               </View>
             ) : (
@@ -208,24 +241,54 @@ export default function WalletScreen() {
   );
 }
 
-/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). */
-function PackTile({ coins, bonus, first, price, busy, onPress }: { coins: number; bonus?: number; first?: boolean; price: string; busy: boolean; onPress: () => void }) {
+/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). `campaign`: the
+ *  running campaign's tag and this pack's extra coins (live store packs only). */
+function PackTile({
+  coins,
+  bonus,
+  first,
+  price,
+  busy,
+  onPress,
+  campaign,
+}: {
+  coins: number;
+  bonus?: number;
+  first?: boolean;
+  price: string;
+  busy: boolean;
+  onPress: () => void;
+  campaign?: { percent: number; extra: number };
+}) {
   const { colors, dark } = useTheme();
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton, ${price}`} style={{ width: '31.3%', margin: '1%' }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
+      style={{ width: '31.3%', margin: '1%' }}
+    >
       <LinearGradient
         colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
-        style={[styles.pack, first && styles.packFirst, busy && { opacity: 0.5 }]}
+        style={[styles.pack, (first || !!campaign?.extra) && styles.packFirst, busy && { opacity: 0.5 }]}
       >
-        {first && (
+        {first ? (
           <View style={styles.firstTag}>
             <Text style={styles.firstTagText}>Hoş geldin paketi</Text>
           </View>
-        )}
+        ) : campaign?.extra ? (
+          <View style={styles.firstTag}>
+            <Text style={styles.firstTagText}>+%{campaign.percent} kampanya</Text>
+          </View>
+        ) : null}
         <Icon3D name="coin" size={40} />
         <Text style={styles.packCoins}>{coins.toLocaleString('tr-TR')}</Text>
-        {bonus ? <Text style={styles.packBonus}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
+        {bonus || campaign?.extra ? (
+          <Text style={styles.packBonus}>+{((bonus ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}</Text>
+        ) : (
+          <View style={{ height: 18 }} />
+        )}
         <Text style={[styles.packPrice, first && { color: colors.text }]}>{busy ? 'Bekleniyor…' : price}</Text>
       </LinearGradient>
     </Pressable>
@@ -259,6 +322,21 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   firstTag: { alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   firstTagText: { color: semantic.moneyInk, fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
+  campaign: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: semantic.money,
+    // Solid: a see-through tint lets the sea photo behind wash the text out in the dark scheme.
+    backgroundColor: colors.card,
+  },
+  campaignTitle: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  campaignText: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   packSelected: { borderColor: colors.primaryText },
   bonus: {
     position: 'absolute',

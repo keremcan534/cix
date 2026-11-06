@@ -7,6 +7,7 @@
 // Spending rules: the total (price × count × recipients) is always visible before sending, gold is
 // used only for the money action, and a short balance turns the action into "top up" instead of
 // failing after the tap. Product rule: no gift ever asks for a confirmation; one tap sends.
+// Gifts the owner hid in Yönetim › Canlı ayarlar are left off every shelf (lib/live/catalog-live visibleGifts).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ import { Avatar, Button } from '@/components/ui';
 import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
@@ -60,11 +62,12 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
 
-function shelfGifts(shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>) {
+/** `shown`: the gifts the server still offers (visibleGifts). */
+function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>) {
   if (shelf === 'lucky') return [];
-  if (shelf === 'fav') return GIFTS.filter((g) => favs.has(g.id));
-  if (shelf === 'bag') return GIFTS.filter((g) => (bag[g.id] ?? 0) > 0);
-  const list = GIFTS.filter((g) => (g.cat ?? 'hot') === shelf);
+  if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
+  if (shelf === 'bag') return shown.filter((g) => (bag[g.id] ?? 0) > 0);
+  const list = shown.filter((g) => (g.cat ?? 'hot') === shelf);
   if (sort !== 'default') list.sort((a, b) => (sort === 'asc' ? a.price - b.price : b.price - a.price));
   return list;
 }
@@ -97,13 +100,14 @@ export function GiftSheet({
 }) {
   const { svipLevel, spentTotal, me, spendBlock } = useApp();
   const lucky = useLucky();
+  const shown = visibleGifts(GIFTS, useLiveCatalog());
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
   const [shelf, setShelf] = useState<Shelf>('hot');
   const [sort, setSort] = useState<PriceSort>('default');
   const [favs, setFavs] = useState(() => new Set(favoriteGifts));
   const [bag, setBag] = useState(() => ({ ...backpackStock }));
-  const [sel, setSel] = useState<{ id: string; bag: boolean }>({ id: GIFTS[0].id, bag: false });
+  const [sel, setSel] = useState<{ id: string; bag: boolean }>(() => ({ id: (shown.find((g) => (g.cat ?? 'hot') === 'hot') ?? shown[0]).id, bag: false }));
   const [count, setCount] = useState(1);
   const [countOpen, setCountOpen] = useState(false);
   const micIds = seated.map((x) => x.id);
@@ -121,8 +125,8 @@ export function GiftSheet({
   const pickedListeners = roomAll ? [] : targets.filter((id) => !micIds.includes(id));
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
-  const list = shelfGifts(shelf, sort, favs, bag);
-  const gift = GIFTS.find((g) => g.id === sel.id) ?? GIFTS[0];
+  const list = shelfGifts(shown, shelf, sort, favs, bag);
+  const gift = shown.find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
   const onShelf = shelf === 'lucky' ? !!lg : list.some((it) => it.id === sel.id && sel.bag === (shelf === 'bag'));
   const fromBag = sel.bag;
@@ -142,7 +146,7 @@ export function GiftSheet({
   const pickShelf = (s: Shelf) => {
     tapHaptic();
     setShelf(s);
-    const l = shelfGifts(s, sort, favs, bag);
+    const l = shelfGifts(shown, s, sort, favs, bag);
     const keep = l.some((g) => g.id === sel.id) && sel.bag === (s === 'bag');
     if (!keep && l[0]) setSel({ id: l[0].id, bag: s === 'bag' });
   };

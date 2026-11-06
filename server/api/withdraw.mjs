@@ -8,9 +8,13 @@
 //   POST /api/admin/withdrawals/decide   { id, approve, note }         (admin) → { withdrawal }
 //
 // Only unlocked diamonds can be asked for (wallet.mjs spendDiamonds), between WITHDRAW.minDiamonds and
-// maxDiamonds, at most weeklyDiamonds in 7 days, one open request per person. The diamonds leave the balance
-// when the request is made (one ledger row, ref = the request's ref, so a retry is applied once and they can't
-// be spent twice) and come back on a cancel or a rejection (ref wd:<id>:return, which no client ref can be).
+// maxDiamonds, at most weeklyDiamonds in 7 days, one open request per person. The largest request and the
+// 7-day limit are Canlı ayarlar (live-settings.mjs withdrawMax, withdrawWeekly; they can only be lowered from
+// the compiled WITHDRAW), read once per request: one already inside its locked transaction completes under
+// the limit it read, the next one uses the new limit. GET /api/wallet/withdrawals returns the same rules.
+// The diamonds leave the balance when the request is made (one ledger row, ref = the request's ref, so a
+// retry is applied once and they can't be spent twice) and come back on a cancel or a rejection (ref
+// wd:<id>:return, which no client ref can be).
 // Payout details stay generic: an IBAN from any country (checked with its mod-97 digits) or another account
 // written out, and the holder's name; they are kept as given.
 //
@@ -19,6 +23,7 @@
 // Finance Control gets no event for this: its ingest has no payout type, and payouts are booked there.
 import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx } from './core.mjs';
 import { WITHDRAW, diamondValueUsd } from './catalog.mjs';
+import { live } from './live-settings.mjs';
 import { notify } from './push.mjs';
 import { PLAY_MONEY, diamondState, everHadPlayMoney, spendDiamonds } from './wallet.mjs';
 
@@ -69,6 +74,9 @@ async function admin(req) {
 const audit = (c, actor, action, target, detail, ip) =>
   c.query('INSERT INTO audit_events (actor, action, target, detail, ip) VALUES ($1,$2,$3,$4,$5)', [actor, action, target, JSON.stringify(detail), ip]);
 
+/** The rules in effect now: the compiled minimum, the live largest request and 7-day limit. */
+const rulesNow = (s = live()) => ({ minDiamonds: WITHDRAW.minDiamonds, maxDiamonds: s.withdrawMax, weeklyDiamonds: s.withdrawWeekly });
+
 /** Diamonds in requests open or paid in the last 7 days. */
 const weekUsed = async (c, userId) =>
   Number((await c.query("SELECT coalesce(sum(diamonds), 0) AS n FROM withdrawals WHERE user_id = $1 AND status IN ('pending', 'paid') AND created_at > now() - interval '7 days'", [userId])).rows[0].n);
@@ -87,9 +95,11 @@ const giveBack = (c, w, reason, actor) => move(c, w.user_id, 'diamond', Number(w
 export const withdrawRoutes = {
   async 'POST /api/wallet/withdraw'(req) {
     const u = await auth(req);
+    const rules = rulesNow();
     const b = await readJson(req);
+    const range = `Tek seferde en az ${fmt(rules.minDiamonds)}, en çok ${fmt(rules.maxDiamonds)} elmas çekilebilir`;
     const n = int(b.diamonds, WITHDRAW.minDiamonds, WITHDRAW.maxDiamonds);
-    if (!n) throw new HttpError(400, `Tek seferde en az ${fmt(WITHDRAW.minDiamonds)}, en çok ${fmt(WITHDRAW.maxDiamonds)} elmas çekilebilir`);
+    if (!n) throw new HttpError(400, range);
     const { method, holder, account } = payoutDetails(b.method, b.details);
     const usd = diamondValueUsd(n);
     const ip = clientIp(req);
@@ -97,11 +107,14 @@ export const withdrawRoutes = {
       // A second copy of the same request waits on the row, then finds the ref (a replay).
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'diamond', b.ref);
+      // The live limits after the ref check, so a retry of a request made before a lower limit still replays.
+      if (n > rules.maxDiamonds) throw new HttpError(400, range);
+      if (n > rules.weeklyDiamonds) throw new HttpError(400, `7 günde en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir`);
       if ((await c.query("SELECT 1 FROM withdrawals WHERE user_id = $1 AND status = 'pending'", [u.id])).rowCount) {
         throw new HttpError(409, 'Bekleyen bir çekim talebin var; sonuçlanınca yenisini açabilirsin');
       }
       const used = await weekUsed(c, u.id);
-      if (used + n > WITHDRAW.weeklyDiamonds) throw new HttpError(409, `7 günde en çok ${fmt(WITHDRAW.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(Math.max(0, WITHDRAW.weeklyDiamonds - used))} elmas`);
+      if (used + n > rules.weeklyDiamonds) throw new HttpError(409, `7 günde en çok ${fmt(rules.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(Math.max(0, rules.weeklyDiamonds - used))} elmas`);
       const w = await c.query(
         'INSERT INTO withdrawals (user_id, diamonds, usd, method, holder, account, play, ref, ip) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
         [u.id, n, usd, method, holder, account, PLAY_MONEY, b.ref, ip],
@@ -120,7 +133,7 @@ export const withdrawRoutes = {
       withdrawals: r.rows.map(view),
       withdrawable: s.withdrawable,
       locked: s.locked,
-      rules: { ...WITHDRAW, weekUsed: await weekUsed(db, u.id) },
+      rules: { ...rulesNow(), weekUsed: await weekUsed(db, u.id) },
     };
   },
 

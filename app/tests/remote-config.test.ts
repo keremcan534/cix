@@ -47,7 +47,29 @@ describe('Uzaktan ayar: sunucu yanıtı', () => {
       notice: '  Bu gece 02:00 bakım var  ',
       featuresOff: ['gifts', 'gifts', 'uçak', 42, 'dm'],
     });
-    assert.deepEqual(c, { minVersion: '1.2.0', updateUrl: 'https://example.com/indir', notice: 'Bu gece 02:00 bakım var', featuresOff: ['gifts', 'dm'] });
+    assert.deepEqual(c, { minVersion: '1.2.0', updateUrl: 'https://example.com/indir', notice: 'Bu gece 02:00 bakım var', featuresOff: ['gifts', 'dm'], v: 0 });
+  });
+
+  test('canlı ayar sürümü (v) alınır; bozuk, eksi veya kesirli v 0 olur', () => {
+    assert.equal(EMPTY_CONFIG.v, 0);
+    assert.equal(parseConfig({ v: 12 }).v, 12);
+    assert.equal(parseConfig({ v: 0 }).v, 0);
+    for (const v of ['12', -1, 1.5, NaN, Infinity, 2 ** 53, null, true, [3], { v: 3 }]) assert.equal(parseConfig({ v }).v, 0, String(v));
+  });
+
+  test('eski sunucunun dört alanlı yanıtı aynen okunur (v 0)', () => {
+    const old = { minVersion: '1.1.0', updateUrl: null, notice: 'Duyuru', featuresOff: ['games'] };
+    assert.deepEqual(parseConfig(old), { ...old, v: 0 });
+    // A saved copy from an older app version (no v) also reads.
+    assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(old))), { ...old, v: 0 });
+  });
+
+  test('v, sürüm zorunluluğunu ve kapalı ekranları değiştirmez', () => {
+    const c = parseConfig({ minVersion: '1.2.0', featuresOff: ['rooms'], v: 99 });
+    assert.equal(needsUpdate('1.1.9', c), true);
+    assert.equal(needsUpdate('1.2.0', c), false);
+    assert.deepEqual(routeGate(c, 'oda/[id]'), { feature: 'rooms', mode: 'block' });
+    assert.equal(routeGate({ ...EMPTY_CONFIG, v: 7 }, 'oda/[id]'), null);
   });
 
   test('geçersiz sürüm, https olmayan adres ve boş duyuru yok sayılır', () => {
