@@ -8,6 +8,9 @@
 // (server/infra/livekit.yaml). Each one carries a JWT signed with the API secret whose sha256 claim is the
 // body's hash, so nobody else can fake presence. If LiveKit restarts and misses "left" events, the cleanup
 // asks LiveKit's own API (LIVEKIT_API_URL, e.g. http://127.0.0.1:7880) which rooms are open and forgets the rest.
+// A server room nobody is in stays open: its blacklist, admins, room mutes and password belong to the room id,
+// and the owner's next "Oda oluştur" gets the same room back (rooms.mjs, 409 → their open room). Instead, once
+// webhooks arrive, GET /api/rooms leaves other people's empty rooms out of the list (presenceTracked).
 //
 // A token is only for an open server room the person may enter (rooms.mjs voiceAccess), with their own account
 // as the identity, and lives LIVEKIT_TOKEN_TTL_S seconds (default 600; LiveKit renews it for a connected
@@ -57,6 +60,14 @@ export function verifyWebhook(raw, authorization) {
 }
 
 const clip = (v) => (typeof v === 'string' ? v.slice(0, 64) : '');
+
+/**
+ * True once a signed webhook has come from LiveKit since this process started: room_presence then says who is in
+ * which room, and the room list can leave empty rooms out. Until then (no webhook set up, or just restarted) a
+ * room's 0 means "not known", and every open room is listed as before.
+ */
+let webhooksSeen = false;
+export const presenceTracked = () => webhooksSeen;
 
 /** Time in a room feeds the agency's activity measure (agency-perf.mjs). Identities are user ids. */
 async function logPresence(gone) {
@@ -148,8 +159,11 @@ async function cleanup() {
 }
 if (env.LIVEKIT_API_URL) {
   const run = () => cleanup().catch((e) => console.error('presence cleanup', String(e).slice(0, 200)));
-  setTimeout(run, 30_000).unref();
-  setInterval(run, 10 * 60_000).unref();
+  // PRESENCE_SWEEP_MS: tests run it often; otherwise 30 s after start, then every 10 minutes.
+  const every = Number(env.PRESENCE_SWEEP_MS);
+  const ms = Number.isFinite(every) && every >= 100 ? every : 10 * 60_000;
+  setTimeout(run, Math.min(ms, 30_000)).unref();
+  setInterval(run, ms).unref();
 }
 
 export const liveRoutes = {
@@ -171,7 +185,9 @@ export const liveRoutes = {
 
   async 'POST /api/livekit/webhook'(req) {
     const raw = await readRaw(req, 64_000);
-    await onEvent(verifyWebhook(raw, req.headers.authorization));
+    const e = verifyWebhook(raw, req.headers.authorization);
+    webhooksSeen = true;
+    await onEvent(e);
     return { ok: true };
   },
 

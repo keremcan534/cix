@@ -25,6 +25,32 @@ export const registerKabile = (f: KabileFamily) => {
 };
 export const findKabile = (id: string | null): KabileFamily | null => (id ? (FAMILIES.find((f) => f.id === id) ?? CUSTOM[id] ?? null) : null);
 
+// --- Live builds ---------------------------------------------------------------
+/**
+ * Tayfa has no server yet: no tribe tables, members, chat, chests or treasury, so all of it lives on this phone
+ * among sample people. A live build (server address set, like lib/live liveMode) hides the Tayfa screens
+ * (components/coming-soon), and the money paths below refuse there: no real coin is taken for a tayfa nobody else
+ * can see or for a gift no one receives, and no chest coins are credited that the server never gave.
+ */
+export const tayfaAvailable = (live: boolean = !!process.env.EXPO_PUBLIC_API_URL) => !live;
+
+type Spend = (amount: number, reason?: string) => boolean;
+type Credit = (amount: number, reason?: string) => void;
+export const KABILE_CREATE_COST = 500;
+
+/** Tayfa kur: the fee, then my new tayfa. 'off' in a live build (nothing is charged), 'coins' when the fee is short. */
+export function createKabile(name: string, spend: Spend, live?: boolean): KabileFamily | 'off' | 'coins' {
+  if (!tayfaAvailable(live)) return 'off';
+  if (!spend(KABILE_CREATE_COST, `Tayfa kurma: ${name}`)) return 'coins';
+  const f: KabileFamily = { id: `custom-${Date.now()}`, name, emoji: '🏰', xp: 0, weekly: 0, members: 1, leaderId: 'me', memberIds: ['me'] };
+  registerKabile(f);
+  return f;
+}
+
+/** A gift in the tayfa chat or in Uyum Köşesi. 'off' in a live build: nothing is charged, its members are sample people. */
+export const payKabileGift = (price: number, reason: string, spend: Spend, live?: boolean): 'ok' | 'off' | 'coins' =>
+  !tayfaAvailable(live) ? 'off' : spend(price, reason) ? 'ok' : 'coins';
+
 export const fmt = (n: number) => n.toLocaleString('tr-TR');
 export const fmtK = (n: number) => (n >= 1_000 ? `${(n / 1_000).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}k` : String(n));
 
@@ -307,6 +333,14 @@ export const kabile = {
     return chest.reward;
   },
 };
+
+/** Opens a weekly milestone chest and credits its coins. A live build gets nothing (chest rewards are not on the server). */
+export function openKabileChest(chestId: string, credit: Credit, live?: boolean): ChestReward | null {
+  if (!tayfaAvailable(live)) return null;
+  const r = kabile.claimChest(chestId);
+  if (r) credit(r.coins, `Tayfa sandığı: ${KABILE_CHESTS.find((c) => c.id === chestId)?.name ?? chestId}`);
+  return r;
+}
 
 const subscribe = (l: () => void) => {
   listeners.add(l);

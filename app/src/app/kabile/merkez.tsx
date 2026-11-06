@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
+import { ComingSoon } from '@/components/coming-soon';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import {
   CHEST_MIN_CONTRIBUTION,
@@ -21,6 +22,7 @@ import {
   kabile,
   kabileMemberIds,
   kabileMeta,
+  openKabileChest,
   taskProgress,
   treasuryLevel,
   useKabileProgress,
@@ -29,13 +31,20 @@ import {
 } from '@/data/kabile';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
 type Counters = { roomMinutes: number; giftsSent: number; spentTotal: number };
 const CHECKIN = KABILE_TASKS.find((t) => t.source === 'checkIn') ?? KABILE_TASKS[0];
 
+// Tayfa has no server yet (data/kabile tayfaAvailable): chest coins credited here would exist only on this phone,
+// so a live build shows a notice instead of the tasks and chests.
 export default function KabileMerkez() {
+  return liveMode() ? <ComingSoon title="Görevler" /> : <DemoKabileMerkez />;
+}
+
+function DemoKabileMerkez() {
   const { familyId, me, stats, spentTotal, addCoins } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
@@ -104,9 +113,8 @@ export default function KabileMerkez() {
     if (p.chests.includes(id)) return showAlert(`${c.name} alındı`, `İçerik: ${chestRewardText(c.reward)}`);
     if (weekly < c.need) return showAlert(c.name, `Tayfanın haftalık katkı puanı ${fmt(c.need)} olunca açılır.\n\nİçerik (sabit): ${chestRewardText(c.reward)}`);
     if (p.myPower < CHEST_MIN_CONTRIBUTION) return showAlert('Önce katkı yap', `Sandık almak için bu hafta en az ${CHEST_MIN_CONTRIBUTION} katkı puanın olmalı. Aşağıdaki günlük görevlerden birini tamamla.`);
-    const r = kabile.claimChest(id);
+    const r = openKabileChest(id, addCoins);
     if (!r) return;
-    addCoins(r.coins, `Tayfa sandığı: ${c.name}`);
     showAlert(`${c.name} açıldı 🎉`, `Kazandın: ${chestRewardText(r)}`);
   };
 

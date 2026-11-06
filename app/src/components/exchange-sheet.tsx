@@ -1,9 +1,11 @@
 // Gelir > Çevir: turn your own diamonds into coins at the in-app coin price (lib/coins-bank exchangeOwnDiamonds).
 // A bottom sheet with the amount, quick shares of the balance, a live "x 💎 → y jeton" preview and one button.
+// Live mode previews at the server's rate (Canlı ayarlar, lib/live/catalog-live liveRules); the server decides.
 // Only the withdrawable part can be exchanged; locked diamonds (lib/diamond-locks) wait for their lock.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Icon3D } from '@/components/Icon3D';
@@ -13,6 +15,7 @@ import { RULES } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { successHaptic } from '@/lib/haptics';
 import { liveExchange, liveMode, message } from '@/lib/live';
+import { liveRules, useLiveCatalog } from '@/lib/live/catalog-live';
 import { exchangeOwnDiamonds, selfExchangeRate } from '@/lib/coins-bank';
 import { blockedFeature } from '@/lib/remote-control';
 import { useApp } from '@/store';
@@ -25,18 +28,28 @@ const SHARES = [
   { label: '%75', f: 0.75 },
   { label: 'Tümü', f: 1 },
 ];
-/** How many coins a round 10.000 💎 buys, for the rate line. */
-const PER_10K = Math.floor(10_000 * selfExchangeRate());
 
-export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, coins, exchangeDiamonds, notify } = useApp();
+/** `split`: live mode, the server's balance and its withdrawable and locked totals, as Gelir shows them (the store's
+ *  numbers otherwise). */
+export function ExchangeSheet({ visible, onClose, split }: { visible: boolean; onClose: () => void; split?: { diamonds: number; withdrawable: number; locked: number } }) {
+  const app = useApp();
+  const { coins, exchangeDiamonds, notify } = app;
+  const diamonds = split?.diamonds ?? app.diamonds;
+  const free = split?.withdrawable ?? app.withdrawableDiamonds;
+  const locked = split?.locked ?? app.lockedDiamonds;
   const { colors, semantic } = useTheme();
   const s = useStyles();
+  // Android modals draw edge to edge: keep the button row above the navigation bar.
+  const paddingBottom = Math.max(28, useSafeAreaInsets().bottom + 8);
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
+  const cat = useLiveCatalog();
+  const rules = liveMode() ? liveRules(cat) : RULES;
+  /** How many coins a round 10.000 elmas buys, for the rate line. */
+  const per10k = Math.floor(10_000 * selfExchangeRate(rules));
   const amount = Number(raw || 0);
-  const exchangeQuote = exchangeOwnDiamonds(amount, diamonds);
+  const exchangeQuote = exchangeOwnDiamonds(amount, diamonds, rules);
   // Same order as the store: the amount itself first, then whether the locked part is in it.
   const quote = exchangeQuote.ok && amount > free ? { ok: false as const, reason: `${fmt(locked)} elmasın kilidi henüz açılmadı; çekilebilir bakiyen ${fmt(free)} elmas.` } : exchangeQuote;
   const tooFew = free < RULES.exchangeMinDiamonds;
@@ -71,7 +84,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-        <View style={s.sheet}>
+        <View style={[s.sheet, { paddingBottom }]}>
           <View style={s.handle} />
           <View style={s.head}>
             <Text style={s.title}>Jetona çevir</Text>
@@ -132,7 +145,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
             </View>
           </View>
           <Text style={s.rate}>
-            Kur: 10.000 💎 = {fmt(PER_10K)} jeton · En az {fmt(RULES.exchangeMinDiamonds)} elmas
+            Kur: 10.000 elmas = {fmt(per10k)} jeton · En az {fmt(RULES.exchangeMinDiamonds)} elmas
           </Text>
           <Text style={[s.note, !quote.ok && raw !== '' && { color: semantic.danger }]}>
             {tooFew

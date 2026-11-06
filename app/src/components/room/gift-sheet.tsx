@@ -7,16 +7,21 @@
 // Spending rules: the total (price × count × recipients) is always visible before sending, gold is
 // used only for the money action, and a short balance turns the action into "top up" instead of
 // failing after the tap. Product rule: no gift ever asks for a confirmation; one tap sends.
+// Gifts the owner hid in Yönetim › Canlı ayarlar are left off every shelf (lib/live/catalog-live visibleGifts).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
+import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { liveMode } from '@/lib/live';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
@@ -38,7 +43,7 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
-  lucky: `Gönderdiğin hediyenin katları kadar jeton kazanma ihtimali. Ödül garanti değildir; olasılıklar aşağıda. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
+  lucky: `Ödül garanti değildir: gönderdiğin hediyenin katları kadar jeton kazanma ihtimalin var, olasılıklar aşağıda. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
   couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
   privilege: 'İnci üyelerine özel hediyeler.',
@@ -60,11 +65,12 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 const levelOf = (spent: number) => LEVEL_XP.filter((x) => spent >= x).length;
 const isLocked = (g: Gift, svip: number) => (g.minSvip ?? 0) > svip;
 
-function shelfGifts(shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>) {
+/** `shown`: the gifts the server still offers (visibleGifts). */
+function shelfGifts(shown: Gift[], shelf: Shelf, sort: PriceSort, favs: Set<string>, bag: Record<string, number>) {
   if (shelf === 'lucky') return [];
-  if (shelf === 'fav') return GIFTS.filter((g) => favs.has(g.id));
-  if (shelf === 'bag') return GIFTS.filter((g) => (bag[g.id] ?? 0) > 0);
-  const list = GIFTS.filter((g) => (g.cat ?? 'hot') === shelf);
+  if (shelf === 'fav') return shown.filter((g) => favs.has(g.id));
+  if (shelf === 'bag') return shown.filter((g) => (bag[g.id] ?? 0) > 0);
+  const list = shown.filter((g) => (g.cat ?? 'hot') === shelf);
   if (sort !== 'default') list.sort((a, b) => (sort === 'asc' ? a.price - b.price : b.price - a.price));
   return list;
 }
@@ -95,15 +101,22 @@ export function GiftSheet({
   /** Server room: the server charges every gift at its price, so the free backpack (a local reward) is hidden. */
   noBag?: boolean;
 }) {
-  const { svipLevel, spentTotal, me, spendBlock } = useApp();
+  const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
+  // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
+  const { bottom: navBar } = useSafeAreaInsets();
   const lucky = useLucky();
+  const shown = visibleGifts(GIFTS, useLiveCatalog());
+  // Uğurlu is a game of chance: no shelf below the gambling level, and none in a live build (the server has no
+  // Uğurlu draw yet, so nothing may be drawn or paid out on this phone).
+  const luckyShelf = !liveMode() && gamblingLevelOk(wealthLevel);
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
-  const [shelf, setShelf] = useState<Shelf>('hot');
+  const [pickedShelf, setShelf] = useState<Shelf>('hot');
+  const shelf: Shelf = pickedShelf === 'lucky' && !luckyShelf ? 'hot' : pickedShelf;
   const [sort, setSort] = useState<PriceSort>('default');
   const [favs, setFavs] = useState(() => new Set(favoriteGifts));
   const [bag, setBag] = useState(() => ({ ...backpackStock }));
-  const [sel, setSel] = useState<{ id: string; bag: boolean }>({ id: GIFTS[0].id, bag: false });
+  const [sel, setSel] = useState<{ id: string; bag: boolean }>(() => ({ id: (shown.find((g) => (g.cat ?? 'hot') === 'hot') ?? shown[0]).id, bag: false }));
   const [count, setCount] = useState(1);
   const [countOpen, setCountOpen] = useState(false);
   const micIds = seated.map((x) => x.id);
@@ -121,8 +134,8 @@ export function GiftSheet({
   const pickedListeners = roomAll ? [] : targets.filter((id) => !micIds.includes(id));
   const lg = lucky.config.gifts.find((x) => x.id === luckyId) ?? lucky.config.gifts[0];
   const isLucky = shelf === 'lucky' && !!lg;
-  const list = shelfGifts(shelf, sort, favs, bag);
-  const gift = GIFTS.find((g) => g.id === sel.id) ?? GIFTS[0];
+  const list = shelfGifts(shown, shelf, sort, favs, bag);
+  const gift = shown.find((g) => g.id === sel.id) ?? shown[0];
   // An empty shelf (bag, favorites, no Lucky packages) keeps the last pick in state; never send it from here.
   const onShelf = shelf === 'lucky' ? !!lg : list.some((it) => it.id === sel.id && sel.bag === (shelf === 'bag'));
   const fromBag = sel.bag;
@@ -142,7 +155,7 @@ export function GiftSheet({
   const pickShelf = (s: Shelf) => {
     tapHaptic();
     setShelf(s);
-    const l = shelfGifts(s, sort, favs, bag);
+    const l = shelfGifts(shown, s, sort, favs, bag);
     const keep = l.some((g) => g.id === sel.id) && sel.bag === (s === 'bag');
     if (!keep && l[0]) setSel({ id: l[0].id, bag: s === 'bag' });
   };
@@ -228,7 +241,7 @@ export function GiftSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={g.scrim} onPress={onClose} accessibilityLabel="Hediye panelini kapat" />
-      <View style={g.sheet}>
+      <View style={[g.sheet, { paddingBottom: Math.max(space.lg, navBar + 8) }]}>
         <View style={g.handle} />
 
         {/* Header: title, quiet gift level, balance, explicit close */}
@@ -236,7 +249,10 @@ export function GiftSheet({
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={g.title}>Hediye gönder</Text>
             <View style={g.levelRow} accessibilityLabel={`Hediye seviyen ${level}`}>
-              <Text style={g.levelText}>Hediye seviyen: {level}</Text>
+              <Text style={g.levelText} numberOfLines={1}>
+                Hediye seviyen:{'\u00A0'}
+                {level}
+              </Text>
               <View style={g.levelTrack}>
                 <View style={[g.levelFill, { width: `${Math.round(progress * 100)}%` }]} />
               </View>
@@ -277,7 +293,7 @@ export function GiftSheet({
 
         {/* What: shelves */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={g.shelves}>
-          {SHELVES.filter((s) => !noBag || s.key !== 'bag').map((s) => {
+          {SHELVES.filter((s) => (!noBag || s.key !== 'bag') && (luckyShelf || s.key !== 'lucky')).map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             return (
@@ -292,7 +308,8 @@ export function GiftSheet({
           })}
         </ScrollView>
         <View style={g.noteRow}>
-          <Text style={[g.dim, { flex: 1 }]} numberOfLines={2}>
+          {/* The Uğurlu note carries the disclaimer: always shown in full. */}
+          <Text style={[g.dim, { flex: 1 }]} numberOfLines={shelf === 'lucky' ? undefined : 2}>
             {shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: İnci ${svipLevel}.` : SHELF_NOTE[shelf]}
           </Text>
           {isLucky && (
@@ -461,7 +478,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
             <Pressable key={it.id} onPress={() => onPick(it.id)} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${it.name}, Uğurlu, ${fmt(it.price)} jeton, en yüksek ×${maxMult(it)}${off ? ', şu an kapalı' : ''}`}>
               <View style={[g.tile, on && g.tileOn]}>
                 <GiftArt giftId={it.id} emoji={it.emoji} size={42} style={off && { opacity: 0.4 }} textStyle={[g.tileArt, off && { opacity: 0.4 }]} />
-                <Text style={g.tileName} numberOfLines={1}>
+                <Text style={g.tileName} numberOfLines={2}>
                   {it.name}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -542,7 +559,7 @@ function GiftTile({
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={a11y} accessibilityHint="Uzun bas: favorilere ekle veya çıkar">
       <View style={[g.tile, selected && g.tileOn]}>
         <GiftArt giftId={gift.id} emoji={gift.emoji} size={42} style={locked && { opacity: 0.4 }} textStyle={[g.tileArt, locked && { opacity: 0.4 }]} />
-        <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={1}>
+        <Text style={[g.tileName, locked && { color: colors.textDim }]} numberOfLines={2}>
           {gift.name}
         </Text>
         {locked ? (
@@ -580,7 +597,7 @@ const g = StyleSheet.create({
   title: { color: colors.text, fontSize: type.title, fontWeight: '800' },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   levelText: { color: colors.textDim, fontSize: type.caption },
-  levelTrack: { width: 56, height: 4, borderRadius: 2, backgroundColor: colors.cardAlt, overflow: 'hidden' },
+  levelTrack: { width: 56, flexShrink: 1, height: 4, borderRadius: 2, backgroundColor: colors.cardAlt, overflow: 'hidden' },
   levelFill: { height: '100%', backgroundColor: colors.textDim },
   balance: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: radius.pill, paddingHorizontal: space.md, height: 36 },
   coin: { fontSize: 15 },
@@ -619,10 +636,11 @@ const g = StyleSheet.create({
   gridScroll: { flexGrow: 0, flexShrink: 1, minHeight: 180 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space.md, paddingBottom: space.sm },
   tileWrap: { width: '25%', padding: 4 },
-  tile: { alignItems: 'center', gap: 2, paddingTop: space.md, paddingBottom: space.sm, paddingHorizontal: 4, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.03)' },
+  tile: { flexGrow: 1, alignItems: 'center', gap: 2, paddingTop: space.md, paddingBottom: space.sm, paddingHorizontal: 4, borderRadius: radius.md, borderWidth: 2, borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.03)' },
   tileOn: { borderColor: colors.primaryText, backgroundColor: semantic.tonal },
   tileArt: { fontSize: 34, lineHeight: 42 },
-  tileName: { color: colors.text, fontSize: type.caption, fontWeight: '600', maxWidth: '100%' },
+  // Two lines, broken between words ("Şans / Yoncası"), instead of "Şans Yon…".
+  tileName: { color: colors.text, fontSize: type.caption, fontWeight: '600', maxWidth: '100%', textAlign: 'center' },
   tilePrice: { color: colors.textDim, fontSize: type.caption, fontVariant: ['tabular-nums'] },
   lockPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(251,191,36,0.14)', borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 },
   lockText: { color: colors.gold, fontSize: 11, fontWeight: '800' },

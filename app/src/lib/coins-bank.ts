@@ -8,6 +8,10 @@
 //     so a diamond can't be sold for more than it is worth when the exchange rate or pack prices change.
 //   - Wholesale: it buys coins from management at its selling price minus its fee (2 %).
 // Every other account is refused, whatever the client sends. Pure functions: the server and the tests run them.
+//
+// Every sum takes the rules as its last argument (RULES when left out). Çevir screens pass liveRules()
+// (lib/live/catalog-live): the server's live rate (Canlı ayarlar exchange_usd_try), the same one the request
+// sends back. The Coins Bank sums keep the compiled rate, as the server does for them.
 import { RULES, type Rules } from '@/data/rules';
 
 export type AccountKind = 'standard' | 'coins_bank_main';
@@ -18,7 +22,7 @@ export const diamondValueTl = (diamonds: number, r: Rules = RULES) => (diamonds 
 /** Coins per diamond for the Coins Bank: value × its selling price × (1 + fee). */
 export const exchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usdTry * r.coinsBankRetailCoinsPerTl * (1 + r.coinsBankExchangeFee);
 
-/** Coins per diamond for Çevir: value × the best pack's coins per TL (no fee). */
+/** Coins per diamond for Çevir: value × the best pack's coins per TL (no fee). Pass liveRules() for the live rate. */
 export const selfExchangeRate = (r: Rules = RULES) => (1 / r.diamondsPerUsd) * r.usdTry * r.coinsBankRetailCoinsPerTl;
 
 /** Çevir: whole diamonds from your own balance, at least the rule's minimum; coins rounded down. */

@@ -1,16 +1,45 @@
 // What the server's GET /api/config says about this app (server/api/features.mjs): the minimum version, where
-// to update, a notice banner, and features switched off for a while. Pure logic, no React; the fetching and the
-// hooks are in lib/remote-control, the screens in components/remote-control.
+// to update, a notice banner, features switched off for a while, and the live settings version. Pure logic, no
+// React; the fetching and the hooks are in lib/remote-control, the screens in components/remote-control.
 
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'] as const;
 export type Feature = (typeof FEATURES)[number];
 
-export type RemoteConfig = { minVersion: string | null; updateUrl: string | null; notice: string | null; featuresOff: Feature[] };
+/** The welcome screen's ways in. `dev` = this device's development account (test servers only). */
+export type SignInFlags = { dev: boolean; google: boolean; email: boolean; phone: boolean };
+/** How Ayarlar can check a phone number. */
+export type VerifyFlags = { sms: boolean; whatsapp: boolean };
 
+export type RemoteConfig = {
+  minVersion: string | null;
+  updateUrl: string | null;
+  notice: string | null;
+  featuresOff: Feature[];
+  /** The server's live settings version (Canlı ayarlar); 0 from an older server. When it changes, the live
+   *  catalog is read again (lib/remote-control, lib/live/catalog-live). */
+  v: number;
+  /** null: the server sent no sign-in switches (an older server, or no answer yet). */
+  signIn: SignInFlags | null;
+  verify: VerifyFlags;
+};
+
+const VERIFY_OFF: VerifyFlags = { sms: false, whatsapp: false };
 /** Nothing set: what the app uses before the first answer, and without a server. */
-export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, featuresOff: [] };
+export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, featuresOff: [], v: 0, signIn: null, verify: VERIFY_OFF };
 
 const isFeature = (v: unknown): v is Feature => typeof v === 'string' && (FEATURES as readonly string[]).includes(v);
+const record = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+
+/** The server's sign-in switches: only a real `true` turns one on, so a switch an older server lacks stays off. */
+export function parseSignIn(raw: unknown): SignInFlags | null {
+  const r = record(raw);
+  return r ? { dev: r.dev === true, google: r.google === true, email: r.email === true, phone: r.phone === true } : null;
+}
+/** The phone-check switches; any one missing is off. */
+export function parseVerify(raw: unknown): VerifyFlags {
+  const r = record(raw);
+  return r ? { sms: r.sms === true, whatsapp: r.whatsapp === true } : VERIFY_OFF;
+}
 
 /** The server's answer (or a saved copy) as a config; anything malformed is left out, never thrown. */
 export function parseConfig(raw: unknown): RemoteConfig {
@@ -24,6 +53,9 @@ export function parseConfig(raw: unknown): RemoteConfig {
     updateUrl: url && /^https:\/\/\S+$/.test(url) ? url : null,
     notice: str(r.notice, 300),
     featuresOff: Array.isArray(r.featuresOff) ? [...new Set(r.featuresOff.filter(isFeature))] : [],
+    v: typeof r.v === 'number' && Number.isSafeInteger(r.v) && r.v >= 0 ? r.v : 0,
+    signIn: parseSignIn(r.signIn),
+    verify: parseVerify(r.verify),
   };
 }
 

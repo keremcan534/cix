@@ -11,6 +11,7 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 
 import { RootCrashScreen, ScreenCrashScreen } from '@/components/crash-screen';
+import { Intro } from '@/components/fx/intro';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
@@ -18,9 +19,11 @@ import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
 import { SanctionLayer } from '@/components/sanction-screen';
 import { ME } from '@/data/mock';
+import { IS_DEMO } from '@/lib/build';
 import { installCrashGuard, markStarted } from '@/lib/crash-guard';
 import { initReporting } from '@/lib/reporting';
 import { setupVoice } from '@/lib/voice-setup';
+import { liveMode } from '@/lib/live';
 import { LiveSync } from '@/lib/live/sync';
 import { AppProvider, useApp } from '@/store';
 import { colors } from '@/theme';
@@ -67,6 +70,8 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <RootStack />
       </ThemeProvider>
+      {/* Over everything while the first screen draws beneath it: the opening (components/fx/intro). */}
+      <Intro />
     </AppProvider>
   );
 }
@@ -103,8 +108,6 @@ function RootStack() {
           <Stack.Screen name="yayinci/index" />
           <Stack.Screen name="yayinci/cek" />
           <Stack.Screen name="ajans/index" />
-          <Stack.Screen name="ajans/panel" />
-          <Stack.Screen name="ajans/ag" />
           <Stack.Screen name="ajans/sohbet" />
           <Stack.Screen name="ajans/ofis" />
           <Stack.Screen name="ajans/merkez" />
@@ -122,22 +125,31 @@ function RootStack() {
           <Stack.Screen name="gelir/detay" />
           <Stack.Screen name="davet" />
           <Stack.Screen name="seviye" />
-          <Stack.Screen name="yetki" />
           <Stack.Screen name="kabile/index" />
           <Stack.Screen name="kabile/sohbet" />
           <Stack.Screen name="kabile/merkez" />
           <Stack.Screen name="kabile/iliski" />
           <Stack.Screen name="kabile/kasa" />
           <Stack.Screen name="coins-bank" />
-          <Stack.Screen name="oyun-yonetimi" />
-          <Stack.Screen name="animasyon-yonetimi" />
-          <Stack.Screen name="pk-yonetimi" />
-          <Stack.Screen name="lucky-yonetimi" />
-          <Stack.Screen name="sunucu-hesabi" />
           <Stack.Screen name="ajans/basvuru" />
-          <Stack.Screen name="ajans/hesap/[id]" />
-          <Stack.Screen name="ajans/yonetim/index" />
-          <Stack.Screen name="ajans/yonetim/[id]" />
+          {/* Staff and demo screens that only have local sample data so far (sample roles, providers, agency stats):
+              a live build leaves them out, so a deep link or a typed URL is redirected to an open screen instead. */}
+          <Stack.Protected guard={!liveMode()}>
+            <Stack.Screen name="yetki" />
+            <Stack.Screen name="oyun-yonetimi" />
+            <Stack.Screen name="animasyon-yonetimi" />
+            <Stack.Screen name="pk-yonetimi" />
+            <Stack.Screen name="lucky-yonetimi" />
+            <Stack.Screen name="ajans/panel" />
+            <Stack.Screen name="ajans/ag" />
+            <Stack.Screen name="ajans/hesap/[id]" />
+            <Stack.Screen name="ajans/yonetim/index" />
+            <Stack.Screen name="ajans/yonetim/[id]" />
+          </Stack.Protected>
+          {/* The server test screen is for preview builds (it is linked only there); a store build leaves it out. */}
+          <Stack.Protected guard={IS_DEMO}>
+            <Stack.Screen name="sunucu-hesabi" />
+          </Stack.Protected>
         </Stack.Protected>
         <Stack.Protected guard={!loggedIn}>
           <Stack.Screen name="giris" />

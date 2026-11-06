@@ -219,6 +219,17 @@ describe('Odalar ve ses token’ı', () => {
     assert.equal((await call('POST', '/api/rooms', { title: 'Yeni oda' }, owner.session))[0], 200, 'kapanınca yeni oda açılır');
   });
 
+  test('ses sunucusu (LIVEKIT_API_URL) bağlı değilken odada hediye yine gider; koltuk işlemi açıkça reddedilir', async () => {
+    const owner = await signUp('Bağlantısız Sahip');
+    const fan = await signUp('Hayran');
+    const [, j] = await call('POST', '/api/rooms', { title: 'Sessiz Oda' }, owner.session);
+    await call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, fan.session);
+    const [st, g] = await call('POST', '/api/gifts/send', { to: owner.user.id, giftId: 'g4', count: 1, room: j.room.id, ref: rnd(6) }, fan.session);
+    assert.equal(st, 200, g.error);
+    assert.equal(g.user.coins, 800);
+    assert.equal((await call('POST', '/api/rooms/seat', { room: j.room.id, action: 'lock', seat: 2 }, owner.session))[0], 503);
+  });
+
   test('sahibini engellediğin oda listede yok ve girilmez', async () => {
     const owner = await signUp('Oda Sahibi');
     const other = await signUp('Diğer');

@@ -242,6 +242,9 @@ export const ROLE_LABEL: Record<string, string> = {
 export const roleLabel = (r: string | null | undefined) => (r ? (ROLE_LABEL[r] ?? r) : '');
 
 export const SOURCE_LABEL: Record<string, string> = { manual: 'Elle', report: 'Şikâyetten', policy: 'Ceza kademesinden', auto: 'Otomatik (şikâyet sayısı)', room: 'Oda yönetiminden' };
+/** Where a sanction came from; the system has two automatic rules: many reports, and the contact filter's mute. */
+export const sourceLabel = (x: { source: string; reasonCode: string }) =>
+  x.source === 'auto' && x.reasonCode === 'contact_sharing' ? 'Otomatik (iletişim filtresi)' : (SOURCE_LABEL[x.source] ?? x.source);
 
 export const AUDIT_ACTION: Record<string, string> = {
   apply: 'Yaptırım uygulandı',

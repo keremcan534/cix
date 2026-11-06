@@ -315,7 +315,7 @@ describe('Kayıtlar', () => {
     for (let i = 0; i < 4; i++) await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: rnd(6) }, u.session));
     const [st, j] = await call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_20000', transactionId: rnd(8) }, u.session);
     assert.equal(st, 429, '40.000 + 20.000 > 50.000');
-    assert.match(j.error, /Günlük test yüklemesi sınırı 50000/);
+    assert.equal(j.error, 'Günlük test yükleme sınırı: 50.000 jeton');
     // 5.000 + its 2.500 first-purchase gift = 47.500.
     await buy(u.session, 'coins_5000');
     assert.equal((await call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(6) }, u.session))[0], 429, 'satın alma sınıra sayıldı');

@@ -8,10 +8,12 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CenterActions } from '@/components/admin/agency-center-actions';
 import { Empty, Kpi, KpiGrid, Line, NetState, Panel, Pill, RateSplit, ScoreBar, Section, SERIES, Tabs, TierLadder, diamondsKpi, ns, statusTone, useAsk, type Ask } from '@/components/agency-net';
 import { Backdrop } from '@/components/fx/surface';
 import { SCENES } from '@/components/fx/scenes';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
+import { NoAccess } from '@/components/no-access';
 import { Text, TextInput } from '@/components/text';
 import { Button, Header } from '@/components/ui';
 import { DEMO_TIERS, demoAdminList, demoAdminOverview, demoAdminPayouts, demoAdminPerf, demoAdminSettings, demoAdminTransfers, demoAudit, demoTree } from '@/data/agency-net-demo';
@@ -77,22 +79,31 @@ export default function CenterPanel() {
     <SafeAreaView style={st.safe}>
       <Backdrop scene={SCENES.family} strength={0.45} />
       <Header title="Ajans Merkezi" />
-      <Tabs<TabKey>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { key: 'genel', label: 'Genel' },
-          { key: 'onay', label: 'Onaylar', badge: waiting },
-          { key: 'perf', label: 'Performans' },
-          { key: 'kural', label: 'Kurallar' },
-          { key: 'denetim', label: 'Denetim' },
-        ]}
-      />
-      {tab === 'genel' && <GeneralTab name={me.name} ov={ov} ask={ask} />}
-      {tab === 'onay' && <ApprovalsTab name={me.name} ask={ask} after={ov.reload} />}
-      {tab === 'perf' && <PerformanceTab name={me.name} ask={ask} />}
-      {tab === 'kural' && <RulesTab name={me.name} ask={ask} />}
-      {tab === 'denetim' && <AuditTab name={me.name} />}
+      {/* A 403 means this account is not centre staff with agency rights: say so instead of five tabs of errors. */}
+      {ov.forbidden ? (
+        <View style={st.scroll}>
+          <NoAccess text="Ajans Merkezi yalnız ajans yönetimi yetkisi olan merkez personeline açık." />
+        </View>
+      ) : (
+        <>
+          <Tabs<TabKey>
+            value={tab}
+            onChange={setTab}
+            options={[
+              { key: 'genel', label: 'Genel' },
+              { key: 'onay', label: 'Onaylar', badge: waiting },
+              { key: 'perf', label: 'Performans' },
+              { key: 'kural', label: 'Kurallar' },
+              { key: 'denetim', label: 'Denetim' },
+            ]}
+          />
+          {tab === 'genel' && <GeneralTab name={me.name} ov={ov} ask={ask} />}
+          {tab === 'onay' && <ApprovalsTab name={me.name} ask={ask} after={ov.reload} />}
+          {tab === 'perf' && <PerformanceTab name={me.name} ask={ask} />}
+          {tab === 'kural' && <RulesTab name={me.name} ask={ask} />}
+          {tab === 'denetim' && <AuditTab name={me.name} />}
+        </>
+      )}
       {askNode}
     </SafeAreaView>
   );
@@ -117,8 +128,12 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
     tree.reload();
     ov.reload();
   };
+  // When the server is unreachable both calls fail the same way: show one error with one retry, not two.
+  const bothFailed = !!ov.error && !!tree.error;
   return (
     <Scroll q={tree}>
+      {!tree.demo && tree.data && <CenterActions nodes={tree.data.nodes} demo={tree.demo} after={reload} />}
+      {!bothFailed && (
       <NetState q={ov}>
         {(o) => (
           <Section title="Son 30 gün">
@@ -144,7 +159,8 @@ function GeneralTab({ name, ov, ask }: { name: string; ov: Loaded<ReturnType<typ
           </Section>
         )}
       </NetState>
-      <NetState q={tree}>
+      )}
+      <NetState q={bothFailed ? { ...tree, reload } : tree}>
         {(t) => {
           const ids = new Set(t.nodes.map((n) => n.id));
           const roots = t.nodes.filter((n) => !n.parentId || !ids.has(n.parentId));

@@ -2,24 +2,35 @@
 // room, for the room screen. Kept apart from LiveKit itself so the room screen and the tests don't load it.
 //
 //  - peers: everyone else connected to the room's voice, with the mic they sit on (their own `seat` participant
-//    attribute, which only they can set) and whether they are talking right now;
-//  - signals: small messages the phones send each other inside the room (chat lines, gift animations). They
-//    are not stored anywhere: whoever is in the room sees them, a later joiner doesn't. Money never moves
-//    through a signal: a gift is paid on the server first (lib/live liveGift) and only announced here.
+//    attribute: set by their phone, or by the server when the owner or an admin moves them) and whether they
+//    are talking right now;
+//  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
+//    later joiner doesn't. The phones send each other chat lines only. A gift is announced by the server after
+//    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
+//    fake one; a gift packet from a phone is dropped;
+//  - the room's state the server keeps on LiveKit: locked mics (room metadata, server/api/rooms.mjs) and a seat
+//    the owner or an admin set for me (my own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
 
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean };
-export type RoomSignal = { t: 'chat'; text: string } | { t: 'gift'; giftId: string; count: number; to: string[] };
+/** What one phone may send the others. */
+export type PeerSignal = { t: 'chat'; text: string };
+/** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
+export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number };
+export type RoomSignal = PeerSignal | GiftSignal;
 
 /** `send` is false when the voice connection isn't up and nothing went out. */
-type Link = { setSeat: (seat: number | null) => void; send: (msg: RoomSignal) => boolean };
-type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean };
+type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) => boolean };
+type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; lockedSeats: number[] };
 
-const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false };
+const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, lockedSeats: [] };
 let snap: Snapshot = EMPTY;
 let link: Link | null = null;
 const listeners = new Set<() => void>();
 const signalListeners = new Set<(roomId: string, from: string, msg: RoomSignal) => void>();
+const seatListeners = new Set<(roomId: string, seat: number | null) => void>();
+// Gift announcements already shown (a reliable packet can come twice around a reconnect).
+const seenGifts: number[] = [];
 
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -38,50 +49,100 @@ export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking
     snap.peers.length === peers.length &&
     snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.name === peers[i].name);
   if (same) return;
-  snap = roomId ? { roomId, peers, meSpeaking } : EMPTY;
+  // The locks belong to the room: a new list of people keeps them, another room starts without.
+  snap = roomId ? { roomId, peers, meSpeaking, lockedSeats: snap.roomId === roomId ? snap.lockedSeats : [] } : EMPTY;
   listeners.forEach((l) => l());
 }
 
-/** A signal another phone sent; anything malformed is dropped here. */
-export function reportSignal(roomId: string, from: string, raw: unknown) {
+/** The room's LiveKit metadata changed (or we just joined): the mics the owner or an admin locked. */
+export function reportRoomMeta(roomId: string, metadata: string | undefined) {
+  const lockedSeats = parseRoomMeta(metadata);
+  if (snap.roomId === roomId && snap.lockedSeats.join() === lockedSeats.join()) return;
+  snap = { ...(snap.roomId === roomId ? snap : { ...EMPTY, roomId }), lockedSeats };
+  listeners.forEach((l) => l());
+}
+
+/** `{"lockedSeats":[2,5]}` → [2, 5]; mic 0 is the owner's and never locked; anything else → none. */
+export function parseRoomMeta(metadata: string | undefined): number[] {
+  try {
+    const m = JSON.parse(metadata || '{}') as { lockedSeats?: unknown };
+    if (!Array.isArray(m?.lockedSeats)) return [];
+    return [...new Set(m.lockedSeats.filter((x): x is number => Number.isInteger(x) && x >= 1 && x <= 99))].sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+/** The server moved me to another mic or took me off (my `seat` attribute, not written by this phone). */
+export function reportServerSeat(roomId: string, seat: number | null) {
+  seatListeners.forEach((l) => l(roomId, seat));
+}
+
+/**
+ * A data packet in the room. `from` is the phone that sent it, or null when the server did: then only a paid
+ * gift's announcement is taken (once per gift); from a phone only a chat line. Anything else is dropped here.
+ */
+export function reportSignal(roomId: string, from: string | null, raw: unknown) {
+  if (from === null) {
+    const g = parseServerGift(raw);
+    if (!g || seenGifts.includes(g.msg.eventId)) return;
+    seenGifts.push(g.msg.eventId);
+    if (seenGifts.length > 200) seenGifts.shift();
+    signalListeners.forEach((l) => l(roomId, g.from, g.msg));
+    return;
+  }
   const msg = parseSignal(raw);
   if (msg) signalListeners.forEach((l) => l(roomId, from, msg));
 }
 
-export function parseSignal(raw: unknown): RoomSignal | null {
+/** What a phone may send: a chat line. A "gift" from a phone is never shown (only the server announces one). */
+export function parseSignal(raw: unknown): PeerSignal | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
   if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) return { t: 'chat', text: m.text.slice(0, 300) };
-  if (m.t === 'gift' && typeof m.giftId === 'string' && Number.isInteger(m.count) && Array.isArray(m.to)) {
-    const to = m.to.filter((x): x is string => typeof x === 'string').slice(0, 20);
-    if (to.length && (m.count as number) > 0 && (m.count as number) <= 10_000) return { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to };
-  }
   return null;
+}
+
+/** The server's gift packet: `{ type: 'gift', giftId, count, from, to, eventId }` (server/api/gifts.mjs). */
+export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (m.type !== 'gift' || typeof m.giftId !== 'string' || typeof m.from !== 'string' || typeof m.to !== 'string' || !m.from || !m.to) return null;
+  if (!Number.isInteger(m.count) || (m.count as number) <= 0 || (m.count as number) > 10_000) return null;
+  if (!Number.isSafeInteger(m.eventId) || (m.eventId as number) <= 0) return null;
+  return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
 }
 
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
 
 // --- Room screen side -------------------------------------------------------------------------------
-const peersOf = (roomId: string) => (snap.roomId === roomId ? snap : EMPTY);
-/** The other phones in this room's voice connection (empty while connecting or in another room). */
+/** What the voice connection shows of this room right now (empty while connecting or in another room). */
+export const getLivePeers = (roomId: string): Snapshot => (snap.roomId === roomId ? snap : EMPTY);
+/** The other phones in this room's voice connection and its locked mics, as a hook. */
 export function useLivePeers(roomId: string): Snapshot {
   return useSyncExternalStore(
     subscribe,
-    () => peersOf(roomId),
+    () => getLivePeers(roomId),
     () => EMPTY,
   );
 }
-/** Signals sent in this room; returns the unsubscribe. */
+/** Signals in this room (chat from the phones, gifts from the server); returns the unsubscribe. */
 export function onSignal(roomId: string, fn: (from: string, msg: RoomSignal) => void) {
   const l = (r: string, from: string, msg: RoomSignal) => r === roomId && fn(from, msg);
   signalListeners.add(l);
   return () => void signalListeners.delete(l);
 }
+/** The server set my mic in this room (null = took me off); returns the unsubscribe. */
+export function onServerSeat(roomId: string, fn: (seat: number | null) => void) {
+  const l = (r: string, seat: number | null) => r === roomId && fn(seat);
+  seatListeners.add(l);
+  return () => void seatListeners.delete(l);
+}
 /** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);
 /** False when it could not go out (no voice connection yet, or it dropped). */
-export const sendSignal = (msg: RoomSignal) => link?.send(msg) ?? false;
+export const sendSignal = (msg: PeerSignal) => link?.send(msg) ?? false;
 
 // --- Wire format ------------------------------------------------------------------------------------
 // UTF-8 by hand: Turkish letters must survive, and not every phone JavaScript engine has TextEncoder/TextDecoder.

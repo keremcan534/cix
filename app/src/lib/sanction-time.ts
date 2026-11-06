@@ -28,7 +28,13 @@ export function formatLeft(ms: number) {
   const h = Math.floor((sec % 86400) / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
-  if (d >= 365) return `${Math.floor(d / 365)} yıl ${Math.floor((d % 365) / 30)} ay`;
+  if (d >= 365) {
+    // 360–364 leftover days would read "9 yıl 12 ay": carry them into the year, and write no "0 ay".
+    let y = Math.floor(d / 365);
+    let mo = Math.floor((d % 365) / 30);
+    if (mo >= 12) [y, mo] = [y + 1, 0];
+    return mo ? `${y} yıl ${mo} ay` : `${y} yıl`;
+  }
   if (d > 0) return `${d} gün ${h} saat`;
   if (h > 0) return `${h} saat ${m} dk`;
   return `${m} dk ${String(s).padStart(2, '0')} sn`;

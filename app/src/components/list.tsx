@@ -57,6 +57,7 @@ export function ListRow({
   disabled,
   chevron = !!onPress,
   accessibilityLabel,
+  subtitleOneLine,
 }: {
   icon?: IconName;
   tone?: ListTone;
@@ -72,6 +73,8 @@ export function ListRow({
   disabled?: boolean;
   chevron?: boolean;
   accessibilityLabel?: string;
+  /** An address or a number: one line, shortened in the middle when it doesn't fit, so the row keeps its height. */
+  subtitleOneLine?: boolean;
 }) {
   const t = useTheme();
   const s = useStyles();
@@ -87,7 +90,11 @@ export function ListRow({
         <Text style={[s.title, destructive && { color: t.semantic.danger }]} numberOfLines={2}>
           {title}
         </Text>
-        {!!subtitle && <Text style={s.subtitle}>{subtitle}</Text>}
+        {!!subtitle && (
+          <Text style={s.subtitle} {...(subtitleOneLine && { numberOfLines: 1, ellipsizeMode: 'middle' as const })}>
+            {subtitle}
+          </Text>
+        )}
       </View>
       {!!value && <Text style={s.value} numberOfLines={1}>{value}</Text>}
       {right}

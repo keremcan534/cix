@@ -6,8 +6,9 @@
 // phone only decides whether to show the way in (useIsAdmin) and which sanction actions to offer (meta.perms).
 import { useEffect, useSyncExternalStore } from 'react';
 
+import { banBody } from '@/lib/admin-format';
 import * as api from '@/lib/api';
-import { liveMode } from '@/lib/live';
+import { liveMode, myServerId, onAccountChange } from '@/lib/live';
 import type { AppealOutcome, ApplyBody, DeviceRisk, SanctionAppeal, SanctionAudit, SanctionDevice, SanctionMeta, SanctionPolicy, SanctionType, StaffSanction } from '@/lib/sanction-format';
 
 const get = <T>(path: string) => api.apiRequest<T>('GET', path);
@@ -24,21 +25,42 @@ const subscribeRole = (l: () => void) => {
   roleListeners.add(l);
   return () => roleListeners.delete(l);
 };
-/** Reads my server role (GET /api/me) once per app start; a failed read leaves the panel hidden. */
+/**
+ * Reads my server role (GET /api/me) once per signed-in account; a failed read leaves the panel hidden. The role
+ * is kept only for the account this phone holds now (lib/live myServerId): a read that answers for another one
+ * (a session still ending as the account signs out) or that an account change overtook is dropped.
+ */
 let roleRead: Promise<void> | null = null;
+let roleGen = 0;
 export function readRole(force = false) {
   if (!liveMode()) return Promise.resolve();
   if (roleRead && !force) return roleRead;
-  roleRead = get<{ user: api.ServerMe }>('/api/me')
+  const gen = ++roleGen;
+  const read = get<{ user: api.ServerMe }>('/api/me')
     .then((r) => {
+      if (gen !== roleGen) return;
+      // Not the account held now (or none yet): read again once it is known (onAccountChange below).
+      if (r.user.id !== myServerId()) return void (roleRead = null);
       role = r.user.role ?? 'user';
       roleListeners.forEach((l) => l());
     })
     .catch(() => {
-      roleRead = null;
+      if (gen === roleGen) roleRead = null;
     });
-  return roleRead;
+  roleRead = read;
+  return read;
 }
+// Signed out, or in as someone else, without a restart: the last account's role must not carry over (the
+// Yönetim entry, the 'Yönetici olarak devam et' way past a forced update). The new account's is read afresh.
+onAccountChange(() => {
+  roleGen++;
+  roleRead = null;
+  if (role !== null) {
+    role = null;
+    roleListeners.forEach((l) => l());
+  }
+  if (myServerId()) void readRole(true);
+});
 /** True for an admin account in a live build. */
 export function useIsAdmin() {
   return useStaffRole() === 'admin';
@@ -75,11 +97,13 @@ export type Report = {
   handledAt: string | null;
 };
 export const reports = (status: ReportStatus = 'open') => get<{ reports: Report[] }>(`/api/admin/reports${q({ status })}`).then((r) => r.reports);
-/** actioned (with an optional ban of the reported person) or dismissed. */
-export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDays?: number) =>
-  post<{ report: { id: number; status: ReportStatus }; bannedUntil: string | null }>('/api/admin/reports/handle', { id, status, ...(banDays ? { banDays } : {}) });
-/** days = null lifts the ban. */
-export const ban = (user: string, days: number | null) => post<{ bannedUntil: string | null }>('/api/admin/ban', { user, days });
+/** actioned (with an optional ban of the reported person) or dismissed. 'Süresiz' also sends permanent: true (banBody). */
+export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDays?: number) => {
+  const b = banDays ? banBody(banDays) : null;
+  return post<{ report: { id: number; status: ReportStatus }; bannedUntil: string | null }>('/api/admin/reports/handle', { id, status, ...(b ? { banDays: b.days, permanent: b.permanent } : {}) });
+};
+/** days = null lifts the ban; 'Süresiz' also sends permanent: true (banBody). */
+export const ban = (user: string, days: number | null) => post<{ bannedUntil: string | null }>('/api/admin/ban', { user, ...(days === null ? { days } : banBody(days)) });
 
 // --- Withdrawals -------------------------------------------------------------------------------------------
 export type WithdrawalStatus = 'pending' | 'paid' | 'rejected' | 'cancelled';
@@ -120,6 +144,8 @@ export type AgencyPayout = {
   paidAt: string | null;
   paymentRef: string | null;
   note: string;
+  /** false when the commission came from test coins on this server: the server refuses approve/pay then (as with user withdrawals). Older servers leave it out. */
+  payable?: boolean;
 };
 export const agencyPayouts = (status?: PayoutStatus) => get<{ payouts: AgencyPayout[] }>(`/api/admin/agency/payouts${q({ status })}`).then((r) => r.payouts);
 export type PayoutAction = 'approve' | 'pay' | 'reject' | 'cancel';

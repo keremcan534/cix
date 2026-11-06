@@ -2,14 +2,18 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Card, GradientButton, Header } from '@/components/ui';
 import { FAQ, TICKET_CATEGORIES, type TicketCategory } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
+import { liveMode, myServerId } from '@/lib/live';
+import { openSupportMail } from '@/lib/open-mail';
+import { SUPPORT_EMAIL, supportRequestMail } from '@/lib/support-mail';
 import { useApp, type Ticket } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 
@@ -19,14 +23,13 @@ const statusColor = ({ colors, semantic }: Theme, status: Ticket['status']): str
 // Quick-help chips → the matching ticket category.
 const TOPICS: { label: string; category: TicketCategory }[] = [
   { label: 'Hesap ve yetkiler', category: 'Hesap kısıtlaması' },
-  { label: 'Elmas ve altın', category: 'Kazanç' },
+  { label: 'Elmas ve jeton', category: 'Kazanç' },
   { label: 'İhlal Raporu', category: 'Şikâyet' },
   { label: 'Yükleme', category: 'Ödeme' },
   { label: 'Olağanüstü', category: 'Güvenlik' },
   { label: 'Doğrulama', category: 'Üyelik' },
   { label: 'Diğer', category: 'Teknik' },
 ];
-const SUPPORT_EMAIL = 'destek@similarclub.app';
 const FAQ_PREVIEW = 3;
 
 type View_ = 'home' | 'faq' | 'new' | 'list';
@@ -42,6 +45,9 @@ export default function SupportScreen() {
   const [feedback, setFeedback] = useState(false);
   const [text, setText] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  // A live build has no ticket route on the server yet: a request goes to support as an e-mail, and there is no
+  // ticket list here (no made-up answers either). The demo keeps the prototype tickets (giris-3).
+  const live = liveMode();
 
   const openNew = (c: TicketCategory, isFeedback = false) => {
     setCategory(c);
@@ -58,8 +64,7 @@ export default function SupportScreen() {
     showAlert('Talep oluşturuldu', `Talep numaran #${no}. Yanıtlar ve durum değişiklikleri burada görünür.`);
   };
 
-  const email = () =>
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => showAlert('Resmi e-posta', `Bize ${SUPPORT_EMAIL} adresinden ulaşabilirsin.`));
+  const email = () => openSupportMail(supportRequestMail(feedback ? 'Geri bildirim' : category, live ? myServerId() : null, feedback));
 
   const faqItem = (f: (typeof FAQ)[number], i: number, last: boolean) => (
     <Pressable key={f.q} onPress={() => setOpenFaq(openFaq === i ? null : i)} style={[styles.faqRow, !last && styles.divider]}>
@@ -73,107 +78,135 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Header title={tab === 'home' ? '' : 'Müşteri hizmetleri'} />
-      {tab !== 'home' && (
-        <View style={styles.segment}>
-          <Pressable onPress={() => setTab('home')} style={styles.segBtn} accessibilityLabel="Müşteri hizmetleri ana sayfa">
-            <Ionicons name="home" size={15} color={colors.text} />
-          </Pressable>
-          {(
-            [
-              ['faq', 'SSS'],
-              ['new', feedback ? 'Geri bildirim' : 'Yeni talep'],
-              ['list', `Taleplerim (${tickets.length})`],
-            ] as const
-          ).map(([k, l]) => (
-            <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
-              <Text style={[styles.segText, tab === k && styles.segTextOn]}>{l}</Text>
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Header title={tab === 'home' ? '' : 'Müşteri hizmetleri'} />
+        {tab !== 'home' && (
+          <View style={styles.segment}>
+            <Pressable onPress={() => setTab('home')} style={styles.segBtn} accessibilityLabel="Müşteri hizmetleri ana sayfa">
+              <Ionicons name="home" size={15} color={colors.text} />
             </Pressable>
-          ))}
-        </View>
-      )}
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-        {tab === 'home' && (
-          <>
-            <View style={styles.hero}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <Text style={styles.heroTitle}>Müşteri hizmetleri</Text>
-                <Text style={styles.heroSub}>Merhaba, size nasıl yardımcı olabilirim?</Text>
+            {(
+              [
+                ['faq', 'SSS'],
+                ['new', feedback ? 'Geri bildirim' : live ? 'E-posta ile yaz' : 'Yeni talep'],
+                ...(live ? [] : ([['list', `Taleplerim (${tickets.length})`]] as const)),
+              ] as const
+            ).map(([k, l]) => (
+              <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
+                <Text style={[styles.segText, tab === k && styles.segTextOn]}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+          {tab === 'home' && (
+            <>
+              <View style={styles.hero}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={styles.heroTitle}>Müşteri hizmetleri</Text>
+                  <Text style={styles.heroSub}>Merhaba, size nasıl yardımcı olabilirim?</Text>
+                </View>
+                <LinearGradient colors={gradientDeep} style={styles.bot}>
+                  <Art name="maskot-destek-botu" size={38} />
+                </LinearGradient>
               </View>
-              <LinearGradient colors={gradientDeep} style={styles.bot}>
-                <Art name="maskot-destek-botu" size={38} />
-              </LinearGradient>
-            </View>
 
-            <View style={styles.topics}>
-              {TOPICS.map((t) => (
-                <Pressable key={t.label} onPress={() => openNew(t.category)} style={({ pressed }) => [styles.topic, pressed && { backgroundColor: colors.cardAlt }]}>
-                  <Text style={styles.topicText}>{t.label}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={colors.textDim} />
-                </Pressable>
-              ))}
-            </View>
-
-            <Card style={{ paddingVertical: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
-                <Ionicons name="help-circle" size={18} color={colors.primaryText} />
-                <Text style={styles.cardTitle}>SSS</Text>
-                <View style={{ flex: 1 }} />
-                {FAQ.length > FAQ_PREVIEW && (
-                  <Pressable onPress={() => setTab('faq')} hitSlop={8}>
-                    <Text style={[styles.dim, { color: colors.primaryText, fontWeight: '700' }]}>Tümü</Text>
+              <View style={styles.topics}>
+                {TOPICS.map((t) => (
+                  <Pressable key={t.label} onPress={() => openNew(t.category)} style={({ pressed }) => [styles.topic, pressed && { backgroundColor: colors.cardAlt }]}>
+                    <Text style={styles.topicText}>{t.label}</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.textDim} />
                   </Pressable>
-                )}
+                ))}
               </View>
-              {FAQ.slice(0, FAQ_PREVIEW).map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}
+
+              <Card style={{ paddingVertical: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
+                  <Ionicons name="help-circle" size={18} color={colors.primaryText} />
+                  <Text style={styles.cardTitle}>SSS</Text>
+                  <View style={{ flex: 1 }} />
+                  {FAQ.length > FAQ_PREVIEW && (
+                    <Pressable onPress={() => setTab('faq')} hitSlop={8}>
+                      <Text style={[styles.dim, { color: colors.primaryText, fontWeight: '700' }]}>Tümü</Text>
+                    </Pressable>
+                  )}
+                </View>
+                {FAQ.slice(0, FAQ_PREVIEW).map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}
+              </Card>
+
+              {!live && <ServiceRow icon="headset" tint={['#13D9DF', '#0A8F95']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />}
+              <ServiceRow icon="create" tint={['#3B82F6', '#0E7C9A']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
+              {!live && (
+                <ServiceRow
+                  icon="chatbubbles"
+                  tint={['#38BDF8', '#3B82F6']}
+                  title="Sorun Takibi"
+                  sub={tickets.length ? `${tickets.length} talep · ${tickets.filter((t) => t.status === 'Yanıtlandı').length} yanıtlandı` : undefined}
+                  onPress={() => setTab('list')}
+                />
+              )}
+              <ServiceRow icon="mail" tint={['#5B7BA6', '#34507A']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={() => openSupportMail({ subject: 'Similar Club destek' })} />
+            </>
+          )}
+
+          {tab === 'faq' && <Card style={{ paddingVertical: 4 }}>{FAQ.map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}</Card>}
+
+          {tab === 'new' && live && (
+            <Card style={{ gap: 10 }}>
+              <Text style={styles.dim}>
+                {feedback
+                  ? 'Uygulamayı geliştirmemize yardım et: öneri, hata veya beğenmediğin bir şeyi e-postayla yaz.'
+                  : 'Destek taleplerini e-postayla alıyoruz. Konuyu seç; açılan e-postaya ne olduğunu yaz. Tarih, kullanıcı ID veya işlem numarası eklersen daha hızlı çözeriz.'}
+              </Text>
+              {!feedback && (
+                <>
+                  <Text style={styles.label}>Konu</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {TICKET_CATEGORIES.map((c) => (
+                      <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { borderColor: colors.primaryText }]}>
+                        <Text style={styles.chipText}>{c}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+              <GradientButton title="E-posta yaz" icon="mail" onPress={email} />
+              <Text style={[styles.dim, { textAlign: 'center' }]}>Yanıtımız e-postana gelir · {SUPPORT_EMAIL}</Text>
             </Card>
+          )}
 
-            <ServiceRow icon="headset" tint={['#13D9DF', '#0A8F95']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
-            <ServiceRow icon="create" tint={['#3B82F6', '#0E7C9A']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
-            <ServiceRow
-              icon="chatbubbles"
-              tint={['#38BDF8', '#3B82F6']}
-              title="Sorun Takibi"
-              sub={tickets.length ? `${tickets.length} talep · ${tickets.filter((t) => t.status === 'Yanıtlandı').length} yanıtlandı` : undefined}
-              onPress={() => setTab('list')}
-            />
-            <ServiceRow icon="mail" tint={['#5B7BA6', '#34507A']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={email} />
-          </>
-        )}
+          {tab === 'new' && !live && (
+            <Card style={{ gap: 10 }}>
+              {feedback && <Text style={styles.dim}>Uygulamayı geliştirmemize yardım et: öneri, hata veya beğenmediğin bir şeyi yaz.</Text>}
+              <Text style={styles.label}>Kategori</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {TICKET_CATEGORIES.map((c) => (
+                  <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { borderColor: colors.primaryText }]}>
+                    <Text style={styles.chipText}>{c}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.label}>Açıklama</Text>
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                multiline
+                placeholder={feedback ? 'Önerini veya geri bildirimini yaz…' : 'Ne oldu? Tarih, kullanıcı ID veya işlem numarası eklersen daha hızlı çözeriz.'}
+                placeholderTextColor={colors.textDim}
+                style={[styles.input, { minHeight: 110 }]}
+              />
+              <Pressable onPress={() => showAlert('Kanıt ekleme', 'Ekran görüntüsü ekleme gerçek sürümde dosya seçiciyle yapılır (demo).')} style={styles.attach}>
+                <Ionicons name="attach" size={18} color={colors.textDim} />
+                <Text style={styles.dim}>Kanıt ekle (ekran görüntüsü)</Text>
+              </Pressable>
+              <GradientButton title="Gönder" icon="send" onPress={submit} />
+              <Text style={[styles.dim, { textAlign: 'center' }]}>Canlı destek 9:00 - 19:00 arasında yanıt verir; diğer saatlerde talebin sıraya alınır.</Text>
+            </Card>
+          )}
 
-        {tab === 'faq' && <Card style={{ paddingVertical: 4 }}>{FAQ.map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}</Card>}
-
-        {tab === 'new' && (
-          <Card style={{ gap: 10 }}>
-            {feedback && <Text style={styles.dim}>Uygulamayı geliştirmemize yardım et: öneri, hata veya beğenmediğin bir şeyi yaz.</Text>}
-            <Text style={styles.label}>Kategori</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {TICKET_CATEGORIES.map((c) => (
-                <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { borderColor: colors.primaryText }]}>
-                  <Text style={styles.chipText}>{c}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.label}>Açıklama</Text>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              multiline
-              placeholder={feedback ? 'Önerini veya geri bildirimini yaz…' : 'Ne oldu? Tarih, kullanıcı ID veya işlem numarası eklersen daha hızlı çözeriz.'}
-              placeholderTextColor={colors.textDim}
-              style={[styles.input, { minHeight: 110 }]}
-            />
-            <Pressable onPress={() => showAlert('Kanıt ekleme', 'Ekran görüntüsü ekleme gerçek sürümde dosya seçiciyle yapılır (demo).')} style={styles.attach}>
-              <Ionicons name="attach" size={18} color={colors.textDim} />
-              <Text style={styles.dim}>Kanıt ekle (ekran görüntüsü)</Text>
-            </Pressable>
-            <GradientButton title="Gönder" icon="send" onPress={submit} />
-            <Text style={[styles.dim, { textAlign: 'center' }]}>Canlı destek 9:00 - 19:00 arasında yanıt verir; diğer saatlerde talebin sıraya alınır.</Text>
-          </Card>
-        )}
-
-        {tab === 'list' && (tickets.length === 0 ? <Text style={[styles.dim, { textAlign: 'center', marginTop: 30 }]}>Henüz talebin yok.</Text> : tickets.map((t) => <TicketCard key={t.id} t={t} />))}
-      </ScrollView>
+          {tab === 'list' && !live && (tickets.length === 0 ? <Text style={[styles.dim, { textAlign: 'center', marginTop: 30 }]}>Henüz talebin yok.</Text> : tickets.map((t) => <TicketCard key={t.id} t={t} />))}
+        </ScrollView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

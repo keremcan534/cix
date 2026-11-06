@@ -5,13 +5,13 @@
 //   GET  /api/ledger                                            → { rows }
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
 //   POST /api/wallet/gift       { to, amount, ref } (test only) → { user, replay }
-//   POST /api/wallet/exchange   { diamonds, ref }             → { user, replay, coins }
+//   POST /api/wallet/exchange   { diamonds, ref, usdTry? }    → { user, replay, coins }
 //   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (in-app purchases: VIP, store items…)
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
-// Sign-in and sessions: auth.mjs. Push: push.mjs. Gifts, catalog, rankings: gifts.mjs. Store purchases:
-// purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
+// Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
+// Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
@@ -30,15 +30,17 @@ import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
-import { authRoutes } from './auth.mjs';
+import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
-import { wheelRoutes } from './wheel.mjs';
+import { wealthPoints, wheelRoutes } from './wheel.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
-import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
+import { HttpError, RawText, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
+import { exchangeOk } from './live-registry.mjs';
+import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
 import { messageRoutes } from './messages.mjs';
 import { purchaseRoutes } from './purchases.mjs';
@@ -47,6 +49,7 @@ import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
 import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 
@@ -99,8 +102,10 @@ const walletRoutes = {
     return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000), warnings: await warningCodes() };
   },
 
+  /** wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same value. */
   async 'GET /api/me'(req) {
-    return { user: selfUser(await auth(req)) };
+    const u = await auth(req);
+    return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id) } };
   },
 
   async 'GET /api/ledger'(req) {
@@ -117,7 +122,7 @@ const walletRoutes = {
     return once(u.id, 'coin', ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       // One daily cap for all play coins: test top-ups and test purchases together (wallet.mjs).
-      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
       await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
     });
   },
@@ -145,12 +150,6 @@ const walletRoutes = {
   },
 
   /**
-   * Gelir > Çevir: the user's own unlocked diamonds become coins at the server's rate (catalog.mjs
-   * exchangeCoins). The client sends only the diamond amount; the coins are worked out here. Both moves share
-   * one transaction and the ref, so a retry is applied once and a short balance (409) changes nothing. Locked
-   * diamonds (wallet.mjs) can't be exchanged.
-   */
-  /**
    * An in-app purchase paid with coins (VIP, rank, store items, stickers, game entries). Coins only leave the
    * account, so this can't create value; what was bought is kept by the app for now. A short balance is a 409.
    */
@@ -161,29 +160,58 @@ const walletRoutes = {
     if (!n) throw new HttpError(400, 'Geçersiz miktar');
     const why = typeof reason === 'string' ? reason.trim().slice(0, 80) : '';
     if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
-    return once(u.id, 'coin', ref, async (c) => {
+    const out = await once(u.id, 'coin', ref, async (c) => {
       const row = await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'coin', ref);
       if (Number(row.rows[0].coins) < n) throw new HttpError(409, 'Yetersiz jeton');
       await spendCoins(c, u.id, n, `Uygulama içi: ${why}`, ref);
     });
+    // once() keys on (user, coin, ref), which gifts, bonds and Jeton Noktası share: their ref is not this spend's
+    // replay. Refused, nothing taken.
+    if (out.replay && !(await db.query("SELECT 1 FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref = $2 AND reason LIKE 'Uygulama içi:%'", [u.id, ref])).rowCount) {
+      throw new HttpError(409, 'Geçersiz istek kimliği');
+    }
+    return out;
   },
 
+  /**
+   * Gelir > Çevir: the user's own unlocked diamonds become coins at the server's rate (catalog.mjs
+   * exchangeCoins), the live one from Canlı ayarlar (live-settings.mjs). The client sends the diamond amount
+   * and the rate its screen showed (usdTry; old apps send none and showed the compiled rate); the coins are
+   * worked out here. A live rate below the shown one is a 409: rate_changed with the new rate and coins for
+   * new apps, update_required for old ones. Both moves share one transaction and the ref, so a retry is
+   * applied once and a short balance (409) changes nothing. Locked diamonds (wallet.mjs) can't be exchanged.
+   */
   async 'POST /api/wallet/exchange'(req) {
     const u = await auth(req);
-    const { diamonds, ref } = await readJson(req);
+    // Read once: a request that read the old rate completes at it, the rate the user saw.
+    const s = live();
+    const { diamonds, ref, usdTry } = await readJson(req);
     const n = int(diamonds, EXCHANGE.minDiamonds, EXCHANGE_MAX);
     if (!n) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas çevrilebilir`);
-    const coins = exchangeCoins(n);
+    // The rate the screen showed: new apps send it, old ones send nothing and showed the compiled rate.
+    const newApp = usdTry !== undefined && usdTry !== null;
+    const shown = newApp ? (typeof usdTry === 'number' ? usdTry : NaN) : EXCHANGE.usdTry;
+    const coins = exchangeCoins(n, s.usdTry);
     const r = await once(u.id, 'diamond', ref, async (c) => {
       // A second copy of the same request waits on the row, then finds the ref (a replay) before the
       // balance check (a false "not enough").
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'diamond', ref);
-      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins } });
+      // After the ref check, so a retry of one that went through gets its replay. Never fewer coins than the
+      // screen showed: a lower live rate is refused, nothing moves; a higher one simply gives more.
+      if (!exchangeOk(s.usdTry, shown)) {
+        throw newApp
+          ? Object.assign(new HttpError(409, 'Kur değişti, yeni tutarı kontrol et'), { extra: { code: 'rate_changed', usdTry: s.usdTry, coins } })
+          : Object.assign(new HttpError(409, 'Çevirme kuru değişti. Güncel tutar için uygulamayı güncelle'), { extra: { code: 'update_required' } });
+      }
+      await spendDiamonds(c, u.id, n, 'Jetona çevrildi', ref, null, { channel: 'cevir', detail: { coins, usdTry: s.usdTry } });
       await creditCoins(c, u.id, [{ channel: 'cevir', amount: coins }], 'Elmastan çevrildi', ref, null, { detail: { diamonds: n } });
     });
-    return { ...r, coins };
+    if (!r.replay) return { ...r, coins };
+    // A replay reports what that ref gave (its diamond row), not this body's amount at today's rate.
+    const row = (await db.query("SELECT detail FROM ledger WHERE user_id = $1 AND currency = 'diamond' AND ref = $2", [u.id, ref])).rows[0];
+    return { ...r, coins: Number(row?.detail?.coins ?? 0) };
   },
 };
 
@@ -194,6 +222,7 @@ const routes = {
   ...jetonRoutes,
   ...refundSyncRoutes,
   ...authRoutes,
+  ...whatsappRoutes,
   ...pushRoutes,
   ...giftRoutes,
   ...bondRoutes,
@@ -211,6 +240,7 @@ const routes = {
   ...configRoutes,
   ...alertRoutes,
   ...sanctionRoutes,
+  ...liveSettingsRoutes,
 };
 
 // --- Server: CORS, security headers, rate limits, JSON errors, one log line per request ---------------------
@@ -228,7 +258,8 @@ const server = http.createServer(async (req, res) => {
   inFlight++;
   const url = new URL(req.url ?? '/', 'http://x');
   const send = (code, data) => {
-    if (!res.headersSent) res.writeHead(code).end(JSON.stringify(data));
+    if (!res.headersSent && data instanceof RawText) res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }).end(data.text);
+    else if (!res.headersSent) res.writeHead(code).end(JSON.stringify(data));
     // Path only: query strings can hold a room password.
     if (LOG && url.pathname !== '/api/health') console.log(JSON.stringify({ t: new Date().toISOString(), m: req.method, p: url.pathname, s: code, ms: Math.round(performance.now() - t0) }));
   };
@@ -260,9 +291,11 @@ const server = http.createServer(async (req, res) => {
     gate(req.method, url.pathname);
     send(200, await route(req, url));
   } catch (err) {
-    // A malformed value that only Postgres caught (an id that isn't a uuid, a number or date out of range) is the
-    // request's fault: 400, not a server error.
-    const e = ['22P02', '22003', '22007', '22008'].includes(err?.code) && !(err instanceof HttpError) ? new HttpError(400, 'Geçersiz istek') : err;
+    // A malformed value that only Postgres caught is the request's fault: 400, not a server error. An id that
+    // isn't a uuid, a number or date out of range; text Postgres can't store, such as a NUL byte (22021). A
+    // missing row (23503) stays a 5xx: each route checks its own ids, so one that gets that far is a server bug.
+    const bad = err instanceof HttpError ? null : err?.code === '22021' ? 'Geçersiz metin' : ['22P02', '22003', '22007', '22008'].includes(err?.code) ? 'Geçersiz istek' : null;
+    const e = bad ? new HttpError(400, bad) : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);
     // extra: structured detail for the app (a ban or mute for its screen, sanctions.mjs).
@@ -286,6 +319,8 @@ function shutdown(signal) {
   stopRefundSync();
   stopBondSweep();
   stopSanctionSweep();
+  stopLiveSync();
+  stopOtpSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -299,8 +334,11 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 await migrate();
+await refreshLive();
 server.listen(PORT, '127.0.0.1', () => console.log(`api on 127.0.0.1:${PORT} version ${VERSION}${TEST_TOPUP ? ' (test top-up on)' : ''}`));
 startFinanceSync();
 startRefundSync();
 startBondSweep();
 startSanctionSweep();
+startLiveSync();
+startOtpSweep();

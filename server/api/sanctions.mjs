@@ -15,7 +15,7 @@
 // Staff (permissions below; users.role admin holds all, moderator a default set, admin_permissions adds more):
 //   GET  /api/admin/sanctions/meta                         → { reasons, types, presets, policies, perms }
 //   GET  /api/admin/sanctions/search?q=                    → { users }   (id, name, phone, device id #, sanction id #)
-//   GET  /api/admin/sanctions/user?id=                     → { user, sanctions, devices, appeals, audit }
+//   GET  /api/admin/sanctions/user?id=                     → { user, sanctions, devices, appeals, audit, contactRefusals }
 //   GET  /api/admin/sanctions/pending                      → { sanctions }   (waiting for approval)
 //   POST /api/admin/sanctions        { user, type, reason, minutes|null, description?, note?, roomId?,
 //                                      includeDm?, includeCalls?, deviceIds?, evidence?, usePolicy?, reportId? } → { sanctions }
@@ -36,6 +36,8 @@
 //   POST /api/devices/check           { deviceInfo }       → { banned, sanction? }   (no sign-in needed)
 // Agency managers: GET /api/agency/member-sanctions?user= → { sanctions } (their streamers, read only).
 // Room staff: POST /api/rooms/mute, /api/rooms/unmute, GET /api/rooms/mutes (rooms.mjs, via applySanction).
+// The system: autoFromReports (many reports) and contactStrike (5 contact filter refusals in an hour → a 1-hour
+// text mute covering DMs, reason contact_sharing; core.mjs countRefusal).
 import {
   HttpError,
   LIVE_SANCTION,
@@ -93,6 +95,16 @@ const RANK = { user: 0, coins_bank: 0, moderator: 1, admin: 2 };
 /** Off by default: with SANCTION_HEAVY_APPROVAL=1 even a permitted person's lifetime / device ban waits for a second person. */
 const HEAVY_APPROVAL = env.SANCTION_HEAVY_APPROVAL === '1';
 const AUTO_REPORTS = Number(env.SANCTION_AUTO_REPORTS ?? 3);
+/** Contact filter: this many refusals (0 = off) inside the window mute the person's messages for a while (contactStrike). */
+const AUTO_MUTE_REFUSALS = Number(env.AUTO_MUTE_REFUSALS ?? 5);
+const AUTO_MUTE_MINUTES = int(Number(env.AUTO_MUTE_MINUTES ?? 60), 1, MAX_MINUTES) ?? 60;
+const AUTO_MUTE_WINDOW = int(Number(env.AUTO_MUTE_WINDOW ?? 60), 1, 1440) ?? 60;
+const CONTACT_REASON = 'contact_sharing';
+/**
+ * Reasons only the system's own rules give: staff and room staff can't pick them (not in GET meta, refused by
+ * applySanction and the policy editor), so a person who reads "Otomatik: …" was muted by the rule.
+ */
+const SYSTEM_REASONS = [CONTACT_REASON];
 
 export async function permsOf(u) {
   const out = new Set(ROLE_PERMS[u.role] ?? []);
@@ -222,6 +234,7 @@ export async function registerDevice(sig) {
  */
 export async function linkDevice(dev, uid) {
   await db.query('INSERT INTO device_accounts (device_id, user_id) VALUES ($1, $2) ON CONFLICT (device_id, user_id) DO UPDATE SET last_seen_at = now()', [dev.id, uid]);
+  await carryMutes(dev, uid).catch((e) => console.error('carry mutes', uid, e.message));
   const others = await db.query(
     `SELECT a.user_id, EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = a.user_id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS banned
        FROM device_accounts a WHERE a.device_id = $1 AND a.user_id <> $2`,
@@ -236,6 +249,47 @@ export async function linkDevice(dev, uid) {
   if (next === cur.rows[0].risk_status) return;
   await db.query('UPDATE device_registry SET risk_status = $2 WHERE id = $1', [dev.id, next]);
   await audit(db, { action: 'device_risk', device: dev.id, target: uid, detail: { risk: next, accounts: others.rowCount + 1 } });
+}
+
+/**
+ * Deleting an account is never refused for a mute (social.mjs DELETE /api/me), but it frees the sign-in key. So a
+ * general mute still running on an account deleted on this device moves to an account made here after that
+ * deletion: same type, reason, start and end, applied by the same role. Accounts that were already here keep
+ * their own record; room mutes stay with their room. Once per mute: a copy `uid` already has (even one staff
+ * lifted since) is not made again.
+ */
+async function carryMutes(dev, uid) {
+  const moved = await tx(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`carry-mutes:${uid}`]);
+    const r = await c.query(
+      `SELECT DISTINCT ON (s.sanction_type, s.reason_code, s.expires_at) s.*, m.include_dm, m.include_calls
+         FROM user_sanctions s JOIN users old ON old.id = s.user_id JOIN users nu ON nu.id = $2
+         LEFT JOIN user_mute_records m ON m.sanction_id = s.id
+        WHERE s.user_id IN (SELECT user_id FROM device_accounts WHERE device_id = ANY($1::bigint[]) AND user_id <> $2)
+          AND old.deleted_at IS NOT NULL AND nu.created_at >= old.deleted_at AND s.scope = 'global' AND ${LIVE_SANCTION}
+          AND NOT EXISTS (SELECT 1 FROM user_sanctions x WHERE x.user_id = $2 AND x.sanction_type = s.sanction_type
+                            AND x.reason_code = s.reason_code AND x.expires_at IS NOT DISTINCT FROM s.expires_at)
+        ORDER BY s.sanction_type, s.reason_code, s.expires_at, s.id`,
+      [dev.matched?.length ? dev.matched : [dev.id], uid],
+    );
+    for (const s of r.rows) {
+      // Copied in SQL: the times keep Postgres' microseconds (a JS Date would cut them), so the check above matches.
+      const id = (
+        await c.query(
+          `INSERT INTO user_sanctions (user_id, sanction_type, scope, reason_code, reason_description, internal_note, start_at, expires_at, is_permanent, status,
+                                       created_by, created_role, source, report_id, policy_step)
+           SELECT $1, sanction_type, 'global', reason_code, reason_description, left(rtrim($2 || internal_note), 2000), start_at, expires_at, is_permanent, 'active',
+                  created_by, created_role, source, report_id, policy_step
+             FROM user_sanctions WHERE id = $3 RETURNING id`,
+          [uid, `Silinen hesaptan taşındı (yaptırım #${s.id}). `, s.id],
+        )
+      ).rows[0].id;
+      await c.query('INSERT INTO user_mute_records (sanction_id, include_dm, include_calls) VALUES ($1, $2, $3)', [id, !!s.include_dm, !!s.include_calls]);
+      await audit(c, { action: 'carry_over', sanction: id, target: uid, device: dev.id, detail: { from: Number(s.id), fromUser: s.user_id } });
+    }
+    return r.rowCount;
+  });
+  if (moved) await refreshVoice(uid);
 }
 
 // --- Enforcement -----------------------------------------------------------------------------------------------
@@ -338,13 +392,16 @@ const live = (s) => s.status === 'active' && new Date(s.start_at) <= new Date() 
  * Writes one sanction (one per device for a device ban) and starts it unless it waits for approval. Every
  * check about who may do it is the caller's; this only refuses what is never allowed.
  *   input: { user, type, reason, minutes (null = permanent), description?, note?, roomId?, includeDm?,
- *            includeCalls?, deviceIds?, evidence?, source, reportId?, policyStep?, pending? }
+ *            includeCalls?, deviceIds?, evidence?, source, reportId?, policyStep?, pending?,
+ *            guard? (async (c) => boolean, run first inside the transaction: false writes nothing and returns []),
+ *            effectLater? (true: answers once the sanction is written; starting it (voice rooms) goes on after) }
  *   actor: { id (null = system), role }
  */
 export async function applySanction(actor, input) {
   const { type, minutes } = input;
   const reason = (await db.query('SELECT * FROM sanction_reasons WHERE code = $1 AND active', [input.reason])).rows[0];
   if (!reason) throw new HttpError(400, 'Geçersiz ihlal kategorisi');
+  if (SYSTEM_REASONS.includes(reason.code) && !(actor.id === null && input.source === 'auto')) throw new HttpError(400, 'Bu kategoriyi yalnızca otomatik sistem kullanır');
   const target = (await db.query('SELECT id, role FROM users WHERE id = $1 AND deleted_at IS NULL', [input.user])).rows[0];
   if (!target) throw new HttpError(404, 'Kullanıcı bulunamadı');
   if (type === 'device_ban' && !input.deviceIds?.length) throw new HttpError(400, 'Engellenecek cihazı seç');
@@ -355,6 +412,7 @@ export async function applySanction(actor, input) {
   }
   const out = [];
   await tx(async (c) => {
+    if (input.guard && !(await input.guard(c))) return;
     for (const dev of devices) {
       const s = (
         await c.query(
@@ -398,7 +456,10 @@ export async function applySanction(actor, input) {
   const rows = [];
   for (const id of out) {
     const s = await sanctionRow(db, id);
-    if (s.status === 'active') await takeEffect(s);
+    if (s.status === 'active') {
+      if (input.effectLater) takeEffect(s).catch((e) => console.error('sanction take effect', s.id, e.message));
+      else await takeEffect(s);
+    }
     rows.push(s);
   }
   return rows;
@@ -446,7 +507,11 @@ export async function autoFromReports(target, reasonText) {
     (await db.query("SELECT count(DISTINCT reporter) AS n FROM reports WHERE target_type = 'user' AND target_id = $1 AND created_at > now() - interval '1 day'", [target])).rows[0].n,
   );
   if (n < AUTO_REPORTS) return null;
-  const recent = await db.query("SELECT 1 FROM user_sanctions WHERE user_id = $1 AND source = 'auto' AND created_at > now() - interval '1 day'", [target]);
+  // The contact filter's own automatic mutes (contactStrike) don't count here.
+  const recent = await db.query("SELECT 1 FROM user_sanctions WHERE user_id = $1 AND source = 'auto' AND reason_code <> $2 AND created_at > now() - interval '1 day'", [
+    target,
+    CONTACT_REASON,
+  ]);
   if (recent.rowCount) return null;
   const u = (await db.query('SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL', [target])).rows[0];
   if (!u || RANK[u.role] > 0) return null;
@@ -462,6 +527,87 @@ export async function autoFromReports(target, reasonText) {
     { id: null, role: 'system' },
     { user: target, type: finalType, reason, minutes: step.minutes, source: 'auto', policyStep: step.step, pending, note: `${n} farklı kişi 24 saat içinde şikâyet etti` },
   );
+}
+
+/**
+ * Refusals the per-minute write cap left out of contact_refusals (core.mjs countRefusal), per person: their times
+ * (ms), newest last, only the newest AUTO_MUTE_REFUSALS inside the window (no more are ever needed). In memory,
+ * like the cap itself.
+ */
+const unwritten = new Map();
+setInterval(() => {
+  const old = Date.now() - AUTO_MUTE_WINDOW * 60_000;
+  for (const [uid, times] of unwritten) if (times.at(-1) <= old) unwritten.delete(uid);
+}, 3_600_000).unref();
+
+/**
+ * Contact filter (core.mjs countRefusal, right after a refusal is counted, the app's own included): once
+ * AUTO_MUTE_REFUSALS refusals (default 5, 0 = off) fall inside AUTO_MUTE_WINDOW minutes (default 60), the system
+ * mutes the person's messages, DMs and room chat, for AUTO_MUTE_MINUTES (default 60). Only refusals made after the
+ * last mute that kept the person from writing (this rule's or staff's, DMs and room chat) ended or was lifted
+ * count: those made while it ran never do, so when it is over the count starts again from zero, with the same
+ * warnings. Nothing is added while such a mute runs; staff are never muted.
+ * `skipped`: this refusal was not written (the per-minute cap); it still counts, and so do the earlier ones the
+ * cap left out (`unwritten`). Answers what the person is told: { strikesLeft, muteMinutes } with one or two tries
+ * left, { muted, until, muteMinutes, sanction, serverNow } when this refusal started the mute, else {}.
+ */
+export async function contactStrike(uid, skipped = false) {
+  if (!(AUTO_MUTE_REFUSALS > 0)) return {};
+  const now = Date.now();
+  const kept = (unwritten.get(uid) ?? []).filter((t) => t > now - AUTO_MUTE_WINDOW * 60_000);
+  const times = skipped ? [...kept, now].slice(-AUTO_MUTE_REFUSALS) : kept;
+  if (times.length) unwritten.set(uid, times);
+  else unwritten.delete(uid);
+  const r = (
+    await db.query(
+      `WITH stops AS (
+         -- When each mute that stopped both DMs and room chat stopped doing so: its end, or when it was lifted
+         -- (one still running ends in the future). One lifted while it waited for approval never ran.
+         SELECT CASE WHEN s.status = 'lifted' THEN least(s.revoked_at, coalesce(s.expires_at, 'infinity')) ELSE coalesce(s.expires_at, 'infinity') END AS ended
+           FROM user_sanctions s LEFT JOIN user_mute_records m ON m.sanction_id = s.id
+          WHERE s.user_id = $1 AND s.status IN ('active', 'lifted') AND s.start_at <= now()
+            AND (s.sanction_type = 'mute_all' OR (s.sanction_type = 'mute_global_text' AND m.include_dm))
+            AND (s.status = 'active' OR s.approved_at IS NOT NULL
+                 OR NOT EXISTS (SELECT 1 FROM sanction_audit_logs l WHERE l.sanction_id = s.id AND l.action = 'propose'))
+       ), cut AS (
+         SELECT greatest(now() - make_interval(mins => $3), coalesce((SELECT max(ended) FROM stops), '-infinity')) AS t
+       )
+       SELECT u.role,
+              (SELECT max(id) FROM user_sanctions WHERE user_id = $1 AND reason_code = $2 AND source = 'auto') AS last_id,
+              (SELECT count(*) FROM contact_refusals f WHERE f.user_id = $1 AND f.created_at > (SELECT t FROM cut))
+                + (SELECT count(*) FROM unnest($4::timestamptz[]) x WHERE x > (SELECT t FROM cut)) AS n
+         FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL`,
+      [uid, CONTACT_REASON, AUTO_MUTE_WINDOW, times.map((t) => new Date(t).toISOString())],
+    )
+  ).rows[0];
+  if (!r || RANK[r.role] > 0) return {};
+  const n = Number(r.n);
+  const left = AUTO_MUTE_REFUSALS - n;
+  if (left > 2) return {};
+  // Already unable to write (this rule's mute or a moderator's): nothing to add, nothing to warn about.
+  if ((await liveMutes(uid)).some((s) => STOPS.dm(s) && STOPS.room_text(s, null))) return {};
+  if (left > 0) return { strikesLeft: left, muteMinutes: AUTO_MUTE_MINUTES };
+  const [s] = await applySanction(
+    { id: null, role: 'system' },
+    {
+      user: uid,
+      type: 'mute_global_text',
+      includeDm: true,
+      reason: CONTACT_REASON,
+      minutes: AUTO_MUTE_MINUTES,
+      source: 'auto',
+      // The answer (muted, until) doesn't wait for LiveKit: the open voice connections lose chat right after.
+      effectLater: true,
+      note: `${AUTO_MUTE_WINDOW === 60 ? '1 saatte' : `${AUTO_MUTE_WINDOW} dakikada`} ${n} kez iletişim bilgisi yazmaya çalıştı`,
+      // Refusals at the same moment make one mute: the lock waits for the other's transaction, whose mute is newer than `last_id`.
+      guard: async (c) => {
+        await c.query("SELECT pg_advisory_xact_lock(hashtext('contact-auto-mute'), hashtext($1))", [uid]);
+        const since = await c.query("SELECT 1 FROM user_sanctions WHERE user_id = $1 AND reason_code = $2 AND source = 'auto' AND id > $3", [uid, CONTACT_REASON, r.last_id ?? 0]);
+        return !since.rowCount;
+      },
+    },
+  );
+  return s ? { muted: true, until: s.expires_at, muteMinutes: AUTO_MUTE_MINUTES, sanction: sanctionView(s), serverNow: new Date().toISOString() } : {};
 }
 
 // --- Input -----------------------------------------------------------------------------------------------------
@@ -551,11 +697,60 @@ async function staffTarget(me, uid) {
   return t;
 }
 
+/**
+ * How often the contact filter refused this person's text (contact-filter.mjs, kept 180 days): counts by kind
+ * and by place, for staff to judge. The texts themselves were never stored. Not a sanction by itself.
+ */
+async function contactRefusals(uid) {
+  const r = await db.query(
+    `SELECT category, place, count(*)::int AS n, count(*) FILTER (WHERE created_at > now() - interval '7 days')::int AS recent, max(created_at) AS last_at
+       FROM contact_refusals WHERE user_id = $1 GROUP BY category, place`,
+    [uid],
+  );
+  const out = { total: 0, last7Days: 0, byCategory: {}, byPlace: {}, lastAt: null };
+  for (const x of r.rows) {
+    out.total += x.n;
+    out.last7Days += x.recent;
+    out.byCategory[x.category] = (out.byCategory[x.category] ?? 0) + x.n;
+    out.byPlace[x.place] = (out.byPlace[x.place] ?? 0) + x.n;
+    if (!out.lastAt || x.last_at > out.lastAt) out.lastAt = x.last_at;
+  }
+  return out;
+}
+
+/** The rank a sanction was given with (room staff and the system: 0). */
+const ISSUER_RANK = { moderator: 1, admin: 2 };
+const LIFT_REFUSED = {
+  self: 'Kendi yaptırımını kaldıramazsın',
+  rank: 'Kendi yetki seviyende veya üstündeki birinin yaptırımını kaldıramazsın',
+  issuer: 'Bu yaptırımı senden üst yetkili biri verdi; yalnızca o seviyede biri kaldırabilir',
+};
+
+/**
+ * Whether `me` may lift `s`, with the rules of applying one (staffTarget): never one's own; a staff member's
+ * only from a higher rank (an admin may lift another admin's); never one given by a higher rank than `me` (the
+ * rank it was given with, or the giver's role now if higher). A refusal is audited and answers 403.
+ */
+export async function mayLift(me, s) {
+  const mine = RANK[me.role] ?? 0;
+  const roles = await db.query('SELECT id, role FROM users WHERE id = ANY($1::uuid[])', [[s.user_id, s.created_by].filter(Boolean)]);
+  const roleOf = (id) => roles.rows.find((x) => x.id === id)?.role;
+  const issuer = Math.max(ISSUER_RANK[s.created_role] ?? 0, s.created_by ? (RANK[roleOf(s.created_by)] ?? 0) : 0);
+  let why = null;
+  if (s.user_id === me.id) why = 'self';
+  else if (me.role !== 'admin' && (RANK[roleOf(s.user_id)] ?? 0) >= mine) why = 'rank';
+  else if (issuer > mine) why = 'issuer';
+  if (!why) return;
+  await audit(db, { actor: me.id, role: me.role, action: 'lift', sanction: s.id, target: s.user_id, result: 'denied', detail: { why } });
+  throw new HttpError(403, LIFT_REFUSED[why]);
+}
+
 export const sanctionRoutes = {
   // --- Staff --------------------------------------------------------------------------------------------------
   async 'GET /api/admin/sanctions/meta'(req) {
     const { perms } = await staffWith(req, 'sanction.view');
-    const reasons = await db.query('SELECT code, title, public_text FROM sanction_reasons WHERE active ORDER BY sort');
+    // Not the system's own reasons (SYSTEM_REASONS): nobody can pick those.
+    const reasons = await db.query('SELECT code, title, public_text FROM sanction_reasons WHERE active AND code <> ALL($1::text[]) ORDER BY sort', [SYSTEM_REASONS]);
     const pol = await db.query('SELECT * FROM sanction_policies ORDER BY reason_code, step');
     return {
       reasons: reasons.rows.map((r) => ({ code: r.code, title: r.title, publicText: r.public_text })),
@@ -620,6 +815,7 @@ export const sanctionRoutes = {
     const log = await db.query('SELECT l.*, u.name AS actor_name FROM sanction_audit_logs l LEFT JOIN users u ON u.id = l.actor WHERE l.target_user = $1 ORDER BY l.id DESC LIMIT 200', [uid]);
     return {
       user: { id: u.id, name: u.name, phone: u.phone, role: u.role, createdAt: u.created_at, deleted: !!u.deleted_at },
+      contactRefusals: await contactRefusals(uid),
       sanctions: await Promise.all(s.rows.map(staffView)),
       deviceSanctions: await Promise.all(onDevices.rows.map(staffView)),
       devices: devices.rows.map(deviceView),
@@ -695,6 +891,7 @@ export const sanctionRoutes = {
     const s = await sanctionRow(db, idOf(b.id));
     if (!s) throw new HttpError(404, 'Yaptırım bulunamadı');
     const why = text(b.reason, 3, 300, 'Kaldırma gerekçesi');
+    await mayLift(me, s);
     // A lifetime ban comes off only with the lifetime permission.
     if (s.is_permanent && (s.sanction_type === 'account_ban' || s.sanction_type === 'device_ban')) {
       const need = s.sanction_type === 'account_ban' ? 'sanction.ban_permanent' : 'sanction.device_ban_permanent';
@@ -801,6 +998,7 @@ export const sanctionRoutes = {
     const { u: me } = await staffWith(req, 'sanction.policy');
     const b = await readJson(req, 20_000);
     if (!(await db.query('SELECT 1 FROM sanction_reasons WHERE code = $1', [b.reason])).rowCount) throw new HttpError(400, 'Geçersiz ihlal kategorisi');
+    if (SYSTEM_REASONS.includes(b.reason)) throw new HttpError(400, 'Bu kategoriyi yalnızca otomatik sistem kullanır');
     if (!Array.isArray(b.steps) || b.steps.length > 10) throw new HttpError(400, 'En çok 10 kademe');
     const windowDays = b.steps.length ? int(b.windowDays ?? 90, 1, 3650) : 90;
     if (!windowDays) throw new HttpError(400, 'Değerlendirme süresi 1–3650 gün');

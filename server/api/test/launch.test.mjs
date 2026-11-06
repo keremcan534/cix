@@ -26,6 +26,7 @@ const REVIEW_PHONE = '+905550000001';
 const REVIEW_CODE = '246810';
 const h = startApi({
   SMS_PROVIDER: 'log',
+  PHONE_SIGN_IN: '1',
   OTP_REVIEW_PHONE: REVIEW_PHONE,
   OTP_REVIEW_CODE: REVIEW_CODE,
   PUSH_ENABLED: '1',
@@ -48,13 +49,20 @@ const until = async (fn, ms = 3000) => {
   }
   return false;
 };
+/** A phone as the app describes it (sanctions.mjs deviceSignals). */
+const handset = (hardwareId = rnd(8)) => ({ installId: rnd(20), hardwareId, platform: 'android' });
 /** Signs in with a phone through the SMS code (the "log" provider prints it). */
-async function phoneSignIn(phone = phoneNo(), extra = {}) {
-  const from = h.logs.length;
-  assert.equal((await call('POST', '/api/auth/otp/start', { phone }))[0], 200);
-  const [st, j] = await call('POST', '/api/auth/otp/verify', { phone, code: await codeFor(phone, from), ...extra });
+async function phoneSignIn(phone = phoneNo(), extra = { deviceInfo: handset() }) {
+  const [st, j] = await phoneVerify(phone, extra);
   assert.equal(st, 200, j.error);
   return { ...j, phone };
+}
+/** Asks for a code and sends it back with the start's challenge: the verify answer. */
+async function phoneVerify(phone, extra) {
+  const from = h.logs.length;
+  const [sst, started] = await call('POST', '/api/auth/otp/start', { phone });
+  assert.equal(sst, 200, started.error);
+  return call('POST', '/api/auth/otp/verify', { phone, code: await codeFor(phone, from), challenge: started.challenge, ...extra });
 }
 
 describe('Sağlık', () => {
@@ -76,24 +84,51 @@ describe('Telefonla giriş', () => {
     const [st, j] = await call('POST', '/api/auth/otp/start', { phone: `0${phone.slice(3, 6)} ${phone.slice(6, 9)} ${phone.slice(9)}` });
     assert.equal(st, 200, j.error);
     assert.equal(j.retryAfter, 60);
+    const { challenge } = j;
     const code = await codeFor(phone);
     assert.equal((await call('POST', '/api/auth/otp/start', { phone }))[0], 429, 'yeni kod için bekle');
     const wrong = String((Number(code) + 1) % 1e6).padStart(6, '0');
-    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code: wrong }))[1].error, 'Kod yanlış');
-    const [vs, v] = await call('POST', '/api/auth/otp/verify', { phone, code, name: 'Telefonlu' });
+    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code: wrong, challenge }))[1].error, 'Kod yanlış');
+    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code }))[1].error, 'Kodun süresi doldu, yeni kod iste', 'challenge gerekli');
+    const [vs, v] = await call('POST', '/api/auth/otp/verify', { phone, code, challenge, name: 'Telefonlu', deviceInfo: handset() });
     assert.equal(vs, 200, v.error);
     assert.deepEqual([v.isNew, v.user.phone, v.user.name], [true, phone, 'Telefonlu']);
     assert.equal((await call('GET', '/api/me', null, v.session))[0], 200);
-    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code }))[0], 400, 'kod bir kez kullanılır');
+    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code, challenge }))[0], 400, 'kod bir kez kullanılır');
   });
 
   test('beş yanlış denemeden sonra doğru kod da kabul edilmez', async () => {
     const phone = phoneNo();
-    await call('POST', '/api/auth/otp/start', { phone });
+    const { challenge } = (await call('POST', '/api/auth/otp/start', { phone }))[1];
     const code = await codeFor(phone);
     const wrong = String((Number(code) + 7) % 1e6).padStart(6, '0');
-    for (let i = 0; i < 5; i++) assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code: wrong }))[0], 400);
-    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code }))[0], 429);
+    for (let i = 0; i < 5; i++) assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code: wrong, challenge }))[0], 400);
+    assert.equal((await call('POST', '/api/auth/otp/verify', { phone, code, challenge }))[0], 429);
+  });
+
+  test('bir telefonda tek hesap: ikinci yeni numara 409; Google ya da e-postayla girilen hesabın numarası giriş yolu olmaz; cihaz bilgisi yoksa 400', async () => {
+    const hw = rnd(8);
+    const first = await phoneSignIn(phoneNo(), { deviceInfo: handset(hw) });
+    assert.equal(first.isNew, true);
+    // Reinstalled app (new install id, same phone): a second new number is refused.
+    const [st, j] = await phoneVerify(phoneNo(), { deviceInfo: handset(hw) });
+    assert.equal(st, 409, j.error);
+    assert.deepEqual([j.code, j.method], ['device_has_account', 'phone']);
+    // The phone's own number still signs in there.
+    assert.equal((await phoneSignIn(first.phone, { deviceInfo: handset(hw) })).user.id, first.user.id);
+
+    // A number that is only a badge on a Google account does not open that account.
+    const g = await h.account('Google Kişi');
+    const badge = phoneNo();
+    await h.sql.query('UPDATE users SET phone = $2 WHERE id = $1', [g.user.id, badge]);
+    await h.sql.query("INSERT INTO auth_identities (provider, subject, user_id, email) VALUES ('google', $1, $2, 'g@gmail.com')", [rnd(10), g.user.id]);
+    const [gst, gj] = await phoneVerify(badge, { deviceInfo: handset() });
+    assert.equal(gst, 409);
+    assert.match(gj.error, /Google ya da e-postayla/);
+
+    const [nst, nj] = await phoneVerify(phoneNo(), {});
+    assert.equal(nst, 400);
+    assert.equal(nj.error, 'Bu cihaz tanınamadı; uygulamayı güncelleyip tekrar dene');
   });
 
   test('cihazdaki geliştirme hesabı telefonla aynı hesap olarak devam eder', async () => {

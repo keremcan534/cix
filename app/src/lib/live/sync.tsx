@@ -1,13 +1,18 @@
 // Live mode background sync (lib/live): while signed in, keeps the balance and the Gelir locks in step with the
-// server (a gift someone sends from another phone shows up here within seconds) and polls direct messages.
+// server (a gift someone sends from another phone shows up here within seconds), polls direct messages and
+// passes on the contact filter's refusals made on this phone. On signing in it also takes the server's follow
+// and block lists (a reinstall or a new sign-in starts from them). An open chat reads its own thread more often
+// (lib/live/messages useLiveThread).
 // Mounted once above the stack (app/_layout); renders nothing and does nothing without a server address.
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { showAlert } from '@/lib/alert';
-import { SignInAgain } from '@/lib/api';
+import { SignInAgain, countContactRefusal } from '@/lib/api';
+import { onContactRefusal } from '@/lib/contact-filter';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
+import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { pollMessages } from '@/lib/live/messages';
 import { settleWithdrawals } from '@/lib/live/withdraw';
 import { useApp } from '@/store';
@@ -22,6 +27,13 @@ export function LiveSync() {
     appRef.current = app;
   });
   const name = app.me.name;
+
+  // Room and group chats, moments, room polls … are refused on this phone and never reach the server, so the
+  // refusal is reported for the moderators' count: its kind and place only, never the text. Best effort.
+  useEffect(() => {
+    if (!liveMode()) return;
+    return onContactRefusal((r) => void countContactRefusal(r.category, r.place).catch(() => {}));
+  }, []);
 
   useEffect(() => {
     if (!liveMode()) return;
@@ -40,6 +52,13 @@ export function LiveSync() {
           signedIn = true;
           // A Play purchase whose server answer was lost last time is verified now.
           resumePurchases();
+          // Follows and blocks are kept on the server; one failing leaves this phone's list as it is.
+          void loadFollowing()
+            .then((ids) => alive && appRef.current.takeServerSocial({ following: ids }))
+            .catch(() => {});
+          void loadBlocks()
+            .then((ids) => alive && appRef.current.takeServerSocial({ blocked: ids }))
+            .catch(() => {});
           await refreshEarnings();
         } else {
           // A rejected withdrawal gives diamonds back: known before the balance is read, so it isn't a gift.
@@ -50,11 +69,11 @@ export function LiveSync() {
         if (alive) await pollMessages(appRef.current);
       } catch (e) {
         if (e instanceof SignInAgain) {
-          // A Google account's session ended (signed out on the server, or expired): back to the welcome screen.
+          // A Google, e-mail or phone account's session ended (signed out on the server, or expired): back to the welcome screen.
           signedIn = false;
           if (alive && appRef.current.loggedIn) {
             appRef.current.logout();
-            showAlert('Oturumun sona erdi', 'Devam etmek için Google ile yeniden giriş yap.');
+            showAlert('Oturumun sona erdi', 'Devam etmek için yeniden giriş yap.');
           }
           return;
         }

@@ -20,8 +20,35 @@ export const intimacyOf = (userId: string) => INTIMACY[userId] ?? 0;
 
 export const formatIntimacy = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}B` : String(n));
 
-/** Last-message times are "HH:MM" for today, otherwise "Dün", "Pzt" etc. */
-export const isTodayTime = (time: string) => /^\d{1,2}:\d{2}$/.test(time);
+type Stamp = { time: string; at?: string };
+const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+const dayOf = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const readAt = (m: Stamp) => {
+  if (!m.at) return null;
+  const d = new Date(m.at);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/**
+ * A message's time as shown: "HH:MM" today, "Dün" yesterday, otherwise the day ("3 Kas", with the year when it
+ * isn't this year). Messages with a stored moment (`at`, every live message) are formatted from it; the demo's
+ * written labels ("21:02", "Pzt") are shown as they are.
+ */
+export function messageTime(m: Stamp, now = new Date()) {
+  const d = readAt(m);
+  if (!d) return m.time;
+  if (dayOf(d) === dayOf(now)) return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (dayOf(d) === dayOf(yesterday)) return 'Dün';
+  const day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? day : `${day} ${d.getFullYear()}`;
+}
+
+/** The "Bugün" filter: sent today by its stored moment; a demo label counts when it is a bare "HH:MM". */
+export function isTodayTime(m: Stamp, now = new Date()) {
+  const d = readAt(m);
+  return d ? dayOf(d) === dayOf(now) : /^\d{1,2}:\d{2}$/.test(m.time);
+}
 
 export type CallKind = 'voice' | 'video';
 export type CallDirection = 'in' | 'out' | 'missed';

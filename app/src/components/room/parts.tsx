@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
@@ -467,6 +468,13 @@ export function GiftAnimation({ gift, onDone }: { gift: Gift; onDone: () => void
       )}
     </View>
   );
+}
+
+/** Bottom padding for a bottom sheet in a Modal. Android modals draw edge to edge, so a fixed padding leaves the
+ *  last button under the navigation bar; this keeps it above the bar and never below `min`. */
+export function useSheetBottom(min = 34) {
+  const { bottom } = useSafeAreaInsets();
+  return Math.max(min, bottom + 8);
 }
 
 export const roomStyles = StyleSheet.create({

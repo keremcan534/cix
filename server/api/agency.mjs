@@ -14,6 +14,7 @@
 //   GET  /api/agency/subagencies?id=   GET /api/agency/commissions?id=&from&to&streamer&sub&kind&format=csv
 //   GET  /api/agency/performance?id=   GET /api/agency/report?id=&from&to&group=day|week|month
 //   GET  /api/agency/requests?id=      POST /api/agency/invite { id, user | username, note? }
+//   GET  /api/agency/invite/search?id=&q=  → { users }  (whom to invite, by name or username)
 //   POST /api/agency/requests/decide { id, requestId, approve, note? }
 //   POST /api/agency/sub/create { parentId, name, owner?, …, submit? }   POST /api/agency/sub/submit { id }
 //   POST /api/agency/sub/decide { id, approve, note? }    POST /api/agency/apply { name, parentCode?, owner?, … }
@@ -25,7 +26,7 @@
 //   POST /api/agency/independence { id, reason, ref }     POST /api/agency/change-parent { id, toCode, reason, ref }
 //   POST /api/agency/sub/close { id, reason, ref }        POST /api/agency/appeal { id, subject, body }
 //   GET  /api/agency/notices?id=
-import { HttpError, REF, UUID, auth, db, readJson, text, tx } from './core.mjs';
+import { HttpError, REF, UUID, assertClean, auth, db, readJson, text, tx } from './core.mjs';
 import {
   AGENCY_PERMS,
   PLATFORM_PERMS,
@@ -48,6 +49,15 @@ import {
   viewerOf,
 } from './agency-lib.mjs';
 import { approveTransfer, checkCanFoundSub, feeRule, linkStreamer, namesFor, openTransfer, payoutStep, rejectTransfer, setStatus, submitAgency, transferView } from './agency-ops.mjs';
+import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
+
+/**
+ * Commission is never paid out on a server that holds or held play money (test top-ups, test or sandbox
+ * purchases): the same rule as diamond withdrawals (withdraw.mjs). Coins are fungible, so no commission there is
+ * provably earned with real money. Requests, approvals and payments are refused; only reject or cancel remain.
+ */
+export const PLAY_PAYOUT = 'Test jetonundan gelen kazanç ödenemez';
+export const playMoneyOn = async (c) => PLAY_MONEY || (await everHadPlayMoney(c));
 
 // --- Small helpers -----------------------------------------------------------------------------------------
 const bad = (m) => {
@@ -56,6 +66,11 @@ const bad = (m) => {
 const uuid = (v, what = 'kimlik') => (typeof v === 'string' && UUID.test(v) ? v : bad(`Geçersiz ${what}`));
 const ref = (v) => (typeof v === 'string' && REF.test(v) ? v : bad('Geçersiz istek kimliği'));
 const opt = (v, max, field) => (v === undefined || v === null ? '' : text(v, 0, max, field));
+/**
+ * A note or reason the other side reads (a streamer, another agency): no phone numbers, IBANs, e-mails, links
+ * or social media accounts (contact-filter.mjs). The refusal is counted for `x.u` at `place`.
+ */
+const said = (s, x, place, field = 'note') => assertClean(s, x.u, place, field);
 const dateParam = (v, dflt) => {
   if (!v) return dflt;
   const d = new Date(v);
@@ -220,7 +235,7 @@ export const agencyRoutes = {
       }
       try {
         await c.query('SAVEPOINT j');
-        const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by) VALUES ($1,$2,'join',$3,$4,$2) RETURNING *", [a.id, x.u.id, method, opt(b.note, 300, 'Not')]);
+        const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by) VALUES ($1,$2,'join',$3,$4,$2) RETURNING *", [a.id, x.u.id, method, await said(opt(b.note, 300, 'Not'), x, 'agency.join')]);
         await c.query('RELEASE SAVEPOINT j');
         await notice(c, a.id, 'request', `${x.u.name} katılmak istiyor`, '');
         return { request: { id: Number(r.rows[0].id), status: 'pending', agency: { id: a.id, name: a.name } } };
@@ -257,7 +272,7 @@ export const agencyRoutes = {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await ctx(c, req);
-      const reason = text(b.reason, 3, 500, 'Gerekçe');
+      const reason = await said(text(b.reason, 3, 500, 'Gerekçe'), x, 'agency.transfer', 'reason');
       const link = await c.query('SELECT * FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [x.u.id]);
       if (!link.rowCount) throw new HttpError(409, 'Bir ajansa bağlı değilsin');
       const from = await agencyRow(c, link.rows[0].agency_id);
@@ -535,6 +550,34 @@ export const agencyRoutes = {
     return { requests: r.rows.map((q) => ({ id: Number(q.id), kind: q.kind, method: q.method, status: q.status, user: { id: q.user_id, name: q.name, username: q.username }, note: q.note, createdAt: q.created_at, decidedAt: q.decided_at })) };
   },
 
+  /**
+   * "Yayıncı davet et": the people the app shows by name (few accounts have a username), found by name or
+   * username, so the invite can name them by id. Only for whoever may invite in this agency; deleted accounts,
+   * the caller and blocks either way are left out. `agency`: 'this' or 'other' when they already belong to one.
+   */
+  async 'GET /api/agency/invite/search'(req, url) {
+    const x = await ctx(db, req);
+    const a = await agencyRow(db, uuid(url.searchParams.get('id'), 'ajans'));
+    await actIn(db, x, a, 'streamers.invite');
+    const q = (url.searchParams.get('q') ?? '').trim().replace(/^@+/, '');
+    if (q.length < 2) return { users: [] };
+    if (q.length > 40) bad('Arama en fazla 40 karakter olabilir');
+    const esc = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+    const r = await db.query(
+      `SELECT u.id, u.name, u.username, u.avatar_url,
+              (SELECT s.agency_id FROM agency_streamers s WHERE s.streamer_id = u.id AND s.ended_at IS NULL LIMIT 1) AS agency_id
+         FROM users u
+        WHERE u.deleted_at IS NULL AND u.id <> $1 AND (u.name ILIKE $2 OR u.username ILIKE $2)
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
+        ORDER BY lower(u.username) = lower($3) IS TRUE DESC, lower(u.name) = lower($3) DESC, u.name ILIKE $4 DESC, u.name, u.id
+        LIMIT 20`,
+      [x.u.id, `%${esc}%`, q, `${esc}%`],
+    );
+    return {
+      users: r.rows.map((u) => ({ id: u.id, name: u.name, username: u.username ?? null, avatarUrl: u.avatar_url ?? null, agency: u.agency_id === a.id ? 'this' : u.agency_id ? 'other' : null })),
+    };
+  },
+
   async 'POST /api/agency/invite'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
@@ -550,7 +593,7 @@ export const agencyRoutes = {
       if (open.rowCount) throw new HttpError(409, open.rows[0].agency_id === a.id ? 'Bu yayıncı zaten ajansında' : 'Bu yayıncı başka bir ajansa bağlı; ancak kendi transfer talebiyle geçebilir');
       try {
         await c.query('SAVEPOINT i');
-        const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by) VALUES ($1,$2,'invite','invite',$3,$4) RETURNING id", [a.id, target.rows[0].id, opt(b.note, 300, 'Not'), x.u.id]);
+        const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by) VALUES ($1,$2,'invite','invite',$3,$4) RETURNING id", [a.id, target.rows[0].id, await said(opt(b.note, 300, 'Not'), x, 'agency.invite'), x.u.id]);
         await c.query('RELEASE SAVEPOINT i');
         await audit(c, x.u.id, 'streamer.invite', 'agency', a.id, { after: { user: target.rows[0].id } });
         return { request: { id: Number(r.rows[0].id), user: target.rows[0], status: 'pending' } };
@@ -568,11 +611,12 @@ export const agencyRoutes = {
       const x = await ctx(c, req);
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       await actIn(c, x, a, 'streamers.approve');
+      const note = await said(opt(b.note, 300, 'Not'), x, 'agency.request');
       const r = await c.query("SELECT * FROM agency_requests WHERE id = $1 AND agency_id = $2 AND kind = 'join' AND status = 'pending' FOR UPDATE", [b.requestId, a.id]);
       if (!r.rowCount) throw new HttpError(404, 'Başvuru bulunamadı');
       if (b.approve === true) await linkStreamer(c, r.rows[0].user_id, a, r.rows[0].method, x.u.id);
       await c.query('UPDATE agency_requests SET status = $2, decided_by = $3, decided_at = now() WHERE id = $1', [r.rows[0].id, b.approve === true ? 'approved' : 'rejected', x.u.id]);
-      await audit(c, x.u.id, b.approve === true ? 'request.approve' : 'request.reject', 'agency', a.id, { after: { user: r.rows[0].user_id }, reason: opt(b.note, 300, 'Not') });
+      await audit(c, x.u.id, b.approve === true ? 'request.approve' : 'request.reject', 'agency', a.id, { after: { user: r.rows[0].user_id }, reason: note });
       return { status: b.approve === true ? 'approved' : 'rejected' };
     });
   },
@@ -585,7 +629,7 @@ export const agencyRoutes = {
       const parent = await agencyRow(c, uuid(b.parentId, 'üst ajans'), true);
       await actIn(c, x, parent, 'subagencies.manage');
       await checkCanFoundSub(c, parent, x.s);
-      const a = await insertAgency(c, b, { parent, owner: b.owner ? uuid(b.owner, 'yönetici') : null, actor: x.u.id, status: 'draft', pendingWith: null });
+      const a = await insertAgency(c, b, { parent, owner: b.owner ? uuid(b.owner, 'yönetici') : null, actor: x.u.id, status: 'draft', pendingWith: null, screen: x.u });
       if (b.submit === true) await submitAgency(c, a, x.u.id);
       return { agency: card(await agencyRow(c, a.id), x.s) };
     });
@@ -617,7 +661,7 @@ export const agencyRoutes = {
         parent = await agencyByCode(c, b.parentCode);
         await checkCanFoundSub(c, parent, x.s);
       }
-      const a = await insertAgency(c, b, { parent, owner, actor: x.u.id, status: 'pending', pendingWith: parent ? 'parent' : 'center', bd: bd ? x.u.id : null });
+      const a = await insertAgency(c, b, { parent, owner, actor: x.u.id, status: 'pending', pendingWith: parent ? 'parent' : 'center', bd: bd ? x.u.id : null, screen: bd ? null : x.u });
       if (parent) await notice(c, parent.id, 'sub', `Yeni alt ajans başvurusu: ${a.name}`, '');
       return { agency: card(a, x.s), pendingWith: a.pending_with };
     });
@@ -634,8 +678,9 @@ export const agencyRoutes = {
       await actIn(c, x, parent, 'subagencies.manage');
       if (b.approve === true) await submitAgency(c, a, x.u.id);
       else {
-        await setStatus(c, a, 'rejected', x.u.id, opt(b.note, 300, 'Not'));
-        await audit(c, x.u.id, 'agency.reject', 'agency', a.id, { reason: opt(b.note, 300, 'Not') });
+        const note = await said(opt(b.note, 300, 'Not'), x, 'agency.sub_decide');
+        await setStatus(c, a, 'rejected', x.u.id, note);
+        await audit(c, x.u.id, 'agency.reject', 'agency', a.id, { reason: note });
       }
       return { agency: card(await agencyRow(c, a.id), x.s) };
     });
@@ -748,6 +793,7 @@ export const agencyRoutes = {
       if (same.rowCount) return { payout: { id: Number(same.rows[0].id), amount: d4(same.rows[0].amount), status: same.rows[0].status }, replay: true };
       if (a.status !== 'approved') throw new HttpError(403, 'Askıdaki veya kapalı ajans ödeme talep edemez');
       if (!x.s.payout_policy.currencies.includes(b.currency)) bad(`Para birimi: ${x.s.payout_policy.currencies.join(', ')}`);
+      if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
       const open = await c.query("SELECT 1 FROM agency_payouts WHERE agency_id = $1 AND status IN ('pending', 'ready')", [a.id]);
       if (open.rowCount) throw new HttpError(409, 'Sonuçlanmamış bir ödeme talebin var');
       // Only earnings of closed periods that no payout has claimed; claimed in the same statement's lock.
@@ -797,7 +843,7 @@ export const agencyRoutes = {
       const party = t.from_agency_id === a.id && t.needs.includes('from') ? 'from' : t.to_agency_id === a.id && t.needs.includes('to') ? 'to' : null;
       if (!party) throw new HttpError(403, 'Bu talep ajansının kararını beklemiyor');
       if (b.approve !== true) {
-        await rejectTransfer(c, t, x.u.id, opt(b.note, 300, 'Not'));
+        await rejectTransfer(c, t, x.u.id, await said(opt(b.note, 300, 'Not'), x, 'agency.transfer_decide'));
         return { transfer: transferView(t, await namesFor(c, [t])) };
       }
       const extra = {};
@@ -822,7 +868,7 @@ export const agencyRoutes = {
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       await actIn(c, x, a, 'transfers.manage');
       if (!a.parent_id || a.status !== 'approved') throw new HttpError(409, 'Yalnızca aktif bir alt ajans bağımsızlık başvurusu yapabilir');
-      const t = await openTransfer(c, { kind: 'independence', agencyId: a.id, fromId: a.parent_id, needs: ['center'], mode: 'free', reason: text(b.reason, 3, 500, 'Gerekçe'), ref: ref(b.ref), actor: x.u.id });
+      const t = await openTransfer(c, { kind: 'independence', agencyId: a.id, fromId: a.parent_id, needs: ['center'], mode: 'free', reason: await said(text(b.reason, 3, 500, 'Gerekçe'), x, 'agency.independence', 'reason'), ref: ref(b.ref), actor: x.u.id });
       await notice(c, a.parent_id, 'transfer', `${a.name} bağımsızlık başvurusu yaptı`, 'Kararı merkez verir. Onaylanırsa bu ajansın bundan sonraki gelirinden pay almazsın; geçmiş kazançların değişmez.');
       return { transfer: transferView(t, await namesFor(c, [t])) };
     });
@@ -838,7 +884,7 @@ export const agencyRoutes = {
       const to = await agencyByCode(c, b.toCode);
       if (to.status !== 'approved' || to.level !== 1 || to.id === a.id || to.id === a.parent_id) throw new HttpError(409, 'Hedef aktif bir üst ajans olmalı');
       const fr = await feeRule(c, 'agency', a.id, x.s);
-      const t = await openTransfer(c, { kind: 'change_parent', agencyId: a.id, fromId: a.parent_id, toId: to.id, needs: ['to', 'center'], mode: fr.fee > 0 ? 'paid' : 'free', fee: fr.fee, feeRule: fr, reason: text(b.reason, 3, 500, 'Gerekçe'), ref: ref(b.ref), actor: x.u.id });
+      const t = await openTransfer(c, { kind: 'change_parent', agencyId: a.id, fromId: a.parent_id, toId: to.id, needs: ['to', 'center'], mode: fr.fee > 0 ? 'paid' : 'free', fee: fr.fee, feeRule: fr, reason: await said(text(b.reason, 3, 500, 'Gerekçe'), x, 'agency.change_parent', 'reason'), ref: ref(b.ref), actor: x.u.id });
       await notice(c, to.id, 'transfer', `${a.name} alt ajansın olmak istiyor`, '');
       if (a.parent_id) await notice(c, a.parent_id, 'transfer', `${a.name} üst ajans değişikliği istedi`, 'Kararı hedef ajans ve merkez verir.');
       return { transfer: transferView(t, await namesFor(c, [t])) };
@@ -858,7 +904,7 @@ export const agencyRoutes = {
         await audit(db, x.u.id, 'sub.close', 'agency', a.id, { result: 'denied' });
         throw new HttpError(403, 'Bu işlem için yetkin yok');
       }
-      const t = await openTransfer(c, { kind: 'sub_close', agencyId: a.id, fromId: a.id, toId: a.parent_id, needs: ['center'], mode: 'free', reason: text(b.reason, 3, 500, 'Gerekçe'), ref: ref(b.ref), actor: x.u.id });
+      const t = await openTransfer(c, { kind: 'sub_close', agencyId: a.id, fromId: a.id, toId: a.parent_id, needs: ['center'], mode: 'free', reason: await said(text(b.reason, 3, 500, 'Gerekçe'), x, 'agency.sub_close', 'reason'), ref: ref(b.ref), actor: x.u.id });
       return { transfer: transferView(t, await namesFor(c, [t])) };
     });
   },
@@ -885,9 +931,16 @@ export const agencyRoutes = {
   },
 };
 
-/** A new agency row (draft or pending) with a unique invite code. */
-export async function insertAgency(c, b, { parent, owner, actor, status, pendingWith, bd = null }) {
+/**
+ * A new agency row (draft or pending) with a unique invite code. With `screen` (the applicant, for an
+ * application from the app; staff tools pass none) the name, country and region, which other people see, are
+ * checked for contact details (contact-filter.mjs). The contact fields and the description go to reviewers only.
+ */
+export async function insertAgency(c, b, { parent, owner, actor, status, pendingWith, bd = null, screen = null }) {
   const name = text(b.name, 2, 60, 'Ajans adı');
+  const country = opt(b.country, 60, 'Ülke');
+  const region = opt(b.region, 60, 'Bölge');
+  if (screen) for (const [v, field] of [[name, 'name'], [country, 'country'], [region, 'region']]) await assertClean(v, screen, `agency.${field}`, field);
   for (let i = 0; i < 5; i++) {
     try {
       await c.query('SAVEPOINT ins');
@@ -902,8 +955,8 @@ export async function insertAgency(c, b, { parent, owner, actor, status, pending
           owner,
           status,
           pendingWith,
-          opt(b.country, 60, 'Ülke'),
-          opt(b.region, 60, 'Bölge'),
+          country,
+          region,
           opt(b.contactName, 60, 'Yetkili'),
           opt(b.contactPhone, 30, 'Telefon'),
           opt(b.contactEmail, 120, 'E-posta'),

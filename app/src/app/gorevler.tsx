@@ -9,6 +9,7 @@ import { Text } from '@/components/text';
 import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
+import { callsAvailable, liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
@@ -34,6 +35,9 @@ const secsToMidnight = () => {
   const d = new Date();
   return Math.max(0, Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - d.getTime()) / 1000));
 };
+// Only the rows a user can actually do are listed: calls are 'Yakında' while callsAvailable() is false, and Anlar
+// is not open in a live build. Display only; the reward and claim rules are untouched.
+const shownTask = (key: TaskKey) => (key === 'calls' ? callsAvailable() : key === 'moments' ? !liveMode() : true);
 const pad = (n: number) => String(n).padStart(2, '0');
 const hms = (s: number) => `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 
@@ -95,7 +99,7 @@ export default function TaskCenter() {
               {TOMORROW(CHECKIN_REWARDS[selected]).map((x) => (
                 <View key={x.name} style={styles.rewardBox}>
                   <Icon3D name={x.icon} size={34} />
-                  <Text style={styles.dim} numberOfLines={1}>
+                  <Text style={[styles.dim, { textAlign: 'center' }]} numberOfLines={2}>
                     {x.name}
                   </Text>
                   <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>{x.n}</Text>
@@ -113,7 +117,7 @@ export default function TaskCenter() {
           </View>
         </View>
         <View style={[styles.card, { paddingVertical: 4 }]}>
-          {TASKS.map((t, i) => {
+          {TASKS.filter((t) => shownTask(t.key)).map((t, i) => {
             const progress = Math.min(stats[t.key], t.goal);
             const complete = progress >= t.goal;
             const claimed = claimedTasks.has(t.id);
@@ -165,16 +169,19 @@ export default function TaskCenter() {
           })}
         </View>
 
-        <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
-          <LinearGradient colors={[semantic.socialFill, '#6E2440']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
-            <Icon3D name="envelope" size={48} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 17 }}>Ödüllü davet</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Arkadaşlarını davet et, kayıt ve gelir görevlerinden ödül kazan</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#fff" />
-          </LinearGradient>
-        </Pressable>
+        {/* Davet has no server referral yet (it shows ComingSoon in a live build), so the banner is demo only. */}
+        {!liveMode() && (
+          <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
+            <LinearGradient colors={[semantic.socialFill, '#6E2440']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
+              <Icon3D name="envelope" size={48} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 17 }}>Ödüllü davet</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Arkadaşlarını davet et, kayıt ve gelir görevlerinden ödül kazan</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color="#fff" />
+            </LinearGradient>
+          </Pressable>
+        )}
         <Text style={styles.dim}>Görevler her gün 00:00&apos;da sıfırlanır. Ödüller sunucuda doğrulanan etkinliklerden verilir; sahte etkileşim ödül üretmez.</Text>
       </ScrollView>
       {reward && <RewardBurst reward={reward} still={settings.reduceMotion} onDone={() => setReward(null)} />}
@@ -197,7 +204,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
   tomorrow: { backgroundColor: dark ? 'rgba(19,217,223,0.12)' : 'rgba(0,140,148,0.07)', borderRadius: 16, padding: 14, gap: 12 },
   tomorrowTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
-  rewardBox: { flex: 1, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10 },
+  rewardBox: { flex: 1, alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 4 },
   h1: { color: colors.text, fontSize: 20, fontFamily: fonts.display, letterSpacing: -0.3 },
   timer: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, ...lift },
   timerText: { color: colors.text, fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] },

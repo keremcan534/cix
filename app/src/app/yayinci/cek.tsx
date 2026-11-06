@@ -3,13 +3,15 @@ import { useState } from 'react';
 import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
-import { Button, Card, GradientButton, Header } from '@/components/ui';
+import { Button, Card, Header } from '@/components/ui';
 import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message } from '@/lib/live';
 import { cancelWithdraw, liveWithdraw, useServerWithdrawals, type ServerWithdrawal } from '@/lib/live/withdraw';
 import { blockedFeature } from '@/lib/remote-control';
+import { suggestedWithdraw, withdrawPresets } from '@/lib/withdraw-form';
 import { checkWithdraw, formatIban, maskAccount, withdrawUsd, type WithdrawMethod } from '@/lib/withdraw-rules';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -33,13 +35,36 @@ export default function Withdraw() {
   const fromServer = live && server.loaded;
   const diamonds = fromServer ? server.withdrawable : app.withdrawableDiamonds;
   const locked = fromServer ? server.locked : app.lockedDiamonds;
-  const [amount, setAmount] = useState(String(Math.max(RULES.minWithdrawDiamonds, Math.floor(diamonds / 1000) * 1000)));
+  // Below the minimum nothing is offered: no pre-filled amount, no payout line, the button stays off. Above it the
+  // field suggests the withdrawable balance (whole thousands, at most one request's limit) until the person types.
+  const enough = diamonds >= RULES.minWithdrawDiamonds;
+  const suggested = suggestedWithdraw(diamonds);
+  const [typed, setTyped] = useState<string | null>(null);
+  const amount = typed ?? (suggested ? String(suggested) : '');
+  const setAmount = (t: string) => setTyped(t);
   const [method, setMethod] = useState<WithdrawMethod>('iban');
   const [account, setAccount] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const n = Number(amount) || 0;
-  const presets = [10_000, 20_000, 50_000].filter((p) => p <= diamonds);
+  // Live mode: the limits the server sends with the list (Canlı ayarlar can change them); the compiled ones
+  // until it answers or when an older server sends none. The server checks every request again.
+  const limits = fromServer ? server.rules : null;
+  const minD = limits?.minDiamonds ?? RULES.minWithdrawDiamonds;
+  const maxD = limits?.maxDiamonds ?? RULES.maxWithdrawDiamonds;
+  const weekLeft = limits ? Math.max(0, limits.weeklyDiamonds - limits.weekUsed) : Infinity;
+  const cap = Math.min(diamonds, maxD, weekLeft);
+  const presets = withdrawPresets(cap, { ...RULES, minWithdrawDiamonds: minD, maxWithdrawDiamonds: maxD });
+  const payable = n >= minD && n <= cap;
+  /** The amount against the server's limits (null when they're not in: checkWithdraw uses the compiled ones). */
+  const amountError = (d: number) => {
+    if (!limits) return null;
+    if (!Number.isSafeInteger(d) || d < limits.minDiamonds) return `En az ${fmt(limits.minDiamonds)} elmas çekebilirsin.`;
+    if (d > limits.maxDiamonds) return `Tek talepte en çok ${fmt(limits.maxDiamonds)} elmas çekebilirsin.`;
+    if (d > weekLeft) return `7 günde en çok ${fmt(limits.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(weekLeft)} elmas.`;
+    if (d > diamonds) return 'Çekilebilir elmasın yetmiyor. Kilitli elmaslar süresi dolunca eklenir.';
+    return null;
+  };
   const { colors } = useTheme();
   const styles = useStyles();
   // Live mode: one request at a time; a new one waits until the pending one is settled or cancelled.
@@ -49,7 +74,17 @@ export default function Withdraw() {
     if (live) {
       if (busy || blockedFeature('withdraw')) return;
       if (pending) return showAlert('Bekleyen talebin var', 'Bekleyen talebin sonuçlanınca ya da onu iptal edince yenisini açabilirsin.');
-      const err = checkWithdraw({ diamonds: n, withdrawable: diamonds, method, holder: name, account: method === 'iban' ? formatIban(account) : account });
+      // With the server's limits the amount is checked above; checkWithdraw then checks only the holder and the
+      // account (it gets an amount its compiled limits accept).
+      const err =
+        amountError(n) ??
+        checkWithdraw({
+          diamonds: limits ? RULES.minWithdrawDiamonds : n,
+          withdrawable: limits ? RULES.minWithdrawDiamonds : diamonds,
+          method,
+          holder: name,
+          account: method === 'iban' ? formatIban(account) : account,
+        });
       if (err) return showAlert('Hata', err);
       setBusy(true);
       liveWithdraw({ diamonds: n, method, holder: name, account: method === 'iban' ? formatIban(account) : account })
@@ -82,11 +117,17 @@ export default function Withdraw() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Para çek" />
+      <KeyboardAvoid style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
         <Card style={{ alignItems: 'center', gap: 4 }}>
           <Text style={styles.dim}>Çekilebilir bakiye</Text>
           <Text style={styles.big}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
-          <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas</Text>
+          <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {minD.toLocaleString('tr-TR')} elmas</Text>
+          {limits && (
+            <Text style={[styles.dim, { textAlign: 'center' }]}>
+              Tek talepte en çok {fmt(limits.maxDiamonds)} elmas · 7 günde en çok {fmt(limits.weeklyDiamonds)} elmas (kalan {fmt(weekLeft)})
+            </Text>
+          )}
           {locked > 0 && (
             <View style={styles.locked}>
               <Ionicons name="lock-closed" size={12} color={colors.textDim} />
@@ -96,20 +137,33 @@ export default function Withdraw() {
         </Card>
 
         <Text style={styles.label}>Çekilecek elmas</Text>
-        <TextInput value={amount} onChangeText={(t) => setAmount(t.replace(/\D/g, ''))} keyboardType="number-pad" style={styles.input} />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TextInput
+          value={amount}
+          onChangeText={(t) => setAmount(t.replace(/\D/g, ''))}
+          keyboardType="number-pad"
+          style={styles.input}
+          placeholder={`En az ${fmt(RULES.minWithdrawDiamonds)}`}
+          placeholderTextColor={colors.textDim}
+        />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {presets.map((p) => (
             <Pressable key={p} style={styles.chip} onPress={() => setAmount(String(p))}>
               <Text style={styles.chipText}>{p.toLocaleString('tr-TR')}</Text>
             </Pressable>
           ))}
-          {diamonds >= RULES.minWithdrawDiamonds && (
-            <Pressable style={styles.chip} onPress={() => setAmount(String(diamonds))}>
+          {cap >= minD && (
+            <Pressable style={styles.chip} onPress={() => setAmount(String(cap))}>
               <Text style={styles.chipText}>Tümü</Text>
             </Pressable>
           )}
         </View>
-        <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n)) : usd(n)}</Text>
+        {!enough ? (
+          <Text style={styles.dim}>
+            Para çekmek için en az {fmt(RULES.minWithdrawDiamonds)} çekilebilir elmas gerekli; {fmt(RULES.minWithdrawDiamonds - diamonds)} elmas daha biriktirmelisin.
+          </Text>
+        ) : (
+          payable && <Text style={styles.receive}>Hesabına geçecek: {live ? money(withdrawUsd(n)) : usd(n)}</Text>
+        )}
 
         {live && (
           <View style={{ flexDirection: 'row', gap: 8 }} accessibilityRole="radiogroup">
@@ -134,7 +188,7 @@ export default function Withdraw() {
           </>
         )}
 
-        <GradientButton title={busy ? 'Gönderiliyor…' : 'Çekim talebi oluştur'} icon="cash" onPress={submit} />
+        <Button title={busy ? 'Gönderiliyor…' : 'Çekim talebi oluştur'} icon="cash" onPress={submit} disabled={!enough || busy} />
         {live && <Text style={styles.dim}>Talep açılınca elmaslar bakiyenden düşer. Ödeme yapılınca ya da talep reddedilirse haber verilir; reddedilen veya iptal edilen talebin elmasları geri gelir.</Text>}
 
         {live
@@ -177,6 +231,7 @@ export default function Withdraw() {
               </Card>
             )}
       </ScrollView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

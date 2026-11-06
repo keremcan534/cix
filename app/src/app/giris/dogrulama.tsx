@@ -1,15 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { AuthHeader } from '@/components/AuthHeader';
+import { SignupHeader } from '@/components/signup-header';
 import { GradientButton } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import { liveMode } from '@/lib/live';
+import { signupStep, welcomeText } from '@/lib/signup';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -21,7 +23,15 @@ const TIPS: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
   { icon: 'happy-outline', text: 'Yüzün tam ortada olsun' },
 ];
 
-export default function VerifyScreen() {
+/**
+ * The selfie step is a prototype: nothing checks the face. A live build skips it (giris/profil ends sign-up)
+ * and never marks anyone verified on the phone (giris-6); a link that still lands here goes back to the start.
+ */
+export default function VerifyRoute() {
+  return liveMode() ? <Redirect href="/giris" /> : <VerifyScreen />;
+}
+
+function VerifyScreen() {
   const { me, updateMe, login, addCoins } = useApp();
   const { colors, semantic, gradient } = useTheme();
   const styles = useStyles();
@@ -43,21 +53,17 @@ export default function VerifyScreen() {
     }, 2000);
   };
 
+  // Demo only (the route redirects in a live build): the welcome coins are the demo's local balance.
   const finish = () => {
-    // Test server (live mode): coins come from the server only; test packs are under Jeton Yükle.
-    if (liveMode()) {
-      login();
-      showAlert('Hoş geldin! 🎉', 'Hesabın açıldı. Jeton Yükle ekranından ücretsiz test jetonu ekleyebilirsin.');
-      return;
-    }
     addCoins(100);
     login();
-    showAlert('Hoş geldin! 🎉', 'Hoş geldin hediyesi olarak 100 jeton hesabına eklendi.');
+    showAlert('Hoş geldin! 🎉', welcomeText(false, true));
   };
+  const { step, total } = signupStep('dogrulama', false);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <AuthHeader step={4} title="Gerçek kişi doğrulaması" subtitle="Herkesin gerçek olduğu güvenli bir topluluk için kısa bir selfie çek. Fotoğrafın profilinde gösterilmez." />
+      <SignupHeader step={step} total={total} title="Gerçek kişi doğrulaması" subtitle="Herkesin gerçek olduğu güvenli bir topluluk için kısa bir selfie çek. Fotoğrafın profilinde gösterilmez." />
 
       <View style={styles.center}>
         <LinearGradient colors={status === 'done' ? [semantic.success, '#16A34A'] : gradient} style={styles.ring}>

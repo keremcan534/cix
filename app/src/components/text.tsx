@@ -37,5 +37,7 @@ export function Text({ style, children, ...rest }: TextProps) {
 export function TextInput({ style, ref, ...rest }: TextInputProps & { ref?: Ref<ComponentRef<typeof RNTextInput>> }) {
   const flat = StyleSheet.flatten(style);
   const own = flat?.fontFamily ? null : { fontFamily: faceFor(flat?.fontWeight), fontWeight: 'normal' as const };
-  return <RNTextInput ref={ref} style={own ? [style, own] : style} {...rest} />;
+  // Android centres the text of a tall box vertically: a multi-line box starts at the top unless its style says otherwise.
+  const top = rest.multiline ? { textAlignVertical: 'top' as const } : null;
+  return <RNTextInput ref={ref} style={own || top ? [top, style, own] : style} {...rest} />;
 }

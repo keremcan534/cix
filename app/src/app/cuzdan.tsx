@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LoadError } from '@/components/load-error';
 import { Text } from '@/components/text';
 import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { goBack } from '@/lib/nav';
@@ -15,8 +16,12 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
-import { liveMode, liveTopup, message, TEST_PACKS } from '@/lib/live';
+import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
+import { LEDGER_PAGE, useLiveLedger } from '@/lib/live/earnings';
+import { coinsAddedOn, ledgerTime } from '@/lib/ledger-view';
 import { buyCoins, openShop, useShop } from '@/lib/live/billing';
+import { activeCampaign, campaignCoins, useLiveCatalog } from '@/lib/live/catalog-live';
+import { fmtIstanbul } from '@/lib/live-settings-format';
 import { outcomeAlert, SHOP_NOTICE } from '@/lib/live/billing-core';
 import { openLegal } from '@/lib/legal';
 import { blockedFeature } from '@/lib/remote-control';
@@ -33,10 +38,29 @@ export default function WalletScreen() {
   const live = liveMode();
   const shop = useShop();
   const testPacks = RECHARGE_PACKS.filter((p) => TEST_PACKS.includes(p.coins));
+  // Live mode: the campaign the owner runs from Canlı ayarlar (extra coins on every store pack, credited by the
+  // server at the store's purchase time; test packs never get it). Shown only while it runs.
+  const liveCat = useLiveCatalog();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!live) return;
+    // A minute is enough: the badge goes away soon after the campaign ends (the server decides either way).
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [live]);
+  const campaign = live ? activeCampaign(now, liveCat) : null;
   useEffect(() => {
     if (live) void openShop();
   }, [live]);
-  const { colors } = useTheme();
+  // Live mode: the history is the server's ledger (its refs), read when the tab opens; the balance is re-read here
+  // so a failed read says so instead of showing the last number as if it were current.
+  const history = useLiveLedger(live && tab === 'history');
+  const [walletError, setWalletError] = useState(false);
+  const readWallet = () => void refreshWallet().then(() => setWalletError(false), () => setWalletError(true));
+  useEffect(() => {
+    if (live) readWallet();
+  }, [live]);
+  const { colors, semantic } = useTheme();
   const styles = useStyles();
 
   // Live mode: Google Play takes the payment; the coins arrive only with the server's answer.
@@ -72,7 +96,8 @@ export default function WalletScreen() {
   };
   const rows = ledger.filter((r) => r.currency === filter);
   const day = today();
-  const loadedToday = ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
+  const loadedToday = live ? coinsAddedOn(history.rows) : ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
+  const serverRows = history.rows.filter((r) => r.currency === filter);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -108,6 +133,33 @@ export default function WalletScreen() {
               </Pressable>
             ))}
           </View>
+          {live ? (
+            history.status === 'error' ? (
+              <LoadError text="Hareketler sunucudan okunamadı." onRetry={history.reload} style={{ marginHorizontal: 16 }} />
+            ) : (
+              <FlatList
+                data={serverRows}
+                keyExtractor={(r) => String(r.id)}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
+                ListEmptyComponent={<Text style={[styles.note, { marginTop: 30 }]}>{history.status === 'ready' ? 'Henüz hareket yok.' : 'Yükleniyor…'}</Text>}
+                ListFooterComponent={history.rows.length >= LEDGER_PAGE ? <Text style={[styles.note, { marginTop: 12 }]}>Son {LEDGER_PAGE} hareket gösteriliyor.</Text> : undefined}
+                renderItem={({ item }) => (
+                  <View style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text }}>{item.reason}</Text>
+                      <Text style={{ color: colors.textDim, fontSize: 12 }}>
+                        {ledgerTime(item.createdAt)} · {item.ref}
+                      </Text>
+                    </View>
+                    <Text style={{ color: item.amount < 0 ? colors.red : colors.green, fontWeight: '800' }}>
+                      {item.amount > 0 ? '+' : ''}
+                      {item.amount.toLocaleString('tr-TR')}
+                    </Text>
+                  </View>
+                )}
+              />
+            )
+          ) : (
           <FlatList
             data={rows}
             keyExtractor={(r) => r.id}
@@ -128,6 +180,7 @@ export default function WalletScreen() {
               </View>
             )}
           />
+          )}
         </>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
@@ -137,6 +190,7 @@ export default function WalletScreen() {
               <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
             </View>
             <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
+            {live && walletError && <LoadError text="Bakiyen sunucudan güncellenemedi; son bilinen bakiye gösteriliyor." onRetry={readWallet} style={{ marginTop: 8 }} />}
             {IS_DEMO && !live && (
               <Pressable
                 onPress={() => {
@@ -156,11 +210,31 @@ export default function WalletScreen() {
             <Text style={[styles.title, { flex: 1, fontSize: 20 }]}>Paket seç</Text>
             <Text style={styles.currency}>{!live ? 'Fiyatlar TL' : shop.status === 'ready' ? 'Google Play ile' : ''}</Text>
           </View>
+          {campaign && (
+            <View style={styles.campaign} accessibilityRole="summary">
+              <Ionicons name="gift" size={22} color={semantic.moneyText} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.campaignTitle}>
+                  {campaign.label} · +%{campaign.percent} ek jeton
+                </Text>
+                <Text style={styles.campaignText}>
+                  Google Play ile aldığın her pakete %{campaign.percent} fazla jeton eklenir. Bitiş: {fmtIstanbul(campaign.endsAt)} (İstanbul)
+                </Text>
+              </View>
+            </View>
+          )}
           {live ? (
             shop.status === 'ready' ? (
               <View style={styles.grid}>
                 {shop.packs.map((p) => (
-                  <PackTile key={p.productId} coins={p.coins} price={p.price} busy={processing === p.productId} onPress={() => buyLive(p.productId)} />
+                  <PackTile
+                    key={p.productId}
+                    coins={p.coins}
+                    price={p.price}
+                    busy={processing === p.productId}
+                    onPress={() => buyLive(p.productId)}
+                    campaign={campaign ? { percent: campaign.percent, extra: campaignCoins(p.coins, campaign.percent) } : undefined}
+                  />
                 ))}
               </View>
             ) : (
@@ -200,7 +274,7 @@ export default function WalletScreen() {
             <Text style={styles.legalLink} onPress={() => openLegal('payment')} accessibilityRole="link">
               Ödeme Sözleşmesi
             </Text>
-            &apos;ni okuduğunu ve kabul ettiğini onaylarsın. {IS_DEMO ? 'Prototip: ödeme simüle edilir; ' : ''}İade ve itiraz için Destek&apos;e yazabilirsin.
+            &apos;ni okuduğunu ve kabul ettiğini onaylarsın. {IS_DEMO && !live ? 'Prototip: ödeme simüle edilir; ' : ''}İade ve itiraz için Destek&apos;e yazabilirsin.
           </Text>
         </ScrollView>
       )}
@@ -208,24 +282,54 @@ export default function WalletScreen() {
   );
 }
 
-/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). */
-function PackTile({ coins, bonus, first, price, busy, onPress }: { coins: number; bonus?: number; first?: boolean; price: string; busy: boolean; onPress: () => void }) {
+/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). `campaign`: the
+ *  running campaign's tag and this pack's extra coins (live store packs only). */
+function PackTile({
+  coins,
+  bonus,
+  first,
+  price,
+  busy,
+  onPress,
+  campaign,
+}: {
+  coins: number;
+  bonus?: number;
+  first?: boolean;
+  price: string;
+  busy: boolean;
+  onPress: () => void;
+  campaign?: { percent: number; extra: number };
+}) {
   const { colors, dark } = useTheme();
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton, ${price}`} style={{ width: '31.3%', margin: '1%' }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
+      style={{ width: '31.3%', margin: '1%' }}
+    >
       <LinearGradient
         colors={first ? ['rgba(246,189,96,0.30)', dark ? 'rgba(22,37,60,0.96)' : 'rgba(255,255,255,0.96)'] : [colors.cardAlt, colors.card]}
-        style={[styles.pack, first && styles.packFirst, busy && { opacity: 0.5 }]}
+        style={[styles.pack, (first || !!campaign?.extra) && styles.packFirst, busy && { opacity: 0.5 }]}
       >
-        {first && (
+        {first ? (
           <View style={styles.firstTag}>
             <Text style={styles.firstTagText}>Hoş geldin paketi</Text>
           </View>
-        )}
+        ) : campaign?.extra ? (
+          <View style={styles.firstTag}>
+            <Text style={styles.firstTagText}>+%{campaign.percent} kampanya</Text>
+          </View>
+        ) : null}
         <Icon3D name="coin" size={40} />
         <Text style={styles.packCoins}>{coins.toLocaleString('tr-TR')}</Text>
-        {bonus ? <Text style={styles.packBonus}>+{bonus.toLocaleString('tr-TR')}</Text> : <View style={{ height: 18 }} />}
+        {bonus || campaign?.extra ? (
+          <Text style={styles.packBonus}>+{((bonus ?? 0) + (campaign?.extra ?? 0)).toLocaleString('tr-TR')}</Text>
+        ) : (
+          <View style={{ height: 18 }} />
+        )}
         <Text style={[styles.packPrice, first && { color: colors.text }]}>{busy ? 'Bekleniyor…' : price}</Text>
       </LinearGradient>
     </Pressable>
@@ -249,7 +353,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   section: { color: colors.text, fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
   packHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 },
-  shopNotice: { color: colors.textDim, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
+  shopNotice: { color: colors.text, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
   pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }) },
   packFirst: { borderColor: 'rgba(246,189,96,0.75)', paddingTop: 12 },
   svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },
@@ -259,6 +363,21 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   firstTag: { alignSelf: 'center', backgroundColor: semantic.money, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   firstTagText: { color: semantic.moneyInk, fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   packBonus: { color: colors.gold, fontWeight: '800', fontSize: 14 },
+  campaign: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: semantic.money,
+    // Solid: a see-through tint lets the sea photo behind wash the text out in the dark scheme.
+    backgroundColor: colors.card,
+  },
+  campaignTitle: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  campaignText: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   packSelected: { borderColor: colors.primaryText },
   bonus: {
     position: 'absolute',

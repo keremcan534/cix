@@ -17,6 +17,7 @@ const h = startApi({
   LOCK_DAYS_STORE: '0',
   AGENCY_JOBS: '0',
   SMS_PROVIDER: 'log',
+  PHONE_SIGN_IN: '1',
   OTP_GLOBAL_PER_HOUR: '3',
   OTP_REVIEW_PHONE: REVIEW_PHONE,
   OTP_REVIEW_CODE: REVIEW_CODE,
@@ -173,7 +174,7 @@ describe('yayın sunucusu', () => {
     assert.match(j.error, /bir saat sonra/);
     await q("UPDATE otp_review_lock SET locked_until = now() - interval '1 second'");
     await ok(verify(REVIEW_CODE));
-    const [lock] = await q('SELECT fails FROM otp_review_lock WHERE phone = $1', [REVIEW_PHONE]);
+    const [lock] = await q("SELECT fails FROM otp_review_lock WHERE channel = 'sms' AND target = $1", [REVIEW_PHONE]);
     assert.equal(lock.fails, 0);
   });
 

@@ -216,18 +216,23 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
   textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  textLinkCenter: { alignSelf: 'center' },
   headerTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center' },
   headerSide: { flex: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center' },
   headerBack: { width: 40, height: 40, justifyContent: 'center' },
 }));
 
 /** Secondary action inside a card: colored text with a chevron instead of a typed arrow. */
-export function TextLink({ title, onPress, color: own }: { title: string; onPress: () => void; color?: string }) {
+export function TextLink({ title, onPress, color: own, center }: {
+  title: string; onPress: () => void; color?: string;
+  /** In a centred column or row; otherwise the link keeps to the start edge, as inside a card. */
+  center?: boolean;
+}) {
   const { colors } = useTheme();
   const styles = useStyles();
   const color = own ?? colors.primaryText;
   return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={styles.textLink}>
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={[styles.textLink, center && styles.textLinkCenter]}>
       <Text style={{ color, fontWeight: '700' }}>{title}</Text>
       <Ionicons name="chevron-forward" size={14} color={color} />
     </Pressable>
@@ -253,6 +258,17 @@ export function Header({ title, right, onBack }: { title: string; right?: ReactN
   );
 }
 
+/** The photo, or the person glyph Avatar shows when there is none (new users have no photo yet). */
+function FaceImage({ uri, size, style }: { uri?: string; size: number; style: object }) {
+  const { colors, semantic } = useTheme();
+  if (uri) return <Image source={{ uri }} style={style} />;
+  return (
+    <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
+      <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.actionText} />
+    </View>
+  );
+}
+
 /** Avatar with the nobility (VIP) frame color, if any. */
 // Memoized: props are plain values and settings come from their own context, so rows re-render only when they change.
 export const FramedAvatar = memo(FramedAvatarBase);
@@ -265,7 +281,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   if (art) {
     return (
       <ArtFrame art={art} size={size} still={settings.reduceMotion} maxScale={artScale}>
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+        <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
       </ArtFrame>
     );
   }
@@ -273,7 +289,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
     return (
       <View style={{ width: size, height: size }}>
         <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion}>
-          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+          <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
         {tier && <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />}
       </View>
@@ -285,7 +301,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   return (
     <View style={{ width: size, height: size }}>
       <LinearGradient colors={frameColors} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
-        <Image source={{ uri }} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
+        <FaceImage uri={uri} size={size} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
       </LinearGradient>
       {tier ? (
         <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />

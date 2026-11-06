@@ -5,10 +5,12 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, Share, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
+import { ContactNote } from '@/components/contact-note';
+import { ComingSoon } from '@/components/coming-soon';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
 import {
@@ -24,6 +26,8 @@ import {
   type MomentComment,
 } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
+import { contactRefusal } from '@/lib/contact-filter';
+import { liveMode } from '@/lib/live';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -38,7 +42,13 @@ const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m,
 // Privileged name colors are drawn for the night background; on light paper each takes a deeper shade of its hue.
 const LIGHT_NAME_COLOR: Record<string, string> = { '#FBBF24': '#9A6408', '#FF8A97': '#C8304A', '#FB923C': '#C2410C', '#A5F3F5': '#00757B' };
 
+// The server has no moments yet (no feed, no posting, likes or comments), so a live build shows a notice instead of
+// sample people's posts and a composer whose posts would never leave this phone. The tab itself is hidden there.
 export default function MomentsScreen() {
+  return liveMode() ? <ComingSoon title="Anlar" /> : <DemoMoments />;
+}
+
+function DemoMoments() {
   const { bump, blocked, following, me, notifications, settings, vipLevel, equipped } = useApp();
   const [tab, setTab] = useState<Tab>('Önerilen');
   const [topic, setTopic] = useState<string | null>(null);
@@ -302,10 +312,18 @@ function MomentCard({
 
 function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () => void; onPost: (text: string, image: string | undefined, topicId: string | undefined) => void }) {
   const [draft, setDraft] = useState('');
+  // Why the text was not shared (contact details, lib/contact-filter); cleared as soon as it changes.
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string) => {
+    setDraft(next);
+    setRefused(null);
+  };
   const [image, setImage] = useState<string | undefined>();
   const [topicId, setTopicId] = useState<string | undefined>();
   const { colors } = useTheme();
   const styles = useStyles();
+  // Android modals draw edge to edge: keep the last row above the navigation bar.
+  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -314,6 +332,8 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
 
   const submit = () => {
     if (!draft.trim() && !image) return showAlert('Boş an paylaşılamaz', 'Bir şeyler yaz ya da fotoğraf ekle.');
+    const refusal = contactRefusal(draft.trim(), 'moment.post');
+    if (refusal) return setRefused(refusal);
     onPost(draft.trim(), image, topicId);
     setDraft('');
     setImage(undefined);
@@ -324,17 +344,19 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom }]}>
           <Text style={styles.sheetTitle}>Yeni an paylaş</Text>
           <TextInput
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={edit}
             placeholder="Neler oluyor?"
             placeholderTextColor={colors.textDim}
             multiline
+            maxLength={1000}
             style={styles.composeInput}
             autoFocus
           />
+          <ContactNote text={refused} style={styles.contactNote} />
           {image && (
             <View style={{ alignSelf: 'flex-start' }}>
               <Image source={{ uri: image }} style={styles.preview} />
@@ -382,11 +404,21 @@ function CommentsSheet({
   onSend: (text: string) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string) => {
+    setDraft(next);
+    setRefused(null);
+  };
   const { colors } = useTheme();
   const styles = useStyles();
+  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
   const send = () => {
-    if (!draft.trim()) return;
-    onSend(draft.trim());
+    const text = draft.trim();
+    if (!text) return;
+    // Contact details are refused, not masked: the comment stays in the input.
+    const refusal = contactRefusal(text, 'moment.comment');
+    if (refusal) return setRefused(refusal);
+    onSend(text);
     setDraft('');
   };
 
@@ -394,7 +426,7 @@ function CommentsSheet({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={[styles.sheet, { maxHeight: '70%' }]}>
+        <View style={[styles.sheet, { maxHeight: '70%', paddingBottom }]}>
           <Text style={styles.sheetTitle}>Yorumlar ({comments.length})</Text>
           <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 14, paddingVertical: 4 }}>
             {comments.length === 0 && <Text style={{ color: colors.textDim, textAlign: 'center', paddingVertical: 20 }}>İlk yorumu sen yap 💬</Text>}
@@ -421,12 +453,14 @@ function CommentsSheet({
               );
             })}
           </ScrollView>
+          <ContactNote text={refused} style={styles.contactNote} />
           <View style={styles.commentInputRow}>
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={edit}
               placeholder="Yorum yaz…"
               placeholderTextColor={colors.textDim}
+              maxLength={300}
               style={styles.commentInput}
               onSubmitEditing={send}
               returnKeyType="send"
@@ -501,6 +535,8 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },
+  // The contact note sits inside the sheet's own padding.
+  contactNote: { marginHorizontal: 0, marginBottom: 0 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 999, paddingLeft: 14, paddingRight: 4, paddingVertical: 4 },
   commentInput: { flex: 1, color: colors.text, fontSize: 14, paddingVertical: 8 },
   sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },

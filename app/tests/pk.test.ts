@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { computeCrowns, drawTeams, finishNow, getPk, inviteCrossPk, pkPointsFor, recordGift, resetPk, revokeGift, setInviteScenario, startRoomPk, type PkSession } from '@/lib/pk';
+import { computeCrowns, drawTeams, finishNow, getPk, invitableRooms, inviteCrossPk, pkPointsFor, recordGift, resetPk, revokeGift, setInviteScenario, startRoomPk, type PkSession } from '@/lib/pk';
 import { join, leave, leaveSeat, resetPresence, seedRoom, setBoss, takeSeat } from '@/lib/room-presence';
 
 const R = 'pk-room';
@@ -328,5 +328,39 @@ describe('İnceleme düzeltmeleri', () => {
     activate();
     assert.ok(gift('spare1', 250).r.ok);
     assert.equal(pk().points.spare1, 250);
+  });
+});
+
+describe('Canlı mod: PK sunulmaz (sunucu tarafı yok)', () => {
+  const live = (on: boolean) => {
+    if (on) process.env.EXPO_PUBLIC_API_URL = 'https://api.test';
+    else delete process.env.EXPO_PUBLIC_API_URL;
+  };
+  afterEach(() => live(false));
+
+  test('davet edilecek oda listesi boş; odalar arası, Normal ve Takım PK başlatılamaz', () => {
+    room(4);
+    assert.ok(invitableRooms(R).length > 0, 'demoda örnek odalar var');
+    live(true);
+    assert.deepEqual(invitableRooms(R), []);
+    assert.equal(inviteCrossPk(R, 'host', 'pk-other', 15).ok, false);
+    assert.equal(startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' }).ok, false);
+    assert.equal(startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'team', red: ['host', 'admin'], blue: ['p1', 'p2'] }).ok, false);
+    assert.equal(getPk().sessions.length, 0, 'PK kaydı açılmaz');
+    live(false);
+    assert.ok(startRoomPk({ roomId: R, starterId: 'host', durationMin: 15, mode: 'solo' }).ok, 'demoda Normal PK sürer');
+  });
+
+  test('canlı modda rakip odaya uydurma hediye yazılmaz', () => {
+    room(3);
+    setInviteScenario('accept');
+    assert.ok(inviteCrossPk(R, 'host', 'pk-other', 15).ok); // opened in the demo
+    mock.timers.tick(2_500);
+    live(true);
+    activate();
+    mock.timers.tick(60_000);
+    assert.equal(pk().status, 'active');
+    assert.equal(pk().records.filter((x) => x.txId.startsWith('OPP-')).length, 0);
+    assert.deepEqual(pk().teams.map((t) => t.score), [0, 0]);
   });
 });

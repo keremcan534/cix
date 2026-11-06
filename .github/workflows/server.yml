@@ -82,6 +82,19 @@ jobs:
         working-directory: .
         env:
           FINANCE_OK: ${{ steps.finance.outcome == 'success' }}
+          # E-posta ile giriş and the WhatsApp phone check (docs/SUNUCU.md): written into the server's .env below
+          # when set. The run log is public: GitHub shows a variable's value there (a secret's as ***), so only
+          # what anyone may read is a variable (provider names, the sender, our WhatsApp number); everything
+          # else, the review address included, is a secret.
+          MAIL_PROVIDERS: ${{ vars.MAIL_PROVIDERS }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          WHATSAPP_NUMBER: ${{ vars.WHATSAPP_NUMBER }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          OTP_REVIEW_EMAIL: ${{ secrets.OTP_REVIEW_EMAIL }}
+          OTP_REVIEW_EMAIL_CODE: ${{ secrets.OTP_REVIEW_EMAIL_CODE }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
@@ -120,6 +133,38 @@ jobs:
           if [ "$TEST_MODE" = 1 ]; then v=1; else v=0; fi
           $SSH "cd /opt/similar && for k in ALLOW_DEV_AUTH ALLOW_TEST_TOPUP; do
               if ! sudo grep -qx \"\$k=$v\" .env; then sudo sed -i \"/^\$k=/d\" .env; echo \"\$k=$v\" | sudo tee -a .env >/dev/null; echo \"set \$k=$v\"; fi; done"
+
+          # Mail and WhatsApp settings (env above). Only the set ones are written; an empty one leaves .env as it
+          # is, and "-" empties it on the server (KEY=), which switches that setting off again. The values travel
+          # over ssh's stdin into a private temp folder and are merged into .env there: this step never echoes
+          # them or puts them on a command line, and only the names of changed keys are printed.
+          # Single quotes keep docker from reading $ or # in them, so a value can't hold a quote or a line break.
+          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE; do
+              v=${!k}
+              v=${v#"${v%%[![:space:]]*}"}
+              v=${v%"${v##*[![:space:]]}"}
+              [ -n "$v" ] || continue
+              if [ "$v" = "-" ]; then printf '%s=\n' "$k"; continue; fi
+              case "$v" in *"'"* | *$'\n'* | *$'\r'*) echo "::warning::$k has a quote or a line break: not written to .env" >&2; continue ;; esac
+              printf "%s='%s'\n" "$k" "$v"
+            done)
+          merge=$(cat <<'SH'
+          set -e
+          cd /opt/similar
+          d=$(mktemp -d)
+          trap 'sudo rm -rf "$d"' EXIT
+          cat > "$d/in"
+          sudo awk -v out="$d/env" '
+            NR == FNR { i = index($0, "="); if (i > 1) { k = substr($0, 1, i - 1); if (!(k in want)) order[++n] = k; want[k] = $0 }; next }
+            { i = index($0, "="); k = i > 1 ? substr($0, 1, i - 1) : "" }
+            k in want { seen[k]++; if ($0 == want[k]) same[k]++; next }
+            { print > out }
+            END { for (j = 1; j <= n; j++) { k = order[j]; print want[k] > out; if (seen[k] != 1 || same[k] != 1) print k } }
+          ' "$d/in" .env > "$d/changed"
+          if [ -s "$d/changed" ]; then sudo cp "$d/env" .env; sed 's/^/set in .env: /' "$d/changed"; fi
+          SH
+          )
+          if [ -n "$lines" ]; then printf '%s\n' "$lines" | $SSH "$merge"; fi
 
           # Only services whose image or settings changed are recreated (postgres and livekit normally stay up).
           # A recreated Caddy already read the new Caddyfile; one that stayed up is told to reload it. Caddy

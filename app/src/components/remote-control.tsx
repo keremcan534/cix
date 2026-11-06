@@ -14,6 +14,7 @@ import { AppState, Linking, Modal, Platform, Pressable, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text as T } from '@/components/text';
+import { useIsAdmin } from '@/lib/live/admin';
 import { featureLabel, needsUpdate, offMessage, routeGate, type Feature } from '@/lib/remote-config';
 import { refreshRemoteConfig, useRemoteConfig } from '@/lib/remote-control';
 import { APP_VERSION } from '@/lib/reporting';
@@ -96,9 +97,18 @@ function NoticeBanner() {
 /** APP_MIN_VERSION: a window that can't be closed until the app is updated. */
 function UpdateRequired() {
   const config = useRemoteConfig();
+  if (!needsUpdate(APP_VERSION, config)) return null;
+  return <UpdateWindow config={config} />;
+}
+
+/** The window itself. An admin may close it for this run ('Yönetici olarak devam et'), so a minimum version set
+ *  too high in Canlı ayarlar never locks the owner out of the panel that lowers it again. */
+function UpdateWindow({ config }: { config: ReturnType<typeof useRemoteConfig> }) {
   const { semantic } = useTheme();
   const s = useStyles();
-  if (!needsUpdate(APP_VERSION, config)) return null;
+  const isAdmin = useIsAdmin();
+  const [skipped, setSkipped] = useState(false);
+  if (skipped) return null;
   const url = config.updateUrl;
   const update = () => {
     if (Platform.OS === 'web') return globalThis.location?.reload();
@@ -126,6 +136,11 @@ function UpdateRequired() {
             </Pressable>
           ) : (
             <T style={s.body}>Yeni sürümü uygulamayı indirdiğin yerden alabilirsin.</T>
+          )}
+          {isAdmin && (
+            <Pressable onPress={() => setSkipped(true)} accessibilityRole="button" style={({ pressed }) => [s.secondary, pressed && { opacity: 0.85 }]}>
+              <T style={s.secondaryText}>Yönetici olarak devam et</T>
+            </Pressable>
           )}
         </View>
       </View>

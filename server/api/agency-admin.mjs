@@ -43,7 +43,7 @@ import {
 } from './agency-lib.mjs';
 import { approveAgency, approveTransfer, checkCanFoundSub, linkStreamer, moveParent, namesFor, payoutStep, rejectTransfer, setStatus, transferView, unlinkStreamer } from './agency-ops.mjs';
 import { applyTier, calcPending, runPerformance } from './agency-perf.mjs';
-import { insertAgency } from './agency.mjs';
+import { PLAY_PAYOUT, insertAgency, playMoneyOn } from './agency.mjs';
 
 const TEST = env.ALLOW_TEST_TOPUP === '1';
 const bad = (m) => {
@@ -537,7 +537,10 @@ export const agencyAdminRoutes = {
         ${st ? 'WHERE p.status = $1' : ''} ORDER BY p.id DESC LIMIT 200`,
       st ? [st] : [],
     );
+    // payable: false = commission on a server with play money; it can't be approved or paid (agency.mjs PLAY_PAYOUT).
+    const playMoney = await playMoneyOn(db);
     return {
+      playMoney,
       payouts: r.rows.map((p) => ({
         id: Number(p.id),
         agency: { id: p.agency_id, name: p.agency_name, code: p.code, status: p.agency_status },
@@ -553,6 +556,7 @@ export const agencyAdminRoutes = {
         paidAt: p.paid_at,
         paymentRef: p.payment_ref,
         note: p.note,
+        payable: !playMoney,
       })),
     };
   },
@@ -571,11 +575,13 @@ export const agencyAdminRoutes = {
         case 'approve':
           await needPlatform(c, x.acc, 'agencies.payouts.approve', String(p.id));
           if (p.status !== 'pending') throw new HttpError(409, 'Talep onay beklemiyor');
+          if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
           await payoutStep(c, p, 'ready', x.u.id, note);
           break;
         case 'pay': {
           await needPlatform(c, x.acc, 'agencies.payouts.pay', String(p.id));
           if (p.status !== 'ready') throw new HttpError(409, 'Önce onaylanmalı');
+          if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
           if (x.s.payout_policy.two_person && p.approved_by === x.u.id) throw new HttpError(403, 'Onaylayan kişi ödendi olarak işaretleyemez (iki kişili onay)');
           const paymentRef = text(b.paymentRef, 3, 100, 'Ödeme referansı');
           await payoutStep(c, p, 'paid', x.u.id, note, { paymentRef });

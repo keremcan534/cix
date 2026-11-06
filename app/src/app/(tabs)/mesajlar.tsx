@@ -3,21 +3,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
-import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimacyOf, isTodayTime, type CallLog } from '@/data/messages-ui';
+import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime, type CallLog } from '@/data/messages-ui';
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { messagePreview } from '@/components/ReactionArt';
-import { callsAvailable } from '@/lib/live';
+import { callsAvailable, liveMode } from '@/lib/live';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
@@ -29,9 +29,10 @@ const TABS: { key: Tab; label: string }[] = [
   ...(callsAvailable() ? [{ key: 'calls' as const, label: 'Aramalar' }] : []),
 ];
 
+// Yakınlık sorts by the demo's intimacy points; the server has none yet, so a live build leaves the chip out.
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Hepsi' },
-  { key: 'intimacy', label: 'Yakınlık' },
+  ...(liveMode() ? [] : [{ key: 'intimacy' as const, label: 'Yakınlık' }]),
   { key: 'online', label: 'Çevrimiçi' },
   { key: 'today', label: 'Bugün' },
 ];
@@ -66,21 +67,24 @@ export default function MessagesScreen() {
   let convs = visibleConvs;
   if (filter === 'intimacy') convs = [...visibleConvs].sort((a, b) => intimacyOf(b.userId) - intimacyOf(a.userId));
   else if (filter === 'online') convs = visibleConvs.filter((c) => userById(c.userId).online);
-  else if (filter === 'today') convs = visibleConvs.filter((c) => lastOf(c) && isTodayTime(lastOf(c).time));
+  else if (filter === 'today') convs = visibleConvs.filter((c) => lastOf(c) && isTodayTime(lastOf(c)));
   const totalUnread = visibleConvs.reduce((n, c) => n + c.unread, 0);
 
-  // Friends: people I follow + people who follow me (mutual first, then online).
-  const friendIds = [...new Set([...following, ...FOLLOWS_ME])].filter((id) => !blocked.has(id) && id !== 'me');
+  // Friends: people I follow + people who follow me (mutual first, then online). Who follows me is the demo's
+  // sample list; a live build lists the people I follow on the server (loaded after signing in).
+  const followsMe = (id: string) => !liveMode() && FOLLOWS_ME.has(id);
+  const friendIds = [...new Set([...following, ...(liveMode() ? [] : FOLLOWS_ME)])].filter((id) => !blocked.has(id) && id !== 'me');
   const friends: Friend[] = friendIds
     .map((id) => ({
       user: userById(id),
       iFollow: following.has(id),
-      followsMe: FOLLOWS_ME.has(id),
+      followsMe: followsMe(id),
     }))
     .sort((a, b) => Number(b.iFollow && b.followsMe) - Number(a.iFollow && a.followsMe) || Number(b.user.online) - Number(a.user.online));
 
   const calls = clearedCalls ? [] : CALL_HISTORY.filter((c) => !blocked.has(c.userId));
-  const visitors = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId));
+  // Profile visitors are sample data: the server doesn't record visits yet, so a live build shows no visitors row.
+  const visitors = liveMode() ? [] : PROFILE_VISITORS.filter((v) => !blocked.has(v.userId));
 
   // Last visited room for the "Canlı Odalar" row.
   const lastRoomId = recentRooms[0];
@@ -152,14 +156,19 @@ export default function MessagesScreen() {
             onPress={openParty}
             right={<Image source={{ uri: partyCover }} style={styles.roomCover} />}
           />
-          <View style={styles.sep} />
-          <SystemRow
-            icon={<Icon3D name="coin" size={30} />}
-            iconColors={['#F59E0B', '#FBBF24']}
-            title="Tayfanı bul"
-            subtitle="Birlikte konuşacak insanlar seni bekliyor"
-            onPress={() => router.push('/aile')}
-          />
+          {/* Tayfa (families) only exists in the demo: a live build leaves this row out. */}
+          {!liveMode() && (
+            <>
+              <View style={styles.sep} />
+              <SystemRow
+                icon={<Icon3D name="coin" size={30} />}
+                iconColors={['#F59E0B', '#FBBF24']}
+                title="Tayfanı bul"
+                subtitle="Birlikte konuşacak insanlar seni bekliyor"
+                onPress={() => router.push('/aile')}
+              />
+            </>
+          )}
           {/* Only shown when there are visitors to list; the count is the same list the sheet shows. */}
           {visitors.length > 0 && (
             <>
@@ -206,15 +215,16 @@ export default function MessagesScreen() {
           ListHeaderComponent={messagesHeader}
           contentContainerStyle={{ paddingBottom: 24 }}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              {filter === 'all'
-                ? "Henüz mesaj yok. Keşfet'ten birine selam ver!"
-                : filter === 'online'
-                  ? 'Şu an çevrimiçi sohbet yok.'
-                  : filter === 'today'
-                    ? 'Bugün mesajlaşmadın.'
-                    : 'Henüz sohbet yok.'}
-            </Text>
+            filter === 'all' ? (
+              // The Benzerler tab (/kesfet) lists people to greet.
+              <Pressable onPress={() => router.push('/kesfet')} accessibilityRole="link" accessibilityLabel="Benzerler sekmesini aç">
+                <Text style={styles.empty}>
+                  Henüz mesaj yok. <Text style={[styles.empty, styles.emptyLink]}>Benzerler</Text>&apos;den birine selam ver!
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.empty}>{filter === 'online' ? 'Şu an çevrimiçi sohbet yok.' : filter === 'today' ? 'Bugün mesajlaşmadın.' : 'Henüz sohbet yok.'}</Text>
+            )
           }
           renderItem={({ item }) => <ConversationRow conv={item} showIntimacy={filter === 'intimacy'} />}
         />
@@ -364,7 +374,7 @@ function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntim
           {last ? `${last.fromMe ? 'Sen: ' : ''}${messagePreview(last.text)}` : ''}
         </Text>
       </View>
-      <Text style={styles.time}>{last?.time ?? ''}</Text>
+      <Text style={styles.time}>{last ? messageTime(last) : ''}</Text>
     </Pressable>
   );
 }
@@ -441,10 +451,12 @@ function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }
 function VisitorsSheet({ visible, visitors, onClose }: { visible: boolean; visitors: typeof PROFILE_VISITORS; onClose: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
+  // Android draws the modal edge to edge: the last row stays above the navigation bar.
+  const { bottom } = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom: Math.max(34, bottom + 8) }]}>
         <View style={styles.sheetHandle} />
         <View
           style={{
@@ -472,9 +484,7 @@ function VisitorsSheet({ visible, visitors, onClose }: { visible: boolean; visit
               >
                 <Avatar uri={u.avatar} size={44} online={u.online} />
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.name}>
-                    {u.name}, {u.age}
-                  </Text>
+                  <Text style={styles.name}>{u.age > 0 ? `${u.name}, ${u.age}` : u.name}</Text>
                   <Text style={styles.last}>
                     {v.count} kez ziyaret etti · {u.city}
                   </Text>
@@ -576,6 +586,7 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     marginTop: 40,
     paddingHorizontal: 24,
   },
+  emptyLink: { color: colors.primaryText, fontWeight: '700', marginTop: 0, paddingHorizontal: 0 },
   sectionNote: {
     color: colors.textDim,
     fontSize: 12,

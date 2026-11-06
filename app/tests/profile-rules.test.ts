@@ -5,7 +5,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LIMITS, ageFrom, formatTrDate, hasProfanity, parseTrDate, validateProfile, type ProfileDraft } from '@/lib/profile-rules';
+import { CONTACT_MESSAGE, onContactRefusal, type ContactRefusal } from '@/lib/contact-filter';
+import { LIMITS, ageFrom, formatTrDate, hasProfanity, noteProfileRefusal, parseTrDate, validateProfile, type ProfileDraft } from '@/lib/profile-rules';
 
 /** 2 Kasım 2026, local time (ageFrom reads local date parts). */
 const TODAY = new Date(2026, 10, 2);
@@ -13,7 +14,8 @@ const OK: ProfileDraft = { name: 'Ayşe', username: 'ayse.yilmaz', bio: 'Müzik,
 const errs = (patch: Partial<ProfileDraft>, selfId?: string) => validateProfile({ ...OK, ...patch }, selfId, TODAY);
 
 const USERNAME_SHAPE = '3–20 karakter; harfle başlamalı, yalnızca a-z, 0-9, nokta ve alt çizgi.';
-const CONTACT = 'Biyografide telefon, IBAN, bağlantı veya başka uygulama hesabı paylaşılamaz.';
+// The same friendly text the server sends with code contact_blocked (lib/contact-filter).
+const CONTACT = CONTACT_MESSAGE;
 
 describe('Geçerli profil', () => {
   test('kurallara uyan taslakta hata yok; birden fazla hatalı alan birlikte döner', () => {
@@ -88,8 +90,39 @@ describe('Biyografi ve şehir', () => {
       assert.equal(errs({ bio: bad }).bio, CONTACT, bad);
   });
 
-  test('protokolsüz alan adına benzeyen yazım (noktadan sonra boşluk unutulmuş) engellenmez', () => {
-    assert.equal(errs({ bio: 'Müzik dinlerim.Net konuşurum' }).bio, undefined);
+  test('protokolsüz alan adına benzeyen yazım, sunucudaki filtre gibi, bağlantı sayılır', () => {
+    // The server refuses 'dinlerim.Net' as a link too; the app says so before sending instead of after.
+    assert.equal(errs({ bio: 'Müzik dinlerim.Net konuşurum' }).bio, CONTACT);
+    assert.equal(errs({ bio: 'Müzik dinlerim. Net konuşurum' }).bio, undefined);
+  });
+
+  test('ad, kullanıcı adı ve şehirde de iletişim bilgisi paylaşılamaz', () => {
+    assert.equal(errs({ name: '05321234567' }).name, CONTACT);
+    assert.equal(errs({ name: 'Ayşe insta' }).name, CONTACT);
+    assert.equal(errs({ city: 'İzmir wp 0532 123 45 67' }).city, CONTACT);
+    assert.equal(errs({ username: 'ig_ayse' }).username, CONTACT, 'alt çizgi boşluk gibi okunur');
+    assert.equal(errs({ username: 'snap.ayse' }).username, CONTACT);
+    assert.deepEqual(errs({ name: 'Mehmet 34', username: 'mehmet_34', city: 'İstanbul' }), {}, 'gündelik sayı ve şehir geçer');
+  });
+
+  test('denetim sayılmaz; reddedilen kayıt bir kez, ilk alanında sayılır (sunucu gibi)', () => {
+    const heard: ContactRefusal[] = [];
+    const off = onContactRefusal((r) => heard.push(r));
+    try {
+      const draft = { ...OK, username: 'ig_ayse', bio: 'Ara: 0532 123 45 67' };
+      const e = validateProfile(draft, 'me', TODAY);
+      validateProfile(draft, 'me', TODAY);
+      assert.equal(heard.length, 0, 'validateProfile yalnızca denetler');
+      noteProfileRefusal(draft, e);
+      assert.deepEqual(
+        heard.map((r) => [r.category, r.place]),
+        [['social', 'profile.username']],
+      );
+      noteProfileRefusal(OK, validateProfile(OK, 'me', TODAY));
+      assert.equal(heard.length, 1, 'geçen kayıt sayılmaz');
+    } finally {
+      off();
+    }
   });
 });
 

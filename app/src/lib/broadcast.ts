@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { ROOMS, USERS, roomById } from '@/data/mock';
+import { liveBuild } from '@/lib/live-flag';
 
 export type WinNews = {
   id: string;
@@ -38,6 +39,8 @@ export function useWinNews() {
     () => queue,
   );
 }
+/** The waiting banners, outside React (tests). */
+export const getWinNews = () => queue;
 /** Remove the banner that has finished showing. */
 export const shiftWinNews = (id: string) => {
   queue = queue.filter((n) => n.id !== id);
@@ -56,9 +59,13 @@ export function announceWin(news: Omit<WinNews, 'id' | 'at'>, opts?: { mine?: bo
   queue = [...queue, n].slice(-MAX_QUEUE);
   emit();
 }
+/** An Oyun Salonu win. The source prefix counts too, so an announcement without the flag is still caught. */
+export const isCasinoWin = (n: Pick<WinNews, 'casino' | 'source'>) => !!n.casino || n.source.startsWith('Oyun Merkezi ›');
+/** Any game of chance (Oyun Salonu or Uğurlu): not news for someone below the gambling level. */
+export const isChanceWin = (n: Pick<WinNews, 'casino' | 'source'>) => isCasinoWin(n) || n.source.startsWith('Uğurlu ›');
 export const roomTitleOf = (roomId: string) => (roomId === 'yeni' ? 'Benim Odam' : (roomById(roomId)?.title ?? ''));
 
-// --- Simulated wins from other rooms (prototype only) --------------------------------------------
+// --- Simulated wins from other rooms (offline demo only; never in live mode) ---------------------
 const FAKE_SOURCES: { source: string; price: number; mults: number[]; casino?: boolean }[] = [
   { source: 'Uğurlu › Şans Yoncası', price: 20, mults: [2, 5, 10, 20, 50, 100] },
   { source: 'Uğurlu › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
@@ -68,7 +75,8 @@ const FAKE_SOURCES: { source: string; price: number; mults: number[]; casino?: b
 ];
 let feed: ReturnType<typeof setTimeout> | undefined;
 export function startWinFeed() {
-  if (feed) return;
+  // Made-up people winning in made-up rooms: a live build shows only real wins.
+  if (feed || liveBuild()) return;
   const tick = () => {
     const u = USERS[Math.floor(Math.random() * USERS.length)];
     const s = FAKE_SOURCES[Math.floor(Math.random() * FAKE_SOURCES.length)];

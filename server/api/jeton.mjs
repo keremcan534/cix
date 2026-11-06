@@ -20,7 +20,7 @@
 // wherever a Jeton Noktası passed them, and the diamonds they became that are still locked. Diamonds already
 // unlocked are reported as unrecovered. The agency commission those gifts earned is reversed. Admin only:
 // moderators don't touch money. Google Play refunds also arrive on their own (refunds.mjs).
-import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { HttpError, assertClean, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { recordIncome } from './agency-lib.mjs';
@@ -166,8 +166,10 @@ export const jetonRoutes = {
     if (to === u.id) throw new HttpError(400, 'Kendine aktaramazsın');
     const coins = int(b.coins, 1, TRANSFER_MAX);
     if (!coins) throw new HttpError(400, 'Geçersiz jeton miktarı');
+    // The receipt number is a payment record, like withdrawal details; the note is for the buyer to read
+    // (GET /api/jeton/transfers), so it may not share contact details (contact-filter.mjs).
     const paymentRef = optional(b.paymentRef, 100, 'Ödeme referansı');
-    const note = optional(b.note, 200, 'Not');
+    const note = await assertClean(optional(b.note, 200, 'Not'), u, 'jeton.transfer', 'note');
     const ip = clientIp(req);
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       const rows = await lockUsers(c, [u.id, to]);
@@ -291,7 +293,7 @@ export const jetonRoutes = {
     if (!u) throw new HttpError(404, 'Kullanıcı bulunamadı');
     const q = (sql) => db.query(sql, [id]).then((r) => r.rows);
     const [purchases, lots, locks, transfers, ledger, events, lotSum] = await Promise.all([
-      q('SELECT id, platform, product_id, transaction_id, coins, bonus, status, created_at FROM purchases WHERE user_id = $1 ORDER BY id DESC LIMIT 100'),
+      q('SELECT id, platform, product_id, transaction_id, coins, bonus, campaign_bonus, campaign_ref, status, created_at FROM purchases WHERE user_id = $1 ORDER BY id DESC LIMIT 100'),
       q('SELECT id, channel, amount, remaining, lock_hours, purchase_id, transfer_id, source_lot, source_user, ref, created_at FROM coin_lots WHERE user_id = $1 ORDER BY id DESC LIMIT 200'),
       q('SELECT id, sender, amount, channel, unlock_at, gift_event, coin_lot, status, ref, created_at FROM diamond_locks WHERE user_id = $1 ORDER BY id DESC LIMIT 200'),
       db.query(`${TRANSFER_SELECT} WHERE t.from_user = $1 OR t.to_user = $1 OR t.actor = $1 ORDER BY t.id DESC LIMIT 200`, [id]).then((r) => r.rows.map(transferOf)),
@@ -303,7 +305,7 @@ export const jetonRoutes = {
     return {
       user: { ...selfUser(u), ...(await diamondState(db, id)), coinsInLots: Number(lotSum[0].n) },
       channels: Object.fromEntries(Object.entries(CHANNELS).map(([k, v]) => [k, v.label])),
-      purchases: nums(purchases, ['id', 'coins', 'bonus']),
+      purchases: nums(purchases, ['id', 'coins', 'bonus', 'campaign_bonus']),
       lots: nums(lots, ['id', 'amount', 'remaining', 'purchase_id', 'transfer_id', 'source_lot']),
       locks: nums(locks, ['id', 'amount', 'gift_event', 'coin_lot']),
       transfers,

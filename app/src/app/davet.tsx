@@ -3,10 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ComingSoon } from '@/components/coming-soon';
 import { Text } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -23,7 +25,13 @@ const STEPS = [
   `İlk odasına girdiğinde ikinize de ${coinsText} gelir.`,
 ];
 
+// The server has no referral system yet: no personal code, no code field at sign-up and no payout. A live build
+// must not hand everyone the same demo code and promise coins nobody pays, so it lands on ComingSoon.
 export default function InviteScreen() {
+  return liveMode() ? <ComingSoon title="Arkadaşını Getir" /> : <DemoInvite />;
+}
+
+function DemoInvite() {
   const { inviteCode } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
@@ -48,11 +56,14 @@ export default function InviteScreen() {
             <Text style={styles.rewardAmount}>{coinsText}</Text>
             <Text style={styles.rewardText}>Arkadaşın ilk odasına girdiğinde ikinize de {coinsText}</Text>
           </View>
+          {/* The label sits above the code so the code gets the whole width; at 360 px it shrinks rather than cut. */}
           <View style={styles.codeRow}>
-            <Text style={styles.codeLabel}>Davet kodun</Text>
-            <Text style={styles.code} numberOfLines={1}>
-              {inviteCode}
-            </Text>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.codeLabel}>Davet kodun</Text>
+              <Text style={styles.code} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {inviteCode}
+              </Text>
+            </View>
             <Pressable onPress={copy} style={styles.copyBtn} accessibilityRole="button" accessibilityLabel="Davet kodunu kopyala">
               <Text style={styles.copyText}>Kopyala</Text>
             </Pressable>
@@ -96,8 +107,8 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   rewardAmount: { color: semantic.money, fontSize: 36, fontWeight: '900' },
   rewardText: { color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14, lineHeight: 20 },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
-  codeLabel: { color: colors.text, fontSize: 15 },
-  code: { color: colors.text, fontWeight: '800', fontSize: 16, flex: 1, letterSpacing: 0.5 },
+  codeLabel: { color: colors.textDim, fontSize: 13 },
+  code: { color: colors.text, fontWeight: '800', fontSize: 18, letterSpacing: 0.5 },
   copyBtn: { backgroundColor: semantic.socialFill, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   copyText: { color: '#fff', fontWeight: '700' },
   cardTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },

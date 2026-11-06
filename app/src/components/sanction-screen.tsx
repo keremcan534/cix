@@ -3,14 +3,19 @@
 // server's; nothing here decides whether a sanction is on.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
+import { showAlert } from '@/lib/alert';
 import type { SanctionView } from '@/lib/api';
-import { message } from '@/lib/live';
+import { CONTACT_MUTE_REASON } from '@/lib/contact-filter';
+import { LEGAL_TITLE, legalUrl, type LegalDoc } from '@/lib/legal';
+import { message, myServerId } from '@/lib/live';
+import { openSupportMail } from '@/lib/open-mail';
+import { SUPPORT_EMAIL, banHelpMail } from '@/lib/support-mail';
 import { APPEAL_STATUS, formatAt, formatLeft, refreshSanctions, remaining, sendAppeal, showSanction, stopping, useSanctions, type Action } from '@/lib/sanctions';
 import { makeStyles, radius, space } from '@/theme';
 
@@ -124,7 +129,52 @@ function Appeal({ s }: { s: SanctionView }) {
   );
 }
 
-/** Full screen over the whole app while an account or device ban is on. Only the appeal works from here. */
+/**
+ * A legal text from the ban screen. openLegal's fallback sends people to Ayarlar › Destek, which a banned person
+ * cannot reach, so until the address is set this one points to the support address on the same screen.
+ */
+function openBanLegal(doc: LegalDoc) {
+  const title = LEGAL_TITLE[doc];
+  const url = legalUrl(doc);
+  const fallback = () => showAlert(title, `${title} metnine şu an ulaşılamıyor. Sorunun varsa ${SUPPORT_EMAIL} adresine yazabilirsin.`);
+  if (url) Linking.openURL(url).catch(fallback);
+  else fallback();
+}
+
+/**
+ * Ways out that need no account: the support address (a decided appeal, a lifetime or device ban, a request to
+ * erase or copy the data under UK GDPR) and the legal texts (giris-13).
+ */
+function BanHelp({ s }: { s: SanctionView }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.help}>
+      <Pressable
+        style={styles.helpRow}
+        onPress={() => openSupportMail(banHelpMail(s.id, s.label, myServerId()))}
+        accessibilityRole="link"
+        accessibilityLabel={`Destek: ${SUPPORT_EMAIL}`}
+      >
+        <Ionicons name="mail-outline" size={18} color={styles.link.color} />
+        <Text style={styles.helpText}>
+          Destek: <Text style={styles.link}>{SUPPORT_EMAIL}</Text>
+        </Text>
+      </Pressable>
+      <Text style={styles.helpNote}>Kararla ilgili sorun, verilerinin bir kopyası veya silinmesi (UK GDPR) için bu adrese yazabilirsin.</Text>
+      <Text style={styles.helpNote}>
+        <Text style={styles.link} onPress={() => openBanLegal('terms')} accessibilityRole="link">
+          Kullanım Koşulları
+        </Text>
+        {'  ·  '}
+        <Text style={styles.link} onPress={() => openBanLegal('privacy')} accessibilityRole="link">
+          Gizlilik Politikası
+        </Text>
+      </Text>
+    </View>
+  );
+}
+
+/** Full screen over the whole app while an account or device ban is on. Only the appeal and the help links work from here. */
 export function BanScreen() {
   const styles = useStyles();
   const { block, sanctions } = useSanctions();
@@ -142,12 +192,13 @@ export function BanScreen() {
           <Text style={styles.title}>{device ? 'Bu cihazın erişimi kapatıldı' : 'Hesabının erişimi kapatıldı'}</Text>
           <Text style={styles.lead}>
             {device
-              ? 'Topluluk kurallarımız nedeniyle bu cihazdan SimilarClub’a giriş yapılamıyor. Başka bir hesap açmak bu kısıtlamayı kaldırmaz.'
+              ? 'Topluluk kurallarımız nedeniyle bu cihazdan Similar Club’a giriş yapılamıyor. Başka bir hesap açmak bu kısıtlamayı kaldırmaz.'
               : 'Topluluk kurallarımız nedeniyle hesabın şu an kullanılamıyor. Süre dolduğunda yeniden giriş yapabilirsin.'}
           </Text>
           <SanctionDetails s={s} />
           {block.appealSession ? <Appeal s={s} /> : <Text style={styles.appealNote}>İtiraz için uygulamayı kapatıp yeniden aç.</Text>}
           <Button title="Durumu yenile" icon="refresh" variant="ghost" onPress={() => void refreshSanctions().catch(() => {})} />
+          <BanHelp s={s} />
         </ScrollView>
       </KeyboardAvoid>
     </Modal>
@@ -197,16 +248,27 @@ export function useStopped(action: Action, roomId?: string | null) {
   return s;
 }
 
-/** A thin bar above a composer or mic: what is stopped and for how long; tap for details and the appeal. */
+/**
+ * A thin bar above a composer or mic: what is stopped and for how long; tap for details and the appeal. The
+ * contact filter's automatic mute also says why under it ("Otomatik: iletişim bilgisi paylaşma denemesi").
+ */
 export function MuteBanner({ s, text }: { s: SanctionView; text: string }) {
   const styles = useStyles();
   const left = remaining(s);
+  const why = s.reasonCode === CONTACT_MUTE_REASON ? s.reasonText : null;
   return (
-    <Pressable style={styles.banner} onPress={() => showSanction(s)} accessibilityRole="button" accessibilityLabel={`${text}. Ayrıntı`}>
+    <Pressable style={styles.banner} onPress={() => showSanction(s)} accessibilityRole="button" accessibilityLabel={`${text}${why ? `. ${why}` : ''}. Ayrıntı`}>
       <Ionicons name="volume-mute" size={16} color={styles.danger.color} />
-      <Text style={styles.bannerText} numberOfLines={1}>
-        {text} · {left === Infinity ? 'süresiz' : `${formatLeft(left)} kaldı`}
-      </Text>
+      <View style={styles.bannerBody}>
+        <Text style={styles.bannerText} numberOfLines={1}>
+          {text} · {left === Infinity ? 'süresiz' : `${formatLeft(left)} kaldı`}
+        </Text>
+        {why ? (
+          <Text style={styles.bannerWhy} numberOfLines={2}>
+            {why}
+          </Text>
+        ) : null}
+      </View>
       <Text style={styles.bannerLink}>Ayrıntı</Text>
     </Pressable>
   );
@@ -235,12 +297,19 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   appealNote: { color: colors.textDim, fontSize: 13, lineHeight: 19, marginTop: 2 },
   input: { minHeight: 110, textAlignVertical: 'top', color: colors.text, backgroundColor: colors.cardAlt, borderRadius: radius.md, padding: space.md, fontSize: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   error: { color: semantic.danger, fontSize: 13 },
+  help: { gap: space.sm, alignItems: 'center', paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  helpRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 4 },
+  helpText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  helpNote: { color: colors.textDim, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  link: { color: colors.primaryText, fontWeight: '700' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md, maxHeight: '88%' },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: semantic.danger },
-  bannerText: { color: colors.text, fontSize: 13, flex: 1 },
+  bannerBody: { flex: 1, gap: 2 },
+  bannerText: { color: colors.text, fontSize: 13 },
+  bannerWhy: { color: colors.textDim, fontSize: 12, lineHeight: 16 },
   bannerLink: { color: colors.primaryText, fontSize: 13, fontWeight: '700' },
 }));

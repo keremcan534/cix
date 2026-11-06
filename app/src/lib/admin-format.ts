@@ -46,21 +46,47 @@ export function fmtUptime(s: number) {
   return `${Math.max(0, m)} dk`;
 }
 
+/** 'Süresiz' in the ban choices: the server's longest length, sent with permanent: true (banBody). */
+export const PERMANENT_BAN_DAYS = 3650;
+export const isPermanentBan = (days: number) => days >= PERMANENT_BAN_DAYS;
 /** Ban lengths the server accepts (1–3650 days). */
 export const BAN_OPTIONS: { days: number; label: string }[] = [
   { days: 1, label: '1 gün' },
   { days: 3, label: '3 gün' },
   { days: 7, label: '7 gün' },
   { days: 30, label: '30 gün' },
-  { days: 3650, label: 'Süresiz' },
+  { days: PERMANENT_BAN_DAYS, label: 'Süresiz' },
 ];
 export const banLabel = (days: number) => BAN_OPTIONS.find((o) => o.days === days)?.label ?? `${days} gün`;
 /** "7 gün askıya alındı" / "süresiz askıya alındı"; `future`: "… alınacak". */
-export const banPhrase = (days: number, future = false) => `${days >= 3650 ? 'süresiz' : `${days} gün`} askıya ${future ? 'alınacak' : 'alındı'}`;
+export const banPhrase = (days: number, future = false) => `${isPermanentBan(days) ? 'süresiz' : `${days} gün`} askıya ${future ? 'alınacak' : 'alındı'}`;
+/**
+ * What a ban choice sends: the days, plus permanent: true for 'Süresiz' so the server records a lifetime ban
+ * (is_permanent) rather than a 10-year one. A server that does not know the flag still bans for the 3650 days.
+ */
+export const banBody = (days: number): { days: number; permanent?: true } => (isPermanentBan(days) ? { days: PERMANENT_BAN_DAYS, permanent: true } : { days });
 
 export const REPORT_TARGET_LABEL: Record<string, string> = { user: 'Kişi', room: 'Oda', message: 'Mesaj', moment: 'Paylaşım' };
 
 export const PLATFORM_LABEL: Record<string, string> = { android: 'Google Play', ios: 'App Store', test: 'Test' };
+
+/** A device's verification state (user_devices.device_verification_status) in words. */
+export const VERIFICATION_LABEL: Record<string, string> = { unverified: 'Doğrulanmamış', verified: 'Doğrulandı', failed: 'Doğrulama başarısız' };
+export const verificationLabel = (v: string) => VERIFICATION_LABEL[v] ?? v;
+
+/** The line under a sanction permission (its title is already the Turkish description): where it comes from. */
+export const permSource = (on: boolean, fromRole: boolean) => (fromRole ? 'Rolden geliyor' : on ? 'Ek yetki' : undefined);
+
+/** The agency commission ledger's kinds (agency_ledger.kind on the server) as the office and centre show them. */
+export const AGENCY_LEDGER_LABEL: Record<string, string> = {
+  direct: 'Doğrudan komisyon',
+  difference: 'Fark komisyonu',
+  transition: 'Geçiş komisyonu',
+  transfer_fee: 'Transfer ücreti',
+  adjustment: 'Düzeltme',
+  reversal: 'İptal / iade',
+  bd: 'BD komisyonu',
+};
 
 /** "5.000 jeton + 2.500 hediye". */
 export const purchaseCoins = (coins: number, bonus: number) => (bonus > 0 ? `${fmtCoins(coins)} + ${n(bonus)} hediye` : fmtCoins(coins));

@@ -6,13 +6,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
+import { ComingSoon } from '@/components/coming-soon';
 import { GroupChat, type QuickAction } from '@/components/GroupChat';
 import { GradientButton, StateIcon } from '@/components/ui';
-import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta } from '@/data/kabile';
+import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta, payKabileGift } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { presenceOf } from '@/data/presence';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
+import { liveMode } from '@/lib/live';
 import { useApp, type GroupMsg } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -25,8 +28,17 @@ const QUICK: QuickAction[] = [
   { key: 'kasa', label: 'Tayfa Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];
 
+// Tayfa has no server yet (data/kabile tayfaAvailable): in a live build the chat would reach no one and its gifts
+// would take real coins for sample members, so it shows a notice instead.
 export default function KabileChat() {
+  return liveMode() ? <ComingSoon title="Tayfa sohbeti" /> : <DemoKabileChat />;
+}
+
+function DemoKabileChat() {
   const { familyId, me, familyChat, sendFamilyMessage, familyMuted, setFamilyMuted, spendCoins } = useApp();
+  // Only the chat gifts the server still offers (Canlı ayarlar can hide a gift); all of them if it hid every one,
+  // so the sheet never opens empty (these sends are local, the server never refuses them).
+  const chatGifts = visibleGifts(CHAT_GIFTS, useLiveCatalog());
   const { colors } = useTheme();
   const styles = useStyles();
   const [menu, setMenu] = useState(false);
@@ -65,7 +77,9 @@ export default function KabileChat() {
   };
 
   const sendGift = (g: Gift) => {
-    if (!spendCoins(g.price, `Tayfa sohbeti hediyesi: ${g.name}`)) {
+    const paid = payKabileGift(g.price, `Tayfa sohbeti hediyesi: ${g.name}`, spendCoins);
+    if (paid === 'off') return;
+    if (paid === 'coins') {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
@@ -101,6 +115,7 @@ export default function KabileChat() {
         members={members}
         messages={[welcome, ...familyChat]}
         onSend={send}
+        place="tayfa.chat"
         pinned={`Tayfa duyurusu: ${meta.announcement}`}
         roomId={meta.roomId}
         lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length] ?? LAST_ACTIVE[0]}
@@ -123,7 +138,7 @@ export default function KabileChat() {
         visible={gifts}
         title="Tayfa sohbetine hediye · her 400 🪙 için +2 katkı puanı"
         onClose={() => setGifts(false)}
-        options={CHAT_GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price} 🪙`, onPress: () => sendGift(g) }))}
+        options={chatGifts.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price} 🪙`, onPress: () => sendGift(g) }))}
       />
     </SafeAreaView>
   );

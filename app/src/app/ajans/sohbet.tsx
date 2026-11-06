@@ -7,6 +7,7 @@ import { GroupChat } from '@/components/GroupChat';
 import { GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { USERS } from '@/data/mock';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -24,13 +25,19 @@ export default function AgencyChat() {
           members={USERS.slice(0, 10)}
           messages={agencyChat}
           onSend={sendAgencyMessage}
+          place="agency.chat"
           pinned="📢 Bu hafta: PK turnuvası Cumartesi 21:00 · Aylık 100 saat hedefi"
           lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length]}
           roomId="r2"
+          // The Jeton Noktası and the member network are demo screens; a live build leaves their shortcuts out.
           quickActions={[
             { key: 'panel', label: 'Ajans paneli', emoji: '📊', onPress: () => router.push('/ajans') },
-            { key: 'bank', label: 'Coins Bank', emoji: '🏦', onPress: () => router.push('/coins-bank') },
-            { key: 'net', label: 'Üye ağı', emoji: '🌐', onPress: () => router.push('/ajans/ag') },
+            ...(liveMode()
+              ? []
+              : [
+                  { key: 'bank', label: 'Jeton Noktası', emoji: '🏦', onPress: () => router.push('/coins-bank') },
+                  { key: 'net', label: 'Üye ağı', emoji: '🌐', onPress: () => router.push('/ajans/ag') },
+                ]),
           ]}
         />
       ) : (

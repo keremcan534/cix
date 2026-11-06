@@ -8,14 +8,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { ExchangeSheet } from '@/components/exchange-sheet';
+import { LoadError } from '@/components/load-error';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
-import { liveMode } from '@/lib/live';
+import { callsAvailable, liveMode } from '@/lib/live';
+import { liveRules, useLiveCatalog } from '@/lib/live/catalog-live';
+import { useLiveEarnings, useLiveLedger } from '@/lib/live/earnings';
 import { useServerWithdrawals } from '@/lib/live/withdraw';
 import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
-import { activeLocks, channelLabel, lockDays, lockProgress, nextUnlock, timeLeft, type DiamondLock } from '@/lib/diamond-locks';
+import { activeLocks, lockLabel, lockLength, lockProgress, nextUnlock, timeLeft, type DiamondLock } from '@/lib/diamond-locks';
+import { diamondIncome, giftOfReason, ledgerTime, type LedgerEntry } from '@/lib/ledger-view';
 import { stampLabel } from '@/lib/tr';
 import { useApp, type Earning, type EarningSource } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -61,18 +65,34 @@ function useMinuteClock() {
 }
 
 export default function IncomeScreen() {
-  const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, diamondLocks, earnings } = useApp();
+  const app = useApp();
+  const { diamondLocks, earnings } = app;
+  const live = liveMode();
+  // Live mode: the server's totals (summed over every lock) and its lock rows; the store's numbers only until the
+  // first answer. The history is the server's ledger, not this phone's record of balance changes.
+  const server = useLiveEarnings(app.diamonds);
+  const history = useLiveLedger();
+  const fromServer = live && server.status === 'ready';
+  const diamonds = fromServer ? server.diamonds : app.diamonds;
+  const free = fromServer ? server.withdrawable : app.withdrawableDiamonds;
+  const locked = fromServer ? server.locked : app.lockedDiamonds;
   // Live mode: a pending withdrawal holds its diamonds on the server (they are already out of the balance).
   const withdrawState = useServerWithdrawals();
-  const pendingWithdraw = liveMode() ? withdrawState.list.find((w) => w.status === 'pending') : undefined;
+  // Çevir's rate line: the server's rate in a live build (Canlı ayarlar), the compiled one otherwise.
+  const liveCat = useLiveCatalog();
+  const per10k = Math.floor(10_000 * selfExchangeRate(live ? liveRules(liveCat) : RULES));
+  const pendingWithdraw = live ? withdrawState.list.find((w) => w.status === 'pending') : undefined;
   const { colors, semantic, ink } = useTheme();
   const styles = useStyles();
   const [exchange, setExchange] = useState(false);
   const [allLocks, setAllLocks] = useState(false);
   const now = useMinuteClock();
   // Soonest first: the list answers "when can I take these out?".
-  const locks = activeLocks(diamondLocks, now).sort((a, b) => a.unlockAt - b.unlockAt);
+  const locks = activeLocks(fromServer ? server.locks : diamondLocks, now).sort((a, b) => a.unlockAt - b.unlockAt);
+  // The server lists the soonest 100 locks; its total counts them all.
+  const listed = locks.reduce((t, l) => t + l.amount, 0);
   const next = nextUnlock(locks, now);
+  const income = live ? diamondIncome(history.rows) : [];
   const lockedNote = locked > 0 ? `\n\n${fmt(locked)} elmasın kilidi henüz açılmadı; açıldıkça bu tutara eklenir.` : '';
   // Three ways out, all from the withdrawable part: Çevir (own diamonds → coins at the in-app price), Anında
   // bozdur (Jeton Noktası pays the cash value now) and Para Çek (weekly payout).
@@ -89,7 +109,7 @@ export default function IncomeScreen() {
   const info = () =>
     showAlert(
       'Elmasların',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir kazanç: hemen çekebileceğin, bozdurabileceğin ya da jetona çevirebileceğin elmaslar.\nKilitli elmas: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
+      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin${live ? '' : ', bozdurabileceğin'} ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
     );
 
   return (
@@ -98,9 +118,12 @@ export default function IncomeScreen() {
         title="Gelir"
         right={
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
-              <Ionicons name="gift" size={18} color={colors.gold} />
-            </Pressable>
+            {/* The invite programme is not on the server yet: in live builds /davet is only the "yakında" screen. */}
+            {!live && (
+              <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
+                <Ionicons name="gift" size={18} color={colors.gold} />
+              </Pressable>
+            )}
             <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
               <Ionicons name="headset" size={18} color={colors.primaryText} />
             </Pressable>
@@ -120,19 +143,20 @@ export default function IncomeScreen() {
             {free > 0 && <View style={[styles.meterFree, { flex: free }]} />}
             {locked > 0 && <View style={[styles.meterLocked, { flex: locked }]} />}
           </View>
+          {live && server.status === 'error' && <LoadError text="Elmas bakiyen sunucudan okunamadı." onRetry={server.reload} style={{ marginTop: 10 }} />}
           <View style={styles.split}>
-            <View style={styles.part} accessible accessibilityLabel={`Çekilebilir kazanç: ${fmt(free)} elmas, yaklaşık ${usd(free)}`}>
+            <View style={styles.part} accessible accessibilityLabel={`Çekilebilir: ${fmt(free)} elmas, yaklaşık ${usd(free)}`}>
               <View style={styles.partHead}>
                 <Ionicons name="lock-open" size={14} color={semantic.successText} />
-                <Text style={styles.partLabel} numberOfLines={1}>Çekilebilir kazanç</Text>
+                <Text style={styles.partLabel} numberOfLines={1}>Çekilebilir</Text>
               </View>
               <Text style={styles.partN} numberOfLines={1} adjustsFontSizeToFit>{fmt(free)}</Text>
               <Text style={styles.partSub} numberOfLines={1}>≈ {usd(free)}</Text>
             </View>
-            <View style={styles.part} accessible accessibilityLabel={`Kilitli elmas: ${fmt(locked)}${next ? `, ilk kilit ${timeLeft(next, now)} sonra açılır` : ''}`}>
+            <View style={styles.part} accessible accessibilityLabel={`Kilitli: ${fmt(locked)} elmas${next ? `, ilk kilit ${timeLeft(next, now)} sonra açılır` : ''}`}>
               <View style={styles.partHead}>
                 <Ionicons name="lock-closed" size={14} color={colors.textDim} />
-                <Text style={styles.partLabel} numberOfLines={1}>Kilitli elmas</Text>
+                <Text style={styles.partLabel} numberOfLines={1}>Kilitli</Text>
               </View>
               <Text style={styles.partN} numberOfLines={1} adjustsFontSizeToFit>{fmt(locked)}</Text>
               <Text style={styles.partSub} numberOfLines={1}>{next ? `İlki ${timeLeft(next, now)} sonra açılır` : 'Kilitli elmas yok'}</Text>
@@ -142,7 +166,7 @@ export default function IncomeScreen() {
             <Ionicons name="swap-horizontal" size={20} color={semantic.moneyInk} />
             <View style={{ flex: 1 }}>
               <Text style={styles.exchangeTitle}>Çevir</Text>
-              <Text style={styles.exchangeSub} numberOfLines={1}>10.000 💎 = {fmt(Math.floor(10_000 * selfExchangeRate()))} jeton · ücret yok</Text>
+              <Text style={styles.exchangeSub} numberOfLines={2}>10.000 💎 = {fmt(per10k)} jeton · ücretsiz</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={semantic.moneyInk} />
           </Pressable>
@@ -150,9 +174,12 @@ export default function IncomeScreen() {
             <Pressable style={styles.outlineBtn} onPress={() => router.push('/yayinci/cek')}>
               <Text style={styles.outlineText}>Para Çek</Text>
             </Pressable>
-            <Pressable style={styles.outlineBtn} onPress={instant}>
-              <Text style={styles.outlineText}>Anında bozdur</Text>
-            </Pressable>
+            {/* Jeton Noktası is still a demo screen: a live build doesn't send money there (Decision A). */}
+            {!live && (
+              <Pressable style={styles.outlineBtn} onPress={instant}>
+                <Text style={styles.outlineText}>Anında bozdur</Text>
+              </Pressable>
+            )}
           </View>
           {pendingWithdraw && (
             <Text style={[styles.exchangeSub, { marginTop: 8 }]} onPress={() => router.push('/yayinci/cek')}>
@@ -161,14 +188,16 @@ export default function IncomeScreen() {
           )}
         </LinearGradient>
 
-        <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">
-          <Art name="finans-haftalik-odeme-banka" size={26} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Jeton Noktası</Text>
-            <Text style={styles.dim}>Cüzdan, kazançlar, ödemeler ve kurallar</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-        </Pressable>
+        {!live && (
+          <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">
+            <Art name="finans-haftalik-odeme-banka" size={26} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>Jeton Noktası</Text>
+              <Text style={styles.dim}>Cüzdan, kazançlar, ödemeler ve kurallar</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+        )}
 
         <View style={styles.sectionHead}>
           <View style={styles.lockBadge}>
@@ -177,7 +206,11 @@ export default function IncomeScreen() {
           <Text style={styles.sectionTitle}>Kilitli elmas</Text>
           {locked > 0 && <Text style={styles.dim}>{fmt(locked)} 💎</Text>}
         </View>
-        {locks.length === 0 ? (
+        {live && !fromServer && server.status !== 'error' ? (
+          <Card style={styles.noLocks}>
+            <Text style={[styles.dim, { flex: 1 }]}>Kilitler yükleniyor…</Text>
+          </Card>
+        ) : locks.length === 0 ? (
           <Card style={styles.noLocks}>
             <Ionicons name="lock-open" size={18} color={semantic.successText} />
             <Text style={[styles.dim, { flex: 1 }]}>Şu an kilitli elmasın yok; bakiyenin tamamı çekilebilir.</Text>
@@ -191,6 +224,9 @@ export default function IncomeScreen() {
               <Pressable onPress={() => setAllLocks((v) => !v)} style={styles.lockMore} accessibilityRole="button">
                 <Text style={{ color: colors.primaryText, fontWeight: '700' }}>{allLocks ? 'Daha az göster' : `Tümünü gör (${locks.length})`}</Text>
               </Pressable>
+            )}
+            {fromServer && allLocks && listed < locked && (
+              <Text style={[styles.dim, { paddingVertical: 10 }]}>Açılışı en yakın {fmt(locks.length)} kilit listede; diğer {fmt(locked - listed)} elmasın kilidi daha sonra açılır.</Text>
             )}
           </Card>
         )}
@@ -207,23 +243,44 @@ export default function IncomeScreen() {
           </Pressable>
         </View>
 
-        {earnings.length === 0 ? (
-          <Card style={{ alignItems: 'center', gap: 6, paddingVertical: 30 }}>
-            <Art name="maskot-uyuyan-bakiye" size={52} />
-            <Text style={styles.dim}>Veri yok</Text>
-            <Text style={[styles.dim, { textAlign: 'center' }]}>Odanda hediye aldığında veya arama yaptığında elmas gelirin burada listelenir.</Text>
-          </Card>
+        {live ? (
+          history.status === 'error' ? (
+            <LoadError text="Elmas geçmişin sunucudan okunamadı." onRetry={history.reload} />
+          ) : history.status !== 'ready' ? (
+            <Card style={styles.noLocks}>
+              <Text style={[styles.dim, { flex: 1 }]}>Yükleniyor…</Text>
+            </Card>
+          ) : income.length === 0 ? (
+            <NoIncome />
+          ) : (
+            income.slice(0, PREVIEW).map((e) => <ServerIncomeRow key={e.id} e={e} />)
+          )
+        ) : earnings.length === 0 ? (
+          <NoIncome />
         ) : (
           earnings.slice(0, PREVIEW).map((e) => <EarningRow key={e.id} e={e} />)
         )}
-        {earnings.length > PREVIEW && (
+        {(live ? income.length : earnings.length) > PREVIEW && (
           <Pressable onPress={() => router.push('/gelir/detay')} style={{ alignItems: 'center', paddingVertical: 6 }}>
-            <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Tümünü gör ({earnings.length})</Text>
+            <Text style={{ color: colors.primaryText, fontWeight: '700' }}>{live ? 'Tümünü gör' : `Tümünü gör (${earnings.length})`}</Text>
           </Pressable>
         )}
       </ScrollView>
-      <ExchangeSheet visible={exchange} onClose={() => setExchange(false)} />
+      <ExchangeSheet visible={exchange} onClose={() => setExchange(false)} split={fromServer ? { diamonds, withdrawable: free, locked } : undefined} />
     </SafeAreaView>
+  );
+}
+
+function NoIncome() {
+  const styles = useStyles();
+  return (
+    <Card style={{ alignItems: 'center', gap: 6, paddingVertical: 30 }}>
+      <Art name="maskot-uyuyan-bakiye" size={52} />
+      <Text style={styles.dim}>Veri yok</Text>
+      <Text style={[styles.dim, { textAlign: 'center' }]}>
+        {callsAvailable() ? 'Odanda hediye aldığında veya arama yaptığında elmas gelirin burada listelenir.' : 'Hediye aldığında elmas gelirin burada listelenir.'}
+      </Text>
+    </Card>
   );
 }
 
@@ -235,12 +292,12 @@ function LockRow({ lock, now, first }: { lock: DiamondLock; now: number; first: 
   const what = lock.gift ? `${lock.gift.name} ×${lock.gift.count}` : INCOME_LABEL[lock.source];
   const left = timeLeft(lock.unlockAt, now);
   return (
-    <View style={[styles.lockRow, !first && styles.lockSep]} accessible accessibilityLabel={`${fmt(lock.amount)} elmas, ${what}, ${who}, ${channelLabel(lock.channel)}, ${left} sonra açılır`}>
+    <View style={[styles.lockRow, !first && styles.lockSep]} accessible accessibilityLabel={`${fmt(lock.amount)} elmas, ${what}, ${who}, ${lockLabel(lock)}, ${left} sonra açılır`}>
       <View style={styles.row}>
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={styles.rowTitle} numberOfLines={1}>{what}</Text>
           <Text style={styles.dim} numberOfLines={1}>
-            <Text style={styles.sender}>{who}</Text> · {channelLabel(lock.channel)} · {lockDays(lock.channel)} gün
+            <Text style={styles.sender}>{who}</Text> · {lockLabel(lock)} · {lockLength(lock)}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 3 }}>
@@ -255,6 +312,25 @@ function LockRow({ lock, now, first }: { lock: DiamondLock; now: number; first: 
         <View style={[styles.trackFill, { width: `${Math.round(lockProgress(lock, now) * 100)}%` }]} />
       </View>
     </View>
+  );
+}
+
+/** One server ledger row of incoming diamonds: a gift (with its sender) or a platform credit. */
+export function ServerIncomeRow({ e }: { e: LedgerEntry }) {
+  const styles = useStyles();
+  const gift = giftOfReason(e.reason);
+  return (
+    <Card style={styles.row}>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Text style={styles.rowTitle} numberOfLines={1}>{gift ? 'Hediye geliri' : e.reason}</Text>
+        <Text style={styles.sender} numberOfLines={1}>{e.counterparty ? userById(e.counterparty).name : 'Similar Club'}</Text>
+        <Text style={styles.dim}>{ledgerTime(e.createdAt)}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 6, flexShrink: 1 }}>
+        <Text style={styles.amount}>+{fmt(e.amount)} 💎</Text>
+        {gift && <Text style={styles.dim} numberOfLines={1}>🎁 {gift.name} x{gift.count}</Text>}
+      </View>
+    </Card>
   );
 }
 

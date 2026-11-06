@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
+import { CONTACT_MESSAGE, checkText } from './contact-filter.mjs';
 
 export const env = process.env;
 
@@ -20,6 +21,12 @@ export const db = new pg.Pool({
 // listener the error would end the whole process.
 db.on('error', (e) => console.error('postgres idle connection lost', e.code ?? '', e.message));
 export const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+/** Constant-time equality of two strings, compared as UTF-8 bytes (a non-ASCII input is just unequal, never a throw). */
+export function same(a, b) {
+  const x = Buffer.from(String(a ?? ''), 'utf8');
+  const y = Buffer.from(String(b ?? ''), 'utf8');
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
 
 // --- Migrations: every .sql file in ./migrations once, in name order ----------------------------------------
 export async function migrate() {
@@ -49,6 +56,13 @@ export class HttpError extends Error {
   constructor(code, message) {
     super(message);
     this.code = code;
+  }
+}
+
+/** A route's answer sent as plain text instead of JSON (Meta's webhook handshake wants the bare challenge). */
+export class RawText {
+  constructor(text) {
+    this.text = String(text);
   }
 }
 
@@ -109,7 +123,7 @@ export async function auth(req, { appeal = false } = {}) {
   if (!m) throw new HttpError(401, 'Giriş gerekli');
   const hash = sha(m[1]);
   const r = await db.query(
-    'SELECT u.*, s.last_seen_at AS session_seen, s.device_id AS session_device, s.scope AS session_scope FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL',
+    'SELECT u.*, s.created_at AS session_created, s.last_seen_at AS session_seen, s.device_id AS session_device, s.scope AS session_scope FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL',
     [hash],
   );
   if (!r.rowCount) throw new HttpError(401, 'Oturum geçersiz veya süresi dolmuş');
@@ -212,9 +226,13 @@ export function bannedError(s, extra = {}) {
   return Object.assign(new HttpError(403, msg), { extra: { code: device ? 'device_banned' : 'account_banned', sanction: sanctionView(s), serverNow: new Date().toISOString(), ...extra } });
 }
 
-/** True when either of the two has blocked the other. */
-export async function blockedBetween(a, b) {
-  const r = await db.query('SELECT 1 FROM blocks WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)', [a, b]);
+/**
+ * True when either of the two has blocked the other. Inside a transaction pass its client as `q`: a second pool
+ * connection taken while the transaction holds row locks can wait forever once the pool is full of requests
+ * waiting on those locks.
+ */
+export async function blockedBetween(a, b, q = db) {
+  const r = await q.query('SELECT 1 FROM blocks WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)', [a, b]);
   return r.rowCount > 0;
 }
 
@@ -337,3 +355,57 @@ export const text = (v, min, max, field) => {
   if (s.length < min || s.length > max) throw new HttpError(400, `${field} ${min}–${max} karakter olmalı`);
   return s;
 };
+
+// --- Contact filter: no phone numbers, IBANs, e-mails, links or social media accounts (contact-filter.mjs) ---
+// Refused, never masked. Each refusal is counted for moderators (who, which kind, where, when;
+// 017_contact_refusals.sql), and the refused text is not stored or logged anywhere. Too many in an hour mute the
+// person's messages for a while (sanctions.mjs contactStrike, AUTO_MUTE_*).
+const REFUSAL_DAYS = 180;
+const REFUSALS_PER_MINUTE = 20;
+let refusalsPrunedAt = 0;
+
+/**
+ * Counts one refusal (at most 20 a minute per person are written; the rest still count for the automatic mute,
+ * sanctions.mjs keeps their times in memory) and applies the automatic mute rule. Answers
+ * what the person is told: { strikesLeft, muteMinutes } near the limit, { muted, until, sanction, serverNow } when
+ * this refusal started the mute, else {}. Never fails the request, and waits for the rule at most 2 seconds.
+ */
+export async function countRefusal(uid, category, place) {
+  const written = allow(`contact-refusal:${uid}`, REFUSALS_PER_MINUTE);
+  if (written) {
+    try {
+      await db.query('INSERT INTO contact_refusals (user_id, category, place) VALUES ($1, $2, $3)', [uid, category, place]);
+      if (Date.now() - refusalsPrunedAt > 3_600_000) {
+        refusalsPrunedAt = Date.now();
+        await db.query(`DELETE FROM contact_refusals WHERE created_at < now() - interval '${REFUSAL_DAYS} days'`);
+      }
+    } catch (e) {
+      console.error('contact refusal count', e.message);
+    }
+  }
+  // Imported here, not at the top: sanctions.mjs imports this file.
+  const rule = import('./sanctions.mjs')
+    .then((m) => m.contactStrike(uid, !written))
+    .catch((e) => (console.error('contact auto mute', e.message), {}));
+  let timer;
+  const late = new Promise((done) => (timer = setTimeout(done, 2000, {})));
+  return Promise.race([rule, late]).finally(() => clearTimeout(timer));
+}
+
+/** The refusal the app shows: 400 { error, code: 'contact_blocked', category, field?, strikesLeft?, muted? … } (countRefusal). */
+export const contactError = (category, field, strike = {}) =>
+  Object.assign(new HttpError(400, CONTACT_MESSAGE), { extra: { code: 'contact_blocked', category, ...(field ? { field } : {}), ...strike } });
+
+/**
+ * Refuses `s` when it shares contact details, counting it for `user` at `place` (e.g. 'profile.bio');
+ * `field` is the request's key, for the app to point at the input. Returns `s`.
+ */
+export async function assertClean(s, user, place, field) {
+  if (!s) return s;
+  const r = checkText(s);
+  if (r.ok) return s;
+  throw contactError(r.category, field, await countRefusal(user.id, r.category, place));
+}
+
+/** text() for what other people read: trimmed, `min`–`max` characters, and no contact details. */
+export const publicText = (v, min, max, label, user, place, field) => assertClean(text(v, min, max, label), user, place, field);

@@ -146,6 +146,29 @@ export function setLocks(roomId: string, locked: number[]) {
   if (!r || r.locked.join() === locked.join()) return;
   put({ ...r, locked });
 }
+/**
+ * Server room: whose mic a room voice mute switched off (server/api/sanctions.mjs), shown like a moderator's
+ * mic mute. The server enforces it on the voice connection; this only draws it.
+ */
+export function setMutedList(roomId: string, ids: string[]) {
+  const r = state.rooms[roomId];
+  const micMuted = [...new Set(ids)].sort();
+  if (!r || [...r.micMuted].sort().join() === micMuted.join()) return;
+  put({ ...r, micMuted });
+}
+/**
+ * Server room: who is kept out (a kick for a while, `until` in ms, or the blacklist, null), as the server lists
+ * them for the owner and admins (server/api/rooms.mjs). It replaces this phone's own bans, so a ban lifted on the
+ * server lets the person show up here again. The server enforces it (voice token); this only follows it.
+ */
+export function setServerBans(roomId: string, bans: { uid: string; until: number | null }[]) {
+  const r = state.rooms[roomId];
+  if (!r) return;
+  const next: Record<string, number> = Object.fromEntries(bans.map((b) => [b.uid, b.until === null ? Infinity : b.until]));
+  const keys = Object.keys(next);
+  if (keys.length === Object.keys(r.bans).length && keys.every((uid) => r.bans[uid] === next[uid])) return;
+  put({ ...r, bans: next });
+}
 /** Room blacklist (owner settings): listed people are out and can't enter; people taken off it can enter again. */
 export function setBlacklist(roomId: string, ids: string[]) {
   const r = state.rooms[roomId];

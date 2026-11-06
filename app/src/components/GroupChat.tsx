@@ -1,13 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Platform, Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { onWebEnter } from '@/lib/enter-sends';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
+import { ContactNote } from '@/components/contact-note';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
+import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { roomById, userById, type User } from '@/data/mock';
@@ -35,10 +38,13 @@ export function GroupChat({
   roomId,
   quickActions,
   onGift,
+  place,
 }: {
   members: User[];
   messages: GroupMsg[];
   onSend: (text: string) => void;
+  /** Where this chat is, for the contact filter's count (lib/contact-filter), e.g. 'tayfa.chat'. */
+  place: string;
   pinned?: string;
   lastActive: (u: User) => string;
   /** The group's own room, pinned under the announcement. */
@@ -50,6 +56,12 @@ export function GroupChat({
   const styles = useStyles();
   const [tab, setTab] = useState<'chat' | 'members'>('chat');
   const [draft, setDraft] = useState('');
+  // Why the last text did not go out (contact details); cleared as soon as the text changes.
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string | ((d: string) => string)) => {
+    setDraft(next);
+    setRefused(null);
+  };
   const [emoji, setEmoji] = useState(false);
   const [pinOpen, setPinOpen] = useState(true);
   // In-room members first, then online, then the rest.
@@ -59,8 +71,13 @@ export function GroupChat({
   const room = roomId ? roomById(roomId) : null;
 
   const send = () => {
-    if (!draft.trim()) return;
-    onSend(draft.trim());
+    const text = draft.trim();
+    if (!text) return;
+    // Contact details are refused, not masked: nothing goes out and the text stays in the input.
+    const refusal = messageRefusal(place, text, place);
+    if (refusal) return setRefused(refusal);
+    noteSent(place, text);
+    onSend(text);
     setDraft('');
     setEmoji(false);
   };
@@ -156,17 +173,32 @@ export function GroupChat({
             <EmojiPanel
               onPick={(e) => {
                 // A sticker goes out on its own; an emoji is typed into the draft.
-                if (!stickerIdOf(e)) return setDraft((d) => d + e);
+                if (!stickerIdOf(e)) return edit((d) => d + e);
                 onSend(e);
                 setEmoji(false);
               }}
             />
           )}
+          <ContactNote text={refused} style={{ marginTop: 6 }} />
           <View style={styles.inputRow}>
             <Pressable onPress={() => setEmoji((v) => !v)} accessibilityLabel="Emoji">
               <Ionicons name={emoji ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
             </Pressable>
-            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Mesaj yaz…" placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
+            {/* Wraps up to a few lines (at most 1000 characters, like a direct message); the keyboard's send key
+                sends and keeps the keyboard open. Web: Enter sends, Shift+Enter is a new line (lib/enter-sends). */}
+            <TextInput
+              value={draft}
+              onChangeText={edit}
+              onSubmitEditing={send}
+              onKeyPress={Platform.OS === 'web' ? (e) => onWebEnter(e, send) : undefined}
+              submitBehavior="submit"
+              multiline
+              maxLength={1000}
+              placeholder="Mesaj yaz…"
+              placeholderTextColor={colors.textDim}
+              style={styles.input}
+              returnKeyType="send"
+            />
             {onGift && (
               <Pressable onPress={onGift} accessibilityLabel="Hediye">
                 <Text style={{ fontSize: 24 }}>🎁</Text>
@@ -267,7 +299,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   quick: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, ...lift },
   quickTag: { position: 'absolute', top: -9, right: 8, color: colors.gold, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, color: colors.text, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, ...lift },
+  input: { flex: 1, minWidth: 0, maxHeight: 120, backgroundColor: colors.card, color: colors.text, borderRadius: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, ...lift },
   send: { backgroundColor: colors.primary, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
 }));

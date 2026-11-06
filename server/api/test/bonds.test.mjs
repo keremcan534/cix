@@ -130,18 +130,27 @@ describe('Bağlar', () => {
     assert.match(why.error, /7 gün/);
   });
 
-  test('gizlilik: başkası göremez, kendisi görür', async () => {
-    const a = await signUp('A');
-    const b = await signUp('B');
-    await topUp(a.session, 1000);
+  test('gizlilik: başkası göremez, kendisi görür; bağın öbür ucu yalnızca kendi bağını görür', async () => {
+    const [a, b, c, d] = await Promise.all(['A', 'B', 'C', 'D'].map((n) => signUp(n)));
+    await topUp(a.session, 2000);
     const [, r] = await ask(a.session, b.user.id, 'kanka');
     await call('POST', '/api/bonds/respond', { id: r.bond.id, accept: true }, b.session);
+    const [, r2] = await ask(a.session, c.user.id, 'kardes');
+    await call('POST', '/api/bonds/respond', { id: r2.bond.id, accept: true }, c.session);
     await call('POST', '/api/bonds/privacy', { hidden: true }, a.session);
+    assert.deepEqual((await call('GET', `/api/bonds?user=${a.user.id}`, null, d.session))[1], { hidden: true, bonds: [] }, 'bağı olmayan hiçbirini görmez');
+    // B is in one of A's bonds: B still sees that one (so the app offers no "Bağ kur"), never A's bond with C.
     const [, other] = await call('GET', `/api/bonds?user=${a.user.id}`, null, b.session);
-    assert.deepEqual(other, { hidden: true, bonds: [] });
+    assert.equal(other.hidden, true);
+    assert.deepEqual(other.bonds.map((x) => [x.id, x.partner.id, x.kind]), [[r.bond.id, b.user.id, 'kanka']]);
+    const [, third] = await call('GET', `/api/bonds?user=${a.user.id}`, null, c.session);
+    assert.deepEqual(third.bonds.map((x) => [x.id, x.partner.id]), [[r2.bond.id, c.user.id]]);
+    const [again, why] = await ask(b.session, a.user.id, 'kardes');
+    assert.equal(again, 409, 'gizli olsa da ikinci bağ yok');
+    assert.match(why.error, /zaten bir bağın var/);
     const [, own] = await call('GET', '/api/bonds', null, a.session);
     assert.equal(own.hidden, true);
-    assert.equal(own.bonds.length, 1);
+    assert.equal(own.bonds.length, 2);
     const [, info] = await call('GET', '/api/bonds/info');
     assert.equal(info.kinds.find((k) => k.id === 'cift').price, 5000);
   });

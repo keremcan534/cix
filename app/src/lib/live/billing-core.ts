@@ -34,7 +34,8 @@ export interface StoreAdapter {
 /** A token kept until the server has answered for it. */
 export type SavedToken = { productId: string; token: string; at: number };
 
-export type Verified<U> = { user: U; replay: boolean; coins: number; bonus: number };
+/** `bonus`: the first-buy gift; `campaignBonus`: a campaign's extra coins (missing from an older server). */
+export type Verified<U> = { user: U; replay: boolean; coins: number; bonus: number; campaignBonus?: number };
 
 export type BillingDeps<U> = {
   store: StoreAdapter;
@@ -54,7 +55,8 @@ export type BillingDeps<U> = {
 };
 
 export type Outcome =
-  | { kind: 'done'; coins: number; bonus: number; replay: boolean }
+  /** `campaignBonus` only when a campaign added coins. */
+  | { kind: 'done'; coins: number; bonus: number; replay: boolean; campaignBonus?: number }
   | { kind: 'cancelled' }
   | { kind: 'busy' }
   | { kind: 'pending' }
@@ -70,6 +72,8 @@ const MAX_SAVED = 20;
 
 // --- Words ------------------------------------------------------------------------------------------------
 const n = (x: number) => x.toLocaleString('tr-TR');
+/** A campaign's extra coins from the server's answer: a whole number above 0, else none. */
+const campaignBonus = (x: unknown) => (typeof x === 'number' && Number.isSafeInteger(x) && x > 0 ? x : 0);
 
 export type ShopStatus = 'loading' | 'ready' | 'offline' | 'not-android' | 'not-configured' | 'no-store' | 'no-products';
 
@@ -86,9 +90,12 @@ export const SHOP_NOTICE: Record<Exclude<ShopStatus, 'ready'>, string> = {
 /** What the wallet tells the person after a purchase; null when nothing needs saying (cancelled, busy). */
 export function outcomeAlert(o: Outcome): { title: string; body: string } | null {
   switch (o.kind) {
-    case 'done':
+    case 'done': {
       if (o.replay) return { title: 'Jetonlar hesabında', body: 'Bu ödeme daha önce hesabına eklenmişti; bakiyen güncel.' };
-      return { title: 'Jetonlar yüklendi', body: `${n(o.coins)} jeton hesabına eklendi.${o.bonus ? ` İlk alım hediyesi olarak +${n(o.bonus)} jeton da eklendi.` : ''}` };
+      const first = o.bonus ? ` İlk alım hediyesi olarak +${n(o.bonus)} jeton da eklendi.` : '';
+      const campaign = campaignBonus(o.campaignBonus);
+      return { title: 'Jetonlar yüklendi', body: `${n(o.coins)} jeton hesabına eklendi.${first}${campaign ? ` Kampanya hediyesi olarak +${n(campaign)} jeton da eklendi.` : ''}` };
+    }
     case 'pending':
       return { title: 'Ödeme onay bekliyor', body: 'Ödemen tamamlandığında jetonların hesabına kendiliğinden eklenir.' };
     case 'saved':
@@ -103,7 +110,10 @@ export function outcomeAlert(o: Outcome): { title: string; body: string } | null
 }
 
 /** The wallet history line of a purchase (the same words as the server's ledger). */
-export const purchaseReason = (bonus: number) => (bonus ? `Jeton satın alma (+${n(bonus)} ilk alım hediyesi)` : 'Jeton satın alma');
+export function purchaseReason(bonus: number, campaign = 0) {
+  const extra = [bonus ? `+${n(bonus)} ilk alım hediyesi` : '', campaignBonus(campaign) ? `+${n(campaign)} kampanya` : ''].filter(Boolean);
+  return extra.length ? `Jeton satın alma (${extra.join(', ')})` : 'Jeton satın alma';
+}
 
 // --- Catalog and packs ------------------------------------------------------------------------------------
 /** GET /api/catalog as the wallet needs it; anything malformed is left out. An older server without
@@ -243,11 +253,12 @@ export function createBilling<U>(d: BillingDeps<U>) {
         await forget(token);
         return { kind: 'failed', message: errorText(e) };
       }
-      d.apply(r, purchaseReason(r.bonus));
+      const campaign = campaignBonus(r.campaignBonus);
+      d.apply(r, purchaseReason(r.bonus, campaign));
       await forget(token);
       // The server consumes it too; this is the second try (an error here only means it is already consumed).
       if (purchase) await d.store.finish(purchase).catch(() => {});
-      return { kind: 'done', coins: r.coins, bonus: r.bonus, replay: r.replay };
+      return { kind: 'done', coins: r.coins, bonus: r.bonus, replay: r.replay, ...(campaign ? { campaignBonus: campaign } : {}) };
     })().finally(() => inflight.delete(token));
     inflight.set(token, run);
     return run;

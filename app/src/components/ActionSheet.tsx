@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Modal, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { makeStyles, useTheme } from '@/theme';
@@ -13,10 +14,12 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const listed = options.some((o) => o.icon);
+  // Android modals draw edge to edge: keep 'Vazgeç' above the navigation bar.
+  const { bottom } = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom: Math.max(34, bottom + 8) }]}>
         {title &&
           (titleArt ? (
             <View style={styles.titleRow}>

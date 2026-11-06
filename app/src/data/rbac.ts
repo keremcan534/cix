@@ -4,6 +4,7 @@
 // supports — adding a brand-new kind of action still requires code that implements and enforces it.
 import { AGENCIES } from '@/data/agency';
 import { ROOMS, USERS } from '@/data/mock';
+import { IS_DEMO } from '@/lib/build';
 
 export type ScopeType = 'platform' | 'region' | 'agency' | 'room';
 export type Scope = { type: ScopeType; id?: string };
@@ -110,6 +111,22 @@ export type ModerationAction = { id: string; at: string; actor: string; action: 
 export type RbacState = { roles: Role[]; userRoles: UserRole[]; audit: AuditLog[]; moderation: ModerationAction[] };
 
 const ALL = PERMISSIONS.map((p) => p.key);
+// The sample role assignments, 'me' as Super Admin included. They belong to the offline demo only.
+const DEMO_USER_ROLES: UserRole[] = [
+  { id: 'ur1', userId: 'me', roleId: 'super', scope: { type: 'platform' }, grantedBy: 'Sistem', at: '01.10.2026' },
+  { id: 'ur2', userId: 'u2', roleId: 'mod', scope: { type: 'region', id: 'marmara' }, grantedBy: 'Demo', at: '12.10.2026' },
+  { id: 'ur3', userId: 'u2', roleId: 'bd', scope: { type: 'region', id: 'ege' }, grantedBy: 'Demo', at: '15.10.2026' },
+  { id: 'ur4', userId: 'u5', roleId: 'bd', scope: { type: 'region', id: 'marmara' }, grantedBy: 'Demo', at: '18.10.2026' },
+  { id: 'ur5', userId: 'u9', roleId: 'mod', scope: { type: 'room', id: 'r1' }, grantedBy: 'Demo', at: '20.10.2026' },
+  { id: 'ur6', userId: 'u3', roleId: 'admin', scope: { type: 'platform' }, grantedBy: 'Demo', at: '01.10.2026' },
+];
+/**
+ * Role assignments the app starts with. A build with a server address (live) or a store build starts with none:
+ * there a staff role, and the staff badge on a profile, comes only from the server (lib/live/admin useStaffRole).
+ */
+export const initialUserRoles = (o: { live: boolean; demo: boolean } = { live: !!process.env.EXPO_PUBLIC_API_URL, demo: IS_DEMO }): UserRole[] =>
+  o.demo && !o.live ? DEMO_USER_ROLES.map((u) => ({ ...u })) : [];
+
 export const INITIAL_RBAC: RbacState = {
   roles: [
     { id: 'super', name: 'Super Admin', permissions: ALL, denies: [], scopeTypes: ['platform'], priority: 100, protected: true, system: true },
@@ -126,14 +143,7 @@ export const INITIAL_RBAC: RbacState = {
       system: true,
     },
   ],
-  userRoles: [
-    { id: 'ur1', userId: 'me', roleId: 'super', scope: { type: 'platform' }, grantedBy: 'Sistem', at: '01.10.2026' },
-    { id: 'ur2', userId: 'u2', roleId: 'mod', scope: { type: 'region', id: 'marmara' }, grantedBy: 'Demo', at: '12.10.2026' },
-    { id: 'ur3', userId: 'u2', roleId: 'bd', scope: { type: 'region', id: 'ege' }, grantedBy: 'Demo', at: '15.10.2026' },
-    { id: 'ur4', userId: 'u5', roleId: 'bd', scope: { type: 'region', id: 'marmara' }, grantedBy: 'Demo', at: '18.10.2026' },
-    { id: 'ur5', userId: 'u9', roleId: 'mod', scope: { type: 'room', id: 'r1' }, grantedBy: 'Demo', at: '20.10.2026' },
-    { id: 'ur6', userId: 'u3', roleId: 'admin', scope: { type: 'platform' }, grantedBy: 'Demo', at: '01.10.2026' },
-  ],
+  userRoles: initialUserRoles(),
   audit: [],
   moderation: [],
 };
@@ -205,4 +215,14 @@ export function staffBadgeOf(state: RbacState, userId: string): 'Yönetici' | 'M
   if (ids.includes('super') || ids.includes('admin')) return 'Yönetici';
   if (ids.includes('mod')) return 'Moderatör';
   return null;
+}
+
+/**
+ * The staff badge a profile shows. With a server (live) only my own, and only from my server role (admin or
+ * moderator); the local assignments above are the demo's.
+ */
+export function shownStaffBadge(state: RbacState, userId: string, live: boolean, serverRole: 'admin' | 'moderator' | null): 'Yönetici' | 'Moderatör' | null {
+  if (!live) return staffBadgeOf(state, userId);
+  if (userId !== 'me') return null;
+  return serverRole === 'admin' ? 'Yönetici' : serverRole === 'moderator' ? 'Moderatör' : null;
 }

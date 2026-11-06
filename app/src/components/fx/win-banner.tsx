@@ -7,7 +7,7 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { NEWS_TTL_MS, shiftWinNews, useWinNews, type WinNews } from '@/lib/broadcast';
-import { casinoVisible } from '@/lib/games';
+import { winNewsHidden } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -19,8 +19,9 @@ export function WinBanner({ top = 96, still }: { top?: number; /** reduce motion
   const queue = useWinNews();
   const { wealthLevel } = useApp();
   const news = queue[0];
-  // Oyun Salonu wins are not news for someone who cannot see Oyun Salonu: skipped, never shown.
-  const hidden = !!news?.casino && !casinoVisible(wealthLevel);
+  // Wins of chance are not news for someone below the gambling level (Cömertlik Lv.2), and Oyun Salonu wins
+  // not for someone who cannot see Oyun Salonu: skipped, never shown.
+  const hidden = !!news && winNewsHidden(news, wealthLevel);
   useEffect(() => {
     if (news && hidden) shiftWinNews(news.id);
   }, [news, hidden]);

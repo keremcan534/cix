@@ -4,53 +4,168 @@
 // "Odayı küçült" (stay in the room, mini card) or "Odadan çık".
 import { router, useIsFocused, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { CreateRoomSheet } from '@/components/room/create-room-sheet';
+import { Text, TextInput } from '@/components/text';
+import { Button, StateIcon } from '@/components/ui';
 import { isServerId, roomById, serverRoomKnown } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
-import { liveMode, loadRooms, message, openServerRoom } from '@/lib/live';
+import { refusalTitle } from '@/lib/contact-filter';
+import { isLockedRoom, isMyServerRoom, liveMode, liveSignIn, loadRooms, message, myServerId } from '@/lib/live';
+import { roomPassword, setRoomPassword } from '@/lib/live/room-password';
+import { roomStaff } from '@/lib/live/room-staff';
 import { endRoom, getSession, openRoom, registerOpener, requestLeave, setLeaving, useRoomSession } from '@/lib/room-session';
 import { savedAtStart } from '@/lib/room-session-persist';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { colors, radius, space } from '@/theme';
 
 const stepBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 /**
- * Live mode (lib/live): "Oda aç" opens my room on the server first and comes back as /oda/<its id>; a server room
- * this phone hasn't listed yet (a link, a restart) is read from the server before it opens.
+ * Live mode (lib/live): only server rooms exist here (the sample rooms and their bots stay in the demo). "Oda aç"
+ * (/oda/yeni) goes to my open room, or shows the create sheet when I have none; a server room this phone hasn't
+ * listed yet (a link, a restart) is read from the server first, and a password room asks for its password.
  */
 export default function RoomRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { myRoom } = useApp();
-  const [, setLoaded] = useState(0);
-  const pending = liveMode() && (id === 'yeni' || (isServerId(id) && !serverRoomKnown(id)));
+  if (liveMode() && id !== 'yeni' && !isServerId(id)) return <RoomMissing />;
+  if (liveMode()) return <LiveRoomGate key={id} id={id} />;
+  return <RoomOpen />;
+}
+
+/** A sample room's link (r1, a demo notification) in a live build: nothing to open. */
+function RoomMissing() {
+  return (
+    <View style={st.center}>
+      <StateIcon name="radio-outline" />
+      <Text style={st.title}>Oda bulunamadı</Text>
+      <Text style={st.lead}>Bu oda artık yok ya da bağlantı hatalı. Açık odaları ana sayfada bulabilirsin.</Text>
+      <Button title="Geri dön" icon="arrow-back" onPress={stepBack} style={st.wide} />
+    </View>
+  );
+}
+
+type Gate = 'loading' | 'create' | 'password' | 'open';
+
+/** A password room whose password I haven't typed this run and that I'm not already inside. */
+const maybeLocked = (id: string) => {
+  const s = getSession().session;
+  return isLockedRoom(id) && !roomPassword(id) && !(s?.roomId === id && s.status !== 'ended');
+};
+/** A listed room opens at once unless it may need its password; then the server is asked first (the effect
+ *  below), unless it is surely mine (my server id known and the list read with it). */
+const gateFor = (id: string): Gate =>
+  id === 'yeni' || !serverRoomKnown(id) ? 'loading' : !maybeLocked(id) || (!!myServerId() && isMyServerRoom(id)) ? 'open' : 'loading';
+
+/** Whether I run this room (its owner or one of its admins): the server lets them in without the password.
+ *  When that can't be read, the password is asked (the server still lets staff in with any). */
+async function runsRoom(id: string) {
+  const mine = myServerId();
+  if (!mine) return false;
+  try {
+    const s = await roomStaff(id);
+    return s.owner === mine || s.admins.some((a) => a.id === mine);
+  } catch {
+    return false;
+  }
+}
+
+function LiveRoomGate({ id }: { id: string }) {
+  const { me } = useApp();
+  const [gate, setGate] = useState<Gate>(() => gateFor(id));
   useEffect(() => {
-    if (!pending) return;
+    if (gate !== 'loading') return;
     let alive = true;
     const fail = (title: string, text: string) => {
       if (!alive) return;
       showAlert(title, text);
       stepBack();
     };
-    const work =
-      id === 'yeni'
-        ? openServerRoom(myRoom.title, myRoom.announcement).then((r) => alive && router.replace(`/oda/${r.id}`))
-        : loadRooms().then(() => (serverRoomKnown(id) ? alive && setLoaded((n) => n + 1) : fail('Oda bulunamadı', 'Bu oda kapanmış olabilir.')));
-    work.catch((e) => fail('Oda açılamadı', message(e)));
+    void (async () => {
+      // "Is it mine, do I run it?" needs my server id (a cold start can list rooms before it is known): sign in
+      // first if this run hasn't yet, then read the list with it.
+      if (!myServerId()) await liveSignIn(me.name);
+      const list = await loadRooms();
+      if (!alive) return;
+      if (id === 'yeni') {
+        const mine = list.find((r) => r.hostId === 'me');
+        if (mine) router.replace(`/oda/${mine.id}`);
+        else setGate('create');
+        return;
+      }
+      if (!serverRoomKnown(id)) return fail('Oda bulunamadı', 'Bu oda kapanmış olabilir.');
+      const free = !maybeLocked(id) || isMyServerRoom(id) || (await runsRoom(id));
+      if (alive) setGate(free ? 'open' : 'password');
+    })().catch((e) => fail(refusalTitle(e, 'Oda açılamadı'), message(e)));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, pending]);
-  if (pending)
+  }, [gate, id]);
+
+  if (gate === 'create')
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={st.screen}>
+        <CreateRoomSheet visible onClose={stepBack} onCreated={(r) => router.replace(`/oda/${r.id}`)} />
       </View>
     );
-  return <RoomOpen />;
+  if (gate === 'password') return <PasswordGate id={id} onDone={() => setGate('open')} />;
+  if (gate === 'open') return <RoomOpen />;
+  return (
+    <View style={[st.screen, st.center]}>
+      <ActivityIndicator color={colors.primary} />
+    </View>
+  );
 }
+
+/** A password room: the password goes with the voice token request (the server checks it; a wrong one ends the
+ *  entry with "Oda şifresi yanlış" and the next visit asks again). */
+function PasswordGate({ id, onDone }: { id: string; onDone: () => void }) {
+  const [value, setValue] = useState('');
+  const title = roomById(id)?.title ?? 'Oda';
+  const enter = () => {
+    const p = value.trim();
+    if (!p) return;
+    setRoomPassword(id, p);
+    onDone();
+  };
+  return (
+    <View style={st.center}>
+      <StateIcon name="lock-closed" />
+      <Text style={st.title} numberOfLines={2}>
+        {title}
+      </Text>
+      <Text style={st.lead}>Bu oda şifreli. Girmek için oda sahibinin paylaştığı şifreyi yaz.</Text>
+      <TextInput
+        style={st.input}
+        value={value}
+        onChangeText={setValue}
+        onSubmitEditing={enter}
+        maxLength={32}
+        autoFocus
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+        returnKeyType="go"
+        placeholder="Oda şifresi"
+        placeholderTextColor={colors.textDim}
+        accessibilityLabel="Oda şifresi"
+      />
+      <Button title="Odaya gir" icon="enter-outline" disabled={!value.trim()} onPress={enter} style={st.wide} />
+      <Button title="Vazgeç" variant="ghost" onPress={stepBack} style={st.wide} />
+    </View>
+  );
+}
+
+const st = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.xl, gap: space.md },
+  title: { color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  lead: { color: colors.textDim, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  input: { alignSelf: 'stretch', color: colors.text, backgroundColor: colors.cardAlt, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: 12, fontSize: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  wide: { alignSelf: 'stretch' },
+});
 
 function RoomOpen() {
   const { id, via } = useLocalSearchParams<{ id: string; via?: string }>();

@@ -64,6 +64,7 @@ export default function PrivilegeCenter() {
 function Svip() {
   const { svipXp, svipLevel } = useApp();
   const styles = useStyles();
+  const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const cardW = Math.min(width, 520) - 48;
   const [index, setIndex] = useState(Math.max(0, svipLevel - 1));
@@ -160,15 +161,17 @@ function Svip() {
           return (
             <Pressable
               key={r.name}
-              style={[styles.rightCell, !on && { opacity: 0.38 }]}
+              style={styles.rightCell}
+              accessibilityState={{ disabled: !on }}
               onPress={() => {
                 const need = SVIP_LEVELS.find((x) => x.rights > i);
                 showAlert(r.name, on ? `İnci ${lv.level} ile kullanabilirsin.` : need ? `İnci ${need.level} ile açılır.` : 'Yakında.');
               }}>
-              <View style={styles.rightIcon}>
+              {/* Locked: only the art fades; the name stays readable (textDim). */}
+              <View style={[styles.rightIcon, !on && { opacity: 0.38 }]}>
                 {r.art ? <Art name={r.art} size={34} /> : <Text style={{ fontSize: 26 }}>{r.emoji}</Text>}
               </View>
-              <Text style={styles.rightName} numberOfLines={2}>
+              <Text style={[styles.rightName, !on && { color: colors.textDim }]} numberOfLines={2}>
                 {r.name}
               </Text>
             </Pressable>
@@ -413,13 +416,14 @@ function Noble() {
             return (
               <Pressable
                 key={r.name}
-                style={[styles.rightCell, { backgroundColor: 'transparent', borderWidth: 0 }, !on && { opacity: 0.35 }]}
+                style={[styles.rightCell, { backgroundColor: 'transparent', borderWidth: 0 }]}
+                accessibilityState={{ disabled: !on }}
                 onPress={() => {
                   const need = NOBLE_TIERS.find((x) => x.rights > i);
                   showAlert(r.name, on ? `${t.name} ile kullanabilirsin.` : need ? `${need.name} rütbesiyle açılır.` : '');
                 }}>
-                <View>{r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}</View>
-                <Text style={[styles.rightName, { color: gold }]} numberOfLines={2}>
+                <View style={!on && { opacity: 0.35 }}>{r.art ? <Art name={r.art} size={44} /> : <Text style={{ fontSize: 34 }}>{r.emoji}</Text>}</View>
+                <Text style={[styles.rightName, { color: on ? gold : colors.textDim }]} numberOfLines={2}>
                   {r.name}
                 </Text>
               </Pressable>

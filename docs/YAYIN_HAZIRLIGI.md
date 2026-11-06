@@ -44,7 +44,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | **Uygulamanın sunucuya bağlanması** (profil, takip, mesaj, oda listesi, şikâyet, engelleme, hesap silme, cüzdan ve hediye) | 🟡 | Test APK'sında (canlı mod, `EXPO_PUBLIC_API_URL` dolu) bağlı: kayıt, profil, takip, mesaj, oda listesi ve oda açma, cüzdan (ücretsiz test jetonu, elmas → jeton), odada hediye. Hâlâ telefonda kalanlar: kozmetik/VIP alımı, görev ödülleri, oyun kazançları, para çekme, şifreli oda, fotoğraf yükleme. Keşfet/arama/son odalar ekranlarından açılan demo odalarında botlar çalışmaya devam ediyor. |
 | Hediye kataloğu, fiyatlar, İnci sınırları ve sıralamalar sunucuda | ✅ | Bedeli sunucu hesaplıyor; uygulamadaki fiyatlarla eşitliği testle korunuyor |
 | Odadaki dinleyici sayısı (LiveKit'ten) ve oda listesinin doluluğa göre sıralanması | ✅ | LiveKit sunucuya kimin girip çıktığını bildiriyor |
-| Oda içi durum (kim hangi koltukta, mikrofon) sunucuda | 🟡 | Canlı modda LiveKit üzerinden: herkes kendi koltuğunu bildiriyor, konuşanlar halkayla görünüyor, sohbet ve hediye animasyonu odadakilere gidiyor. Sunucuda saklanmıyor; iki telefon aynı koltuğa aynı anda oturursa çakışabilir. Sahibi çıkınca oda sunucuda kapanmıyor (tekrar açınca aynı oda kullanılıyor) |
+| Oda içi durum (kim hangi koltukta, mikrofon) sunucuda | 🟡 | Canlı modda LiveKit üzerinden: herkes kendi koltuğunu bildiriyor, konuşanlar halkayla görünüyor, sohbet ve hediye animasyonu odadakilere gidiyor. Sunucuda saklanmıyor; iki telefon aynı koltuğa aynı anda oturursa çakışabilir. Sahibi çıkınca oda sunucuda kapanmıyor (tekrar açınca aynı oda, kara listesi ve yöneticileriyle kullanılıyor); içinde kimse yokken başkalarının oda listesinde görünmüyor |
 | Telefonla giriş (SMS kodu, 5 yanlış denemede kilit, oturum listesi ve kapatma) | 🟡 | Sunucu hazır ve testli; madde 5'teki anahtar bekliyor. İnceleme hesabı için sabit numara ve kod ayarı var |
 | Apple ile giriş, Google ile giriş | ⛔ | Madde 3 |
 | Uygulama içi satın alma + sunucuda makbuz doğrulama | 🟡 | Google Play ve App Store doğrulaması sunucuda yazılı, ilk alım hediyesi ve çift kullanım koruması testli; madde 3 ve 8 bekliyor |
@@ -72,7 +72,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | | Durum |
 |---|---|
 | Yaş derecesi anketleri (IARC, Apple): 18+, kullanıcı içeriği, varsa simüle şans oyunu | ⏳ |
-| Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar | ⏳ |
+| Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, e-posta adresi (giriş; Brevo, Resend ve WhatsApp açılırsa Meta veri işleyen olarak gizlilik politikasında), ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar | ⏳ |
 | Uygulama içi hesap silme | ✅ sunucu · ⏳ uygulama bağlantısı |
 | Web'den hesap silme bağlantısı (Play şartı) | ⏳ alan adıyla |
 | İncelemeci hesabı, inceleme notları, ekran görüntüleri | ⏳ |
