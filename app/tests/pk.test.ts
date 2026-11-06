@@ -4,7 +4,8 @@
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { computeCrowns, drawTeams, finishNow, getPk, invitableRooms, inviteCrossPk, pkPointsFor, recordGift, resetPk, revokeGift, setInviteScenario, startRoomPk, type PkSession } from '@/lib/pk';
+import { applyServerPk, computeCrowns, drawTeams, drawTeamsFrom, finishNow, getPk, invitableRooms, inviteCrossPk, pkOfRoom, pkPointsFor, recordGift, resetPk, revokeGift, serverPkSession, setInviteScenario, startRoomPk, type PkSession } from '@/lib/pk';
+import type { ServerPk } from '@/lib/api';
 import { join, leave, leaveSeat, resetPresence, seedRoom, setBoss, takeSeat } from '@/lib/room-presence';
 
 const R = 'pk-room';
@@ -331,7 +332,7 @@ describe('İnceleme düzeltmeleri', () => {
   });
 });
 
-describe('Canlı mod: PK sunulmaz (sunucu tarafı yok)', () => {
+describe('Canlı mod: telefonda PK açılmaz (sunucunun işi)', () => {
   const live = (on: boolean) => {
     if (on) process.env.EXPO_PUBLIC_API_URL = 'https://api.test';
     else delete process.env.EXPO_PUBLIC_API_URL;
@@ -362,5 +363,101 @@ describe('Canlı mod: PK sunulmaz (sunucu tarafı yok)', () => {
     assert.equal(pk().status, 'active');
     assert.equal(pk().records.filter((x) => x.txId.startsWith('OPP-')).length, 0);
     assert.deepEqual(pk().teams.map((t) => t.score), [0, 0]);
+  });
+});
+
+describe('Sunucu PK’sı (canlı mod): herkes aynı skoru ve sonucu görür', () => {
+  const T0 = Date.parse('2026-11-06T12:00:00Z');
+  const base = (over: Partial<ServerPk> = {}): ServerPk => ({
+    id: '7',
+    room: 'srv-room',
+    mode: 'solo',
+    status: 'active',
+    startedBy: 'u-host',
+    durationMin: 15,
+    participants: ['u-me', 'u-a', 'u-b'],
+    red: [],
+    blue: [],
+    startAt: new Date(T0).toISOString(),
+    endAt: new Date(T0 + 15 * 60_000).toISOString(),
+    pairs: [
+      { from: 'u-fan', to: 'u-a', team: null, points: 400, gifts: 2 },
+      { from: 'u-me', to: 'u-b', team: null, points: 150, gifts: 1 },
+      { from: 'u-fan2', to: 'u-a', team: null, points: 100, gifts: 3 },
+    ],
+    people: [],
+    ...over,
+  });
+  const local = (id: string) => (id === 'u-me' ? 'me' : id);
+
+  test('Normal PK: puanlar alıcıya yazılır, benim kimliğim "me" olur, saat farkı düzeltilir', () => {
+    const s = serverPkSession(base(), local, 2_000, T0 + 60_000);
+    assert.equal(s.id, 'SPK-7');
+    assert.equal(s.status, 'active');
+    assert.deepEqual(s.participants, ['me', 'u-a', 'u-b']);
+    assert.deepEqual(s.points, { 'u-a': 500, 'u-b': 150 });
+    assert.equal(s.startAt, T0 - 2_000, 'sunucu 2 sn ileride: yerel saate çevrilir');
+    assert.equal(s.records.find((r) => r.recipientId === 'u-b')?.senderId, 'me');
+  });
+
+  test('geri sayım bitmeden "hazırlık"; iptal ve bitiş sunucudan gelir', () => {
+    assert.equal(serverPkSession(base(), local, 0, T0 - 1).status, 'prep');
+    const c = serverPkSession(base({ status: 'cancelled' }), local, 0, T0 + 1);
+    assert.equal(c.status, 'cancelled');
+    assert.ok(c.cancelReason);
+    assert.equal(c.result, undefined);
+  });
+
+  test('bitince sonuç her telefonda aynı: sıralama, hediye sayısı ve taçlar', () => {
+    const a = serverPkSession(base({ status: 'done' }), local, 0, T0 + 20 * 60_000);
+    const b = serverPkSession(base({ status: 'done' }), local, 5_000, T0 + 30 * 60_000);
+    assert.deepEqual(a.result, b.result);
+    assert.deepEqual(a.result!.ranking.map((r) => r.userId), ['u-a', 'u-b', 'me']);
+    assert.deepEqual(a.result!.winners, ['u-a']);
+    assert.equal(a.result!.validGifts, 6);
+    const top = a.result!.crowns.find((c) => c.top);
+    assert.equal(top?.senderId, 'u-fan');
+    assert.equal(top?.gifts, 2);
+  });
+
+  test('Takım PK: takım skorları ve üyeler', () => {
+    const s = serverPkSession(
+      base({
+        mode: 'team',
+        participants: ['u-me', 'u-a', 'u-b'],
+        red: ['u-me'],
+        blue: ['u-a', 'u-b'],
+        pairs: [
+          { from: 'u-fan', to: 'u-a', team: 'blue', points: 300, gifts: 1 },
+          { from: 'u-fan', to: 'u-me', team: 'red', points: 100, gifts: 1 },
+        ],
+      }),
+      local,
+      0,
+      T0 + 1,
+    );
+    assert.deepEqual(s.participants, []);
+    assert.deepEqual(s.teams.map((t) => [t.id, t.members, t.score]), [
+      ['red', ['me'], 100],
+      ['blue', ['u-a', 'u-b'], 300],
+    ]);
+  });
+
+  test('odanın PK’sı sunucunun cevabıyla değişir; yok derse kalkar', () => {
+    applyServerPk('srv-room', serverPkSession(base(), local, 0, T0 + 1));
+    assert.equal(pkOfRoom('srv-room')?.id, 'SPK-7');
+    applyServerPk('srv-room', serverPkSession(base({ id: '8' }), local, 0, T0 + 1));
+    assert.deepEqual(getPk().sessions.map((s) => s.id), ['SPK-8']);
+    applyServerPk('srv-room', null);
+    assert.equal(getPk().sessions.length, 0);
+  });
+
+  test('canlı odada takımlar ekrandaki mikrofon listesinden karıştırılır', () => {
+    const r = drawTeamsFrom('srv-room', ['me', 'u-a', 'u-b', 'u-c']);
+    assert.ok(r.ok);
+    if (!r.ok) return;
+    assert.equal(r.draft.red.length, 2);
+    assert.equal(r.draft.blue.length, 2);
+    assert.deepEqual([...r.draft.red, ...r.draft.blue].sort(), ['me', 'u-a', 'u-b', 'u-c']);
   });
 });

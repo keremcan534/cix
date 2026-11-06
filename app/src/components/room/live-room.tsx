@@ -80,6 +80,7 @@ import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/da
 import { callsAvailable, isLiveRoom, liveGift, liveMode, message as errorText, myServerId, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
+import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
 import { banLeft, roomBan, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type SeatAction } from '@/lib/live/room-staff';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
@@ -427,8 +428,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const pkPointsOf = (uid: string | null) => (!uid || !pk || pk.status === 'invite' || (teamPk && !teamOf(teamPk, uid)) ? undefined : pkPointsFor(pk, id, uid));
   // Profiles opened from the PK end screens: the room minimizes while away and shows them again on return.
   const openProfileFromPk = (uid: string) => router.push(`/kullanici/${uid}`);
-  // Gifts score in a PK only through the PK server, once per transaction id.
+  // Gifts score in a PK only through the PK server, once per transaction id. In a server room the server scored
+  // the gift when it was paid (server/api/pk.mjs): read the new score.
   const scorePk = (txId: string, senderId: string, recipientId: string, giftId: string, coins: number) => {
+    if (real) {
+      if (pk) refreshRoomPkSoon(id);
+      return null;
+    }
     const r = recordGift(id, txId, senderId, recipientId, giftId, coins);
     if (!r.ok && !r.duplicate && pk?.status === 'active' && r.reason.includes('aktif değil')) reportMismatch(txId, 'Hediye alındı ama PK puanı yazılamadı');
     return r;
@@ -626,6 +632,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     },
     onServerSeat: (seat) => addMsg({ system: true, text: seat === null ? 'Oda yönetimi seni mikrofondan indirdi' : `Oda yönetimi seni ${seat + 1}. mikrofona taşıdı` }),
   });
+  // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
+  useRoomPkSync(id, real && unlocked, pk);
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
@@ -838,7 +846,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const g = pick(GIFTS.slice(0, 6));
       const tx = `BOT-${msgId()}`;
       const r = scorePk(tx, from.id, to, g.id, g.price);
-      if (r.ok) addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} → ${userById(to).name} ${g.emoji} ${g.name} · PK +${r.points}`, gift: { fromId: from.id, toIds: [to], emoji: g.emoji, name: g.name, count: 1, giftId: g.id } });
+      if (r?.ok) addMsg({ id: `gift:${tx}`, system: true, text: `🎁 ${from.name} → ${userById(to).name} ${g.emoji} ${g.name} · PK +${r.points}`, gift: { fromId: from.id, toIds: [to], emoji: g.emoji, name: g.name, count: 1, giftId: g.id } });
     }, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1866,8 +1874,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       title: 'Etkileşimli Oyunlar',
       variant: 'round',
       items: [
-        // PK runs on this phone only (lib/pk): no server side, real gifts are not scored. Live mode doesn't offer it.
-        ...(myRole !== 'member' && !pk && !liveMode() ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
+        // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
+        ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         ...(callsAvailable() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
         // The room envelope isn't on the server: live mode doesn't offer it.
         ...(!liveMode() ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel('envelope') }] : []),

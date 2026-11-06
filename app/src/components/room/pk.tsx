@@ -12,10 +12,12 @@ import { useSheetBottom } from '@/components/room/parts';
 import { roomById, userById } from '@/data/mock';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode } from '@/lib/live';
+import { cancelLivePk, startLivePk } from '@/lib/live/pk';
 import {
   PK_DURATIONS,
   cancelPk,
   drawTeams,
+  drawTeamsFrom,
   inviteCrossPk,
   invitableRooms,
   liveRanking,
@@ -81,6 +83,9 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   const [assign, setAssign] = useState<Record<string, TeamId | undefined>>({});
   const [query, setQuery] = useState('');
   const [requestId] = useState(rid);
+  // Live mode: the server starts it (lib/live/pk); the button waits for its answer.
+  const live = liveMode();
+  const [busy, setBusy] = useState(false);
 
   const draftStale = !!draft && [...draft.red, ...draft.blue].some((u) => !micUsers.includes(u));
   const manual = { red: micUsers.filter((u) => assign[u] === 'red'), blue: micUsers.filter((u) => assign[u] === 'blue') };
@@ -88,7 +93,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   const imbalance = Math.abs(manual.red.length - manual.blue.length) > 1;
 
   const draw = () => {
-    const r = drawTeams(roomId, starterId);
+    const r = live ? drawTeamsFrom(roomId, micUsers) : drawTeams(roomId, starterId);
     if (!r.ok) return showAlert('Takımlar oluşturulamadı', r.reason);
     setDraft(r.draft);
   };
@@ -96,13 +101,21 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
     if (!r.ok) return showAlert('PK başlatılamadı', r.reason);
     onClose();
   };
-  const startSolo = () => done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'solo', requestId }));
+  const startLive = async (o: Parameters<typeof startLivePk>[0]) => {
+    if (busy) return;
+    setBusy(true);
+    const r = await startLivePk(o);
+    setBusy(false);
+    done(r);
+  };
+  const startSolo = () => (live ? void startLive({ roomId, durationMin: duration, mode: 'solo', participants: micUsers }) : done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'solo', requestId })));
   const startTeam = () => {
     if (method === 'random') {
       if (!draft) return;
+      if (live) return void startLive({ roomId, durationMin: duration, mode: 'team', red: draft.red, blue: draft.blue });
       return done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'team', draftId: draft.id, requestId }));
     }
-    const go = () => done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue, requestId }));
+    const go = () => (live ? void startLive({ roomId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue }) : done(startRoomPk({ roomId, starterId, durationMin: duration, mode: 'team', red: manual.red, blue: manual.blue, requestId })));
     if (!imbalance) return go();
     showAlert('Takımlar dengesiz', `${config.teamNames.red}: ${manual.red.length} kişi · ${config.teamNames.blue}: ${manual.blue.length} kişi. Yine de başlatılsın mı?`, [
       { text: 'Düzenle', style: 'cancel' },
@@ -118,9 +131,9 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   const soloOff = !config.soloPkEnabled;
   const teamOff = !config.roomPkEnabled;
   const modeOff = mode === 'solo' ? soloOff : teamOff;
-  const canStart = !offline && !modeOff && (mode === 'solo' ? micUsers.length >= 2 : method === 'random' ? !!draft && !draftStale : manual.red.length >= config.teamMin && manual.blue.length >= config.teamMin);
+  const canStart = !offline && !busy && !modeOff && (mode === 'solo' ? micUsers.length >= 2 : method === 'random' ? !!draft && !draftStale : manual.red.length >= config.teamMin && manual.blue.length >= config.teamMin);
   // Cross-room PK has no server side yet (the rival room's answer and gifts are simulated): only in the demo.
-  const crossOn = !liveMode();
+  const crossOn = !live;
   const paddingBottom = useSheetBottom(16);
 
   return (
@@ -178,9 +191,11 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                   ))}
                 </View>
                 {micUsers.length < 2 && <Notice icon="information-circle-outline" text="Normal PK için mikrofonda en az 2 kişi olmalı." warn />}
-                <Text style={st.dim}>Her kişi aldığı hediyelerin PK puanıyla yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi o andan itibaren katılır, mikrofondan inen kişinin puanı kalır ama yeni puan almaz.</Text>
+                <Text style={st.dim}>{live
+                    ? 'Her kişi aldığı hediyelerin jeton değeriyle yarışır; en yüksek puan kazanır. Katılımcılar başlarken sabitlenir: sonradan mikrofona geçen bu PK’ya katılmaz.'
+                    : 'Her kişi aldığı hediyelerin PK puanıyla yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi o andan itibaren katılır, mikrofondan inen kişinin puanı kalır ama yeni puan almaz.'}</Text>
                 <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startSolo} accessibilityLabel="Normal PK başlat">
-                  <Text style={st.primaryText}>Normal PK’yı başlat · {duration} dk</Text>
+                  <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Normal PK’yı başlat · ${duration} dk`}</Text>
                 </Pressable>
               </>
             )}
@@ -252,7 +267,7 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                   Takım başına {config.teamMin}–{config.teamMax} kişi · PK başladıktan sonra takımlar sabittir · hediyeyi alan kişi ve takımı puan kazanır
                 </Text>
                 <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startTeam} accessibilityLabel="Takımları onayla ve başlat">
-                  <Text style={st.primaryText}>Takımları onayla ve başlat · {duration} dk</Text>
+                  <Text style={st.primaryText}>{busy ? 'Başlatılıyor…' : `Takımları onayla ve başlat · ${duration} dk`}</Text>
                 </Pressable>
               </>
             )}
@@ -627,7 +642,11 @@ export function PkDetail({ pk, open, onClose, viewerRoomId, canManage }: { pk: P
             <Pressable
               style={st.danger}
               onPress={() => {
-                cancelPk(pk.id, 'Oda yönetimi PK’yı iptal etti');
+                if (pk.id.startsWith('SPK-'))
+                  void cancelLivePk(pk.roomId).then((r) => {
+                    if (!r.ok) showAlert('PK iptal edilemedi', r.reason);
+                  });
+                else cancelPk(pk.id, 'Oda yönetimi PK’yı iptal etti');
                 onClose();
               }}
               accessibilityLabel="PK'yı iptal et"

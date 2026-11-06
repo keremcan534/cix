@@ -9,6 +9,8 @@
 // (lib/room-presence) and never changes seats, microphones or room membership.
 import { useSyncExternalStore } from 'react';
 
+import type { ServerPk } from '@/lib/api';
+
 import { GIFTS, ROOMS, roomById, userById } from '@/data/mock';
 import { liveBuild } from '@/lib/live-flag';
 import { micUsersOf, onMicNow, roleOf } from '@/lib/room-presence';
@@ -41,7 +43,8 @@ export type PkConfig = {
 
 export type PkTeam = { id: TeamId; name: string; color: string; roomId: string; members: string[]; score: number };
 export type RecordStatus = 'Doğrulandı' | 'Reddedildi' | 'İade edildi';
-export type PkRecord = { txId: string; teamId?: TeamId; senderId: string; recipientId: string; giftId: string; coins: number; points: number; at: number; status: RecordStatus; note?: string };
+/** `count`: gifts this record stands for (a server PK sends one record per sender → recipient); 1 when missing. */
+export type PkRecord = { txId: string; teamId?: TeamId; senderId: string; recipientId: string; giftId: string; coins: number; points: number; at: number; status: RecordStatus; note?: string; count?: number };
 /** One "who crowned whom" relation: the sum of one sender's valid gifts to one crowned person. */
 export type PkCrown = { senderId: string; recipientId: string; points: number; gifts: number; /** share of the crowned person's points */ share: number; /** this crowned person's biggest contributor */ top: boolean };
 export type PkResultData = {
@@ -168,8 +171,8 @@ export const markPkSeen = (key: string) => !state.seen.includes(key) && emit({ s
 export type StartResult = { ok: true; pk: PkSession } | { ok: false; reason: string };
 function checkStart(kind: PkKind, mode: PkMode, roomId: string, starterId: string, durationMin: number): string | null {
   const c = state.config;
-  // PK has no server side yet (no invite, score ledger or result there): it would run on the starter's phone
-  // only, real gifts would not count and the other room's answer would be made up, so a live build starts none.
+  // A live build runs Oda içi PK on the server (lib/live/pk, server/api/pk.mjs), never here: a PK started on this
+  // phone would be seen by nobody else. Cross-room PK has no server side yet, so a live build offers none.
   if (liveBuild()) return 'PK şu an kapalı.';
   if (kind === 'room' && mode === 'solo' && !c.soloPkEnabled) return 'Normal PK şu an kapalı.';
   if (kind === 'room' && mode === 'team' && !c.roomPkEnabled) return 'Oda içi takım PK şu an kapalı.';
@@ -200,8 +203,12 @@ function shuffle<T>(arr: T[]) {
  */
 export function drawTeams(roomId: string, starterId: string): { ok: true; draft: TeamDraft } | { ok: false; reason: string } {
   if (roleOf(roomId, starterId) === 'member') return { ok: false, reason: 'Takımları oda sahibi veya yöneticiler oluşturabilir.' };
+  return drawTeamsFrom(roomId, micUsersOf(roomId));
+}
+/** The same draw from a given list (a server room: the people its screen shows on a mic; the server checks them). */
+export function drawTeamsFrom(roomId: string, onMic: string[]): { ok: true; draft: TeamDraft } | { ok: false; reason: string } {
   const { teamMin, teamMax } = state.config;
-  const pool = shuffle(micUsersOf(roomId));
+  const pool = shuffle(onMic);
   const take = pool.slice(0, teamMax * 2);
   if (take.length < teamMin * 2) return { ok: false, reason: `Takım PK için mikrofonda en az ${teamMin * 2} kişi olmalı.` };
   const redSize = take.length % 2 === 0 ? take.length / 2 : Math.floor(take.length / 2) + (Math.random() < 0.5 ? 1 : 0);
@@ -452,7 +459,7 @@ export function computeCrowns(pk: PkSession, winner: TeamId | 'tie' | null, winn
   valid.filter(onWinningSide).forEach((r) => {
     const key = `${r.senderId}→${r.recipientId}`;
     const c = pairs.get(key) ?? { senderId: r.senderId, recipientId: r.recipientId, points: 0, gifts: 0, share: 0, top: false };
-    pairs.set(key, { ...c, points: c.points + r.points, gifts: c.gifts + 1 });
+    pairs.set(key, { ...c, points: c.points + r.points, gifts: c.gifts + (r.count ?? 1) });
     received[r.recipientId] = (received[r.recipientId] ?? 0) + r.points;
   });
   const crowns = [...pairs.values()].map((c) => ({ ...c, share: received[c.recipientId] ? c.points / received[c.recipientId] : 0 }));
@@ -468,7 +475,7 @@ export function computeCrowns(pk: PkSession, winner: TeamId | 'tie' | null, winn
 /** The final result from the server's records; the same for every viewer. */
 export function computeResult(pk: PkSession): PkResultData {
   const [red, blue] = pk.teams;
-  const validGifts = pk.records.filter((r) => r.status === 'Doğrulandı').length;
+  const validGifts = pk.records.filter((r) => r.status === 'Doğrulandı').reduce((n, r) => n + (r.count ?? 1), 0);
   if (pk.mode === 'solo') {
     const ids = [...new Set([...pk.participants, ...Object.keys(pk.points)])];
     const ranking = ids.map((userId) => ({ userId, points: pk.points[userId] ?? 0 })).sort((a, b) => b.points - a.points);
@@ -525,6 +532,61 @@ export function cancelPk(pkId: string, reason: string, actor = 'Sen (moderatör)
   stop(pkId);
   put({ ...pk, status: 'cancelled', cancelReason: reason });
   log(actor, 'PK iptal edildi', pk.id, reason);
+}
+
+// --- Server PK (live mode) -----------------------------------------------------------------------
+/**
+ * A PK from the server (server/api/pk.mjs) as a session of this store, so the boards, result and crowns draw it
+ * like any other. `toLocal` maps server ids (mine → 'me'); `skew` is the server's clock minus this phone's. The
+ * server sends points per sender → recipient: one verified record each, `count` gifts. Every phone gets the same
+ * rows, so computeResult gives everyone the same result.
+ */
+export function serverPkSession(v: ServerPk, toLocal: (id: string) => string, skew: number, now = Date.now()): PkSession {
+  const startAt = Date.parse(v.startAt) - skew;
+  const endAt = Date.parse(v.endAt) - skew;
+  const records: PkRecord[] = v.pairs.map((p) => ({
+    txId: `${p.from}>${p.to}`,
+    teamId: p.team ?? undefined,
+    senderId: toLocal(p.from),
+    recipientId: toLocal(p.to),
+    giftId: '',
+    coins: p.points,
+    points: p.points,
+    at: startAt,
+    status: 'Doğrulandı',
+    count: p.gifts,
+  }));
+  const points: Record<string, number> = {};
+  records.forEach((r) => (points[r.recipientId] = (points[r.recipientId] ?? 0) + r.points));
+  const score = (id: TeamId) => records.filter((r) => r.teamId === id).reduce((n, r) => n + r.points, 0);
+  const [red, blue] = teams(v.room, v.room, v.red.map(toLocal), v.blue.map(toLocal));
+  const status: PkStatus = v.status === 'cancelled' ? 'cancelled' : v.status === 'done' ? 'done' : now < startAt ? 'prep' : 'active';
+  const pk: PkSession = {
+    id: `SPK-${v.id}`,
+    kind: 'room',
+    mode: v.mode,
+    status,
+    roomId: v.room,
+    durationMin: v.durationMin as PkDuration,
+    configVersion: 0,
+    giftPoints: {},
+    teams: [{ ...red, score: score('red') }, { ...blue, score: score('blue') }],
+    participants: v.mode === 'solo' ? v.participants.map(toLocal) : [],
+    points,
+    createdAt: startAt,
+    startAt,
+    endAt,
+    records,
+    ...(status === 'cancelled' ? { cancelReason: 'Oda yönetimi PK’yı iptal etti.' } : {}),
+  };
+  return status === 'done' ? { ...pk, result: computeResult(pk) } : pk;
+}
+
+/** The server's answer for one room: its PK replaces the one held for that room (null: it has none now). */
+export function applyServerPk(roomId: string, pk: PkSession | null) {
+  const held = state.sessions.filter((x) => x.id.startsWith('SPK-') && x.roomId === roomId);
+  if (pk ? held.length === 1 && JSON.stringify(held[0]) === JSON.stringify(pk) : !held.length) return;
+  emit({ sessions: [...(pk ? [pk] : []), ...state.sessions.filter((x) => !held.includes(x) && x.id !== pk?.id)] });
 }
 
 export const roomTitle = (id: string) => (id === 'yeni' ? 'Benim Odam' : (roomById(id)?.title ?? id));

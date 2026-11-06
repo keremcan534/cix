@@ -137,6 +137,24 @@ export async function roomService(method, body, grant) {
   return true;
 }
 
+/**
+ * Who is in a voice room now, with their mic (`seat` attribute: "0"–"99", missing or "" = not on a mic). null
+ * when LIVEKIT_API_URL isn't set; throws when LiveKit can't be reached.
+ */
+export async function voiceParticipants(room) {
+  if (!env.LIVEKIT_API_URL) return null;
+  const r = await fetch(`${env.LIVEKIT_API_URL.replace(/\/$/, '')}/twirp/livekit.RoomService/ListParticipants`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${liveKitJwt({ video: { roomAdmin: true, room } }, 60)}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ room }),
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error(`livekit ListParticipants ${r.status}`);
+  const j = await r.json();
+  return (j.participants ?? []).map((p) => ({ identity: String(p.identity ?? ''), seat: /^\d{1,2}$/.test(p.attributes?.seat ?? '') ? Number(p.attributes.seat) : null }));
+}
+
 /** Ends a voice room for everyone in it. Never fails the caller: the room is closed in our records either way. */
 export const deleteVoiceRoom = (room) =>
   roomService('DeleteRoom', { room }, { roomCreate: true }).catch((e) => (console.error('livekit DeleteRoom', room, String(e).slice(0, 200)), false));

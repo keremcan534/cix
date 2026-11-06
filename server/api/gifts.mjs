@@ -21,6 +21,7 @@ import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
 import { EXCHANGE, GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, svipLevel } from './catalog.mjs';
 import { live } from './live-settings.mjs';
+import { scorePkGift } from './pk.mjs';
 import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
@@ -91,6 +92,8 @@ export const giftRoutes = {
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
       await addBondCoins(c, u.id, to, total);
+      // Oda içi PK (pk.mjs): scores for the recipient while a PK runs in this room; never fails the gift.
+      if (room) await scorePkGift(c, { room, eventId, sender: u.id, recipient: to, coins: total });
       // Never fails the gift: runs in a savepoint, and the agency job backfills a missed one from gift_events.
       await recordIncome(c, to, 'gift', `gift:${g.rows[0].id}`, total);
     });
