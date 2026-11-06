@@ -6,11 +6,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Keyboard, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { micHaptic, tapHaptic } from '@/lib/haptics';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { setConnection, useOnline, useRoomLive } from '@/lib/room-presence';
 import {
   MIC_BLOCK_LABEL,
@@ -180,22 +181,6 @@ const CHAT = [/^\/sohbet\//, /^\/kabile\/sohbet/, /^\/ajans\/sohbet/];
 /** Call and match screens keep all their controls: only the small edge tab is shown there. */
 const DENSE = [/^\/arama\//, /^\/tanis/, /^\/eslesme/];
 const TAB_BAR = 64;
-
-/** Keyboard height on the device (0 when closed). Web has no soft-keyboard events. */
-function useKeyboardOpen() {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const a = Keyboard.addListener(showEvt, () => setOpen(true));
-    const b = Keyboard.addListener(hideEvt, () => setOpen(false));
-    return () => {
-      a.remove();
-      b.remove();
-    };
-  }, []);
-  return open;
-}
 
 /**
  * The room while the user is elsewhere in the app. Tap: back to the full room (same session). Mic button:
