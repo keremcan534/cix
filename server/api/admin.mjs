@@ -8,8 +8,37 @@
 // lifetime-ban permission), permanent: true a lifetime one (is_permanent, the same permission), null lifts the
 // running account bans (each by the lifting rules, sanctions.mjs mayLift). `reason` is a sanction_reasons code;
 // without it a report's ban takes the report's category, otherwise 'other'. Every step is audited there.
-import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, readJson, userId } from './core.mjs';
+//
+// Kullanıcılar (admins only): every account, newest first, and deleting one the way DELETE /api/me does.
+//   GET  /api/admin/users?q=&offset=   → { users, total, tests }  (50 a page; tests: the smoke-test accounts)
+//   POST /api/admin/users/delete { id } | { tests: true } → { deleted }
+// A staff account and your own can't be deleted here. `tests: true` deletes the accounts smoke-test.mjs makes:
+// named "Test A" or "Test B", development sign-in only (no Google or e-mail), role user.
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, readJson, tx, userId } from './core.mjs';
 import { applySanction, audit, liftSanction, mayLift, permsOf } from './sanctions.mjs';
+import { eraseAccount } from './social.mjs';
+
+async function owner(req) {
+  const u = await auth(req);
+  if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+  return u;
+}
+
+const TEST_ACCOUNT = `u.role = 'user' AND u.deleted_at IS NULL AND u.name IN ('Test A', 'Test B')
+  AND NOT EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id)`;
+const PAGE = 50;
+
+/** Deletes account `id` for admin `me`; refused for staff, yourself and an account already deleted. */
+async function deleteAccount(me, id) {
+  await tx(async (c) => {
+    const t = (await c.query('SELECT id, role, phone, deleted_at FROM users WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    if (!t || t.deleted_at) throw new HttpError(404, 'Kullanıcı bulunamadı');
+    if (t.id === me.id) throw new HttpError(400, 'Kendi hesabını buradan silemezsin');
+    if (RANK[t.role] >= 1) throw new HttpError(403, 'Yetkili hesabı silinemez; önce yetkisini al');
+    await eraseAccount(c, t.id, t.phone);
+    await audit(c, { actor: me.id, role: me.role, action: 'account_delete', target: t.id });
+  });
+}
 
 async function staff(req) {
   const u = await auth(req);
@@ -73,6 +102,43 @@ async function ban(me, target, days, { permanent = false, reason = 'other', repo
 }
 
 export const adminRoutes = {
+  async 'GET /api/admin/users'(req, url) {
+    await owner(req);
+    const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
+    const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
+    const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
+    const where = `u.deleted_at IS NULL AND ($1 = '' OR u.name ILIKE $2 OR u.username ILIKE $2 OR u.id::text = $1
+      OR EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.email ILIKE $2))`;
+    const [rows, count] = await Promise.all([
+      db.query(
+        `SELECT u.id, u.name, u.username, u.role, u.created_at,
+                coalesce((SELECT array_agg(i.provider ORDER BY i.provider) FROM auth_identities i WHERE i.user_id = u.id), '{}') AS sign_in,
+                (${TEST_ACCOUNT}) AS test
+           FROM users u WHERE ${where} ORDER BY u.created_at DESC LIMIT ${PAGE} OFFSET $3`,
+        [q, like, offset],
+      ),
+      db.query(`SELECT count(*) AS n, count(*) FILTER (WHERE ${TEST_ACCOUNT}) AS tests FROM users u WHERE ${where}`, [q, like]),
+    ]);
+    return {
+      users: rows.rows.map((x) => ({ id: x.id, name: x.name, username: x.username, role: x.role, createdAt: x.created_at, signIn: x.sign_in, test: x.test })),
+      total: Number(count.rows[0].n),
+      tests: Number(count.rows[0].tests),
+      next: offset + PAGE < Number(count.rows[0].n) ? offset + PAGE : null,
+    };
+  },
+
+  async 'POST /api/admin/users/delete'(req) {
+    const me = await owner(req);
+    const b = await readJson(req);
+    if (b.tests === true) {
+      const ids = (await db.query(`SELECT u.id FROM users u WHERE ${TEST_ACCOUNT}`)).rows.map((r) => r.id);
+      for (const id of ids) await deleteAccount(me, id);
+      return { deleted: ids.length };
+    }
+    await deleteAccount(me, userId(b.id));
+    return { deleted: 1 };
+  },
+
   async 'GET /api/admin/reports'(req, url) {
     await staff(req);
     const status = url.searchParams.get('status') ?? 'open';

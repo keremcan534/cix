@@ -115,7 +115,7 @@ export default function ServerAccount() {
               </View>
             </>
           )}
-          <Text style={s.dim}>Bu bakiye sunucudaki veritabanında. Uygulamanın diğer ekranları henüz yerel prototip bakiyesini gösteriyor.</Text>
+          <Text style={s.dim}>Bu bakiye sunucudaki kayıtlı bakiyendir; uygulamanın her yerinde aynısı görünür.</Text>
         </Card>
 
         {msg && <Text style={[s.msg, msg.bad && { color: colors.gold }]}>{msg.text}</Text>}
