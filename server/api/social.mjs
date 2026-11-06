@@ -28,6 +28,25 @@ const APP_PLACE = /^(?:dm|profile|room|moment|tayfa|agency)(?:\.[a-z_]{2,20}){0,
 /** A public profile row for lists. */
 const card = (u) => ({ id: u.id, name: u.name, avatarUrl: u.avatar_url ?? null });
 
+/** One side of the follows table for the Takipçiler / Takip lists. */
+async function followList(me, url, side) {
+  const raw = url?.searchParams?.get('user');
+  const id = raw ? userId(raw) : me.id;
+  if (id !== me.id) {
+    await liveUser(id);
+    if (await blockedBetween(me.id, id)) throw new HttpError(403, 'Bu listeyi göremezsin');
+  }
+  const [mine, other] = side === 'followers' ? ['followee', 'follower'] : ['follower', 'followee'];
+  const r = await db.query(
+    `SELECT u.*, f.created_at AS followed_at FROM follows f JOIN users u ON u.id = f.${other}
+      WHERE f.${mine} = $1 AND u.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $2 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $2))
+      ORDER BY f.created_at DESC LIMIT 500`,
+    [id, me.id],
+  );
+  return { users: r.rows.map((u) => ({ ...card(u), followedAt: u.followed_at })) };
+}
+
 async function liveUser(id) {
   const r = await db.query('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);
   if (!r.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
@@ -173,10 +192,14 @@ export const socialRoutes = {
     return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };
   },
 
-  async 'GET /api/following'(req) {
-    const me = await auth(req);
-    const r = await db.query('SELECT u.* FROM follows f JOIN users u ON u.id = f.followee WHERE f.follower = $1 AND u.deleted_at IS NULL ORDER BY f.created_at DESC LIMIT 500', [me.id]);
-    return { users: r.rows.map(card) };
+  /** Who `user` follows (default: me). Another person's list leaves out anyone either of us blocked. */
+  async 'GET /api/following'(req, url) {
+    return followList(await auth(req), url, 'following');
+  },
+
+  /** Who follows `user` (default: me), newest first, with when; the app tells me about new followers from it. */
+  async 'GET /api/followers'(req, url) {
+    return followList(await auth(req), url, 'followers');
   },
 
   /** Blocking also ends follows both ways; the other person is not told. */

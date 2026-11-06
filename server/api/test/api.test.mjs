@@ -116,6 +116,28 @@ describe('Takip ve engelleme', () => {
     await call('POST', '/api/block', { to: b.user.id, block: false }, a.session);
     assert.equal((await call('POST', '/api/follow', { to: a.user.id }, b.session))[0], 200, 'engel kalkınca takip edilebilir');
   });
+
+  test('Takipçiler ve Takip listeleri: benim ve başkasının; engel varsa kapalı', async () => {
+    const a = await signUp('Gül');
+    const b = await signUp('Hakan');
+    const c = await signUp('Irmak');
+    await call('POST', '/api/follow', { to: a.user.id }, b.session);
+    await call('POST', '/api/follow', { to: a.user.id }, c.session);
+    let [s, j] = await call('GET', '/api/followers', null, a.session);
+    assert.equal(s, 200);
+    assert.deepEqual(j.users.map((u) => u.id), [c.user.id, b.user.id], 'en yeni önce');
+    assert.ok(!Number.isNaN(Date.parse(j.users[0].followedAt)));
+    [, j] = await call('GET', `/api/followers?user=${a.user.id}`, null, b.session);
+    assert.equal(j.users.length, 2, 'başkasının takipçileri');
+    [, j] = await call('GET', `/api/following?user=${b.user.id}`, null, c.session);
+    assert.deepEqual(j.users.map((u) => u.id), [a.user.id]);
+    // c blocks b: b can't open c's lists, and c's view of a's followers leaves b out.
+    await call('POST', '/api/block', { to: b.user.id }, c.session);
+    assert.equal((await call('GET', `/api/followers?user=${c.user.id}`, null, b.session))[0], 403);
+    [, j] = await call('GET', `/api/followers?user=${a.user.id}`, null, c.session);
+    assert.deepEqual(j.users.map((u) => u.id), [c.user.id]);
+    assert.equal((await call('GET', '/api/followers?user=nope', null, a.session))[0], 400);
+  });
 });
 
 describe('Keşfet', () => {
