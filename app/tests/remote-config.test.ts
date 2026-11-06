@@ -4,7 +4,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { EMPTY_CONFIG, compareVersions, featureLabel, FEATURES, needsUpdate, offMessage, parseConfig, parseVersion, routeGate } from '@/lib/remote-config';
+import { EMPTY_CONFIG, compareVersions, featureLabel, FEATURES, needsUpdate, offMessage, parseConfig, parseSignIn, parseVerify, parseVersion, routeGate } from '@/lib/remote-config';
 import { scrubBreadcrumb, scrubText, scrubUrl } from '@/lib/report-scrub';
 
 describe('Uzaktan ayar: sürüm karşılaştırma', () => {
@@ -47,7 +47,7 @@ describe('Uzaktan ayar: sunucu yanıtı', () => {
       notice: '  Bu gece 02:00 bakım var  ',
       featuresOff: ['gifts', 'gifts', 'uçak', 42, 'dm'],
     });
-    assert.deepEqual(c, { minVersion: '1.2.0', updateUrl: 'https://example.com/indir', notice: 'Bu gece 02:00 bakım var', featuresOff: ['gifts', 'dm'] });
+    assert.deepEqual(c, { ...EMPTY_CONFIG, minVersion: '1.2.0', updateUrl: 'https://example.com/indir', notice: 'Bu gece 02:00 bakım var', featuresOff: ['gifts', 'dm'] });
   });
 
   test('geçersiz sürüm, https olmayan adres ve boş duyuru yok sayılır', () => {
@@ -63,6 +63,38 @@ describe('Uzaktan ayar: sunucu yanıtı', () => {
       assert.match(offMessage(f), /geçici olarak kapalı/);
       assert.match(offMessage(f), /güvende/);
     }
+  });
+});
+
+describe('Uzaktan ayar: giriş ve doğrulama anahtarları', () => {
+  test('anahtarlar alınır; yalnızca gerçek true açar', () => {
+    const c = parseConfig({ signIn: { dev: false, google: true, email: true, phone: 'true' }, verify: { sms: 1, whatsapp: true } });
+    assert.deepEqual(c.signIn, { dev: false, google: true, email: true, phone: false });
+    assert.deepEqual(c.verify, { sms: false, whatsapp: true });
+  });
+
+  test('eski sunucu: giriş anahtarı yoksa null, doğrulama kapalı', () => {
+    const c = parseConfig({ minVersion: '1.0.0', featuresOff: [] });
+    assert.equal(c.signIn, null);
+    assert.deepEqual(c.verify, { sms: false, whatsapp: false });
+    assert.equal(EMPTY_CONFIG.signIn, null);
+  });
+
+  test('eksik anahtar kapalı sayılır (yeni eklenen bir yöntem eski sunucuda görünmez)', () => {
+    assert.deepEqual(parseSignIn({ google: true }), { dev: false, google: true, email: false, phone: false });
+    assert.deepEqual(parseVerify({}), { sms: false, whatsapp: false });
+  });
+
+  test('bozuk anahtarlar hata atmaz', () => {
+    for (const bad of [null, 'x', 42, [], true]) {
+      assert.equal(parseSignIn(bad), null);
+      assert.deepEqual(parseVerify(bad), { sms: false, whatsapp: false });
+    }
+  });
+
+  test('kayıtlı kopya yeniden okununca aynı kalır', () => {
+    const c = parseConfig({ signIn: { dev: true, google: false, email: true, phone: false }, verify: { sms: true, whatsapp: false } });
+    assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(c))), c);
   });
 });
 

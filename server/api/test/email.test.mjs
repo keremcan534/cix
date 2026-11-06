@@ -216,6 +216,21 @@ describe('E-posta ile giriş', () => {
     assert.equal(j.isNew, true);
   });
 
+  test('doğru kodla girince aynı adrese bekleyen öbür kodlar da geçersiz olur', async () => {
+    const email = address('yeniden');
+    const first = await codeFor(email);
+    const firstChallenge = challengeOf(email);
+    await later(email);
+    const second = await codeFor(email);
+    const secondChallenge = challengeOf(email);
+    assert.notEqual(firstChallenge, secondChallenge);
+    const device = phone();
+    await ok(verify(email, second, { challenge: secondChallenge, deviceInfo: device }), 'yeni kod');
+    const [st, err] = await verify(email, first, { challenge: firstChallenge, deviceInfo: device });
+    assert.equal(st, 400, 'eski kod artık geçmez');
+    assert.equal(err.error, 'Kodun süresi doldu, yeni kod iste');
+  });
+
   test('yanlış kodlar gün boyu sayılır: bir bağlantıdan 7 yanlış o bağlantıya, herkesten 12 yanlış herkese kilitler', async () => {
     const email = address('tahmin');
     const A = { 'x-forwarded-for': '192.0.2.20' };

@@ -121,6 +121,9 @@ type AppState = {
   logout: () => void;
   phone: string;
   setPhone: (phone: string) => void;
+  /** Live mode: the account's e-mail address and whether `phone` was checked (from the server, not saved here). */
+  email: string | null;
+  phoneVerified: boolean;
   // coins
   coins: number;
   addCoins: (n: number, reason?: string) => void;
@@ -345,6 +348,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [loggedIn, setLoggedIn] = useState(s.loggedIn ?? false);
   const [me, setMe] = useState<User>({ ...ME });
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState<string | null>(null);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   // Coins are read synchronously by spendCoins (e.g. from call timers), so mirror them in a ref.
   const [coins, setCoinsState] = useState(s.coins ?? 250);
@@ -693,6 +698,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (switched && loggedIn) return forgetAccount();
     }
     if (isFiniteNumber(u.svipXp)) setSvipXp(u.svipXp);
+    // Wallet answers carry no e-mail: only an answer that has the field changes it.
+    if (u.email !== undefined) setEmail(u.email ?? null);
+    if (u.phone !== undefined) {
+      setPhone(u.phone ?? '');
+      setPhoneVerified(u.phoneVerified ?? !!u.phone);
+    }
     const prev = serverBalRef.current;
     serverBalRef.current = { coins: u.coins, diamonds: u.diamonds, gameCoins: u.gameCoins ?? 0 };
     // Game coins: only server games (Rüzgâr Gülü) move them there, the other games here, so the server's change
@@ -772,6 +783,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     logout: () => (liveMode() ? forgetAccount() : setLoggedIn(false)),
     phone,
     setPhone,
+    email,
+    phoneVerified,
 
     coins,
     addCoins: (n, reason = 'Jeton yükleme') => {

@@ -22,6 +22,10 @@ import { openLegal } from '@/lib/legal';
 import { liveMode } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useStaffRole } from '@/lib/live/admin';
+import { type CodeKind } from '@/lib/live/account';
+import { useRemoteConfig } from '@/lib/remote-control';
+import { formatPhone } from '@/lib/verify-code';
+import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -71,6 +75,12 @@ function AppearancePicker() {
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
+  // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
+  const { email, phoneVerified } = useApp();
+  const { signIn, verify } = useRemoteConfig();
+  const [verifyKind, setVerifyKind] = useState<CodeKind | null>(null);
+  const canAddEmail = liveMode() && !!signIn?.email;
+  const canCheckPhone = liveMode() && (verify.sms || verify.whatsapp);
   const staff = useStaffRole();
   const [adminOpen, setAdminOpen] = useState(false);
   const { colors, semantic } = useTheme();
@@ -90,9 +100,29 @@ export default function SettingsScreen() {
           <ListRow
             leading={<Avatar uri={me.avatar} size={40} />}
             title={me.name}
-            subtitle={phone ? `Telefon · ${phone}` : 'Telefon bağlı değil'}
+            subtitle={liveMode() ? 'Profilini gör' : phone ? `Telefon · ${phone}` : 'Telefon bağlı değil'}
             onPress={() => router.push('/kullanici/me')}
           />
+          {liveMode() && (!!email || canAddEmail) && (
+            <ListRow
+              icon="mail-outline"
+              title={email ? 'E-posta' : 'E-posta ekle'}
+              subtitle={email ?? 'Bu adresle de giriş yapabilirsin'}
+              subtitleOneLine={!!email}
+              right={email ? <VerifiedPill /> : undefined}
+              onPress={canAddEmail ? () => setVerifyKind('email') : undefined}
+            />
+          )}
+          {liveMode() && (phoneVerified || canCheckPhone) && (
+            <ListRow
+              icon="call-outline"
+              tone="success"
+              title={phoneVerified ? 'Telefon' : 'Telefonunu doğrula'}
+              subtitle={phoneVerified && phone ? formatPhone(phone) : 'Numaran profilinde görünmez'}
+              right={phoneVerified ? <VerifiedPill /> : undefined}
+              onPress={canCheckPhone ? () => setVerifyKind('phone') : undefined}
+            />
+          )}
           <ListRow icon="receipt-outline" tone="money" title="İşlem geçmişi" subtitle="Satın almalar ve iadeler" onPress={() => router.push('/cuzdan')} />
           {IS_DEMO && <ListRow icon="server-outline" tone="neutral" title="Sunucu hesabı" subtitle="Veritabanı bağlantısı ve test" onPress={() => router.push('/sunucu-hesabi')} />}
           {staff && (
@@ -336,6 +366,7 @@ export default function SettingsScreen() {
         </ListGroup>
       </ScrollView>
       <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
+      {liveMode() && <VerifySheet kind={verifyKind} onClose={() => setVerifyKind(null)} />}
       {staff && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
     </SafeAreaView>
   );

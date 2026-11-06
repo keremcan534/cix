@@ -5,7 +5,8 @@
 // Sign-in: a random device key is created once and kept on the device; the server knows only its hash. The
 // session it returns is kept too, so the app stays signed in. Phone sign-in (otpStart / otpVerify) keeps the
 // device's development account and wallet when it is used for the first time. Google sign-in (googleSignIn,
-// lib/live/account) does the same; after it, an ended session asks for Google again instead of the device key.
+// lib/live/account) and e-mail sign-in (emailStart / emailVerify) do the same; after any of them, an ended
+// session asks the person to sign in again instead of using the device key.
 //
 // Sanctions (server/api/sanctions.mjs, lib/sanctions): every sign-in sends this phone's device signals
 // (lib/device-info). A banned account or device gets 403 with code account_banned / device_banned and a one-day
@@ -15,13 +16,17 @@ import { getRandomBytes } from 'expo-crypto';
 
 import { deviceInfo } from '@/lib/device-info';
 
-export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number };
+export type ServerUser = {
+  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number;
+  // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
+  email?: string | null; identities?: string[]; phoneVerified?: boolean;
+};
 export type ServerLedgerRow = { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; ref: string; counterparty: string | null; created_at: string };
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 const DEVICE_KEY = 'similarclub:device-key';
 const SESSION_KEY = 'similarclub:api-session';
-/** 'google' after a Google sign-in. */
+/** How this device signed in: 'google', 'email' or 'phone' (none for the development account). */
 const PROVIDER_KEY = 'similarclub:sign-in';
 
 export const apiEnabled = () => !!BASE;
@@ -43,7 +48,11 @@ export type SanctionView = {
   appeal?: string | null;
 };
 export type SanctionCode = 'muted' | 'account_banned' | 'device_banned';
-export type ErrorData = { error?: string; code?: SanctionCode | string; sanction?: SanctionView; serverNow?: string; appealSession?: string };
+export type ErrorData = {
+  error?: string; code?: SanctionCode | string; sanction?: SanctionView; serverNow?: string; appealSession?: string;
+  /** 409 device_has_account: how the account already on this phone signs in ('email' | 'google' | 'phone'). */
+  method?: string;
+};
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -57,13 +66,16 @@ export type Block = { code: 'account_banned' | 'device_banned'; sanction: Sancti
 let blockListener: (b: Block) => void = () => {};
 /** The app's ban screen (lib/sanctions) hears every account / device ban refusal here. */
 export const onBlocked = (fn: (b: Block) => void) => (blockListener = fn);
-/** The Google account's session ended: the person signs in with Google again (no silent device account). */
+/** A Google, e-mail or phone account's session ended: the person signs in again (no silent device account). */
 export class SignInAgain extends ApiError {
   constructor() {
-    super(401, 'Oturumun sona erdi. Google ile yeniden giriş yap.');
+    super(401, 'Oturumun sona erdi. Devam etmek için yeniden giriş yap.');
   }
 }
-const viaGoogle = async () => (await AsyncStorage.getItem(PROVIDER_KEY)) === 'google';
+const provider = () => AsyncStorage.getItem(PROVIDER_KEY);
+const viaGoogle = async () => (await provider()) === 'google';
+/** Signed in with an account of its own (Google, e-mail, phone), not this device's key. */
+const viaAccount = async () => ['google', 'email', 'phone'].includes((await provider()) ?? '');
 
 // expo-crypto, not the global `crypto`: Android's JavaScript engine (Hermes) has no crypto.getRandomValues,
 // so sign-up and every wallet request id would fail on the phone.
@@ -127,7 +139,7 @@ let reSigning: Promise<void> | null = null;
 function reSignIn() {
   reSigning ??= (async () => {
     if (session) return; // another call already signed in again
-    if (await viaGoogle()) throw new SignInAgain();
+    if (await viaAccount()) throw new SignInAgain();
     const key = await AsyncStorage.getItem(DEVICE_KEY);
     if (!key) throw new ApiError(401, 'Oturumun sona erdi. Uygulamayı yeniden açıp giriş yap.');
     const r = await call<{ session: string }>('POST', '/api/auth/dev', { deviceKey: key, deviceInfo: await myDevice() });
@@ -215,7 +227,7 @@ export function ensureSignedIn(name: string): Promise<ServerUser> {
         session = null;
       }
     }
-    if (await viaGoogle()) throw new SignInAgain();
+    if (await viaAccount()) throw new SignInAgain();
     return signIn(name);
   })().finally(() => (signingIn = null));
   return signingIn;
@@ -245,8 +257,31 @@ export const otpStart = (phone: string) => call<{ sent: boolean; retryAfter: num
 export async function otpVerify(phone: string, code: string, challenge: string, name?: string, device?: string) {
   const r = await call<{ session: string; user: ServerUser; isNew: boolean }>('POST', '/api/auth/otp/verify', { phone, code, challenge, name, deviceKey: await deviceKey(), deviceInfo: await myDevice(), device });
   await keepSession(r.session);
+  await AsyncStorage.setItem(PROVIDER_KEY, 'phone');
   return { user: r.user, isNew: r.isNew };
 }
+
+export type CodeSent = { sent: boolean; retryAfter: number; challenge: string };
+/** E-mail sign-in, step 1 (503 until the server has a mail provider): a 6-digit code to the address. */
+export const emailStart = (email: string) => call<CodeSent>('POST', '/api/auth/email/start', { email });
+/** E-mail sign-in, step 2: the code and step 1's `challenge` open a session. `isNew` = a new account. */
+export async function emailVerify(email: string, code: string, challenge: string, device?: string) {
+  const r = await call<{ session: string; user: ServerMe; isNew: boolean }>('POST', '/api/auth/email/verify', { email, code, challenge, deviceKey: await deviceKey(), deviceInfo: await myDevice(), device });
+  await keepSession(r.session);
+  await AsyncStorage.setItem(PROVIDER_KEY, 'email');
+  return { user: r.user, isNew: r.isNew };
+}
+
+// Adding an address or checking a number on the signed-in account (Ayarlar). Never merges two accounts.
+export const linkEmailStart = (email: string) => call<CodeSent>('POST', '/api/me/email/start', { email });
+export const linkEmailVerify = (email: string, code: string, challenge: string) => call<{ user: ServerMe }>('POST', '/api/me/email/verify', { email, code, challenge }).then((r) => r.user);
+export const linkPhoneStart = (phone: string) => call<CodeSent>('POST', '/api/me/phone/start', { phone });
+export const linkPhoneVerify = (phone: string, code: string, challenge: string) => call<{ user: ServerMe }>('POST', '/api/me/phone/verify', { phone, code, challenge }).then((r) => r.user);
+/** A wa.me link with a one-time message to our number; sending it checks the number (valid `expiresIn` s). */
+export const whatsappStart = () => call<{ link: string; expiresIn: number }>('POST', '/api/me/phone/whatsapp');
+export type PhoneCheck = { phone: string | null; pending: boolean; result: null | 'verified' | 'taken' | 'country' | 'no_number' | 'expired' };
+/** The latest WhatsApp check of this account (the app asks every few seconds while it waits). */
+export const phoneStatus = () => call<PhoneCheck>('GET', '/api/me/phone/status');
 
 /** Google sign-in: Google's ID token opens a session (a device development account is linked, not replaced). */
 export async function googleSignIn(idToken: string, device?: string) {
@@ -257,6 +292,8 @@ export async function googleSignIn(idToken: string, device?: string) {
 }
 /** True after a Google sign-in on this device. */
 export const signedInWithGoogle = viaGoogle;
+/** True after a Google, e-mail or phone sign-in on this device (not the development account). */
+export const signedInWithAccount = viaAccount;
 /** This phone already has its account: the device key stays after "Çıkış yap" and goes only when the account is deleted. */
 export const hasDeviceAccount = async () => !!(await AsyncStorage.getItem(DEVICE_KEY));
 

@@ -341,8 +341,12 @@ async function checkCode(channel, target, code, challenge, ip) {
     if (!row || row.channel !== channel || row.target !== target || new Date(row.expires_at) < new Date()) throw new HttpError(400, 'Kodun süresi doldu, yeni kod iste');
     if (row.attempts >= MAX_TRIES) throw new HttpError(429, 'Çok fazla yanlış deneme, yeni kod iste');
     const good = same(ch.hash(target, code), row.code_hash);
-    if (good) await c.query('DELETE FROM otp_codes WHERE challenge_hash = $1', [row.challenge_hash]);
-    else {
+    if (good) {
+      await c.query('DELETE FROM otp_codes WHERE challenge_hash = $1', [row.challenge_hash]);
+      // One right code ends every other code still waiting for this address or number. Their rows stay until the
+      // sweep, so the wait between codes is worked out as before.
+      await c.query("UPDATE otp_codes SET expires_at = now() - interval '1 second' WHERE channel = $1 AND target = $2 AND expires_at > now()", [channel, target]);
+    } else {
       await c.query('UPDATE otp_codes SET attempts = attempts + 1 WHERE challenge_hash = $1', [row.challenge_hash]);
       await countFailure(c, channel, target, ip);
     }
