@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { useKeyboardOpen } from '@/lib/keyboard-open';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -364,6 +365,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setChatRefused(null);
   };
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // Typing in the room chat: the keyboard is up for this field (not for a sheet's field over the room). The
+  // window does not shrink on edge-to-edge Android, so the stage folds away and the chat takes its place;
+  // otherwise the seats keep their height and the chat is squeezed down to its tabs.
+  const [inputFocused, setInputFocused] = useState(false);
+  const typing = useKeyboardOpen() && inputFocused;
   // Seat emoji reactions currently playing, by user id.
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
   const [giftOpen, setGiftOpen] = useState(false);
@@ -2231,8 +2237,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics. Capped so the Güverte and the chat always keep their space on small phones; scrolls when taller. */}
-          <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58) }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+          {/* Stage: boards and mics. Capped so the Güverte and the chat always keep their space on small phones; scrolls when taller.
+              Folded away (still mounted) while typing, so the chat keeps its lines above the keyboard. */}
+          <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58), display: typing ? 'none' : 'flex' }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
@@ -2325,14 +2332,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               </View>
             )}
           </ScrollView>
-          <BalconyBar
-            view={view}
-            stale={offline}
-            onOpen={() => {
-              setInviteSeat(null);
-              setPeopleOpen(true);
-            }}
-          />
+          {!typing && (
+            <BalconyBar
+              view={view}
+              stale={offline}
+              onOpen={() => {
+                setInviteSeat(null);
+                setPeopleOpen(true);
+              }}
+            />
+          )}
 
           <ChatFeed messages={feed} visible={visibleInAll} renderItem={renderChat} />
 
@@ -2357,8 +2366,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </View>
           ) : null}
           <ContactNote text={chatRefused} />
+          {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
+              field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
           <View style={styles.bottom}>
-            <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />
+            {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />}
             <View style={styles.inputWrap}>
               <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
@@ -2367,6 +2378,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 value={draft}
                 onChangeText={editDraft}
                 onSubmitEditing={() => send()}
+                submitBehavior="submit"
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
                 editable={!chatBlocked}
                 placeholder={chatBlocked ? 'Sohbete yazman kısıtlı' : 'Yaz…'}
                 placeholderTextColor={colors.textDim}
@@ -2375,9 +2389,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 returnKeyType="send"
               />
             </View>
-            {roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
-            <RoundBtn label="Mesajlar" icon="chatbubble-ellipses" onPress={() => setInboxOpen(true)} badge={inboxUnread} />
-            {amSeated ? (
+            {typing && (
+              <Pressable onPress={() => send()} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel="Gönder" style={[styles.sendBtn, !draft.trim() && { opacity: 0.45 }]}>
+                <Ionicons name="send" size={18} color="#fff" />
+              </Pressable>
+            )}
+            {!typing && roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
+            {!typing && <RoundBtn label="Mesajlar" icon="chatbubble-ellipses" onPress={() => setInboxOpen(true)} badge={inboxUnread} />}
+            {/* A speaker keeps the mic while typing; the raise-hand button waits. */}
+            {typing && !amSeated ? null : amSeated ? (
               <MicBtn
                 state={!micOn ? 'off' : sending ? 'on' : 'held'}
                 caption={block ? HELD_CAPTION[block] : undefined}
@@ -2387,15 +2407,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             ) : (
               <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
             )}
-            <RoundBtn
-              label="Hediye"
-              icon="gift"
-              gift
-              onPress={() => {
-                setGiftTo(null);
-                setGiftOpen(true);
-              }}
-            />
+            {!typing && (
+              <RoundBtn
+                label="Hediye"
+                icon="gift"
+                gift
+                onPress={() => {
+                  setGiftTo(null);
+                  setGiftOpen(true);
+                }}
+              />
+            )}
           </View>
         </KeyboardAvoid>
       </SafeAreaView>
@@ -2726,4 +2748,5 @@ const styles = StyleSheet.create({
   eventBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   inputWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)', borderRadius: 999, paddingLeft: 10, height: 48 },
   input: { flex: 1, minWidth: 0, color: '#fff', paddingRight: 14, paddingVertical: 10, fontSize: 15 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
 });
