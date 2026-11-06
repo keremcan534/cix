@@ -551,6 +551,33 @@ async function staffTarget(me, uid) {
   return t;
 }
 
+/** The rank a sanction was given with (room staff and the system: 0). */
+const ISSUER_RANK = { moderator: 1, admin: 2 };
+const LIFT_REFUSED = {
+  self: 'Kendi yaptırımını kaldıramazsın',
+  rank: 'Kendi yetki seviyende veya üstündeki birinin yaptırımını kaldıramazsın',
+  issuer: 'Bu yaptırımı senden üst yetkili biri verdi; yalnızca o seviyede biri kaldırabilir',
+};
+
+/**
+ * Whether `me` may lift `s`, with the rules of applying one (staffTarget): never one's own; a staff member's
+ * only from a higher rank (an admin may lift another admin's); never one given by a higher rank than `me` (the
+ * rank it was given with, or the giver's role now if higher). A refusal is audited and answers 403.
+ */
+export async function mayLift(me, s) {
+  const mine = RANK[me.role] ?? 0;
+  const roles = await db.query('SELECT id, role FROM users WHERE id = ANY($1::uuid[])', [[s.user_id, s.created_by].filter(Boolean)]);
+  const roleOf = (id) => roles.rows.find((x) => x.id === id)?.role;
+  const issuer = Math.max(ISSUER_RANK[s.created_role] ?? 0, s.created_by ? (RANK[roleOf(s.created_by)] ?? 0) : 0);
+  let why = null;
+  if (s.user_id === me.id) why = 'self';
+  else if (me.role !== 'admin' && (RANK[roleOf(s.user_id)] ?? 0) >= mine) why = 'rank';
+  else if (issuer > mine) why = 'issuer';
+  if (!why) return;
+  await audit(db, { actor: me.id, role: me.role, action: 'lift', sanction: s.id, target: s.user_id, result: 'denied', detail: { why } });
+  throw new HttpError(403, LIFT_REFUSED[why]);
+}
+
 export const sanctionRoutes = {
   // --- Staff --------------------------------------------------------------------------------------------------
   async 'GET /api/admin/sanctions/meta'(req) {
@@ -695,6 +722,7 @@ export const sanctionRoutes = {
     const s = await sanctionRow(db, idOf(b.id));
     if (!s) throw new HttpError(404, 'Yaptırım bulunamadı');
     const why = text(b.reason, 3, 300, 'Kaldırma gerekçesi');
+    await mayLift(me, s);
     // A lifetime ban comes off only with the lifetime permission.
     if (s.is_permanent && (s.sanction_type === 'account_ban' || s.sanction_type === 'device_ban')) {
       const need = s.sanction_type === 'account_ban' ? 'sanction.ban_permanent' : 'sanction.device_ban_permanent';

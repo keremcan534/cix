@@ -55,13 +55,16 @@ import {
   fmtPct,
   fmtScore,
   fmtUsd,
+  inviteStreamer,
   runAction,
   useNet,
   usdOf,
   type LedgerRow,
   type Overview,
 } from '@/lib/agency-net';
+import { NoAccess } from '@/components/no-access';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
@@ -74,6 +77,7 @@ const METHOD_TEXT: Record<string, string> = { code: 'Kod', link: 'Bağlantı', i
 export default function AgencyOffice() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
+  const live = liveMode();
   const { me } = useApp();
   const q = useNet(me.name, () => agencyNet.overview(id), () => demoOverview(id || 'demo-top'), [id]);
   const [tab, setTab] = useState<Tab>('summary');
@@ -100,27 +104,34 @@ export default function AgencyOffice() {
       <Header title={o?.agency.name ?? 'Ajans'} right={<Pressable onPress={q.reload} hitSlop={10} accessibilityLabel="Yenile"><Ionicons name="refresh" size={22} color="#fff" /></Pressable>} />
       {o && <Tabs value={cur.key} onChange={setTab} options={shown.map((t) => ({ key: t.key, label: t.label, badge: t.badge, locked: !!t.perm && !can(t.perm) }))} />}
       <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps="handled">
-        <NetState q={q}>
-          {() =>
-            !ctx ? null : locked ? (
-              <Locked perm={cur.perm!} />
-            ) : cur.key === 'summary' ? (
-              <Summary c={ctx} />
-            ) : cur.key === 'streamers' ? (
-              <Streamers c={ctx} />
-            ) : cur.key === 'subs' ? (
-              <Subs c={ctx} />
-            ) : cur.key === 'performance' ? (
-              <PerformanceTab c={ctx} />
-            ) : cur.key === 'earnings' ? (
-              <Earnings c={ctx} />
-            ) : cur.key === 'requests' ? (
-              <Requests c={ctx} />
-            ) : (
-              <Team c={ctx} />
-            )
-          }
-        </NetState>
+        {/* One state for "nothing to show here" (no agency picked, or the server refused with 403), never demo data. */}
+        {live && !id ? (
+          <NoAccess title="Ajans seçilmedi" text="Panelini açmak istediğin ajansı Ajans ekranından seç." />
+        ) : q.forbidden ? (
+          <NoAccess text="Bu ajansın paneli yalnız ajans sahibine, ekibine, üst ajansına ve yetkili merkez personeline açık." />
+        ) : (
+          <NetState q={q}>
+            {() =>
+              !ctx ? null : locked ? (
+                <Locked perm={cur.perm!} />
+              ) : cur.key === 'summary' ? (
+                <Summary c={ctx} />
+              ) : cur.key === 'streamers' ? (
+                <Streamers c={ctx} />
+              ) : cur.key === 'subs' ? (
+                <Subs c={ctx} />
+              ) : cur.key === 'performance' ? (
+                <PerformanceTab c={ctx} />
+              ) : cur.key === 'earnings' ? (
+                <Earnings c={ctx} />
+              ) : cur.key === 'requests' ? (
+                <Requests c={ctx} />
+              ) : (
+                <Team c={ctx} />
+              )
+            }
+          </NetState>
+        )}
       </ScrollView>
       {askNode}
     </SafeAreaView>
@@ -352,8 +363,8 @@ function Streamers({ c }: { c: Ctx }) {
   const [scope, setScope] = useState<'direct' | 'sub'>('direct');
   const q = useNet(c.name, () => agencyNet.streamers(c.id, scope), () => demoStreamers(c.id, scope), [c.id, scope]);
   const invite = async () => {
-    const r = await c.ask({ title: 'Yayıncı davet et', message: 'Kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Kullanıcı adı', placeholder: 'kullaniciadi', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder' });
-    if (r) await runAction(c.demo, () => agencyNet.invite(c.id, r.field.replace(/^@/, ''), r.reason || undefined), 'Davet gönderildi.', q.reload);
+    const r = await c.ask({ title: 'Yayıncı davet et', message: 'Yayıncının profilindeki ID numarasını ya da kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Profil ID’si veya kullanıcı adı', placeholder: 'Örn. 104829301457', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder' });
+    if (r) await runAction(c.demo, () => inviteStreamer(c.id, r.field, r.reason || undefined), 'Davet gönderildi.', q.reload);
   };
   return (
     <View style={{ gap: space.lg }}>

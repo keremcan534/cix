@@ -2,12 +2,15 @@
 // top and sub agencies, streamers, the commission ledger, performance tiers, payouts, transfers and the centre's
 // management. Every rule and every amount is decided by the server; the screens only show what it returns.
 //
-// When the server cannot be reached (no address set, offline, a server version without these routes) the panels
-// show a labelled example dataset (data/agency-net-demo) instead of empty screens; actions stay disabled there.
+// A build without a server address shows a labelled example dataset (data/agency-net-demo) with actions disabled.
+// A live build never does: when its server cannot be reached the panels say so and offer a retry.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ApiError, apiEnabled, apiRequest, ensureSignedIn, newRef } from '@/lib/api';
+import { displayId } from '@/data/profile';
+import { AGENCY_LEDGER_LABEL } from '@/lib/admin-format';
+import { ApiError, apiEnabled, apiRequest, discover, ensureSignedIn, followingList, newRef } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
+import { parseInviteInput, pickByPublicId } from '@/lib/invite-target';
 
 // --- Types (mirroring the server's responses) ---------------------------------------------------------------
 export type AgencyStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'suspended' | 'closed';
@@ -141,7 +144,7 @@ export type SubAgency = AgencyCard & {
   rank: number | null;
 };
 
-export type LedgerKind = 'direct' | 'difference' | 'transition' | 'fee' | 'adjustment' | 'reversal' | 'bd';
+export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd';
 export type LedgerRow = {
   id: number;
   kind: LedgerKind;
@@ -329,7 +332,8 @@ export const agencyNet = {
   performance: (id: string) => get<Performance>('/api/agency/performance', { id }),
   report: (id: string, group: 'day' | 'week' | 'month' = 'week') => get<Report>('/api/agency/report', { id, group }),
   requests: (id: string) => get<{ requests: JoinRequest[] }>('/api/agency/requests', { id }).then((r) => r.requests),
-  invite: (id: string, username: string, note?: string) => post('/api/agency/invite', { id, username, note }),
+  /** The server finds the streamer by account id (`user`) or by username. */
+  invite: (id: string, to: { user: string } | { username: string }, note?: string) => post('/api/agency/invite', { id, ...to, note }),
   decideRequest: (id: string, requestId: number, approve: boolean, note?: string) => post('/api/agency/requests/decide', { id, requestId, approve, note }),
   createSub: (parentId: string, name: string, owner?: string, region?: string) => post<{ agency: AgencyCard }>('/api/agency/sub/create', { parentId, name, owner, region, submit: true }),
   submitSub: (id: string) => post('/api/agency/sub/submit', { id }),
@@ -353,6 +357,11 @@ export const centerNet = {
   overview: () => get<AdminOverview>('/api/admin/agency/overview'),
   list: (f: { status?: string; pendingWith?: string; q?: string } = {}) => get<{ agencies: AdminAgency[] }>('/api/admin/agency/list', f).then((r) => r.agencies),
   decide: (id: string, approve: boolean, note: string) => post('/api/admin/agency/decide', { id, approve, note }),
+  /** A new agency, approved at once (agencies.manage): a top agency, or a sub agency under `parentId`. */
+  create: (b: { name: string; owner?: string; parentId?: string }) =>
+    post<{ agency: { id: string; code: string; name: string; level: number; status: AgencyStatus } }>('/api/admin/agency/create', b),
+  /** Links a streamer to an agency (or, without one, ends their membership) with a written reason. */
+  assign: (b: { streamer: string; agencyId?: string; reason: string }) => post<{ agencyId: string | null }>('/api/admin/agency/assign', b),
   setStatus: (id: string, status: 'suspended' | 'approved' | 'closed', reason: string) => post('/api/admin/agency/status', { id, status, reason }),
   setRate: (id: string, rate: number, reason: string, effectiveFrom?: string) => post('/api/admin/agency/rate', { id, rate, reason, effectiveFrom }),
   setTier: (id: string, tier: string, reason: string, effectiveFrom?: string) => post('/api/admin/agency/tier', { id, tier, reason, effectiveFrom }),
@@ -380,16 +389,19 @@ export function unavailable(e: unknown) {
 }
 export const errorText = (e: unknown) => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Beklenmeyen hata');
 
-export type Loaded<T> = { data: T | null; demo: boolean; error: string | null; loading: boolean; reload: () => void };
+/** `forbidden`: the server refused with 403 (no right to this screen), so the screen shows one "no access" state. */
+export type Loaded<T> = { data: T | null; demo: boolean; error: string | null; forbidden: boolean; loading: boolean; reload: () => void };
+const NO_SERVER = 'Sunucuya ulaşılamadı. Bağlantını kontrol edip tekrar dene.';
 
 /**
- * Loads `load()` from the server as the signed-in user. When the server cannot be reached, `demo()` is shown with
- * demo = true (the screen labels it and disables actions). `deps` reloads when they change.
+ * Loads `load()` from the server as the signed-in user. Without a server address `demo()` is shown with demo = true
+ * (the screen labels it and disables actions); in a live build an unreachable server is an error with a retry, never
+ * example data. `deps` reloads when they change.
  */
 export function useNet<T>(name: string, load: () => Promise<T>, demo: () => T, deps: unknown[] = []): Loaded<T> {
   const [tick, setTick] = useState(0);
   const key = JSON.stringify([name, tick, ...deps]);
-  const [res, setRes] = useState<{ key: string; data: T | null; demo: boolean; error: string | null } | null>(null);
+  const [res, setRes] = useState<{ key: string; data: T | null; demo: boolean; error: string | null; forbidden: boolean } | null>(null);
   const fns = useRef({ load, demo });
   useEffect(() => {
     fns.current = { load, demo };
@@ -398,13 +410,13 @@ export function useNet<T>(name: string, load: () => Promise<T>, demo: () => T, d
     let live = true;
     (async () => {
       const { load: l, demo: d } = fns.current;
-      if (!apiEnabled()) return { data: d(), demo: true, error: null };
+      if (!apiEnabled()) return { data: d(), demo: true, error: null, forbidden: false };
       try {
         await ensureSignedIn(name);
-        return { data: await l(), demo: false, error: null };
+        return { data: await l(), demo: false, error: null, forbidden: false };
       } catch (e) {
-        if (unavailable(e)) return { data: d(), demo: true, error: null };
-        return { data: null, demo: false, error: errorText(e) };
+        if (unavailable(e)) return { data: null, demo: false, error: NO_SERVER, forbidden: false };
+        return { data: null, demo: false, error: errorText(e), forbidden: e instanceof ApiError && e.status === 403 };
       }
     })().then((r) => live && setRes({ key, ...r }));
     return () => {
@@ -415,7 +427,31 @@ export function useNet<T>(name: string, load: () => Promise<T>, demo: () => T, d
   const reload = useCallback(() => setTick((t) => t + 1), []);
   const loading = !res || res.key !== key;
   // While reloading, the previous data stays on screen (no flash); a previous error does not.
-  return { data: res?.data ?? null, demo: res?.demo ?? false, error: loading ? null : (res?.error ?? null), loading, reload };
+  return { data: res?.data ?? null, demo: res?.demo ?? false, error: loading ? null : (res?.error ?? null), forbidden: !loading && !!res?.forbidden, loading, reload };
+}
+
+/**
+ * "Yayıncı davet et": `raw` is what the owner typed: the profile ID the app shows ("ID:…"), an account id or a
+ * username. The server knows only account ids and usernames, so a profile ID is looked up among the people this
+ * phone can list (followed accounts and Keşfet) and, when no one matches, tried as a username. "Kullanıcı
+ * bulunamadı" comes back only after both ways found no one.
+ */
+export async function inviteStreamer(agencyId: string, raw: string, note?: string) {
+  const t = parseInviteInput(raw);
+  if (!t) throw new ApiError(400, 'Profil ID’sini ya da kullanıcı adını yaz.');
+  if (t.kind === 'user') return agencyNet.invite(agencyId, { user: t.id }, note);
+  if (t.kind === 'public') {
+    const [following, nearby] = await Promise.all([followingList().catch(() => []), discover().catch(() => [])]);
+    const hits = pickByPublicId(t.publicId, [...following, ...nearby], displayId);
+    if (hits.length === 1) return agencyNet.invite(agencyId, { user: hits[0].id }, note);
+  }
+  try {
+    return await agencyNet.invite(agencyId, { username: t.username }, note);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404 && t.kind === 'public')
+      throw new ApiError(404, 'Kullanıcı bulunamadı. Bu profil ID’si takip ettiklerin ve Keşfet’tekiler arasında yok; yayıncıyı takip edip tekrar dene ya da kullanıcı adını yaz.');
+    throw e;
+  }
 }
 
 /**
@@ -452,7 +488,8 @@ export const fmtScore = (v: number | null | undefined) => (v === null || v === u
 export const STATUS_TEXT: Record<AgencyStatus, string> = { draft: 'Taslak', pending: 'Onay bekliyor', approved: 'Aktif', rejected: 'Reddedildi', suspended: 'Askıda', closed: 'Kapatıldı' };
 export const VIEWER_TEXT: Record<Viewer, string> = { owner: 'Sahip', staff: 'Ekip', parent: 'Üst ajans görünümü', center: 'Merkez görünümü', bd: 'BD görünümü' };
 export const LEVEL_TEXT = (level: number) => (level <= 1 ? 'Üst ajans' : 'Alt ajans');
-export const KIND_TEXT: Record<string, string> = { direct: 'Doğrudan komisyon', difference: 'Fark komisyonu', transition: 'Geçiş komisyonu', fee: 'Transfer ücreti', adjustment: 'Düzeltme', reversal: 'İptal / iade', bd: 'BD komisyonu' };
+/** Commission ledger kinds as the server writes them (agency_ledger.kind); the words live in lib/admin-format. */
+export const KIND_TEXT: Record<string, string> = AGENCY_LEDGER_LABEL;
 export const TRANSFER_TEXT: Record<TransferKind, string> = { streamer_move: 'Yayıncı transferi', streamer_leave: 'Ajanstan ayrılma', independence: 'Bağımsızlık', change_parent: 'Üst ajans değişikliği', sub_close: 'Alt ajans kapatma' };
 export const TRANSFER_STATUS: Record<TransferStatus, string> = { pending: 'Onay bekliyor', completed: 'Tamamlandı', rejected: 'Reddedildi', cancelled: 'İptal edildi' };
 export const PARTY_TEXT: Record<string, string> = { from: 'Mevcut ajans', to: 'Yeni ajans', parent: 'Üst ajans', streamer: 'Yayıncı', center: 'Merkez' };

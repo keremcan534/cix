@@ -2,13 +2,14 @@
 // end over HTTP. Ş1-n = "Üst Ajans, Alt Ajans ve Çok Katmanlı Ajans Yönetim Sistemi" test n; Ş2-n = "Performansa
 // Dayalı Dinamik Komisyon" test n. The steps share one network and run in order: T (top agency), S and S2 (its
 // sub-agencies), streamers tA (T), sA sB sC (S), s2A (S2). Background jobs are off (AGENCY_JOBS=0); the tests
-// run the engine through the centre's routes.
+// run the engine through the centre's routes. The server sells no play money (ALLOW_TEST_TOPUP=0), so payouts
+// can be paid; the refusal on a server with play money is in qa-money.test.mjs.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ AGENCY_JOBS: '0' });
+const h = startApi({ AGENCY_JOBS: '0', ALLOW_TEST_TOPUP: '0' });
 const { call, signUp } = h;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -28,6 +29,11 @@ const refused = ([st, j], code, msg = '') => {
 const ref = () => `t${rnd(8)}`;
 const q = async (sql, vals = []) => (await h.sql.query(sql, vals)).rows;
 const num = (v) => Number(v);
+/** Coins as from a Google Play purchase, put straight into the database (no store here): a lot and the balance. */
+const storeCoins = async (who, amount) => {
+  await q("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'google', $2, $2, 0, $3)", [who.id, amount, ref()]);
+  await q('UPDATE users SET coins = coins + $2 WHERE id = $1', [who.id, amount]);
+};
 
 // Shared state, filled in step by step.
 let admin, tOwner, sOwner, s2Owner, outsider, gifter, staffU, staffV, bdU, fin1, fin2;
@@ -167,7 +173,7 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
 describe('Komisyon motoru', () => {
   let giftRef;
   test('[Ş1-8] gerçek hediye: alt ajans %25, üst ajans fark %15, toplam %40; elmaslar dokunulmaz', async () => {
-    ok(await gifter.post('/api/wallet/test-topup', { amount: 10000, ref: ref() }));
+    await storeCoins(gifter, 10000);
     giftRef = ref();
     const g = ok(await gifter.post('/api/gifts/send', { to: sA.id, giftId: 'g5', count: 10, ref: giftRef }));
     assert.equal(g.total, 5000);
@@ -508,6 +514,9 @@ describe('Askı, personel, BD, ödemeler, raporlar', () => {
     ok(await admin.post('/api/admin/agency/staff/set', { user: fin1.id, roleId: roles['Finans sorumlusu'] }));
     ok(await admin.post('/api/admin/agency/staff/set', { user: fin2.id, roleId: roles['Finans sorumlusu'] }));
     refused(await tOwner.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'approve' }), 403, 'ajans kendi ödemesini onaylayamaz');
+    const list = ok(await fin1.get('/api/admin/agency/payouts'));
+    assert.equal(list.playMoney, false);
+    assert.equal(list.payouts.find((x) => x.id === p.payout.id).payable, true, 'gerçek parayla kazanılan komisyon ödenebilir');
     ok(await fin1.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'approve' }));
     refused(await fin1.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001' }), 403, 'onaylayan ödeyemez');
     ok(await fin2.post('/api/admin/agency/payouts/decide', { payoutId: p.payout.id, action: 'pay', paymentRef: 'BANKA-0001' }));

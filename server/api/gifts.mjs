@@ -9,6 +9,8 @@
 // the agency commission: recordIncome writes the income event and its commission records (agency-lib.mjs)
 // in the same transaction; the commission is a platform liability paid on top, the diamonds aren't touched.
 // Rankings follow Turkey's calendar (Europe/Istanbul).
+// A gift sent in a server room is announced to the room's voice connection from here, after it is paid
+// (LiveKit SendData, so no phone can fake one); the phones draw only these, never a peer's own claim.
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, int, once, readJson, userId } from './core.mjs';
@@ -16,10 +18,22 @@ import { GIFTS, GIFT_COUNTS, PACKS, SVIP_XP, svipLevel } from './catalog.mjs';
 import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
+import { roomService } from './live.mjs';
 
 const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
 const PERIODS = ['day', 'week', 'month'];
+/** A server room's LiveKit name (rooms.mjs liveKitName), from its id or that name; null for anything else. */
+const liveKitRoom = (room) => {
+  const m = /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(room ?? '');
+  return m ? `oda-${m[1]}` : null;
+};
+
+/** Tells everyone in the room's voice connection about a paid gift. Best effort: never slows or fails the gift. */
+function announceGift(room, packet) {
+  const data = Buffer.from(JSON.stringify({ type: 'gift', ...packet })).toString('base64');
+  roomService('SendData', { room, data, kind: 'RELIABLE' }, { roomAdmin: true, room }).catch((e) => console.error('livekit SendData', room, String(e).slice(0, 200)));
+}
 
 export const giftRoutes = {
   /** Public: the app can show prices before sign-in and cache them. */
@@ -49,12 +63,14 @@ export const giftRoutes = {
     if (await blockedBetween(u.id, to)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
     const total = gift.price * count;
     const label = count > 1 ? `${gift.name} ×${count}` : gift.name;
+    let eventId = null;
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       // Lock both rows in id order so two people gifting each other at once can't deadlock.
       const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
       if (locked.rowCount < 2) throw new HttpError(404, 'Alıcı bulunamadı');
       await claimRef(c, u.id, 'coin', b.ref);
       const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [u.id, to, gift.id, count, gift.price, total, room, b.ref]);
+      eventId = Number(g.rows[0].id);
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
       await addBondCoins(c, u.id, to, total);
@@ -62,6 +78,8 @@ export const giftRoutes = {
       await recordIncome(c, to, 'gift', `gift:${g.rows[0].id}`, total);
     });
     // In a room the recipient sees it on stage; elsewhere (profile, chat) they get a notification.
+    const lkRoom = liveKitRoom(room);
+    if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     return { ...out, total };
   },

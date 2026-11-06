@@ -48,6 +48,15 @@ import {
   viewerOf,
 } from './agency-lib.mjs';
 import { approveTransfer, checkCanFoundSub, feeRule, linkStreamer, namesFor, openTransfer, payoutStep, rejectTransfer, setStatus, submitAgency, transferView } from './agency-ops.mjs';
+import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
+
+/**
+ * Commission is never paid out on a server that holds or held play money (test top-ups, test or sandbox
+ * purchases): the same rule as diamond withdrawals (withdraw.mjs). Coins are fungible, so no commission there is
+ * provably earned with real money. Requests, approvals and payments are refused; only reject or cancel remain.
+ */
+export const PLAY_PAYOUT = 'Test jetonundan gelen kazanç ödenemez';
+export const playMoneyOn = async (c) => PLAY_MONEY || (await everHadPlayMoney(c));
 
 // --- Small helpers -----------------------------------------------------------------------------------------
 const bad = (m) => {
@@ -748,6 +757,7 @@ export const agencyRoutes = {
       if (same.rowCount) return { payout: { id: Number(same.rows[0].id), amount: d4(same.rows[0].amount), status: same.rows[0].status }, replay: true };
       if (a.status !== 'approved') throw new HttpError(403, 'Askıdaki veya kapalı ajans ödeme talep edemez');
       if (!x.s.payout_policy.currencies.includes(b.currency)) bad(`Para birimi: ${x.s.payout_policy.currencies.join(', ')}`);
+      if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
       const open = await c.query("SELECT 1 FROM agency_payouts WHERE agency_id = $1 AND status IN ('pending', 'ready')", [a.id]);
       if (open.rowCount) throw new HttpError(409, 'Sonuçlanmamış bir ödeme talebin var');
       // Only earnings of closed periods that no payout has claimed; claimed in the same statement's lock.

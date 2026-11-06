@@ -154,7 +154,7 @@ async function credit(u, platform, pack, transactionId, play) {
     const first = !(await c.query('SELECT 1 FROM purchases WHERE user_id = $1 AND product_id = $2', [u.id, pack.productId])).rowCount;
     const bonus = first ? pack.firstBonus : 0;
     // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
-    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
     const sandbox = play && platform !== 'test';
     const p = await c.query('INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id', [
       u.id,

@@ -117,7 +117,7 @@ const walletRoutes = {
     return once(u.id, 'coin', ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       // One daily cap for all play coins: test top-ups and test purchases together (wallet.mjs).
-      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
       await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
     });
   },
@@ -260,9 +260,11 @@ const server = http.createServer(async (req, res) => {
     gate(req.method, url.pathname);
     send(200, await route(req, url));
   } catch (err) {
-    // A malformed value that only Postgres caught (an id that isn't a uuid, a number or date out of range) is the
-    // request's fault: 400, not a server error.
-    const e = ['22P02', '22003', '22007', '22008'].includes(err?.code) && !(err instanceof HttpError) ? new HttpError(400, 'Geçersiz istek') : err;
+    // A malformed value that only Postgres caught is the request's fault: 400, not a server error. An id that
+    // isn't a uuid, a number or date out of range, an id of a row that doesn't exist (23503); text Postgres can't
+    // store, such as a NUL byte (22021).
+    const bad = err instanceof HttpError ? null : err?.code === '22021' ? 'Geçersiz metin' : ['22P02', '22003', '22007', '22008', '23503'].includes(err?.code) ? 'Geçersiz istek' : null;
+    const e = bad ? new HttpError(400, bad) : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);
     // extra: structured detail for the app (a ban or mute for its screen, sanctions.mjs).

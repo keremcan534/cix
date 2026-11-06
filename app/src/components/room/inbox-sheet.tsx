@@ -3,7 +3,7 @@
 // blocked people are hidden and every reply goes through ChatThread.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,7 +12,10 @@ import { ChatThread } from '@/components/chat-thread';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { messagePreview } from '@/components/ReactionArt';
 import { Avatar, VerifiedBadge } from '@/components/ui';
+import { messageTime } from '@/data/messages-ui';
 import { userById } from '@/data/mock';
+import { loadProfile } from '@/lib/live';
+import { isLiveUser } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -32,6 +35,18 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
   };
   const user = openId ? userById(openId) : null;
   const { top } = useSafeAreaInsets();
+  // A real person's chat header shows the loaded profile (name, photo, city), drawn again once it arrives.
+  const [, setLoaded] = useState(0);
+  useEffect(() => {
+    if (!openId || !isLiveUser(openId)) return;
+    let alive = true;
+    loadProfile(openId)
+      .then(() => alive && setLoaded((n) => n + 1))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [openId]);
 
   // The whole sheet rises with the keyboard (the dimmed area above gives way first), so the reply box and the
   // newest messages stay in view; it stops below the status bar.
@@ -49,7 +64,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
               avoidKeyboard={false}
               header={(typing) => (
                 <View style={s.head}>
-                  <Pressable onPress={() => setOpenId(null)} hitSlop={10} accessibilityLabel="Mesajlara dön">
+                  <Pressable onPress={() => setOpenId(null)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Mesajlara dön">
                     <Ionicons name="chevron-back" size={24} color="#fff" />
                   </Pressable>
                   <Avatar uri={user.avatar} size={34} online={user.online} />
@@ -110,7 +125,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
                           <Text style={[s.name, { flex: 1 }]} numberOfLines={1}>
                             {u.name}
                           </Text>
-                          {last && <Text style={s.time}>{last.time}</Text>}
+                          {last && <Text style={s.time}>{messageTime(last)}</Text>}
                         </View>
                         <Text style={[s.dim, item.unread > 0 && { color: '#fff' }]} numberOfLines={1}>
                           {last ? `${last.fromMe ? 'Sen: ' : ''}${messagePreview(last.text)}` : 'Sohbete başla'}

@@ -19,9 +19,11 @@ import {
   clearNotice,
   closeLeaveDialog,
   confirmSwitch,
+  connectionLine,
   continueLeave,
   dismissEnded,
   endRoom,
+  endedText,
   engineInfo,
   hasOpener,
   hearing,
@@ -61,13 +63,13 @@ export function closeRoomScreen() {
 // --- Status text --------------------------------------------------------------------------------------
 type Tone = 'live' | 'calm' | 'warn' | 'bad';
 const TONE: Record<Tone, string> = { live: semantic.live, calm: colors.textDim, warn: colors.gold, bad: semantic.danger };
-const ENDED_TEXT = { kicked: 'Odadan çıkarıldın', server: 'Oda sona erdi' } as const;
 
 /** One line for the session's real state; a dropped connection is never shown as connected. */
 export function sessionStatus(s: RoomSession, invited = false): { text: string; tone: Tone; icon: keyof typeof Ionicons.glyphMap } {
-  if (s.status === 'ended') return { text: s.endReason === 'server' ? ENDED_TEXT.server : ENDED_TEXT.kicked, tone: 'bad', icon: 'close-circle' };
-  if (s.status === 'disconnected') return { text: 'Bağlantı kesildi', tone: 'bad', icon: 'cloud-offline' };
-  if (s.status === 'reconnecting') return { text: 'Yeniden bağlanıyor…', tone: 'warn', icon: 'sync' };
+  if (s.status === 'ended') return { text: endedText(s).title, tone: 'bad', icon: 'close-circle' };
+  // Before the first join nothing dropped: it could not connect (yet).
+  if (s.status === 'disconnected') return { text: s.everConnected ? 'Bağlantı kesildi' : 'Bağlanılamadı', tone: 'bad', icon: 'cloud-offline' };
+  if (s.status === 'reconnecting') return { text: s.everConnected ? 'Yeniden bağlanıyor…' : 'Bağlanılamadı · yeniden deneniyor', tone: 'warn', icon: 'sync' };
   if (s.status === 'connecting') return { text: 'Bağlanıyor…', tone: 'warn', icon: 'sync' };
   if (s.interruption === 'phone_call') return { text: 'Telefon görüşmesi · ses duraklatıldı', tone: 'warn', icon: 'call' };
   if (s.interruption === 'focus_loss') return { text: 'Ses başka bir uygulamada', tone: 'warn', icon: 'volume-mute' };
@@ -361,19 +363,14 @@ export function SwitchDialog() {
 /** The full room was ended by the room (kicked, closed). The room screen closes after it is read. */
 export function EndedDialog({ session }: { session: RoomSession }) {
   const kicked = session.endReason === 'kicked';
+  const { title, body } = endedText(session);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={dismissEnded}>
       <View style={s.center}>
         <View style={s.dialog} accessibilityViewIsModal>
           <Ionicons name={kicked ? 'remove-circle' : 'radio'} size={28} color={semantic.danger} />
-          <Text style={s.dialogTitle}>{kicked ? ENDED_TEXT.kicked : ENDED_TEXT.server}</Text>
-          <Text style={s.dialogText}>
-            {session.endText
-              ? `${session.endText}. Mikrofonun ve ses bağlantın kapatıldı.`
-              : kicked
-              ? `Oda yönetimi seni “${session.title}” odasından çıkardı. Mikrofonun ve ses bağlantın kapatıldı.`
-              : `“${session.title}” odası sunucu tarafından kapatıldı. Mikrofonun ve ses bağlantın kapatıldı.`}
-          </Text>
+          <Text style={s.dialogTitle}>{title}</Text>
+          <Text style={s.dialogText}>{body}</Text>
           <Pressable style={[s.dialogBtn, { backgroundColor: semantic.action }]} onPress={dismissEnded} accessibilityRole="button">
             <Text style={[s.dialogBtnText, { color: semantic.actionInk }]}>Tamam</Text>
           </Pressable>
@@ -431,22 +428,37 @@ export function RecoveryCard({ roomId, title }: { roomId: string; title: string 
 }
 
 // --- Inside the full room -------------------------------------------------------------------------------
+/** True once `on` has stayed true for `ms`; false again as soon as it turns false. */
+function useAfter(on: boolean, ms: number) {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const t = setTimeout(() => setLate(true), ms);
+    return () => {
+      clearTimeout(t);
+      setLate(false);
+    };
+  }, [on, ms]);
+  return on && late;
+}
+
 /** Connection and audio problems of the session, in the room. Shown only while something is wrong. */
 export function SessionBanner({ session }: { session: RoomSession }) {
   const offline = !useOnline();
   const block = session.micWant ? micBlock(session) : null;
+  const line = connectionLine(session, offline);
+  // A normal join takes a moment: "Bağlanılıyor…" only shows when it takes longer than that.
+  const slowJoin = useAfter(session.status === 'connecting', 1500);
   let text: string | null = null;
   let tone: Tone = 'warn';
-  if (session.status === 'disconnected') {
-    text = 'Oda bağlantısı kesildi. Sayılar ve liste son alınan durumu gösteriyor.';
-    tone = 'bad';
-  } else if (session.status === 'reconnecting' || offline)
-    text = `Bağlantı koptu · yeniden bağlanılıyor${session.reconnectAttempt ? ` (${session.reconnectAttempt}. deneme)` : ''}. Sayılar ve liste son alınan durumu gösteriyor.`;
-  else if (session.interruption === 'phone_call') text = 'Telefon görüşmesi sürüyor: oda sesi ve mikrofonun duraklatıldı.';
+  if (line && (session.status !== 'connecting' || offline || slowJoin)) {
+    text = line.text;
+    if (line.bad) tone = 'bad';
+  } else if (session.interruption === 'phone_call') text = 'Telefon görüşmesi sürüyor: oda sesi ve mikrofonun duraklatıldı.';
   else if (session.interruption === 'focus_loss') text = 'Ses başka bir uygulamada; geri gelince oda sesi kaldığı yerden sürer.';
   else if (block === 'permission') text = 'Mikrofon izni yok: dinlemeye devam ediyorsun. Konuşmak için telefon ayarlarından mikrofon izni ver.';
   if (!text) return null;
-  const canRetry = session.status === 'disconnected' || session.status === 'reconnecting';
+  const canRetry = !!line?.retry;
   return (
     <View style={[s.banner, tone === 'bad' && { backgroundColor: 'rgba(255,122,130,0.9)' }]} accessibilityLiveRegion="polite">
       <Ionicons name={canRetry ? 'cloud-offline-outline' : 'information-circle-outline'} size={16} color={semantic.moneyInk} />

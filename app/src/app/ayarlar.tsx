@@ -1,11 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
 import { AdminPanel } from '@/components/admin/admin-panel';
@@ -19,15 +18,18 @@ import { useApp, type NotifyType, type Settings } from '@/store';
 import { makeStyles, useTheme, type Appearance } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
-import { liveMode } from '@/lib/live';
+import { liveMode, message, myServerId } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useStaffRole } from '@/lib/live/admin';
+import { useLiveSessions } from '@/lib/live/sessions';
+import { openSupportMail } from '@/lib/open-mail';
+import { dataRequestMail } from '@/lib/support-mail';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
 
 /** A settings switch bound to one boolean in the store. */
-function Toggle({ k, ...row }: { k: BoolKey; title: string; subtitle?: string; icon?: IconName; leading?: ReactNode; disabled?: boolean }) {
+function Toggle({ k, ...row }: { k: BoolKey; title: string; subtitle?: string; icon?: IconName; disabled?: boolean }) {
   const { settings, setSetting } = useApp();
   return <ListSwitch {...row} value={settings[k]} onChange={(v) => setSetting(k, v)} />;
 }
@@ -68,6 +70,47 @@ function AppearancePicker() {
   );
 }
 
+const ONE_ACCOUNT_RULE =
+  'Kişi başına tek hesap kuralı: aynı cihaz, telefon veya IBAN ile açılmış birden fazla hesap risk incelemesine alınır; ödüller ve hak edişler inceleme bitene kadar bekletilir.';
+// The demo's prototype promises (SMS on a new device, re-verification). The server does neither, so a live build
+// does not say them.
+const DEMO_SESSIONS_FOOTER = `Yeni cihaz veya alışılmadık konumdan girişte bildirim gönderilir ve SMS doğrulaması istenir. Para çekme, IBAN değişikliği ve ajans transferi gibi hassas işlemlerde yeniden doğrulama yapılır. ${ONE_ACCOUNT_RULE}`;
+
+/** Live build: the account's real sessions on the server; Sonlandır ends one there (lib/live/sessions). */
+function LiveSessions() {
+  const styles = useStyles();
+  const { rows, status, busy, reload, revoke } = useLiveSessions(true);
+  const end = (id: string) => void revoke(id).catch((e) => showAlert('Oturum sonlandırılamadı', message(e)));
+  return (
+    <ListGroup label="Aktif oturumlar" footer={`Tanımadığın bir cihaz görürsen oturumunu sonlandır. ${ONE_ACCOUNT_RULE}`}>
+      {status === 'failed' && rows.length === 0 ? (
+        <ListRow icon="cloud-offline-outline" tone="neutral" title="Oturumlar yüklenemedi" subtitle="Dokun, tekrar deneyelim." onPress={() => void reload()} chevron={false} />
+      ) : status === 'loading' ? (
+        <ListRow icon="time-outline" tone="neutral" title="Oturumlar yükleniyor…" />
+      ) : (
+        rows.map((x) => (
+          <ListRow
+            key={x.id}
+            icon={x.web ? 'desktop-outline' : 'phone-portrait-outline'}
+            tone={x.current ? 'success' : 'neutral'}
+            title={x.title}
+            subtitle={x.subtitle}
+            right={
+              x.current ? (
+                <View style={styles.liveDot} accessibilityLabel="Şu an kullandığın cihaz" />
+              ) : (
+                <Pressable style={[styles.endBtn, busy === x.id && { opacity: 0.5 }]} disabled={!!busy} accessibilityLabel={`${x.title} oturumunu sonlandır`} onPress={() => end(x.id)}>
+                  <Text style={styles.endText}>{busy === x.id ? 'Sonlandırılıyor…' : 'Sonlandır'}</Text>
+                </Pressable>
+              )
+            }
+          />
+        ))
+      )}
+    </ListGroup>
+  );
+}
+
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
@@ -81,6 +124,9 @@ export default function SettingsScreen() {
     if (h) showAlert('Bildirimler ertelendi', `${h} saat boyunca bildirim gelmez. Güvenlik ve ödeme bildirimleri ertelenmez.`);
   };
   const snoozedUntil = new Date(settings.snoozeUntil).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  // A live build shows only what the server really does: its sessions, and no privacy, contact or spending
+  // switches until the server keeps and enforces them (giris-4). The demo keeps every prototype setting.
+  const live = liveMode();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -105,88 +151,104 @@ export default function SettingsScreen() {
           )}
         </ListGroup>
 
-        <ListGroup
-          label="Aktif oturumlar"
-          footer="Yeni cihaz veya alışılmadık konumdan girişte bildirim gönderilir ve SMS doğrulaması istenir. Para çekme, IBAN değişikliği ve ajans transferi gibi hassas işlemlerde yeniden doğrulama yapılır. Kişi başına tek hesap kuralı: aynı cihaz, telefon veya IBAN ile açılmış birden fazla hesap risk incelemesine alınır; ödüller ve hak edişler inceleme bitene kadar bekletilir."
-        >
-          {sessions.map((x) => (
-            <ListRow
-              key={x.id}
-              icon={/Web/.test(x.device) ? 'desktop-outline' : 'phone-portrait-outline'}
-              tone={x.current ? 'success' : 'neutral'}
-              title={x.device}
-              subtitle={`${x.place} · ${x.current ? 'Şu an aktif' : x.last}`}
-              right={
-                x.current ? (
-                  <View style={styles.liveDot} accessibilityLabel="Şu an kullandığın cihaz" />
-                ) : (
-                  <Pressable
-                    style={styles.endBtn}
-                    accessibilityLabel={`${x.device} oturumunu sonlandır`}
-                    onPress={() => {
-                      endSession(x.id);
-                      notify({ kind: 'security', icon: 'lock-closed', title: 'Oturum sonlandırıldı', body: `${x.device} · ${x.place} oturumu kapatıldı.` });
-                    }}
-                  >
-                    <Text style={styles.endText}>Sonlandır</Text>
-                  </Pressable>
-                )
-              }
-            />
-          ))}
-        </ListGroup>
+        {live ? (
+          <LiveSessions />
+        ) : (
+          <ListGroup label="Aktif oturumlar" footer={DEMO_SESSIONS_FOOTER}>
+            {sessions.map((x) => (
+              <ListRow
+                key={x.id}
+                icon={/Web/.test(x.device) ? 'desktop-outline' : 'phone-portrait-outline'}
+                tone={x.current ? 'success' : 'neutral'}
+                title={x.device}
+                subtitle={`${x.place} · ${x.current ? 'Şu an aktif' : x.last}`}
+                right={
+                  x.current ? (
+                    <View style={styles.liveDot} accessibilityLabel="Şu an kullandığın cihaz" />
+                  ) : (
+                    <Pressable
+                      style={styles.endBtn}
+                      accessibilityLabel={`${x.device} oturumunu sonlandır`}
+                      onPress={() => {
+                        endSession(x.id);
+                        notify({ kind: 'security', icon: 'lock-closed', title: 'Oturum sonlandırıldı', body: `${x.device} · ${x.place} oturumu kapatıldı.` });
+                      }}
+                    >
+                      <Text style={styles.endText}>Sonlandır</Text>
+                    </Pressable>
+                  )
+                }
+              />
+            ))}
+          </ListGroup>
+        )}
 
-        <ListGroup label="Harcama" footer="Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.">
-          <ListBlock title="Günlük harcama limiti">
-            <ChoiceChips
-              value={settings.dailySpendLimit}
-              options={[
-                [0, 'Limitsiz'],
-                [500, '500', coin],
-                [2000, '2.000', coin],
-                [10000, '10.000', coin],
-              ]}
-              onChange={(v) => setSetting('dailySpendLimit', v)}
-            />
-          </ListBlock>
-        </ListGroup>
+        {/* The daily limit lives only on this phone. A live build does not offer it, but a limit saved here
+            earlier is still applied to spending, so it stays on screen until it is lifted. */}
+        {(!live || settings.dailySpendLimit > 0) && (
+          <ListGroup
+            label="Harcama"
+            footer={
+              live
+                ? 'Bu limit yalnızca bu telefonda geçerli. Limitsiz seçersen kaldırılır.'
+                : 'Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.'
+            }
+          >
+            <ListBlock title="Günlük harcama limiti">
+              <ChoiceChips
+                value={settings.dailySpendLimit}
+                options={[
+                  [0, 'Limitsiz'],
+                  [500, '500', coin],
+                  [2000, '2.000', coin],
+                  [10000, '10.000', coin],
+                ]}
+                onChange={(v) => setSetting('dailySpendLimit', v)}
+              />
+            </ListBlock>
+          </ListGroup>
+        )}
 
-        <ListGroup label="Gizlilik">
-          <Toggle k="profilePublic" icon="globe-outline" title="Profilim herkese açık" />
-          <Toggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" />
-          <Toggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
-          <Toggle k="showCurrentRoom" icon="mic-outline" title="Bulunduğum odayı profilimde göster" subtitle="Kapalıyken profilinden odana 'Git' ile gelinemez." />
-          <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Uğurlu hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
-          <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
-          <Toggle
-            k="invisibleEntry"
-            leading={<Art name="oda-gizli-giris" size={32} />}
-            title="Odalara gizli giriş"
-            subtitle="Rütbe: Amiral ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
-            disabled={!GATES.invisibleEntry(nobleTier)}
-          />
-        </ListGroup>
+        {!live && (
+          <>
+            <ListGroup label="Gizlilik">
+              <Toggle k="profilePublic" icon="globe-outline" title="Profilim herkese açık" />
+              <Toggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" />
+              <Toggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
+              <Toggle k="showCurrentRoom" icon="mic-outline" title="Bulunduğum odayı profilimde göster" subtitle="Kapalıyken profilinden odana 'Git' ile gelinemez." />
+              <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Uğurlu hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
+              <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
+              <Toggle
+                k="invisibleEntry"
+                icon="eye-off-outline"
+                title="Odalara gizli giriş"
+                subtitle="Rütbe: Amiral ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
+                disabled={!GATES.invisibleEntry(nobleTier)}
+              />
+            </ListGroup>
 
-        <ListGroup label="Kimler ulaşabilir">
-          <ListBlock title="Bana kimler mesaj gönderebilir?">
-            <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
-          </ListBlock>
-          <ListBlock title="Beni kimler arayabilir?">
-            <Text style={styles.blockHint}>Ücretli sesli ve görüntülü aramalar</Text>
-            <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
-          </ListBlock>
-          <ListBlock title="Beni odalara kimler davet edebilir?">
-            <ChoiceChips
-              value={settings.invitesFrom}
-              options={[
-                ['everyone', 'Herkes'],
-                ['following', 'Takip ettiklerim'],
-                ['nobody', 'Kimse'],
-              ]}
-              onChange={(v) => setSetting('invitesFrom', v)}
-            />
-          </ListBlock>
-        </ListGroup>
+            <ListGroup label="Kimler ulaşabilir">
+              <ListBlock title="Bana kimler mesaj gönderebilir?">
+                <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
+              </ListBlock>
+              <ListBlock title="Beni kimler arayabilir?">
+                <Text style={styles.blockHint}>Ücretli sesli ve görüntülü aramalar</Text>
+                <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
+              </ListBlock>
+              <ListBlock title="Beni odalara kimler davet edebilir?">
+                <ChoiceChips
+                  value={settings.invitesFrom}
+                  options={[
+                    ['everyone', 'Herkes'],
+                    ['following', 'Takip ettiklerim'],
+                    ['nobody', 'Kimse'],
+                  ]}
+                  onChange={(v) => setSetting('invitesFrom', v)}
+                />
+              </ListBlock>
+            </ListGroup>
+          </>
+        )}
 
         <ListGroup label={`Engellenenler · ${blocked.size}`} footer="Engellediğin kişiler sana mesaj atamaz, seni arayamaz, hediye veya oda daveti gönderemez.">
           {blocked.size === 0 ? (
@@ -267,7 +329,7 @@ export default function SettingsScreen() {
         </ListGroup>
 
         <ListGroup label="Destek">
-          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle="Taleplerin ve yanıtlar" onPress={() => router.push('/destek')} />
+          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle={live ? 'SSS ve e-posta ile destek' : 'Taleplerin ve yanıtlar'} onPress={() => router.push('/destek')} />
           <ListRow
             icon="scale-outline"
             title="Bir karara itiraz et"
@@ -288,7 +350,19 @@ export default function SettingsScreen() {
             ) : undefined
           }
         >
-          <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="KVKK kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
+          {live ? (
+            // No export route on the server yet: the request goes to support as an e-mail from the person's mail app.
+            <ListRow
+              icon="download-outline"
+              tone="neutral"
+              title="Verilerimin kopyasını iste"
+              subtitle="UK GDPR veri erişim talebi · destek ekibine e-postayla"
+              onPress={() => openSupportMail(dataRequestMail(myServerId(), me.name))}
+              chevron={false}
+            />
+          ) : (
+            <ListRow icon="download-outline" tone="neutral" title="Verilerimin kopyasını iste" subtitle="UK GDPR kapsamında e-postana gönderilir" onPress={requestDataExport} chevron={false} />
+          )}
           <ListRow
             icon="log-out-outline"
             tone="neutral"

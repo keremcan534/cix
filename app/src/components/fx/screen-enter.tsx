@@ -6,20 +6,17 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Platform, View } from 'react-native';
 
+import { isDarkRoute } from '@/components/fx/dark-routes';
+import { callsAvailable } from '@/lib/live';
 import { useSettings } from '@/store';
 import { ThemeScope, themes, useTheme } from '@/theme';
-
-/**
- * Screens drawn dark in both modes: the live room and calls sit on a photo stage, Hemen Tanış is a full-screen
- * call. The agency screens wait for their own light pass (they are being reworked in another branch).
- */
-const ALWAYS_DARK = /^(oda|arama|tanis|ajans)(\/|$)/;
 
 export function ScreenEnter({ children }: { children: ReactNode }) {
   const settings = useSettings();
   const route = useRoute();
   const app = useTheme();
-  const scheme = ALWAYS_DARK.test(route.name) ? 'dark' : app.scheme;
+  // Screens drawn dark in both modes: see fx/dark-routes.
+  const scheme = isDarkRoute(route.name, callsAvailable()) ? 'dark' : app.scheme;
   // A dark screen in the light app keeps a light status bar while it is on top (the app's own bar is dark there).
   const focused = useIsFocused();
   const ownBar = scheme !== app.scheme && focused;

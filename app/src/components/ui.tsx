@@ -253,6 +253,17 @@ export function Header({ title, right, onBack }: { title: string; right?: ReactN
   );
 }
 
+/** The photo, or the person glyph Avatar shows when there is none (new users have no photo yet). */
+function FaceImage({ uri, size, style }: { uri?: string; size: number; style: object }) {
+  const { colors, semantic } = useTheme();
+  if (uri) return <Image source={{ uri }} style={style} />;
+  return (
+    <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
+      <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.actionText} />
+    </View>
+  );
+}
+
 /** Avatar with the nobility (VIP) frame color, if any. */
 // Memoized: props are plain values and settings come from their own context, so rows re-render only when they change.
 export const FramedAvatar = memo(FramedAvatarBase);
@@ -265,7 +276,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   if (art) {
     return (
       <ArtFrame art={art} size={size} still={settings.reduceMotion} maxScale={artScale}>
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+        <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
       </ArtFrame>
     );
   }
@@ -273,7 +284,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
     return (
       <View style={{ width: size, height: size }}>
         <AnimatedFrame fx={frame.fx as FrameFx} size={size} still={settings.reduceMotion}>
-          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+          <FaceImage uri={uri} size={size} style={{ width: '100%', height: '100%' }} />
         </AnimatedFrame>
         {tier && <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />}
       </View>
@@ -285,7 +296,7 @@ function FramedAvatarBase({ uri, size = 44, vipLevel = 0, frameId, online, artSc
   return (
     <View style={{ width: size, height: size }}>
       <LinearGradient colors={frameColors} style={{ width: size, height: size, borderRadius: size / 2, padding: 3 }}>
-        <Image source={{ uri }} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
+        <FaceImage uri={uri} size={size} style={{ flex: 1, borderRadius: size / 2, borderWidth: 2, borderColor: colors.bg }} />
       </LinearGradient>
       {tier ? (
         <Art name={tier.art} size={size * 0.38} style={{ position: 'absolute', top: -size * 0.14, right: -size * 0.07 }} />

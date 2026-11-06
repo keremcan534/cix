@@ -6,13 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
+import { ComingSoon } from '@/components/coming-soon';
 import { GroupChat, type QuickAction } from '@/components/GroupChat';
 import { GradientButton, StateIcon } from '@/components/ui';
-import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta } from '@/data/kabile';
+import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta, payKabileGift } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { presenceOf } from '@/data/presence';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { useApp, type GroupMsg } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -25,7 +27,13 @@ const QUICK: QuickAction[] = [
   { key: 'kasa', label: 'Tayfa Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];
 
+// Tayfa has no server yet (data/kabile tayfaAvailable): in a live build the chat would reach no one and its gifts
+// would take real coins for sample members, so it shows a notice instead.
 export default function KabileChat() {
+  return liveMode() ? <ComingSoon title="Tayfa sohbeti" /> : <DemoKabileChat />;
+}
+
+function DemoKabileChat() {
   const { familyId, me, familyChat, sendFamilyMessage, familyMuted, setFamilyMuted, spendCoins } = useApp();
   const { colors } = useTheme();
   const styles = useStyles();
@@ -65,7 +73,9 @@ export default function KabileChat() {
   };
 
   const sendGift = (g: Gift) => {
-    if (!spendCoins(g.price, `Tayfa sohbeti hediyesi: ${g.name}`)) {
+    const paid = payKabileGift(g.price, `Tayfa sohbeti hediyesi: ${g.name}`, spendCoins);
+    if (paid === 'off') return;
+    if (paid === 'coins') {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },

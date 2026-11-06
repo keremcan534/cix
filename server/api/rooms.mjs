@@ -13,11 +13,16 @@
 //   POST /api/rooms/mute   { room, user, kind: text|voice, minutes|null, reason, description? } → { sanction }
 //   POST /api/rooms/unmute { sanction, reason? }                            → { lifted }
 //   GET  /api/rooms/mutes?room=                                             → { mutes }    (owner or admin)
+//   GET  /api/rooms/staff?room=                                             → { owner, admins, bans? } (bans: staff only)
+//   POST /api/rooms/seat   { room, action: remove|move, user, seat? }       → { done }     (owner or admin)
+//   POST /api/rooms/seat   { room, action: lock|unlock, seat, locked? }     → { lockedSeats }
 // Room mutes are sanctions (sanctions.mjs): their own row, server time, audited. A room admin mutes for up to
 // 7 days; the owner also without an end. Nobody mutes the owner, platform staff or (unless owner) another admin.
+// Seats live in LiveKit, not here: a phone's mic is its own `seat` participant attribute, which room staff can
+// set for someone else (taken off the mic or moved), and locked mics are the LiveKit room's metadata.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
+import { deleteVoiceRoom, removeFromVoice, roomService } from './live.mjs';
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
@@ -49,6 +54,22 @@ async function roomRow(id) {
   return r.rows[0];
 }
 const isAdmin = async (roomId, uid) => (await db.query('SELECT 1 FROM room_admins WHERE room_id = $1 AND user_id = $2', [roomId, uid])).rowCount > 0;
+/** A made-up or deleted account gets a 404, not a room_admins / room_bans row. */
+async function mustExist(uid) {
+  if (!(await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [uid])).rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
+}
+/** One seat change in LiveKit (live.mjs roomService); false when LiveKit doesn't have the room or the person. */
+async function seatCall(method, body, room) {
+  if (!env.LIVEKIT_API_URL) throw new HttpError(503, 'Ses sunucusu şu an bağlı değil');
+  try {
+    return await roomService(method, body, { roomAdmin: true, room });
+  } catch (e) {
+    console.error('livekit', method, room, String(e).slice(0, 200));
+    throw new HttpError(502, 'Ses sunucusuna şu an ulaşılamadı');
+  }
+}
+/** Mic numbers as the app draws them: 0 is the owner's, 1–99 the others. */
+const seatNo = (v) => int(v, 1, 99);
 
 /**
  * Whether `u` may join the LiveKit room `name`: a server room that exists and is open, not banned there, the
@@ -172,6 +193,7 @@ export const roomRoutes = {
       await db.query('DELETE FROM room_admins WHERE room_id = $1 AND user_id = $2', [room.id, target]);
       return { admin: false };
     }
+    await mustExist(target);
     await db.query('INSERT INTO room_admins (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [room.id, target]);
     return { admin: true };
   },
@@ -188,6 +210,7 @@ export const roomRoutes = {
     if (!owner && (await isAdmin(room.id, target))) throw new HttpError(403, 'Yöneticiyi yalnızca oda sahibi çıkarabilir');
     const minutes = b.minutes === null ? null : int(b.minutes, 1, 60 * 24 * 30);
     if (b.minutes !== null && minutes === null) throw new HttpError(400, 'Süre 1 dakika ile 30 gün arası olmalı');
+    await mustExist(target);
     const r = await db.query(
       `INSERT INTO room_bans (room_id, user_id, until, by_user) VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE now() + make_interval(mins => $3::int) END, $4)
        ON CONFLICT (room_id, user_id) DO UPDATE SET until = EXCLUDED.until, by_user = EXCLUDED.by_user, created_at = now() RETURNING until`,
@@ -264,5 +287,59 @@ export const roomRoutes = {
     if (room.owner !== me.id && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
     const r = await db.query(`${SANCTION_SELECT} JOIN users t ON t.id = s.user_id WHERE s.room_id = $1 AND ${LIVE_SANCTION} ORDER BY s.id DESC`.replace('SELECT s.*', 'SELECT t.name AS user_name, s.*'), [room.id]);
     return { mutes: r.rows.map((s) => ({ ...sanctionView(s), userId: s.user_id, userName: s.user_name })) };
+  },
+
+  /** Who runs the room: everyone sees the admins (role badges); only the owner and admins see who is kept out. */
+  async 'GET /api/rooms/staff'(req, url) {
+    const me = await auth(req);
+    const room = await roomRow(url.searchParams.get('room'));
+    const admins = await db.query('SELECT u.id, u.name FROM room_admins a JOIN users u ON u.id = a.user_id WHERE a.room_id = $1 AND u.deleted_at IS NULL ORDER BY u.name, u.id', [room.id]);
+    const staff = room.owner === me.id || admins.rows.some((a) => a.id === me.id);
+    const result = { owner: room.owner, admins: admins.rows.map((a) => ({ id: a.id, name: a.name })) };
+    if (!staff) return result;
+    const bans = await db.query(
+      'SELECT b.user_id, u.name, b.until FROM room_bans b JOIN users u ON u.id = b.user_id WHERE b.room_id = $1 AND (b.until IS NULL OR b.until > now()) ORDER BY b.created_at DESC LIMIT 200',
+      [room.id],
+    );
+    return { ...result, bans: bans.rows.map((x) => ({ userId: x.user_id, name: x.name, until: x.until })) };
+  },
+
+  /**
+   * Room staff move someone's mic: off it (remove) or to another free one (move), as that person's own `seat`
+   * attribute in LiveKit, which their phone then follows. Lock / unlock changes the locked mics in the LiveKit
+   * room's metadata; `locked` is the set the staff phone sees there now. Admins don't touch the owner or admins.
+   */
+  async 'POST /api/rooms/seat'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const room = await roomRow(b.room);
+    if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
+    const owner = room.owner === me.id;
+    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    const name = liveKitName(room.id);
+    if (b.action === 'remove' || b.action === 'move') {
+      const target = userId(b.user);
+      if (!owner && (target === room.owner || (await isAdmin(room.id, target)))) throw new HttpError(403, 'Oda sahibinin ya da yöneticinin koltuğunu yalnızca oda sahibi değiştirebilir');
+      const seat = b.action === 'move' ? seatNo(b.seat) : null;
+      if (b.action === 'move' && seat === null) throw new HttpError(400, 'Geçersiz koltuk');
+      limit(`roomseat:${me.id}`, 60, 'Çok sık işlem yaptın, biraz bekle');
+      const done = await seatCall('UpdateParticipant', { room: name, identity: target, attributes: { seat: seat === null ? '' : String(seat) } }, name);
+      if (!done) throw new HttpError(409, 'Bu kişi şu an sesli odada değil');
+      await audit(db, { actor: me.id, role: owner ? 'room_owner' : 'room_admin', action: b.action === 'move' ? 'room_seat_move' : 'room_seat_remove', target, detail: { room: room.id, seat } });
+      return { done: true };
+    }
+    if (b.action === 'lock' || b.action === 'unlock') {
+      const seat = seatNo(b.seat);
+      if (seat === null) throw new HttpError(400, 'Geçersiz koltuk');
+      const now = new Set((Array.isArray(b.locked) ? b.locked : []).map(seatNo).filter((x) => x !== null));
+      if (b.action === 'lock') now.add(seat);
+      else now.delete(seat);
+      const lockedSeats = [...now].sort((x, y) => x - y);
+      limit(`roomseat:${me.id}`, 60, 'Çok sık işlem yaptın, biraz bekle');
+      const done = await seatCall('UpdateRoomMetadata', { room: name, metadata: JSON.stringify({ lockedSeats }) }, name);
+      if (!done) throw new HttpError(409, 'Odanın sesli bağlantısı şu an açık değil');
+      return { lockedSeats };
+    }
+    throw new HttpError(400, 'Geçersiz işlem');
   },
 };

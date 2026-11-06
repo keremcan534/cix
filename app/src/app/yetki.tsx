@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Share, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Header } from '@/components/ui';
@@ -96,6 +96,8 @@ function Roles({ rbac, update, actor }: Props) {
   const [spec, setSpec] = useState<string | null>(null);
   const { colors } = useTheme();
   const styles = useStyles();
+  // Android modals draw edge to edge: keep the sheet's button above the navigation bar.
+  const sheetBottom = Math.max(30, useSafeAreaInsets().bottom + 8);
 
   const pick = (id: string) => {
     setSel(id);
@@ -234,7 +236,7 @@ function Roles({ rbac, update, actor }: Props) {
       )}
       <Modal visible={!!spec} transparent animationType="slide" onRequestClose={() => setSpec(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setSpec(null)} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: sheetBottom }]}>
           <Text style={styles.h2}>Teknik şartname</Text>
           <ScrollView style={{ maxHeight: 420 }}>
             <Text style={styles.mono}>{spec}</Text>

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
 import { deviceInfo } from '@/lib/device-info';
+import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
 
 export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number };
 export type ServerLedgerRow = { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; ref: string; counterparty: string | null; created_at: string };
@@ -44,13 +45,14 @@ export type SanctionView = {
 };
 export type SanctionCode = 'muted' | 'account_banned' | 'device_banned';
 export type ErrorData = { error?: string; code?: SanctionCode | string; sanction?: SanctionView; serverNow?: string; appealSession?: string };
+// Plain fields, not constructor parameter properties: Node's type stripping (the unit tests) can't run those.
 export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly data: ErrorData = {},
-  ) {
+  readonly status: number;
+  readonly data: ErrorData;
+  constructor(status: number, message: string, data: ErrorData = {}) {
     super(message);
+    this.status = status;
+    this.data = data;
   }
 }
 export type Block = { code: 'account_banned' | 'device_banned'; sanction: SanctionView; serverNow: string; appealSession: string | null };
@@ -73,6 +75,46 @@ export const newRef = () => randomId(12);
 
 let session: string | null = null;
 let signingIn: Promise<ServerUser> | null = null;
+/** The name the last sign-in used (a call refused for having no session signs in with it once); null after logout. */
+let lastName: string | null = null;
+
+// The saved session is read once per app start, and every call waits for that read: on a cold start (a room
+// link, a reload inside a screen) the first requests would otherwise go out without it and get 401.
+let restored = false;
+/** A sign-in, sign-out or ended session since the start: the saved copy no longer counts. */
+let sessionChanged = false;
+let restoring: Promise<void> | null = null;
+function restoreSession() {
+  restoring ??= AsyncStorage.getItem(SESSION_KEY)
+    .then(
+      (saved) => {
+        if (saved && !sessionChanged) session ??= saved;
+      },
+      () => {},
+    )
+    .finally(() => (restored = true));
+  return restoring;
+}
+const setSession = (s: string | null) => {
+  session = s;
+  sessionChanged = true;
+};
+
+/**
+ * A call that went out without a session got 401: waits for the sign-in under way, or, when this app start has
+ * had no session at all yet (the first sign-in failed, e.g. no network), signs in once with the last name. Not
+ * after a sign-out, a ban or an ended session: those are handled where they happen. true: there is a session now,
+ * so the call can be sent again.
+ */
+async function signedInNow() {
+  try {
+    if (signingIn) await signingIn;
+    else if (!session && !sessionChanged && lastName !== null) await ensureSignedIn(lastName);
+  } catch {
+    // The sign-in itself failed: the call keeps its own 401.
+  }
+  return !!session;
+}
 
 const TIMEOUT_MS = 15_000;
 
@@ -80,9 +122,17 @@ const TIMEOUT_MS = 15_000;
  * One request. It gives up after 15 s (a phone network can otherwise hang a request forever, leaving a screen
  * busy). A 401 on a signed-in call means the session ended (expired, signed out elsewhere, server reset): the
  * session is dropped, the device signs in again once with its key, and the request is sent once more.
+ *
+ * Before sending it waits for the saved session (restoreSession) and for a sign-in under way, so it carries the
+ * session; one that still went out without a session and got 401 is sent again once the sign-in is done.
+ * `inSignIn`: a call made by the sign-in itself (it must not wait for itself).
  */
-async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: object, retried = false): Promise<T> {
+async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: object, retried = false, inSignIn = false): Promise<T> {
   if (!BASE) throw new ApiError(0, 'Sunucu adresi ayarlı değil');
+  const signedRoute = !path.startsWith('/api/auth/');
+  if (!restored) await restoreSession();
+  // `retried` also marks a call with an appeal session (withSession), which must not wait for a normal sign-in.
+  if (signedRoute && !inSignIn && !retried && signingIn) await signingIn.catch(() => {});
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   const sent = session;
@@ -101,11 +151,12 @@ async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string
     clearTimeout(timer);
   }
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && sent && !retried && !path.startsWith('/api/auth/')) {
+  if (res.status === 401 && sent && !retried && signedRoute) {
     if (session === sent) await forgetSession();
     await reSignIn();
     return call<T>(method, path, body, true);
   }
+  if (res.status === 401 && !sent && !retried && !inSignIn && signedRoute && (await signedInNow())) return call<T>(method, path, body, true);
   if (!res.ok) {
     if (res.status === 403 && (data.code === 'account_banned' || data.code === 'device_banned') && data.sanction) {
       // The server already ended the session; keep only the appeal session it gave.
@@ -118,7 +169,7 @@ async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string
 }
 
 async function forgetSession() {
-  session = null;
+  setSession(null);
   await AsyncStorage.removeItem(SESSION_KEY);
 }
 
@@ -151,6 +202,7 @@ export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: objec
 
 /** Signs in with this device (creating the account with `name` the first time). */
 export async function signIn(name: string): Promise<ServerUser> {
+  lastName = name;
   const key = await deviceKey();
   const r = await call<{ session: string; user: ServerUser }>('POST', '/api/auth/dev', { deviceKey: key, name, deviceInfo: await myDevice() });
   await keepSession(r.session);
@@ -185,7 +237,7 @@ async function registerDevice() {
   const info = await myDevice();
   if (!info) return;
   try {
-    await call('POST', '/api/devices/register', { deviceInfo: info });
+    await call('POST', '/api/devices/register', { deviceInfo: info }, false, true);
     registered = true;
   } catch (e) {
     // Banned: onBlocked already heard it. Anything else: try again on the next start.
@@ -194,8 +246,15 @@ async function registerDevice() {
 }
 
 async function keepSession(s: string) {
-  session = s;
+  setSession(s);
   await AsyncStorage.setItem(SESSION_KEY, s);
+}
+
+const signedInListeners = new Set<() => void>();
+/** Hears every sign-in that worked (lib/sanctions asks again for what failed before it). Returns the unsubscribe. */
+export function onSignedIn(fn: () => void) {
+  signedInListeners.add(fn);
+  return () => void signedInListeners.delete(fn);
 }
 
 /**
@@ -203,21 +262,27 @@ async function keepSession(s: string) {
  * the same time share one sign-in.
  */
 export function ensureSignedIn(name: string): Promise<ServerUser> {
+  lastName = name;
   signingIn ??= (async () => {
-    session ??= await AsyncStorage.getItem(SESSION_KEY);
+    await restoreSession();
     if (session) {
       try {
-        const u = (await call<{ user: ServerUser }>('GET', '/api/me')).user;
+        const u = (await call<{ user: ServerUser }>('GET', '/api/me', undefined, false, true)).user;
         await registerDevice();
         return u;
       } catch (e) {
         if (!(e instanceof ApiError && e.status === 401)) throw e;
-        session = null;
+        setSession(null);
       }
     }
     if (await viaGoogle()) throw new SignInAgain();
     return signIn(name);
-  })().finally(() => (signingIn = null));
+  })()
+    .then((u) => {
+      signedInListeners.forEach((l) => l());
+      return u;
+    })
+    .finally(() => (signingIn = null));
   return signingIn;
 }
 
@@ -225,8 +290,21 @@ export const me = () => call<{ user: ServerUser }>('GET', '/api/me').then((r) =>
 export const ledger = () => call<{ rows: ServerLedgerRow[] }>('GET', '/api/ledger').then((r) => r.rows);
 export const testTopup = (amount: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/test-topup', { amount, ref });
 export const gift = (to: string, amount: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/gift', { to, amount, ref });
-/** LiveKit token for a room; needs a signed-in user. */
-export const voiceToken = (room: string) => call<{ token: string }>('GET', `/token?room=${encodeURIComponent(room)}`).then((r) => r.token);
+/**
+ * LiveKit token for a room; needs a signed-in user. A password room's token needs the password the person typed
+ * (lib/live/room-password, keyed by the room id in `oda-<id>`); a refusal forgets it, so the room asks again.
+ */
+export async function voiceToken(room: string) {
+  const id = room.startsWith('oda-') ? room.slice(4) : room;
+  const password = roomPassword(id);
+  try {
+    const r = await call<{ token: string }>('GET', `/token?room=${encodeURIComponent(room)}${password ? `&password=${encodeURIComponent(password)}` : ''}`);
+    return r.token;
+  } catch (e) {
+    if (password && e instanceof ApiError && e.status === 403) forgetRoomPassword(id);
+    throw e;
+  }
+}
 
 // --- Launch endpoints (server/api auth, gifts, purchases, push, media, live). Screens move to them one by one.
 export type CatalogGift = { id: string; name: string; price: number; cat: string; minSvip: number };
@@ -260,14 +338,16 @@ export const hasDeviceAccount = async () => !!(await AsyncStorage.getItem(DEVICE
 /** Ends this session (or every session of the account) and forgets it on the device. */
 export async function logout(all = false) {
   await call('POST', '/api/auth/logout', { all }).catch(() => {});
-  session = null;
+  setSession(null);
+  lastName = null;
   await AsyncStorage.multiRemove([SESSION_KEY, PROVIDER_KEY]);
 }
 
 /** Deletes the account on the server (DELETE /api/me), then forgets the session and the device key here. */
 export async function deleteAccount() {
   await call<{ deleted: boolean }>('DELETE', '/api/me');
-  session = null;
+  setSession(null);
+  lastName = null;
   await AsyncStorage.multiRemove([SESSION_KEY, PROVIDER_KEY, DEVICE_KEY]);
 }
 export const sessions = () => call<{ sessions: ServerSession[] }>('GET', '/api/sessions').then((r) => r.sessions);
@@ -316,7 +396,9 @@ export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('PO
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
 
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
-export const createRoom = (title: string, announcement = '', roomType = 'free') => call<{ room: ServerRoom }>('POST', '/api/rooms', { title, announcement, roomType }).then((r) => r.room);
+/** `password` (4–32 characters, optional): only people who type it get into the room's voice. */
+export const createRoom = (title: string, announcement = '', roomType = 'free', password?: string) =>
+  call<{ room: ServerRoom }>('POST', '/api/rooms', { title, announcement, roomType, ...(password ? { password } : {}) }).then((r) => r.room);
 export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api/rooms/close', { id });
 /** The owner renames the room or changes its bulletin. */
 export const updateRoom = (id: string, patch: { title?: string; announcement?: string }) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
@@ -363,6 +445,8 @@ export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs
 /** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
 async function withSession<T>(as: string | null | undefined, run: () => Promise<T>) {
   if (!as) return run();
+  // Read the saved session first: it must not land on top of the appeal session while this runs.
+  await restoreSession();
   const saved = session;
   session = as;
   try {

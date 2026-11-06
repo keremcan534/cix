@@ -7,8 +7,8 @@
 //   GET    /api/following                                 → { users }
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
-//   POST   /api/report  { type, id, reason, note? }       → { reported: true }
-import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId } from './core.mjs';
+//   POST   /api/report  { type, id, reason, note? }       → { reported: true, updated }
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, sanctionView, selfUser, text, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 
@@ -76,9 +76,13 @@ export const socialRoutes = {
    * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, own rooms. The id,
    * ledger, gifts and purchases stay, because financial records must be kept; they no longer point to anything
    * personal. The phone number and the Google account are free again for a new account.
+   * Not while a sanction is on (a ban already stops auth): deleting would free the sign-in key, and the same
+   * phone would come back as a new account without the mute or the repeat-offence history.
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
+    const live = (await db.query(`${SANCTION_SELECT} WHERE s.user_id = $1 AND ${LIVE_SANCTION} ORDER BY s.expires_at DESC NULLS FIRST LIMIT 1`, [u.id])).rows[0];
+    if (live) throw Object.assign(new HttpError(409, 'Yaptırım bitince hesabını silebilirsin'), { extra: { code: 'sanction_active', sanction: sanctionView(live), serverNow: new Date().toISOString() } });
     await tx(async (c) => {
       await c.query(
         `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
@@ -191,9 +195,17 @@ export const socialRoutes = {
     if (typeof b.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(b.id)) throw new HttpError(400, 'Geçersiz hedef');
     const reason = text(b.reason, 1, 60, 'Sebep');
     const note = b.note === undefined ? '' : text(b.note, 0, 500, 'Not');
-    await db.query('INSERT INTO reports (reporter, target_type, target_id, reason, note) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [me.id, b.type, b.id, reason, note]);
+    // One open report per person and target (reports_open_once): reporting it again while it is open keeps the
+    // newer reason (and note, if one is given) instead of dropping it. updated: it was such a repeat.
+    const r = await db.query(
+      `INSERT INTO reports (reporter, target_type, target_id, reason, note) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (reporter, target_type, target_id) WHERE status = 'open'
+       DO UPDATE SET reason = EXCLUDED.reason, note = CASE WHEN EXCLUDED.note <> '' THEN EXCLUDED.note ELSE reports.note END, created_at = now()
+       RETURNING (xmax::text <> '0') AS updated`,
+      [me.id, b.type, b.id, reason, note],
+    );
     // Many people reporting one account: the category's policy step (sanctions.mjs). Never fails the report.
     if (b.type === 'user' && b.id !== me.id) await autoFromReports(b.id, reason).catch((e) => console.error('auto sanction', e.message));
-    return { reported: true };
+    return { ok: true, reported: true, updated: r.rows[0].updated };
   },
 };

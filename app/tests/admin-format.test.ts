@@ -5,7 +5,24 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BAN_OPTIONS, ago, banLabel, banPhrase, fmtDate, fmtUptime, fmtUsd, purchaseCoins, refundResult, voidedResult } from '@/lib/admin-format';
+import {
+  AGENCY_LEDGER_LABEL,
+  BAN_OPTIONS,
+  PERMANENT_BAN_DAYS,
+  ago,
+  banBody,
+  banLabel,
+  banPhrase,
+  fmtDate,
+  fmtUptime,
+  fmtUsd,
+  isPermanentBan,
+  permSource,
+  purchaseCoins,
+  refundResult,
+  verificationLabel,
+  voidedResult,
+} from '@/lib/admin-format';
 
 const now = new Date(2026, 10, 4, 15, 0);
 const iso = (d: Date) => d.toISOString();
@@ -67,5 +84,38 @@ describe('admin-format: sonuç cümleleri', () => {
     assert.equal(voidedResult({ checked: 0, refunded: 0, unknown: 0 }), 'Google Play’de yeni iade yok.');
     assert.equal(voidedResult({ checked: 3, refunded: 2, unknown: 0 }), '3 iade kaydı okundu, 2 tanesi uygulandı.');
     assert.equal(voidedResult({ checked: 2, refunded: 0, unknown: 1 }), '2 iade kaydı okundu, yeni uygulanacak iade yok, 1 tanesi bu uygulamanın alımı değil.');
+  });
+});
+
+describe('admin-format: süresiz yasak ve ham kodlar', () => {
+  test("'Süresiz' sends a permanent ban, timed choices only their days", () => {
+    const forever = BAN_OPTIONS.find((o) => o.label === 'Süresiz')!;
+    assert.equal(forever.days, PERMANENT_BAN_DAYS);
+    assert.ok(isPermanentBan(forever.days));
+    assert.deepEqual(banBody(forever.days), { days: 3650, permanent: true });
+    for (const o of BAN_OPTIONS.filter((x) => x !== forever)) {
+      assert.deepEqual(banBody(o.days), { days: o.days }, o.label);
+      assert.equal(isPermanentBan(o.days), false);
+    }
+    assert.equal(banPhrase(forever.days), 'süresiz askıya alındı');
+  });
+
+  test('device verification states read in Turkish', () => {
+    assert.equal(verificationLabel('unverified'), 'Doğrulanmamış');
+    assert.equal(verificationLabel('verified'), 'Doğrulandı');
+    assert.equal(verificationLabel('failed'), 'Doğrulama başarısız');
+  });
+
+  test('permission rows say where a right comes from, never the raw key', () => {
+    assert.equal(permSource(true, true), 'Rolden geliyor');
+    assert.equal(permSource(true, false), 'Ek yetki');
+    assert.equal(permSource(false, false), undefined);
+  });
+
+  test("agency ledger kinds have labels, including the server's 'transfer_fee'", () => {
+    assert.equal(AGENCY_LEDGER_LABEL.transfer_fee, 'Transfer ücreti');
+    for (const k of ['direct', 'difference', 'transition', 'transfer_fee', 'adjustment', 'reversal', 'bd']) {
+      assert.ok(AGENCY_LEDGER_LABEL[k] && !/[a-z]_[a-z]/.test(AGENCY_LEDGER_LABEL[k]), k);
+    }
   });
 });

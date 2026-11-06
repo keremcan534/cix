@@ -10,6 +10,7 @@ import { Text } from '@/components/text';
 import { RewardBurst } from '@/components/fx/reward';
 import { DepthCard } from '@/components/fx/surface';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -17,7 +18,11 @@ const REWARD = 300;
 
 type Step = { key: string; icon: Icon3DName; title: string; done: boolean; href: Href };
 
-export function StarterPath() {
+/**
+ * `roomHref`: where "join a room" and "first gift" lead. A live build has no sample rooms (their bots would take
+ * real coins): the home tab passes a real open room, and without one the steps stay on the room list.
+ */
+export function StarterPath({ roomHref }: { roomHref?: Href } = {}) {
   const { me, recentRooms, stats, following, checkedInToday, starter, claimStarter, hideStarter, settings } = useApp();
   const [open, setOpen] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
@@ -25,12 +30,13 @@ export function StarterPath() {
   const s = useStyles();
   if (starter.hidden || (starter.claimed && !celebrate)) return null;
 
+  const room: Href = roomHref ?? (liveMode() ? '/(tabs)' : '/oda/r1');
   const steps: Step[] = [
     { key: 'interests', icon: 'heart', title: 'İlgi alanlarını seç', done: (me.interests?.length ?? 0) >= 2, href: '/kullanici/me' },
-    { key: 'room', icon: 'mic', title: 'Bir odaya katıl', done: recentRooms.length > 0, href: '/oda/r1' },
+    { key: 'room', icon: 'mic', title: 'Bir odaya katıl', done: recentRooms.length > 0, href: room },
     { key: 'greet', icon: 'chat', title: 'Birine selam ver', done: stats.greetings > 0, href: '/(tabs)/kesfet' },
     { key: 'follow', icon: 'crown', title: 'Birini takip et', done: following.size >= 2, href: '/(tabs)/kesfet' },
-    { key: 'gift', icon: 'gift', title: 'İlk hediyeni gönder', done: stats.giftsSent > 0, href: '/oda/r1' },
+    { key: 'gift', icon: 'gift', title: 'İlk hediyeni gönder', done: stats.giftsSent > 0, href: room },
     { key: 'checkin', icon: 'tasks', title: 'Günlük ödülünü al', done: checkedInToday, href: '/gorevler' },
   ];
   const doneCount = steps.filter((x) => x.done).length;

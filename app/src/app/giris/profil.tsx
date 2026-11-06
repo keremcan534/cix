@@ -9,19 +9,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
-import { AuthHeader } from '@/components/AuthHeader';
+import { SignupHeader } from '@/components/signup-header';
 import { GradientButton } from '@/components/ui';
 import { INTERESTS, ME } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { IS_DEMO } from '@/lib/build';
 import { liveMode, message, saveProfile } from '@/lib/live';
+import { ageFromYear, birthDateOf, birthYearError, firstSignupProblem, signupStep, welcomeText } from '@/lib/signup';
 import { GENDER_ART, interestParts } from '@/data/profile-art';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
-const THIS_YEAR = new Date().getFullYear();
-
 export default function ProfileSetupScreen() {
-  const { updateMe } = useApp();
+  const { updateMe, login } = useApp();
   const { colors, gradient } = useTheme();
   const styles = useStyles();
   const [photo, setPhoto] = useState<string | null>(null);
@@ -34,9 +34,12 @@ export default function ProfileSetupScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const age = year.length === 4 ? THIS_YEAR - Number(year) : null;
-  const ageError = age !== null && (age < 18 || age > 99) ? 'Uygulamayı kullanmak için 18 yaşından büyük olmalısın.' : null;
-  const valid = name.trim().length >= 2 && !!gender && age !== null && !ageError;
+  // Separate texts for a future or impossible year and for under 18; the age counts from 31 December (lib/signup).
+  const ageError = birthYearError(year);
+  const problem = firstSignupProblem({ name, gender, year });
+  const valid = !problem;
+  const live = liveMode();
+  const { step, total } = signupStep('profil', live);
 
   const pickPhoto = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 });
@@ -47,19 +50,24 @@ export default function ProfileSetupScreen() {
     setInterests((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : prev.length < 5 ? [...prev, i] : prev));
 
   const submit = async () => {
-    if (!valid || busy) return;
+    if (busy) return;
+    // Devam is never silent: the first missing or wrong field is named.
+    if (problem) return showAlert('Profilini tamamla', problem);
     updateMe({
       name: name.trim(),
       gender: gender!,
-      age: age!,
+      age: ageFromYear(Number(year)),
+      // The same date the server keeps (set once), so the own profile shows the real birthday (sosyal-8).
+      birthDate: birthDateOf(Number(year)),
       city: city.trim() || 'İstanbul',
       interests,
       bio: interests.length ? interests.join(' ') : 'Yeni buradayım 👋',
       verified: false,
       ...(photo ? { avatar: photo } : {}),
     });
-    // Live mode: the account is opened on the server now, so other phones see this name, age and city.
-    if (liveMode()) {
+    // Live mode: the account is opened on the server now, so other phones see this name, age and city. There is
+    // no selfie check behind it yet, so sign-up ends here and nothing claims the person is verified (giris-6).
+    if (live) {
       setBusy(true);
       try {
         await saveProfile({ ...ME }, Number(year));
@@ -69,6 +77,9 @@ export default function ProfileSetupScreen() {
       } finally {
         setBusy(false);
       }
+      login();
+      showAlert('Hoş geldin! 🎉', welcomeText(true, IS_DEMO));
+      return;
     }
     router.push('/giris/dogrulama');
   };
@@ -76,7 +87,7 @@ export default function ProfileSetupScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoid style={{ flex: 1 }}>
-        <AuthHeader step={3} title="Profilini oluştur" subtitle="Diğer kullanıcılar seni böyle görecek." />
+        <SignupHeader step={step} total={total} title="Profilini oluştur" subtitle="Diğer kullanıcılar seni böyle görecek." />
         <ScrollView contentContainerStyle={{ padding: 20, gap: 22 }} keyboardShouldPersistTaps="handled">
           <Pressable style={{ alignSelf: 'center' }} onPress={pickPhoto}>
             <LinearGradient colors={gradient} style={styles.photoRing}>

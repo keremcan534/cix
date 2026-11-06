@@ -37,6 +37,7 @@ import {
   type Experience,
 } from '@/lib/agency-apps';
 import { errorHaptic, successHaptic } from '@/lib/haptics';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -226,7 +227,7 @@ function ApplicationFormView({ draft }: { draft?: Application }) {
           </Section>
 
           <Section title="3. Plan ve hedefler" icon="trending-up">
-            <Field label="SimilarClub'a kazandırabileceğin tahmini yayıncı sayısı" required value={f.estimatedHosts} onChange={(v) => up('estimatedHosts', v.replace(/\D/g, '').slice(0, 5))} keyboardType="number-pad" placeholder="Örn. 25" />
+            <Field label="Similar Club'a kazandırabileceğin tahmini yayıncı sayısı" required value={f.estimatedHosts} onChange={(v) => up('estimatedHosts', v.replace(/\D/g, '').slice(0, 5))} keyboardType="number-pad" placeholder="Örn. 25" />
             <Field label="Yayıncı bulma ve yönetme planın" value={f.recruitPlan} onChange={(v) => up('recruitPlan', v)} multiline placeholder="Yayıncıları nereden bulacaksın, nasıl destekleyeceksin?" />
             <Field label="Ajansın büyüme hedefleri" value={f.growthGoals} onChange={(v) => up('growthGoals', v)} multiline placeholder="Örn. 6 ayda 50 aktif yayıncı" />
             <Field label="Eklemek istediklerin" value={f.notes} onChange={(v) => up('notes', v)} multiline />
@@ -359,6 +360,8 @@ function Tracking({ app, onNew }: { app: Application; onNew?: () => void }) {
       },
     ]);
   const goAgency = () => {
+    // A live build has no demo agency account screen: the agency lives on the server (Ajans → Ofis).
+    if (liveMode()) return router.push('/ajans');
     const ag = app.agencyId ? agencyById(app.agencyId) : undefined;
     if (ag && ownedAgency?.status !== 'Onaylandı') activateOwnedAgency(ag.name, ag.code);
     router.push(`/ajans/hesap/${app.agencyId}`);
@@ -412,7 +415,7 @@ function Tracking({ app, onNew }: { app: Application; onNew?: () => void }) {
         {app.status === 'Onaylandı' && (
           <Section title="Tebrikler, ajansın onaylandı" icon="checkmark-done">
             <KV k="Ajans kimliği" v={app.agencyId ?? '—'} />
-            <Text style={s.dim}>Sıradaki adımlar: sözleşme ve komisyon tanımı, Coins Bank, finansal doğrulama. Para çekme yetkisi bu adımlar tamamlanınca açılır.</Text>
+            <Text style={s.dim}>Sıradaki adımlar: sözleşme ve komisyon tanımı{liveMode() ? '' : ', Jeton Noktası'}, finansal doğrulama. Para çekme yetkisi bu adımlar tamamlanınca açılır.</Text>
             <Button title="Ajans hesabıma git" icon="business" onPress={goAgency} />
           </Section>
         )}
@@ -445,7 +448,7 @@ function Tracking({ app, onNew }: { app: Application; onNew?: () => void }) {
           <KV k="Deneyim" v={app.form.experience ? EXPERIENCE_LABEL[app.form.experience] : ''} />
           <KV k="Tahmini yayıncı" v={app.form.estimatedHosts} />
           <KV k="Belgeler" v={app.docs.length ? app.docs.map((d) => d.name).join('\n') : 'Yok'} />
-          <Text style={s.dim}>Bu başvuruyu yalnız sen ve yetkili SimilarClub personeli görebilir.</Text>
+          <Text style={s.dim}>Bu başvuruyu yalnız sen ve yetkili Similar Club personeli görebilir.</Text>
         </Section>
 
         {!CLOSED.includes(app.status) && <Button title="Başvuruyu iptal et" variant="danger" onPress={cancel} />}

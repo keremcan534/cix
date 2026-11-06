@@ -1,7 +1,8 @@
 // Bağlar: two people tied as Çift, Kardeş, Ağabey, Kanka… (docs/BAGLAR.md).
 //
 //   GET  /api/bonds/info                         → { kinds, levels, rewards }           (public)
-//   GET  /api/bonds?user=                        → { hidden, bonds }                    (someone's active bonds; mine without user)
+//   GET  /api/bonds?user=                        → { hidden, bonds }                    (someone's active bonds; mine without user;
+//                                                                                        hidden: only the viewer's own bond with them)
 //   GET  /api/bonds/requests                     → { incoming, outgoing }               (my pending requests)
 //   POST /api/bonds/request  { to, kind, ref }   → { bond, user, replay }
 //   POST /api/bonds/respond  { id, accept }      → { bond }
@@ -164,17 +165,21 @@ export const bondRoutes = {
   async 'GET /api/bonds'(req, url) {
     const me = await auth(req);
     const who = url.searchParams.get('user') ? userId(url.searchParams.get('user')) : me.id;
+    let hidden = who === me.id ? !!me.bonds_hidden : false;
     if (who !== me.id) {
       const u = await db.query('SELECT bonds_hidden FROM users WHERE id = $1 AND deleted_at IS NULL', [who]);
       if (!u.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
-      if (u.rows[0].bonds_hidden) return { hidden: true, bonds: [] };
+      hidden = !!u.rows[0].bonds_hidden;
     }
+    // Hidden from others: a viewer still sees their own bond with this person (and so no "Bağ kur"), nothing else.
+    const onlyMine = who !== me.id && hidden;
     const r = await db.query(
       `${SELECT} WHERE x.status = 'active' AND (x.a = $1 OR x.b = $1) AND ua.deleted_at IS NULL AND ub.deleted_at IS NULL
+          AND (NOT $2 OR $3 IN (x.a, x.b))
         ORDER BY (x.kind = 'cift') DESC, x.gift_coins DESC, x.accepted_at LIMIT 50`,
-      [who],
+      [who, onlyMine, me.id],
     );
-    return { hidden: who === me.id ? !!me.bonds_hidden : false, bonds: r.rows.map((b) => out(b, who)) };
+    return { hidden, bonds: r.rows.map((b) => out(b, who)) };
   },
 
   async 'GET /api/bonds/requests'(req) {
@@ -242,7 +247,8 @@ export const bondRoutes = {
         await refund(c, b, 'refused', `Bağ isteği iadesi: ${k.label} (kabul edilmedi)`);
         return 'refused';
       }
-      if (await blockedBetween(b.a, b.b)) throw new HttpError(403, 'Bu kişiyle bağ kuramazsın');
+      // On this transaction's own connection: it holds both accounts' locks (see blockedBetween).
+      if (await blockedBetween(b.a, b.b, c)) throw new HttpError(403, 'Bu kişiyle bağ kuramazsın');
       const alive = await c.query('SELECT count(*) AS n FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL', [[b.a, b.b]]);
       if (Number(alive.rows[0].n) < 2) throw new HttpError(404, 'Kullanıcı bulunamadı');
       // Room may have filled since the request: mine, or theirs from another bond accepted meanwhile.

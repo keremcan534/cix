@@ -8,6 +8,11 @@ import { AGENCIES, ROLE_LABEL, agencyOf, type AgencyRole } from '@/data/agency';
 import { findKabile, KABILE_ROUTES } from '@/data/kabile';
 import type { User } from '@/data/mock';
 import { familyOf } from '@/data/profile';
+import { shownStaffBadge } from '@/data/rbac';
+import { liveMode } from '@/lib/live';
+import { useStaffRole } from '@/lib/live/admin';
+import { useMyServerAgency } from '@/lib/live/me-stats';
+import { AGENCY_ROLE_TEXT } from '@/lib/me-view';
 import { useApp } from '@/store';
 import { makeStyles, themes, useTheme } from '@/theme';
 
@@ -15,14 +20,19 @@ import { makeStyles, themes, useTheme } from '@/theme';
 export const FEMALE_FILL = themes.dark.semantic.socialFill;
 export const MALE_FILL = '#0369A1';
 
-/** Profile spec §2-A: a hidden gender shows only the age to others; the owner still sees it, marked as hidden. */
+/**
+ * Profile spec §2-A: a hidden gender shows only the age to others; the owner still sees it, marked as hidden.
+ * An age of 0 is an age nobody entered yet (a new live account): it is left out, not shown as "0".
+ */
 export function GenderChip({ user, owner }: { user: User; owner?: boolean }) {
   const styles = useStyles();
   const hidden = user.showGender === false;
+  const age = user.age > 0 ? user.age : null;
   if (!user.gender || (hidden && !owner)) {
+    if (age === null) return null;
     return (
-      <View style={[styles.chip, styles.ageChip]} accessibilityLabel={`${user.age} yaş`}>
-        <Text style={[styles.chipText, styles.ageChipText]}>{user.age}</Text>
+      <View style={[styles.chip, styles.ageChip]} accessibilityLabel={`${age} yaş`}>
+        <Text style={[styles.chipText, styles.ageChipText]}>{age}</Text>
       </View>
     );
   }
@@ -30,11 +40,11 @@ export function GenderChip({ user, owner }: { user: User; owner?: boolean }) {
   return (
     <View
       style={[styles.chip, { backgroundColor: female ? FEMALE_FILL : MALE_FILL }, hidden && styles.hiddenChip]}
-      accessibilityLabel={`${user.gender}, ${user.age} yaş${hidden ? ', gizli: yalnızca sen görüyorsun' : ''}`}
+      accessibilityLabel={`${user.gender}${age === null ? '' : `, ${age} yaş`}${hidden ? ', gizli: yalnızca sen görüyorsun' : ''}`}
     >
       <Ionicons name={female ? 'female' : 'male'} size={12} color="#fff" />
       <Text style={styles.chipText}>
-        {user.gender} · {user.age}
+        {age === null ? user.gender : `${user.gender} · ${age}`}
       </Text>
       {hidden && <Ionicons name="eye-off" size={12} color="#fff" />}
     </View>
@@ -46,10 +56,20 @@ export type Affiliation = { emoji: string; name: string; sub: string; href?: Hre
 /**
  * The agency and kabile a user belongs to. Mine come from the store; others' from their public profile.
  * href is set only when the page it opens shows that same agency / kabile (or lets me join it).
+ *
+ * Live mode: my agency is the server's (lib/live/me-stats, the answer /ajans shows), `known` false until it is
+ * in. Kabile (Tayfa) and other people's agencies exist only in the demo, so live mode shows none of them.
  */
-export function useAffiliations(user: User): { agency: Affiliation | null; kabile: Affiliation | null } {
+export function useAffiliations(user: User): { agency: Affiliation | null; kabile: Affiliation | null; known: boolean } {
   const { agencyId, agencyRole, ownedAgency, familyId } = useApp();
   const isMe = user.id === 'me';
+  const live = liveMode();
+  const server = useMyServerAgency(isMe && live);
+
+  if (live) {
+    const agency: Affiliation | null = isMe && server ? { emoji: '🏢', name: server.name, sub: AGENCY_ROLE_TEXT[server.role], href: '/ajans' } : null;
+    return { agency, kabile: null, known: !isMe || server !== undefined };
+  }
 
   let agency: Affiliation | null = null;
   if (isMe) {
@@ -78,7 +98,14 @@ export function useAffiliations(user: User): { agency: Affiliation | null; kabil
     // /aile shows my own kabile, or the kabile list when I have none.
     href: isMe || !mine || mine.id === k.id ? KABILE_ROUTES.profile : undefined,
   };
-  return { agency, kabile };
+  return { agency, kabile, known: true };
+}
+
+/** The staff badge on a profile: in live mode only my own, from my server role; in the demo the local roles. */
+export function useStaffBadge(userId: string) {
+  const { rbac } = useApp();
+  const role = useStaffRole();
+  return shownStaffBadge(rbac, userId, liveMode(), role);
 }
 
 // Assistants are an internal agency role; publicly they are hosts like everyone else.
@@ -87,20 +114,22 @@ const publicRole = (r: AgencyRole) => (r === 'owner' ? ROLE_LABEL.owner : ROLE_L
 /** Compact pills under the name. Empty affiliations are hidden for others; the owner gets a soft "join" prompt. */
 export function AffiliationPills({ user }: { user: User }) {
   const styles = useStyles();
-  const { agency, kabile } = useAffiliations(user);
+  const { agency, kabile, known } = useAffiliations(user);
   const isMe = user.id === 'me';
-  if (!agency && !kabile && !isMe) return null;
+  // Live mode has no Tayfa yet: no pill and no "join" prompt for it.
+  const tayfa = !liveMode();
+  if (!agency && !kabile && (!isMe || (!known && !tayfa))) return null;
   return (
     <View style={styles.pills}>
       {agency ? (
         <Pill icon="business" label={agency.name} emoji={agency.emoji} a11y={`Ajans: ${agency.name}, ${agency.sub}`} href={agency.href} />
       ) : (
-        isMe && <Pill icon="business" label="Ajans yok · Katıl" empty a11y="Ajans: yok. Ajansa katıl" href="/ajans" />
+        isMe && known && <Pill icon="business" label="Ajans yok · Katıl" empty a11y="Ajans: yok. Ajansa katıl" href="/ajans" />
       )}
       {kabile ? (
         <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Tayfa: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
       ) : (
-        isMe && <Pill icon="people" label="Tayfa yok · Katıl" empty a11y="Tayfa: yok. Bir tayfaya katıl" href={KABILE_ROUTES.profile} />
+        isMe && tayfa && <Pill icon="people" label="Tayfa yok · Katıl" empty a11y="Tayfa: yok. Bir tayfaya katıl" href={KABILE_ROUTES.profile} />
       )}
     </View>
   );

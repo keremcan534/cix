@@ -72,6 +72,8 @@ function PayoutCard({ p, onDone }: { p: admin.AgencyPayout; onDone: () => void }
   const ctx = useAdmin();
   const [busy, setBusy] = useState(false);
   const who = `${p.agency.name} (${p.agency.code})`;
+  // Commission earned from test coins never turns into money: approve and pay stay off, only reject/cancel remain.
+  const blocked = p.payable === false;
 
   const approve = () =>
     confirmThen(
@@ -127,17 +129,27 @@ function PayoutCard({ p, onDone }: { p: admin.AgencyPayout; onDone: () => void }
     });
 
   return (
-    <ItemCard title={money(p)} sub={`${fmtUsd(p.usd)} · ${p.currency === 'TRY' ? 'TL olarak ödenecek' : 'USD olarak ödenecek'}`} pill={<StatusPill text={p.statusLabel} tone={TONE[p.status]} />}>
+    <ItemCard
+      title={money(p)}
+      sub={`${fmtUsd(p.usd)} · ${p.currency === 'TRY' ? 'TL olarak ödenecek' : 'USD olarak ödenecek'}`}
+      pill={
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+          {blocked && <StatusPill text="Test jetonu · ödenemez" tone="danger" />}
+          <StatusPill text={p.statusLabel} tone={TONE[p.status]} />
+        </View>
+      }
+    >
       <Line label="Ajans" value={who} />
       <Line label="Talep eden" value={`${p.requestedBy} · ${fmtDate(p.requestedAt)} · ${ago(p.requestedAt)}`} />
       {!!p.approvedBy && <Line label="Onaylayan" value={`${p.approvedBy}${p.approvedAt ? ` · ${fmtDate(p.approvedAt)}` : ''}`} />}
       {!!p.paidAt && <Line label="Ödendi" value={fmtDate(p.paidAt)} />}
       {!!p.paymentRef && <Line label="Dekont" value={p.paymentRef} mono />}
+      {blocked && <Line label="Not" value="Komisyon test jetonuyla kazanılmış; onaylanamaz ve ödenemez, yalnızca reddedilebilir." />}
       {!!p.note && <Quote text={p.note} />}
       {(p.status === 'pending' || p.status === 'ready') && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
-          {p.status === 'pending' && <Button title="Onayla" icon="checkmark-circle-outline" variant="tonal" small onPress={approve} disabled={busy} />}
-          {p.status === 'ready' && <Button title="Ödendi olarak işaretle" icon="checkmark-done-outline" variant="tonal" small onPress={pay} disabled={busy} />}
+          {p.status === 'pending' && <Button title="Onayla" icon="checkmark-circle-outline" variant="tonal" small onPress={approve} disabled={busy || blocked} />}
+          {p.status === 'ready' && <Button title="Ödendi olarak işaretle" icon="checkmark-done-outline" variant="tonal" small onPress={pay} disabled={busy || blocked} />}
           <Button
             title={p.status === 'pending' ? 'Reddet' : 'İptal et'}
             icon="close-circle-outline"

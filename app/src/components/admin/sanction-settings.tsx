@@ -10,6 +10,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ChoiceChips, ListGroup, ListSwitch } from '@/components/list';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
+import { permSource } from '@/lib/admin-format';
 import { message } from '@/lib/live';
 import * as admin from '@/lib/live/admin';
 import { durationOptions, fmtLength, groupPolicies, heavyStep, isMute, normalizeStep, policyError, roleLabel, type PolicyGroup, type SanctionMeta, type SanctionType } from '@/lib/sanction-format';
@@ -229,7 +230,7 @@ function UserPerms({ user, meta, nav, onBack }: { user: admin.SanctionSearchUser
                     icon={fromRole ? 'lock-closed-outline' : on ? 'checkmark-circle-outline' : 'ellipse-outline'}
                     tone={on ? 'success' : 'neutral'}
                     title={desc}
-                    subtitle={fromRole ? `${p} · rolden geliyor` : on ? `${p} · ek yetki` : p}
+                    subtitle={permSource(on, fromRole)}
                     value={on}
                     disabled={fromRole || busy}
                     onChange={(grant) =>

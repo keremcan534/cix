@@ -70,7 +70,13 @@ const MY_EXTRAS: ProfileExtras = {
   birthday: '2002-11-13',
 };
 
+/** Nothing filled in: what everyone has in live mode, where the server keeps none of these fields. */
+export const NO_EXTRAS: ProfileExtras = { height: 0, weight: 0, job: '', languages: [], zodiac: '', slogan: null, tags: [], relationship: '', education: '', birthday: '' };
+
+/** Sample extras for the offline demo. In live mode (a server address is set; read on each call so a test can
+ *  switch it) nobody has any, me included: a made-up height, job or birthday must not show as someone's. */
 export const profileExtras = (user: User): ProfileExtras => {
+  if (process.env.EXPO_PUBLIC_API_URL) return NO_EXTRAS;
   if (user.id === 'me') return MY_EXTRAS;
   const s = seedOf(user.id);
   const woman = user.gender === 'Kadın';

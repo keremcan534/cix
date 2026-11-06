@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { EdgeLight, Glass } from '@/components/fx/surface';
+import { liveMode } from '@/lib/live';
+import { unreadTotal } from '@/lib/unread';
 import { useApp } from '@/store';
 import { TAB_BAR_HEIGHT, makeStyles, themes, useTheme } from '@/theme';
 
@@ -47,9 +49,10 @@ function TabBarGlass() {
 }
 
 export default function TabLayout() {
-  const { conversations } = useApp();
+  const { conversations, blocked } = useApp();
   const { colors, scheme } = useTheme();
-  const unread = conversations.reduce((sum, c) => sum + c.unread, 0);
+  // Same chats as the Mesajlar list: a blocked person's unread messages are hidden there, so not counted here.
+  const unread = unreadTotal(conversations, blocked);
   // The bar's height must include the home-indicator inset: React Navigation pads by it inside the height we
   // give, so a fixed 64 would leave the icons ~24pt on notched phones. Screens pad by TAB_BAR_HEIGHT + inset.
   const insets = useSafeAreaInsets();
@@ -75,7 +78,9 @@ export default function TabLayout() {
         }}
       >
         <Tabs.Screen name="kesfet" options={{ title: 'Benzerler', tabBarIcon: icon('heart-outline', 'heart') }} />
-        <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture') }} />
+        {/* Moments have no server feed yet (posts would stay on this phone among sample people), so a live build
+            leaves the tab out; the route itself shows a "yakında" notice there (anlar.tsx). */}
+        <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture'), ...(liveMode() ? { href: null } : {}) }} />
         <Tabs.Screen
           name="index"
           options={{

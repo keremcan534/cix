@@ -3,9 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Share, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
+import { ComingSoon } from '@/components/coming-soon';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
@@ -16,6 +18,7 @@ import { FAMILIES } from '@/data/economy';
 import {
   KABILE_CHESTS,
   KABILE_COUPLES,
+  KABILE_CREATE_COST,
   KABILE_ROUTES,
   KABILE_TASKS,
   KABILE_THEMES,
@@ -25,8 +28,8 @@ import {
   fmtK,
   kabileMemberIds,
   kabileMeta,
+  createKabile,
   powerTier,
-  registerKabile,
   taskProgress,
   useKabileProgress,
   type KabileFamily,
@@ -36,12 +39,12 @@ import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { youLabel } from '@/lib/tr';
 import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
-const CREATE_COST = 500;
 type Role = 'owner' | 'helper' | 'member';
 type Tab = 'oda' | 'gorev' | 'cift' | 'durum' | 'tema';
 type Sheet = 'stats' | 'rules' | 'ranking' | 'highlights' | null;
@@ -61,7 +64,13 @@ const WEEK_SHARE = [0.1, 0.12, 0.15, 0.13, 0.18, 0.17, 0.15];
 const activity = (id: string, i: number) => ({ days: id === 'me' ? 4 : (i * 3 + 2) % 8, contribution: id === 'me' ? 2_500 : Math.max(0, (9 - i) * 2_600 - (i % 3) * 900) });
 const isActive = (a: { days: number; contribution: number }) => a.days >= 3 && a.contribution >= 1_000;
 
+// Tayfa has no server yet (data/kabile tayfaAvailable): a live build shows a notice instead of sample tayfas and
+// a "Tayfa kur" that would take real coins for a tayfa that exists only on this phone.
 export default function FamilyScreen() {
+  return liveMode() ? <ComingSoon title="Tayfalar" /> : <DemoFamilies />;
+}
+
+function DemoFamilies() {
   const { familyId, setFamily, familyRole, setFamilyRole, spendCoins } = useApp();
   const { colors } = useTheme();
   const styles = useStyles();
@@ -76,62 +85,64 @@ export default function FamilyScreen() {
     <SafeAreaView style={styles.safe}>
       <Backdrop scene={SCENES.family} />
       <Header title="Tayfalar" />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
-        {creating ? (
-          <Card style={{ gap: 10 }}>
-            <Text style={styles.title}>Tayfa kur · 🪙 {CREATE_COST}</Text>
-            <TextInput value={newName} onChangeText={setNewName} placeholder="Tayfa adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
-            <Text style={styles.dim}>Tayfayı kuran kişi tayfa lideri olur; yardımcı atayabilir, üye davet edebilir ve başvuruları onaylayabilir.</Text>
-            <GradientButton
-              title="Kur"
-              onPress={() => {
-                if (newName.trim().length < 3) return showAlert('Tayfa adı en az 3 karakter olmalı');
-                if (!spendCoins(CREATE_COST)) return showAlert('Yetersiz jeton', `Tayfa kurmak ${CREATE_COST} jeton.`);
-                const id = `custom-${Date.now()}`;
-                registerKabile({ id, name: newName.trim(), emoji: '🏰', xp: 0, weekly: 0, members: 1, leaderId: 'me', memberIds: ['me'] });
-                setFamily(id);
-                setFamilyRole('owner');
-              }}
-            />
-          </Card>
-        ) : (
-          <GradientButton title="Kendi tayfanı kur" icon="add" onPress={() => setCreating(true)} />
-        )}
-        <Text style={[styles.title, { marginTop: 6 }]}>Haftalık tayfa sıralaması</Text>
-        {ranked.map((f, i) => {
-          const lvl = familyLevel(f.xp);
-          return (
-            <Card key={f.id} style={styles.row}>
-              <Text style={styles.rank}>{i + 1}</Text>
-              <Text style={{ fontSize: 32 }}>{f.emoji}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>{f.name}</Text>
-                <Text style={styles.dim} numberOfLines={1}>
-                  Lv.{lvl} · {f.members}/{familyCapacity(lvl)} üye
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                  {f.memberIds.slice(0, 5).map((id, j) => (
-                    <View key={id} style={{ marginLeft: j ? -8 : 0 }}>
-                      <Avatar uri={userById(id).avatar} size={22} />
-                    </View>
-                  ))}
-                  <Text style={[styles.dim, { marginLeft: 8 }]}>Bonus {pct(RULES.familyRates[lvl - 1])}</Text>
-                </View>
-              </View>
-              <Pressable
-                style={styles.join}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
+          {creating ? (
+            <Card style={{ gap: 10 }}>
+              <Text style={styles.title}>Tayfa kur · 🪙 {KABILE_CREATE_COST}</Text>
+              <TextInput value={newName} onChangeText={setNewName} placeholder="Tayfa adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
+              <Text style={styles.dim}>Tayfayı kuran kişi tayfa lideri olur; yardımcı atayabilir, üye davet edebilir ve başvuruları onaylayabilir.</Text>
+              <GradientButton
+                title="Kur"
                 onPress={() => {
-                  setFamily(f.id);
-                  setFamilyRole('member');
-                  showAlert('Başvurun onaylandı', `${f.name} tayfasına katıldın. (Demo: başvuru lider/yardımcı tarafından anında onaylandı.)`);
-                }}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Katıl</Text>
-              </Pressable>
+                  if (newName.trim().length < 3) return showAlert('Tayfa adı en az 3 karakter olmalı');
+                  const made = createKabile(newName.trim(), spendCoins);
+                  if (made === 'off') return;
+                  if (made === 'coins') return showAlert('Yetersiz jeton', `Tayfa kurmak ${KABILE_CREATE_COST} jeton.`);
+                  setFamily(made.id);
+                  setFamilyRole('owner');
+                }}
+              />
             </Card>
-          );
-        })}
-        <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kullanıcı aynı anda yalnızca bir tayfaya üye olabilir.</Text>
-      </ScrollView>
+          ) : (
+            <GradientButton title="Kendi tayfanı kur" icon="add" onPress={() => setCreating(true)} />
+          )}
+          <Text style={[styles.title, { marginTop: 6 }]}>Haftalık tayfa sıralaması</Text>
+          {ranked.map((f, i) => {
+            const lvl = familyLevel(f.xp);
+            return (
+              <Card key={f.id} style={styles.row}>
+                <Text style={styles.rank}>{i + 1}</Text>
+                <Text style={{ fontSize: 32 }}>{f.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>{f.name}</Text>
+                  <Text style={styles.dim} numberOfLines={1}>
+                    Lv.{lvl} · {f.members}/{familyCapacity(lvl)} üye
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                    {f.memberIds.slice(0, 5).map((id, j) => (
+                      <View key={id} style={{ marginLeft: j ? -8 : 0 }}>
+                        <Avatar uri={userById(id).avatar} size={22} />
+                      </View>
+                    ))}
+                    <Text style={[styles.dim, { marginLeft: 8 }]}>Bonus {pct(RULES.familyRates[lvl - 1])}</Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={styles.join}
+                  onPress={() => {
+                    setFamily(f.id);
+                    setFamilyRole('member');
+                    showAlert('Başvurun onaylandı', `${f.name} tayfasına katıldın. (Demo: başvuru lider/yardımcı tarafından anında onaylandı.)`);
+                  }}>
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>Katıl</Text>
+                </Pressable>
+              </Card>
+            );
+          })}
+          <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kullanıcı aynı anda yalnızca bir tayfaya üye olabilir.</Text>
+        </ScrollView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }
@@ -214,6 +225,8 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* The announcement field sits in the scroll: the keyboard must not cover it (Android draws edge to edge). */}
+      <KeyboardAvoid style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
         {/* The tribe's theme header stays dark in both schemes (white type on the theme gradient). */}
         <ThemeScope scheme="dark">
@@ -578,6 +591,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           {tab === 'tema' && <ThemeTab themeId={themeId} onPick={setThemeId} level={lvl} canManage={canManage} />}
         </View>
       </ScrollView>
+      </KeyboardAvoid>
 
       <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
         <Pressable style={{ flex: 1 }} onPress={() => setShareOpen(true)} accessibilityLabel="Paylaş">
@@ -868,10 +882,12 @@ function Stat({ label, value }: { label: string; value: string }) {
 function InfoSheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const { colors } = useTheme();
   const styles = useStyles();
+  // Android modals draw edge to edge: keep the sheet's end above the navigation bar.
+  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom }]}>
         <View style={[styles.row, { marginBottom: 10 }]}>
           <Text style={[styles.title, { flex: 1 }]}>{title}</Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">

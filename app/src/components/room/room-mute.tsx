@@ -1,7 +1,7 @@
 // Room staff mute someone in a server room (server/api/rooms.mjs POST /api/rooms/mute): chat or mic, for a set
 // time. The server enforces it through the voice token, keeps the record and decides who may do it (an admin up
 // to 7 days, the owner longer or until lifted; nobody mutes the owner). The first sheet picks what, the second
-// for how long.
+// for how long; "Mikrofonunu sustur" on a mic already says what, so it opens the second one straight away.
 import { useRef, useState } from 'react';
 
 import { ActionSheet } from '@/components/ActionSheet';
@@ -21,7 +21,7 @@ const TIMES: { label: string; minutes: number | null; ownerOnly?: boolean }[] = 
 
 type Target = { uid: string; name: string };
 
-/** `start(uid, name)` opens the sheets; render `sheet`. `owner`: the room's owner (longer times). */
+/** `start(uid, name, kind?)` opens the sheets; render `sheet`. `owner`: the room's owner (longer times). */
 export function useRoomMute(roomId: string, owner: boolean, onDone?: (text: string) => void) {
   const [target, setTarget] = useState<Target | null>(null);
   const [kind, setKind] = useState<'text' | 'voice' | null>(null);
@@ -83,5 +83,10 @@ export function useRoomMute(roomId: string, owner: boolean, onDone?: (text: stri
       />
     </>
   );
-  return { start: (uid: string, name: string) => setTimeout(() => setTarget({ uid, name }), 300), sheet };
+  const start = (uid: string, name: string, k?: 'text' | 'voice') =>
+    setTimeout(() => {
+      setTarget({ uid, name });
+      if (k) setKind(k);
+    }, 300);
+  return { start, sheet };
 }

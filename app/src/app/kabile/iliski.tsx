@@ -7,17 +7,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Art } from '@/components/Art';
+import { ComingSoon } from '@/components/coming-soon';
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
-import { CP_GIFT_IDS, KABILE_COUPLES, KABILE_FRIENDS, KABILE_ROUTES, findKabile, fmtK, kabile, kabileMemberIds, type Pair } from '@/data/kabile';
+import { CP_GIFT_IDS, KABILE_COUPLES, KABILE_FRIENDS, KABILE_ROUTES, findKabile, fmtK, kabile, kabileMemberIds, payKabileGift, type Pair } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { successHaptic } from '@/lib/haptics';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
 const CP_GIFTS = CP_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
+// Tayfa has no server yet (data/kabile tayfaAvailable): the pairs are sample people and an İkili gift would take
+// real coins for no one, so a live build shows a notice instead.
 export default function IliskiMeydani() {
+  return liveMode() ? <ComingSoon title="Uyum Köşesi" /> : <DemoIliski />;
+}
+
+function DemoIliski() {
   const { familyId, spendCoins } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
@@ -32,7 +40,9 @@ export default function IliskiMeydani() {
   const sendGift = (g: Gift) => {
     if (!giftTo) return;
     const u = userById(giftTo);
-    if (!spendCoins(g.price, `İkili hediyesi: ${g.name} → ${u.name}`)) {
+    const paid = payKabileGift(g.price, `İkili hediyesi: ${g.name} → ${u.name}`, spendCoins);
+    if (paid === 'off') return;
+    if (paid === 'coins') {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
@@ -147,11 +157,17 @@ function PairCard({ pair, mode, big }: { pair: Pair; mode: 'cp' | 'dost'; big?: 
           {a.name} & {b.name}
         </Text>
         <View style={{ flexDirection: 'row', gap: 6 }}>
-          <Text style={styles.chip}>{mode === 'cp' ? 'İkili' : 'Dost'}</Text>
-          <Text style={styles.chip}>LV.{pair.level}</Text>
+          <Text style={styles.chip} numberOfLines={1}>
+            {mode === 'cp' ? 'İkili' : 'Dost'}
+          </Text>
+          <Text style={styles.chip} numberOfLines={1}>
+            LV.{pair.level}
+          </Text>
         </View>
       </View>
-      <Text style={styles.score}>{fmtK(pair.score)} ❤</Text>
+      <Text style={styles.score} numberOfLines={1}>
+        {fmtK(pair.score)} ❤
+      </Text>
     </View>
   );
 }
@@ -172,6 +188,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   pair: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(255,101,118,0.35)' },
   pairBig: { backgroundColor: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.3)' },
   pairName: { color: colors.text, fontWeight: '800', fontSize: 14 },
-  chip: { color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: dark ? 'rgba(255,101,118,0.6)' : semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
-  score: { color: dark ? '#F9A8D4' : semantic.socialText, fontWeight: '900', fontSize: 15 },
+  // Chips and the score never shrink: on a narrow row (360 px) a shrunk chip broke inside its word ('İkil i').
+  chip: { flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: '800', backgroundColor: dark ? 'rgba(255,101,118,0.6)' : semantic.socialFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  score: { flexShrink: 0, color: dark ? '#F9A8D4' : semantic.socialText, fontWeight: '900', fontSize: 15 },
 }));

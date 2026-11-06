@@ -1,12 +1,14 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { AuthHeader } from '@/components/AuthHeader';
+import { SignupHeader } from '@/components/signup-header';
 import { GradientButton } from '@/components/ui';
+import { liveMode } from '@/lib/live';
+import { signupStep } from '@/lib/signup';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -14,7 +16,12 @@ import { makeStyles, useTheme } from '@/theme';
 const format = (digits: string) =>
   [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean).join(' ');
 
-export default function PhoneScreen() {
+/** Phone sign-in is a prototype (no SMS is sent). A live build has none, so a link here goes to the start (giris-10). */
+export default function PhoneRoute() {
+  return liveMode() ? <Redirect href="/giris" /> : <PhoneScreen />;
+}
+
+function PhoneScreen() {
   const { setPhone } = useApp();
   const { colors } = useTheme();
   const styles = useStyles();
@@ -30,7 +37,7 @@ export default function PhoneScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoid style={{ flex: 1 }}>
-        <AuthHeader step={1} title="Telefon numaran" subtitle="Sana bir doğrulama kodu göndereceğiz." />
+        <SignupHeader {...signupStep('telefon', false)} title="Telefon numaran" subtitle="Sana bir doğrulama kodu göndereceğiz." />
         <View style={styles.row}>
           <View style={styles.prefix}>
             <Text style={{ fontSize: 18 }}>🇹🇷</Text>

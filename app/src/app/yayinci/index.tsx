@@ -14,6 +14,8 @@ import { diamondValueTl } from '@/lib/coins-bank';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { IS_DEMO } from '@/lib/build';
+import { callsAvailable, liveMode } from '@/lib/live';
+import { useLiveEarnings } from '@/lib/live/earnings';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -26,6 +28,8 @@ const PERKS: { icon: string; art?: ArtName; title: string; text: string }[] = [
   { icon: '📹', art: 'finans-ucretli-aramalar', title: 'Ücretli aramalar', text: 'Görüntülü aramalarda dakika başı kazan.' },
   { icon: '🏦', art: 'finans-haftalik-odeme-banka', title: 'Haftalık ödeme', text: 'Elmaslarını banka hesabına çek.' },
 ];
+/** Calls are not open in this build yet (lib/live callsAvailable), so they are not promised as a way to earn. */
+const perks = () => PERKS.filter((p) => p.art !== 'finans-ucretli-aramalar' || callsAvailable());
 
 /** The picture for an earning row by its source; other sources keep the emoji. */
 const EARNING_ART: Partial<Record<string, ArtName>> = { Hediye: 'finans-hediyelerden-kazan', Arama: 'finans-ucretli-aramalar' };
@@ -43,9 +47,9 @@ export default function HostCenter() {
           <LinearGradient colors={gradientDeep} style={styles.hero}>
             <Icon3D name="mic" size={64} />
             <Text style={styles.heroTitle}>Yayıncı ol, kazanmaya başla</Text>
-            <Text style={styles.heroText}>Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.</Text>
+            <Text style={styles.heroText}>{callsAvailable() ? 'Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.' : 'Oda aç, sohbet et, hediyelerden elmas kazan.'}</Text>
           </LinearGradient>
-          {PERKS.map((p) => (
+          {perks().map((p) => (
             <Card key={p.title} style={styles.perk}>
               {p.art ? <Art name={p.art} size={36} /> : <Text style={{ fontSize: 28 }}>{p.icon}</Text>}
               <View style={{ flex: 1 }}>
@@ -87,7 +91,15 @@ export default function HostCenter() {
 }
 
 function Dashboard() {
-  const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, totalDiamonds, weekly, earnings, agencyId, withdrawals, me } = useApp();
+  const app = useApp();
+  const { totalDiamonds, weekly, earnings, agencyId, withdrawals, me } = app;
+  // Live mode: the server's balance and its two parts (summed over every lock), the store's until it answers.
+  const live = liveMode();
+  const server = useLiveEarnings(app.diamonds);
+  const fromServer = live && server.status === 'ready';
+  const diamonds = fromServer ? server.diamonds : app.diamonds;
+  const free = fromServer ? server.withdrawable : app.withdrawableDiamonds;
+  const locked = fromServer ? server.locked : app.lockedDiamonds;
   // The join window runs from sign-up; once it has passed the host is already on the management account.
   const [joinedDays] = useState(() => (me.joinedAt ? Math.floor((Date.now() - new Date(me.joinedAt).getTime()) / 86_400_000) : 0));
   const joinDaysLeft = Math.max(0, RULES.hostAgencyJoinDays - joinedDays);
@@ -130,10 +142,13 @@ function Dashboard() {
               <Ionicons name="cash-outline" size={18} color="#fff" />
               <Text style={styles.balanceBtnText}>Para çek</Text>
             </Pressable>
-            <Pressable style={styles.balanceBtn} onPress={exchange}>
-              <Ionicons name="flash-outline" size={18} color="#fff" />
-              <Text style={styles.balanceBtnText}>Anında bozdur</Text>
-            </Pressable>
+            {/* Jeton Noktası is still a demo screen: a live build doesn't send anyone there. */}
+            {!live && (
+              <Pressable style={styles.balanceBtn} onPress={exchange}>
+                <Ionicons name="flash-outline" size={18} color="#fff" />
+                <Text style={styles.balanceBtnText}>Anında bozdur</Text>
+              </Pressable>
+            )}
           </View>
         </LinearGradient>
 
@@ -208,7 +223,7 @@ function Dashboard() {
         <Card style={{ gap: 4 }}>
           <Text style={[styles.cardTitle, { marginBottom: 6 }]}>Son kazançlar</Text>
           {earnings.length === 0 ? (
-            <Text style={styles.dim}>Henüz kazanç yok. Bir oda aç veya aramayı bekle — gelen hediyeler burada görünür.</Text>
+            <Text style={styles.dim}>{callsAvailable() ? 'Henüz kazanç yok. Bir oda aç veya aramayı bekle — gelen hediyeler burada görünür.' : 'Henüz kazanç yok. Bir oda aç — gelen hediyeler burada görünür.'}</Text>
           ) : (
             earnings.slice(0, 15).map((e) => (
               <View key={e.id} style={styles.earning}>
@@ -256,7 +271,7 @@ function Analytics() {
     ['Günlük ortalama', `${fmt(Math.round(weekTotal / 7))} elmas`],
     ['Hediye gönderen', fmt(senders)],
     ['Gelen hediye', fmt(giftRows.reduce((n, e) => n + (e.gift?.count ?? 1), 0))],
-    ['Ücretli arama', fmt(calls)],
+    ...(callsAvailable() ? [['Ücretli arama', fmt(calls)]] : []),
   ];
   return (
     <Card style={{ gap: 8 }}>
@@ -277,7 +292,7 @@ function Analytics() {
       <Line label="Brüt hediye değeri" value={`💎 ${gifts.toLocaleString('tr-TR')}`} />
       <Line label={`Oda sahibi bonusu (${pct(RULES.roomOwnerBonus)})`} value={`+ ${ownerBonus.toLocaleString('tr-TR')}`} />
       <Line label="Tayfa bonusu" value={`+ ${familyBonus.toLocaleString('tr-TR')}`} />
-      <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />
+      {callsAvailable() && <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />}
       <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />
       {agencyId && <Line label={`Ajans komisyonu (${pct(RULES.agencyCommission)}, ayrıca ödenir)`} value={`${commission.toLocaleString('tr-TR')} · ${usd(commission)}`} dim />}
       <Text style={styles.dim}>

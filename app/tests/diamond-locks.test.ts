@@ -12,7 +12,11 @@ import {
   diamondSplit,
   lockDays,
   lockMs,
+  fromServerLock,
+  lockLabel,
+  lockLength,
   lockProgress,
+  lockTotalMs,
   lockedReason,
   locksFor,
   nextUnlock,
@@ -115,5 +119,57 @@ describe('Elmas kilidi', () => {
     })!;
     assert.deepEqual(s.diamondLocks!.map((l) => l.id), ['k1', 'k2']);
     assert.equal('diamondLocks' in readSnapshot({ diamondLocks: 'hepsi' })!, false);
+  });
+});
+
+describe('Sunucudaki kilitler (canlı mod)', () => {
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const srv = (channel: string, channelLabel: string, hours: number, extra: Partial<ServerLockT> = {}): ServerLockT => ({
+    id: 7,
+    amount: 120,
+    channel,
+    channelLabel,
+    createdAt: iso(T),
+    unlockAt: iso(T + hours * H),
+    from: null,
+    gift: null,
+    ...extra,
+  });
+  type ServerLockT = Parameters<typeof fromServerLock>[0];
+
+  test("label and length come from the server row, not from the two local channels", () => {
+    const play = fromServerLock(srv('google_play', 'Google Play', 7 * 24));
+    assert.equal(play.channel, 'store');
+    assert.equal(lockLabel(play), 'Google Play');
+    assert.equal(lockLength(play), '7 gün');
+
+    const cevir = fromServerLock(srv('cevir', 'Elmastan çevrildi', 24));
+    assert.equal(cevir.channel, 'jeton', 'Çevir jetonu kısa kilitlenir');
+    assert.equal(lockLabel(cevir), 'Elmastan çevrildi');
+    assert.equal(lockLength(cevir), '1 gün');
+
+    // A Jeton Noktası passing on store coins keeps the 7-day lock: the length is the server's, whatever the channel.
+    const bank = fromServerLock(srv('jeton_noktasi', 'Jeton Noktası', 7 * 24));
+    assert.equal(bank.channel, 'jeton');
+    assert.equal(lockTotalMs(bank), 7 * D);
+    assert.equal(lockLength(bank), '7 gün');
+    assert.equal(lockLength(fromServerLock(srv('test', 'Test jetonu', 12))), '12 saat');
+  });
+
+  test('progress runs over the real lock length', () => {
+    const l = fromServerLock(srv('jeton_noktasi', 'Jeton Noktası', 7 * 24));
+    assert.equal(lockProgress(l, T + 7 * 12 * H), 0.5, 'local jeton channel would say 1 day and show it full');
+    assert.equal(lockProgress(l, T + 8 * D), 1);
+  });
+
+  test('sender, gift and id are kept; a local lock still uses its channel', () => {
+    const l = fromServerLock(srv('google_play', 'Google Play', 168, { from: { id: 'abc', name: 'Ayşe' }, gift: { id: 'rose', count: 3 } }), (id) => (id === 'rose' ? { name: 'Gül', emoji: '' } : undefined));
+    assert.equal(l.id, 'srv-7');
+    assert.equal(l.fromId, 'abc');
+    assert.deepEqual(l.gift, { id: 'rose', name: 'Gül', emoji: '', count: 3 });
+    assert.equal(l.lockedAt, T);
+    const local = lock(10, T + D, { channel: 'jeton' });
+    assert.equal(lockLabel(local), 'Jeton Noktası');
+    assert.equal(lockTotalMs(local, DEFAULT_RULES), lockMs('jeton', DEFAULT_RULES));
   });
 });

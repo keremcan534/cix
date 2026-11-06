@@ -5,10 +5,11 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, Share, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
+import { ComingSoon } from '@/components/coming-soon';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
 import {
@@ -24,6 +25,7 @@ import {
   type MomentComment,
 } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -38,7 +40,13 @@ const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m,
 // Privileged name colors are drawn for the night background; on light paper each takes a deeper shade of its hue.
 const LIGHT_NAME_COLOR: Record<string, string> = { '#FBBF24': '#9A6408', '#FF8A97': '#C8304A', '#FB923C': '#C2410C', '#A5F3F5': '#00757B' };
 
+// The server has no moments yet (no feed, no posting, likes or comments), so a live build shows a notice instead of
+// sample people's posts and a composer whose posts would never leave this phone. The tab itself is hidden there.
 export default function MomentsScreen() {
+  return liveMode() ? <ComingSoon title="Anlar" /> : <DemoMoments />;
+}
+
+function DemoMoments() {
   const { bump, blocked, following, me, notifications, settings, vipLevel, equipped } = useApp();
   const [tab, setTab] = useState<Tab>('Önerilen');
   const [topic, setTopic] = useState<string | null>(null);
@@ -306,6 +314,8 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
   const [topicId, setTopicId] = useState<string | undefined>();
   const { colors } = useTheme();
   const styles = useStyles();
+  // Android modals draw edge to edge: keep the last row above the navigation bar.
+  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -324,7 +334,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom }]}>
           <Text style={styles.sheetTitle}>Yeni an paylaş</Text>
           <TextInput
             value={draft}
@@ -384,6 +394,7 @@ function CommentsSheet({
   const [draft, setDraft] = useState('');
   const { colors } = useTheme();
   const styles = useStyles();
+  const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
   const send = () => {
     if (!draft.trim()) return;
     onSend(draft.trim());
@@ -394,7 +405,7 @@ function CommentsSheet({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={[styles.sheet, { maxHeight: '70%' }]}>
+        <View style={[styles.sheet, { maxHeight: '70%', paddingBottom }]}>
           <Text style={styles.sheetTitle}>Yorumlar ({comments.length})</Text>
           <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 14, paddingVertical: 4 }}>
             {comments.length === 0 && <Text style={{ color: colors.textDim, textAlign: 'center', paddingVertical: 20 }}>İlk yorumu sen yap 💬</Text>}

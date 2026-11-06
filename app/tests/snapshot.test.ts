@@ -71,6 +71,12 @@ describe('Kayıt okuyucu (readSnapshot)', () => {
     assert.equal(s.conversations![1].unread, 2);
   });
 
+  test('canlı sohbet mesajının sunucu kimliği, zamanı ve okundu bilgisi kayıtta kalır', () => {
+    const m = { id: 's9', fromMe: true, text: 'selam', time: '10:09', at: '2026-11-06T10:09:00.000Z', sid: 9, read: true };
+    const s = readSnapshot({ conversations: [{ id: 'c1', userId: 'u1', unread: 0, messages: [m] }] })!;
+    assert.deepEqual(s.conversations![0].messages[0], m);
+  });
+
   test('hayran kulübü, hediye duvarı ve sayaç haritalarında bozuk girişler atılır', () => {
     const s = readSnapshot({
       fanClubs: { u1: { points: 40, history: [{ text: 'hediye', pts: 10, time: '10:00' }, { text: 1 }] }, u2: { points: 'x', history: [] }, u3: 5 },

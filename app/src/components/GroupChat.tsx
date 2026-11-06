@@ -166,7 +166,20 @@ export function GroupChat({
             <Pressable onPress={() => setEmoji((v) => !v)} accessibilityLabel="Emoji">
               <Ionicons name={emoji ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
             </Pressable>
-            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Mesaj yaz…" placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
+            {/* Wraps up to a few lines (at most 1000 characters, like a direct message); the keyboard's send key
+                sends and keeps the keyboard open. */}
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              onSubmitEditing={send}
+              submitBehavior="submit"
+              multiline
+              maxLength={1000}
+              placeholder="Mesaj yaz…"
+              placeholderTextColor={colors.textDim}
+              style={styles.input}
+              returnKeyType="send"
+            />
             {onGift && (
               <Pressable onPress={onGift} accessibilityLabel="Hediye">
                 <Text style={{ fontSize: 24 }}>🎁</Text>
@@ -267,7 +280,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   quick: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, ...lift },
   quickTag: { position: 'absolute', top: -9, right: 8, color: colors.gold, fontSize: 11, fontWeight: '800', fontStyle: 'italic' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  input: { flex: 1, minWidth: 0, backgroundColor: colors.card, color: colors.text, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, ...lift },
+  input: { flex: 1, minWidth: 0, maxHeight: 120, backgroundColor: colors.card, color: colors.text, borderRadius: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, ...lift },
   send: { backgroundColor: colors.primary, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
 }));

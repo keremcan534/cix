@@ -1,17 +1,24 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { AuthHeader } from '@/components/AuthHeader';
+import { SignupHeader } from '@/components/signup-header';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
+import { liveMode } from '@/lib/live';
+import { signupStep } from '@/lib/signup';
 
 const LENGTH = 6;
 
-export default function CodeScreen() {
+/** The SMS code is a prototype (any 6 digits pass). A live build has no phone sign-in, so a link here goes to the start (giris-10). */
+export default function CodeRoute() {
+  return liveMode() ? <Redirect href="/giris" /> : <CodeScreen />;
+}
+
+function CodeScreen() {
   const { phone } = useApp();
   const { colors } = useTheme();
   const styles = useStyles();
@@ -41,7 +48,7 @@ export default function CodeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <AuthHeader step={2} title="Doğrulama kodu" subtitle={`${phone || 'Numarana'} gönderilen 6 haneli kodu gir.`} />
+      <SignupHeader {...signupStep('kod', false)} title="Doğrulama kodu" subtitle={`${phone || 'Numarana'} gönderilen 6 haneli kodu gir.`} />
 
       <Pressable style={styles.boxes} onPress={() => input.current?.focus()}>
         {Array.from({ length: LENGTH }).map((_, i) => {

@@ -144,4 +144,48 @@ describe('Rüzgâr Gülü sunucuda', () => {
     assert.ok(info.winners.some((w) => w.id === a.user.id && w.payout === 25000 && w.tier === 'acik'));
     assert.equal(info.allowed, false);
   });
+
+  test('Jeton Noktası satışı ve iade geri alımı Cömertlik saymaz', async () => {
+    const a = await signUp('Satıcı');
+    const debit = (amount, reason) =>
+      h.sql.query("INSERT INTO ledger (user_id, currency, amount, balance, reason, ref) VALUES ($1, 'coin', $2, 0, $3, $4)", [a.user.id, -amount, reason, rnd(8)]);
+    await debit(10000, 'Jeton Noktası satışı');
+    await debit(5000, 'İade: satın alınan jeton geri alındı');
+    assert.equal((await call('GET', '/api/wheel', null, a.session))[1].allowed, false, 'satış ve iade harcama değil');
+    assert.equal((await spin(a.session, 'kiyi', 1))[0], 403);
+    // A real purchase of 50 coins counts.
+    await topUp(a.session, 1000);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Mağaza: çıkartma', ref: rnd(6) }, a.session))[0], 200);
+    assert.equal((await call('GET', '/api/wheel', null, a.session))[1].allowed, true);
+  });
+
+  test('başka bir işlemin ref’i: çark 500 vermez, sonraki hediye gerçekten gider', async () => {
+    const a = await player('A', 5000);
+    const b = await signUp('B');
+    // A store purchase, then a spin with the same ref: the spin is its own request.
+    const r1 = rnd(8);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 100, reason: 'Mağaza: rozet', ref: r1 }, a.session))[0], 200);
+    const coins0 = (await me(a.session)).coins;
+    const [st1, s1] = await spin(a.session, 'kiyi', 1, r1);
+    assert.equal(st1, 200, s1.error);
+    assert.equal(s1.replay, false);
+    assert.equal(s1.user.coins, coins0 - 250);
+    // A spin, then a gift with the same ref: the gift is sent, not taken for a replay of the spin.
+    const r2 = rnd(8);
+    assert.equal((await spin(a.session, 'kiyi', 1, r2))[0], 200);
+    const before = await me(a.session);
+    const [st2, g] = await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g1', count: 1, ref: r2 }, a.session);
+    assert.equal(st2, 200, g.error);
+    assert.equal(g.replay, false);
+    assert.equal(g.user.coins, before.coins - 10, 'hediyenin jetonu alındı');
+    assert.equal((await me(b.session)).diamonds, 10, 'alıcıya elmas geçti');
+    assert.equal((await h.sql.query('SELECT count(*)::int AS n FROM gift_events WHERE sender = $1 AND ref = $2', [a.user.id, r2])).rows[0].n, 1);
+    // The spin's own replay still answers with its row.
+    const [st3, again] = await spin(a.session, 'kiyi', 1, r2);
+    assert.equal(st3, 200);
+    assert.equal(again.replay, true);
+    // The wheel's ledger rows carry their own prefix.
+    const refs = (await h.sql.query("SELECT ref FROM ledger WHERE user_id = $1 AND reason LIKE '%Rüzgâr%'", [a.user.id])).rows.map((r) => r.ref);
+    assert.ok(refs.length > 0 && refs.every((r) => r.startsWith('wheel:')), refs.join(','));
+  });
 });

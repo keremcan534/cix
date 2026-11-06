@@ -4,6 +4,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Icon3D } from '@/components/Icon3D';
@@ -32,6 +33,8 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
   const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, coins, exchangeDiamonds, notify } = useApp();
   const { colors, semantic } = useTheme();
   const s = useStyles();
+  // Android modals draw edge to edge: keep the button row above the navigation bar.
+  const paddingBottom = Math.max(28, useSafeAreaInsets().bottom + 8);
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,7 +74,7 @@ export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose:
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <KeyboardAvoid style={{ flex: 1 }}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-        <View style={s.sheet}>
+        <View style={[s.sheet, { paddingBottom }]}>
           <View style={s.handle} />
           <View style={s.head}>
             <Text style={s.title}>Jetona çevir</Text>

@@ -12,6 +12,8 @@ import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
+import { ComingSoon } from '@/components/coming-soon';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES, AGENCY_MEMBERS } from '@/data/agency';
 import {
@@ -31,6 +33,8 @@ import {
 } from '@/data/bank-mock';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { IS_DEMO } from '@/lib/build';
+import { liveMode } from '@/lib/live';
 import {
   PROVIDERS,
   blockedFor,
@@ -115,7 +119,13 @@ function bdNumbers(bank: BankState) {
 }
 
 // --- screen -------------------------------------------------------------------------
+// A live build shows a notice instead: the bonus balance, bonus ledger, agency and BD figures and payouts here are
+// sample data on this phone, not the user's money on the server (cash-out is Gelir > Para çek).
 export default function CoinsBankScreen() {
+  return liveMode() ? <ComingSoon title="Jeton Noktası" /> : <DemoCoinsBank />;
+}
+
+function DemoCoinsBank() {
   const [tab, setTab] = useState<Tab>('wallet');
   const { colors } = useTheme();
   const styles = useStyles();
@@ -124,9 +134,11 @@ export default function CoinsBankScreen() {
       <Header
         title="Jeton Noktası"
         right={
-          <View style={styles.protoPill}>
-            <Text style={styles.protoPillText}>PROTOTİP</Text>
-          </View>
+          IS_DEMO ? (
+            <View style={styles.protoPill}>
+              <Text style={styles.protoPillText}>PROTOTİP</Text>
+            </View>
+          ) : undefined
         }
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.tabs}>
@@ -137,16 +149,21 @@ export default function CoinsBankScreen() {
           </Pressable>
         ))}
       </ScrollView>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <View style={styles.banner}>
-          <Ionicons name="flask" size={16} color={colors.gold} />
-          <Text style={styles.bannerText}>Demo: tüm tutarlar örnek veridir, gerçek ödeme veya para transferi yapılmaz. Gerçek sistemde tüm doğrulamalar sunucuda çalışır.</Text>
-        </View>
-        {tab === 'wallet' && <WalletTab />}
-        {tab === 'creator' && <CreatorTab />}
-        {tab === 'agency' && <AgencyTab />}
-        {tab === 'bd' && <BdTab />}
-      </ScrollView>
+      {/* The payout account and amount fields sit low in the scroll: the keyboard must not cover them (Android). */}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          {IS_DEMO && (
+            <View style={styles.banner}>
+              <Ionicons name="flask" size={16} color={colors.gold} />
+              <Text style={styles.bannerText}>Demo: tüm tutarlar örnek veridir, gerçek ödeme veya para transferi yapılmaz. Gerçek sistemde tüm doğrulamalar sunucuda çalışır.</Text>
+            </View>
+          )}
+          {tab === 'wallet' && <WalletTab />}
+          {tab === 'creator' && <CreatorTab />}
+          {tab === 'agency' && <AgencyTab />}
+          {tab === 'bd' && <BdTab />}
+        </ScrollView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

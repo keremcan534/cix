@@ -9,10 +9,12 @@
 // Balances: the store keeps the last balance the server sent. A new one is applied as the change since then, so
 // a purchase the store already took locally (and mirrored with api.spend) is not taken twice. Local-only
 // credits (task rewards, game wins) are not on the server: the next app start shows the server's balance.
+import { useIsFocused } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
+import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
@@ -79,8 +81,9 @@ export async function saveProfile(me: User, birthYear?: number) {
   const user = await api.updateProfile({
     name: me.name,
     ...(me.gender && { gender: me.gender }),
-    // Only the year is asked; the server keeps a date (set once) for the 18+ check.
-    ...(birthYear && { birthDate: `${birthYear}-01-01` }),
+    // Only the year is asked; the server keeps a date (set once) for the 18+ check. The last day of the year,
+    // so the age is never overstated (someone born late in the year isn't counted a year older).
+    ...(birthYear && { birthDate: `${birthYear}-12-31` }),
     city: me.city,
     bio: me.bio.slice(0, 160),
     interests: (me.interests ?? []).slice(0, 5),
@@ -133,7 +136,7 @@ export async function liveExchange(diamonds: number) {
 /** A gift to a real person, at the server's price. `room` = the LiveKit room it was sent in. */
 export async function liveGift(to: string, giftId: string, count: number, room?: string) {
   const id = toServer(to);
-  if (!id) throw new Error('Bu kişi test sunucusunda yok');
+  if (!id) throw new Error('Bu kişiye şu an ulaşılamıyor');
   return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref)), 'Hediye gönderildi');
 }
 
@@ -145,6 +148,10 @@ export function forgetLiveAccount() {
   unsure.clear();
   order.reset();
   people = null;
+  peopleState = 'loading';
+  locked.clear();
+  forgetRoomPasswords();
+  roomsState = 'loading';
   setRooms([]);
 }
 
@@ -170,7 +177,8 @@ export async function loadProfile(id: string) {
   return putServerUser({
     id: p.id,
     name: p.name,
-    age: p.age ?? 0,
+    // No age on the server stays unknown (0 in data/mock, which the screens leave out), never a made-up number.
+    ...(p.age ? { age: p.age } : {}),
     city: p.city ?? '',
     bio: p.bio,
     interests: p.interests,
@@ -180,49 +188,69 @@ export async function loadProfile(id: string) {
   });
 }
 
+/** How a server list stands: the first answer still coming, the last answer read, or the last try failed. */
+export type LoadState = 'loading' | 'ready' | 'failed';
+
 let people: User[] | null = null;
+let peopleState: LoadState = 'loading';
 const peopleListeners = new Set<() => void>();
 const subscribePeople = (l: () => void) => {
   peopleListeners.add(l);
   return () => peopleListeners.delete(l);
 };
-/** Keşfet in a live build: real people from the server, re-read every 30 seconds; null until the first answer. */
+const emitPeople = () => peopleListeners.forEach((l) => l());
+/** Reads Keşfet's people from the server once (the retry button calls it too). */
+export async function reloadDiscoverPeople() {
+  try {
+    const rows = await api.discover();
+    people = rows.map((p) =>
+      putServerUser({
+        id: p.id,
+        name: p.name,
+        ...(p.age ? { age: p.age } : {}),
+        city: p.city ?? '',
+        bio: p.bio,
+        interests: p.interests,
+        online: p.online,
+        ...(p.gender && { gender: p.gender }),
+        ...(p.username && { username: p.username }),
+        ...(p.avatarUrl && { avatar: p.avatarUrl }),
+      }),
+    );
+    peopleState = 'ready';
+  } catch {
+    peopleState = 'failed';
+  }
+  emitPeople();
+}
+/** Keşfet in a live build: real people from the server, re-read every 30 seconds while the screen is in front
+ *  (once more when it comes back); null until the first answer. */
 export function useDiscoverPeople(): User[] | null {
   const list = useSyncExternalStore(subscribePeople, () => people, () => people);
+  const focused = useIsFocused();
   useEffect(() => {
-    if (!liveMode()) return;
-    const tick = () =>
-      void api
-        .discover()
-        .then((rows) => {
-          people = rows.map((p) =>
-            putServerUser({
-              id: p.id,
-              name: p.name,
-              age: p.age ?? 0,
-              city: p.city ?? '',
-              bio: p.bio,
-              interests: p.interests,
-              online: p.online,
-              ...(p.gender && { gender: p.gender }),
-              ...(p.username && { username: p.username }),
-              ...(p.avatarUrl && { avatar: p.avatarUrl }),
-            }),
-          );
-          peopleListeners.forEach((l) => l());
-        })
-        .catch(() => {});
-    tick();
-    const t = setInterval(tick, 30_000);
+    if (!liveMode() || !focused) return;
+    void reloadDiscoverPeople();
+    const t = setInterval(() => void reloadDiscoverPeople(), 30_000);
     return () => clearInterval(t);
-  }, []);
+  }, [focused]);
   return list;
 }
+/** Whether Keşfet's last read worked ('failed': the screen offers "Tekrar dene"). */
+export const useDiscoverState = () => useSyncExternalStore(subscribePeople, () => peopleState, () => peopleState);
 
 // --- Rooms -----------------------------------------------------------------------------------------------
+// Rooms with a password, by id. Kept beside the Room (not as Room.password, which is the demo rooms' own
+// password and would let this phone check it): the server checks the password when the voice token is asked for.
+const locked = new Set<string>();
+/** A server room that asks for a password before anyone but its staff gets in. */
+export const isLockedRoom = (id: string) => locked.has(id);
+
 /** A server room as the app's Room (no sample cover, empty mics: who sits where comes from LiveKit). */
 export function roomOf(r: api.ServerRoom): Room {
   rememberUser(r.owner);
+  if (r.hasPassword) locked.add(r.id);
+  else locked.delete(r.id);
   const room: Room = {
     id: r.id,
     title: r.title,
@@ -241,39 +269,57 @@ export function roomOf(r: api.ServerRoom): Room {
 }
 
 let rooms: Room[] = [];
+let roomsState: LoadState = 'loading';
 const roomListeners = new Set<() => void>();
+const emitRooms = () => roomListeners.forEach((l) => l());
 const setRooms = (next: Room[]) => {
   rooms = next;
-  roomListeners.forEach((l) => l());
+  emitRooms();
 };
-/** Open server rooms, fullest first. Rooms with a password are left out until the app can ask for it. */
+/** Open server rooms, fullest first; password rooms too (the lists show a lock, the room asks for it). */
 export async function loadRooms() {
-  const list = await api.serverRooms();
-  setRooms(list.filter((r) => !r.closed && !r.hasPassword).map(roomOf));
+  let list: api.ServerRoom[];
+  try {
+    list = await api.serverRooms();
+  } catch (e) {
+    roomsState = 'failed';
+    emitRooms();
+    throw e;
+  }
+  roomsState = 'ready';
+  setRooms(list.filter((r) => !r.closed).map(roomOf));
   return rooms;
 }
+/** Reads the room list again (the "Tekrar dene" button); a failure only shows in the state. */
+export const reloadServerRooms = () => void loadRooms().catch(() => {});
 const subscribeRooms = (l: () => void) => {
   roomListeners.add(l);
   return () => roomListeners.delete(l);
 };
-/** The open server rooms, re-read every 15 seconds while a screen shows them. */
+/** The open server rooms, re-read every 15 seconds while the screen is in front (once more when it comes back). */
 export function useServerRooms(): Room[] {
   const list = useSyncExternalStore(subscribeRooms, () => rooms, () => rooms);
+  const focused = useIsFocused();
   useEffect(() => {
-    if (!liveMode()) return;
-    const tick = () => void loadRooms().catch(() => {});
-    tick();
-    const t = setInterval(tick, 15_000);
+    if (!liveMode() || !focused) return;
+    reloadServerRooms();
+    const t = setInterval(reloadServerRooms, 15_000);
     return () => clearInterval(t);
-  }, []);
+  }, [focused]);
   return list;
 }
+/** Whether the last read of the room list worked ('failed': the list offers "Tekrar dene"). */
+export const useServerRoomsState = () => useSyncExternalStore(subscribeRooms, () => roomsState, () => roomsState);
+
+/** What the create sheet can set besides the name and the bulletin. `password`: 4–32 characters, or none. */
+export type NewRoomOptions = { roomType?: string; password?: string };
 
 /** Opens my room on the server and returns it, ready for /oda/<id>. One open room per person: if mine is already
  *  open, that one comes back. */
-export async function openServerRoom(title: string, announcement: string) {
+export async function openServerRoom(title: string, announcement: string, opts: NewRoomOptions = {}) {
   try {
-    const r = roomOf(await api.createRoom(title.trim().slice(0, 40) || 'Odam', announcement.trim().slice(0, 200)));
+    const password = opts.password?.trim() || undefined;
+    const r = roomOf(await api.createRoom(title.trim().slice(0, 40) || 'Odam', announcement.trim().slice(0, 200), opts.roomType ?? 'free', password));
     setRooms([r, ...rooms.filter((x) => x.id !== r.id)]);
     return r;
   } catch (e) {

@@ -14,10 +14,11 @@ import { useSyncExternalStore } from 'react';
 
 import { CASINO_GAMES, ROOM_GAMES, type CasinoGame, type RoomGame } from '@/data/games';
 import { ME } from '@/data/mock';
-import { announceWin } from '@/lib/broadcast';
+import { announceWin, isCasinoWin, isChanceWin, type WinNews } from '@/lib/broadcast';
 import { BOARDS, boardMaxPayout, boardPayout } from '@/lib/board-games';
 import { CASINO_HOUSE_SHARE, DUEL_MULT, PICKS, duelMultiplier, isLineSlot, maxMultiplier, outcomeOf, splitStake, type Outcome } from '@/lib/casino-odds';
 import { SLOT_CONFIGS } from '@/lib/slot-configs';
+import { liveBuild } from '@/lib/live-flag';
 import { today } from '@/lib/persist';
 
 export type Entry = { from: 'profile' } | { from: 'room'; roomId: string; roomTitle: string };
@@ -93,10 +94,20 @@ export const updateCasino = (id: string, patch: Partial<CasinoGame>) => emit({ c
 /** Below this Cömertlik level Oyun Salonu does not exist for the user: no tab, tile, link, banner or mention.
  *  A game's own minWealth can only raise it. */
 export const CASINO_MIN_WEALTH = 2;
-export const casinoVisible = (wealthLevel: number) => wealthLevel >= CASINO_MIN_WEALTH;
+/** The gambling level itself: below it no game of chance exists for the user. Rüzgâr Gülü, the one game the
+ *  server runs, is gated by this alone. */
+export const gamblingLevelOk = (wealthLevel: number) => wealthLevel >= CASINO_MIN_WEALTH;
+/** Oyun Salonu games (and Zar Düellosu) are decided on this phone: random draw, local winnings. The server has no
+ *  round for them yet, so a live build has none of them, whatever the level. */
+export const casinoVisible = (wealthLevel: number) => !liveBuild() && gamblingLevelOk(wealthLevel);
+/** A win banner that is not news for this user, skipped and never shown: an Oyun Salonu win for someone who cannot
+ *  see Oyun Salonu, and any other win of chance (Uğurlu) below the gambling level. */
+export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number) => (isCasinoWin(n) ? !casinoVisible(wealthLevel) : isChanceWin(n) && !gamblingLevelOk(wealthLevel));
+const CASINO_OFF = 'Bu oyun şu an kapalı.';
 export type Access = { ok: true } | { ok: false; reason: string; needWealth?: number };
 /** Same check the server runs on every launch and every round; the UI only uses it to explain. */
 export function casinoAccess(game: CasinoGame, entry: Entry, wealthLevel: number): Access {
+  if (liveBuild()) return { ok: false, reason: CASINO_OFF };
   if (!game.active) return { ok: false, reason: `${game.name} şu an kapalı.` };
   if (game.providerStatus === 'down') return { ok: false, reason: `${game.name} sağlayıcısı bakımda. Bakiyen etkilenmez; oda ve sesli sohbetin devam eder.` };
   if (entry.from === 'profile' && !game.fromProfile) return { ok: false, reason: `${game.name} yalnızca oda içinden açılabilir.` };
@@ -129,6 +140,7 @@ function payFromPool(n: number) {
  * can't be taken (balance or daily spending limit); nothing is taken then.
  */
 function takeStake(d: GameDeps, bet: number, reason: string) {
+  if (liveBuild()) return null; // a round the phone decides never spends real (server) coins
   const split = splitStake(bet, d.gameCoins());
   if (split.fromWallet > 0 && !d.spend(split.fromWallet, reason)) return null;
   if (split.fromGame > 0 && !d.spendGame(split.fromGame, reason)) {
@@ -192,6 +204,7 @@ function settle(
   requestId: string,
   r: { check: (game: CasinoGame) => string | null; maxPayout: () => number; resolve: () => { outcome: Outcome; payout: number } },
 ): PlayResult {
+  if (liveBuild()) return { ok: false, reason: CASINO_OFF };
   const seen = results.get(requestId);
   if (seen) return seen.ok ? { ...seen, replay: true } : seen;
   const finish = (res: PlayResult) => {
@@ -247,7 +260,7 @@ function settle(
     payout += won;
   }
   // A real win (more back than the stake) is announced in every room.
-  if (payout > bet * Math.max(1, ANNOUNCE_MIN[game.id] ?? 1)) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout }, { mine: true });
+  if (payout > bet * Math.max(1, ANNOUNCE_MIN[game.id] ?? 1)) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout, casino: true }, { mine: true });
   return finish({ ok: true, outcome, replay: false, row: { ...base, txId: id, payout, status: 'Tamamlandı', detail: outcome.detail } });
 }
 
@@ -259,6 +272,7 @@ export const setProviderStatus = (id: string, s: CasinoGame['providerStatus']) =
  * your die beats the other by 3 or more. Same split and pool as the casino.
  */
 export function playDuel(bet: number): { ok: true; me: number; them: number; payout: number } | { ok: false; reason: string } {
+  if (liveBuild()) return { ok: false, reason: 'Zar Düellosu şu an kapalı.' };
   if (!deps) return { ok: false, reason: 'Oyun şu an açılamıyor.' };
   if (state.bank.pool < bet * DUEL_MULT) return { ok: false, reason: POOL_LOW };
   if (deps.coins() + deps.gameCoins() < bet || !takeStake(deps, bet, 'Zar Düellosu bahis')) return { ok: false, reason: 'Yetersiz jeton.' };
