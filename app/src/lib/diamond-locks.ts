@@ -110,9 +110,16 @@ export function addLock(locks: readonly DiamondLock[], lock: DiamondLock): Diamo
   return [...next.filter((l) => kept.has(l)), folded];
 }
 
-/** The balance in two parts. Locks never count for more than the balance itself. */
-export function diamondSplit(diamonds: number, locks: readonly DiamondLock[], now: number) {
-  const pending = locks.reduce((t, l) => (l.unlockAt > now ? t + l.amount : t), 0);
+/**
+ * Live mode: the locked diamonds GET /api/wallet/earnings counts in its total but leaves off its list (it lists
+ * only the 100 locks that open soonest). Those open after every listed lock, so they stay locked until the next read.
+ */
+export const unlistedLocked = (e: { locked: number; locks: readonly { amount: number }[] }) => Math.max(0, e.locked - e.locks.reduce((t, l) => t + l.amount, 0));
+
+/** The balance in two parts. Locks never count for more than the balance itself. `unlisted`: locked diamonds that
+ *  have no row here (unlistedLocked), counted as still locked. */
+export function diamondSplit(diamonds: number, locks: readonly DiamondLock[], now: number, unlisted = 0) {
+  const pending = locks.reduce((t, l) => (l.unlockAt > now ? t + l.amount : t), Math.max(0, unlisted));
   const locked = Math.max(0, Math.min(diamonds, pending));
   return { locked, withdrawable: Math.max(0, diamonds - locked) };
 }

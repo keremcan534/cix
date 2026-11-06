@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Platform, Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { onWebEnter } from '@/lib/enter-sends';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -167,11 +168,12 @@ export function GroupChat({
               <Ionicons name={emoji ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
             </Pressable>
             {/* Wraps up to a few lines (at most 1000 characters, like a direct message); the keyboard's send key
-                sends and keeps the keyboard open. */}
+                sends and keeps the keyboard open. Web: Enter sends, Shift+Enter is a new line (lib/enter-sends). */}
             <TextInput
               value={draft}
               onChangeText={setDraft}
               onSubmitEditing={send}
+              onKeyPress={Platform.OS === 'web' ? (e) => onWebEnter(e, send) : undefined}
               submitBehavior="submit"
               multiline
               maxLength={1000}

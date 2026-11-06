@@ -48,7 +48,15 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
     if (d.id <= sync.after || hidden.has(d.id)) continue;
     const mine = isMine(d, sync.peer);
     const seen = mine && d.readAt ? { read: true } : null;
-    const pending = mine ? out.findIndex((m) => m.fromMe && m.sid === undefined && m.text === d.text) : -1;
+    // My message still waiting for its answer, else one whose send failed without an answer (the server may have
+    // stored it); the oldest first, as the server numbers messages in the order they arrive. A message the server
+    // refused (noRetry) was never stored, so it never takes the id.
+    let pending = -1;
+    if (mine) {
+      const unconfirmed = (m: ChatMessage) => m.fromMe && m.sid === undefined && !m.noRetry && m.text === d.text;
+      pending = out.findIndex((m) => unconfirmed(m) && !m.failed);
+      if (pending < 0) pending = out.findIndex(unconfirmed);
+    }
     if (pending >= 0) {
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
@@ -96,8 +104,19 @@ export function markSent(list: Conversation[], userId: string, ref: string, d: P
   const i = list.findIndex((c) => c.userId === userId);
   const conv = i >= 0 ? list[i] : undefined;
   const at = conv ? conv.messages.findIndex((m) => m.ref === ref) : -1;
-  // Deleted meanwhile, or a sync already matched it by its text: nothing to do.
-  if (!conv || at < 0 || conv.messages.some((m) => m.sid === d.id)) return list;
-  const messages = conv.messages.map((m, j) => (j === at ? { ...withoutFailure(m), sid: d.id, at: d.createdAt } : m));
+  // Deleted meanwhile: nothing to do.
+  if (!conv || at < 0) return list;
+  const holder = conv.messages.findIndex((m) => m.sid === d.id);
+  // A sync already matched it by its text.
+  if (holder === at) return list;
+  const sent = conv.messages[at];
+  const messages = conv.messages.map((m, j) => {
+    if (j === at) return { ...withoutFailure(m), sid: d.id, at: d.createdAt, ...(holder >= 0 && conv.messages[holder].read ? { read: true } : null) };
+    if (j !== holder) return m;
+    // A sync gave this id to another message of mine with the same text (sent twice, the later one stored first):
+    // that one takes what this one held instead, and its own answer settles it.
+    const { sid: _sid, read: _read, ...rest } = m;
+    return { ...rest, ...(sent.sid !== undefined ? { sid: sent.sid, at: sent.at } : null), ...(sent.read ? { read: true } : null) };
+  });
   return list.map((c, j) => (j === i ? { ...conv, messages } : c));
 }

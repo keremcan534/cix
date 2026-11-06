@@ -8,7 +8,7 @@
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true, updated }
-import { HttpError, LIVE_SANCTION, SANCTION_SELECT, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, sanctionView, selfUser, text, tx, userId } from './core.mjs';
+import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 
@@ -76,13 +76,12 @@ export const socialRoutes = {
    * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, own rooms. The id,
    * ledger, gifts and purchases stay, because financial records must be kept; they no longer point to anything
    * personal. The phone number and the Google account are free again for a new account.
-   * Not while a sanction is on (a ban already stops auth): deleting would free the sign-in key, and the same
-   * phone would come back as a new account without the mute or the repeat-offence history.
+   * Never refused for a mute (UK GDPR erasure; a ban already stops auth): the sanction records and the device
+   * link stay, and a general mute still running moves to a new account made on the same device
+   * (sanctions.mjs carryMutes).
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
-    const live = (await db.query(`${SANCTION_SELECT} WHERE s.user_id = $1 AND ${LIVE_SANCTION} ORDER BY s.expires_at DESC NULLS FIRST LIMIT 1`, [u.id])).rows[0];
-    if (live) throw Object.assign(new HttpError(409, 'Yaptırım bitince hesabını silebilirsin'), { extra: { code: 'sanction_active', sanction: sanctionView(live), serverNow: new Date().toISOString() } });
     await tx(async (c) => {
       await c.query(
         `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',

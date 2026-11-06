@@ -18,11 +18,11 @@ import { countsForWealth, wealthLevelOf } from '@/data/wealth';
 import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
-import { addLock, diamondSplit, lockMs, lockedReason, locksFor, type DiamondLock } from '@/lib/diamond-locks';
+import { addLock, diamondSplit, fromServerLock, lockMs, lockedReason, locksFor, unlistedLocked, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { validAnyIban } from '@/lib/withdraw-rules';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
-import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
+import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
@@ -347,8 +347,12 @@ export function AppProvider({ children, onReady }: { children: ReactNode; onRead
   }, [ready, onReady]);
   if (!boot) return null;
   // The new store mounts only once the save is gone, so it starts from the defaults and saves those.
-  // `keep` (signing out of a live account): what the next store starts from instead of the defaults.
-  const reset = (keep?: Partial<Snapshot>) => void resetLocalData().then(() => setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: keep ?? null })));
+  // `keep` (signing out of a live account, or back in): what the next store starts from instead of the defaults.
+  const reset = (keep?: Partial<Snapshot>) =>
+    void resetLocalData().then(() => {
+      if (keep?.me) Object.assign(ME, keep.me);
+      setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: keep ?? null }));
+    });
   return (
     <StateProvider key={boot.gen} initial={boot.initial ?? {}} onReset={reset}>
       {children}
@@ -394,7 +398,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setDiamondLocksState(locksRef.current);
   };
   const [lockNow, setLockNow] = useState(() => Date.now());
-  const { locked: lockedDiamonds, withdrawable: withdrawableDiamonds } = diamondSplit(diamonds, diamondLocks, lockNow);
+  // Live mode: locked diamonds the server counted but did not list (lib/diamond-locks unlistedLocked).
+  const [unlisted, setUnlisted] = useState(0);
+  const { locked: lockedDiamonds, withdrawable: withdrawableDiamonds } = diamondSplit(diamonds, diamondLocks, lockNow, unlisted);
   const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
   const [charmXp, setCharmXp] = useState(s.charmXp ?? s.totalDiamonds ?? 0);
   const charmRef = useRef(charmXp);
@@ -590,9 +596,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // The server account this phone's state belongs to (saved): another one must not inherit it.
   const [serverId, setServerId] = useState<string | null>(s.serverId ?? null);
   const serverIdRef = useRef(serverId);
+  // Signed out of a live account: its state, kept for when the same account signs in here again (login below).
+  const [parked, setParked] = useState(s.parked ?? null);
 
   /** Everything on this phone goes back to the defaults, including what lib/live remembers of the account.
-   *  `keep` survives it (signing out keeps this phone's settings for whoever signs in next). */
+   *  `keep` survives it (signing out keeps this phone's settings, and parks the account's own state). */
   const forgetAccount = (keep?: Partial<Snapshot>) => {
     forgetLiveAccount();
     forgetSeen();
@@ -608,6 +616,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     serverId, following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
+    ...(parked && { parked }),
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -718,6 +727,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       if (switched && loggedIn) return forgetAccount();
     }
     if (isFiniteNumber(u.svipXp)) setSvipXp(u.svipXp);
+    // Cömertlik as the server counts it (GET /api/me): the games open on the same value the server checks, also
+    // after signing in again on a phone that signing out cleared.
+    if (isFiniteNumber(u.wealthXp)) {
+      wealthRef.current = u.wealthXp;
+      setWealthXp(u.wealthXp);
+    }
     const prev = serverBalRef.current;
     serverBalRef.current = { coins: u.coins, diamonds: u.diamonds, gameCoins: u.gameCoins ?? 0 };
     // Game coins: only server games (Rüzgâr Gülü) move them there, the other games here, so the server's change
@@ -766,19 +781,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const applyLocks = (e: ServerEarnings) => {
     const at = Date.now();
     setLockNow(at);
+    // The server's channel names, labels and lock lengths (lib/diamond-locks fromServerLock), sender ids as this phone
+    // names people. The server lists only the soonest 100; the locked diamonds it left off stay counted.
+    setUnlisted(unlistedLocked(e));
     setDiamondLocks(() =>
       e.locks.map((l): DiamondLock => {
         if (l.from) rememberUser(l.from);
-        const g = l.gift ? GIFTS.find((x) => x.id === l.gift!.id) : undefined;
-        return {
-          id: `srv-${l.id}`,
-          amount: l.amount,
-          unlockAt: Date.parse(l.unlockAt),
-          channel: l.channel === 'jeton' ? 'jeton' : 'store',
-          source: 'Hediye',
-          ...(l.from && { fromId: toLocal(l.from.id) }),
-          ...(l.gift && { gift: { id: l.gift.id, name: g?.name ?? 'Hediye', emoji: g?.emoji ?? '🎁', count: l.gift.count } }),
-        };
+        const x = fromServerLock(l, (id) => GIFTS.find((g) => g.id === id));
+        return x.fromId ? { ...x, fromId: toLocal(x.fromId) } : x;
       }),
     );
   };
@@ -792,10 +802,21 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       Object.assign(ME, patch);
       setMe({ ...ME });
     },
-    login: () => setLoggedIn(true),
+    login: () => {
+      const back = liveMode() ? unparkAccount(parked, myServerId()) : null;
+      if (!back) {
+        // Another account signed in here: the parked one stays gone.
+        if (parked) setParked(null);
+        return setLoggedIn(true);
+      }
+      // The same account signed in again: the store starts from what it had on this phone (items, VIP, progress,
+      // notices), as after an app restart, with the profile and balance the sign-in just read from the server.
+      onReset({ ...back, settings, me: { ...ME }, coins: coinsRef.current, diamonds: diamondsRef.current, loggedIn: true });
+    },
     // Live mode: the next account on this phone must not inherit this one's chats, follows, items or balance.
-    // The phone's settings (theme, sounds, privacy choices) stay; follows and blocks come back from the server.
-    logout: () => (liveMode() ? forgetAccount({ settings }) : setLoggedIn(false)),
+    // The phone's settings (theme, sounds, privacy choices) stay, and this account's own state is parked until it
+    // signs in here again (login); follows, blocks and chats come back from the server.
+    logout: () => (liveMode() ? forgetAccount(parkAccount(snapshot)) : setLoggedIn(false)),
     phone,
     setPhone,
 

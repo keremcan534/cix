@@ -7,12 +7,12 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type ColorValue 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { ActionSheet } from '@/components/ActionSheet';
+import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { GiftArt } from '@/components/GiftArt';
 import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
-import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type User } from '@/data/mock';
+import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
 import { privacyOf } from '@/data/privacy';
 import { COUNTRIES } from '@/data/social-ui';
 import {
@@ -30,7 +30,7 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
-import { callsAvailable, liveGift, liveMode, message, toServer } from '@/lib/live';
+import { callsAvailable, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
 import { followOnServer, loadMe, loadPublicProfile, profilePatch, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
 import { copyText } from '@/lib/clipboard';
 import { goBack } from '@/lib/nav';
@@ -81,22 +81,8 @@ export default function UserProfile() {
   // with the follower and following counts and my follow state. Kept with the id it is for.
   const [social, setSocial] = useState<{ id: string; counts: SocialCounts } | null>(null);
   const [reloads, setReloads] = useState(0);
-  useEffect(() => {
-    if (!serverId) return;
-    let alive = true;
-    loadPublicProfile(serverId, isMe)
-      .then((counts) => alive && setSocial({ id: serverId, counts }))
-      .catch(() => {});
-    if (isMe)
-      loadMe()
-        .then((p) => alive && updateMe(p))
-        .catch(() => {});
-    return () => {
-      alive = false;
-    };
-    // updateMe is a new function on every render; the profile is read when it opens and after a follow.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverId, isMe, reloads]);
+  // Live mode, my own profile: my open room as the server has it (null: none open), never the demo's sample room.
+  const [myLiveRoom, setMyLiveRoom] = useState<Room | null>(null);
   const counts = social && social.id === serverId ? social.counts : null;
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
@@ -107,6 +93,37 @@ export default function UserProfile() {
 
   const club = fanClubs[user.id];
   const isBlocked = blocked.has(user.id);
+  // Read again after a follow and after a block or unblock: a block ends the follows both ways on the server.
+  useEffect(() => {
+    if (!serverId) return;
+    let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let tries = 0;
+    const read = () =>
+      loadPublicProfile(serverId, isMe)
+        .then((counts) => {
+          if (!alive) return;
+          setSocial({ id: serverId, counts });
+          // The block (or unblock) just sent may reach the server after this read: read again until it is there.
+          if (!isMe && counts.blockedByMe !== isBlocked && tries++ < 3) retry = setTimeout(read, 1000);
+        })
+        .catch(() => {});
+    read();
+    if (isMe) {
+      loadMe()
+        .then((p) => alive && updateMe(p))
+        .catch(() => {});
+      loadRooms()
+        .then((list) => alive && setMyLiveRoom(list.find((r) => r.hostId === 'me') ?? null))
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+      clearTimeout(retry);
+    };
+    // updateMe is a new function on every render; the profile is read when it opens, after a follow and after a block.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId, isMe, reloads, isBlocked]);
   // Live mode: the server's follow state once read (a block ends the follow there too).
   const isFollowing = !isBlocked && (counts ? counts.isFollowing : following.has(user.id));
   const extras = profileExtras(user);
@@ -275,7 +292,7 @@ export default function UserProfile() {
   };
 
   const copyId = () => copyText(displayId(user.id), 'ID');
-  const copyUsername = () => copyText(`@${user.username ?? ''}`, 'Kullanıcı adı');
+  const copyUsername = () => user.username && copyText(`@${user.username}`, 'Kullanıcı adı');
 
   // Blocking also ends the follows both ways (on the server too), so it asks first; unblocking doesn't.
   const blockUser = () => {
@@ -342,15 +359,24 @@ export default function UserProfile() {
   };
 
   // Room & family
-  const otherRoom = ROOMS.find((r) => r.hostId === user.id);
-  const room = isMe
-    ? { title: myRoom.title, desc: myRoom.announcement, cover: myRoom.cover, level: roomLevel(myRoom.xp), go: () => router.push('/oda/yeni') }
+  // Live mode: no sample room for anyone; mine is my open server room (it has no level there, so none is shown).
+  const otherRoom = live ? undefined : ROOMS.find((r) => r.hostId === user.id);
+  const room: { title: string; desc: string; cover: string; level: number | null; go: () => void } | null = isMe
+    ? live
+      ? myLiveRoom && {
+          title: myLiveRoom.title || 'Odam',
+          desc: myLiveRoom.announcement ?? `${myLiveRoom.listeners.toLocaleString('tr-TR')} kişi içeride`,
+          cover: myLiveRoom.cover,
+          level: null,
+          go: () => router.push(`/oda/${myLiveRoom.id}`),
+        }
+      : { title: myRoom.title, desc: myRoom.announcement, cover: myRoom.cover, level: roomLevel(myRoom.xp), go: () => router.push('/oda/yeni') }
     : otherRoom
       ? { title: otherRoom.title, desc: otherRoom.announcement ?? `${otherRoom.listeners} dinleyici`, cover: otherRoom.cover, level: otherRoom.level ?? 1, go: () => router.push(`/oda/${otherRoom.id}`) }
       : null;
   const { agency, kabile, known } = useAffiliations(user);
-  // Live mode: my own room and agency (once the server answered); nobody else's is on the server yet.
-  const showRoom = !live || isMe || !!room;
+  // Live mode: my open room and my agency (once the server answered); nobody else's is on the server yet.
+  const showRoom = !live || !!room;
   const showAgency = !live || (isMe && known);
 
   // Live mode: the tabs and blocks with something real behind them (the rest is sample data in the demo).
@@ -733,10 +759,12 @@ export default function UserProfile() {
                       <Text style={styles.meta} numberOfLines={2}>
                         {room.desc}
                       </Text>
-                      <View style={styles.lvChip}>
-                        <Text style={{ fontSize: 12 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
-                        <Text style={styles.lvText}>Lv.{room.level}</Text>
-                      </View>
+                      {room.level !== null && (
+                        <View style={styles.lvChip}>
+                          <Text style={{ fontSize: 12 }}>{ROOM_LEVEL_ICONS[Math.min(room.level, ROOM_LEVEL_ICONS.length) - 1]}</Text>
+                          <Text style={styles.lvText}>Lv.{room.level}</Text>
+                        </View>
+                      )}
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
                   </Pressable>
@@ -831,9 +859,11 @@ export default function UserProfile() {
         title={user.name}
         onClose={() => setSheet('none')}
         options={[
-          { label: 'Odama davet et', icon: 'mic-outline', onPress: inviteToRoom },
+          // Live mode: the server has no room invites yet (and my room there is not the demo's), so no invite that goes nowhere.
+          ...(live ? [] : [{ label: 'Odama davet et', icon: 'mic-outline', onPress: inviteToRoom } satisfies SheetOption]),
           { label: 'Profili paylaş', icon: 'share-social-outline', onPress: () => shareLink(`${user.name} Similar Club'da, profiline göz at!`, `kullanici/${user.id}`) },
-          { label: 'Kullanıcı adını kopyala', icon: 'copy-outline', onPress: copyUsername },
+          // No username chosen yet: nothing to copy (not a bare "@").
+          ...(user.username ? [{ label: 'Kullanıcı adını kopyala', icon: 'copy-outline', onPress: copyUsername } satisfies SheetOption] : []),
           {
             label: 'Şikâyet et',
             icon: 'flag-outline',

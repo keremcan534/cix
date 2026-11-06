@@ -119,12 +119,22 @@ describe('Başkasının profili: gerçek sayılar', () => {
       s.path === `/api/user?id=${id}`
         ? { body: { user: { id, name: 'Elif', username: 'elif', gender: 'Kadın', age: 27, city: 'Ankara', bio: 'Selam', interests: ['☕ Kahve'], avatarUrl: null, followers: 3, following: 1, isFollowing: true, blockedByMe: false } } }
         : { status: 404 };
-    assert.deepEqual(await loadPublicProfile(id), { followers: 3, following: 1, isFollowing: true });
+    assert.deepEqual(await loadPublicProfile(id), { followers: 3, following: 1, isFollowing: true, blockedByMe: false });
     const u = userById(id);
     assert.equal(u.name, 'Elif');
     assert.equal(u.age, 27);
     assert.equal(u.city, 'Ankara');
     assert.equal(u.username, 'elif');
+  });
+
+  test('engelden sonra sunucunun engel durumu da gelir (ekran eski takip durumunu tutmaz)', async () => {
+    const { loadPublicProfile } = await profile();
+    const id = 'bbbbbbbb-0000-4000-8000-000000000003';
+    route = (s) =>
+      s.path === `/api/user?id=${id}`
+        ? { body: { user: { id, name: 'Can', username: null, gender: null, age: null, city: null, bio: '', interests: [], avatarUrl: null, followers: 0, following: 0, isFollowing: false, blockedByMe: true } } }
+        : { status: 404 };
+    assert.deepEqual(await loadPublicProfile(id), { followers: 0, following: 0, isFollowing: false, blockedByMe: true });
   });
 
   test('takip sunucuya gider ve cevap sunucunun takip durumudur', async () => {

@@ -32,7 +32,7 @@ import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes } from './auth.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
-import { wheelRoutes } from './wheel.mjs';
+import { wealthPoints, wheelRoutes } from './wheel.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { HttpError, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, selfUser, sha, userId } from './core.mjs';
@@ -99,8 +99,10 @@ const walletRoutes = {
     return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000), warnings: await warningCodes() };
   },
 
+  /** wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same value. */
   async 'GET /api/me'(req) {
-    return { user: selfUser(await auth(req)) };
+    const u = await auth(req);
+    return { user: { ...selfUser(u), wealthXp: await wealthPoints(db, u.id) } };
   },
 
   async 'GET /api/ledger'(req) {
@@ -161,12 +163,18 @@ const walletRoutes = {
     if (!n) throw new HttpError(400, 'Geçersiz miktar');
     const why = typeof reason === 'string' ? reason.trim().slice(0, 80) : '';
     if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
-    return once(u.id, 'coin', ref, async (c) => {
+    const out = await once(u.id, 'coin', ref, async (c) => {
       const row = await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'coin', ref);
       if (Number(row.rows[0].coins) < n) throw new HttpError(409, 'Yetersiz jeton');
       await spendCoins(c, u.id, n, `Uygulama içi: ${why}`, ref);
     });
+    // once() keys on (user, coin, ref), which gifts, bonds and Jeton Noktası share: their ref is not this spend's
+    // replay. Refused, nothing taken.
+    if (out.replay && !(await db.query("SELECT 1 FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref = $2 AND reason LIKE 'Uygulama içi:%'", [u.id, ref])).rowCount) {
+      throw new HttpError(409, 'Geçersiz istek kimliği');
+    }
+    return out;
   },
 
   async 'POST /api/wallet/exchange'(req) {
@@ -261,9 +269,9 @@ const server = http.createServer(async (req, res) => {
     send(200, await route(req, url));
   } catch (err) {
     // A malformed value that only Postgres caught is the request's fault: 400, not a server error. An id that
-    // isn't a uuid, a number or date out of range, an id of a row that doesn't exist (23503); text Postgres can't
-    // store, such as a NUL byte (22021).
-    const bad = err instanceof HttpError ? null : err?.code === '22021' ? 'Geçersiz metin' : ['22P02', '22003', '22007', '22008', '23503'].includes(err?.code) ? 'Geçersiz istek' : null;
+    // isn't a uuid, a number or date out of range; text Postgres can't store, such as a NUL byte (22021). A
+    // missing row (23503) stays a 5xx: each route checks its own ids, so one that gets that far is a server bug.
+    const bad = err instanceof HttpError ? null : err?.code === '22021' ? 'Geçersiz metin' : ['22P02', '22003', '22007', '22008'].includes(err?.code) ? 'Geçersiz istek' : null;
     const e = bad ? new HttpError(400, bad) : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);

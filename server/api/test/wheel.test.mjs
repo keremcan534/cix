@@ -153,10 +153,13 @@ describe('Rüzgâr Gülü sunucuda', () => {
     await debit(5000, 'İade: satın alınan jeton geri alındı');
     assert.equal((await call('GET', '/api/wheel', null, a.session))[1].allowed, false, 'satış ve iade harcama değil');
     assert.equal((await spin(a.session, 'kiyi', 1))[0], 403);
+    // GET /api/me carries the same points, so the app gates the games with the server's value.
+    assert.equal((await me(a.session)).wealthXp, 0);
     // A real purchase of 50 coins counts.
     await topUp(a.session, 1000);
     assert.equal((await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Mağaza: çıkartma', ref: rnd(6) }, a.session))[0], 200);
     assert.equal((await call('GET', '/api/wheel', null, a.session))[1].allowed, true);
+    assert.equal((await me(a.session)).wealthXp, 50);
   });
 
   test('başka bir işlemin ref’i: çark 500 vermez, sonraki hediye gerçekten gider', async () => {

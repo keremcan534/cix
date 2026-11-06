@@ -51,8 +51,10 @@ silerek aşılabilir. Play Integrity / App Attest henüz bağlı değildir.
   eklenmelidir.
 - Kişi kendi yaptırımlarını, gerekçesini, bitişini ve itiraz durumunu uygulamada görür (Madde 15 erişim hakkı).
   İç not (`internal_note`) yalnızca personel içindir ve kişiye gönderilmez.
-- Hesap silme isteğinde yaptırım kayıtları, banın aşılmasını önlemek için kişiden ayrılmış olarak tutulmalıdır;
-  bu ayrıştırma henüz yazılmadı.
+- Hesap silme, süren bir susturma yüzünden reddedilmez (UK GDPR silme hakkı). Kişisel bilgiler silinir; yaptırım
+  kayıtları ve cihaz bağı, yaptırımın aşılmasını önlemek için kalır. Silinen hesapta süren genel susturma, aynı
+  cihazda silmeden sonra açılan yeni hesaba aynı bitişle geçer (`sanctions.mjs` `carryMutes`). Cihazdaki eski
+  hesaplar ve oda içi susturmalar etkilenmez.
 
 ## Bilinen sınırlar
 

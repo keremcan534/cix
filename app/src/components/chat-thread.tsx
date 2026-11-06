@@ -5,8 +5,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Platform, Pressable, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { onWebEnter } from '@/lib/enter-sends';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { useReport } from '@/components/report-sheet';
@@ -290,11 +291,13 @@ export function ChatThread({
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
           </Pressable>
-          {/* Wraps up to a few lines; the keyboard's send key sends and the keyboard stays open for the next one. */}
+          {/* Wraps up to a few lines; the keyboard's send key sends and the keyboard stays open for the next one.
+              Web: Enter sends, Shift+Enter is a new line (lib/enter-sends). */}
           <TextInput
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={() => send()}
+            onKeyPress={Platform.OS === 'web' ? (e) => onWebEnter(e, () => send()) : undefined}
             submitBehavior="submit"
             multiline
             maxLength={MAX_LENGTH}

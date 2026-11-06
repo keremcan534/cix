@@ -45,6 +45,22 @@ const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
   ['system', 'Sistem', 'settings-outline'],
 ];
 const LOCKED_NOTIFY: NotifyType[] = ['payment', 'system'];
+
+// The privacy and contact settings a live build does not offer (giris-4), with the store's defaults. One changed
+// on this phone before still works here (showLastSeen off also hides other people's last seen), so a live build
+// offers to put them back.
+const PRIVACY_DEFAULTS: Pick<Settings, 'profilePublic' | 'showOnline' | 'showLastSeen' | 'showCurrentRoom' | 'luckyAnnounce' | 'invisibleEntry' | 'dmFrom' | 'callsFrom' | 'invitesFrom'> = {
+  profilePublic: true,
+  showOnline: true,
+  showLastSeen: true,
+  showCurrentRoom: true,
+  luckyAnnounce: true,
+  invisibleEntry: false,
+  dmFrom: 'everyone',
+  callsFrom: 'everyone',
+  invitesFrom: 'everyone',
+};
+const PRIVACY_KEYS = Object.keys(PRIVACY_DEFAULTS) as (keyof typeof PRIVACY_DEFAULTS)[];
 const nowMs = () => Date.now();
 
 const coin = <Icon3D name="coin" size={14} />;
@@ -127,6 +143,11 @@ export default function SettingsScreen() {
   // A live build shows only what the server really does: its sessions, and no privacy, contact or spending
   // switches until the server keeps and enforces them (giris-4). The demo keeps every prototype setting.
   const live = liveMode();
+  const stalePrivacy = live && PRIVACY_KEYS.some((k) => settings[k] !== PRIVACY_DEFAULTS[k]);
+  const resetPrivacy = () => {
+    for (const k of PRIVACY_KEYS) setSetting(k, PRIVACY_DEFAULTS[k]);
+    showAlert('Gizlilik ayarları sıfırlandı', 'Bu telefondaki gizlilik ve iletişim ayarları varsayılana döndü.');
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -207,6 +228,28 @@ export default function SettingsScreen() {
               />
             </ListBlock>
           </ListGroup>
+        )}
+
+        {live && (
+          <>
+            {/* Only this phone's Keşfet › Yakındaki list: it shows people whose profile city is mine. Nothing is
+                sent to the server, so it does not promise who can find me. */}
+            <ListGroup label="Keşfet">
+              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Keşfet'teki Yakındaki sekmesi, profilindeki şehre göre listelenir. Kesin konumun kullanılmaz." />
+            </ListGroup>
+            {stalePrivacy && (
+              <ListGroup label="Gizlilik" footer="Bu ayarlar sunucuya gönderilmez, yalnızca bu telefonda etkilidir. Örneğin son görülmeni kapattıysan başkalarının son görülmesini de göremezsin.">
+                <ListRow
+                  icon="refresh-outline"
+                  tone="neutral"
+                  title="Eski gizlilik ayarlarını sıfırla"
+                  subtitle="Bu telefonda daha önce değiştirdiğin gizlilik ve iletişim ayarları varsayılana döner."
+                  onPress={resetPrivacy}
+                  chevron={false}
+                />
+              </ListGroup>
+            )}
+          </>
         )}
 
         {!live && (

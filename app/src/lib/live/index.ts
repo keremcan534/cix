@@ -72,6 +72,9 @@ export async function liveSignIn(name: string) {
   const at = order.begin();
   const u = await api.ensureSignedIn(name);
   applied({ user: u }, undefined, at);
+  // A new sign-in answers without the Cömertlik points (only GET /api/me counts them): read them now, so the
+  // games the server allows don't stay hidden until the next refresh.
+  if (u.wealthXp === undefined) void refreshWallet().catch(() => {});
   return u;
 }
 

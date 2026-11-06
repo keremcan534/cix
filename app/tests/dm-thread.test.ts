@@ -56,6 +56,31 @@ describe('Sohbet eşitleme (mergeThread)', () => {
     assert.equal('noRetry' in r.messages[0], false);
   });
 
+  test('aynı metinde önce gönderilmekte olan mesajım eşleşir; sunucunun reddettiği mesaj hiç eşleşmez', () => {
+    const local: ChatMessage[] = [
+      { id: 'l1', fromMe: true, text: 'ok', time: '10:00', ref: 'r1', failed: 'Mesaj çok uzun', noRetry: true },
+      { id: 'l2', fromMe: true, text: 'ok', time: '10:01', ref: 'r2', failed: 'Sunucuya ulaşılamadı' },
+      { id: 'l3', fromMe: true, text: 'ok', time: '10:02', ref: 'r3' },
+    ];
+    const r = mergeThread(local, [dm(9, ME, 'ok')], { peer: PEER, after: 0 });
+    assert.deepEqual(r.messages.map((m) => [m.ref, m.sid, m.failed]), [
+      ['r1', undefined, 'Mesaj çok uzun'],
+      ['r2', undefined, 'Sunucuya ulaşılamadı'],
+      ['r3', 9, undefined],
+    ]);
+    // Gönderilmekte olan yoksa cevabı gelmeyen (belki saklanmış) mesaj eşleşir; reddedilen yine eşleşmez.
+    const r2 = mergeThread(local.slice(0, 2), [dm(9, ME, 'ok')], { peer: PEER, after: 0 });
+    assert.deepEqual(r2.messages.map((m) => [m.ref, m.sid]), [
+      ['r1', undefined],
+      ['r2', 9],
+    ]);
+    const r3 = mergeThread(local.slice(0, 1), [dm(9, ME, 'ok')], { peer: PEER, after: 0 });
+    assert.deepEqual(r3.messages.map((m) => [m.ref, m.sid]), [
+      ['r1', undefined],
+      [undefined, 9],
+    ]);
+  });
+
   test('karşı taraf okuyunca mesajım okundu olur', () => {
     const local: ChatMessage[] = [{ id: 'l1', fromMe: true, text: 'selam', time: '10:00', sid: 2 }];
     const r = mergeThread(local, [dm(2, ME, 'selam', { readAt: '2026-11-06T10:05:00.000Z' })], { peer: PEER, after: 2 });
@@ -118,6 +143,27 @@ describe('Sohbet listesi (applyThread, markSent)', () => {
     // Silinmiş ya da eşitlemenin zaten eşlediği mesaj: liste değişmez.
     assert.equal(markSent(list, PEER, 'yok', { id: 43, createdAt: '' }), list);
     assert.equal(markSent(next, PEER, 'r1', { id: 42, createdAt: '' }), next);
+  });
+
+  test('eşitleme kimliği aynı metinli öbür mesajıma verdiyse cevap gelince yer değiştirir', () => {
+    // İki kez "ok" gönderildi; sunucu ikincisini (r2) önce sakladı ve eşitleme 50'yi ilk balona (r1) verdi.
+    const list = [
+      conv(0, [
+        { id: 'l1', fromMe: true, text: 'ok', time: '10:00', ref: 'r1', sid: 50, at: '2026-11-06T10:50:00.000Z', read: true },
+        { id: 'l2', fromMe: true, text: 'ok', time: '10:00', ref: 'r2' },
+      ]),
+    ];
+    const next = markSent(list, PEER, 'r2', { id: 50, createdAt: '2026-11-06T10:50:00.000Z' });
+    const [first, second] = next[0].messages;
+    assert.equal(second.sid, 50);
+    assert.equal(second.read, true);
+    assert.equal(first.sid, undefined, 'ilk balon kendi cevabını bekler');
+    assert.equal('read' in first, false);
+    const done = markSent(next, PEER, 'r1', { id: 51, createdAt: '2026-11-06T10:51:00.000Z' });
+    assert.deepEqual(done[0].messages.map((m) => [m.ref, m.sid]), [
+      ['r1', 51],
+      ['r2', 50],
+    ]);
   });
 });
 

@@ -193,6 +193,8 @@ export type Report = {
   earnings: { bucket: string; direct: number; difference: number; transition: number; total: number }[];
 };
 
+/** Someone "Yayıncı davet et" can invite; `agency`: 'this' or 'other' when they already belong to one. */
+export type Invitee = { id: string; name: string; username: string | null; avatarUrl: string | null; agency: 'this' | 'other' | null };
 export type JoinRequest = { id: number; kind: 'invite' | 'join'; method: string; status: string; user: { id: string; name: string; username: string | null }; note: string | null; createdAt: string; decidedAt: string | null };
 export type StaffRole = { id: number; name: string; permissions: string[] };
 export type StaffMember = { user: Named; roleId: number | null; role: string | null; extra: string[]; denied: string[]; perms: string[]; since: string };
@@ -334,6 +336,8 @@ export const agencyNet = {
   requests: (id: string) => get<{ requests: JoinRequest[] }>('/api/agency/requests', { id }).then((r) => r.requests),
   /** The server finds the streamer by account id (`user`) or by username. */
   invite: (id: string, to: { user: string } | { username: string }, note?: string) => post('/api/agency/invite', { id, ...to, note }),
+  /** Whom to invite: people found by name or username (at most 20; 2 letters at least). */
+  inviteSearch: (id: string, q: string) => get<{ users: Invitee[] }>('/api/agency/invite/search', { id, q }).then((r) => r.users),
   decideRequest: (id: string, requestId: number, approve: boolean, note?: string) => post('/api/agency/requests/decide', { id, requestId, approve, note }),
   createSub: (parentId: string, name: string, owner?: string, region?: string) => post<{ agency: AgencyCard }>('/api/agency/sub/create', { parentId, name, owner, region, submit: true }),
   submitSub: (id: string) => post('/api/agency/sub/submit', { id }),
@@ -452,6 +456,22 @@ export async function inviteStreamer(agencyId: string, raw: string, note?: strin
       throw new ApiError(404, 'Kullanıcı bulunamadı. Bu profil ID’si takip ettiklerin ve Keşfet’tekiler arasında yok; yayıncıyı takip edip tekrar dene ya da kullanıcı adını yaz.');
     throw e;
   }
+}
+
+/**
+ * Live "Yayıncı davet et" search over what the owner typed. A name (as the app shows it) or a username is looked up
+ * on the server. A profile ID number has no server lookup (people see their own on their profile and may pass it
+ * on), so it is matched among the people this phone can list (followed accounts and Keşfet), else searched as text.
+ */
+export async function findInvitees(agencyId: string, raw: string): Promise<Invitee[]> {
+  const t = parseInviteInput(raw);
+  if (!t || t.kind === 'user') return [];
+  if (t.kind === 'public') {
+    const [following, nearby] = await Promise.all([followingList().catch(() => []), discover().catch(() => [])]);
+    const hits = pickByPublicId(t.publicId, [...following, ...nearby], displayId);
+    if (hits.length) return hits.map((u) => ({ id: u.id, name: u.name, username: null, avatarUrl: u.avatarUrl ?? null, agency: null }));
+  }
+  return agencyNet.inviteSearch(agencyId, t.username);
 }
 
 /**

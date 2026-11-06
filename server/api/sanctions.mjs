@@ -222,6 +222,7 @@ export async function registerDevice(sig) {
  */
 export async function linkDevice(dev, uid) {
   await db.query('INSERT INTO device_accounts (device_id, user_id) VALUES ($1, $2) ON CONFLICT (device_id, user_id) DO UPDATE SET last_seen_at = now()', [dev.id, uid]);
+  await carryMutes(dev, uid).catch((e) => console.error('carry mutes', uid, e.message));
   const others = await db.query(
     `SELECT a.user_id, EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = a.user_id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS banned
        FROM device_accounts a WHERE a.device_id = $1 AND a.user_id <> $2`,
@@ -236,6 +237,47 @@ export async function linkDevice(dev, uid) {
   if (next === cur.rows[0].risk_status) return;
   await db.query('UPDATE device_registry SET risk_status = $2 WHERE id = $1', [dev.id, next]);
   await audit(db, { action: 'device_risk', device: dev.id, target: uid, detail: { risk: next, accounts: others.rowCount + 1 } });
+}
+
+/**
+ * Deleting an account is never refused for a mute (social.mjs DELETE /api/me), but it frees the sign-in key. So a
+ * general mute still running on an account deleted on this device moves to an account made here after that
+ * deletion: same type, reason, start and end, applied by the same role. Accounts that were already here keep
+ * their own record; room mutes stay with their room. Once per mute: a copy `uid` already has (even one staff
+ * lifted since) is not made again.
+ */
+async function carryMutes(dev, uid) {
+  const moved = await tx(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`carry-mutes:${uid}`]);
+    const r = await c.query(
+      `SELECT DISTINCT ON (s.sanction_type, s.reason_code, s.expires_at) s.*, m.include_dm, m.include_calls
+         FROM user_sanctions s JOIN users old ON old.id = s.user_id JOIN users nu ON nu.id = $2
+         LEFT JOIN user_mute_records m ON m.sanction_id = s.id
+        WHERE s.user_id IN (SELECT user_id FROM device_accounts WHERE device_id = ANY($1::bigint[]) AND user_id <> $2)
+          AND old.deleted_at IS NOT NULL AND nu.created_at >= old.deleted_at AND s.scope = 'global' AND ${LIVE_SANCTION}
+          AND NOT EXISTS (SELECT 1 FROM user_sanctions x WHERE x.user_id = $2 AND x.sanction_type = s.sanction_type
+                            AND x.reason_code = s.reason_code AND x.expires_at IS NOT DISTINCT FROM s.expires_at)
+        ORDER BY s.sanction_type, s.reason_code, s.expires_at, s.id`,
+      [dev.matched?.length ? dev.matched : [dev.id], uid],
+    );
+    for (const s of r.rows) {
+      // Copied in SQL: the times keep Postgres' microseconds (a JS Date would cut them), so the check above matches.
+      const id = (
+        await c.query(
+          `INSERT INTO user_sanctions (user_id, sanction_type, scope, reason_code, reason_description, internal_note, start_at, expires_at, is_permanent, status,
+                                       created_by, created_role, source, report_id, policy_step)
+           SELECT $1, sanction_type, 'global', reason_code, reason_description, left(rtrim($2 || internal_note), 2000), start_at, expires_at, is_permanent, 'active',
+                  created_by, created_role, source, report_id, policy_step
+             FROM user_sanctions WHERE id = $3 RETURNING id`,
+          [uid, `Silinen hesaptan taşındı (yaptırım #${s.id}). `, s.id],
+        )
+      ).rows[0].id;
+      await c.query('INSERT INTO user_mute_records (sanction_id, include_dm, include_calls) VALUES ($1, $2, $3)', [id, !!s.include_dm, !!s.include_calls]);
+      await audit(c, { action: 'carry_over', sanction: id, target: uid, device: dev.id, detail: { from: Number(s.id), fromUser: s.user_id } });
+    }
+    return r.rowCount;
+  });
+  if (moved) await refreshVoice(uid);
 }
 
 // --- Enforcement -----------------------------------------------------------------------------------------------

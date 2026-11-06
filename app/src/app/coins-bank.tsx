@@ -33,7 +33,6 @@ import {
 } from '@/data/bank-mock';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
-import { IS_DEMO } from '@/lib/build';
 import { liveMode } from '@/lib/live';
 import {
   PROVIDERS,
@@ -125,6 +124,8 @@ export default function CoinsBankScreen() {
   return liveMode() ? <ComingSoon title="Jeton Noktası" /> : <DemoCoinsBank />;
 }
 
+// Everything below is sample data, so it always carries the PROTOTİP pill and the Demo banner (also in a build
+// without a server and with EXPO_PUBLIC_DEMO=0).
 function DemoCoinsBank() {
   const [tab, setTab] = useState<Tab>('wallet');
   const { colors } = useTheme();
@@ -134,11 +135,9 @@ function DemoCoinsBank() {
       <Header
         title="Jeton Noktası"
         right={
-          IS_DEMO ? (
-            <View style={styles.protoPill}>
-              <Text style={styles.protoPillText}>PROTOTİP</Text>
-            </View>
-          ) : undefined
+          <View style={styles.protoPill}>
+            <Text style={styles.protoPillText}>PROTOTİP</Text>
+          </View>
         }
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.tabs}>
@@ -152,12 +151,10 @@ function DemoCoinsBank() {
       {/* The payout account and amount fields sit low in the scroll: the keyboard must not cover them (Android). */}
       <KeyboardAvoid style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {IS_DEMO && (
-            <View style={styles.banner}>
-              <Ionicons name="flask" size={16} color={colors.gold} />
-              <Text style={styles.bannerText}>Demo: tüm tutarlar örnek veridir, gerçek ödeme veya para transferi yapılmaz. Gerçek sistemde tüm doğrulamalar sunucuda çalışır.</Text>
-            </View>
-          )}
+          <View style={styles.banner}>
+            <Ionicons name="flask" size={16} color={colors.gold} />
+            <Text style={styles.bannerText}>Demo: tüm tutarlar örnek veridir, gerçek ödeme veya para transferi yapılmaz. Gerçek sistemde tüm doğrulamalar sunucuda çalışır.</Text>
+          </View>
           {tab === 'wallet' && <WalletTab />}
           {tab === 'creator' && <CreatorTab />}
           {tab === 'agency' && <AgencyTab />}

@@ -8,7 +8,8 @@
 import * as api from '@/lib/api';
 import { putServerUser, type User } from '@/data/mock';
 
-export type SocialCounts = { followers: number; following: number; isFollowing: boolean };
+/** `blockedByMe`: whether the server already has my block, so a read sent right after a block can be told apart. */
+export type SocialCounts = { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
 
 /** My profile as the server keeps it. Empty fields stay empty, so no demo value (a handle, a city) survives. */
 export function meFromServer(u: api.ServerMe): Partial<User> {
@@ -51,7 +52,7 @@ export async function loadPublicProfile(serverId: string, mine = false): Promise
       ...(p.avatarUrl && { avatar: p.avatarUrl }),
     });
   }
-  return { followers: p.followers, following: p.following, isFollowing: p.isFollowing };
+  return { followers: p.followers, following: p.following, isFollowing: p.isFollowing, blockedByMe: !!p.blockedByMe };
 }
 
 /** Follow or unfollow on the server; the answer is the server's follow state. */

@@ -13,6 +13,7 @@ import { isServerId, roomById, serverRoomKnown } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { isLockedRoom, isMyServerRoom, liveMode, liveSignIn, loadRooms, message, myServerId } from '@/lib/live';
 import { roomPassword, setRoomPassword } from '@/lib/live/room-password';
+import { roomStaff } from '@/lib/live/room-staff';
 import { endRoom, getSession, openRoom, registerOpener, requestLeave, setLeaving, useRoomSession } from '@/lib/room-session';
 import { savedAtStart } from '@/lib/room-session-persist';
 import { useApp } from '@/store';
@@ -46,12 +47,28 @@ function RoomMissing() {
 
 type Gate = 'loading' | 'create' | 'password' | 'open';
 
-/** I'm not staff of this password room, haven't typed its password this run and am not already inside. */
-const needsPassword = (id: string) => {
+/** A password room whose password I haven't typed this run and that I'm not already inside. */
+const maybeLocked = (id: string) => {
   const s = getSession().session;
-  return isLockedRoom(id) && !isMyServerRoom(id) && !roomPassword(id) && !(s?.roomId === id && s.status !== 'ended');
+  return isLockedRoom(id) && !roomPassword(id) && !(s?.roomId === id && s.status !== 'ended');
 };
-const gateFor = (id: string): Gate => (id === 'yeni' || !serverRoomKnown(id) ? 'loading' : needsPassword(id) ? 'password' : 'open');
+/** A listed room opens at once unless it may need its password; then the server is asked first (the effect
+ *  below), unless it is surely mine (my server id known and the list read with it). */
+const gateFor = (id: string): Gate =>
+  id === 'yeni' || !serverRoomKnown(id) ? 'loading' : !maybeLocked(id) || (!!myServerId() && isMyServerRoom(id)) ? 'open' : 'loading';
+
+/** Whether I run this room (its owner or one of its admins): the server lets them in without the password.
+ *  When that can't be read, the password is asked (the server still lets staff in with any). */
+async function runsRoom(id: string) {
+  const mine = myServerId();
+  if (!mine) return false;
+  try {
+    const s = await roomStaff(id);
+    return s.owner === mine || s.admins.some((a) => a.id === mine);
+  } catch {
+    return false;
+  }
+}
 
 function LiveRoomGate({ id }: { id: string }) {
   const { me } = useApp();
@@ -64,20 +81,22 @@ function LiveRoomGate({ id }: { id: string }) {
       showAlert(title, text);
       stepBack();
     };
-    // "Is it mine?" needs my server id: sign in first if this run hasn't yet.
-    const ready = id === 'yeni' && !myServerId() ? liveSignIn(me.name).then(() => undefined) : Promise.resolve();
-    ready
-      .then(() => loadRooms())
-      .then((list) => {
-        if (!alive) return;
-        if (id === 'yeni') {
-          const mine = list.find((r) => r.hostId === 'me');
-          if (mine) router.replace(`/oda/${mine.id}`);
-          else setGate('create');
-        } else if (!serverRoomKnown(id)) fail('Oda bulunamadı', 'Bu oda kapanmış olabilir.');
-        else setGate(needsPassword(id) ? 'password' : 'open');
-      })
-      .catch((e) => fail('Oda açılamadı', message(e)));
+    void (async () => {
+      // "Is it mine, do I run it?" needs my server id (a cold start can list rooms before it is known): sign in
+      // first if this run hasn't yet, then read the list with it.
+      if (!myServerId()) await liveSignIn(me.name);
+      const list = await loadRooms();
+      if (!alive) return;
+      if (id === 'yeni') {
+        const mine = list.find((r) => r.hostId === 'me');
+        if (mine) router.replace(`/oda/${mine.id}`);
+        else setGate('create');
+        return;
+      }
+      if (!serverRoomKnown(id)) return fail('Oda bulunamadı', 'Bu oda kapanmış olabilir.');
+      const free = !maybeLocked(id) || isMyServerRoom(id) || (await runsRoom(id));
+      if (alive) setGate(free ? 'open' : 'password');
+    })().catch((e) => fail('Oda açılamadı', message(e)));
     return () => {
       alive = false;
     };

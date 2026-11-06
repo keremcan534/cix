@@ -8,9 +8,9 @@
 // (server/infra/livekit.yaml). Each one carries a JWT signed with the API secret whose sha256 claim is the
 // body's hash, so nobody else can fake presence. If LiveKit restarts and misses "left" events, the cleanup
 // asks LiveKit's own API (LIVEKIT_API_URL, e.g. http://127.0.0.1:7880) which rooms are open and forgets the rest.
-// A server room nobody is in closes: when LiveKit says it finished (everyone left), and in the cleanup when it
-// is not open in LiveKit, has nobody in it and is older than ROOM_IDLE_MINUTES (one never joined, a missed
-// webhook). The owner's next "Oda oluştur" opens a new one.
+// A server room nobody is in stays open: its blacklist, admins, room mutes and password belong to the room id,
+// and the owner's next "Oda oluştur" gets the same room back (rooms.mjs, 409 → their open room). Instead, once
+// webhooks arrive, GET /api/rooms leaves other people's empty rooms out of the list (presenceTracked).
 //
 // A token is only for an open server room the person may enter (rooms.mjs voiceAccess), with their own account
 // as the identity, and lives LIVEKIT_TOKEN_TTL_S seconds (default 600; LiveKit renews it for a connected
@@ -60,17 +60,14 @@ export function verifyWebhook(raw, authorization) {
 }
 
 const clip = (v) => (typeof v === 'string' ? v.slice(0, 64) : '');
-/** A server room's LiveKit name (rooms.mjs liveKitName); the app's sample rooms have none. */
-const SERVER_ROOM = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
-/** An open room with nobody in it closes after this long (cleanup); a just-made one is left to be joined. */
-const ROOM_IDLE_MINUTES = 30;
 
-/** Closes the server room behind LiveKit room `name` if nobody is in it. */
-async function closeIfEmpty(name) {
-  const m = SERVER_ROOM.exec(name);
-  if (!m) return;
-  await db.query('UPDATE rooms SET closed_at = now() WHERE id = $1 AND closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM room_presence WHERE room = $2)', [m[1], name]);
-}
+/**
+ * True once a signed webhook has come from LiveKit since this process started: room_presence then says who is in
+ * which room, and the room list can leave empty rooms out. Until then (no webhook set up, or just restarted) a
+ * room's 0 means "not known", and every open room is listed as before.
+ */
+let webhooksSeen = false;
+export const presenceTracked = () => webhooksSeen;
 
 /** Time in a room feeds the agency's activity measure (agency-perf.mjs). Identities are user ids. */
 async function logPresence(gone) {
@@ -118,8 +115,6 @@ async function onEvent(e) {
       break;
     case 'room_finished':
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
-      // Everyone left (owner included) and LiveKit ended it: the room leaves the list.
-      await closeIfEmpty(room);
       break;
     default:
   }
@@ -161,13 +156,6 @@ async function cleanup() {
   if (!r.ok) throw new Error(`livekit ListRooms ${r.status}`);
   const open = ((await r.json()).rooms ?? []).map((x) => x.name);
   await logPresence(await db.query('DELETE FROM room_presence WHERE NOT (room = ANY($1::text[])) RETURNING room, identity, joined_at', [open]));
-  // Open rooms LiveKit doesn't have, with nobody in them, made long enough ago that they would have been joined.
-  await db.query(
-    `UPDATE rooms r SET closed_at = now()
-      WHERE r.closed_at IS NULL AND r.created_at < now() - make_interval(mins => $2::int) AND NOT ('oda-' || r.id::text = ANY($1::text[]))
-        AND NOT EXISTS (SELECT 1 FROM room_presence p WHERE p.room = 'oda-' || r.id::text)`,
-    [open, ROOM_IDLE_MINUTES],
-  );
 }
 if (env.LIVEKIT_API_URL) {
   const run = () => cleanup().catch((e) => console.error('presence cleanup', String(e).slice(0, 200)));
@@ -197,7 +185,9 @@ export const liveRoutes = {
 
   async 'POST /api/livekit/webhook'(req) {
     const raw = await readRaw(req, 64_000);
-    await onEvent(verifyWebhook(raw, req.headers.authorization));
+    const e = verifyWebhook(raw, req.headers.authorization);
+    webhooksSeen = true;
+    await onEvent(e);
     return { ok: true };
   },
 

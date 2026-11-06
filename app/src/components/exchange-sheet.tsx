@@ -29,8 +29,14 @@ const SHARES = [
 /** How many coins a round 10.000 💎 buys, for the rate line. */
 const PER_10K = Math.floor(10_000 * selfExchangeRate());
 
-export function ExchangeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, coins, exchangeDiamonds, notify } = useApp();
+/** `split`: live mode, the server's balance and its withdrawable and locked totals, as Gelir shows them (the store's
+ *  numbers otherwise). */
+export function ExchangeSheet({ visible, onClose, split }: { visible: boolean; onClose: () => void; split?: { diamonds: number; withdrawable: number; locked: number } }) {
+  const app = useApp();
+  const { coins, exchangeDiamonds, notify } = app;
+  const diamonds = split?.diamonds ?? app.diamonds;
+  const free = split?.withdrawable ?? app.withdrawableDiamonds;
+  const locked = split?.locked ?? app.lockedDiamonds;
   const { colors, semantic } = useTheme();
   const s = useStyles();
   // Android modals draw edge to edge: keep the button row above the navigation bar.

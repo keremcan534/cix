@@ -22,7 +22,7 @@
 // set for someone else (taken off the mic or moved), and locked mics are the LiveKit room's metadata.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { deleteVoiceRoom, removeFromVoice, roomService } from './live.mjs';
+import { deleteVoiceRoom, presenceTracked, removeFromVoice, roomService } from './live.mjs';
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
@@ -140,14 +140,21 @@ export const roomRoutes = {
     }
   },
 
-  /** Open rooms, fullest first, without the ones whose owner and you have blocked each other. */
+  /**
+   * Open rooms, fullest first, without the ones whose owner and you have blocked each other. Once LiveKit's
+   * webhooks arrive (live.mjs presenceTracked), also without other people's rooms nobody is in: such a room stays
+   * open with its blacklist and admins, and is listed again as soon as someone joins. Rooms you own or run are
+   * always listed.
+   */
   async 'GET /api/rooms'(req) {
     const me = await auth(req);
     const r = await db.query(
       `${SELECT} WHERE r.closed_at IS NULL AND u.deleted_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = r.owner AND b.blocked = $1) OR (b.blocker = $1 AND b.blocked = r.owner))
+         AND (NOT $2::boolean OR r.owner = $1 OR EXISTS (SELECT 1 FROM room_presence p WHERE p.room = 'oda-' || r.id::text)
+              OR EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = r.id AND a.user_id = $1))
        ORDER BY listeners DESC, r.created_at DESC LIMIT 100`,
-      [me.id],
+      [me.id, presenceTracked()],
     );
     return { rooms: r.rows.map(out) };
   },

@@ -3,14 +3,15 @@
 // server's; nothing here decides whether a sanction is on.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
+import { showAlert } from '@/lib/alert';
 import type { SanctionView } from '@/lib/api';
-import { openLegal } from '@/lib/legal';
+import { LEGAL_TITLE, legalUrl, type LegalDoc } from '@/lib/legal';
 import { message, myServerId } from '@/lib/live';
 import { openSupportMail } from '@/lib/open-mail';
 import { SUPPORT_EMAIL, banHelpMail } from '@/lib/support-mail';
@@ -128,6 +129,18 @@ function Appeal({ s }: { s: SanctionView }) {
 }
 
 /**
+ * A legal text from the ban screen. openLegal's fallback sends people to Ayarlar › Destek, which a banned person
+ * cannot reach, so until the address is set this one points to the support address on the same screen.
+ */
+function openBanLegal(doc: LegalDoc) {
+  const title = LEGAL_TITLE[doc];
+  const url = legalUrl(doc);
+  const fallback = () => showAlert(title, `${title} metnine şu an ulaşılamıyor. Sorunun varsa ${SUPPORT_EMAIL} adresine yazabilirsin.`);
+  if (url) Linking.openURL(url).catch(fallback);
+  else fallback();
+}
+
+/**
  * Ways out that need no account: the support address (a decided appeal, a lifetime or device ban, a request to
  * erase or copy the data under UK GDPR) and the legal texts (giris-13).
  */
@@ -148,11 +161,11 @@ function BanHelp({ s }: { s: SanctionView }) {
       </Pressable>
       <Text style={styles.helpNote}>Kararla ilgili sorun, verilerinin bir kopyası veya silinmesi (UK GDPR) için bu adrese yazabilirsin.</Text>
       <Text style={styles.helpNote}>
-        <Text style={styles.link} onPress={() => openLegal('terms')} accessibilityRole="link">
+        <Text style={styles.link} onPress={() => openBanLegal('terms')} accessibilityRole="link">
           Kullanım Koşulları
         </Text>
         {'  ·  '}
-        <Text style={styles.link} onPress={() => openLegal('privacy')} accessibilityRole="link">
+        <Text style={styles.link} onPress={() => openBanLegal('privacy')} accessibilityRole="link">
           Gizlilik Politikası
         </Text>
       </Text>

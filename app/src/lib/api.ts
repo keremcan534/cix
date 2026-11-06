@@ -16,7 +16,8 @@ import { getRandomBytes } from 'expo-crypto';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
 
-export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number };
+/** wealthXp: Cömertlik points, only in GET /api/me (the server's count, server/api/wheel.mjs wealthPoints). */
+export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number };
 export type ServerLedgerRow = { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; ref: string; counterparty: string | null; created_at: string };
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';

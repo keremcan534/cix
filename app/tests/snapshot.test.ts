@@ -5,7 +5,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ME } from '@/data/mock';
-import { ME_DEFAULT, readSnapshot } from '@/lib/snapshot';
+import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 
 describe('Kayıt okuyucu (readSnapshot)', () => {
   test('nesne olmayan kayıt yok sayılır', () => {
@@ -113,5 +113,68 @@ describe('Kayıt okuyucu (readSnapshot)', () => {
   test('sonraki sürümde adı değişen tayfa rolü varsayılana döner', () => {
     assert.equal(readSnapshot({ familyRole: 'captain' })!.familyRole, null);
     assert.equal(readSnapshot({ familyRole: 'helper' })!.familyRole, 'helper');
+  });
+
+  test('çıkışta bekletilen hesap kayıtta kalır, bozuksa düşer', () => {
+    const ok = readSnapshot({ parked: { serverId: 'a1', state: { inventory: ['wave', 3], vipDays: 7, loggedIn: true, parked: { serverId: 'x', state: {} } } } })!;
+    assert.equal(ok.parked!.serverId, 'a1');
+    assert.deepEqual(ok.parked!.state, { inventory: ['wave'], vipDays: 7 });
+    assert.equal(readSnapshot({ parked: { serverId: 5, state: {} } })!.parked, null);
+    assert.equal(readSnapshot({ parked: { serverId: 'a1', state: 'x' } })!.parked, null);
+    assert.equal(readSnapshot({ parked: null })!.parked, null);
+  });
+});
+
+// mantik-5 / giris-2: "Çıkış yap" then "Giriş yap" on the same phone must bring back the paid items, VIP and
+// progress (the coins were already taken on the server), while another account signing in here gets none of it.
+describe('Çıkış yapıp aynı hesapla geri girmek (parkAccount / unparkAccount)', () => {
+  const signedIn = {
+    loggedIn: true,
+    me: { ...ME_DEFAULT, name: 'Deniz' },
+    coins: 9850,
+    settings: { appearance: 'dark' },
+    inventory: ['wave'],
+    equipped: { entry: 'wave' },
+    vipDays: 30,
+    starter: { claimed: true, hidden: false },
+    stats: { roomMinutes: 3, giftsSent: 1, greetings: 2, moments: 0, calls: 0 },
+    notifications: [{ id: 'n9', kind: 'finance', icon: 'gift', title: 'Hediye aldın', body: '', time: '10:00', read: false }],
+    serverId: 'srv-a',
+  } as unknown as Snapshot;
+
+  test('çıkış: ayarlar kalır, hesabın kendi durumu sunucu kimliğiyle bekletilir', () => {
+    const keep = parkAccount(signedIn);
+    assert.deepEqual(keep.settings, { appearance: 'dark' });
+    assert.equal('inventory' in keep, false, 'sıradaki hesap eşyaları devralmaz');
+    assert.equal(keep.parked!.serverId, 'srv-a');
+    assert.deepEqual(keep.parked!.state.inventory, ['wave']);
+    assert.deepEqual(keep.parked!.state.equipped, { entry: 'wave' });
+    assert.equal(keep.parked!.state.vipDays, 30);
+    assert.equal(keep.parked!.state.starter!.claimed, true);
+    assert.equal(keep.parked!.state.notifications!.length, 1);
+    for (const key of ['loggedIn', 'me', 'settings', 'parked'] as const) assert.equal(key in keep.parked!.state, false, key);
+  });
+
+  test('sunucu kimliği olmayan hesap için bir şey bekletilmez', () => {
+    assert.deepEqual(parkAccount({ ...signedIn, serverId: null }), { settings: { appearance: 'dark' } });
+  });
+
+  test('aynı hesap geri gelince durumu döner; başka hesap ya da kimliksiz giriş hiçbir şey almaz', () => {
+    const { parked } = parkAccount(signedIn);
+    const back = unparkAccount(parked, 'srv-a')!;
+    assert.deepEqual(back.inventory, ['wave']);
+    assert.equal(back.vipDays, 30);
+    assert.equal(back.serverId, 'srv-a');
+    assert.equal(unparkAccount(parked, 'srv-b'), null);
+    assert.equal(unparkAccount(parked, null), null);
+    assert.equal(unparkAccount(null, 'srv-a'), null);
+  });
+
+  test('kayıttan okunan bekletilmiş hesap da geri döner (çıkıştan sonra uygulama kapanıp açıldıysa)', () => {
+    const saved = readSnapshot(JSON.parse(JSON.stringify(parkAccount(signedIn))))!;
+    const back = unparkAccount(saved.parked, 'srv-a')!;
+    assert.deepEqual(back.inventory, ['wave']);
+    assert.deepEqual(back.equipped, { entry: 'wave' });
+    assert.equal(back.notifications!.length, 1);
   });
 });

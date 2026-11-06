@@ -77,6 +77,9 @@ export const giftRoutes = {
       // Never fails the gift: runs in a savepoint, and the agency job backfills a missed one from gift_events.
       await recordIncome(c, to, 'gift', `gift:${g.rows[0].id}`, total);
     });
+    // once() keys on (sender, coin, ref), which spends, bonds and Jeton Noktası share: only a gift of this ref is
+    // this gift's replay. Another feature's ref is refused, so a success always means the gift went.
+    if (out.replay && !(await db.query('SELECT 1 FROM gift_events WHERE sender = $1 AND ref = $2', [u.id, b.ref])).rowCount) throw new HttpError(409, 'Geçersiz istek kimliği');
     // In a room the recipient sees it on stage; elsewhere (profile, chat) they get a notification.
     const lkRoom = liveKitRoom(room);
     if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });

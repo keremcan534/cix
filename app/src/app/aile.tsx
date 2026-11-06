@@ -227,370 +227,370 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* The announcement field sits in the scroll: the keyboard must not cover it (Android draws edge to edge). */}
       <KeyboardAvoid style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
-        {/* The tribe's theme header stays dark in both schemes (white type on the theme gradient). */}
-        <ThemeScope scheme="dark">
-        <LinearGradient colors={theme.colors} style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-          <View style={styles.topBar}>
-            <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
-              <Ionicons name="arrow-back" size={26} color="#fff" />
-            </Pressable>
-            <View style={{ flex: 1 }} />
-            <Pressable style={styles.topBtn} onPress={() => setSheet('rules')} accessibilityLabel="Tayfa kuralları">
-              <Ionicons name="document-text-outline" size={20} color="#fff" />
-            </Pressable>
-            <Pressable style={[styles.topBtn, { flexDirection: 'row', gap: 6, paddingHorizontal: 12 }]} onPress={() => setSheet('stats')} accessibilityLabel="Veri Merkezi">
-              <Ionicons name="stats-chart" size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Veri Merkezi</Text>
-            </Pressable>
-            <Pressable style={styles.topBtn} onPress={() => setMoreOpen(true)} accessibilityLabel="Menü">
-              <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
-            </Pressable>
-          </View>
-
-          <View style={[styles.row, { gap: 14, marginTop: 8 }]}>
-            <View style={styles.logo}>
-              <Text style={{ fontSize: 46 }}>{family.emoji}</Text>
+        <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
+          {/* The tribe's theme header stays dark in both schemes (white type on the theme gradient). */}
+          <ThemeScope scheme="dark">
+          <LinearGradient colors={theme.colors} style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+            <View style={styles.topBar}>
+              <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
+                <Ionicons name="arrow-back" size={26} color="#fff" />
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              <Pressable style={styles.topBtn} onPress={() => setSheet('rules')} accessibilityLabel="Tayfa kuralları">
+                <Ionicons name="document-text-outline" size={20} color="#fff" />
+              </Pressable>
+              <Pressable style={[styles.topBtn, { flexDirection: 'row', gap: 6, paddingHorizontal: 12 }]} onPress={() => setSheet('stats')} accessibilityLabel="Veri Merkezi">
+                <Ionicons name="stats-chart" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Veri Merkezi</Text>
+              </Pressable>
+              <Pressable style={styles.topBtn} onPress={() => setMoreOpen(true)} accessibilityLabel="Menü">
+                <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+              </Pressable>
             </View>
-            <View style={{ flex: 1, gap: 8 }}>
-              <View style={styles.nameRow}>
-                <Text style={styles.big} numberOfLines={1}>
-                  {family.name}
-                </Text>
-                <Text style={styles.badgeChip}>🏷️ {meta.badge}</Text>
-                <Text style={styles.powerChip}>🔥×{fmt(meta.multiplier)}</Text>
+
+            <View style={[styles.row, { gap: 14, marginTop: 8 }]}>
+              <View style={styles.logo}>
+                <Text style={{ fontSize: 46 }}>{family.emoji}</Text>
               </View>
-              <Pressable style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setTab('durum')} accessibilityLabel="Üyeler">
-                {memberIds.slice(0, 4).map((id, j) => (
-                  <View key={id} style={{ marginLeft: j ? -6 : 0 }}>
-                    <Avatar uri={userOf(id).avatar} size={36} ring={roleOf(id) !== 'member'} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.big} numberOfLines={1}>
+                    {family.name}
+                  </Text>
+                  <Text style={styles.badgeChip}>🏷️ {meta.badge}</Text>
+                  <Text style={styles.powerChip}>🔥×{fmt(meta.multiplier)}</Text>
+                </View>
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setTab('durum')} accessibilityLabel="Üyeler">
+                  {memberIds.slice(0, 4).map((id, j) => (
+                    <View key={id} style={{ marginLeft: j ? -6 : 0 }}>
+                      <Avatar uri={userOf(id).avatar} size={36} ring={roleOf(id) !== 'member'} />
+                    </View>
+                  ))}
+                  {totalMembers > 4 && (
+                    <View style={styles.more}>
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>+{totalMembers - 4}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+
+            <Pressable onPress={() => setTab('durum')} accessibilityLabel="Tayfa seviyesi">
+              <LinearGradient colors={['#047857', '#14532D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.levelCard}>
+                <View style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tier}>{tier.name}</Text>
+                    <Text style={{ color: '#fff', marginTop: 4 }}>
+                      <Text style={{ fontWeight: '900', fontSize: 20 }}>{fmt(power)}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)' }}>{nextTier ? `/${fmt(nextTier.min)}` : ''}</Text>
+                    </Text>
                   </View>
-                ))}
-                {totalMembers > 4 && (
-                  <View style={styles.more}>
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>+{totalMembers - 4}</Text>
+                  <View style={{ alignItems: 'center', gap: 4 }}>
+                    <StateIcon name="shield-checkmark-outline" />
+                    <Text style={styles.lvChip}>
+                      Lv.{lvl} · {pct(RULES.familyRates[lvl - 1])}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.bar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                  <View style={[styles.barFill, { backgroundColor: '#fff', width: `${nextTier ? Math.round(((power - tier.min) / (nextTier.min - tier.min)) * 100) : 100}%` }]} />
+                </View>
+                <Pressable
+                  style={[styles.row, { marginTop: 8, gap: 6 }]}
+                  onPress={() => showAlert('Seviyeyi koruma', `Tayfanın ${tier.name} kademesinde kalması için her hafta toplam ${fmt(KEEP_GOAL)} katkı puanı toplaması gerekir. Hedefe ulaşılamazsa haftalık kapanışta bir kademe düşer.`)}>
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>Seviyeyi koruma ilerlemesi ⓘ</Text>
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>
+                    {fmt(keep)}/{fmt(KEEP_GOAL)}
+                  </Text>
+                </Pressable>
+              </LinearGradient>
+            </Pressable>
+          </LinearGradient>
+          </ThemeScope>
+
+          <View style={styles.body}>
+            <View style={styles.row}>
+              <Text style={[styles.sectionTitle, { flex: 1 }]}>Tayfa Duyurusu</Text>
+              {canManage && annDraft === null && (
+                <Pressable onPress={() => setAnnDraft(announcement)} hitSlop={8} accessibilityLabel="Duyuruyu düzenle">
+                  <Ionicons name="create-outline" size={18} color={colors.textDim} />
+                </Pressable>
+              )}
+            </View>
+            {annDraft === null ? (
+              <Text style={styles.dim}>{announcement}</Text>
+            ) : (
+              <View style={{ gap: 8 }}>
+                <TextInput value={annDraft} onChangeText={setAnnDraft} multiline maxLength={140} style={[styles.input, { minHeight: 70 }]} placeholderTextColor={colors.textDim} placeholder="Duyuru" />
+                <View style={[styles.row, { justifyContent: 'flex-end' }]}>
+                  <Pressable style={[styles.small, { backgroundColor: colors.cardAlt }]} onPress={() => setAnnDraft(null)}>
+                    <Text style={[styles.smallText, { color: colors.text }]}>Vazgeç</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.small, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      if (annDraft.trim()) setAnnouncement(annDraft.trim());
+                      setAnnDraft(null);
+                    }}>
+                    <Text style={styles.smallText}>Kaydet</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            <View style={[styles.row, { marginTop: 16 }]}>
+              <Text style={styles.sectionTitle}>Tayfa Etiketi</Text>
+              <Pressable style={[styles.row, { gap: 4 }]} onPress={() => copyText(String(meta.tagId), 'Tayfa ID')} accessibilityLabel="Tayfa ID kopyala">
+                <Text style={styles.dim}>ID:{meta.tagId}</Text>
+                <Ionicons name="copy-outline" size={14} color={colors.textDim} />
+              </Pressable>
+            </View>
+            <View style={styles.tags}>
+              {meta.tags.map((t) => (
+                <Text key={t.label} style={styles.tag}>
+                  {t.emoji} {t.label}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.cards}>
+              <Pressable style={[styles.miniCard, { backgroundColor: '#0A8F95' }]} onPress={() => featured && featured.id !== 'me' && router.push(`/kullanici/${featured.id}`)}>
+                <Text style={styles.miniTitle} numberOfLines={1}>
+                  Haftanın Öne Çıkan Kişisi
+                </Text>
+                {featured && (
+                  <View style={[styles.row, { gap: 6 }]}>
+                    <Avatar uri={userOf(featured.id).avatar} size={34} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }} numberOfLines={1}>
+                        {userOf(featured.id).name}
+                      </Text>
+                      <Text style={styles.miniChip}>{fmtK(featured.contribution)}</Text>
+                    </View>
                   </View>
                 )}
               </Pressable>
-            </View>
-          </View>
-
-          <Pressable onPress={() => setTab('durum')} accessibilityLabel="Tayfa seviyesi">
-            <LinearGradient colors={['#047857', '#14532D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.levelCard}>
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tier}>{tier.name}</Text>
-                  <Text style={{ color: '#fff', marginTop: 4 }}>
-                    <Text style={{ fontWeight: '900', fontSize: 20 }}>{fmt(power)}</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)' }}>{nextTier ? `/${fmt(nextTier.min)}` : ''}</Text>
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'center', gap: 4 }}>
-                  <StateIcon name="shield-checkmark-outline" />
-                  <Text style={styles.lvChip}>
-                    Lv.{lvl} · {pct(RULES.familyRates[lvl - 1])}
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.bar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <View style={[styles.barFill, { backgroundColor: '#fff', width: `${nextTier ? Math.round(((power - tier.min) / (nextTier.min - tier.min)) * 100) : 100}%` }]} />
-              </View>
-              <Pressable
-                style={[styles.row, { marginTop: 8, gap: 6 }]}
-                onPress={() => showAlert('Seviyeyi koruma', `Tayfanın ${tier.name} kademesinde kalması için her hafta toplam ${fmt(KEEP_GOAL)} katkı puanı toplaması gerekir. Hedefe ulaşılamazsa haftalık kapanışta bir kademe düşer.`)}>
-                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>Seviyeyi koruma ilerlemesi ⓘ</Text>
-                <Text style={{ color: '#fff', fontWeight: '800' }}>
-                  {fmt(keep)}/{fmt(KEEP_GOAL)}
+              <Pressable style={[styles.miniCard, { backgroundColor: '#065A60' }]} onPress={() => setSheet('ranking')}>
+                <Text style={styles.miniTitle} numberOfLines={1}>
+                  Haftalık Tayfa Sıralaması
                 </Text>
+                <Text style={{ color: '#fff', fontSize: 13 }}>{meta.weeklyRank ? `No.${meta.weeklyRank}` : 'Sırasız'}</Text>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{fmtK(weeklyPower)} puan</Text>
               </Pressable>
-            </LinearGradient>
-          </Pressable>
-        </LinearGradient>
-        </ThemeScope>
-
-        <View style={styles.body}>
-          <View style={styles.row}>
-            <Text style={[styles.sectionTitle, { flex: 1 }]}>Tayfa Duyurusu</Text>
-            {canManage && annDraft === null && (
-              <Pressable onPress={() => setAnnDraft(announcement)} hitSlop={8} accessibilityLabel="Duyuruyu düzenle">
-                <Ionicons name="create-outline" size={18} color={colors.textDim} />
+              <Pressable style={[styles.miniCard, { backgroundColor: '#B45309' }]} onPress={() => setSheet('highlights')}>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }} numberOfLines={2}>
+                  Öne Çıkanlar
+                </Text>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>»</Text>
               </Pressable>
-            )}
-          </View>
-          {annDraft === null ? (
-            <Text style={styles.dim}>{announcement}</Text>
-          ) : (
-            <View style={{ gap: 8 }}>
-              <TextInput value={annDraft} onChangeText={setAnnDraft} multiline maxLength={140} style={[styles.input, { minHeight: 70 }]} placeholderTextColor={colors.textDim} placeholder="Duyuru" />
-              <View style={[styles.row, { justifyContent: 'flex-end' }]}>
-                <Pressable style={[styles.small, { backgroundColor: colors.cardAlt }]} onPress={() => setAnnDraft(null)}>
-                  <Text style={[styles.smallText, { color: colors.text }]}>Vazgeç</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.small, { backgroundColor: colors.primary }]}
-                  onPress={() => {
-                    if (annDraft.trim()) setAnnouncement(annDraft.trim());
-                    setAnnDraft(null);
-                  }}>
-                  <Text style={styles.smallText}>Kaydet</Text>
-                </Pressable>
-              </View>
             </View>
-          )}
-
-          <View style={[styles.row, { marginTop: 16 }]}>
-            <Text style={styles.sectionTitle}>Tayfa Etiketi</Text>
-            <Pressable style={[styles.row, { gap: 4 }]} onPress={() => copyText(String(meta.tagId), 'Tayfa ID')} accessibilityLabel="Tayfa ID kopyala">
-              <Text style={styles.dim}>ID:{meta.tagId}</Text>
-              <Ionicons name="copy-outline" size={14} color={colors.textDim} />
-            </Pressable>
           </View>
-          <View style={styles.tags}>
-            {meta.tags.map((t) => (
-              <Text key={t.label} style={styles.tag}>
-                {t.emoji} {t.label}
-              </Text>
+
+          <View style={styles.tabs}>
+            {TABS.map(([k, l]) => (
+              <Pressable key={k} onPress={() => setTab(k)} style={styles.tabBtn} accessibilityLabel={l}>
+                <Text style={[styles.tabText, tab === k && { color: colors.text, fontSize: 19 }]}>{l}</Text>
+                {tab === k && <View style={styles.tabLine} />}
+              </Pressable>
             ))}
           </View>
 
-          <View style={styles.cards}>
-            <Pressable style={[styles.miniCard, { backgroundColor: '#0A8F95' }]} onPress={() => featured && featured.id !== 'me' && router.push(`/kullanici/${featured.id}`)}>
-              <Text style={styles.miniTitle} numberOfLines={1}>
-                Haftanın Öne Çıkan Kişisi
-              </Text>
-              {featured && (
-                <View style={[styles.row, { gap: 6 }]}>
-                  <Avatar uri={userOf(featured.id).avatar} size={34} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }} numberOfLines={1}>
-                      {userOf(featured.id).name}
-                    </Text>
-                    <Text style={styles.miniChip}>{fmtK(featured.contribution)}</Text>
-                  </View>
-                </View>
-              )}
-            </Pressable>
-            <Pressable style={[styles.miniCard, { backgroundColor: '#065A60' }]} onPress={() => setSheet('ranking')}>
-              <Text style={styles.miniTitle} numberOfLines={1}>
-                Haftalık Tayfa Sıralaması
-              </Text>
-              <Text style={{ color: '#fff', fontSize: 13 }}>{meta.weeklyRank ? `No.${meta.weeklyRank}` : 'Sırasız'}</Text>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{fmtK(weeklyPower)} puan</Text>
-            </Pressable>
-            <Pressable style={[styles.miniCard, { backgroundColor: '#B45309' }]} onPress={() => setSheet('highlights')}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17 }} numberOfLines={2}>
-                Öne Çıkanlar
-              </Text>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>»</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.tabs}>
-          {TABS.map(([k, l]) => (
-            <Pressable key={k} onPress={() => setTab(k)} style={styles.tabBtn} accessibilityLabel={l}>
-              <Text style={[styles.tabText, tab === k && { color: colors.text, fontSize: 19 }]}>{l}</Text>
-              {tab === k && <View style={styles.tabLine} />}
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={{ padding: 16, gap: 14 }}>
-          {tab === 'oda' && (
-            <>
-              <Card style={{ gap: 10 }}>
-                <Text style={styles.title}>Birlikte oynuyor</Text>
-                {playing.length === 0 ? (
-                  <Text style={styles.dim}>Şu anda çevrimiçi üye yok.</Text>
-                ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-                    {playing.map((u) => (
-                      <PlayingChip key={u.id} u={u} onPress={() => openMember(u)} />
-                    ))}
-                  </ScrollView>
-                )}
-                <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Tayfa odası">
-                  <Text style={{ fontSize: 22 }}>🎙️</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.text, fontWeight: '800' }}>Tayfa odası</Text>
-                    <Text style={styles.dim}>Tayfa odasında 15 dakika kal görevi buradan sayılır</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
-                </Pressable>
-              </Card>
-              <Card style={{ gap: 2 }}>
-                <Text style={[styles.title, { marginBottom: 6 }]}>
-                  Üyeler ({memberIds.length}
-                  {hidden ? ` / ${totalMembers}` : ''})
-                </Text>
-                {sortedMembers.map((id) => {
-                  const u = userOf(id);
-                  const r = roleOf(id);
-                  const p = id === 'me' ? null : presenceOf(id);
-                  return (
-                    <Pressable key={id} style={styles.row} onPress={() => id !== 'me' && setMenuFor(id)} accessibilityLabel={u.name}>
-                      <Avatar uri={u.avatar} size={40} online={id === 'me' || u.online} />
-                      <View style={{ flex: 1, paddingVertical: 4 }}>
-                        <View style={[styles.row, { gap: 6, paddingVertical: 0 }]}>
-                          <Text style={{ color: colors.text, fontWeight: '700' }} numberOfLines={1}>
-                            {id === 'me' ? youLabel(me.name) : u.name}
-                          </Text>
-                          {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: dark ? 'rgba(19,217,223,0.16)' : 'rgba(0,140,148,0.10)', color: colors.primaryText }]}>{ROLE_LABEL[r]}</Text>}
-                        </View>
-                        <Text style={[styles.dim, p?.kind === 'room' && { color: colors.gold }]} numberOfLines={1}>
-                          {id === 'me' ? 'Çevrimiçi' : presenceLabel(p, u.online)}
-                        </Text>
-                      </View>
-                      {p?.kind === 'room' && (
-                        <Pressable style={styles.goBtn} onPress={() => goToMember(u)} accessibilityLabel={`${u.name} odasına git`}>
-                          <Text style={styles.smallText}>Git</Text>
-                        </Pressable>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </Card>
-            </>
-          )}
-
-          {tab === 'gorev' && <TasksTab roomId={meta.roomId} weeklyPower={weeklyPower} />}
-
-          {tab === 'cift' && <CoupleTab />}
-
-          {tab === 'durum' && (
-            <>
-              <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Tayfa seviyesi · Lv.{lvl}</Text>
-                <Text style={styles.dim}>
-                  {totalMembers}/{familyCapacity(lvl)} üye · {activeRows.length} aktif · Lider: {userOf(family.leaderId).name} · Rolün: {ROLE_LABEL[role]}
-                </Text>
-                <View style={styles.bar}>
-                  <View style={[styles.barFill, { width: `${Math.round(xpProgress * 100)}%` }]} />
-                </View>
-                <Text style={styles.dim}>{next ? `${fmt(family.xp)} / ${fmt(next)} XP → Lv.${lvl + 1}` : 'En yüksek seviye'}</Text>
-              </Card>
-              <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Bu haftaki tayfa bonusu</Text>
-                <Text style={styles.dim}>
-                  Uygun tayfa kazancı 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = <Text style={{ color: colors.gold, fontWeight: '800' }}>💎 {fmt(pool)}</Text>
-                </Text>
-                <Text style={styles.dim}>
-                  Senin tahmini payın: <Text style={{ color: colors.text, fontWeight: '700' }}>💎 {fmt(myShare)}</Text>
-                  {myShare ? '' : ' (aktif üye şartını sağlamıyorsun)'}
-                </Text>
-              </Card>
-              <Card style={{ gap: 4 }}>
-                <Text style={[styles.title, { marginBottom: 6 }]}>Haftalık katkı</Text>
-                {rows.map((r, i) => {
-                  const u = userOf(r.id);
-                  return (
-                    <Pressable key={r.id} style={styles.row} onPress={() => r.id !== 'me' && router.push(`/kullanici/${r.id}`)}>
-                      <Text style={styles.rank}>{i + 1}</Text>
-                      <Avatar uri={u.avatar} size={36} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: colors.text }}>
-                          {r.id === 'me' ? youLabel(me.name) : u.name} {roleOf(r.id) !== 'member' ? ROLE_LABEL[roleOf(r.id)].split(' ')[0] : ''}
-                        </Text>
-                        <Text style={styles.dim}>
-                          {isActive(r) ? '🟢 Aktif' : '⚪ Pasif'} · {r.days} gün
-                        </Text>
-                      </View>
-                      <Text style={{ color: colors.gold, fontWeight: '700' }}>{fmt(r.contribution)}</Text>
-                    </Pressable>
-                  );
-                })}
-              </Card>
-
-              {canManage && <GradientButton title="Üye davet et" icon="person-add" onPress={() => setInviteOpen(true)} />}
-              {canManage && pending.length > 0 && (
-                <Card style={{ gap: 8 }}>
-                  <Text style={styles.title}>Katılım başvuruları ({pending.length})</Text>
-                  {pending.map((id) => {
-                    const u = userById(id);
+          <View style={{ padding: 16, gap: 14 }}>
+            {tab === 'oda' && (
+              <>
+                <Card style={{ gap: 10 }}>
+                  <Text style={styles.title}>Birlikte oynuyor</Text>
+                  {playing.length === 0 ? (
+                    <Text style={styles.dim}>Şu anda çevrimiçi üye yok.</Text>
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                      {playing.map((u) => (
+                        <PlayingChip key={u.id} u={u} onPress={() => openMember(u)} />
+                      ))}
+                    </ScrollView>
+                  )}
+                  <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Tayfa odası">
+                    <Text style={{ fontSize: 22 }}>🎙️</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text, fontWeight: '800' }}>Tayfa odası</Text>
+                      <Text style={styles.dim}>Tayfa odasında 15 dakika kal görevi buradan sayılır</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+                  </Pressable>
+                </Card>
+                <Card style={{ gap: 2 }}>
+                  <Text style={[styles.title, { marginBottom: 6 }]}>
+                    Üyeler ({memberIds.length}
+                    {hidden ? ` / ${totalMembers}` : ''})
+                  </Text>
+                  {sortedMembers.map((id) => {
+                    const u = userOf(id);
+                    const r = roleOf(id);
+                    const p = id === 'me' ? null : presenceOf(id);
                     return (
-                      <View key={id} style={styles.row}>
-                        <Avatar uri={u.avatar} size={34} />
-                        <Text style={{ color: colors.text, flex: 1 }}>{u.name}</Text>
-                        <Pressable
-                          style={[styles.small, { backgroundColor: semantic.successFill }]}
-                          onPress={() => {
-                            if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `Lv.${lvl} tayfa en fazla ${familyCapacity(lvl)} üye alabilir.`);
-                            setPending((p) => p.filter((x) => x !== id));
-                            setMemberIds((m) => [...m, id]);
-                          }}>
-                          <Text style={styles.smallText}>Onayla</Text>
-                        </Pressable>
-                        <Pressable style={[styles.small, { backgroundColor: colors.cardAlt }]} onPress={() => setPending((p) => p.filter((x) => x !== id))}>
-                          <Text style={[styles.smallText, { color: colors.text }]}>Reddet</Text>
-                        </Pressable>
-                      </View>
+                      <Pressable key={id} style={styles.row} onPress={() => id !== 'me' && setMenuFor(id)} accessibilityLabel={u.name}>
+                        <Avatar uri={u.avatar} size={40} online={id === 'me' || u.online} />
+                        <View style={{ flex: 1, paddingVertical: 4 }}>
+                          <View style={[styles.row, { gap: 6, paddingVertical: 0 }]}>
+                            <Text style={{ color: colors.text, fontWeight: '700' }} numberOfLines={1}>
+                              {id === 'me' ? youLabel(me.name) : u.name}
+                            </Text>
+                            {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: dark ? 'rgba(19,217,223,0.16)' : 'rgba(0,140,148,0.10)', color: colors.primaryText }]}>{ROLE_LABEL[r]}</Text>}
+                          </View>
+                          <Text style={[styles.dim, p?.kind === 'room' && { color: colors.gold }]} numberOfLines={1}>
+                            {id === 'me' ? 'Çevrimiçi' : presenceLabel(p, u.online)}
+                          </Text>
+                        </View>
+                        {p?.kind === 'room' && (
+                          <Pressable style={styles.goBtn} onPress={() => goToMember(u)} accessibilityLabel={`${u.name} odasına git`}>
+                            <Text style={styles.smallText}>Git</Text>
+                          </Pressable>
+                        )}
+                      </Pressable>
                     );
                   })}
                 </Card>
-              )}
-              <Card style={{ gap: 4 }}>
-                <Text style={styles.title}>Roller</Text>
-                <Text style={styles.dim}>👑 Lider: yardımcı atar/kaldırır, üye çıkarır, tayfa ayarlarını ve duyuruyu yönetir, liderliği devreder.</Text>
-                <Text style={styles.dim}>🛡️ Yardımcı: üye davet eder, başvuruları onaylar, sohbeti ve duyuruyu yönetir, normal üyeleri çıkarabilir.</Text>
-                <Text style={styles.dim}>Üye: sohbete katılır, tayfa odalarına girer, katkı verir ve aktifse bonus payı alır.</Text>
-                <Text style={[styles.dim, { marginTop: 4 }]}>Üye yönetimi için Oda sekmesindeki üyeye dokun.</Text>
-              </Card>
-              <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Aktif üye tanımı</Text>
-                <Text style={styles.dim}>Hafta içinde en az 3 gün aktif olan ve en az 1.000 geçerli katkı puanı (hediye, oda süresi, görev) toplayan üye aktif sayılır. Bonus yalnızca aktif üyeler arasında, katkı oranına göre dağıtılır.</Text>
-              </Card>
-              <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Haftalık bonus hesaplama</Text>
-                <Text style={styles.dim}>Tayfa bonusu = haftalık uygun tayfa kazancı × seviye oranı</Text>
-                <Text style={styles.dim}>Örnek: 💎 100.000 × %3,25 = 💎 {fmt(Math.round(100_000 * 0.0325))}</Text>
-                <Text style={styles.dim}>
-                  Bu tayfa: 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = 💎 {fmt(pool)} → {activeRows.length} aktif üyeye katkıya göre
-                </Text>
-                {activeRows.slice(0, 5).map((r) => (
-                  <Text key={r.id} style={styles.dim}>
-                    · {r.id === 'me' ? 'Sen' : userById(r.id).name}: {fmt(r.contribution)} / {fmt(activeTotal)} → 💎 {fmt(Math.round((pool * r.contribution) / activeTotal))}
-                  </Text>
-                ))}
-                <Text style={styles.dim}>İade edilen hediyeler, sahte etkileşim ve kısıtlı hesapların katkısı hesaba katılmaz. Bonus haftalık kapanıştan sonra cüzdana elmas olarak yansır.</Text>
-              </Card>
-              <Card style={{ gap: 2 }}>
-                <Text style={[styles.title, { marginBottom: 6 }]}>Seviyeler (Lv.1–15)</Text>
-                <View style={styles.tableRow}>
-                  <Text style={[styles.th, { width: 44 }]}>Lv</Text>
-                  <Text style={[styles.th, { flex: 1 }]}>Gereken XP</Text>
-                  <Text style={[styles.th, { width: 70 }]}>Kapasite</Text>
-                  <Text style={[styles.th, { width: 60, textAlign: 'right' }]}>Bonus</Text>
-                </View>
-                {FAMILY_XP.map((xp, i) => (
-                  <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: dark ? 'rgba(19,217,223,0.25)' : 'rgba(0,140,148,0.15)', borderRadius: 8 }]}>
-                    <Text style={[styles.td, { width: 44 }]}>Lv.{i + 1}</Text>
-                    <Text style={[styles.td, { flex: 1 }]}>{fmt(xp)}</Text>
-                    <Text style={[styles.td, { width: 70 }]}>{familyCapacity(i + 1)}</Text>
-                    <Text style={[styles.td, { width: 60, textAlign: 'right', color: colors.gold }]}>{pct(RULES.familyRates[i])}</Text>
-                  </View>
-                ))}
-              </Card>
-              <Card style={{ gap: 6 }}>
-                <Text style={styles.title}>Seviye ayrıcalıkları</Text>
-                {FAMILY_PERKS.map((p) => (
-                  <View key={p.from} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-                    <Ionicons name={lvl >= p.from ? 'checkmark-circle' : 'lock-closed'} size={14} color={lvl >= p.from ? colors.green : colors.textDim} style={{ marginTop: 2 }} />
-                    <Text style={[styles.dim, { flex: 1 }, lvl >= p.from && { color: colors.text }]}>
-                      Lv.{p.from}–{p.to}: {p.text}
-                    </Text>
-                  </View>
-                ))}
-                <Text style={styles.dim}>Oranlar merkezi yönetim panelinden değiştirilebilir; geçmiş haftalar değişmez.</Text>
-              </Card>
-              <Pressable onPress={leave} style={{ alignItems: 'center', padding: 8 }}>
-                <Text style={{ color: colors.red, fontWeight: '600' }}>Tayfadan ayrıl</Text>
-              </Pressable>
-            </>
-          )}
+              </>
+            )}
 
-          {tab === 'tema' && <ThemeTab themeId={themeId} onPick={setThemeId} level={lvl} canManage={canManage} />}
-        </View>
-      </ScrollView>
+            {tab === 'gorev' && <TasksTab roomId={meta.roomId} weeklyPower={weeklyPower} />}
+
+            {tab === 'cift' && <CoupleTab />}
+
+            {tab === 'durum' && (
+              <>
+                <Card style={{ gap: 6 }}>
+                  <Text style={styles.title}>Tayfa seviyesi · Lv.{lvl}</Text>
+                  <Text style={styles.dim}>
+                    {totalMembers}/{familyCapacity(lvl)} üye · {activeRows.length} aktif · Lider: {userOf(family.leaderId).name} · Rolün: {ROLE_LABEL[role]}
+                  </Text>
+                  <View style={styles.bar}>
+                    <View style={[styles.barFill, { width: `${Math.round(xpProgress * 100)}%` }]} />
+                  </View>
+                  <Text style={styles.dim}>{next ? `${fmt(family.xp)} / ${fmt(next)} XP → Lv.${lvl + 1}` : 'En yüksek seviye'}</Text>
+                </Card>
+                <Card style={{ gap: 6 }}>
+                  <Text style={styles.title}>Bu haftaki tayfa bonusu</Text>
+                  <Text style={styles.dim}>
+                    Uygun tayfa kazancı 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = <Text style={{ color: colors.gold, fontWeight: '800' }}>💎 {fmt(pool)}</Text>
+                  </Text>
+                  <Text style={styles.dim}>
+                    Senin tahmini payın: <Text style={{ color: colors.text, fontWeight: '700' }}>💎 {fmt(myShare)}</Text>
+                    {myShare ? '' : ' (aktif üye şartını sağlamıyorsun)'}
+                  </Text>
+                </Card>
+                <Card style={{ gap: 4 }}>
+                  <Text style={[styles.title, { marginBottom: 6 }]}>Haftalık katkı</Text>
+                  {rows.map((r, i) => {
+                    const u = userOf(r.id);
+                    return (
+                      <Pressable key={r.id} style={styles.row} onPress={() => r.id !== 'me' && router.push(`/kullanici/${r.id}`)}>
+                        <Text style={styles.rank}>{i + 1}</Text>
+                        <Avatar uri={u.avatar} size={36} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.text }}>
+                            {r.id === 'me' ? youLabel(me.name) : u.name} {roleOf(r.id) !== 'member' ? ROLE_LABEL[roleOf(r.id)].split(' ')[0] : ''}
+                          </Text>
+                          <Text style={styles.dim}>
+                            {isActive(r) ? '🟢 Aktif' : '⚪ Pasif'} · {r.days} gün
+                          </Text>
+                        </View>
+                        <Text style={{ color: colors.gold, fontWeight: '700' }}>{fmt(r.contribution)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </Card>
+
+                {canManage && <GradientButton title="Üye davet et" icon="person-add" onPress={() => setInviteOpen(true)} />}
+                {canManage && pending.length > 0 && (
+                  <Card style={{ gap: 8 }}>
+                    <Text style={styles.title}>Katılım başvuruları ({pending.length})</Text>
+                    {pending.map((id) => {
+                      const u = userById(id);
+                      return (
+                        <View key={id} style={styles.row}>
+                          <Avatar uri={u.avatar} size={34} />
+                          <Text style={{ color: colors.text, flex: 1 }}>{u.name}</Text>
+                          <Pressable
+                            style={[styles.small, { backgroundColor: semantic.successFill }]}
+                            onPress={() => {
+                              if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `Lv.${lvl} tayfa en fazla ${familyCapacity(lvl)} üye alabilir.`);
+                              setPending((p) => p.filter((x) => x !== id));
+                              setMemberIds((m) => [...m, id]);
+                            }}>
+                            <Text style={styles.smallText}>Onayla</Text>
+                          </Pressable>
+                          <Pressable style={[styles.small, { backgroundColor: colors.cardAlt }]} onPress={() => setPending((p) => p.filter((x) => x !== id))}>
+                            <Text style={[styles.smallText, { color: colors.text }]}>Reddet</Text>
+                          </Pressable>
+                        </View>
+                      );
+                    })}
+                  </Card>
+                )}
+                <Card style={{ gap: 4 }}>
+                  <Text style={styles.title}>Roller</Text>
+                  <Text style={styles.dim}>👑 Lider: yardımcı atar/kaldırır, üye çıkarır, tayfa ayarlarını ve duyuruyu yönetir, liderliği devreder.</Text>
+                  <Text style={styles.dim}>🛡️ Yardımcı: üye davet eder, başvuruları onaylar, sohbeti ve duyuruyu yönetir, normal üyeleri çıkarabilir.</Text>
+                  <Text style={styles.dim}>Üye: sohbete katılır, tayfa odalarına girer, katkı verir ve aktifse bonus payı alır.</Text>
+                  <Text style={[styles.dim, { marginTop: 4 }]}>Üye yönetimi için Oda sekmesindeki üyeye dokun.</Text>
+                </Card>
+                <Card style={{ gap: 6 }}>
+                  <Text style={styles.title}>Aktif üye tanımı</Text>
+                  <Text style={styles.dim}>Hafta içinde en az 3 gün aktif olan ve en az 1.000 geçerli katkı puanı (hediye, oda süresi, görev) toplayan üye aktif sayılır. Bonus yalnızca aktif üyeler arasında, katkı oranına göre dağıtılır.</Text>
+                </Card>
+                <Card style={{ gap: 6 }}>
+                  <Text style={styles.title}>Haftalık bonus hesaplama</Text>
+                  <Text style={styles.dim}>Tayfa bonusu = haftalık uygun tayfa kazancı × seviye oranı</Text>
+                  <Text style={styles.dim}>Örnek: 💎 100.000 × %3,25 = 💎 {fmt(Math.round(100_000 * 0.0325))}</Text>
+                  <Text style={styles.dim}>
+                    Bu tayfa: 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = 💎 {fmt(pool)} → {activeRows.length} aktif üyeye katkıya göre
+                  </Text>
+                  {activeRows.slice(0, 5).map((r) => (
+                    <Text key={r.id} style={styles.dim}>
+                      · {r.id === 'me' ? 'Sen' : userById(r.id).name}: {fmt(r.contribution)} / {fmt(activeTotal)} → 💎 {fmt(Math.round((pool * r.contribution) / activeTotal))}
+                    </Text>
+                  ))}
+                  <Text style={styles.dim}>İade edilen hediyeler, sahte etkileşim ve kısıtlı hesapların katkısı hesaba katılmaz. Bonus haftalık kapanıştan sonra cüzdana elmas olarak yansır.</Text>
+                </Card>
+                <Card style={{ gap: 2 }}>
+                  <Text style={[styles.title, { marginBottom: 6 }]}>Seviyeler (Lv.1–15)</Text>
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.th, { width: 44 }]}>Lv</Text>
+                    <Text style={[styles.th, { flex: 1 }]}>Gereken XP</Text>
+                    <Text style={[styles.th, { width: 70 }]}>Kapasite</Text>
+                    <Text style={[styles.th, { width: 60, textAlign: 'right' }]}>Bonus</Text>
+                  </View>
+                  {FAMILY_XP.map((xp, i) => (
+                    <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: dark ? 'rgba(19,217,223,0.25)' : 'rgba(0,140,148,0.15)', borderRadius: 8 }]}>
+                      <Text style={[styles.td, { width: 44 }]}>Lv.{i + 1}</Text>
+                      <Text style={[styles.td, { flex: 1 }]}>{fmt(xp)}</Text>
+                      <Text style={[styles.td, { width: 70 }]}>{familyCapacity(i + 1)}</Text>
+                      <Text style={[styles.td, { width: 60, textAlign: 'right', color: colors.gold }]}>{pct(RULES.familyRates[i])}</Text>
+                    </View>
+                  ))}
+                </Card>
+                <Card style={{ gap: 6 }}>
+                  <Text style={styles.title}>Seviye ayrıcalıkları</Text>
+                  {FAMILY_PERKS.map((p) => (
+                    <View key={p.from} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                      <Ionicons name={lvl >= p.from ? 'checkmark-circle' : 'lock-closed'} size={14} color={lvl >= p.from ? colors.green : colors.textDim} style={{ marginTop: 2 }} />
+                      <Text style={[styles.dim, { flex: 1 }, lvl >= p.from && { color: colors.text }]}>
+                        Lv.{p.from}–{p.to}: {p.text}
+                      </Text>
+                    </View>
+                  ))}
+                  <Text style={styles.dim}>Oranlar merkezi yönetim panelinden değiştirilebilir; geçmiş haftalar değişmez.</Text>
+                </Card>
+                <Pressable onPress={leave} style={{ alignItems: 'center', padding: 8 }}>
+                  <Text style={{ color: colors.red, fontWeight: '600' }}>Tayfadan ayrıl</Text>
+                </Pressable>
+              </>
+            )}
+
+            {tab === 'tema' && <ThemeTab themeId={themeId} onPick={setThemeId} level={lvl} canManage={canManage} />}
+          </View>
+        </ScrollView>
       </KeyboardAvoid>
 
       <SafeAreaView edges={['bottom']} style={styles.bottomBar}>

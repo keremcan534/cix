@@ -31,6 +31,7 @@ import {
   type Ask,
 } from '@/components/agency-net';
 import { Field, TransferCard, openOffice } from '@/components/agency-net-hub';
+import { InviteSheet } from '@/components/agency-invite-sheet';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
 import { ChoiceChips, ListGroup, ListRow } from '@/components/list';
@@ -362,7 +363,11 @@ function Streamers({ c }: { c: Ctx }) {
   const subsAllowed = c.o.agency.level === 1 && c.can('subagencies.view');
   const [scope, setScope] = useState<'direct' | 'sub'>('direct');
   const q = useNet(c.name, () => agencyNet.streamers(c.id, scope), () => demoStreamers(c.id, scope), [c.id, scope]);
+  const [inviting, setInviting] = useState(false);
   const invite = async () => {
+    // With a server: pick the streamer from the people it finds by name (sign-up sets no username, and the app
+    // shows no profile ID on other people's profiles). The example data keeps the typed field.
+    if (!c.demo) return setInviting(true);
     const r = await c.ask({ title: 'Yayıncı davet et', message: 'Yayıncının profilindeki ID numarasını ya da kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Profil ID’si veya kullanıcı adı', placeholder: 'Örn. 104829301457', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder' });
     if (r) await runAction(c.demo, () => inviteStreamer(c.id, r.field, r.reason || undefined), 'Davet gönderildi.', q.reload);
   };
@@ -379,6 +384,7 @@ function Streamers({ c }: { c: Ctx }) {
         />
       )}
       {c.acting && c.can('streamers.invite') && scope === 'direct' && c.o.agency.status === 'approved' && <Button title="Yayıncı davet et" icon="person-add-outline" onPress={invite} />}
+      {inviting && <InviteSheet agencyId={c.id} onClose={() => setInviting(false)} onSent={q.reload} />}
       <NetState q={q}>
         {(rows) => {
           const total = rows.reduce((x, r) => x + r.diamonds30, 0);

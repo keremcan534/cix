@@ -3,7 +3,8 @@
 //     pool is kept small here so the old self-deadlock would show at once),
 //   - lifting a sanction follows the rank rules of applying one (no self-lift, no peer, nothing a higher rank gave),
 //     the panel's "Askıyı kaldır" too, and 'Süresiz' from a report is a lifetime ban with the report's category,
-//   - an empty room closes: when LiveKit says it finished, and in the cleanup when it was never joined.
+//   - an empty room leaves other people's room list but stays open, so the owner gets the same room back with its
+//     blacklist, admins and password (odalar-8).
 // A fake LiveKit answers ListRooms with the rooms a test says are open.
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -199,7 +200,7 @@ describe('Yaptırım kaldırmada rütbe (sunucu-3, yonetim-2)', () => {
   });
 });
 
-describe('Boş oda kapanır (odalar-8)', () => {
+describe('Boş oda listeden düşer ama kapanmaz (odalar-8)', () => {
   const sign = (body) => {
     const b64 = (v) => Buffer.from(JSON.stringify(v)).toString('base64url');
     const now = Math.floor(Date.now() / 1000);
@@ -211,51 +212,75 @@ describe('Boş oda kapanır (odalar-8)', () => {
     const [st, j] = await call('POST', '/api/livekit/webhook', body, null, { authorization: sign(body), 'content-type': 'application/webhook+json' });
     assert.equal(st, 200, j.error);
   };
-  const openRoom = async (owner, title = `Oda ${rnd(2)}`) => {
-    const [st, j] = await call('POST', '/api/rooms', { title }, owner.session);
+  const joined = (name, u, sid) => hook('participant_joined', { room: { name }, participant: { identity: u.user.id, sid } });
+  const left = (name, u, sid) => hook('participant_left', { room: { name }, participant: { identity: u.user.id, sid } });
+  const openRoom = async (owner, body = { title: `Oda ${rnd(2)}` }) => {
+    const [st, j] = await call('POST', '/api/rooms', body, owner.session);
     assert.equal(st, 200, j.error);
     return j.room.id;
   };
   const closed = async (id) => !!(await h.sql.query('SELECT closed_at FROM rooms WHERE id = $1', [id])).rows[0].closed_at;
   const listed = async (s, id) => (await call('GET', '/api/rooms', null, s))[1].rooms.some((r) => r.id === id);
-  const age = (id) => h.sql.query("UPDATE rooms SET created_at = now() - interval '31 minutes' WHERE id = $1", [id]);
 
-  test('herkes çıkıp LiveKit odayı bitirince oda kapanır; sahibi yenisini açar', async () => {
-    const owner = await signUp('Sahip');
-    const guest = await signUp('Misafir');
-    const id = await openRoom(owner, 'Benim Odam');
+  // Runs first in this file: "a webhook has arrived" is per API process, and no test above sends one.
+  test('LiveKit’ten hiç webhook gelmemişken (sayılar bilinmiyor) boş oda da listelenir', async () => {
+    const [owner, guest] = await Promise.all([signUp('İlk Sahip'), signUp('İlk Misafir')]);
+    const id = await openRoom(owner);
+    assert.equal(await listed(guest.session, id), true);
+  });
+
+  test('içinde kimse yokken başkasının listesinde yok, biri girince var; sahibi ve yöneticisi hep görür', async () => {
+    const [owner, guest, viewer] = await Promise.all([signUp('Sahip'), signUp('Misafir'), signUp('Bakan')]);
+    const id = await openRoom(owner, { title: 'Benim Odam' });
     const name = `oda-${id}`;
     lkOpen.add(name);
-    await hook('participant_joined', { room: { name }, participant: { identity: owner.user.id, sid: 'PA_o' } });
-    await hook('participant_joined', { room: { name }, participant: { identity: guest.user.id, sid: 'PA_g' } });
-    await hook('participant_left', { room: { name }, participant: { identity: owner.user.id, sid: 'PA_o' } });
-    await sweeps();
-    assert.equal(await closed(id), false, 'içeride biri varken açık');
-    await hook('participant_left', { room: { name }, participant: { identity: guest.user.id, sid: 'PA_g' } });
+    await joined(name, owner, 'PA_o');
+    assert.equal(await listed(viewer.session, id), true, 'sahibi içerideyken listede');
+    await left(name, owner, 'PA_o');
     lkOpen.delete(name);
     await hook('room_finished', { room: { name } });
-    assert.equal(await closed(id), true, 'LiveKit bitirince kapandı');
-    assert.equal(await listed(guest.session, id), false, 'listede yok');
-    assert.equal((await call('POST', '/api/rooms', { title: 'Yeni Odam' }, owner.session))[0], 200, 'sahibi yeni oda açabilir');
+    assert.equal(await listed(viewer.session, id), false, 'boş oda başkasının listesinde yok');
+    assert.equal(await listed(owner.session, id), true, 'sahibi kendi odasını görür');
+    assert.equal((await call('POST', '/api/rooms/admin', { room: id, user: viewer.user.id, admin: true }, owner.session))[0], 200);
+    assert.equal(await listed(viewer.session, id), true, 'odanın yöneticisi de görür');
+    assert.equal((await call('POST', '/api/rooms/admin', { room: id, user: viewer.user.id, admin: false }, owner.session))[0], 200);
+    assert.equal(await closed(id), false, 'oda kapanmadı');
+    lkOpen.add(name);
+    await joined(name, guest, 'PA_g');
+    assert.equal(await listed(viewer.session, id), true, 'biri girince yine listede');
+    await left(name, guest, 'PA_g');
+    lkOpen.delete(name);
     await hook('room_finished', { room: { name: 'oda-r1' } });
   });
 
-  test('temizlik: hiç girilmeyen oda hemen değil 30 dakika sonra kapanır; LiveKit’te açık olan kalır', async () => {
-    const [o1, o2] = await Promise.all([signUp('Yeni Sahip'), signUp('Canlı Sahip')]);
-    const fresh = await openRoom(o1);
-    const busy = await openRoom(o2);
-    const name = `oda-${busy}`;
+  test('sahibi çıkıp oda boş kalınca kapanmaz: sahibi aynı odaya döner, kara liste, yönetici ve şifre geçerli', async () => {
+    const [owner, admin, troll, stranger] = await Promise.all([signUp('Oda Sahibi'), signUp('Oda Yöneticisi'), signUp('Trol'), signUp('Yabancı')]);
+    const id = await openRoom(owner, { title: 'Benim Odam', password: '1234' });
+    const name = `oda-${id}`;
+    assert.equal((await call('POST', '/api/rooms/admin', { room: id, user: admin.user.id, admin: true }, owner.session))[0], 200);
+    assert.equal((await call('POST', '/api/rooms/ban', { room: id, user: troll.user.id, minutes: null }, owner.session))[0], 200);
     lkOpen.add(name);
-    await hook('participant_joined', { room: { name }, participant: { identity: o2.user.id, sid: 'PA_b' } });
-    await age(busy);
-    await sweeps();
-    assert.equal(await closed(fresh), false, 'yeni açılan oda hemen kapanmaz');
-    assert.equal(await closed(busy), false, 'LiveKit’te açık ve içinde biri olan oda kalır');
-    await age(fresh);
-    assert.ok(await until(() => closed(fresh)), 'boş ve eski oda kapandı');
-    assert.equal(await listed(o2.session, fresh), false);
-    // A missed "room_finished": LiveKit no longer has it, so the cleanup forgets its people and closes it.
+    await joined(name, owner, 'PA_o');
+    await left(name, owner, 'PA_o');
     lkOpen.delete(name);
-    assert.ok(await until(() => closed(busy)), 'kaçırılan webhook sonrası da kapandı');
+    await hook('room_finished', { room: { name } });
+    // Long empty and not open in LiveKit: the cleanup forgets presence but leaves the room itself alone.
+    await h.sql.query("UPDATE rooms SET created_at = now() - interval '2 hours' WHERE id = $1", [id]);
+    await sweeps();
+    assert.equal(await closed(id), false, 'LiveKit bitirdi, temizlik de geçti: oda açık');
+
+    // "Oda oluştur" again: one open room per person, and the app takes this one back from the list.
+    assert.equal((await call('POST', '/api/rooms', { title: 'Benim Odam' }, owner.session))[0], 409);
+    const [, mine] = await call('GET', '/api/rooms', null, owner.session);
+    assert.deepEqual(mine.rooms.filter((r) => r.owner.id === owner.user.id).map((r) => r.id), [id], 'aynı oda');
+
+    const [st, j] = await call('GET', `/token?room=${name}&password=1234`, null, troll.session);
+    assert.equal(st, 403);
+    assert.equal(j.error, 'Bu odaya giremezsin', 'kara liste sürüyor');
+    assert.equal((await call('GET', `/token?room=${name}`, null, stranger.session))[1].error, 'Oda şifresi yanlış', 'şifre sürüyor');
+    assert.equal((await call('GET', `/token?room=${name}`, null, admin.session))[0], 200, 'yönetici şifresiz girer');
+    const [, staff] = await call('GET', `/api/rooms/staff?room=${id}`, null, owner.session);
+    assert.deepEqual(staff.admins.map((a) => a.id), [admin.user.id]);
+    assert.deepEqual(staff.bans.map((b) => [b.userId, b.until]), [[troll.user.id, null]]);
   });
 });

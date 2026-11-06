@@ -62,7 +62,10 @@ export type Snapshot = {
   micFx: string | null;
   /** Live mode: the server account the rest belongs to. */
   serverId?: string | null;
+  /** Live mode, signed out: the account's own state, back when the same account signs in here (parkAccount). */
+  parked?: Parked | null;
 };
+export type Parked = { serverId: string; state: Partial<Snapshot> };
 
 /** The built-in profile before any saved data is applied (the store's reset puts it back). */
 export const ME_DEFAULT = { ...ME };
@@ -79,7 +82,24 @@ const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
   vipDays: 'number', agencyId: 'string?', agencyRole: 'string?', ownedAgency: 'object?', familyRole: 'string?', familyId: 'string?',
   fanClubs: 'object', recentRooms: 'strings', following: 'strings', blocked: 'strings', conversations: 'objects',
   followerInvites: 'object', starter: 'object', safetyLog: 'objects', ownedAnims: 'strings', micFx: 'string?', serverId: 'string?',
+  parked: 'object?',
 };
+
+/**
+ * Signing out of a live account: what the store starts from next. The phone's settings stay. The rest goes
+ * (the next account on this phone must not inherit it) but is parked under the server id, so this account gets its
+ * items, VIP, progress and notices back when it signs in here again (unparkAccount). The profile comes from the
+ * server at sign-in; coins, diamonds, follows and chats are read from the server again as well.
+ */
+export function parkAccount(s: Snapshot): Partial<Snapshot> {
+  const { loggedIn: _in, settings, parked: _old, me: _me, ...state } = s;
+  return { settings, ...(s.serverId ? { parked: { serverId: s.serverId, state } } : {}) };
+}
+
+/** Signing in as `id`: the state parked for that account, or null when there is none (or it is someone else's). */
+export function unparkAccount(parked: Parked | null | undefined, id: string | null): Partial<Snapshot> | null {
+  return parked && id && parked.serverId === id ? { ...parked.state, serverId: id } : null;
+}
 
 /** The saved state with every field checked; null when nothing usable was saved. */
 export function readSnapshot(raw: unknown): Partial<Snapshot> | null {
@@ -129,5 +149,15 @@ export function readSnapshot(raw: unknown): Partial<Snapshot> | null {
   // Choices from a fixed list: an unknown value (renamed in a later version) is dropped, so its default is used.
   if (s.agencyRole !== undefined && s.agencyRole !== null) s.agencyRole = oneOf(s.agencyRole, AGENCY_ROLES) ?? null;
   if (s.familyRole !== undefined && s.familyRole !== null) s.familyRole = oneOf(s.familyRole, FAMILY_ROLES) ?? null;
+  // The parked account goes through the same checks; a broken one is dropped (that account starts over).
+  if (s.parked) {
+    const raw = s.parked as unknown as Record<string, unknown>;
+    const state = typeof raw.serverId === 'string' && raw.serverId ? readSnapshot(raw.state) : null;
+    if (state) {
+      delete state.parked;
+      delete state.loggedIn;
+    }
+    s.parked = state ? { serverId: raw.serverId as string, state } : null;
+  }
   return s;
 }
