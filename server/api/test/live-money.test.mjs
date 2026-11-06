@@ -43,6 +43,7 @@ const h = startApi({
   ALLOW_SANDBOX_PURCHASES: '1',
   TEST_TOPUP_DAILY: String(DAILY),
   SMS_PROVIDER: 'log',
+  PHONE_SIGN_IN: '1',
   LIVE_POLL_MS: '200',
   FINANCE_API_KEY: 'fc_test_key',
   FINANCE_INGEST_URL: `http://127.0.0.1:${srv.address().port}/api/ingest/events`,
@@ -232,7 +233,7 @@ describe('Canlı ayarlar para uçlarında', () => {
     await setLive({ otp_global_per_hour: 0 });
     const [st, j] = await call('POST', '/api/auth/otp/start', { phone: phone() });
     assert.equal(st, 503);
-    assert.equal(j.error, 'SMS ile giriş şu an kapalı, Google ile giriş yapabilirsin');
+    assert.deepEqual(j, { error: 'Telefon doğrulama henüz açık değil', feature: 'sms' });
     await setLive({ otp_global_per_hour: null });
     assert.equal((await call('POST', '/api/auth/otp/start', { phone: phone() }))[0], 200);
   });

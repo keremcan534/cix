@@ -106,7 +106,7 @@ describe('Google ile giriş', () => {
     assert.equal((await h.sql.query("SELECT count(*)::int AS n FROM auth_identities WHERE subject = '42'")).rows[0].n, 0);
   });
 
-  test('cihazdaki geliştirme hesabına bağlanır, bakiye korunur; ikinci Google hesabı yeni hesap açar', async () => {
+  test('cihazdaki geliştirme hesabına bağlanır, bakiye korunur; ikinci Google hesabı aynı telefonda hesap açamaz', async () => {
     const dev = await signUp('Test Kişi');
     assert.equal((await call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(8) }, dev.session))[0], 200);
 
@@ -117,15 +117,54 @@ describe('Google ile giriş', () => {
     assert.equal(j.user.coins, 5000);
     assert.equal(j.user.name, 'Test Kişi');
 
+    // ONE_ACCOUNT_PER_DEVICE (varsayılan açık): bu telefonun hesabı zaten başka bir Google hesabına bağlı.
     const [st2, other] = await google_({ idToken: idToken(), deviceKey: dev.deviceKey });
-    assert.equal(st2, 200, other.error);
-    assert.equal(other.isNew, true, 'bu cihazın hesabı zaten başka bir Google hesabına bağlı');
-    assert.notEqual(other.user.id, dev.user.id);
+    assert.equal(st2, 409, other.error);
+    assert.equal(other.code, 'device_has_account');
+    assert.equal(other.method, 'google');
 
     // Geçersiz bir cihaz anahtarı yok sayılır.
     const [st3, third] = await google_({ idToken: idToken(), deviceKey: 'short' });
     assert.equal(st3, 200, third.error);
     assert.equal(third.isNew, true);
+  });
+
+  test('yeniden kurulum: telefondaki geliştirme hesabı Google ile yeni hesabı engellemez; ikinci Google hesabı 409', async () => {
+    const hw = rnd(8);
+    const handset = () => ({ installId: rnd(20), hardwareId: hw, platform: 'android' });
+    const [dst, dev] = await call('POST', '/api/auth/dev', { deviceKey: rnd(24), name: 'Eski Test', deviceInfo: handset() });
+    assert.equal(dst, 200, dev.error);
+    // The app was reinstalled: its device key is gone, the phone is the same.
+    const [st, j] = await google_({ idToken: idToken(), deviceKey: rnd(24), deviceInfo: handset() });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.isNew, true);
+    assert.notEqual(j.user.id, dev.user.id);
+    // That Google account counts: a second one on this phone is refused.
+    const [st2, j2] = await google_({ idToken: idToken(), deviceInfo: handset() });
+    assert.equal(st2, 409, j2.error);
+    assert.deepEqual([j2.code, j2.method], ['device_has_account', 'google']);
+  });
+
+  test('e-postayla giren hesap, aynı adresli Google hesabına bağlanır (EMAIL_LINK_GOOGLE)', async () => {
+    const u = await h.account('E-posta Kişi');
+    const email = `elif.${rnd(3)}@gmail.com`;
+    await h.sql.query("INSERT INTO auth_identities (provider, subject, user_id, email) VALUES ('email', $1, $2, $1)", [email, u.user.id]);
+    const [st, j] = await google_({ idToken: idToken({ email: email.replace('elif', 'Elif') }) });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.isNew, false);
+    assert.equal(j.user.id, u.user.id);
+    assert.equal(j.user.email, email);
+    assert.deepEqual(j.user.identities, ['email', 'google']);
+  });
+
+  test('Gmail dışı adres kendiliğinden bağlanmaz: e-postayla giren hesabın adresini taşıyan Google hesabı 409', async () => {
+    const u = await h.account('İş Adresli');
+    const email = `ali.${rnd(3)}@example.com`;
+    await h.sql.query("INSERT INTO auth_identities (provider, subject, user_id, email) VALUES ('email', $1, $2, $1)", [email, u.user.id]);
+    const [st, j] = await google_({ idToken: idToken({ email }) });
+    assert.equal(st, 409, j.error);
+    assert.equal(j.code, 'use_email');
+    assert.equal((await h.sql.query("SELECT count(*)::int AS n FROM auth_identities WHERE provider = 'google' AND lower(email) = $1", [email])).rows[0].n, 0);
   });
 
   test('aynı Google hesabı aynı anda iki kez: tek hesap', async () => {

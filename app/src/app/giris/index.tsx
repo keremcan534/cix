@@ -15,8 +15,13 @@ import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
 import { showAlert } from '@/lib/alert';
 import { liveMode, message } from '@/lib/live';
-import { hasDeviceAccount } from '@/lib/api';
-import { googleSignInOffered, profileFromServer, signInWithDevice, signInWithGoogle } from '@/lib/live/account';
+import { ApiError, hasDeviceAccount } from '@/lib/api';
+import { forgetEndedSignIn, googleSignInOffered, profileFromServer, signInWithDevice, signInWithGoogle } from '@/lib/live/account';
+import { deviceAccountText } from '@/lib/verify-code';
+import { refreshRemoteConfig, useRemoteConfig } from '@/lib/remote-control';
+
+type IconName = keyof typeof Ionicons.glyphMap;
+type SignInOption = { key: string; title: string; icon: IconName; onPress: () => void; busy?: boolean };
 
 // The delivered brand mark (two people forming a heart); app icons are generated from the same file.
 const LOGO = require('../../../assets/brand/logo.png');
@@ -48,19 +53,33 @@ export default function WelcomeScreen() {
       if (r.needsProfile) router.push({ pathname: '/giris/profil', params: { ad: r.user.name === 'Yeni üye' ? '' : r.user.name } });
       else login();
     } catch (e) {
-      showAlert('Google ile giriş yapılamadı', message(e));
+      showAlert('Google ile giriş yapılamadı', e instanceof ApiError && e.data.code === 'device_has_account' ? deviceAccountText(message(e), e.data.method) : message(e));
     } finally {
       setGoogleBusy(false);
     }
   };
 
-  // Live mode without Google: a phone that already has its account (signed out with "Çıkış yap") signs back in
-  // to it. One phone holds one account, so "Hesap oluştur" is not offered again there.
-  const [hasAccount, setHasAccount] = useState<boolean | null>(liveMode() && !googleSignInOffered() ? null : false);
+  // Live mode: the server says which ways are on (GET /api/config signIn). An older server sends none: then Google
+  // when it is set up here, otherwise this phone's account, as before.
+  const { signIn: flags } = useRemoteConfig();
+  const [asked, setAsked] = useState(!liveMode());
   useEffect(() => {
-    if (hasAccount !== null) return;
+    if (asked) return;
+    void refreshRemoteConfig().finally(() => setAsked(true));
+  }, [asked]);
+  const live = liveMode();
+  const googleOn = live && googleSignInOffered() && (flags ? flags.google : true);
+  const emailOn = live && !!flags?.email;
+  const phoneOn = live && !!flags?.phone;
+  const deviceOn = live && (flags ? flags.dev : asked && !googleSignInOffered());
+
+  // This phone's account (test servers): a phone that already has its account (signed out with "Çıkış yap") signs
+  // back in to it. One phone holds one account, so "Hesap oluştur" is not offered again there.
+  const [hasAccount, setHasAccount] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!deviceOn || hasAccount !== null) return;
     hasDeviceAccount().then(setHasAccount, () => setHasAccount(false));
-  }, [hasAccount]);
+  }, [deviceOn, hasAccount]);
   const [deviceBusy, setDeviceBusy] = useState(false);
   const deviceLogin = async () => {
     if (deviceBusy) return;
@@ -77,6 +96,17 @@ export default function WelcomeScreen() {
     }
   };
 
+  // Live mode: the first way on is the big button, the others sit under it.
+  const options: SignInOption[] = [];
+  if (googleOn) options.push({ key: 'google', title: googleBusy ? 'Google ile bağlanılıyor…' : 'Google ile devam et', icon: 'logo-google', onPress: google, busy: googleBusy });
+  if (emailOn) options.push({ key: 'email', title: 'E-posta ile devam et', icon: 'mail', onPress: () => router.push({ pathname: '/giris/telefon', params: { kind: 'email' } }) });
+  if (phoneOn) options.push({ key: 'phone', title: 'Telefonla devam et', icon: 'call', onPress: () => router.push({ pathname: '/giris/telefon', params: { kind: 'phone' } }) });
+  const deviceAlone = !options.length;
+  if (deviceOn && hasAccount) options.push({ key: 'device', title: deviceBusy ? 'Giriş yapılıyor…' : deviceAlone ? 'Giriş yap' : 'Bu telefondaki hesapla giriş yap', icon: 'log-in', onPress: deviceLogin, busy: deviceBusy });
+  else if (deviceOn && hasAccount === false) options.push({ key: 'device', title: deviceAlone ? 'Hesap oluştur' : 'Bu telefonla hesap oluştur', icon: 'person-add', onPress: () => void forgetEndedSignIn().then(() => router.push('/giris/profil')) });
+  const deciding = live && !options.length && (!asked || (deviceOn && hasAccount === null));
+  const [primary, ...more] = options;
+
   return (
     <LinearGradient colors={[dark ? '#0B3B4A' : '#D9F1F3', colors.bg, colors.bg]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -90,20 +120,24 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.actions}>
-          {/* Test server (live mode): Google sign-in when it is set up; otherwise the account is this phone's (one device, one account). */}
-          {googleSignInOffered() ? (
-            <GradientButton title={googleBusy ? 'Google ile bağlanılıyor…' : 'Google ile devam et'} icon="logo-google" onPress={google} style={googleBusy ? { opacity: 0.6 } : undefined} />
-          ) : liveMode() && hasAccount === null ? (
-            <View style={styles.placeholder} />
-          ) : liveMode() && hasAccount ? (
-            <>
-              <GradientButton title={deviceBusy ? 'Giriş yapılıyor…' : 'Giriş yap'} icon="log-in" onPress={deviceLogin} style={deviceBusy ? { opacity: 0.6 } : undefined} />
-              <Text style={styles.terms}>Bu telefondaki hesabınla devam edersin. Bir telefonda tek hesap açılabilir.</Text>
-            </>
-          ) : liveMode() ? (
-            <GradientButton title="Hesap oluştur" icon="person-add" onPress={() => router.push('/giris/profil')} />
-          ) : (
+          {/* Live mode: the ways the server has on (Google, e-mail, phone; this phone's account on test servers only). */}
+          {!live ? (
             <GradientButton title="Telefon numarası ile devam et" icon="call" onPress={() => router.push('/giris/telefon')} />
+          ) : deciding ? (
+            <View style={styles.placeholder} />
+          ) : primary ? (
+            <>
+              <GradientButton title={primary.title} icon={primary.icon} onPress={primary.onPress} style={primary.busy ? { opacity: 0.6 } : undefined} />
+              {more.map((o) => (
+                <SocialButton key={o.key} icon={o.icon} title={o.title} onPress={o.onPress} busy={o.busy} />
+              ))}
+              {primary.key === 'device' && hasAccount && <Text style={styles.terms}>Bu telefondaki hesabınla devam edersin. Bir telefonda tek hesap açılabilir.</Text>}
+            </>
+          ) : (
+            <>
+              <Text style={styles.closed}>Giriş şu an kapalı. Biraz sonra tekrar dene.</Text>
+              <GradientButton title="Tekrar dene" icon="refresh" onPress={() => void refreshRemoteConfig(true)} />
+            </>
           )}
           {!liveMode() && <SocialButton icon="logo-google" title="Google ile devam et" />}
           {!liveMode() && <SocialButton icon="logo-apple" title="Apple ile devam et" />}
@@ -130,12 +164,16 @@ export default function WelcomeScreen() {
   );
 }
 
-function SocialButton({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
-  // Prototype: social sign-in skips phone verification and goes straight to profile setup.
+function SocialButton({ icon, title, onPress, busy }: { icon: IconName; title: string; onPress?: () => void; busy?: boolean }) {
+  // Prototype (no onPress): social sign-in skips phone verification and goes straight to profile setup.
   const { colors } = useTheme();
   const styles = useStyles();
   return (
-    <Pressable style={({ pressed }) => [styles.social, pressed && { opacity: 0.8 }]} onPress={() => router.push('/giris/profil')}>
+    <Pressable
+      style={({ pressed }) => [styles.social, (pressed || busy) && { opacity: busy ? 0.6 : 0.8 }]}
+      onPress={onPress ?? (() => router.push('/giris/profil'))}
+      accessibilityRole="button"
+    >
       <Ionicons name={icon} size={20} color={colors.text} />
       <Text style={styles.socialText}>{title}</Text>
     </Pressable>
@@ -166,5 +204,6 @@ const useStyles = makeStyles(({ colors, semantic, dark, lift }) => ({
   },
   socialText: { color: colors.text, fontWeight: '600', fontSize: 15 },
   terms: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 16, marginTop: 4 },
+  closed: { color: colors.text, fontSize: 14, fontWeight: '600', textAlign: 'center', lineHeight: 20 },
   link: { color: semantic.tonalText, fontWeight: '600' },
 }));

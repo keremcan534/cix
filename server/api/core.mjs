@@ -21,6 +21,12 @@ export const db = new pg.Pool({
 // listener the error would end the whole process.
 db.on('error', (e) => console.error('postgres idle connection lost', e.code ?? '', e.message));
 export const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+/** Constant-time equality of two strings, compared as UTF-8 bytes (a non-ASCII input is just unequal, never a throw). */
+export function same(a, b) {
+  const x = Buffer.from(String(a ?? ''), 'utf8');
+  const y = Buffer.from(String(b ?? ''), 'utf8');
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
 
 // --- Migrations: every .sql file in ./migrations once, in name order ----------------------------------------
 export async function migrate() {
@@ -50,6 +56,13 @@ export class HttpError extends Error {
   constructor(code, message) {
     super(message);
     this.code = code;
+  }
+}
+
+/** A route's answer sent as plain text instead of JSON (Meta's webhook handshake wants the bare challenge). */
+export class RawText {
+  constructor(text) {
+    this.text = String(text);
   }
 }
 
@@ -110,7 +123,7 @@ export async function auth(req, { appeal = false } = {}) {
   if (!m) throw new HttpError(401, 'Giriş gerekli');
   const hash = sha(m[1]);
   const r = await db.query(
-    'SELECT u.*, s.last_seen_at AS session_seen, s.device_id AS session_device, s.scope AS session_scope FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL',
+    'SELECT u.*, s.created_at AS session_created, s.last_seen_at AS session_seen, s.device_id AS session_device, s.scope AS session_scope FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND u.deleted_at IS NULL',
     [hash],
   );
   if (!r.rowCount) throw new HttpError(401, 'Oturum geçersiz veya süresi dolmuş');

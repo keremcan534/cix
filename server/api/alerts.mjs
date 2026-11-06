@@ -9,6 +9,9 @@
 //   refunds_high        more than ALERT_REFUNDS_1H store refunds in the last hour (3)
 //   diamonds_spike      one account received more than ALERT_DIAMONDS_1H diamonds in the last hour (500.000)
 //   test_topups_high    more than ALERT_TEST_TOPUP_1H coins of test top-ups in the last hour (500.000)
+//   mail_quota_high     today's e-mail codes passed ALERT_MAIL_QUOTA_PCT % (80) of the free daily quota of the mail
+//                       providers (mail.mjs); at 100 % e-mail sign-in stops until midnight UTC
+//   mail_failing        the last 10 e-mail codes could not be sent by any provider
 //   alerts_error        the checks themselves failed (see the API log)
 //
 // The checks read the last hour of the ledger, so the public answer is computed at most once a minute
@@ -16,6 +19,7 @@
 import fs from 'node:fs';
 
 import { HttpError, auth, db, env } from './core.mjs';
+import { MAIL_DAILY, mailFailing, mailProviders } from './mail.mjs';
 import { lastFailures, recent5xx } from './reporting.mjs';
 
 const num = (v, d) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
@@ -26,6 +30,7 @@ const T = {
   refunds1h: num(env.ALERT_REFUNDS_1H, 3),
   diamonds1h: num(env.ALERT_DIAMONDS_1H, 500_000),
   testTopup1h: num(env.ALERT_TEST_TOPUP_1H, 500_000),
+  mailQuotaPct: num(env.ALERT_MAIL_QUOTA_PCT, 80),
 };
 const CACHE_MS = num(env.ALERT_CACHE_S, 60) * 1000;
 const FINANCE_ON = !!env.FINANCE_API_KEY;
@@ -97,6 +102,18 @@ export async function checkAll() {
       T.testTopup1h,
       tests.slice(0, 10).map((r) => ({ user: r.user_id, coins: Number(r.n) })),
     );
+
+  // The providers with a daily cap ('log' has none); together they are the day's e-mail codes.
+  const capped = mailProviders.filter((p) => MAIL_DAILY[p]);
+  if (capped.length) {
+    const rows = (await db.query("SELECT provider, sent FROM mail_quota WHERE day = (now() AT TIME ZONE 'UTC')::date AND provider = ANY($1::text[])", [capped])).rows;
+    const sent = rows.reduce((a, r) => a + r.sent, 0);
+    const cap = capped.reduce((a, p) => a + MAIL_DAILY[p], 0);
+    const pct = Math.round((sent / cap) * 1000) / 10;
+    if (pct > T.mailQuotaPct)
+      add('mail_quota_high', `Bugünkü ücretsiz e-posta kotasının %${pct} kullanıldı (${sent}/${cap})`, pct, T.mailQuotaPct, Object.fromEntries(capped.map((p) => [p, { sent: rows.find((r) => r.provider === p)?.sent ?? 0, cap: MAIL_DAILY[p] }])));
+  }
+  if (mailFailing()) add('mail_failing', 'Son 10 e-posta kodu hiçbir sağlayıcıyla gönderilemedi', 10, 10);
   return out;
 }
 

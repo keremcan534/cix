@@ -50,7 +50,7 @@ describe('defaults are today', () => {
     assert.equal(WITHDRAW.weeklyDiamonds, 10_000_000);
     assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: '120' }).otp_global_per_hour, 120);
     assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: 'çok' }).otp_global_per_hour, 300);
-    assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: '0' }).otp_global_per_hour, 300);
+    assert.equal(defaultsOf({ OTP_GLOBAL_PER_HOUR: '0' }).otp_global_per_hour, 0);
     assert.deepEqual(defaultsOf({ APP_NOTICE: ' Bakım ', APP_MIN_VERSION: '1.0.3' }).notice, 'Bakım');
     assert.deepEqual(defaultsOf({ APP_MIN_VERSION: '1.0.3' }).min_version, '1.0.3');
     assert.ok(Object.isFrozen(DEFAULTS) && Object.isFrozen(REGISTRY.features_off.bounds));

@@ -57,10 +57,11 @@ export function configOf(e = process.env) {
   };
 }
 
-/** Same reading as auth.mjs: a positive whole number, else `d`. */
-const positive = (v, d) => {
-  const n = Number(v ?? d);
-  return Number.isSafeInteger(n) && n > 0 ? n : d;
+/** OTP_GLOBAL_PER_HOUR as features.mjs reads it: empty or invalid = 300, 0 = no SMS at all. */
+const perHourOf = (v) => {
+  const t = String(v ?? '').trim();
+  const n = t === '' ? 300 : Number(t);
+  return Number.isSafeInteger(n) && n >= 0 ? n : 300;
 };
 
 /** What each key means when it is null (or has no row): today's constants and the .env values of `e`. */
@@ -76,7 +77,7 @@ export function defaultsOf(e = process.env) {
     exchange_usd_try: EXCHANGE.usdTry,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
-    otp_global_per_hour: positive(e.OTP_GLOBAL_PER_HOUR, 300),
+    otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
   };
 }
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);

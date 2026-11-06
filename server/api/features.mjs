@@ -4,7 +4,7 @@
 // (live-settings.mjs): a feature is off when either switches it off, and the live notice and minimum version
 // replace .env's.
 //
-//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, v }
+//   GET /api/config (public, cacheable 30 s) → { minVersion, updateUrl, notice, featuresOff, v, signIn, verify }
 //     v: the live settings' version; the app reloads the catalog when it changes.
 //
 //   APP_MIN_VERSION  e.g. 1.0.3: older apps show a blocking "Güncelleme gerekli" screen
@@ -19,6 +19,7 @@
 import { HttpError, env } from './core.mjs';
 import { FEATURES, OFF_MESSAGE, configOf, listOf } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
+import { mailProvidersOf } from './mail.mjs';
 
 export { FEATURES, OFF_MESSAGE, configOf };
 
@@ -43,6 +44,29 @@ export const ROUTES = {
 
 const CONFIG = configOf(env);
 const ENV_OFF = new Set(CONFIG.featuresOff);
+
+// --- Sign-in and phone-check methods (auth.mjs, mail.mjs, whatsapp.mjs): what the app may offer ---------------
+//   signIn: { dev, google, email, phone }   the welcome screen's buttons (development sign-in only on test servers)
+//   verify: { sms, whatsapp }               how Ayarlar can check a phone number
+// The SMS cap per hour is a live setting (otp_global_per_hour); `cap` is the one in effect, .env's when not given.
+/** WhatsApp phone check: on with our number and the Meta app secret (whatsapp.mjs). */
+export const whatsappOnOf = (e = env) => !!String(e.WHATSAPP_NUMBER ?? '').replace(/\D/g, '') && !!String(e.WHATSAPP_APP_SECRET ?? '').trim();
+/** OTP_GLOBAL_PER_HOUR: SMS codes per hour over everyone; empty or invalid = 300, 0 = no SMS at all. */
+export function smsPerHourOf(e = env) {
+  const v = String(e.OTP_GLOBAL_PER_HOUR ?? '').trim();
+  const n = v === '' ? 300 : Number(v);
+  return Number.isSafeInteger(n) && n >= 0 ? n : 300;
+}
+/** SMS codes can go out: a provider is set (SMS_PROVIDER) and the hourly cap is not 0. */
+export const smsOnOf = (e = env, cap = smsPerHourOf(e)) => ['netgsm', 'twilio', 'log'].includes(e.SMS_PROVIDER ?? '') && cap > 0;
+/** Signing in with a phone number by SMS: only with PHONE_SIGN_IN=1 as well (a checked phone is otherwise just a badge). */
+export const phoneSignInOf = (e = env, cap = smsPerHourOf(e)) => e.PHONE_SIGN_IN === '1' && smsOnOf(e, cap);
+export function signInOf(e = env, cap = smsPerHourOf(e)) {
+  return {
+    signIn: { dev: e.ALLOW_DEV_AUTH === '1', google: listOf(e.GOOGLE_CLIENT_IDS).length > 0, email: mailProvidersOf(e).length > 0, phone: phoneSignInOf(e, cap) },
+    verify: { sms: smsOnOf(e, cap), whatsapp: whatsappOnOf(e) },
+  };
+}
 {
   const unknown = listOf(env.FEATURES_OFF).filter((f) => !FEATURES.includes(f));
   if (unknown.length) console.warn(`FEATURES_OFF: unknown ${unknown.join(', ')} (known: ${FEATURES.join(', ')})`);
@@ -71,6 +95,6 @@ export const configRoutes = {
   async 'GET /api/config'() {
     const s = live();
     // .env's switched-off features first, in .env's order, then the live ones.
-    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v };
+    return { minVersion: s.minVersion, updateUrl: CONFIG.updateUrl, notice: s.notice, featuresOff: [...new Set([...CONFIG.featuresOff, ...s.featuresOff])], v: s.v, ...signInOf(env, s.otpPerHour) };
   },
 };

@@ -1,9 +1,13 @@
-// Live mode account actions (lib/live): Google sign-in, signing out, deleting the account and reporting someone,
-// the parts Google Play asks for. Screens call these only in live mode; the prototype keeps its local flows.
+// Live mode account actions (lib/live): Google and e-mail sign-in, adding an address or checking a number in
+// Ayarlar, signing out, deleting the account and reporting someone, the parts Google Play asks for. Screens call
+// these only in live mode; the prototype keeps its local flows.
+import { Platform } from 'react-native';
+
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { googleAvailable, googleIdToken, googleSignOut } from '@/lib/google-sign-in';
-import { liveMode, liveSignIn, message, toServer } from '@/lib/live';
+import { applyServerUser, liveMode, liveSignIn, message, toServer } from '@/lib/live';
+import { retrySeconds, reusableCode, type SentCode } from '@/lib/verify-code';
 import { isServerId, type User } from '@/data/mock';
 
 /** "Google ile devam et" on the welcome screen: a live build with the client id and the native module. */
@@ -41,18 +45,74 @@ export async function signInWithGoogle() {
  * An account that never finished its profile goes through the profile screen first.
  */
 export async function signInWithDevice() {
+  await forgetEndedSignIn();
   const user = (await liveSignIn('Yeni üye')) as api.ServerMe;
   return { user, needsProfile: !user.gender || user.age === null };
 }
 
 /**
- * After "Çıkış yap": a Google account's session ends on the server and on the phone, so the next person picks
- * their own account. A device account keeps its session (it is this phone's account either way).
+ * Before this phone's own account (the welcome screen's device ways, test servers): an e-mail, phone or Google
+ * sign-in whose session ended on its own (expired, ended from another phone) is still remembered here, and it
+ * would refuse the device key ("yeniden giriş yap"). It is forgotten first, as "Çıkış yap" does. Never fails.
+ */
+export async function forgetEndedSignIn() {
+  try {
+    if (await api.signedInWithAccount()) await api.logout();
+  } catch {
+    // Storage hiccup: the sign-in after this says what went wrong.
+  }
+}
+
+export type CodeKind = 'email' | 'phone';
+/** The session list's name for this phone. */
+const deviceLabel = () => (Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'web' ? 'Web' : 'Android');
+
+// The last code asked for on the welcome screens: going back and asking again for the same address within the
+// wait reuses it (the code in the mailbox still works) instead of a refusal to wait.
+let lastCode: (SentCode & { kind: CodeKind }) | null = null;
+
+/**
+ * Signing in with a code, step 1: a code to the address (or the number, where the server allows phone sign-in).
+ * `resend`: the person asked for a new one. `retryAfter` = seconds until another can be asked for.
+ */
+export async function startSignInCode(kind: CodeKind, target: string, resend = false) {
+  const now = Date.now();
+  const again = !resend && lastCode?.kind === kind ? reusableCode(lastCode, target, now) : null;
+  if (again) return again;
+  const r = kind === 'email' ? await api.emailStart(target) : await api.otpStart(target);
+  const retryAfter = retrySeconds(r.retryAfter);
+  lastCode = { kind, target, challenge: r.challenge, resendAt: now + retryAfter * 1000 };
+  return { retryAfter, challenge: r.challenge };
+}
+
+/** Step 2: the code opens the session. `needsProfile`: a new account (or one without gender and age) fills its profile first. */
+export async function signInWithCode(kind: CodeKind, target: string, code: string, challenge: string) {
+  const { user: u, isNew } = kind === 'email' ? await api.emailVerify(target, code, challenge, deviceLabel()) : await api.otpVerify(target, code, challenge, undefined, deviceLabel());
+  lastCode = null;
+  // The full account (profile, e-mail) and the balance into the store, like every other sign-in.
+  const user = (await liveSignIn(u.name)) as api.ServerMe;
+  return { user, isNew, needsProfile: isNew || !user.gender || user.age === null };
+}
+
+/** Ayarlar: a code to an address or a number for this account. */
+export const startLinkCode = (kind: CodeKind, target: string) => (kind === 'email' ? api.linkEmailStart(target) : api.linkPhoneStart(target));
+/** Ayarlar: the code adds the address or checks the number; the store gets the new account at once. */
+export async function verifyLinkCode(kind: CodeKind, target: string, code: string, challenge: string) {
+  const user = kind === 'email' ? await api.linkEmailVerify(target, code, challenge) : await api.linkPhoneVerify(target, code, challenge);
+  applyServerUser({ user });
+  return user;
+}
+
+/**
+ * After "Çıkış yap": a Google, e-mail or phone account's session ends on the server and on the phone, so the
+ * next person signs in with their own account. A device account keeps its session (it is this phone's account
+ * either way).
  */
 export async function liveSignOut() {
-  if (!(await api.signedInWithGoogle())) return;
+  if (!(await api.signedInWithAccount())) return;
+  const google = await api.signedInWithGoogle();
   await api.logout();
-  await googleSignOut();
+  if (google) await googleSignOut();
 }
 
 /** Deletes the account on the server; the caller then clears this phone (store resetAll). */

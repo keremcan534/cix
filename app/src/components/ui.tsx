@@ -216,18 +216,23 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   levelChip: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   levelChipText: { fontSize: 12, fontWeight: '800' },
   textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  textLinkCenter: { alignSelf: 'center' },
   headerTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center' },
   headerSide: { flex: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center' },
   headerBack: { width: 40, height: 40, justifyContent: 'center' },
 }));
 
 /** Secondary action inside a card: colored text with a chevron instead of a typed arrow. */
-export function TextLink({ title, onPress, color: own }: { title: string; onPress: () => void; color?: string }) {
+export function TextLink({ title, onPress, color: own, center }: {
+  title: string; onPress: () => void; color?: string;
+  /** In a centred column or row; otherwise the link keeps to the start edge, as inside a card. */
+  center?: boolean;
+}) {
   const { colors } = useTheme();
   const styles = useStyles();
   const color = own ?? colors.primaryText;
   return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={styles.textLink}>
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="link" style={[styles.textLink, center && styles.textLinkCenter]}>
       <Text style={{ color, fontWeight: '700' }}>{title}</Text>
       <Ionicons name="chevron-forward" size={14} color={color} />
     </Pressable>

@@ -3,7 +3,10 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { configOf } from '../features.mjs';
+import { configOf as baseOf, signInOf } from '../features.mjs';
+
+/** The config with the sign-in methods, as GET /api/config returns it (without the live version). */
+const configOf = (e) => ({ ...baseOf(e), ...signInOf(e) });
 import { rnd, startApi } from './harness.mjs';
 
 const h = startApi({
@@ -29,13 +32,28 @@ describe('app config', () => {
       notice: 'Bu gece 02:00–02:15 bakım var.',
       featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases', 'withdraw'],
       v: 0,
+      // The harness turns on development sign-in only; e-mail, Google, SMS and WhatsApp are unset.
+      signIn: { dev: true, google: false, email: false, phone: false },
+      verify: { sms: false, whatsapp: false },
     });
   });
 
   test('configOf: bad values are dropped, empty means nothing set', () => {
-    assert.deepEqual(configOf({}), { minVersion: null, updateUrl: null, notice: null, featuresOff: [] });
-    assert.deepEqual(configOf({ APP_MIN_VERSION: 'v1', APP_UPDATE_URL: 'http://insecure', FEATURES_OFF: ' ,games,games' }), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['games'] });
+    const none = { signIn: { dev: false, google: false, email: false, phone: false }, verify: { sms: false, whatsapp: false } };
+    assert.deepEqual(configOf({}), { minVersion: null, updateUrl: null, notice: null, featuresOff: [], ...none });
+    assert.deepEqual(configOf({ APP_MIN_VERSION: 'v1', APP_UPDATE_URL: 'http://insecure', FEATURES_OFF: ' ,games,games' }), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['games'], ...none });
     assert.equal(configOf({ APP_NOTICE: 'x'.repeat(400) }).notice.length, 300);
+    // Sign-in and phone-check methods: a mail provider needs its key and MAIL_FROM, WhatsApp its number and secret.
+    const on = { ALLOW_DEV_AUTH: '1', GOOGLE_CLIENT_IDS: 'x.apps.googleusercontent.com', MAIL_PROVIDERS: 'brevo', BREVO_API_KEY: 'k', SMS_PROVIDER: 'netgsm', WHATSAPP_NUMBER: '+90 555 000 00 00', WHATSAPP_APP_SECRET: 's' };
+    assert.deepEqual(configOf(on).signIn, { dev: true, google: true, email: false, phone: false }, 'MAIL_FROM missing');
+    assert.deepEqual(configOf({ ...on, MAIL_FROM: 'Similar Club <kod@example.com>' }).signIn, { dev: true, google: true, email: true, phone: false });
+    assert.deepEqual(configOf(on).verify, { sms: true, whatsapp: true });
+    assert.deepEqual(configOf({ ...on, SMS_PROVIDER: 'nope', WHATSAPP_APP_SECRET: ' ' }).verify, { sms: false, whatsapp: false });
+    // Phone sign-in needs PHONE_SIGN_IN=1 and SMS; OTP_GLOBAL_PER_HOUR=0 turns SMS off, empty keeps the default.
+    assert.equal(configOf({ ...on, PHONE_SIGN_IN: '1' }).signIn.phone, true);
+    assert.deepEqual(configOf({ ...on, PHONE_SIGN_IN: '1', OTP_GLOBAL_PER_HOUR: '0' }).signIn.phone, false);
+    assert.deepEqual(configOf({ ...on, OTP_GLOBAL_PER_HOUR: '0' }).verify, { sms: false, whatsapp: true });
+    assert.deepEqual(configOf({ ...on, OTP_GLOBAL_PER_HOUR: ' ' }).verify, { sms: true, whatsapp: true });
   });
 });
 
@@ -67,6 +85,29 @@ describe('switched-off features', () => {
     for (const p of ['/api/ledger', '/api/rooms', '/api/conversations', '/api/wallet/earnings', '/api/wallet/withdrawals', '/api/catalog']) assert.equal((await call('GET', p, null, a.session))[0], 200, p);
     // Spending on in-app items is not one of the switches.
     assert.equal((await call('POST', '/api/wallet/spend', { amount: 5, reason: 'VIP', ref: rnd(6) }, a.session))[0], 409);
+  });
+
+  test('e-mail, SMS and WhatsApp stay off until configured: 503 naming the feature', async () => {
+    const a = await h.signUp();
+    const off = [
+      ['POST', '/api/auth/otp/start', { phone: '+905321112233' }, 'phone'],
+      ['POST', '/api/auth/otp/verify', { phone: '+905321112233', code: '123456' }, 'phone'],
+      ['POST', '/api/auth/email/start', { email: 'ali@example.com' }, 'email'],
+      ['POST', '/api/auth/email/verify', { email: 'ali@example.com', code: '123456' }, 'email'],
+      ['POST', '/api/me/email/start', { email: 'ali@example.com' }, 'email'],
+      ['POST', '/api/me/email/verify', { email: 'ali@example.com', code: '123456' }, 'email'],
+      ['POST', '/api/me/phone/start', { phone: '+905321112233' }, 'sms'],
+      ['POST', '/api/me/phone/verify', { phone: '+905321112233', code: '123456' }, 'sms'],
+      ['POST', '/api/me/phone/whatsapp', null, 'whatsapp'],
+      ['GET', '/api/me/phone/status', null, 'whatsapp'],
+      ['GET', '/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=x&hub.challenge=1', null, 'whatsapp'],
+      ['POST', '/api/webhooks/whatsapp', { entry: [] }, 'whatsapp'],
+    ];
+    for (const [m, p, body, feature] of off) {
+      const [st, j] = await call(m, p, body, a.session);
+      assert.equal(st, 503, `${m} ${p}`);
+      assert.equal(j.feature, feature, `${m} ${p}`);
+    }
   });
 });
 

@@ -59,11 +59,11 @@ export function LiveSync() {
         if (alive) await pollMessages(appRef.current);
       } catch (e) {
         if (e instanceof SignInAgain) {
-          // A Google account's session ended (signed out on the server, or expired): back to the welcome screen.
+          // A Google, e-mail or phone account's session ended (signed out on the server, or expired): back to the welcome screen.
           signedIn = false;
           if (alive && appRef.current.loggedIn) {
             appRef.current.logout();
-            showAlert('Oturumun sona erdi', 'Devam etmek için Google ile yeniden giriş yap.');
+            showAlert('Oturumun sona erdi', 'Devam etmek için yeniden giriş yap.');
           }
           return;
         }

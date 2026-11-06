@@ -13,6 +13,9 @@ import { FEATURES } from '../live-registry.mjs';
 import { campaignAt } from '../live-settings.mjs';
 import { rnd, startApi } from './harness.mjs';
 
+/** The sign-in switches /api/config adds: the harness turns on development sign-in only. */
+const SIGN_IN = { signIn: { dev: true, google: false, email: false, phone: false }, verify: { sms: false, whatsapp: false } };
+
 // A stand-in for Expo's push service.
 const pushed = [];
 const pushMock = http.createServer(async (req, res) => {
@@ -65,7 +68,7 @@ describe('nothing saved', () => {
   test('/api/config is the .env config plus v: 0; the catalog is whole', async () => {
     A = await h.account('Ayşe Yönetici', 'admin');
     B = await h.account('Bora Yönetici', 'admin');
-    assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0 });
+    assert.deepEqual(await config(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
     const [st, cat] = await call('GET', '/api/catalog');
     assert.equal(st, 200);
     assert.equal(cat.gifts.length, 54);
@@ -422,7 +425,7 @@ describe('LIVE_SAFE_MODE', () => {
       return [r.status, await r.json()];
     };
     try {
-      assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0 });
+      assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { minVersion: null, updateUrl: null, notice: null, featuresOff: ['dm'], v: 0, ...SIGN_IN });
       const [st, p] = await sc('GET', SETTINGS, null, G.session);
       assert.equal(st, 200);
       assert.equal(p.safeMode, true);
