@@ -78,7 +78,7 @@ import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { callsAvailable, isLiveRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toServer, updateServerRoom } from '@/lib/live';
+import { callsAvailable, isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
@@ -128,7 +128,7 @@ import {
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
 import { ALL_FEATURES, applyServerStage, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
-import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, useRoomSession, type MicBlock } from '@/lib/room-session';
+import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
@@ -310,6 +310,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const stageDeny = stagePermission(id, 'me');
   const canStage = stageDeny === null;
   const [layoutsOpen, setLayoutsOpen] = useState(false);
+  // "Mikrofon denoise" (menu): the voice engine captures the mic with or without the phone's noise suppression.
+  useEffect(() => setNoiseSuppression(settings.micDenoise), [settings.micDenoise]);
   // My own room keeps its layout across app restarts (saved with the room settings).
   const stageLayoutId = stage?.layoutId ?? null;
   useEffect(() => {
@@ -760,9 +762,37 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   );
   const setClassicMics = (n: number) => {
     const r = setClassicCapacity(id, 'me', n);
-    if (r.ok) updateMyRoom({ micCount: n, lockedSeats: myRoom.lockedSeats.filter((i) => i < n) });
+    if (!r.ok) return r;
+    // A server room: the server keeps the count and tells the other phones; a refusal puts its count back.
+    if (real)
+      updateServerRoom(id, { micCount: n })
+        .catch((e) => {
+          showAlert(refusalTitle(e, 'Mikrofon sayısı kaydedilemedi'), errorText(e));
+          return syncServerStage(id);
+        })
+        .catch(() => {});
+    else updateMyRoom({ micCount: n, lockedSeats: myRoom.lockedSeats.filter((i) => i < n) });
     return r;
   };
+  // My room on the server: the lock is set there (the password is checked when someone asks to join).
+  const liveSettings = myServerRoom
+    ? {
+        locked: isLockedRoom(id),
+        setPassword: (password: string | null) =>
+          updateServerRoom(id, { password }).then(
+            () => {
+              setRoomEdits((n) => n + 1);
+              successHaptic();
+              showAlert(password ? 'Oda kilitlendi' : 'Kilit kaldırıldı', password ? 'Yeni girenler odaya şifreyle girer. Odadakiler kalır.' : 'Oda artık herkese açık.');
+            },
+            (e: unknown) => {
+              errorHaptic();
+              showAlert(refusalTitle(e, 'Kaydedilemedi'), errorText(e));
+              throw e;
+            },
+          ),
+      }
+    : undefined;
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
   const logGift = (from: string, to: string, gift: Gift, count: number) =>
     setGiftLog((l) => [{ id: msgId(), from, to, emoji: gift.emoji, name: gift.name, count, coins: gift.price * count, time: clock(), giftId: gift.id }, ...l].slice(0, 100));
@@ -1962,7 +1992,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       variant: 'tool',
       items: [
         { key: 'card', label: 'Oda kartı', icon: 'home-outline', onPress: () => setPanel('info') },
-        ...(isOwn ? [{ key: 'settings', label: 'Oda ayarları', icon: 'settings-outline' as const, onPress: () => setPanel('settings') }] : []),
+        ...(isOwn || myServerRoom ? [{ key: 'settings', label: 'Oda ayarları', icon: 'settings-outline' as const, onPress: () => setPanel('settings') }] : []),
         ...(canStage ? [{ key: 'layout', label: 'Yayına Katılma Modu', icon: 'grid-outline' as const, onPress: () => (setPanel(null), setLayoutsOpen(true)) }] : []),
         ...(myRole !== 'member' ? [{ key: 'mod', label: 'Moderasyon', icon: 'shield-checkmark-outline' as const, onPress: () => setPanel('mod') }] : []),
         ...(real && myRole !== 'member' ? [{ key: 'bans', label: 'Giriş yasakları', icon: 'ban-outline' as const, onPress: openBans }] : []),
@@ -2533,12 +2563,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onInvite={() => setPanel('invite')}
         live={real}
       />
-      {isOwn && (
+      {(isOwn || myServerRoom) && (
         <RoomSettingsScreen
           visible={panel === 'settings'}
           onClose={() => setPanel(null)}
-          room={myRoom}
+          room={liveSettings ? { ...myRoom, micCount: classicCapacity, xp: base!.xp ?? 0 } : myRoom}
+          live={liveSettings}
           update={(p) => {
+            if (liveSettings) return;
             updateMyRoom(p);
             const keys = Object.keys(p).filter((k) => k !== 'password');
             if (keys.length) logMod('Oda ayarını değiştirdi', keys.join(', '));

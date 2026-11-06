@@ -305,7 +305,7 @@ export function RoomInfoSheet({
                 🇹🇷 │ {th.emoji} {th.name} │ ID {roomCode(roomId)}
               </Text>
             </View>
-            {owner && (
+            {(owner || canEditText) && (
               <Pressable onPress={onSettings} hitSlop={8} accessibilityLabel="Oda ayarlarını aç">
                 <Ionicons name="settings-outline" size={26} color="#fff" />
               </Pressable>
@@ -630,6 +630,7 @@ export function RoomSettingsScreen({
   classicActive,
   renderLayouts,
   onClassicMics,
+  live,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -650,6 +651,8 @@ export function RoomSettingsScreen({
   renderLayouts: (visible: boolean, onClose: () => void) => ReactNode;
   /** Classic mic count change, validated by lib/room-modes. */
   onClassicMics: (n: number) => Result;
+  /** My room on the server: only the rows the server keeps (lock, level, layout, mic count) are shown. */
+  live?: LiveRoomSettings;
 }) {
   const [picker, setPicker] = useState<Picker>(null);
   const close = () => setPicker(null);
@@ -672,15 +675,19 @@ export function RoomSettingsScreen({
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <Section title="Standart" />
-          <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} />
-          <Row label="Oda teması" value={roomThemeInfo(room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(room.theme).id]} onPress={() => setPicker('theme')} />
-          <Row
-            label="Oda kilitli"
-            hint={`Oda seviyesi >=${LOCK_MIN_LEVEL} veya soyluluk açılarak kilit açılır`}
-            toggle={{ value: room.locked, onChange: (v) => update({ locked: v }) }}
-            locked={lockOpen ? undefined : `Oda kilidi Lv.${LOCK_MIN_LEVEL} odada veya VIP (soyluluk) ile açılır. Şu an Lv.${level}.`}
-          />
-          {room.locked && (
+          {!live && <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} />}
+          {!live && <Row label="Oda teması" value={roomThemeInfo(room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(room.theme).id]} onPress={() => setPicker('theme')} />}
+          {live ? (
+            <LiveLock live={live} lockOpen={lockOpen} level={level} />
+          ) : (
+            <Row
+              label="Oda kilitli"
+              hint={`Oda seviyesi >=${LOCK_MIN_LEVEL} veya soyluluk açılarak kilit açılır`}
+              toggle={{ value: room.locked, onChange: (v) => update({ locked: v }) }}
+              locked={lockOpen ? undefined : `Oda kilidi Lv.${LOCK_MIN_LEVEL} odada veya VIP (soyluluk) ile açılır. Şu an Lv.${level}.`}
+            />
+          )}
+          {!live && room.locked && (
             <View style={[styles.row, { paddingTop: 0 }]}>
               <TextInput
                 value={room.password}
@@ -692,54 +699,62 @@ export function RoomSettingsScreen({
               />
             </View>
           )}
-          <Row label="Oda Günlüğü" onPress={() => setPicker('log')} />
+          {!live && <Row label="Oda Günlüğü" onPress={() => setPicker('log')} />}
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
           <Section title="Mikrofon pozisyonu" />
           <Row label="Sahne Düzeni" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
-          <Row
-            label="Mikrofon kuyruğu"
-            hint={room.micQueue ? 'Açık: boş mikrofona çıkmak isteyenler kuyruğa girer, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
-            toggle={{ value: room.micQueue, onChange: (v) => update({ micQueue: v }) }}
-          />
-          <Row
-            label="Mikrofon izni"
-            hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
-            value={room.micPermission === 'members' ? 'Oda üyeleri' : 'Herkes'}
-            onPress={() => setPicker('micPerm')}
-            locked={micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`}
-          />
-          <Row
-            label="Dümen Koltuğu"
-            hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · oturumun en çok hediye gönderen kişisi oturur`}
-            toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
-            locked={bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`}
-          />
+          {live ? (
+            <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
+              Şifre, düzen ve mikrofon sayısı sunucuda saklanır; odadaki herkeste aynı görünür. Yeni şifre, odaya bir sonraki girişte sorulur.
+            </Text>
+          ) : (
+            <>
+              <Row
+                label="Mikrofon kuyruğu"
+                hint={room.micQueue ? 'Açık: boş mikrofona çıkmak isteyenler kuyruğa girer, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
+                toggle={{ value: room.micQueue, onChange: (v) => update({ micQueue: v }) }}
+              />
+              <Row
+                label="Mikrofon izni"
+                hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
+                value={room.micPermission === 'members' ? 'Oda üyeleri' : 'Herkes'}
+                onPress={() => setPicker('micPerm')}
+                locked={micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`}
+              />
+              <Row
+                label="Dümen Koltuğu"
+                hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · oturumun en çok hediye gönderen kişisi oturur`}
+                toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
+                locked={bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`}
+              />
 
-          <Section title="Oda üyeleri" />
-          <Row label="Oda üyesi başvurusu" value={joinLabel[room.joinMode]} onPress={() => setPicker('join')} />
-          <Row label="Oda üyelerini yönet" value={who[room.manageMembers]} onPress={() => setPicker('manageMembers')} />
-          <Row
-            label="Otomatik eleme"
-            hint="Oda üyeleri standartlara uymadığında otomatik olarak odadan çıkarılır (yöneticiler hariç)"
-            value={room.autoRemoveDays ? 'Etkinleştirildi' : 'Açılmadı'}
-            onPress={() => setPicker('autoRemove')}
-          />
-          <Row label="Oda işlevlerini yönet" value={who[room.manageFunctions]} onPress={() => setPicker('manageFunctions')} />
-          <Row label={`Oda yöneticileri`} value={`${room.adminIds.length}/${adminCapacity(level)}`} onPress={() => setPicker('admins')} />
-          <Row label="Katılımcı limiti" value={`${room.limit.toLocaleString('tr-TR')} kişi`} onPress={() => setPicker('limit')} />
+              <Section title="Oda üyeleri" />
+              <Row label="Oda üyesi başvurusu" value={joinLabel[room.joinMode]} onPress={() => setPicker('join')} />
+              <Row label="Oda üyelerini yönet" value={who[room.manageMembers]} onPress={() => setPicker('manageMembers')} />
+              <Row
+                label="Otomatik eleme"
+                hint="Oda üyeleri standartlara uymadığında otomatik olarak odadan çıkarılır (yöneticiler hariç)"
+                value={room.autoRemoveDays ? 'Etkinleştirildi' : 'Açılmadı'}
+                onPress={() => setPicker('autoRemove')}
+              />
+              <Row label="Oda işlevlerini yönet" value={who[room.manageFunctions]} onPress={() => setPicker('manageFunctions')} />
+              <Row label={`Oda yöneticileri`} value={`${room.adminIds.length}/${adminCapacity(level)}`} onPress={() => setPicker('admins')} />
+              <Row label="Katılımcı limiti" value={`${room.limit.toLocaleString('tr-TR')} kişi`} onPress={() => setPicker('limit')} />
 
-          <Section title="Gizlilik & Güvenlik" />
-          <Row label="Oda kara listesi" value={String(blacklist.length)} onPress={() => setPicker('blacklist')} />
-          <Row label="Profil Sayfasında Oda Görünürlüğü" hint="Etkinleştirildiğinde odanız profil sayfanızda görüntülenecektir" toggle={{ value: room.profileVisible, onChange: (v) => update({ profileVisible: v }) }} />
-          <Row
-            label="Video Odası Gizlilik Koruması"
-            hint="Etkinleştirildiğinde video odası ekran görüntüsü alma veya kaydetmeye karşı korunur"
-            toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
-          />
-          <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} />
-          <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
+              <Section title="Gizlilik & Güvenlik" />
+              <Row label="Oda kara listesi" value={String(blacklist.length)} onPress={() => setPicker('blacklist')} />
+              <Row label="Profil Sayfasında Oda Görünürlüğü" hint="Etkinleştirildiğinde odanız profil sayfanızda görüntülenecektir" toggle={{ value: room.profileVisible, onChange: (v) => update({ profileVisible: v }) }} />
+              <Row
+                label="Video Odası Gizlilik Koruması"
+                hint="Etkinleştirildiğinde video odası ekran görüntüsü alma veya kaydetmeye karşı korunur"
+                toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
+              />
+              <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} />
+              <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -885,6 +900,69 @@ export function RoomSettingsScreen({
         <LevelTable xp={room.xp} level={level} />
       </BottomSheet>
     </Modal>
+  );
+}
+
+/** The lock of my room on the server: the password goes to the server when saved and never stays on the phone. */
+export type LiveRoomSettings = { locked: boolean; setPassword: (password: string | null) => Promise<void> };
+
+function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen: boolean; level: number }) {
+  const [on, setOn] = useState(live.locked);
+  const [pw, setPw] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = (password: string | null) => {
+    setBusy(true);
+    live
+      .setPassword(password)
+      .then(() => {
+        setPw('');
+        setOn(password !== null);
+      })
+      .catch(() => setOn(live.locked))
+      .finally(() => setBusy(false));
+  };
+  const ok = pw.length >= 4;
+  return (
+    <>
+      <Row
+        label="Oda kilitli"
+        hint={live.locked ? 'Odaya girmek için şifre gerekir (sahip ve yöneticiler hariç)' : `Oda seviyesi >=${LOCK_MIN_LEVEL} veya soyluluk açılarak kilit açılır`}
+        toggle={{
+          value: on,
+          onChange: (v) => {
+            if (busy) return;
+            if (!v && live.locked) save(null);
+            else setOn(v);
+          },
+        }}
+        locked={lockOpen ? undefined : `Oda kilidi Lv.${LOCK_MIN_LEVEL} odada veya VIP (soyluluk) ile açılır. Şu an Lv.${level}.`}
+      />
+      {on && (
+        <View style={[styles.row, { paddingTop: 0, gap: 10 }]}>
+          <TextInput
+            value={pw}
+            onChangeText={(t) => setPw(t.replace(/\s/g, ''))}
+            placeholder={live.locked ? 'Yeni şifre (4–8 karakter)' : 'Oda şifresi (4–8 karakter)'}
+            placeholderTextColor={colors.textDim}
+            maxLength={8}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.input, { flex: 1 }]}
+          />
+          <Pressable
+            onPress={() => ok && !busy && save(pw)}
+            disabled={!ok || busy}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Şifreyi kaydet"
+            style={{ opacity: ok && !busy ? 1 : 0.4 }}
+          >
+            <Text style={{ color: colors.green, fontWeight: '700' }}>Kaydet</Text>
+          </Pressable>
+        </View>
+      )}
+    </>
   );
 }
 
