@@ -9,13 +9,13 @@
 // hours, test and sandbox flags, TEST_DAILY, pack coins / product ids / TL prices (Play Console owns the price),
 // gift prices (installed apps show the compiled price), the SMS provider and every secret.
 //
-// Values: null always means "back to the default". A set (features_off, gifts_hidden, packs_hidden) is kept in
+// Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
-import { EXCHANGE, GIFTS, PACKS, WITHDRAW, exchangeCoins } from './catalog.mjs';
+import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
-export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'];
+export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
 export const FEATURE_LABEL = {
   gifts: 'Hediye',
   purchases: 'Jeton satın alma',
@@ -26,7 +26,13 @@ export const FEATURE_LABEL = {
   dm: 'Mesajlar',
   rooms: 'Odalar',
   withdraw: 'Para çekme',
+  shop: 'Mağaza',
 };
+/**
+ * The app's emergency stop (live-settings-format.ts MONEY_STOP) as admin builds before the shop moved to the
+ * server save it: when all six are off, Mağaza is off too, so the stop covers it from the day it ships.
+ */
+export const MONEY_STOP = ['gifts', 'topup', 'exchange', 'jeton', 'withdraw', 'games'];
 /** What a switched-off feature's calls answer (503), old apps included. */
 export const OFF_MESSAGE = 'Bu özellik geçici olarak kapalı';
 
@@ -73,6 +79,7 @@ export function defaultsOf(e = process.env) {
     min_version: cfg.minVersion,
     campaign: null,
     gifts_hidden: [],
+    shop_hidden: [],
     packs_hidden: [],
     exchange_usd_try: EXCHANGE.usdTry,
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
@@ -123,6 +130,7 @@ const pctText = (x) => `${x >= 0 ? '+' : '-'}%${Math.abs(x).toLocaleString('tr-T
 const when = (iso) => new Date(iso).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 const some = (xs) => (xs.length > 6 ? `${xs.slice(0, 6).join(', ')} ve ${xs.length - 6} tane daha` : xs.join(', '));
 const giftName = (id) => GIFTS.get(id)?.name ?? id;
+const shopName = (sku) => SHOP.get(sku)?.name ?? sku;
 const packName = (id) => `${fmt(PACKS.find((p) => p.id === id)?.coins ?? 0)} jeton`;
 const added = (before, after) => after.filter((x) => !before.includes(x));
 
@@ -137,6 +145,7 @@ const OFF_EFFECT = {
   dm: 'Yeni özel mesaj gönderilemez.',
   rooms: 'Yeni oda açılamaz, odalara girilemez.',
   withdraw: 'Yeni para çekme talebi alınmaz; bekleyen talepler sürer.',
+  shop: 'Mağazadan alım durur (eski uygulamalar dahil); alınmış ürünler kalır ve giyilebilir.',
 };
 
 // --- Checks ----------------------------------------------------------------------------------------------------
@@ -184,7 +193,10 @@ export const REGISTRY = {
     help: 'Kapatılan özellik sunucuda hemen durur; eski uygulamalar da etkilenir. Sunucu ayarında (.env) kapalı olan burada açılamaz.',
     type: 'set',
     bounds: { options: FEATURES, labels: FEATURE_LABEL, max: FEATURES.length },
-    parse: (v) => setOf(v, REGISTRY.features_off.bounds, 'Kapalı özellikler'),
+    parse(v) {
+      const off = setOf(v, REGISTRY.features_off.bounds, 'Kapalı özellikler');
+      return off && MONEY_STOP.every((f) => off.includes(f)) && !off.includes('shop') ? FEATURES.filter((f) => off.includes(f) || f === 'shop') : off;
+    },
     big: () => false,
     impact(before, after, ctx) {
       const off = added(before, after);
@@ -195,6 +207,7 @@ export const REGISTRY = {
       if (off.length) out.push(...off.map((f) => OFF_EFFECT[f]), `Eski uygulamalar "${OFF_MESSAGE}" mesajı görür.`);
       if (on.length) out.push(`Yeniden açılır: ${on.map((f) => FEATURE_LABEL[f]).join(', ')}.`);
       if (kept.length) out.push(`Sunucu ayarında kapalı kalır: ${kept.map((f) => FEATURE_LABEL[f]).join(', ')}.`);
+      if (MONEY_STOP.every((f) => after.includes(f))) out.push('Para özelliklerinin hepsi kapalıyken Mağaza da kapalı kalır; açmak için önce birini aç.');
       return out.join(' ') || 'Görünür bir etkisi yok.';
     },
   },
@@ -263,6 +276,24 @@ export const REGISTRY = {
       const out = [];
       if (hide.length) out.push(`Gizlenir: ${some(hide.map(giftName))}. Eski uygulamalarda görünmeye devam eder; gönderince "Bu hediye artık yok" uyarısı çıkar, jeton düşmez.`);
       if (show.length) out.push(`Yeniden görünür: ${some(show.map(giftName))}.`);
+      return out.join(' ') || 'Görünür bir etkisi yok.';
+    },
+  },
+  shop_hidden: {
+    field: 'shopHidden',
+    group: 'Hediyeler ve paketler',
+    label: 'Mağazada gizli ürünler',
+    help: 'Gizlenen ürün mağazadan çıkar ve satın alınamaz. Alan kişide kalır, süresi bitene kadar kullanır. Fiyatlar değişmez.',
+    type: 'set',
+    bounds: { options: [...SHOP.keys()], labels: Object.fromEntries([...SHOP.values()].map((x) => [x.sku, x.name])), max: SHOP.size, bigAdded: 5 },
+    parse: (v) => setOf(v, REGISTRY.shop_hidden.bounds, 'Mağazada gizli ürünler'),
+    big: (before, after) => !!after && added(before, after).length > REGISTRY.shop_hidden.bounds.bigAdded,
+    impact(before, after) {
+      const hide = added(before, after);
+      const show = added(after, before);
+      const out = [];
+      if (hide.length) out.push(`Mağazada gizlenir: ${some(hide.map(shopName))}. Alanlarda kalır; eski uygulamalarda görünse de satın alınamaz, jeton düşmez.`);
+      if (show.length) out.push(`Mağazada yeniden satılır: ${some(show.map(shopName))}.`);
       return out.join(' ') || 'Görünür bir etkisi yok.';
     },
   },
@@ -425,7 +456,7 @@ const readOnlySet = (xs) => {
  * over the defaults of `e`. A value the registry no longer accepts (e.g. bounds tightened by a later deploy) and
  * unknown keys are ignored; the first are listed in `invalid`. FEATURES_OFF is always added to the live list,
  * and the live notice and minimum version replace .env's ('' = no notice, null = .env's).
- *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
+ *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
@@ -452,6 +483,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     notice: notice === '' ? null : notice,
     minVersion: val('min_version'),
     giftsHidden: readOnlySet(val('gifts_hidden')),
+    shopHidden: readOnlySet(val('shop_hidden')),
     packsHidden: readOnlySet(val('packs_hidden')),
     campaign: campaign && Object.freeze({ ...campaign }),
     usdTry: val('exchange_usd_try'),

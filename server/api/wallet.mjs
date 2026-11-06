@@ -34,6 +34,8 @@ export const CHANNELS = {
   toptan: { label: 'Toptan alım', lock: 'jeton' },
   bozdurma: { label: 'Elmas bozdurma', lock: 'jeton' },
   cevir: { label: 'Elmastan çevrildi', lock: 'jeton' },
+  // Daily check-in, tasks, İlk adımlar: spent only in the shop (spendCoins `use`), so never gifted.
+  odul: { label: 'Ödül jetonu', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */
@@ -103,12 +105,32 @@ export async function creditCoins(c, userId, portions, reason, ref, counterparty
   return lots;
 }
 
+/** The account's coins without its reward coins ('odul'): what may pay for anything outside the shop. */
+export async function paidCoins(c, userId) {
+  const r = await c.query(
+    `SELECT u.coins - coalesce((SELECT sum(remaining) FROM coin_lots WHERE user_id = u.id AND channel = 'odul' AND remaining > 0), 0) AS n FROM users u WHERE u.id = $1`,
+    [userId],
+  );
+  return Number(r.rows[0].n);
+}
+
 /**
  * Spends coins from the account's open lots and writes the ledger row; returns the portions used ({ lot,
  * channel, amount, lockHours }). The account row must be locked. A short balance is a 409 and changes nothing.
+ * `use`: 'paid' (the default: gifts, bonds, Jeton Noktası, the wheel) never touches reward coins; 'items' (the
+ * shop only) spends them first. The check runs before the lot-less shortfall, so reward coins can never pass as
+ * 'legacy' coins.
  */
-export async function spendCoins(c, userId, amount, reason, ref, counterparty = null, { actor = null, detail = {} } = {}) {
-  const open = await c.query(`SELECT id, channel, remaining, lock_hours FROM coin_lots WHERE user_id = $1 AND remaining > 0 ORDER BY ${SPEND_ORDER} FOR UPDATE`, [userId]);
+export async function spendCoins(c, userId, amount, reason, ref, counterparty = null, { actor = null, detail = {}, use = 'paid' } = {}) {
+  if (use === 'paid' && (await paidCoins(c, userId)) < amount) {
+    const all = Number((await c.query('SELECT coins FROM users WHERE id = $1', [userId])).rows[0].coins);
+    throw all >= amount
+      ? Object.assign(new HttpError(409, 'Ödül jetonları sadece mağazada kullanılır'), { extra: { code: 'reward_coins_only' } })
+      : Object.assign(new HttpError(409, 'Yetersiz jeton'), { extra: { code: 'insufficient' } });
+  }
+  const skip = use === 'paid' ? "AND channel <> 'odul'" : '';
+  const order = use === 'items' ? `(channel = 'odul') DESC, ${SPEND_ORDER}` : SPEND_ORDER;
+  const open = await c.query(`SELECT id, channel, remaining, lock_hours FROM coin_lots WHERE user_id = $1 AND remaining > 0 ${skip} ORDER BY ${order} FOR UPDATE`, [userId]);
   const parts = [];
   let left = amount;
   for (const l of open.rows) {

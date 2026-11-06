@@ -24,6 +24,7 @@ import { HttpError, assertClean, auth, claimRef, clientIp, db, int, move, once, 
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { recordIncome } from './agency-lib.mjs';
+import { refundItems } from './economy.mjs';
 
 const TRANSFER_MAX = 100_000_000;
 const DIAMONDS_MAX = 1_000_000_000;
@@ -145,7 +146,9 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
   }
   await c.query("UPDATE purchases SET status = 'refunded' WHERE id = $1", [id]);
   await c.query('UPDATE users SET svip_xp = greatest(0, svip_xp - $2) WHERE id = $1', [p.user_id, p.coins]);
-  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, diamonds, unrecoveredDiamonds, commissionDiamonds, source }, ip);
+  // Coins already spent on shop items can't come back as coins: the buyer's items go, others' go to staff review.
+  const { revokedItems, reviewItems } = await refundItems(c, { purchase: Number(id), buyer: p.user_id, lots: lots.map((l) => l.id), held, actor, ip });
+  await audit(c, actor, 'purchase.refund', p.user_id, { purchase: id, platform: p.platform, transaction: p.transaction_id, coins, diamonds, unrecoveredDiamonds, commissionDiamonds, revokedItems, reviewItems, source }, ip);
   return { coins, diamonds, unrecoveredDiamonds };
 }
 

@@ -75,6 +75,8 @@ export function eventsOf(r) {
     return [];
   }
 
+  // A shop buy (economy.mjs): the item is the catalog sku.
+  if (typeof d.sku === 'string') return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: d.sku }];
   if (r.reason.startsWith('Uygulama içi:')) return [{ ...base, type: 'coin_spend', user_ref: r.user_id, coins: -amount, item_ref: r.reason.slice(13).trim().slice(0, 100) }];
   if (r.reason.startsWith('İade') && d.purchase && store) return [refundOf(d.purchase, at)];
   return [];

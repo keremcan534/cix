@@ -14,6 +14,7 @@ import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
+import { looksOf, revokeAllForDelete } from './economy.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -117,9 +118,11 @@ export const socialRoutes = {
     await tx(async (c) => {
       await c.query(
         `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
-           interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, deleted_at = now() WHERE id = $1`,
+           interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}', deleted_at = now() WHERE id = $1`,
         [u.id],
       );
+      // Shop items are revoked (a special ID is free again); the rows stay as accounting records.
+      await revokeAllForDelete(c, u.id);
       if (u.phone) await c.query("DELETE FROM otp_codes WHERE channel = 'sms' AND target = $1", [u.phone]);
       await c.query("DELETE FROM otp_codes WHERE channel = 'email' AND target IN (SELECT subject FROM auth_identities WHERE user_id = $1 AND provider = 'email')", [u.id]);
       await c.query('DELETE FROM phone_claims WHERE user_id = $1', [u.id]);
@@ -153,6 +156,7 @@ export const socialRoutes = {
     const x = r.rows[0];
     return {
       user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
+      looks: (await looksOf([u.id]))[u.id] ?? null,
     };
   },
 

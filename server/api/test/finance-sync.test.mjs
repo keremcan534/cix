@@ -56,7 +56,7 @@ describe('Finans paneline aktarım', () => {
     const b = await signUp('B');
     await call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(6) }, a.session);
     await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g1', count: 1, ref: rnd(6) }, a.session);
-    await call('POST', '/api/wallet/spend', { amount: 300, reason: 'VIP 7 gün', ref: rnd(6) }, a.session);
+    assert.equal((await call('POST', '/api/shop/buy', { sku: 'fr-neon', price: 150, ref: rnd(6) }, a.session))[0], 200);
     await call('POST', '/api/wallet/purchase', { platform: 'test', productId: 'coins_1000', transactionId: `txn_${rnd(6)}` }, a.session);
     await call('POST', '/api/wallet/gift', { to: b.user.id, amount: 1500, ref: rnd(6) }, a.session);
     await h.sql.query('UPDATE diamond_locks SET unlock_at = now()');
@@ -67,7 +67,7 @@ describe('Finans paneline aktarım', () => {
     assert.ok(panel.apiKeys.has('fc_test_key'));
     const types = got.map((e) => `${e.type}:${e.campaign_ref ?? e.item_ref ?? e.gift_ref ?? ''}`);
     assert.ok(types.includes('promotion:test_yukleme'), types.join());
-    assert.ok(types.includes('coin_spend:VIP 7 gün'), types.join());
+    assert.ok(types.includes('coin_spend:fr-neon'), types.join());
     assert.ok(types.includes('promotion:test_satin_alma'), types.join());
     const gifts = got.filter((e) => e.type === 'gift');
     assert.equal(gifts.length, 2, 'hediye başına tek olay; gönderenin jeton satırı ayrıca gitmez');
@@ -93,7 +93,7 @@ describe('Finans paneline aktarım', () => {
 
     panel.down = false;
     panel.refuse = 'coin_spend';
-    await call('POST', '/api/wallet/spend', { amount: 100, reason: 'Rütbe', ref: rnd(6) }, a.session);
+    assert.equal((await call('POST', '/api/shop/buy', { sku: 'fr-neon', price: 150, ref: rnd(6) }, a.session))[0], 200);
     await until(() => of(a.user.id).some((e) => e.campaign_ref === 'test_yukleme'));
     const failed = await until(async () => (await h.sql.query("SELECT * FROM finance_sync_failed WHERE event->>'type' = 'coin_spend'")).rows[0]);
     assert.match(failed.error, /Tanımsız/);

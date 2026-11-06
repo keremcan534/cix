@@ -15,11 +15,13 @@ const topUp = async (s, amount) => {
   }
 };
 const spin = (s, tier, count, ref = rnd(8)) => call('POST', '/api/wheel/spin', { tier, count, ref }, s);
-/** A signed-up person past Cömertlik Lv.2: tops up and spends 100 coins in the store. */
+/** A signed-up person past Cömertlik Lv.2: tops up and spends 1000 coins in the shop. */
 async function player(name, coins) {
   const p = await signUp(name);
   await topUp(p.session, coins + 1000);
-  assert.equal((await call('POST', '/api/wallet/spend', { amount: 1000, reason: 'Mağaza: çerçeve', ref: rnd(6) }, p.session))[0], 200);
+  for (const [sku, price] of [['fr-silver', 800], ['en-sparkle', 200]]) {
+    assert.equal((await call('POST', '/api/shop/buy', { sku, price, ref: rnd(6) }, p.session))[0], 200);
+  }
   return p;
 }
 
@@ -157,7 +159,7 @@ describe('Rüzgâr Gülü sunucuda', () => {
     assert.equal((await me(a.session)).wealthXp, 0);
     // A real purchase of 50 coins counts.
     await topUp(a.session, 1000);
-    assert.equal((await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Mağaza: çıkartma', ref: rnd(6) }, a.session))[0], 200);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Çıkartma paketi: Eğlence', ref: rnd(6) }, a.session))[0], 200);
     assert.equal((await call('GET', '/api/wheel', null, a.session))[1].allowed, true);
     assert.equal((await me(a.session)).wealthXp, 50);
   });
@@ -167,7 +169,7 @@ describe('Rüzgâr Gülü sunucuda', () => {
     const b = await signUp('B');
     // A store purchase, then a spin with the same ref: the spin is its own request.
     const r1 = rnd(8);
-    assert.equal((await call('POST', '/api/wallet/spend', { amount: 100, reason: 'Mağaza: rozet', ref: r1 }, a.session))[0], 200);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 120, reason: 'Mağaza: Şeker', ref: r1 }, a.session))[0], 200);
     const coins0 = (await me(a.session)).coins;
     const [st1, s1] = await spin(a.session, 'kiyi', 1, r1);
     assert.equal(st1, 200, s1.error);

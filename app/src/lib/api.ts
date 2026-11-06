@@ -581,6 +581,7 @@ export type LiveKey =
   | 'notice'
   | 'min_version'
   | 'gifts_hidden'
+  | 'shop_hidden'
   | 'packs_hidden'
   | 'campaign'
   | 'exchange_usd_try'

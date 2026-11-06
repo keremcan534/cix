@@ -6,7 +6,7 @@
 //   POST /api/wallet/test-topup { amount, ref }   (test only)   → { user, replay }
 //   POST /api/wallet/gift       { to, amount, ref } (test only) → { user, replay }
 //   POST /api/wallet/exchange   { diamonds, ref, usdTry? }    → { user, replay, coins }
-//   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (in-app purchases: VIP, store items…)
+//   POST /api/wallet/spend      { amount, reason, ref }       → { user, replay }   (old apps' shop buys: economy.mjs)
 // Coin sources and diamond locks (Gelir: çekilebilir / kilitli): wallet.mjs. Jeton Noktası, refunds and the
 // audit view for disputes: jeton.mjs.
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
@@ -39,6 +39,7 @@ import { HttpError, RawText, allow, auth, claimRef, clientIp, db, env, int, migr
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
+import { economyRoutes } from './economy.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
@@ -49,7 +50,7 @@ import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
-import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendCoins, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
@@ -70,8 +71,6 @@ const TOPUP_PACKS = [1000, 5000, 10000];
 const GIFT_MAX = 1_000_000;
 /** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
 const EXCHANGE_MAX = 1_000_000_000;
-/** Largest single in-app purchase (VIP, rank, store items, game entries). */
-const SPEND_MAX = 10_000_000;
 /**
  * Web origins allowed to call this: the dev server, the GitHub Pages preview, and the exact origins in
  * ALLOWED_ORIGINS (comma separated, e.g. the product's own domain). Native apps send no Origin.
@@ -151,31 +150,6 @@ const walletRoutes = {
   },
 
   /**
-   * An in-app purchase paid with coins (VIP, rank, store items, stickers, game entries). Coins only leave the
-   * account, so this can't create value; what was bought is kept by the app for now. A short balance is a 409.
-   */
-  async 'POST /api/wallet/spend'(req) {
-    const u = await auth(req);
-    const { amount, reason, ref } = await readJson(req);
-    const n = int(amount, 1, SPEND_MAX);
-    if (!n) throw new HttpError(400, 'Geçersiz miktar');
-    const why = typeof reason === 'string' ? reason.trim().slice(0, 80) : '';
-    if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
-    const out = await once(u.id, 'coin', ref, async (c) => {
-      const row = await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id]);
-      await claimRef(c, u.id, 'coin', ref);
-      if (Number(row.rows[0].coins) < n) throw new HttpError(409, 'Yetersiz jeton');
-      await spendCoins(c, u.id, n, `Uygulama içi: ${why}`, ref);
-    });
-    // once() keys on (user, coin, ref), which gifts, bonds and Jeton Noktası share: their ref is not this spend's
-    // replay. Refused, nothing taken.
-    if (out.replay && !(await db.query("SELECT 1 FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref = $2 AND reason LIKE 'Uygulama içi:%'", [u.id, ref])).rowCount) {
-      throw new HttpError(409, 'Geçersiz istek kimliği');
-    }
-    return out;
-  },
-
-  /**
    * Gelir > Çevir: the user's own unlocked diamonds become coins at the server's rate (catalog.mjs
    * exchangeCoins), the live one from Canlı ayarlar (live-settings.mjs). The client sends the diamond amount
    * and the rate its screen showed (usdTry; old apps send none and showed the compiled rate); the coins are
@@ -219,6 +193,7 @@ const walletRoutes = {
 const routes = {
   ...walletRoutes,
   ...walletInfoRoutes,
+  ...economyRoutes,
   ...withdrawRoutes,
   ...jetonRoutes,
   ...refundSyncRoutes,

@@ -36,6 +36,8 @@ export const ROUTES = {
   // New requests only: cancelling, the list and the owner's decision stay open, so held diamonds can come back.
   'POST /api/wallet/withdraw': ['withdraw'],
   'POST /api/wheel/spin': ['games'],
+  'POST /api/shop/buy': ['shop'],
+  'POST /api/wallet/spend': ['shop'],
   'POST /api/messages': ['dm'],
   'POST /api/rooms': ['rooms'],
   // The voice token: without it nobody joins a room.

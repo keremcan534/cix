@@ -278,6 +278,27 @@ export async function claimRef(c, userId, currency, ref) {
   if (r.rowCount) throw Object.assign(new Error('replay'), { code: '23505' });
 }
 
+/**
+ * A unique conflict is a replay only when it is this request's own ref: claimRef's error (no constraint) or a
+ * unique index with a column named `ref` (the ledger's (user, currency, ref), entitlements' (user, ref),
+ * gift_events…). Any other unique index (a special ID someone else just took, agency_payouts.payment_ref, whose
+ * name also ends in _ref_key) is a real conflict, never a false success. Looked up once per index name.
+ */
+const refIndex = new Map();
+async function isReplay(e) {
+  if (!e.constraint) return true;
+  if (!refIndex.has(e.constraint)) {
+    const r = await db.query(
+      `SELECT 1 FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid
+         JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = ANY(x.indkey)
+        WHERE i.relname = $1 AND x.indisunique AND a.attname = 'ref'`,
+      [e.constraint],
+    );
+    refIndex.set(e.constraint, r.rowCount > 0);
+  }
+  return refIndex.get(e.constraint);
+}
+
 /** Runs a wallet change once per ref: a repeated ref returns the current state with replay = true. */
 export async function once(userId, currency, ref, fn) {
   if (!REF.test(ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
@@ -289,6 +310,7 @@ export async function once(userId, currency, ref, fn) {
     } catch (e) {
       // Two copies of the same request at once: the second hits the unique (user, currency, ref).
       if (e.code !== '23505') throw e;
+      if (!(await isReplay(e))) throw new HttpError(409, 'İşlem çakıştı, tekrar dene');
       replay = true;
     }
   }
