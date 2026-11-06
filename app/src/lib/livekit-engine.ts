@@ -120,7 +120,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   /** Everyone else in the room for the room screen (lib/live/room-bus). */
   const snapshot = (r: Room) => {
     if (room !== r || !s.roomId) return;
-    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking }));
+    const peers = [...r.remoteParticipants.values()].map((p) => ({ identity: p.identity, name: p.name || 'Üye', seat: parseSeat(p.attributes?.seat), speaking: p.isSpeaking, micOn: p.isMicrophoneEnabled }));
     reportPeers(s.roomId, peers, r.localParticipant.isSpeaking);
   };
   bindLink({
@@ -139,7 +139,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   function newRoom() {
     const r = new Room({ dynacast: true, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const update = () => snapshot(r);
-    [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ParticipantAttributesChanged, RoomEvent.ParticipantNameChanged, RoomEvent.ActiveSpeakersChanged, RoomEvent.Reconnected].forEach((ev) => r.on(ev, update));
+    [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ParticipantAttributesChanged, RoomEvent.ParticipantNameChanged, RoomEvent.ActiveSpeakersChanged, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.TrackPublished, RoomEvent.TrackUnpublished, RoomEvent.Reconnected].forEach((ev) => r.on(ev, update));
     r.on(RoomEvent.Reconnected, () => {
       if (seat !== null) pushSeat(r);
       tell(r, { type: 'connected' });

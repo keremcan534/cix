@@ -655,7 +655,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     staff.reload();
   });
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
-  useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
+  // Server room: who switched their own mic off, from the voice connection (drawn like my own mic-off badge).
+  const peersMicOff = useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
     onJoin: (_uid, name) => addMsg({ system: true, text: `${name} güverteye çıktı` }),
     onLeave: (_uid, name) => addMsg({ system: true, text: `${name} odadan ayrıldı` }),
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
@@ -2156,7 +2157,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         vipLevel={uid === 'me' ? vipLevel : 0}
         frameId={uid === 'me' ? equipped.frame : undefined}
         speaking={!!uid && speaking.has(uid)}
-        muted={uid === 'me' && !sending}
+        muted={uid === 'me' ? !sending : !!uid && peersMicOff.has(uid)}
         modMuted={!!uid && mutedUsers.has(uid)}
         invitee={!uid && slots[i]?.state === 'invited' && slots[i].invitee ? userById(slots[i].invitee!).name : undefined}
         similarity={uid ? simScores.get(uid) : undefined}

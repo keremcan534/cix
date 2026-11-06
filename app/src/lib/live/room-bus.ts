@@ -2,8 +2,8 @@
 // room, for the room screen. Kept apart from LiveKit itself so the room screen and the tests don't load it.
 //
 //  - peers: everyone else connected to the room's voice, with the mic they sit on (their own `seat` participant
-//    attribute: set by their phone, or by the server when the owner or an admin moves them) and whether they
-//    are talking right now;
+//    attribute: set by their phone, or by the server when the owner or an admin moves them), whether their mic
+//    is on (their LiveKit microphone track, muted when they switch it off) and whether they are talking right now;
 //  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
 //    later joiner doesn't. The phones send each other chat lines only. A gift is announced by the server after
 //    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
@@ -13,7 +13,7 @@
 //    the owner or an admin set for me (my own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
 
-export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean };
+export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
 /** What one phone may send the others. */
 export type PeerSignal = { t: 'chat'; text: string };
 /** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
@@ -50,7 +50,7 @@ export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking
     snap.roomId === roomId &&
     snap.meSpeaking === meSpeaking &&
     snap.peers.length === peers.length &&
-    snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.name === peers[i].name);
+    snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.micOn === peers[i].micOn && p.name === peers[i].name);
   if (same) return;
   // The locks belong to the room: a new list of people keeps them, another room starts without.
   snap = roomId ? { roomId, peers, meSpeaking, lockedSeats: snap.roomId === roomId ? snap.lockedSeats : [] } : EMPTY;
