@@ -151,7 +151,7 @@ describe('Başka bir işlemin ref’i hediyede ve harcamada', () => {
     const me = async (s) => (await call('GET', '/api/me', null, s))[1].user;
     assert.equal((await call('POST', '/api/wallet/test-topup', { amount: 1000, ref: rnd(6) }, a.session))[0], 200);
     const r1 = rnd(8);
-    assert.equal((await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Mağaza: çıkartma', ref: r1 }, a.session))[0], 200);
+    assert.equal((await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Çıkartma paketi: Eğlence', ref: r1 }, a.session))[0], 200);
     const [st1, g1] = await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g1', count: 1, ref: r1 }, a.session);
     assert.equal(st1, 409, JSON.stringify(g1));
     assert.equal(g1.error, 'Geçersiz istek kimliği');
@@ -166,10 +166,10 @@ describe('Başka bir işlemin ref’i hediyede ve harcamada', () => {
     const [st3, g3] = await call('POST', '/api/gifts/send', { to: b.user.id, giftId: 'g1', count: 1, ref: r2 }, a.session);
     assert.equal(st3, 200, g3.error);
     assert.equal(g3.replay, true);
-    const [st4, s4] = await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Mağaza: rozet', ref: r2 }, a.session);
+    const [st4, s4] = await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Çıkartma paketi: Eğlence', ref: r2 }, a.session);
     assert.equal(st4, 409, JSON.stringify(s4));
     assert.equal(s4.error, 'Geçersiz istek kimliği');
-    const [st5, s5] = await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Mağaza: çıkartma', ref: r1 }, a.session);
+    const [st5, s5] = await call('POST', '/api/wallet/spend', { amount: 50, reason: 'Çıkartma paketi: Eğlence', ref: r1 }, a.session);
     assert.equal(st5, 200, s5.error);
     assert.equal(s5.replay, true);
     assert.equal((await me(a.session)).coins, 940);

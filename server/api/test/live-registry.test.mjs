@@ -5,11 +5,12 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
-import { EXCHANGE, GIFTS, PACKS, WITHDRAW, exchangeCoins } from '../catalog.mjs';
+import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from '../catalog.mjs';
 import {
   DEFAULTS,
   FEATURES,
   LiveError,
+  MONEY_STOP,
   REGISTRY,
   campaignBonus,
   campaignRef,
@@ -39,6 +40,7 @@ describe('defaults are today', () => {
       min_version: null,
       campaign: null,
       gifts_hidden: [],
+      shop_hidden: [],
       packs_hidden: [],
       exchange_usd_try: EXCHANGE.usdTry,
       withdraw_max_diamonds: WITHDRAW.maxDiamonds,
@@ -63,6 +65,7 @@ describe('defaults are today', () => {
       'notice',
       'campaign',
       'gifts_hidden',
+      'shop_hidden',
       'packs_hidden',
       'exchange_usd_try',
       'withdraw_max_diamonds',
@@ -106,6 +109,21 @@ describe('validate', () => {
     assert.deepEqual(validate('packs_hidden', eight), eight);
     refused(() => validate('packs_hidden', PACKS.map((p) => p.id)), /En az bir paket/);
     refused(() => validate('packs_hidden', ['coins_1000']), /bilinmeyen/);
+    assert.deepEqual(validate('shop_hidden', ['noble-1', 'fr-neon']), ['fr-neon', 'noble-1']);
+    refused(() => validate('shop_hidden', ['fr-yok']), /bilinmeyen/);
+    assert.equal(validate('shop_hidden', [...SHOP.keys()]).length, SHOP.size);
+  });
+
+  test('the emergency stop of older admin apps (all six money features) switches Mağaza off too', () => {
+    assert.deepEqual(validate('features_off', MONEY_STOP), ['gifts', 'topup', 'exchange', 'jeton', 'games', 'withdraw', 'shop']);
+    assert.deepEqual(validate('features_off', [...MONEY_STOP, 'dm']), ['gifts', 'topup', 'exchange', 'jeton', 'games', 'dm', 'withdraw', 'shop']);
+    // Five of six: no stop, so the shop stays as chosen.
+    assert.deepEqual(validate('features_off', MONEY_STOP.slice(1)), ['topup', 'exchange', 'jeton', 'games', 'withdraw']);
+    assert.deepEqual(validate('features_off', ['shop']), ['shop']);
+    // Stored rows parse the same way, so an older stop already saved covers the shop as well.
+    assert.ok(snapshotOf([{ key: 'features_off', value: MONEY_STOP, v: 1 }], {}).featuresOff.has('shop'));
+    assert.match(impactOf('features_off', [], validate('features_off', MONEY_STOP), { raw: MONEY_STOP }), /Mağaza da kapalı kalır/);
+    assert.match(impactOf('features_off', [], ['shop'], { raw: ['shop'] }), /Mağazadan alım durur/);
   });
 
   test('notice: trimmed, at most 300, line breaks only', () => {
@@ -204,6 +222,10 @@ describe('save rules', () => {
     assert.equal(isBig('otp_global_per_hour', 300, 1000), false);
     assert.equal(isBig('otp_global_per_hour', 300, 1001), true);
     assert.equal(isBig('features_off', [], FEATURES), false);
+    const six = [...SHOP.keys()].slice(0, 6);
+    assert.equal(isBig('shop_hidden', [], six.slice(0, 5)), false);
+    assert.equal(isBig('shop_hidden', [], six), true);
+    assert.equal(isBig('shop_hidden', six.slice(0, 2), [...six, 'noble-1']), false);
     assert.equal(isBig('withdraw_max_diamonds', 5e6, 50_000), false);
   });
 
@@ -218,6 +240,8 @@ describe('save rules', () => {
     assert.match(impactOf('campaign', null, validate('campaign', camp(), { now: NOW }), { now: NOW }), /^%20 kampanya "Bayram": 100\.000 jetonluk paket alan \+20\.000 kampanya jetonu alır\./);
     assert.match(impactOf('gifts_hidden', [], ['g1']), /Gizlenir: Gül/);
     assert.match(impactOf('packs_hidden', [], ['p1']), /1\.000 jeton/);
+    assert.match(impactOf('shop_hidden', [], ['fr-neon']), /Mağazada gizlenir: Ses Dalgası/);
+    assert.match(impactOf('shop_hidden', ['fr-neon'], []), /yeniden satılır: Ses Dalgası/);
     assert.match(impactOf('otp_global_per_hour', 300, 0), /SMS ile giriş kodu gönderimi durur/);
     assert.match(impactOf('withdraw_weekly_diamonds', 1e7, 1e6, { next: { withdraw_max_diamonds: 5e6 } }), /tek talepte de en çok bu kadar istenebilir/);
     assert.match(impactOf('withdraw_max_diamonds', 5e6, 1e6, { next: { withdraw_weekly_diamonds: 6e5 } }), /tek talepte en çok 600\.000 💎 istenebilir/);

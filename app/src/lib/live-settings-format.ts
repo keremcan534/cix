@@ -68,7 +68,8 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
   switch (key) {
     case 'campaign':
       return !!after && typeof after === 'object' && !Array.isArray(after) && after.percent > 25;
-    case 'gifts_hidden': {
+    case 'gifts_hidden':
+    case 'shop_hidden': {
       if (!Array.isArray(after)) return false;
       const was = Array.isArray(before) ? before : [];
       return after.filter((x) => !was.includes(x)).length > 5;
@@ -95,16 +96,20 @@ export const FEATURE_LABEL: Record<string, string> = {
   dm: 'Mesajlar',
   rooms: 'Odalar',
   withdraw: 'Para çekme',
+  shop: 'Mağaza',
 };
-/** 'Para işlemlerini durdur': every money flow but purchases (paid purchases would wait, and Google refunds after 3 days). */
-export const MONEY_STOP = ['gifts', 'topup', 'exchange', 'jeton', 'withdraw', 'games'];
+/**
+ * 'Para işlemlerini durdur': every money flow but purchases (paid purchases would wait, and Google refunds after 3
+ * days). The server also turns Mağaza off when an older admin build sends only the first six.
+ */
+export const MONEY_STOP = ['gifts', 'topup', 'exchange', 'jeton', 'withdraw', 'games', 'shop'];
 export const PURCHASE_WARNING = 'Ödemesi alınmış satın almalar açınca tekrar denenir; 3 günden uzun kapalı kalırsa Google parayı iade eder.';
 
 const some = (xs: string[]) => (xs.length > 4 ? `${xs.slice(0, 4).join(', ')} ve ${xs.length - 4} tane daha` : xs.join(', '));
 const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const isCampaign = (v: LiveValue): v is CatalogCampaign => !!v && typeof v === 'object' && !Array.isArray(v);
 
-export type Names = { gift?: (id: string) => string; pack?: (id: string) => string };
+export type Names = { gift?: (id: string) => string; pack?: (id: string) => string; shop?: (sku: string) => string };
 
 /**
  * A value as the admin reads it. `stored`: a saved value from the history, where null is "Varsayılan"; otherwise
@@ -131,6 +136,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return Array.isArray(v) && v.length ? `Gizli: ${some(v.map((id) => names.gift?.(id) ?? id))}` : 'Hepsi görünür';
     case 'packs_hidden':
       return Array.isArray(v) && v.length ? `Gizli: ${some(v.map((id) => names.pack?.(id) ?? id))}` : 'Hepsi görünür';
+    case 'shop_hidden':
+      return Array.isArray(v) && v.length ? `Gizli: ${some(v.map((sku) => names.shop?.(sku) ?? sku))}` : 'Hepsi görünür';
     case 'exchange_usd_try':
       return typeof v === 'number' ? `1 USD = ${fmtRate(v)} TL` : String(v);
     case 'withdraw_max_diamonds':

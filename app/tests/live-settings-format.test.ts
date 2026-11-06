@@ -57,6 +57,7 @@ const camp = (percent: number) => ({ percent, startsAt: new Date(NOW).toISOStrin
 describe('the second confirmation', () => {
   test('matches the server big() for every key', () => {
     const gifts = registry.REGISTRY.gifts_hidden.bounds.options as string[];
+    const skus = registry.REGISTRY.shop_hidden.bounds.options as string[];
     const cases: [LiveKey, LiveValue, LiveValue][] = [];
     for (const r of [40, 45, 48.35, 49.8, 51.29, 51.3, 51.5, 54.78, 60, 75]) for (const b of [40, 49.8, 50, 66.6, 75]) cases.push(['exchange_usd_try', b, r]);
     cases.push(['exchange_usd_try', 49.8, null], ['exchange_usd_try', 58, null]);
@@ -64,6 +65,8 @@ describe('the second confirmation', () => {
       cases.push(['gifts_hidden', [], n ? gifts.slice(0, n) : null]);
       cases.push(['gifts_hidden', gifts.slice(0, 3), gifts.slice(0, 3 + n)]);
       cases.push(['gifts_hidden', gifts.slice(0, 6), gifts.slice(2, 2 + n)]);
+      cases.push(['shop_hidden', [], n ? skus.slice(0, n) : null]);
+      cases.push(['shop_hidden', skus.slice(0, 3), skus.slice(0, 3 + n)]);
     }
     for (const p of [5, 20, 25, 30, 50]) cases.push(['campaign', null, camp(p)], ['campaign', camp(40), camp(p)]);
     cases.push(['campaign', camp(40), null], ['campaign', null, null]);

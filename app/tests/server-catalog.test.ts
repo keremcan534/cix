@@ -6,20 +6,36 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { ANIMATION_SEED } from '@/data/animations';
+import { COSMETICS, STICKER_PACKS } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
-import { RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
+import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
 
 type ServerGift = { id: string; name: string; price: number; cat: string; minSvip: number };
 type ServerPack = { id: string; productId: string; coins: number; firstBonus: number };
+type ServerShopItem = { sku: string; kind: string; name: string; price: number; days: number | null; minVip: number };
 
 describe('Sunucu kataloğu uygulamayla aynı', () => {
   test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {
     const app = GIFTS.map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
     assert.deepEqual([...(server.GIFTS as Map<string, ServerGift>).values()], app);
+  });
+
+  test('mağaza: her ürünün adı, fiyatı, süresi ve VIP sınırı', () => {
+    const app = [
+      ...COSMETICS.map((c) => [c.id, c.kind, c.name, c.price, c.days, c.minVip ?? 0]),
+      ...STICKER_PACKS.filter((p) => p.price > 0).map((p) => [`pack-${p.id}`, 'sticker', p.name, p.price, null, p.minVip ?? 0]),
+      ...ANIMATION_SEED.filter((a) => a.display_type === 'mic_effect' && !a.is_free).map((a) => [a.animation_id, 'micfx', a.name, a.coin_price, null, 0]),
+      ...NOBLE_TIERS.map((t) => [`noble-${t.tier}`, 'noble', t.name, t.price, NOBLE_DAYS, 0]),
+    ];
+    const shop = [...(server.SHOP as Map<string, ServerShopItem>).values()].map((x) => [x.sku, x.kind, x.name, x.price, x.days, x.minVip]);
+    assert.deepEqual(shop, app);
+    const free = ANIMATION_SEED.filter((a) => a.display_type === 'mic_effect' && a.is_free).map((a) => a.animation_id);
+    assert.deepEqual(server.FREE_MICFX, free);
   });
 
   test('hediye adetleri (hediye paneli)', () => {

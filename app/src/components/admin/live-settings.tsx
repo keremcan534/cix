@@ -162,7 +162,8 @@ function Body({
   const locked = view.safeMode;
   const byKey = useMemo(() => new Map(view.settings.map((x) => [x.key, x])), [view]);
   const packLabels = (byKey.get('packs_hidden')?.bounds.labels ?? {}) as Record<string, string>;
-  const names: Names = { gift: (id) => GIFT_BY_ID.get(id)?.name ?? id, pack: (id) => packLabels[id] ?? id };
+  const shopLabels = (byKey.get('shop_hidden')?.bounds.labels ?? {}) as Record<string, string>;
+  const names: Names = { gift: (id) => GIFT_BY_ID.get(id)?.name ?? id, pack: (id) => packLabels[id] ?? id, shop: (sku) => shopLabels[sku] ?? sku };
   const serverNow = Date.parse((view as { serverNow?: string }).serverNow ?? '');
   const [skew] = useState(() => (Number.isFinite(serverNow) ? serverNow - Date.now() : 0));
   const kit: Kit = {

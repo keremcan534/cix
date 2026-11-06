@@ -18,7 +18,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | 4 | **Expo hesabı** (EAS) | Mağaza derlemesi, gerçek imza, telefonda gerçek ses için development build, push bildirimleri, uzaktan güncelleme. Ücretsiz planla başlanabilir. | ⛔ |
 | 5 | **SMS sağlayıcısı** hesabı ve API anahtarı (Netgsm veya Twilio; sunucu ikisini de tanıyor) | Telefonla giriş. Sunucudaki kod gönderme ve doğrulama hazır; anahtar `.env`'e girince gerçek SMS gider. Uygulama hâlâ demo girişte her 6 haneli kodu kabul ediyor (bağlantı adımına kadar). | ⛔ |
 | 6 | **Dosya depolama** (Cloudflare R2 önerilir: ücretsiz 10 GB, çıkış trafiği ücretsiz) | Profil fotoğrafı, anlar, yedeklerin sunucu dışına kopyası. Sunucudaki yükleme adresi ve yedek kopyalama hazır; anahtar bekliyor. | ⛔ |
-| 7 | **Yasal metinler:** gizlilik politikası, kullanım koşulları (EULA), KVKK aydınlatma metni, selfie için açık rıza, VERBİS kaydı | Mağazalar zorunlu tutuyor; şu an uygulamada yer tutucu metin var. Metinleri bir hukukçu yazmalı; biz sayfaları ve onay adımını bağlarız. | ⛔ |
+| 7 | **Yasal metinler:** gizlilik politikası (UK GDPR), kullanım koşulları (EULA), selfie için açık rıza | Mağazalar zorunlu tutuyor; şu an uygulamada yer tutucu metin var. Metinleri bir hukukçu yazmalı; biz sayfaları ve onay adımını bağlarız. | ⛔ |
 | 8 | **Jeton paketleri ve fiyat basamakları** (mağaza ürünleri) | Uygulama içi satın almada her paket bir mağaza ürünü olur; fiyatı mağaza basamaklarından seçilir. | ⛔ |
 | 9 | **GitHub'a sunucu anahtarı:** Settings → Secrets → `DEPLOY_SSH_KEY` = `~/.ssh/oracle.key` içeriği | Sunucu kodu ana dala girince otomatik kurulsun diye. Eklenmezse sunucuyu elle güncellemek gerekir (`docs/SUNUCU.md`). | ⛔ |
 | 10 | **Rastgele görüntülü eşleşme** kapsamı | Apple "rastgele görüntülü sohbet" uygulamalarına ek moderasyon şartı koyuyor. | ⛔ |
@@ -72,7 +72,7 @@ Bunlar olmadan ilgili mühendislik işi bitemez. Sıra, yayına etkisine göre.
 | | Durum |
 |---|---|
 | Yaş derecesi anketleri (IARC, Apple): 18+, kullanıcı içeriği, varsa simüle şans oyunu | ⏳ |
-| Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, e-posta adresi (giriş; Brevo, Resend ve WhatsApp açılırsa Meta veri işleyen olarak gizlilik politikasında), ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar | ⏳ |
+| Veri güvenliği formu (Play) ve gizlilik etiketleri (Apple): telefon, e-posta adresi (giriş; Brevo, Resend ve WhatsApp açılırsa Meta veri işleyen olarak gizlilik politikasında), ad, doğum tarihi, şehir, fotoğraf/selfie, ses, mesajlar, satın almalar (mağaza ürünleri dahil; giyilen çerçeve, efekt ve özel numarayı başkaları görür) | ⏳ |
 | Uygulama içi hesap silme | ✅ sunucu · ⏳ uygulama bağlantısı |
 | Web'den hesap silme bağlantısı (Play şartı) | ⏳ alan adıyla |
 | İncelemeci hesabı, inceleme notları, ekran görüntüleri | ⏳ |

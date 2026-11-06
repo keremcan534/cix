@@ -112,3 +112,68 @@ export const diamondValueUsd = (diamonds) => Math.floor((diamonds / EXCHANGE.dia
 /** SVIP level n needs SVIP_XP[n - 1] points (1 purchased coin = 1 point). */
 export const SVIP_XP = [500_000, 1_250_000, 2_500_000, 4_000_000, 7_500_000, 15_000_000, 40_000_000, 100_000_000, 210_000_000, 400_000_000];
 export const svipLevel = (xp) => SVIP_XP.filter((t) => xp >= t).length;
+
+// --- Mağaza (economy.mjs): what the shop sells, in step with the app (app/src/data/catalog.ts COSMETICS and
+// STICKER_PACKS, data/animations.ts mic effects, data/status.ts NOBLE_TIERS); tests/server-catalog.test.ts
+// fails when they drift. Sticker packs are 'pack-<id>'. Prices and durations change only with a deploy.
+/** [sku, kind, name, price in coins, days (null: permanent), minimum VIP level] */
+const SHOP_ROWS = [
+  ['fr-neon', 'frame', 'Ses Dalgası', 150, 7, 0],
+  ['fr-ocean', 'frame', 'Yörünge', 300, 30, 0],
+  ['fr-aurora', 'frame', 'Aurora', 600, 30, 0],
+  ['fr-fire', 'frame', 'Ateş', 900, 30, 0],
+  ['fr-gold', 'frame', 'Altın Taç', 2_500, null, 4],
+  ['fr-silver', 'frame', 'Gümüş Kristal', 800, 30, 0],
+  ['fr-frost', 'frame', 'Buz Kristali', 1_200, 30, 0],
+  ['fr-rose', 'frame', 'Gül Kalpler', 1_200, 30, 0],
+  ['fr-laurel', 'frame', 'Altın Defne', 2_000, 30, 0],
+  ['fr-crown-silver', 'frame', 'Gümüş Taç', 4_000, 30, 2],
+  ['fr-crown-gold', 'frame', 'Kraliyet Kanatları', 9_000, null, 4],
+  ['fr-wing-coral', 'frame', 'Melek Kalp · Mercan', 3_000, 30, 0],
+  ['fr-wing-sky', 'frame', 'Melek Kalp · Turkuaz', 3_000, 30, 0],
+  ['en-sparkle', 'entry', 'Işıltı', 200, 7, 0],
+  ['en-thunder', 'entry', 'Şimşek', 600, 30, 0],
+  ['en-comet', 'entry', 'Kuyruklu Yıldız', 1_200, 30, 0],
+  ['en-dragon', 'entry', 'Ejderha', 3_000, 30, 7],
+  ['rd-scooter', 'ride', 'Scooter', 250, 7, 0],
+  ['rd-sport', 'ride', 'Spor Araba', 1_200, 30, 0],
+  ['rd-jet', 'ride', 'Özel Jet', 5_000, 30, 9],
+  ['bb-candy', 'bubble', 'Şeker', 120, 7, 0],
+  ['bb-galaxy', 'bubble', 'Galaksi', 450, 30, 0],
+  ['bb-gold', 'bubble', 'Altın', 1_500, null, 5],
+  ['id-777', 'specialId', 'ID 777', 8_000, null, 0],
+  ['id-2026', 'specialId', 'ID 2026', 3_000, null, 0],
+  ['id-1001', 'specialId', 'ID 1001', 2_000, null, 0],
+  ['pack-fun', 'sticker', 'Eğlence', 50, null, 0],
+  ['pack-love', 'sticker', 'Aşk', 80, null, 0],
+  ['pack-animals', 'sticker', 'Hayvanlar', 60, null, 0],
+  ['pack-anim', 'sticker', 'Animasyonlu', 150, null, 0],
+  ['an-mic-neon', 'micfx', 'Neon Halka', 500, null, 0],
+  ['an-mic-stars', 'micfx', 'Dönen Yıldızlar', 800, null, 0],
+  ['an-mic-notes', 'micfx', 'Müzik Notaları', 600, null, 0],
+  ['noble-1', 'noble', 'Gemici', 15_000, 30, 0],
+  ['noble-2', 'noble', 'Dümenci', 60_000, 30, 0],
+  ['noble-3', 'noble', 'Lostromo', 150_000, 30, 0],
+  ['noble-4', 'noble', 'Amiral', 400_000, 30, 0],
+  ['noble-5', 'noble', 'Kaptan-ı Derya', 1_000_000, 30, 0],
+];
+export const SHOP = new Map(
+  SHOP_ROWS.map(([sku, kind, name, price, days, minVip]) => [sku, Object.freeze({ sku, kind, name, price, days, minVip, tier: kind === 'noble' ? Number(sku.slice(6)) : null })]),
+);
+/** What a person wears, one each (users.equipped). Sticker packs and noble rank are owned, not worn. */
+export const SLOTS = ['frame', 'entry', 'ride', 'bubble', 'specialId', 'micfx'];
+/** One of a kind: bought coins only, never reward coins. */
+export const PAID_ONLY = ['specialId'];
+/** Mic effects anyone may wear without buying. */
+export const FREE_MICFX = ['an-mic-wave'];
+/** A timed term may not end further ahead than this. */
+export const MAX_AHEAD_DAYS = 365;
+/** VIP level as the app shows it (store.tsx): the higher of the SVIP level and three per noble tier, at most 15. */
+export const vipLevelOf = (svipXp, nobleTier) => Math.min(15, Math.max(svipLevel(Number(svipXp) || 0), (nobleTier ?? 0) * 3));
+/** The history line of a shop charge. Never 'Uygulama içi:' (the old apps' free-text spends). */
+export function labelOf(item) {
+  if (item.kind === 'sticker') return `Çıkartma paketi: ${item.name}`;
+  if (item.kind === 'micfx') return `Mikrofon efekti: ${item.name}`;
+  if (item.kind === 'noble') return `Rütbe: ${item.name} (${item.days} gün)`;
+  return `Mağaza: ${item.name}${item.days ? ` (${item.days} gün)` : ''}`;
+}

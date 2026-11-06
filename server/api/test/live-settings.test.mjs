@@ -100,7 +100,7 @@ describe('nothing saved', () => {
     assert.deepEqual(j.env, { featuresOff: ['dm'], notice: null, minVersion: null });
     assert.deepEqual(
       j.settings.map((x) => x.key),
-      ['features_off', 'notice', 'campaign', 'gifts_hidden', 'packs_hidden', 'exchange_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
+      ['features_off', 'notice', 'campaign', 'gifts_hidden', 'shop_hidden', 'packs_hidden', 'exchange_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
     );
     const by = Object.fromEntries(j.settings.map((x) => [x.key, x]));
     for (const x of j.settings) {
@@ -218,7 +218,7 @@ describe('saving', () => {
 
     // Everything off: the owner can still look, save and undo.
     ok(await save(B.session, { features_off: FEATURES }));
-    assert.deepEqual((await config()).featuresOff, ['dm', 'gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'rooms', 'withdraw']);
+    assert.deepEqual((await config()).featuresOff, ['dm', 'gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'rooms', 'withdraw', 'shop']);
     assert.equal((await call('POST', '/api/rooms', { title: 'Oda' }, a.session))[0], 503);
     ok(await call('GET', HISTORY, null, B.session));
     ok(await save(B.session, { features_off: null }));
