@@ -15,7 +15,7 @@
 // Staff (permissions below; users.role admin holds all, moderator a default set, admin_permissions adds more):
 //   GET  /api/admin/sanctions/meta                         → { reasons, types, presets, policies, perms }
 //   GET  /api/admin/sanctions/search?q=                    → { users }   (id, name, phone, device id #, sanction id #)
-//   GET  /api/admin/sanctions/user?id=                     → { user, sanctions, devices, appeals, audit }
+//   GET  /api/admin/sanctions/user?id=                     → { user, sanctions, devices, appeals, audit, contactRefusals }
 //   GET  /api/admin/sanctions/pending                      → { sanctions }   (waiting for approval)
 //   POST /api/admin/sanctions        { user, type, reason, minutes|null, description?, note?, roomId?,
 //                                      includeDm?, includeCalls?, deviceIds?, evidence?, usePolicy?, reportId? } → { sanctions }
@@ -551,6 +551,27 @@ async function staffTarget(me, uid) {
   return t;
 }
 
+/**
+ * How often the contact filter refused this person's text (contact-filter.mjs, kept 180 days): counts by kind
+ * and by place, for staff to judge. The texts themselves were never stored. Not a sanction by itself.
+ */
+async function contactRefusals(uid) {
+  const r = await db.query(
+    `SELECT category, place, count(*)::int AS n, count(*) FILTER (WHERE created_at > now() - interval '7 days')::int AS recent, max(created_at) AS last_at
+       FROM contact_refusals WHERE user_id = $1 GROUP BY category, place`,
+    [uid],
+  );
+  const out = { total: 0, last7Days: 0, byCategory: {}, byPlace: {}, lastAt: null };
+  for (const x of r.rows) {
+    out.total += x.n;
+    out.last7Days += x.recent;
+    out.byCategory[x.category] = (out.byCategory[x.category] ?? 0) + x.n;
+    out.byPlace[x.place] = (out.byPlace[x.place] ?? 0) + x.n;
+    if (!out.lastAt || x.last_at > out.lastAt) out.lastAt = x.last_at;
+  }
+  return out;
+}
+
 export const sanctionRoutes = {
   // --- Staff --------------------------------------------------------------------------------------------------
   async 'GET /api/admin/sanctions/meta'(req) {
@@ -620,6 +641,7 @@ export const sanctionRoutes = {
     const log = await db.query('SELECT l.*, u.name AS actor_name FROM sanction_audit_logs l LEFT JOIN users u ON u.id = l.actor WHERE l.target_user = $1 ORDER BY l.id DESC LIMIT 200', [uid]);
     return {
       user: { id: u.id, name: u.name, phone: u.phone, role: u.role, createdAt: u.created_at, deleted: !!u.deleted_at },
+      contactRefusals: await contactRefusals(uid),
       sanctions: await Promise.all(s.rows.map(staffView)),
       deviceSanctions: await Promise.all(onDevices.rows.map(staffView)),
       devices: devices.rows.map(deviceView),

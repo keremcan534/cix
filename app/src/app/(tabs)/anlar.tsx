@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
+import { ContactNote } from '@/components/contact-note';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
 import {
@@ -24,6 +25,7 @@ import {
   type MomentComment,
 } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
+import { contactRefusal } from '@/lib/contact-filter';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -302,6 +304,12 @@ function MomentCard({
 
 function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () => void; onPost: (text: string, image: string | undefined, topicId: string | undefined) => void }) {
   const [draft, setDraft] = useState('');
+  // Why the text was not shared (contact details, lib/contact-filter); cleared as soon as it changes.
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string) => {
+    setDraft(next);
+    setRefused(null);
+  };
   const [image, setImage] = useState<string | undefined>();
   const [topicId, setTopicId] = useState<string | undefined>();
   const { colors } = useTheme();
@@ -314,6 +322,8 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
 
   const submit = () => {
     if (!draft.trim() && !image) return showAlert('Boş an paylaşılamaz', 'Bir şeyler yaz ya da fotoğraf ekle.');
+    const refusal = contactRefusal(draft.trim(), 'moment.post');
+    if (refusal) return setRefused(refusal);
     onPost(draft.trim(), image, topicId);
     setDraft('');
     setImage(undefined);
@@ -328,13 +338,15 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
           <Text style={styles.sheetTitle}>Yeni an paylaş</Text>
           <TextInput
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={edit}
             placeholder="Neler oluyor?"
             placeholderTextColor={colors.textDim}
             multiline
+            maxLength={1000}
             style={styles.composeInput}
             autoFocus
           />
+          <ContactNote text={refused} style={styles.contactNote} />
           {image && (
             <View style={{ alignSelf: 'flex-start' }}>
               <Image source={{ uri: image }} style={styles.preview} />
@@ -382,11 +394,20 @@ function CommentsSheet({
   onSend: (text: string) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string) => {
+    setDraft(next);
+    setRefused(null);
+  };
   const { colors } = useTheme();
   const styles = useStyles();
   const send = () => {
-    if (!draft.trim()) return;
-    onSend(draft.trim());
+    const text = draft.trim();
+    if (!text) return;
+    // Contact details are refused, not masked: the comment stays in the input.
+    const refusal = contactRefusal(text, 'moment.comment');
+    if (refusal) return setRefused(refusal);
+    onSend(text);
     setDraft('');
   };
 
@@ -421,12 +442,14 @@ function CommentsSheet({
               );
             })}
           </ScrollView>
+          <ContactNote text={refused} style={styles.contactNote} />
           <View style={styles.commentInputRow}>
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={edit}
               placeholder="Yorum yaz…"
               placeholderTextColor={colors.textDim}
+              maxLength={300}
               style={styles.commentInput}
               onSubmitEditing={send}
               returnKeyType="send"
@@ -501,6 +524,8 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },
+  // The contact note sits inside the sheet's own padding.
+  contactNote: { marginHorizontal: 0, marginBottom: 0 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 999, paddingLeft: 14, paddingRight: 4, paddingVertical: 4 },
   commentInput: { flex: 1, color: colors.text, fontSize: 14, paddingVertical: 8 },
   sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },

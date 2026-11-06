@@ -33,6 +33,7 @@ import {
 import { userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
@@ -500,6 +501,9 @@ export function RoomInfoSheet({
           style={[styles.bigBtn, { backgroundColor: colors.primary, flex: 0 }]}
           onPress={() => {
             if (sub === 'title' && draft.trim().length < 3) return showAlert('Oda adı en az 3 karakter olmalı');
+            // Contact details never go on the room (lib/contact-filter): the sheet stays open with the text in it.
+            const refusal = contactRefusal(draft.trim(), sub === 'title' ? 'room.title' : 'room.announcement');
+            if (refusal) return showAlert(CONTACT_TITLE, refusal);
             onSave(sub === 'title' ? { title: draft.trim() } : { announcement: draft.trim() });
             setSub(null);
           }}>

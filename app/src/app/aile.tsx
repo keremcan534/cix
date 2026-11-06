@@ -36,6 +36,7 @@ import { presenceLabel, presenceOf } from '@/data/presence';
 import { FAMILY_PERKS, FAMILY_XP, RULES, familyBonus, familyCapacity, familyLevel, pct } from '@/data/rules';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { youLabel } from '@/lib/tr';
 import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
@@ -86,6 +87,9 @@ export default function FamilyScreen() {
               title="Kur"
               onPress={() => {
                 if (newName.trim().length < 3) return showAlert('Tayfa adı en az 3 karakter olmalı');
+                // Checked before the coins are spent; the name stays in the input.
+                const refusal = contactRefusal(newName.trim(), 'tayfa.name');
+                if (refusal) return showAlert(CONTACT_TITLE, refusal);
                 if (!spendCoins(CREATE_COST)) return showAlert('Yetersiz jeton', `Tayfa kurmak ${CREATE_COST} jeton.`);
                 const id = `custom-${Date.now()}`;
                 registerKabile({ id, name: newName.trim(), emoji: '🏰', xp: 0, weekly: 0, members: 1, leaderId: 'me', memberIds: ['me'] });
@@ -316,6 +320,9 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <Pressable
                   style={[styles.small, { backgroundColor: colors.primary }]}
                   onPress={() => {
+                    // Contact details never go on the announcement: the editor stays open with the text in it.
+                    const refusal = contactRefusal(annDraft.trim(), 'tayfa.announcement');
+                    if (refusal) return showAlert(CONTACT_TITLE, refusal);
                     if (annDraft.trim()) setAnnouncement(annDraft.trim());
                     setAnnDraft(null);
                   }}>

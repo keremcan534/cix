@@ -9,9 +9,11 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
+import { ContactNote } from '@/components/contact-note';
 import { DepthCard } from '@/components/fx/surface';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
+import { contactRefusal } from '@/lib/contact-filter';
 import { fmtD, fmtPct, fmtScore, fmtUsd, usdOf, type Loaded, type Tier } from '@/lib/agency-net';
 import { colors, fonts, radius, semantic, space } from '@/theme';
 
@@ -299,7 +301,21 @@ export function Line({ label, value, strong }: { label: string; value: string; s
 }
 
 // --- Reason sheet ---------------------------------------------------------------------------------------------
-export type Ask = { title: string; message?: string; placeholder?: string; reasonLabel?: string; confirm?: string; danger?: boolean; min?: number; field?: { label: string; placeholder?: string; keyboard?: 'default' | 'numeric' | 'decimal-pad'; caps?: boolean } };
+export type Ask = {
+  title: string;
+  message?: string;
+  placeholder?: string;
+  reasonLabel?: string;
+  confirm?: string;
+  danger?: boolean;
+  min?: number;
+  field?: { label: string; placeholder?: string; keyboard?: 'default' | 'numeric' | 'decimal-pad'; caps?: boolean };
+  /**
+   * Set when another member or agency reads the reason (e.g. 'agency.invite'): contact details in it are refused
+   * on the sheet (lib/contact-filter), which stays open with the text. Left out for staff tools and appeals.
+   */
+  place?: string;
+};
 type AskResult = { reason: string; field: string };
 
 /** A sheet that collects a written reason (and one extra field when needed); returns null when cancelled. */
@@ -307,15 +323,26 @@ export function useAsk(): [ReactNode, (a: Ask) => Promise<AskResult | null>] {
   const [ask, setAsk] = useState<(Ask & { resolve: (v: AskResult | null) => void }) | null>(null);
   const [reason, setReason] = useState('');
   const [field, setField] = useState('');
+  const [refused, setRefused] = useState<string | null>(null);
+  const editReason = (t: string) => {
+    setReason(t);
+    setRefused(null);
+  };
   const open = (a: Ask) =>
     new Promise<AskResult | null>((resolve) => {
       setReason('');
       setField('');
+      setRefused(null);
       setAsk({ ...a, resolve });
     });
   const close = (v: AskResult | null) => {
     ask?.resolve(v);
     setAsk(null);
+  };
+  const confirm = () => {
+    const refusal = ask?.place ? contactRefusal(reason.trim(), ask.place) : null;
+    if (refusal) return setRefused(refusal);
+    close({ reason: reason.trim(), field: field.trim() });
   };
   const min = ask?.min ?? 3;
   const ok = reason.trim().length >= min && (!ask?.field || field.trim().length > 0);
@@ -334,12 +361,13 @@ export function useAsk(): [ReactNode, (a: Ask) => Promise<AskResult | null>] {
           )}
           <View style={{ gap: 6 }}>
             <Text style={s.fieldLabel}>{ask?.reasonLabel ?? 'Gerekçe'}</Text>
-            <TextInput value={reason} onChangeText={setReason} placeholder={ask?.placeholder ?? 'Kısa bir açıklama yaz'} placeholderTextColor={colors.textDim} multiline maxLength={300} style={[s.input, { minHeight: 84, textAlignVertical: 'top' }]} />
+            <TextInput value={reason} onChangeText={editReason} placeholder={ask?.placeholder ?? 'Kısa bir açıklama yaz'} placeholderTextColor={colors.textDim} multiline maxLength={300} style={[s.input, { minHeight: 84, textAlignVertical: 'top' }]} />
             <Text style={s.foot}>Kayda geçer ve denetim geçmişinde görünür.</Text>
+            <ContactNote text={refused} style={{ marginHorizontal: 0, marginBottom: 0 }} />
           </View>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Button title="Vazgeç" variant="ghost" onPress={() => close(null)} style={{ flex: 1 }} />
-            <Button title={ask?.confirm ?? 'Gönder'} variant={ask?.danger ? 'danger' : 'hero'} disabled={!ok} onPress={() => close({ reason: reason.trim(), field: field.trim() })} style={{ flex: 1 }} />
+            <Button title={ask?.confirm ?? 'Gönder'} variant={ask?.danger ? 'danger' : 'hero'} disabled={!ok} onPress={confirm} style={{ flex: 1 }} />
           </View>
         </DepthCard>
       </KeyboardAvoid>

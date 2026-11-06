@@ -38,7 +38,7 @@ import { goBack } from '@/lib/nav';
 import { successHaptic } from '@/lib/haptics';
 import { checkInteraction, type Action } from '@/lib/interaction';
 import { shareLink } from '@/lib/links';
-import { LIMITS, ageFrom, formatTrDate, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
+import { LIMITS, ageFrom, formatTrDate, noteProfileRefusal, parseTrDate, validateProfile, type ProfileErrors } from '@/lib/profile-rules';
 import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
 import { AffiliationPills, GenderChip, useAffiliations, type Affiliation } from '@/components/profile-badges';
@@ -1108,9 +1108,12 @@ function EditSheet({ user, onSave, onClose, onPhoto }: { user: User; onSave: (pa
 
   const save = () => {
     // Same rules the server applies; nothing is saved while any field is invalid.
-    const e = validateProfile({ name, username, bio, city, birth });
+    const draft = { name, username, bio, city, birth };
+    const e = validateProfile(draft);
     setErrors(e);
-    if (Object.keys(e).length) return showAlert('Profil kaydedilemedi', Object.values(e).join('\n'));
+    noteProfileRefusal(draft, e);
+    // The contact note can come from several fields; it is said once.
+    if (Object.keys(e).length) return showAlert('Profil kaydedilemedi', [...new Set(Object.values(e))].join('\n'));
     const birthDate = parseTrDate(birth)!;
     onSave({
       name: name.trim(),

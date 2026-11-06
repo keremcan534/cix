@@ -26,7 +26,8 @@
 // Google account to it the first time, so testers keep their balance.
 import crypto from 'node:crypto';
 
-import { HttpError, auth, bannedError, clientIp, db, env, liveBan, newSession, readJson, selfUser, sha, tx } from './core.mjs';
+import { checkText } from './contact-filter.mjs';
+import { HttpError, auth, bannedError, clientIp, countRefusal, db, env, liveBan, newSession, readJson, selfUser, sha, tx } from './core.mjs';
 import { googleClientIds, verifyGoogleIdToken } from './google.mjs';
 import { audit, deviceSignals, linkDevice, registerDevice } from './sanctions.mjs';
 import { sendCode, smsProvider } from './sms.mjs';
@@ -59,7 +60,17 @@ export function normalizePhone(v) {
 
 const same = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const codeHash = (phone, code) => sha(`otp:${phone}:${code}`);
-const cleanName = (v) => (typeof v === 'string' ? v.trim().slice(0, 40) : '');
+/**
+ * The name a new account starts with, at most 40 characters. One that shares contact details
+ * (contact-filter.mjs) is dropped rather than failing the sign-in: the account starts as 'Yeni üye' and the
+ * refusal is counted once the account exists (`refused` is its category).
+ */
+function cleanName(v) {
+  const name = typeof v === 'string' ? v.trim().slice(0, 40) : '';
+  const r = checkText(name);
+  return r.ok ? { name, refused: null } : { name: '', refused: r.category };
+}
+const countNameRefusal = (n, u) => (n.refused ? countRefusal(u.id, n.refused, 'signin.name') : undefined);
 
 /**
  * The device a sign-in comes from (deviceInfo, or the old deviceKey), recorded before any account is found or
@@ -143,7 +154,9 @@ async function accountFor(phone, name, deviceKey) {
     if (r.rowCount) return { u: r.rows[0], isNew: false };
   }
   try {
-    const r = await db.query('INSERT INTO users (name, phone) VALUES ($1, $2) RETURNING *', [cleanName(name) || 'Yeni üye', phone]);
+    const n = cleanName(name);
+    const r = await db.query('INSERT INTO users (name, phone) VALUES ($1, $2) RETURNING *', [n.name || 'Yeni üye', phone]);
+    await countNameRefusal(n, r.rows[0]);
     return { u: r.rows[0], isNew: true };
   } catch (e) {
     // The same number verified twice at once: the other request created it.
@@ -161,8 +174,9 @@ async function accountForGoogle(g, deviceKey, retried = false) {
     await db.query("UPDATE auth_identities SET last_used_at = now(), email = coalesce($2, email) WHERE provider = 'google' AND subject = $1", [g.sub, g.email]);
     return { u: found, isNew: false };
   }
+  const n = cleanName(g.givenName || g.name);
   try {
-    return await tx(async (c) => {
+    const out = await tx(async (c) => {
       const link = "INSERT INTO auth_identities (provider, subject, user_id, email) VALUES ('google', $1, $2, $3)";
       if (typeof deviceKey === 'string' && DEVICE_KEY.test(deviceKey)) {
         const dev = (
@@ -177,10 +191,12 @@ async function accountForGoogle(g, deviceKey, retried = false) {
           return { u: dev, isNew: false };
         }
       }
-      const u = (await c.query('INSERT INTO users (name) VALUES ($1) RETURNING *', [cleanName(g.givenName || g.name) || 'Yeni üye'])).rows[0];
+      const u = (await c.query('INSERT INTO users (name) VALUES ($1) RETURNING *', [n.name || 'Yeni üye'])).rows[0];
       await c.query(link, [g.sub, u.id, g.email]);
       return { u, isNew: true };
     });
+    if (out.isNew) await countNameRefusal(n, out.u);
+    return out;
   } catch (e) {
     // The same Google account signed in twice at once, or the device account was linked meanwhile: look again.
     if (e.code !== '23505' || retried) throw e;
@@ -195,15 +211,16 @@ export const authRoutes = {
     const b = await readJson(req);
     const { deviceKey, name } = b;
     if (typeof deviceKey !== 'string' || !DEVICE_KEY.test(deviceKey)) throw new HttpError(400, 'Geçersiz cihaz anahtarı');
-    const clean = cleanName(name);
+    const n = cleanName(name);
     const hash = sha(`device:${deviceKey}`);
     const find = async () => (await db.query('SELECT * FROM users WHERE device_key_hash = $1 AND deleted_at IS NULL', [hash])).rows[0] ?? null;
     const dev = await deviceOf(b);
     await deviceGate(dev, b, find);
     let u = await find();
     if (!u) {
-      if (!clean) throw new HttpError(400, 'Ad gerekli');
-      u = (await db.query('INSERT INTO users (name, device_key_hash) VALUES ($1, $2) ON CONFLICT (device_key_hash) DO UPDATE SET name = users.name RETURNING *', [clean, hash])).rows[0];
+      if (!n.name && !n.refused) throw new HttpError(400, 'Ad gerekli');
+      u = (await db.query('INSERT INTO users (name, device_key_hash) VALUES ($1, $2) ON CONFLICT (device_key_hash) DO UPDATE SET name = users.name RETURNING *', [n.name || 'Yeni üye', hash])).rows[0];
+      await countNameRefusal(n, u);
     }
     return signedIn(u, dev, b);
   },

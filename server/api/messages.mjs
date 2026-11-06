@@ -5,14 +5,35 @@
 //   GET  /api/conversations                         → { conversations }  (last message and unread count)
 //   POST /api/messages/read  { with }               → { read }
 // Messages to or from someone either side has blocked are refused. A new message rings the recipient's
-// phone (push.mjs); an open app polls. At most 30 messages a minute per person, against spam.
-import { HttpError, REF, auth, blockedBetween, db, limit, readJson, text, userId } from './core.mjs';
+// phone (push.mjs); an open app polls. At most 30 messages a minute per person, against spam. A message that
+// shares a phone number, IBAN, e-mail, link or social media account is refused (contact-filter.mjs).
+import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, limit, publicText, readJson, userId } from './core.mjs';
 import { bondTalk } from './bonds.mjs';
+import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 
 const PAGE = 50;
 const out = (m) => ({ id: Number(m.id), from: m.sender, to: m.recipient, text: m.body, createdAt: m.created_at, readAt: m.read_at });
+
+/**
+ * A number typed a few digits at a time ("0532", "123", "45", "67"): a number-only message is read together
+ * with the sender's number-only messages to the same person just before it, within a few minutes.
+ */
+async function assertNoSplitNumber(me, to, body, ref) {
+  if (!isNumberOnly(body)) return;
+  const { windowSeconds, maxMessages } = getRules().sequence;
+  const r = await db.query(
+    `SELECT body FROM messages
+      WHERE sender = $1 AND recipient = $2 AND ref <> $3 AND created_at > now() - make_interval(secs => $4)
+      ORDER BY id DESC LIMIT $5`,
+    [me.id, to, ref, windowSeconds, maxMessages - 1],
+  );
+  const verdict = checkSequence(r.rows.map((m) => m.body).reverse(), body);
+  if (verdict.ok) return;
+  await countRefusal(me.id, verdict.category, 'dm.sequence');
+  throw contactError(verdict.category, 'text');
+}
 
 export const messageRoutes = {
   async 'POST /api/messages'(req) {
@@ -23,11 +44,12 @@ export const messageRoutes = {
     const b = await readJson(req);
     const to = userId(b.to, 'alıcı');
     if (to === me.id) throw new HttpError(400, 'Kendine mesaj gönderemezsin');
-    const body = text(b.text, 1, 1000, 'Mesaj');
+    const body = await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);
     if (!peer.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiye mesaj gönderemezsin');
+    await assertNoSplitNumber(me, to, body, b.ref);
     const r = await db.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, b.ref]);
     if (r.rowCount) {
       notify([to], { title: me.name, body, data: { type: 'message', from: me.id } });

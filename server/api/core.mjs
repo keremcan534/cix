@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
+import { CONTACT_MESSAGE, checkText } from './contact-filter.mjs';
 
 export const env = process.env;
 
@@ -337,3 +338,42 @@ export const text = (v, min, max, field) => {
   if (s.length < min || s.length > max) throw new HttpError(400, `${field} ${min}–${max} karakter olmalı`);
   return s;
 };
+
+// --- Contact filter: no phone numbers, IBANs, e-mails, links or social media accounts (contact-filter.mjs) ---
+// Refused, never masked, and never a sanction by itself. Each refusal is counted for moderators (who, which
+// kind, where, when; 017_contact_refusals.sql), and the refused text is not stored or logged anywhere.
+const REFUSAL_DAYS = 180;
+let refusalsPrunedAt = 0;
+
+/** Counts one refusal; at most 20 a minute per person are written. Never fails the request. */
+export async function countRefusal(uid, category, place) {
+  if (!allow(`contact-refusal:${uid}`, 20)) return;
+  try {
+    await db.query('INSERT INTO contact_refusals (user_id, category, place) VALUES ($1, $2, $3)', [uid, category, place]);
+    if (Date.now() - refusalsPrunedAt > 3_600_000) {
+      refusalsPrunedAt = Date.now();
+      await db.query(`DELETE FROM contact_refusals WHERE created_at < now() - interval '${REFUSAL_DAYS} days'`);
+    }
+  } catch (e) {
+    console.error('contact refusal count', e.message);
+  }
+}
+
+/** The refusal the app shows: 400 { error, code: 'contact_blocked', category, field? }. */
+export const contactError = (category, field) =>
+  Object.assign(new HttpError(400, CONTACT_MESSAGE), { extra: { code: 'contact_blocked', category, ...(field ? { field } : {}) } });
+
+/**
+ * Refuses `s` when it shares contact details, counting it for `user` at `place` (e.g. 'profile.bio');
+ * `field` is the request's key, for the app to point at the input. Returns `s`.
+ */
+export async function assertClean(s, user, place, field) {
+  if (!s) return s;
+  const r = checkText(s);
+  if (r.ok) return s;
+  await countRefusal(user.id, r.category, place);
+  throw contactError(r.category, field);
+}
+
+/** text() for what other people read: trimmed, `min`–`max` characters, and no contact details. */
+export const publicText = (v, min, max, label, user, place, field) => assertClean(text(v, min, max, label), user, place, field);

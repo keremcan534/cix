@@ -9,6 +9,7 @@ import { Button, Card, GradientButton, Header, StateIcon, TextLink } from '@/com
 import { AGENCIES, AGENCY_EVENTS, ROLE_LABEL, agencyByCode } from '@/data/agency';
 import { agenciesOwnedBy, myApplications, useAgencyApps } from '@/lib/agency-apps';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { RULES, pct, usd } from '@/data/rules';
 import { NetworkHub } from '@/components/agency-net-hub';
 import { apiEnabled } from '@/lib/api';
@@ -193,6 +194,9 @@ function MemberView() {
   ];
 
   const submitTransfer = (leave: boolean) => {
+    // The agencies read the reason: contact details are refused and it stays in the input.
+    const refusal = contactRefusal(reason.trim(), 'agency.transfer');
+    if (refusal) return showAlert(CONTACT_TITLE, refusal);
     const err = requestTransfer(leave ? null : toCode, reason);
     if (err) return showAlert('Talep oluşturulamadı', err);
     setShowTransfer(false);

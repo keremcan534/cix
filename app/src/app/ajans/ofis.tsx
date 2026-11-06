@@ -62,6 +62,7 @@ import {
   type Overview,
 } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
@@ -298,15 +299,15 @@ function Actions({ c }: { c: Ctx }) {
   const sub = a.level > 1;
   const [subject, setSubject] = useState<'tier' | 'commission' | 'transfer' | 'other'>('tier');
   const independence = async () => {
-    const r = await ask({ title: 'Bağımsızlık talebi', message: 'Kararı yalnızca merkez verir. Onaylanırsa üst ajans bundan sonraki gelirinizden pay almaz; merkez sınırlı süreli bir geçiş komisyonu tanımlayabilir. Geçmiş kazançlar değişmez.', confirm: 'Merkeze gönder' });
+    const r = await ask({ title: 'Bağımsızlık talebi', message: 'Kararı yalnızca merkez verir. Onaylanırsa üst ajans bundan sonraki gelirinizden pay almaz; merkez sınırlı süreli bir geçiş komisyonu tanımlayabilir. Geçmiş kazançlar değişmez.', confirm: 'Merkeze gönder', place: 'agency.independence' });
     if (r) await runAction(demo, () => agencyNet.independence(id, r.reason), 'Talebin merkeze iletildi.', reload);
   };
   const changeParent = async () => {
-    const r = await ask({ title: 'Üst ajans değiştir', message: 'Yeni üst ajansın kodunu yaz. Mevcut üst ajans, yeni üst ajans ve merkez kurallarına göre onaylanır.', field: { label: 'Yeni üst ajans kodu', placeholder: 'Örn. ALK5R3' }, confirm: 'Talep gönder' });
+    const r = await ask({ title: 'Üst ajans değiştir', message: 'Yeni üst ajansın kodunu yaz. Mevcut üst ajans, yeni üst ajans ve merkez kurallarına göre onaylanır.', field: { label: 'Yeni üst ajans kodu', placeholder: 'Örn. ALK5R3' }, confirm: 'Talep gönder', place: 'agency.change_parent' });
     if (r) await runAction(demo, () => agencyNet.changeParent(id, r.field.toUpperCase(), r.reason), 'Talebin iletildi.', reload);
   };
   const close = async () => {
-    const r = await ask({ title: 'Alt ajansı kapat', message: 'Yayıncılar üst ajansa geçer veya ayrılır (merkez kurallarına göre). Geçmiş komisyon kayıtları silinmez.', confirm: 'Kapatma talebi', danger: true });
+    const r = await ask({ title: 'Alt ajansı kapat', message: 'Yayıncılar üst ajansa geçer veya ayrılır (merkez kurallarına göre). Geçmiş komisyon kayıtları silinmez.', confirm: 'Kapatma talebi', danger: true, place: 'agency.sub_close' });
     if (r) await runAction(demo, () => agencyNet.closeSub(id, r.reason), 'Kapatma talebi alındı.', reload);
   };
   const appeal = async () => {
@@ -352,7 +353,7 @@ function Streamers({ c }: { c: Ctx }) {
   const [scope, setScope] = useState<'direct' | 'sub'>('direct');
   const q = useNet(c.name, () => agencyNet.streamers(c.id, scope), () => demoStreamers(c.id, scope), [c.id, scope]);
   const invite = async () => {
-    const r = await c.ask({ title: 'Yayıncı davet et', message: 'Kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Kullanıcı adı', placeholder: 'kullaniciadi', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder' });
+    const r = await c.ask({ title: 'Yayıncı davet et', message: 'Kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Kullanıcı adı', placeholder: 'kullaniciadi', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder', place: 'agency.invite' });
     if (r) await runAction(c.demo, () => agencyNet.invite(c.id, r.field.replace(/^@/, ''), r.reason || undefined), 'Davet gönderildi.', q.reload);
   };
   return (
@@ -489,7 +490,17 @@ function CreateSub({ c, done }: { c: Ctx; done: () => void }) {
       <Text style={st.foot}>Merkezin onay politikasına göre onaya gider. Başlangıç seviyesi ve oranı merkez kurallarından gelir.</Text>
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <Button title="Vazgeç" variant="ghost" onPress={done} style={{ flex: 1 }} />
-        <Button title="Oluştur" disabled={name.trim().length < 2} onPress={() => runAction(c.demo, () => agencyNet.createSub(c.id, name.trim(), owner || undefined, region.trim() || undefined), 'Alt ajans oluşturuldu ve onaya gönderildi.', done)} style={{ flex: 1 }} />
+        <Button
+          title="Oluştur"
+          disabled={name.trim().length < 2}
+          onPress={() => {
+            // Others see the name and region: contact details are refused and the form keeps what was typed.
+            const refusal = contactRefusal(name.trim(), 'agency.name') ?? contactRefusal(region.trim(), 'agency.region');
+            if (refusal) return showAlert(CONTACT_TITLE, refusal);
+            void runAction(c.demo, () => agencyNet.createSub(c.id, name.trim(), owner || undefined, region.trim() || undefined), 'Alt ajans oluşturuldu ve onaya gönderildi.', done);
+          }}
+          style={{ flex: 1 }}
+        />
       </View>
     </Panel>
   );
@@ -739,11 +750,11 @@ function Requests({ c }: { c: Ctx }) {
   const trs = useNet(c.name, () => agencyNet.transfers(c.id), demoTransfers, [c.id]);
   const [mode, setMode] = useState<'free' | 'paid'>('free');
   const reject = async (requestId: number) => {
-    const r = await c.ask({ title: 'İsteği reddet', reasonLabel: 'Not (yayıncıya gösterilir)', min: 0, confirm: 'Reddet', danger: true });
+    const r = await c.ask({ title: 'İsteği reddet', reasonLabel: 'Not (yayıncıya gösterilir)', min: 0, confirm: 'Reddet', danger: true, place: 'agency.request' });
     if (r) await runAction(c.demo, () => agencyNet.decideRequest(c.id, requestId, false, r.reason || undefined), 'İstek reddedildi.', () => (reqs.reload(), c.reload()));
   };
   const decide = async (transferId: number, approve: boolean, party: string[]) => {
-    const r = await c.ask({ title: approve ? 'Transferi onayla' : 'Transferi reddet', reasonLabel: 'Not', min: approve ? 0 : 3, confirm: approve ? 'Onayla' : 'Reddet', danger: !approve });
+    const r = await c.ask({ title: approve ? 'Transferi onayla' : 'Transferi reddet', reasonLabel: 'Not', min: approve ? 0 : 3, confirm: approve ? 'Onayla' : 'Reddet', danger: !approve, place: 'agency.transfer_decide' });
     if (r) await runAction(c.demo, () => agencyNet.approveTransfer(c.id, transferId, approve, approve && party.includes('from') ? mode : undefined, r.reason || undefined), approve ? 'Onayın kaydedildi.' : 'Talep reddedildi.', () => (trs.reload(), c.reload()));
   };
   return (

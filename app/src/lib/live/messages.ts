@@ -4,6 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as api from '@/lib/api';
+import { isContactBlocked } from '@/lib/contact-filter';
 import { noteRefusal } from '@/lib/sanctions';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { isServerId } from '@/data/mock';
@@ -35,9 +36,10 @@ export const isLiveUser = (id: string) => liveMode() && isServerId(id);
 /**
  * Sends a message I already put in the local thread. `ref` is its request id: a retry sends the same one, so
  * the server never stores it twice. `done` gets null when it went through, or the reason it didn't (shown on
- * the bubble with "tekrar dene", not as one alert per message).
+ * the bubble with "tekrar dene", not as one alert per message). `contact` is true when the server refused it for
+ * contact details (lib/contact-filter): sending it again would fail the same way.
  */
-export function liveDm(to: string, text: string, ref: string, done: (failed: string | null) => void) {
+export function liveDm(to: string, text: string, ref: string, done: (failed: string | null, contact?: boolean) => void) {
   const id = toServer(to);
   if (!id) return;
   api
@@ -48,7 +50,7 @@ export function liveDm(to: string, text: string, ref: string, done: (failed: str
     .catch((e) => {
       // Muted for DMs (403 muted): the details and the appeal open, besides the note on the bubble.
       noteRefusal(e, true);
-      done(message(e));
+      done(message(e), isContactBlocked(e));
     });
 }
 

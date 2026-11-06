@@ -8,7 +8,9 @@
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true }
-import { HttpError, ageOf, allow, auth, blockedBetween, db, profileOf, readJson, selfUser, text, tx, userId } from './core.mjs';
+//   POST   /api/contact/refusals { category, place }      → { counted: true }  (a refusal the app made on its own)
+import { HttpError, ageOf, allow, assertClean, auth, blockedBetween, countRefusal, db, profileOf, publicText, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { CATEGORIES } from './contact-filter.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 
@@ -16,6 +18,11 @@ import { autoFromReports } from './sanctions.mjs';
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
 const REPORT_TYPES = ['user', 'room', 'message', 'moment'];
 const MIN_AGE = 18;
+/**
+ * Where the app refuses contact details on its own, named like the server's places ('room.chat', 'moment.post',
+ * 'tayfa.announcement', 'dm.sequence' …).
+ */
+const APP_PLACE = /^(?:dm|profile|room|moment|tayfa|agency)(?:\.[a-z_]{2,20}){0,2}$/;
 
 /** A public profile row for lists. */
 const card = (u) => ({ id: u.id, name: u.name, avatarUrl: u.avatar_url ?? null });
@@ -31,10 +38,14 @@ export const socialRoutes = {
     const u = await auth(req);
     const b = await readJson(req);
     const set = {};
-    if (b.name !== undefined) set.name = text(b.name, 1, 40, 'Ad');
+    // What other people read is checked for contact details (contact-filter.mjs); `set` is written only once
+    // every field passes, so a refusal changes nothing.
+    if (b.name !== undefined) set.name = await publicText(b.name, 1, 40, 'Ad', u, 'profile.name', 'name');
     if (b.username !== undefined) {
       const name = typeof b.username === 'string' ? b.username.trim().toLowerCase() : '';
       if (!/^[a-z0-9_.]{3,20}$/.test(name)) throw new HttpError(400, 'Kullanıcı adı 3–20 karakter; harf, rakam, nokta ve alt çizgi');
+      // 'insta_ayse', 'ayse.05321234567': read with the dots and underscores as spaces.
+      await assertClean(name.replace(/[._]+/g, ' '), u, 'profile.username', 'username');
       set.username = name;
     }
     if (b.gender !== undefined) {
@@ -50,8 +61,8 @@ export const socialRoutes = {
       if (u.birth_date && new Date(u.birth_date).toISOString().slice(0, 10) !== b.birthDate) throw new HttpError(409, 'Doğum tarihi bir kez girilir; değişiklik için destekle iletişime geç');
       set.birth_date = b.birthDate;
     }
-    if (b.city !== undefined) set.city = text(b.city, 0, 40, 'Şehir') || null;
-    if (b.bio !== undefined) set.bio = text(b.bio, 0, 160, 'Hakkında');
+    if (b.city !== undefined) set.city = (await publicText(b.city, 0, 40, 'Şehir', u, 'profile.city', 'city')) || null;
+    if (b.bio !== undefined) set.bio = await publicText(b.bio, 0, 160, 'Hakkında', u, 'profile.bio', 'bio');
     if (b.interests !== undefined) {
       if (!Array.isArray(b.interests) || b.interests.length > 5 || b.interests.some((i) => !INTERESTS.includes(i))) throw new HttpError(400, 'En fazla 5 ilgi alanı, listeden');
       set.interests = [...new Set(b.interests)];
@@ -73,9 +84,10 @@ export const socialRoutes = {
 
   /**
    * Account deletion (Play and Apple require it in the app). Personal data goes: profile fields, phone number,
-   * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, own rooms. The id,
-   * ledger, gifts and purchases stay, because financial records must be kept; they no longer point to anything
-   * personal. The phone number and the Google account are free again for a new account.
+   * sign-in key, the linked Google account, sessions, push tokens, follows, blocks, messages, contact-filter
+   * refusal counts, own rooms. The id, ledger, gifts and purchases stay, because financial records must be kept;
+   * they no longer point to anything personal. The phone number and the Google account are free again for a new
+   * account.
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
@@ -92,6 +104,7 @@ export const socialRoutes = {
       await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [u.id]);
       await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [u.id]);
       await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [u.id]);
+      await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [u.id]);
       await c.query('DELETE FROM room_admins WHERE user_id = $1', [u.id]);
       await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [u.id]);
     });
@@ -195,5 +208,19 @@ export const socialRoutes = {
     // Many people reporting one account: the category's policy step (sanctions.mjs). Never fails the report.
     if (b.type === 'user' && b.id !== me.id) await autoFromReports(b.id, reason).catch((e) => console.error('auto sanction', e.message));
     return { reported: true };
+  },
+
+  /**
+   * A refusal the app made before sending (room and group chats, moments, room polls …, lib/contact-filter):
+   * nothing reached the server, so the app reports which kind and where, never the text, and it is counted
+   * like the server's own refusals (core.mjs countRefusal, at most 20 a minute).
+   */
+  async 'POST /api/contact/refusals'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    if (!CATEGORIES.includes(b.category)) throw new HttpError(400, 'Geçersiz tür');
+    if (typeof b.place !== 'string' || b.place.length > 40 || !APP_PLACE.test(b.place)) throw new HttpError(400, 'Geçersiz yer');
+    await countRefusal(me.id, b.category, b.place);
+    return { counted: true };
   },
 };

@@ -15,7 +15,7 @@
 //   GET  /api/rooms/mutes?room=                                             → { mutes }    (owner or admin)
 // Room mutes are sanctions (sanctions.mjs): their own row, server time, audited. A room admin mutes for up to
 // 7 days; the owner also without an end. Nobody mutes the owner, platform staff or (unless owner) another admin.
-import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, readJson, sanctionView, sha, text, userId } from './core.mjs';
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { deleteVoiceRoom, removeFromVoice } from './live.mjs';
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
@@ -102,8 +102,9 @@ export const roomRoutes = {
   async 'POST /api/rooms'(req) {
     const me = await auth(req);
     const b = await readJson(req);
-    const title = text(b.title, 1, 40, 'Oda adı');
-    const announcement = b.announcement === undefined ? '' : text(b.announcement, 0, 200, 'Duyuru');
+    // Everyone in the room list reads these: no contact details (contact-filter.mjs).
+    const title = await publicText(b.title, 1, 40, 'Oda adı', me, 'room.title', 'title');
+    const announcement = b.announcement === undefined ? '' : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
     const roomType = b.roomType ?? 'free';
     if (!TYPES.includes(roomType)) throw new HttpError(400, 'Geçersiz oda türü');
     const password = b.password === undefined || b.password === '' ? null : text(b.password, 4, 32, 'Şifre');
@@ -155,8 +156,8 @@ export const roomRoutes = {
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
     if (b.title === undefined && b.announcement === undefined) throw new HttpError(400, 'Değişiklik yok');
     limit(`roomedit:${me.id}`, 20, 'Çok sık değiştirdin, biraz bekle');
-    const title = b.title === undefined ? room.title : text(b.title, 3, 40, 'Oda adı');
-    const announcement = b.announcement === undefined ? room.announcement : text(b.announcement, 0, 200, 'Duyuru');
+    const title = b.title === undefined ? room.title : await publicText(b.title, 3, 40, 'Oda adı', me, 'room.title', 'title');
+    const announcement = b.announcement === undefined ? room.announcement : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
     await db.query('UPDATE rooms SET title = $2, announcement = $3 WHERE id = $1', [room.id, title, announcement]);
     return { room: out(await roomRow(room.id)) };
   },
@@ -227,6 +228,8 @@ export const roomRoutes = {
     const minutes = b.minutes === null && owner ? null : int(b.minutes, 1, max);
     if (minutes === null && !(b.minutes === null && owner)) throw new HttpError(400, owner ? 'Süre 1 dakika ile 10 yıl arası olmalı (ya da süresiz)' : 'Oda yöneticisi en çok 7 gün susturabilir');
     limit(`roommute:${me.id}`, 30, 'Çok sık susturma yaptın, biraz bekle');
+    // The muted person reads the description.
+    const description = b.description === undefined || b.description === '' ? '' : await publicText(b.description, 3, 300, 'Gerekçe', me, 'room.mute', 'description');
     const [s] = await applySanction(
       { id: me.id, role: owner ? 'room_owner' : 'room_admin' },
       {
@@ -234,7 +237,7 @@ export const roomRoutes = {
         type: b.kind === 'text' ? 'mute_room_text' : 'mute_room_voice',
         reason: typeof b.reason === 'string' ? b.reason : 'disruption',
         minutes,
-        description: b.description === undefined || b.description === '' ? '' : text(b.description, 3, 300, 'Gerekçe'),
+        description,
         roomId: room.id,
         source: 'manual',
       },

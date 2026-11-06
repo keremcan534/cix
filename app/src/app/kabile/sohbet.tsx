@@ -101,6 +101,7 @@ export default function KabileChat() {
         members={members}
         messages={[welcome, ...familyChat]}
         onSend={send}
+        place="tayfa.chat"
         pinned={`Tayfa duyurusu: ${meta.announcement}`}
         roomId={meta.roomId}
         lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length] ?? LAST_ACTIVE[0]}

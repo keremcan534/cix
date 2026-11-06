@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ContactNote } from '@/components/contact-note';
 import { Text, TextInput } from '@/components/text';
 import { Avatar, Card, GradientButton, Header, StateIcon, TextLink } from '@/components/ui';
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
 import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -367,6 +369,9 @@ function Events({ kind }: { kind: 'tasks' | 'events' }) {
           title="Oluştur ve üyelere bildir"
           onPress={() => {
             if (title.trim().length < 4) return;
+            // Members see this text: contact details are refused and the title stays in the input.
+            const refusal = contactRefusal(title.trim(), kind === 'tasks' ? 'agency.task' : 'agency.event');
+            if (refusal) return showAlert(CONTACT_TITLE, refusal);
             setItems((l) => [{ id: String(Date.now()), title: title.trim(), when: 'Bu hafta', reward: 'Ödül koşulu: hedef tamamlanınca', joined: 0 }, ...l]);
             setTitle('');
           }}
@@ -428,13 +433,27 @@ function Support() {
 function Settings() {
   const { ownedAgency } = useApp();
   const [desc, setDesc] = useState('Yetenekli yayıncıları büyüten topluluk ajansı.');
+  // The description is the agency's public text: checked when editing ends (it has no save button); a refused
+  // text stays in the input with the note under it.
+  const [refused, setRefused] = useState<string | null>(null);
   const [notify, setNotify] = useState(true);
   return (
     <Card style={{ gap: 10 }}>
       <Text style={styles.label}>Ajans adı</Text>
       <Text style={{ color: '#fff' }}>{ownedAgency?.name}</Text>
       <Text style={styles.label}>Açıklama</Text>
-      <TextInput value={desc} onChangeText={setDesc} style={[styles.input, { minHeight: 60 }]} multiline />
+      <TextInput
+        value={desc}
+        onChangeText={(t) => {
+          setDesc(t);
+          setRefused(null);
+        }}
+        onBlur={() => setRefused(contactRefusal(desc.trim(), 'agency.description'))}
+        maxLength={300}
+        style={[styles.input, { minHeight: 60 }]}
+        multiline
+      />
+      <ContactNote text={refused} style={{ marginHorizontal: 0, marginBottom: 0 }} />
       <View style={styles.row}>
         <Text style={{ color: '#fff', flex: 1 }}>Yeni başvuru bildirimleri</Text>
         <Switch value={notify} onValueChange={setNotify} />

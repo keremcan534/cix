@@ -20,7 +20,7 @@
 // wherever a Jeton Noktası passed them, and the diamonds they became that are still locked. Diamonds already
 // unlocked are reported as unrecovered. The agency commission those gifts earned is reversed. Admin only:
 // moderators don't touch money. Google Play refunds also arrive on their own (refunds.mjs).
-import { HttpError, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { HttpError, assertClean, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { recordIncome } from './agency-lib.mjs';
@@ -166,8 +166,10 @@ export const jetonRoutes = {
     if (to === u.id) throw new HttpError(400, 'Kendine aktaramazsın');
     const coins = int(b.coins, 1, TRANSFER_MAX);
     if (!coins) throw new HttpError(400, 'Geçersiz jeton miktarı');
+    // The receipt number is a payment record, like withdrawal details; the note is for the buyer to read
+    // (GET /api/jeton/transfers), so it may not share contact details (contact-filter.mjs).
     const paymentRef = optional(b.paymentRef, 100, 'Ödeme referansı');
-    const note = optional(b.note, 200, 'Not');
+    const note = await assertClean(optional(b.note, 200, 'Not'), u, 'jeton.transfer', 'note');
     const ip = clientIp(req);
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       const rows = await lockUsers(c, [u.id, to]);

@@ -352,6 +352,8 @@ export const sendDm = (to: string, text: string, ref = newRef()) => call<{ messa
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
 export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });
+/** A refusal the app made before sending (lib/contact-filter), for the moderators' count: the kind and the place, never the text. */
+export const countContactRefusal = (category: string, place: string) => call<{ counted: boolean }>('POST', '/api/contact/refusals', { category, place });
 
 export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
