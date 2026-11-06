@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,7 +10,8 @@ import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
 import { PROFILE_VISITORS } from '@/data/messages-ui';
-import { FOLLOWS_ME } from '@/data/mock';
+import { FollowListSheet } from '@/components/follow-list-sheet';
+import { FOLLOWS_ME, userById } from '@/data/mock';
 import { displayId } from '@/data/profile';
 import { nobleInfo } from '@/data/status';
 import { confirmLogout, showAlert } from '@/lib/alert';
@@ -23,6 +25,7 @@ import { casinoVisible } from '@/lib/games';
 import { callsAvailable, liveMode, myServerId, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
+import { loadFollowList, type FollowSide } from '@/lib/live/follows';
 import { useMeStats } from '@/lib/live/me-stats';
 import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
 
@@ -71,6 +74,13 @@ export default function ProfileScreen() {
   const followers = live ? (server.stats?.followers ?? null) : [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
   const followingCount = live ? (server.stats?.following ?? following.size) : following.size;
   const friendCount = live ? [...following].filter((id) => id !== 'me' && !blocked.has(id)).length : new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
+  // Takipçiler / Takip open a list (live: from the server; demo: the sample people).
+  const [list, setList] = useState<FollowSide | null>(null);
+  const loadList = (side: FollowSide) => {
+    if (live) return loadFollowList(side);
+    const ids = side === 'followers' ? [...FOLLOWS_ME] : [...following];
+    return ids.filter((id) => id !== 'me' && !blocked.has(id)).map((id) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
+  };
   const visitorCount = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId)).length;
   const completion = myCompletion(me, live);
   // My public id: the one others see on my profile (data/profile displayId of my server id); none until known.
@@ -129,8 +139,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.stats}>
-          <Stat n={followers} label="Takipçiler" />
-          <Stat n={followingCount} label="Takip" />
+          <Stat n={followers} label="Takipçiler" onPress={() => setList('followers')} />
+          <Stat n={followingCount} label="Takip" onPress={() => setList('following')} />
           <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
           {!live && (
             <Stat
@@ -248,6 +258,13 @@ export default function ProfileScreen() {
           <Text style={{ color: colors.red, fontWeight: '600' }}>Çıkış yap</Text>
         </Pressable>
       </ScrollView>
+      <FollowListSheet
+        visible={list !== null}
+        title={list === 'following' ? 'Takip ettiklerin' : 'Takipçilerin'}
+        empty={list === 'following' ? 'Henüz kimseyi takip etmiyorsun.' : 'Henüz takipçin yok.'}
+        load={() => loadList(list ?? 'followers')}
+        onClose={() => setList(null)}
+      />
     </SafeAreaView>
   );
 }

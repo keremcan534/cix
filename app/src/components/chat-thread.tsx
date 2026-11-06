@@ -320,7 +320,6 @@ export function ChatThread({
             editable={!dmMuted && !missing}
             placeholder={missing ? 'Kullanıcı bulunamadı' : dmMuted ? 'Mesaj gönderemezsin' : 'Mesaj yaz...'}
             placeholderTextColor={colors.textDim}
-            maxLength={1000}
             style={styles.input}
             returnKeyType="send"
           />

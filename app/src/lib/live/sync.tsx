@@ -1,6 +1,6 @@
 // Live mode background sync (lib/live): while signed in, keeps the balance and the Gelir locks in step with the
 // server (a gift someone sends from another phone shows up here within seconds), polls direct messages and
-// passes on the contact filter's refusals made on this phone. On signing in it also takes the server's follow
+// passes on the contact filter's refusals made on this phone, and tells me about new followers. On signing in it also takes the server's follow
 // and block lists (a reinstall or a new sign-in starts from them). An open chat reads its own thread more often
 // (lib/live/messages useLiveThread).
 // Mounted once above the stack (app/_layout); renders nothing and does nothing without a server address.
@@ -13,6 +13,7 @@ import { onContactRefusal } from '@/lib/contact-filter';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
 import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
+import { checkNewFollowers } from '@/lib/live/follows';
 import { pollMessages } from '@/lib/live/messages';
 import { settleWithdrawals } from '@/lib/live/withdraw';
 import { useApp } from '@/store';
@@ -43,6 +44,7 @@ export function LiveSync() {
     // The timer and a return to the foreground can fire together: two runs at once would read the same
     // "last seen" message id and add the same messages twice.
     let running = false;
+    let resumed = false;
     const run = async () => {
       if (running) return;
       running = true;
@@ -67,6 +69,11 @@ export function LiveSync() {
           if (tick % 4 === 0) await refreshEarnings();
         }
         if (alive) await pollMessages(appRef.current);
+        // No push yet: new followers are noticed here, every minute and on returning to the app.
+        if (alive && (tick % 4 === 0 || resumed)) {
+          resumed = false;
+          void checkNewFollowers((n) => alive && appRef.current.notify(n)).catch(() => {});
+        }
       } catch (e) {
         if (e instanceof SignInAgain) {
           // A Google, e-mail or phone account's session ended (signed out on the server, or expired): back to the welcome screen.
@@ -86,7 +93,11 @@ export function LiveSync() {
     };
     void run();
     const t = setInterval(() => void run(), TICK_MS);
-    const sub = AppState.addEventListener('change', (s) => s === 'active' && void run());
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active') return;
+      resumed = true;
+      void run();
+    });
     return () => {
       alive = false;
       clearInterval(t);

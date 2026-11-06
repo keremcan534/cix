@@ -9,6 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { GiftArt } from '@/components/GiftArt';
+import { FollowListSheet } from '@/components/follow-list-sheet';
 import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
@@ -32,6 +33,7 @@ import {
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
+import { loadFollowList, type FollowSide } from '@/lib/live/follows';
 import { followOnServer, loadMe, loadPublicProfile, profilePatch, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
 import { copyText } from '@/lib/clipboard';
 import { goBack } from '@/lib/nav';
@@ -195,6 +197,7 @@ export default function UserProfile() {
   const [editOpen, setEditOpen] = useState(false);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
   const [tabY, setTabY] = useState(0);
+  const [list, setList] = useState<FollowSide | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
   // Gift wall: my own wall is only what I really received; another user's wall is their simulated
@@ -501,9 +504,9 @@ export default function UserProfile() {
           </Pressable>
 
           <View style={styles.stats}>
-            <Stat n={followers} label="Takipçi" />
+            <Stat n={followers} label="Takipçi" onPress={serverId ? () => setList('followers') : undefined} />
             <View style={styles.vSep} />
-            <Stat n={followingCount} label="Takip" />
+            <Stat n={followingCount} label="Takip" onPress={serverId ? () => setList('following') : undefined} />
             {/* Live mode: no friend count or gift wall on the server yet. */}
             {!live && (
               <>
@@ -898,6 +901,15 @@ export default function UserProfile() {
           { label: `🎥 Görüntülü arama · 🪙 ${callPrice(user)}/dk${can('video').ok ? '' : ' · kapalı'}`, onPress: () => call('goruntulu') },
         ]}
       />
+      {serverId && (
+        <FollowListSheet
+          visible={list !== null}
+          title={list === 'following' ? (isMe ? 'Takip ettiklerin' : 'Takip edilenler') : isMe ? 'Takipçilerin' : 'Takipçiler'}
+          empty={list === 'following' ? (isMe ? 'Henüz kimseyi takip etmiyorsun.' : 'Henüz kimseyi takip etmiyor.') : isMe ? 'Henüz takipçin yok.' : 'Henüz takipçisi yok.'}
+          load={() => loadFollowList(list ?? 'followers', serverId)}
+          onClose={() => setList(null)}
+        />
+      )}
       {giftable && <ProfileGiftSheet visible={sheet === 'gift'} name={user.name} gifts={giftChoices} coins={coins} svipLevel={svipLevel} onClose={() => setSheet('none')} onSend={sendGift} />}
 
       {editOpen && <EditSheet user={me} live={live} serverAge={serverAge} photoBusy={avatarBusy} onPhoto={() => pickPhoto(false)} onClose={() => setEditOpen(false)} onSave={saveEdit} />}

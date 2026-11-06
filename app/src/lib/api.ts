@@ -463,6 +463,10 @@ export const discover = () => call<{ users: DiscoverUser[] }>('GET', '/api/disco
 /** Blocking also ends follows both ways on the server; the other person is not told. */
 export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('POST', '/api/block', { to, block: on }).then((r) => r.blocked);
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
+export type FollowCard = UserCard & { followedAt: string };
+/** Takipçiler / Takip of `user` (a server id; default me), newest first. */
+export const followList = (side: 'followers' | 'following', user?: string) =>
+  call<{ users: FollowCard[] }>('GET', `/api/${side}${user ? `?user=${encodeURIComponent(user)}` : ''}`).then((r) => r.users);
 
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
 /** `password` (4–32 characters, optional): only people who type it get into the room's voice. */
