@@ -28,6 +28,7 @@ describe('app config', () => {
       updateUrl: 'https://example.com/similar.apk',
       notice: 'Bu gece 02:00–02:15 bakım var.',
       featuresOff: ['gifts', 'topup', 'dm', 'rooms', 'exchange', 'jeton', 'purchases', 'withdraw'],
+      v: 0,
     });
   });
 

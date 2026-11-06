@@ -11,6 +11,7 @@ import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { CP_GIFT_IDS, KABILE_COUPLES, KABILE_FRIENDS, KABILE_ROUTES, findKabile, fmtK, kabile, kabileMemberIds, type Pair } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { successHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
@@ -19,6 +20,9 @@ const CP_GIFTS = CP_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter(
 
 export default function IliskiMeydani() {
   const { familyId, spendCoins } = useApp();
+  // Only the İkili gifts the server still offers (Canlı ayarlar can hide a gift); all of them if it hid every one,
+  // so the sheet never opens empty (these sends are local, the server never refuses them).
+  const cpGifts = visibleGifts(CP_GIFTS, useLiveCatalog());
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const [mode, setMode] = useState<'cp' | 'dost'>('cp');
@@ -123,7 +127,7 @@ export default function IliskiMeydani() {
         visible={!!giftTo}
         title={giftTo ? `${userById(giftTo).name} · İkili hediyesi` : ''}
         onClose={() => setGiftTo(null)}
-        options={CP_GIFTS.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price.toLocaleString('tr-TR')} 🪙`, onPress: () => sendGift(g) }))}
+        options={cpGifts.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price.toLocaleString('tr-TR')} 🪙`, onPress: () => sendGift(g) }))}
       />
     </SafeAreaView>
   );

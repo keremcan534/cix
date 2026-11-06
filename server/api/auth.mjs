@@ -15,8 +15,9 @@
 // every 60 seconds and at most 5 per hour per number. Only numbers starting with OTP_COUNTRIES (default +90)
 // can ask for a code, so nobody can make us pay for SMS to premium numbers abroad. On top of that, at most
 // OTP_GLOBAL_PER_HOUR codes (default 300) go out per hour over all numbers, so a script rotating numbers and
-// addresses can't run up the SMS bill. A device that already has a development account keeps it (and its
-// wallet) when it signs in with a phone for the first time.
+// addresses can't run up the SMS bill. That cap is a Canlı ayar (live-settings.mjs otp_global_per_hour): 0
+// turns SMS sign-in off (503, Google sign-in still works). A device that already has a development account
+// keeps it (and its wallet) when it signs in with a phone for the first time.
 // App Store / Play reviewers: OTP_REVIEW_PHONE + OTP_REVIEW_CODE sign in without an SMS. That code never
 // changes, so OTP_REVIEW_MAX_TRIES wrong codes in an hour (default 10) lock the number for an hour.
 // Development sign-in (a device key, no phone) is off unless ALLOW_DEV_AUTH=1.
@@ -28,6 +29,7 @@ import crypto from 'node:crypto';
 
 import { HttpError, auth, bannedError, clientIp, db, env, liveBan, newSession, readJson, selfUser, sha, tx } from './core.mjs';
 import { googleClientIds, verifyGoogleIdToken } from './google.mjs';
+import { live } from './live-settings.mjs';
 import { audit, deviceSignals, linkDevice, registerDevice } from './sanctions.mjs';
 import { sendCode, smsProvider } from './sms.mjs';
 
@@ -43,7 +45,6 @@ const positive = (v, d) => {
   const n = Number(v ?? d);
   return Number.isSafeInteger(n) && n > 0 ? n : d;
 };
-const GLOBAL_PER_HOUR = positive(env.OTP_GLOBAL_PER_HOUR, 300);
 const REVIEW_MAX_TRIES = positive(env.OTP_REVIEW_MAX_TRIES, 10);
 const DEVICE_KEY = /^[A-Za-z0-9_-]{32,128}$/;
 
@@ -215,14 +216,17 @@ export const authRoutes = {
     if (REVIEW_PHONE && phone === REVIEW_PHONE) return { sent: true, retryAfter: RESEND_SECONDS };
     if (!COUNTRIES.some((p) => phone.startsWith(p))) throw new HttpError(400, 'Bu ülkenin numaralarıyla giriş henüz açık değil');
     if (!smsProvider) throw new HttpError(503, 'Telefonla giriş henüz açık değil');
+    // The live cap (OTP_GLOBAL_PER_HOUR until an admin sets one), read once; 0 = SMS off, before any lock.
+    const cap = live().otpPerHour;
+    if (cap === 0) throw new HttpError(503, 'SMS ile giriş şu an kapalı, Google ile giriş yapabilirsin');
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
     /** The hourly cap over all numbers, counted under one lock so two requests can't both take the last code. */
     const globalCap = async (c) => {
       await c.query("SELECT pg_advisory_xact_lock(hashtext('otp_global'))");
       await c.query("DELETE FROM otp_sends WHERE sent_at < now() - interval '1 day'");
       const n = Number((await c.query("SELECT count(*) AS n FROM otp_sends WHERE sent_at > now() - interval '1 hour'")).rows[0].n);
-      if (n >= GLOBAL_PER_HOUR) {
-        console.error(`otp global cap reached: ${n} codes in the last hour (OTP_GLOBAL_PER_HOUR=${GLOBAL_PER_HOUR})`);
+      if (n >= cap) {
+        console.error(`otp global cap reached: ${n} codes in the last hour (cap ${cap})`);
         throw new HttpError(429, 'Şu an çok fazla kod isteniyor, biraz sonra tekrar dene');
       }
       await c.query('INSERT INTO otp_sends (phone, ip) VALUES ($1, $2)', [phone, ip]);

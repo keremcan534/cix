@@ -3,14 +3,16 @@
 // level await before startApi and pass `env` to it.
 //   Google: a token starting "test-" is a license tester's (purchaseType 0), "promo-" a promo code's (1); any
 //   other token is a paid purchase with orderId "GPA.<token>". `voided` is what the voided purchases list returns.
-//   Apple: `apple.prod` / `apple.sandbox` map a transaction id to its product and environment.
+//   `purchaseTimes` maps a token to its purchaseTimeMillis (ms); a token not in it was bought at the lookup.
+//   Apple: `apple.prod` / `apple.sandbox` map a transaction id to its product, environment and purchaseDate
+//   (ms; the lookup time when not set).
 import crypto from 'node:crypto';
 import http from 'node:http';
 
 const PKG = 'com.similarclub.app';
 
 export async function fakeStores() {
-  const s = { consumed: [], voided: [], voidedCalls: 0, livekit: [], apple: { prod: new Map(), sandbox: new Map() } };
+  const s = { consumed: [], voided: [], voidedCalls: 0, livekit: [], purchaseTimes: new Map(), apple: { prod: new Map(), sandbox: new Map() } };
   const server = http.createServer(async (req, res) => {
     let body = '';
     for await (const ch of req) body += ch;
@@ -30,13 +32,14 @@ export async function fakeStores() {
       const token = decodeURIComponent(m[2]);
       if (m[3]) return (s.consumed.push(token), send(200, {}));
       const type = token.startsWith('test-') ? 0 : token.startsWith('promo-') ? 1 : undefined;
-      return send(200, { purchaseState: 0, orderId: `GPA.${token.slice(0, 30)}`, consumptionState: 0, ...(type !== undefined && { purchaseType: type }) });
+      const purchaseTimeMillis = String(s.purchaseTimes.get(token) ?? Date.now());
+      return send(200, { purchaseState: 0, orderId: `GPA.${token.slice(0, 30)}`, purchaseTimeMillis, consumptionState: 0, ...(type !== undefined && { purchaseType: type }) });
     }
     const a = /^\/apple-(prod|sandbox)\/inApps\/v1\/transactions\/(\d+)$/.exec(url.pathname);
     if (a) {
       const t = s.apple[a[1]].get(a[2]);
       if (!t) return send(404, {});
-      const info = { bundleId: PKG, productId: t.productId, transactionId: a[2], environment: t.environment ?? (a[1] === 'prod' ? 'Production' : 'Sandbox') };
+      const info = { bundleId: PKG, productId: t.productId, transactionId: a[2], purchaseDate: t.purchaseDate ?? Date.now(), environment: t.environment ?? (a[1] === 'prod' ? 'Production' : 'Sandbox') };
       return send(200, { signedTransactionInfo: `x.${Buffer.from(JSON.stringify(info)).toString('base64url')}.y` });
     }
     const lk = /^\/lk\/twirp\/livekit\.RoomService\/(\w+)$/.exec(url.pathname);

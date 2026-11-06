@@ -1,14 +1,22 @@
 // What the server's GET /api/config says about this app (server/api/features.mjs): the minimum version, where
-// to update, a notice banner, and features switched off for a while. Pure logic, no React; the fetching and the
-// hooks are in lib/remote-control, the screens in components/remote-control.
+// to update, a notice banner, features switched off for a while, and the live settings version. Pure logic, no
+// React; the fetching and the hooks are in lib/remote-control, the screens in components/remote-control.
 
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw'] as const;
 export type Feature = (typeof FEATURES)[number];
 
-export type RemoteConfig = { minVersion: string | null; updateUrl: string | null; notice: string | null; featuresOff: Feature[] };
+export type RemoteConfig = {
+  minVersion: string | null;
+  updateUrl: string | null;
+  notice: string | null;
+  featuresOff: Feature[];
+  /** The server's live settings version (Canlı ayarlar); 0 from an older server. When it changes, the live
+   *  catalog is read again (lib/remote-control, lib/live/catalog-live). */
+  v: number;
+};
 
 /** Nothing set: what the app uses before the first answer, and without a server. */
-export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, featuresOff: [] };
+export const EMPTY_CONFIG: RemoteConfig = { minVersion: null, updateUrl: null, notice: null, featuresOff: [], v: 0 };
 
 const isFeature = (v: unknown): v is Feature => typeof v === 'string' && (FEATURES as readonly string[]).includes(v);
 
@@ -24,6 +32,7 @@ export function parseConfig(raw: unknown): RemoteConfig {
     updateUrl: url && /^https:\/\/\S+$/.test(url) ? url : null,
     notice: str(r.notice, 300),
     featuresOff: Array.isArray(r.featuresOff) ? [...new Set(r.featuresOff.filter(isFeature))] : [],
+    v: typeof r.v === 'number' && Number.isSafeInteger(r.v) && r.v >= 0 ? r.v : 0,
   };
 }
 

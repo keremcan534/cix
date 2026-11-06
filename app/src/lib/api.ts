@@ -43,7 +43,19 @@ export type SanctionView = {
   appeal?: string | null;
 };
 export type SanctionCode = 'muted' | 'account_banned' | 'device_banned';
-export type ErrorData = { error?: string; code?: SanctionCode | string; sanction?: SanctionView; serverNow?: string; appealSession?: string };
+export type ErrorData = {
+  error?: string;
+  code?: SanctionCode | string;
+  sanction?: SanctionView;
+  serverNow?: string;
+  appealSession?: string;
+  /** Çevir, 409 rate_changed: the server's rate now and what the same diamonds give at it (check before use). */
+  usdTry?: unknown;
+  coins?: unknown;
+  /** Canlı ayarlar, 409 stale: the settings version now; 409 confirm_needed: the preview to confirm. */
+  v?: number;
+  preview?: LivePreviewLine[];
+};
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -273,16 +285,31 @@ export async function deleteAccount() {
 export const sessions = () => call<{ sessions: ServerSession[] }>('GET', '/api/sessions').then((r) => r.sessions);
 export const revokeSession = (id: string) => call<{ revoked: boolean }>('POST', '/api/sessions/revoke', { id });
 
+export type CatalogCampaign = { percent: number; startsAt: string; endsAt: string; label: string };
+/** GET /api/catalog. Hidden gifts and packs are left out; `campaign` only while one runs. An older server
+ *  sends no campaign, exchange or v. The app reads it through lib/live/catalog-live (never trusted as is). */
+export type CatalogBody = {
+  gifts: CatalogGift[];
+  counts: number[];
+  packs: CatalogPack[];
+  svipXp: number[];
+  purchases?: { testTopup: boolean; stores: { android: boolean; ios: boolean } };
+  campaign?: CatalogCampaign | null;
+  exchange?: { usdTry: number; minDiamonds: number };
+  v?: number;
+};
 /** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed). */
-export const catalog = () => call<{ gifts: CatalogGift[]; counts: number[]; packs: CatalogPack[]; svipXp: number[] }>('GET', '/api/catalog');
+export const catalog = () => call<CatalogBody>('GET', '/api/catalog');
 /** A gift at the server's price; `room` = sent on stage (no push to the recipient). */
 export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', { to, giftId, count, room, ref });
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);
 
-/** After a store purchase: the server checks it with Google / Apple and credits the coins once. */
-export const verifyPurchase = (proof: StoreProof) => call<{ user: ServerUser; replay: boolean; coins: number; bonus: number }>('POST', '/api/wallet/purchase', proof);
+/** After a store purchase: the server checks it with Google / Apple and credits the coins once. `bonus` is the
+ *  first-buy gift, `campaignBonus` a campaign's extra coins (missing from an older server). */
+export const verifyPurchase = (proof: StoreProof) =>
+  call<{ user: ServerUser; replay: boolean; coins: number; bonus: number; campaignBonus?: number }>('POST', '/api/wallet/purchase', proof);
 
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
 
@@ -356,7 +383,10 @@ export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api
 export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */
 export const spend = (amount: number, reason: string, ref = newRef()) => call<{ user: ServerUser; replay: boolean }>('POST', '/api/wallet/spend', { amount, reason, ref });
-export const exchange = (diamonds: number, ref = newRef()) => call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref });
+/** Çevir. `usdTry`: the rate the screen showed; the server never gives less than it, and answers 409 rate_changed
+ *  (nothing taken) when its own rate is lower now. */
+export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>
+  call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref, ...(usdTry === undefined ? {} : { usdTry }) });
 
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
@@ -379,3 +409,78 @@ export const roomMute = (room: string, user: string, kind: 'text' | 'voice', min
   call<{ sanction: SanctionView }>('POST', '/api/rooms/mute', { room, user, kind, minutes, ...(reason ? { reason } : {}) });
 export const roomUnmute = (sanction: number) => call<{ lifted: boolean }>('POST', '/api/rooms/unmute', { sanction });
 export const roomMutes = (room: string) => call<{ mutes: (SanctionView & { userId: string; userName: string })[] }>('GET', `/api/rooms/mutes?room=${encodeURIComponent(room)}`).then((r) => r.mutes);
+
+// --- Canlı ayarlar (server/api/live-settings.mjs): admin role only (403 otherwise). Every save sends the reason,
+// the version it was based on (baseV) and this app's version; a stale baseV answers 409 stale, a big change
+// without confirm 409 confirm_needed (ApiError.data.v / .preview).
+export type LiveKey =
+  | 'features_off'
+  | 'notice'
+  | 'min_version'
+  | 'gifts_hidden'
+  | 'packs_hidden'
+  | 'campaign'
+  | 'exchange_usd_try'
+  | 'withdraw_max_diamonds'
+  | 'withdraw_weekly_diamonds'
+  | 'otp_global_per_hour';
+/** A setting's value: a list of ids, text, a number, a campaign, or null for the built-in default. */
+export type LiveValue = string | number | string[] | CatalogCampaign | null;
+export type LiveSetting = {
+  key: LiveKey;
+  group: string;
+  label: string;
+  help: string;
+  type: string;
+  bounds: Record<string, unknown>;
+  default: LiveValue;
+  /** The stored value (null: the default). */
+  value: LiveValue;
+  /** What applies now (the stored value, else the default and .env). */
+  effective: LiveValue;
+  /** The stored value no longer passes the server's rules: the default is used. */
+  invalid: boolean;
+  changedAt: string | null;
+  changedBy: { id: string; name: string } | null;
+  reason: string | null;
+};
+export type LiveSettingsView = {
+  v: number;
+  /** LIVE_SAFE_MODE=1 on the server: the table is ignored and nothing can be saved. */
+  safeMode: boolean;
+  env: { featuresOff: string[]; notice: string | null; minVersion: string | null };
+  settings: LiveSetting[];
+};
+export type LivePreviewLine = { key: LiveKey; label: string; before: LiveValue; after: LiveValue; impact: string; big: boolean };
+export type LivePreview = { preview: LivePreviewLine[]; needsConfirm: boolean };
+export type LiveSaved = { batch: string; v: number; preview: LivePreviewLine[] };
+type LiveWrite = { reason: string; baseV: number; confirm?: boolean; appVersion?: string };
+export type LiveSaveBody = LiveWrite & { changes: Partial<Record<LiveKey, LiveValue>> };
+export type LiveRollbackBody = LiveWrite & { batch: string };
+export type LiveBatch = {
+  /** Paging cursor for liveHistory(before) when the server sends it. */
+  id?: number;
+  batch: string;
+  at: string;
+  by: { id: string; name: string };
+  reason: string;
+  rollbackOf: string | null;
+  changes: { key: LiveKey; label: string; before: LiveValue; after: LiveValue }[];
+};
+
+export const liveSettings = () => call<LiveSettingsView>('GET', '/api/admin/live-settings');
+/** `dryRun: true` previews (nothing saved); without it the change is saved and every admin is told. */
+export function setLiveSettings(body: LiveSaveBody & { dryRun: true }): Promise<LivePreview>;
+export function setLiveSettings(body: LiveSaveBody & { dryRun?: false }): Promise<LiveSaved>;
+export function setLiveSettings(body: LiveSaveBody & { dryRun?: boolean }) {
+  return call<LivePreview | LiveSaved>('POST', '/api/admin/live-settings', body);
+}
+/** The newest saves first (at most 100); `before` pages back (an id from the server's order). */
+export const liveHistory = (before?: number, limit = 30) =>
+  call<{ batches: LiveBatch[] }>('GET', `/api/admin/live-settings/history?limit=${limit}${before === undefined ? '' : `&before=${before}`}`);
+/** Undoes one save: each of its keys goes back to the value before it. `dryRun: true` previews. */
+export function rollbackLive(body: LiveRollbackBody & { dryRun: true }): Promise<LivePreview>;
+export function rollbackLive(body: LiveRollbackBody & { dryRun?: false }): Promise<LiveSaved>;
+export function rollbackLive(body: LiveRollbackBody & { dryRun?: boolean }) {
+  return call<LivePreview | LiveSaved>('POST', '/api/admin/live-settings/rollback', body);
+}

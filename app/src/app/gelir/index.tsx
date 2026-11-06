@@ -13,6 +13,7 @@ import { userById } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, RULES, pct, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { liveMode } from '@/lib/live';
+import { liveRules, useLiveCatalog } from '@/lib/live/catalog-live';
 import { useServerWithdrawals } from '@/lib/live/withdraw';
 import { diamondValueTl, selfExchangeRate } from '@/lib/coins-bank';
 import { activeLocks, channelLabel, lockDays, lockProgress, nextUnlock, timeLeft, type DiamondLock } from '@/lib/diamond-locks';
@@ -64,6 +65,9 @@ export default function IncomeScreen() {
   const { diamonds, withdrawableDiamonds: free, lockedDiamonds: locked, diamondLocks, earnings } = useApp();
   // Live mode: a pending withdrawal holds its diamonds on the server (they are already out of the balance).
   const withdrawState = useServerWithdrawals();
+  // Çevir's rate line: the server's rate in a live build (Canlı ayarlar), the compiled one otherwise.
+  const liveCat = useLiveCatalog();
+  const per10k = Math.floor(10_000 * selfExchangeRate(liveMode() ? liveRules(liveCat) : RULES));
   const pendingWithdraw = liveMode() ? withdrawState.list.find((w) => w.status === 'pending') : undefined;
   const { colors, semantic, ink } = useTheme();
   const styles = useStyles();
@@ -142,7 +146,7 @@ export default function IncomeScreen() {
             <Ionicons name="swap-horizontal" size={20} color={semantic.moneyInk} />
             <View style={{ flex: 1 }}>
               <Text style={styles.exchangeTitle}>Çevir</Text>
-              <Text style={styles.exchangeSub} numberOfLines={1}>10.000 💎 = {fmt(Math.floor(10_000 * selfExchangeRate()))} jeton · ücret yok</Text>
+              <Text style={styles.exchangeSub} numberOfLines={1}>10.000 elmas = {fmt(per10k)} jeton · ücret yok</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={semantic.moneyInk} />
           </Pressable>

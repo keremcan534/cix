@@ -165,6 +165,26 @@ describe('Satın alma sonrası sözler', () => {
     assert.equal(purchaseReason(0), 'Jeton satın alma');
     assert.equal(purchaseReason(1000), 'Jeton satın alma (+1.000 ilk alım hediyesi)', 'sunucunun hareket satırıyla aynı');
   });
+
+  test('kampanya hediyesi yalnızca kampanya jetonu varsa söylenir; ilk alım sözü aynı kalır', () => {
+    assert.equal(
+      outcomeAlert({ kind: 'done', coins: 100_000, bonus: 0, replay: false, campaignBonus: 20_000 })?.body,
+      '100.000 jeton hesabına eklendi. Kampanya hediyesi olarak +20.000 jeton da eklendi.',
+    );
+    assert.equal(
+      outcomeAlert({ kind: 'done', coins: 5000, bonus: 2500, replay: false, campaignBonus: 750 })?.body,
+      '5.000 jeton hesabına eklendi. İlk alım hediyesi olarak +2.500 jeton da eklendi. Kampanya hediyesi olarak +750 jeton da eklendi.',
+    );
+    for (const campaignBonus of [0, undefined, -5, 1.5, NaN]) {
+      assert.equal(outcomeAlert({ kind: 'done', coins: 5000, bonus: 2500, replay: false, campaignBonus })?.body, '5.000 jeton hesabına eklendi. İlk alım hediyesi olarak +2.500 jeton da eklendi.', String(campaignBonus));
+    }
+    assert.equal(outcomeAlert({ kind: 'done', coins: 1000, bonus: 0, replay: true, campaignBonus: 200 })?.body, 'Bu ödeme daha önce hesabına eklenmişti; bakiyen güncel.', 'tekrar: yeni jeton yok');
+    assert.equal(purchaseReason(0, 20_000), 'Jeton satın alma (+20.000 kampanya)');
+    assert.equal(purchaseReason(1000, 200), 'Jeton satın alma (+1.000 ilk alım hediyesi, +200 kampanya)', 'sunucunun hareket satırıyla aynı');
+    assert.equal(purchaseReason(1000, 0), 'Jeton satın alma (+1.000 ilk alım hediyesi)');
+    assert.equal(purchaseReason(0, 0), 'Jeton satın alma');
+    assert.equal(purchaseReason(0, -3), 'Jeton satın alma');
+  });
 });
 
 // --- The flow ---------------------------------------------------------------------------------------------
@@ -246,6 +266,25 @@ describe('Satın alma akışı', () => {
     assert.deepEqual(log, ['buy:coins_1000', `verify:${TOKEN}`, 'apply:1000', `finish:${TOKEN}`], 'jeton sunucunun cevabından önce yazılmaz');
     assert.deepEqual(s.applied, [{ coins: 1000, reason: 'Jeton satın alma' }]);
     assert.deepEqual(s.saved, [], 'cevap gelince belirteç silinir');
+  });
+
+  test('kampanyalı alım: kampanya jetonu sonuçta ve hareket satırında; bozuk değer yok sayılır', async () => {
+    const { s, billing, purchase } = rig();
+    await billing.start();
+    s.verify = async () => ({ user: { id: 'u1', coins: 1200 }, replay: false, coins: 1000, bonus: 0, campaignBonus: 200 });
+    s.onBuy = () => setTimeout(() => s.emitPurchase(purchase()), 0);
+    assert.deepEqual(await billing.buy('coins_1000'), { kind: 'done', coins: 1000, bonus: 0, replay: false, campaignBonus: 200 });
+    assert.deepEqual(s.applied, [{ coins: 1200, reason: 'Jeton satın alma (+200 kampanya)' }]);
+
+    // An older server (no campaignBonus) or a malformed one: no campaign words, the same outcome as before.
+    for (const campaignBonus of [undefined, '200', -1, 2.5]) {
+      const r = rig();
+      await r.billing.start();
+      r.s.verify = async () => ({ user: { id: 'u1', coins: 1000 }, replay: false, coins: 1000, bonus: 0, campaignBonus: campaignBonus as number });
+      r.s.onBuy = () => setTimeout(() => r.s.emitPurchase(r.purchase()), 0);
+      assert.deepEqual(await r.billing.buy('coins_1000'), { kind: 'done', coins: 1000, bonus: 0, replay: false }, String(campaignBonus));
+      assert.deepEqual(r.s.applied, [{ coins: 1000, reason: 'Jeton satın alma' }]);
+    }
   });
 
   test('vazgeçmek sessiz: doğrulama yok, bakiye yok', async () => {

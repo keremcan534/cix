@@ -7,7 +7,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
-import { liveMode } from '@/lib/live';
+import { liveMode, myServerId, onAccountChange } from '@/lib/live';
 import type { AppealOutcome, ApplyBody, DeviceRisk, SanctionAppeal, SanctionAudit, SanctionDevice, SanctionMeta, SanctionPolicy, SanctionType, StaffSanction } from '@/lib/sanction-format';
 
 const get = <T>(path: string) => api.apiRequest<T>('GET', path);
@@ -24,21 +24,42 @@ const subscribeRole = (l: () => void) => {
   roleListeners.add(l);
   return () => roleListeners.delete(l);
 };
-/** Reads my server role (GET /api/me) once per app start; a failed read leaves the panel hidden. */
+/**
+ * Reads my server role (GET /api/me) once per signed-in account; a failed read leaves the panel hidden. The role
+ * is kept only for the account this phone holds now (lib/live myServerId): a read that answers for another one
+ * (a session still ending as the account signs out) or that an account change overtook is dropped.
+ */
 let roleRead: Promise<void> | null = null;
+let roleGen = 0;
 export function readRole(force = false) {
   if (!liveMode()) return Promise.resolve();
   if (roleRead && !force) return roleRead;
-  roleRead = get<{ user: api.ServerMe }>('/api/me')
+  const gen = ++roleGen;
+  const read = get<{ user: api.ServerMe }>('/api/me')
     .then((r) => {
+      if (gen !== roleGen) return;
+      // Not the account held now (or none yet): read again once it is known (onAccountChange below).
+      if (r.user.id !== myServerId()) return void (roleRead = null);
       role = r.user.role ?? 'user';
       roleListeners.forEach((l) => l());
     })
     .catch(() => {
-      roleRead = null;
+      if (gen === roleGen) roleRead = null;
     });
-  return roleRead;
+  roleRead = read;
+  return read;
 }
+// Signed out, or in as someone else, without a restart: the last account's role must not carry over (the
+// Yönetim entry, the 'Yönetici olarak devam et' way past a forced update). The new account's is read afresh.
+onAccountChange(() => {
+  roleGen++;
+  roleRead = null;
+  if (role !== null) {
+    role = null;
+    roleListeners.forEach((l) => l());
+  }
+  if (myServerId()) void readRole(true);
+});
 /** True for an admin account in a live build. */
 export function useIsAdmin() {
   return useStaffRole() === 'admin';

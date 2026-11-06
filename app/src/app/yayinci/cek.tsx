@@ -39,7 +39,23 @@ export default function Withdraw() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const n = Number(amount) || 0;
-  const presets = [10_000, 20_000, 50_000].filter((p) => p <= diamonds);
+  // Live mode: the limits the server sends with the list (Canlı ayarlar can change them); the compiled ones
+  // until it answers or when an older server sends none. The server checks every request again.
+  const limits = fromServer ? server.rules : null;
+  const minD = limits?.minDiamonds ?? RULES.minWithdrawDiamonds;
+  const maxD = limits?.maxDiamonds ?? RULES.maxWithdrawDiamonds;
+  const weekLeft = limits ? Math.max(0, limits.weeklyDiamonds - limits.weekUsed) : Infinity;
+  const cap = Math.min(diamonds, maxD, weekLeft);
+  const presets = [10_000, 20_000, 50_000].filter((p) => p <= cap);
+  /** The amount against the server's limits (null when they're not in: checkWithdraw uses the compiled ones). */
+  const amountError = (d: number) => {
+    if (!limits) return null;
+    if (!Number.isSafeInteger(d) || d < limits.minDiamonds) return `En az ${fmt(limits.minDiamonds)} elmas çekebilirsin.`;
+    if (d > limits.maxDiamonds) return `Tek talepte en çok ${fmt(limits.maxDiamonds)} elmas çekebilirsin.`;
+    if (d > weekLeft) return `7 günde en çok ${fmt(limits.weeklyDiamonds)} elmas çekilebilir; kalan ${fmt(weekLeft)} elmas.`;
+    if (d > diamonds) return 'Çekilebilir elmasın yetmiyor. Kilitli elmaslar süresi dolunca eklenir.';
+    return null;
+  };
   const { colors } = useTheme();
   const styles = useStyles();
   // Live mode: one request at a time; a new one waits until the pending one is settled or cancelled.
@@ -49,7 +65,17 @@ export default function Withdraw() {
     if (live) {
       if (busy || blockedFeature('withdraw')) return;
       if (pending) return showAlert('Bekleyen talebin var', 'Bekleyen talebin sonuçlanınca ya da onu iptal edince yenisini açabilirsin.');
-      const err = checkWithdraw({ diamonds: n, withdrawable: diamonds, method, holder: name, account: method === 'iban' ? formatIban(account) : account });
+      // With the server's limits the amount is checked above; checkWithdraw then checks only the holder and the
+      // account (it gets an amount its compiled limits accept).
+      const err =
+        amountError(n) ??
+        checkWithdraw({
+          diamonds: limits ? RULES.minWithdrawDiamonds : n,
+          withdrawable: limits ? RULES.minWithdrawDiamonds : diamonds,
+          method,
+          holder: name,
+          account: method === 'iban' ? formatIban(account) : account,
+        });
       if (err) return showAlert('Hata', err);
       setBusy(true);
       liveWithdraw({ diamonds: n, method, holder: name, account: method === 'iban' ? formatIban(account) : account })
@@ -86,7 +112,12 @@ export default function Withdraw() {
         <Card style={{ alignItems: 'center', gap: 4 }}>
           <Text style={styles.dim}>Çekilebilir bakiye</Text>
           <Text style={styles.big}>💎 {diamonds.toLocaleString('tr-TR')}</Text>
-          <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {RULES.minWithdrawDiamonds.toLocaleString('tr-TR')} elmas</Text>
+          <Text style={styles.dim}>≈ {usd(diamonds)} · Minimum {minD.toLocaleString('tr-TR')} elmas</Text>
+          {limits && (
+            <Text style={[styles.dim, { textAlign: 'center' }]}>
+              Tek talepte en çok {fmt(limits.maxDiamonds)} elmas · 7 günde en çok {fmt(limits.weeklyDiamonds)} elmas (kalan {fmt(weekLeft)})
+            </Text>
+          )}
           {locked > 0 && (
             <View style={styles.locked}>
               <Ionicons name="lock-closed" size={12} color={colors.textDim} />
@@ -103,8 +134,8 @@ export default function Withdraw() {
               <Text style={styles.chipText}>{p.toLocaleString('tr-TR')}</Text>
             </Pressable>
           ))}
-          {diamonds >= RULES.minWithdrawDiamonds && (
-            <Pressable style={styles.chip} onPress={() => setAmount(String(diamonds))}>
+          {cap >= minD && (
+            <Pressable style={styles.chip} onPress={() => setAmount(String(cap))}>
               <Text style={styles.chipText}>Tümü</Text>
             </Pressable>
           )}

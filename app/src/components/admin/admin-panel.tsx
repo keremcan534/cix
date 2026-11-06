@@ -1,8 +1,9 @@
 // Yönetim: the owner's panel in a live build, opened from Ayarlar for admin accounts (lib/live/admin useIsAdmin).
-// A full-screen sheet, not a route: Özet, Şikâyetler, Para çekme, Ajans ödemeleri, İadeler and Yaptırımlar on
-// the server's admin routes. Every money or account action asks first, then shows a short result and reloads
+// A full-screen sheet, not a route: Özet, Canlı ayarlar, Para çekme, Ajans ödemeleri, Şikâyetler, İadeler and
+// Yaptırımlar on the server's admin routes. Every money or account action asks first, then shows a short result and reloads
 // its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
 // sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
+// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it).
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { AccountSheet } from './account-sheet';
 import { AgencyPayoutsSection } from './agency-payouts';
+import { LiveSettingsSection, loadLiveAccess, type LiveAccess } from './live-settings';
 import { OverviewSection, type Tab } from './overview';
 import { AdminContext, InputSheet, LoadState, SectionScroll, Toast, useLoad, type AdminCtx, type Load, type SheetSpec } from './parts';
 import { RefundsSection } from './refunds';
@@ -27,6 +29,7 @@ import { WithdrawalsSection } from './withdrawals';
 
 const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ozet', label: 'Özet' },
+  { key: 'ayarlar', label: 'Canlı ayarlar' },
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
   { key: 'sikayet', label: 'Şikâyetler', count: 'reports' },
@@ -52,6 +55,8 @@ async function loadSanctionMeta(): Promise<{ meta: SanctionMeta | null; waiting?
 }
 
 type Person = { id: string; name: string };
+
+const noLive = async (): Promise<LiveAccess> => ({ view: null });
 
 /** What waits for the owner; a part that can't be read stays undefined (shown as –, no badge). */
 async function loadPending(): Promise<Partial<Pending>> {
@@ -130,10 +135,16 @@ function PanelBody({
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
   const pending = useLoad(loadPending);
   const sanctions = useLoad(loadSanctionMeta);
+  const isAdmin = admin.useIsAdmin();
+  const live = useLoad<LiveAccess>(moderator ? noLive : loadLiveAccess);
   const meta = sanctions.data?.meta ?? null;
   // Shown once the meta answers, or after a failure other than 403 (the tab offers Tekrar dene); hidden on a 403.
   const showSanctions = !!meta || !!sanctions.error;
-  const tabs = moderator ? TABS.filter((t) => t.key === 'yaptirim') : TABS.filter((t) => t.key !== 'yaptirim' || showSanctions);
+  // Canlı ayarlar: admins only, same rule (a 403 from the server hides the tab).
+  const showLive = isAdmin && !moderator && (!!live.data?.view || !!live.error);
+  const tabs = moderator
+    ? TABS.filter((t) => t.key === 'yaptirim')
+    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive));
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
@@ -191,6 +202,7 @@ function PanelBody({
             </ScrollView>
           </View>
           <View style={{ flex: 1 }}>
+            {tab === 'ayarlar' && <LiveSettingsSection load={live} />}
             {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
             {tab === 'sikayet' && <ReportsSection />}
             {tab === 'cekim' && <WithdrawalsSection />}

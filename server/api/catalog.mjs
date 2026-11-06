@@ -84,12 +84,13 @@ export const PACK_BY_PRODUCT = new Map(PACKS.map((p) => [p.productId, p]));
 /**
  * Diamonds → coins (Gelir > Çevir): a diamond's official value (5.000 💎 = 1 USD, at USD_TRY) priced like the
  * best pack, no fee, coins rounded down. The same sum as app/src/lib/coins-bank.ts exchangeOwnDiamonds with
- * the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift.
+ * the rules in app/src/data/rules.ts; tests/server-catalog.test.ts fails when they drift. `usdTry` is the
+ * rate in effect: Çevir passes the live one (live-settings.mjs, Canlı ayarlar); the default is the compiled rate.
  */
 export const EXCHANGE = { diamondsPerUsd: 5_000, usdTry: 49.8, minDiamonds: 100, bankFee: 0.03, wholesaleFee: 0.02 };
 const BEST = PACKS.at(-1);
 const COINS_PER_TL = BEST.coins / BEST.tl;
-export const exchangeCoins = (diamonds) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * COINS_PER_TL));
+export const exchangeCoins = (diamonds, usdTry = EXCHANGE.usdTry) => Math.floor(diamonds * ((1 / EXCHANGE.diamondsPerUsd) * usdTry * COINS_PER_TL));
 
 /** What diamonds are worth in TL (5.000 💎 = 1 USD at USD_TRY): what a Jeton Noktası pays a host for them. */
 export const diamondValueTl = (diamonds) => Math.round((diamonds / EXCHANGE.diamondsPerUsd) * EXCHANGE.usdTry * 100) / 100;

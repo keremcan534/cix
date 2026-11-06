@@ -1,6 +1,7 @@
 // Real coin packs through Google Play in a live build (the steps: lib/live/billing-core). The wallet screen
 // reads useShop() and calls openShop() / buyCoins(); LiveSync calls resumePurchases() once signed in, so a
-// purchase whose server answer was lost is verified again on the next app start.
+// purchase whose server answer was lost is verified again on the next app start. The catalog is read through
+// lib/live/catalog-live, so opening the wallet also refreshes a campaign and the hidden packs for every screen.
 //
 // The obfuscated account id sent to Play is sha256 hex of the server user id (expo-crypto: Hermes has no
 // WebCrypto); the server checks it against the signed-in account (server/api/purchases.mjs).
@@ -13,6 +14,7 @@ import * as api from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { applyServerUser, liveMode, myServerId, refreshWallet } from '@/lib/live';
 import { createBilling, outcomeAlert, parseCatalog, parseSaved, shopPacks, shopStatus, type Outcome, type ShopCatalog, type ShopPack, type ShopStatus } from '@/lib/live/billing-core';
+import { fetchLiveCatalog } from '@/lib/live/catalog-live';
 import { playStore } from '@/lib/live/play-store';
 
 const SAVED_KEY = 'similarclub:iap-unverified';
@@ -75,7 +77,7 @@ export function openShop(): Promise<void> {
   opening ??= (async () => {
     let c: ShopCatalog;
     try {
-      c = parseCatalog(await api.apiRequest('GET', '/api/catalog'));
+      c = parseCatalog(await fetchLiveCatalog());
     } catch {
       // Offline: what an earlier visit loaded stays on screen.
       if (!catalog || catalog === 'failed') catalog = 'failed';

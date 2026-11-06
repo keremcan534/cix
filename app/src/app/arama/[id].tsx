@@ -12,6 +12,7 @@ import { callPrice } from '@/data/economy';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { goBack } from '@/lib/nav';
 import { showAlert } from '@/lib/alert';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { checkInteraction } from '@/lib/interaction';
 import { beginCall, endCall } from '@/lib/media';
 import { useApp } from '@/store';
@@ -34,6 +35,9 @@ function CallScreen() {
   const video = mode !== 'sesli';
   const price = video ? callPrice(user) : Math.round(callPrice(user) / 2);
   const { coins, spendCoins, bump, recordGift, me, blocked, following } = useApp();
+  // The call's one-tap gift: Kahve, or the first plain gift still offered when Canlı ayarlar hid it.
+  const shownGifts = visibleGifts(GIFTS, useLiveCatalog());
+  const callGift = shownGifts.includes(GIFTS[2]) ? GIFTS[2] : (shownGifts.find((g) => !g.minSvip && (g.cat ?? 'hot') === 'hot') ?? shownGifts[0]);
 
   const [phase, setPhase] = useState<Phase>('ringing');
   const [seconds, setSeconds] = useState(0);
@@ -124,7 +128,7 @@ function CallScreen() {
   };
 
   const sendGift = () => {
-    const gift = GIFTS[2];
+    const gift = callGift;
     if (!spendCoins(gift.price, `Hediye: ${gift.name} → ${user.name}`)) return showAlert('Yetersiz jeton');
     bump('giftsSent');
     recordGift(user.id, gift.id, 1);
