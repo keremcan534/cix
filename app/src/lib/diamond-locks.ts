@@ -5,6 +5,7 @@
 // (server/api/wallet.mjs, diamond_locks) and refuses the same moves with the same message; the app mirrors them so
 // the Gelir screen can show both parts. Kept pure so node --test can load it (tests/diamond-locks.test.ts).
 import { RULES, type Rules } from '@/data/rules';
+import type { ServerLock } from '@/lib/api';
 import type { EarningGift, EarningSource } from '@/store';
 
 /** Where the sender's coins came from: the store (refundable for a week) or a Jeton Noktası. */
@@ -18,6 +19,10 @@ export type DiamondLock = {
   source: EarningSource;
   fromId?: string;
   gift?: EarningGift;
+  /** Live mode: the server's name for the coins behind it ("Google Play", "Jeton Noktası", "Elmastan çevrildi"…). */
+  label?: string;
+  /** Live mode: epoch ms when the lock started. With unlockAt it gives the real lock length, whatever the channel. */
+  lockedAt?: number;
 };
 
 const HOUR = 3_600_000;
@@ -27,6 +32,48 @@ const fmt = (n: number) => n.toLocaleString('tr-TR');
 export const lockDays = (channel: LockChannel, r: Rules = RULES) => (channel === 'jeton' ? r.jetonPendingDays : r.pendingDays);
 export const lockMs = (channel: LockChannel, r: Rules = RULES) => lockDays(channel, r) * DAY;
 export const channelLabel = (channel: LockChannel) => (channel === 'jeton' ? 'Jeton Noktası' : 'Mağaza jetonu');
+
+/** The server's coin channels that lock for the short (Jeton Noktası) period (server/api/wallet.mjs CHANNELS). */
+const SERVER_JETON_CHANNELS = new Set(['jeton_noktasi', 'toptan', 'bozdurma', 'cevir']);
+
+/**
+ * A lock as the server sends it (GET /api/wallet/earnings). The label and the length come from the server row
+ * (its channel label, created_at and unlock_at), never from the two local channels: a Jeton Noktası passing on
+ * store coins keeps the 7-day lock, and Çevir coins lock for 1 day. `giftOf` names the gift from the catalog.
+ */
+export function fromServerLock(l: ServerLock, giftOf: (id: string) => { name: string; emoji: string } | undefined = () => undefined): DiamondLock {
+  const g = l.gift ? giftOf(l.gift.id) : undefined;
+  const lockedAt = Date.parse(l.createdAt);
+  return {
+    id: `srv-${l.id}`,
+    amount: l.amount,
+    unlockAt: Date.parse(l.unlockAt),
+    channel: SERVER_JETON_CHANNELS.has(l.channel) ? 'jeton' : 'store',
+    source: 'Hediye',
+    label: l.channelLabel,
+    ...(Number.isFinite(lockedAt) && { lockedAt }),
+    ...(l.from && { fromId: l.from.id }),
+    ...(l.gift && { gift: { id: l.gift.id, name: g?.name ?? 'Hediye', emoji: g?.emoji ?? '🎁', count: l.gift.count } }),
+  };
+}
+
+/** Where the coins behind a lock came from: the server's label in live mode, else the local channel's. */
+export const lockLabel = (lock: DiamondLock) => lock.label || channelLabel(lock.channel);
+
+/** How long this lock lasts in all: from its start to its unlock when known, else the channel's period. */
+export function lockTotalMs(lock: DiamondLock, r: Rules = RULES) {
+  if (lock.lockedAt !== undefined && Number.isFinite(lock.lockedAt) && lock.unlockAt >= lock.lockedAt) return lock.unlockAt - lock.lockedAt;
+  return lockMs(lock.channel, r);
+}
+
+/** "7 gün", "1 gün", "12 saat": the lock's whole length, as the row shows it next to the countdown. */
+export function lockLength(lock: DiamondLock, r: Rules = RULES) {
+  const ms = lockTotalMs(lock, r);
+  const days = Math.round(ms / DAY);
+  if (days >= 1 && Math.abs(ms - days * DAY) < HOUR) return `${days} gün`;
+  const hours = Math.max(1, Math.round(ms / HOUR));
+  return hours % 24 === 0 ? `${hours / 24} gün` : `${hours} saat`;
+}
 
 /** Earnings paid with someone's coins (a gift, a call, and the bonuses on them) can be refunded, so they lock.
  *  Platform payouts (tasks, agency and family bonuses) are settled weekly and don't. */
@@ -63,9 +110,16 @@ export function addLock(locks: readonly DiamondLock[], lock: DiamondLock): Diamo
   return [...next.filter((l) => kept.has(l)), folded];
 }
 
-/** The balance in two parts. Locks never count for more than the balance itself. */
-export function diamondSplit(diamonds: number, locks: readonly DiamondLock[], now: number) {
-  const pending = locks.reduce((t, l) => (l.unlockAt > now ? t + l.amount : t), 0);
+/**
+ * Live mode: the locked diamonds GET /api/wallet/earnings counts in its total but leaves off its list (it lists
+ * only the 100 locks that open soonest). Those open after every listed lock, so they stay locked until the next read.
+ */
+export const unlistedLocked = (e: { locked: number; locks: readonly { amount: number }[] }) => Math.max(0, e.locked - e.locks.reduce((t, l) => t + l.amount, 0));
+
+/** The balance in two parts. Locks never count for more than the balance itself. `unlisted`: locked diamonds that
+ *  have no row here (unlistedLocked), counted as still locked. */
+export function diamondSplit(diamonds: number, locks: readonly DiamondLock[], now: number, unlisted = 0) {
+  const pending = locks.reduce((t, l) => (l.unlockAt > now ? t + l.amount : t), Math.max(0, unlisted));
   const locked = Math.max(0, Math.min(diamonds, pending));
   return { locked, withdrawable: Math.max(0, diamonds - locked) };
 }
@@ -97,7 +151,7 @@ export function timeLeft(unlockAt: number, now: number): string {
 
 /** How much of the lock period has passed, 0…1 (for the progress bar). */
 export function lockProgress(lock: DiamondLock, now: number, r: Rules = RULES): number {
-  const total = lockMs(lock.channel, r);
+  const total = lockTotalMs(lock, r);
   if (total <= 0) return 1;
   return Math.min(1, Math.max(0, 1 - (lock.unlockAt - now) / total));
 }

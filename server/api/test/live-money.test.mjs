@@ -299,7 +299,7 @@ describe('Kampanya', () => {
     // campaign part it would be 800.000 or 740.000 and pass.
     const [st, j] = await buy('coins_200000');
     assert.equal(st, 429);
-    assert.match(j.error, /Günlük test yüklemesi sınırı/);
+    assert.match(j.error, /Günlük test yükleme sınırı/);
     assert.equal((await ok(buy('coins_100000'))).campaignBonus, 20_000, '720.000 sınırın altında');
     assert.equal((await balance(u.user.id)).coins, 720_000);
   });

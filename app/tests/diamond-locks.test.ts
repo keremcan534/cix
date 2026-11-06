@@ -12,11 +12,16 @@ import {
   diamondSplit,
   lockDays,
   lockMs,
+  fromServerLock,
+  lockLabel,
+  lockLength,
   lockProgress,
+  lockTotalMs,
   lockedReason,
   locksFor,
   nextUnlock,
   timeLeft,
+  unlistedLocked,
   type DiamondLock,
 } from '@/lib/diamond-locks';
 import { readSnapshot } from '@/lib/snapshot';
@@ -115,5 +120,72 @@ describe('Elmas kilidi', () => {
     })!;
     assert.deepEqual(s.diamondLocks!.map((l) => l.id), ['k1', 'k2']);
     assert.equal('diamondLocks' in readSnapshot({ diamondLocks: 'hepsi' })!, false);
+  });
+});
+
+describe('Sunucudaki kilitler (canlı mod)', () => {
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const srv = (channel: string, channelLabel: string, hours: number, extra: Partial<ServerLockT> = {}): ServerLockT => ({
+    id: 7,
+    amount: 120,
+    channel,
+    channelLabel,
+    createdAt: iso(T),
+    unlockAt: iso(T + hours * H),
+    from: null,
+    gift: null,
+    ...extra,
+  });
+  type ServerLockT = Parameters<typeof fromServerLock>[0];
+
+  test("label and length come from the server row, not from the two local channels", () => {
+    const play = fromServerLock(srv('google_play', 'Google Play', 7 * 24));
+    assert.equal(play.channel, 'store');
+    assert.equal(lockLabel(play), 'Google Play');
+    assert.equal(lockLength(play), '7 gün');
+
+    const cevir = fromServerLock(srv('cevir', 'Elmastan çevrildi', 24));
+    assert.equal(cevir.channel, 'jeton', 'Çevir jetonu kısa kilitlenir');
+    assert.equal(lockLabel(cevir), 'Elmastan çevrildi');
+    assert.equal(lockLength(cevir), '1 gün');
+
+    // A Jeton Noktası passing on store coins keeps the 7-day lock: the length is the server's, whatever the channel.
+    const bank = fromServerLock(srv('jeton_noktasi', 'Jeton Noktası', 7 * 24));
+    assert.equal(bank.channel, 'jeton');
+    assert.equal(lockTotalMs(bank), 7 * D);
+    assert.equal(lockLength(bank), '7 gün');
+    assert.equal(lockLength(fromServerLock(srv('test', 'Test jetonu', 12))), '12 saat');
+  });
+
+  test('progress runs over the real lock length', () => {
+    const l = fromServerLock(srv('jeton_noktasi', 'Jeton Noktası', 7 * 24));
+    assert.equal(lockProgress(l, T + 7 * 12 * H), 0.5, 'local jeton channel would say 1 day and show it full');
+    assert.equal(lockProgress(l, T + 8 * D), 1);
+  });
+
+  test('sender, gift and id are kept; a local lock still uses its channel', () => {
+    const l = fromServerLock(srv('google_play', 'Google Play', 168, { from: { id: 'abc', name: 'Ayşe' }, gift: { id: 'rose', count: 3 } }), (id) => (id === 'rose' ? { name: 'Gül', emoji: '' } : undefined));
+    assert.equal(l.id, 'srv-7');
+    assert.equal(l.fromId, 'abc');
+    assert.deepEqual(l.gift, { id: 'rose', name: 'Gül', emoji: '', count: 3 });
+    assert.equal(l.lockedAt, T);
+    const local = lock(10, T + D, { channel: 'jeton' });
+    assert.equal(lockLabel(local), 'Jeton Noktası');
+    assert.equal(lockTotalMs(local, DEFAULT_RULES), lockMs('jeton', DEFAULT_RULES));
+  });
+
+  test('the server lists 100 locks but its total counts them all: the rest stay locked (QA para-7)', () => {
+    // 117 gifts of 10 diamonds, all locked: the server says locked 1.170, withdrawable 0, and lists 100 of them.
+    const listed = Array.from({ length: 100 }, (_, i) => lock(10, T + (i + 1) * H, { id: `s${i}` }));
+    const e = { locked: 1_170, locks: listed };
+    assert.equal(unlistedLocked(e), 170);
+    assert.deepEqual(diamondSplit(1_170, listed, T, unlistedLocked(e)), { locked: 1_170, withdrawable: 0 }, 'the list alone said 170 withdrawable');
+    assert.deepEqual(diamondSplit(1_170, listed, T), { locked: 1_000, withdrawable: 170 });
+    // Listed locks open first (soonest first); the unlisted ones wait for the next read.
+    assert.deepEqual(diamondSplit(1_170, listed, T + 10 * H, 170), { locked: 1_070, withdrawable: 100 });
+    // Never more than the balance, never below zero.
+    assert.deepEqual(diamondSplit(500, listed, T, 170), { locked: 500, withdrawable: 0 });
+    assert.equal(unlistedLocked({ locked: 300, locks: listed }), 0, 'a total under the listed sum (balance cap) adds nothing');
+    assert.equal(unlistedLocked({ locked: 0, locks: [] }), 0);
   });
 });

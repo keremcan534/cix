@@ -7,7 +7,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Button, Header } from '@/components/ui';
-import { ago, fmtDate } from '@/lib/admin-format';
+import { ago, fmtDate, verificationLabel } from '@/lib/admin-format';
 import { copyText } from '@/lib/clipboard';
 import * as admin from '@/lib/live/admin';
 import {
@@ -212,7 +212,7 @@ function DeviceCard({ dev, ctx, perms, onChanged }: { dev: SanctionDevice; ctx: 
       <Line label="Hesap sayısı" value={dev.accounts > 1 ? `${dev.accounts} hesap bu cihazı kullanıyor` : 'Yalnızca bu hesap'} />
       <Line label="İlk görülme" value={fmtDate(dev.firstSeenAt)} />
       <Line label="Son görülme" value={`${fmtDate(dev.lastSeenAt)} · ${ago(dev.lastSeenAt)}`} />
-      {!!dev.verification && <Line label="Doğrulama" value={dev.verification} />}
+      {!!dev.verification && <Line label="Doğrulama" value={verificationLabel(dev.verification)} />}
       {!!dev.riskNote && <Quote text={dev.riskNote} />}
       {canReview && (
         <View style={{ flexDirection: 'row', paddingTop: 4 }}>

@@ -4,13 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
 import {
   BOSS_SEAT_MIN_COINS,
@@ -49,21 +50,28 @@ const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m
 export const lastSeenDays = (id: string) => (Number(id.replace(/\D/g, '') || 0) * 5) % 40;
 
 // --- Generic sheets -------------------------------------------------------------
+// The modal is edge to edge on Android: the sheet rises above the keyboard as a whole and keeps its last row
+// clear of the navigation bar.
+const useSheetBottom = () => Math.max(30, useSafeAreaInsets().bottom + 8);
+
 function BottomSheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  const paddingBottom = useSheetBottom();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={[styles.sheetTitle, { flex: 1 }]}>{title}</Text>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { paddingBottom }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={[styles.sheetTitle, { flex: 1 }]}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ gap: 8, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
         </View>
-        <ScrollView contentContainerStyle={{ gap: 8, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
-          {children}
-        </ScrollView>
-      </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }
@@ -85,39 +93,42 @@ export function ChoiceSheet<T extends string | number>({
   onPick: (v: T) => void;
   onClose: () => void;
 }) {
+  const paddingBottom = useSheetBottom();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingHorizontal: 0 }]}>
-        {title && <Text style={[styles.sheetTitle, { textAlign: 'center', paddingHorizontal: 16 }]}>{title}</Text>}
-        {desc && <Text style={[styles.dim, { textAlign: 'center', paddingHorizontal: 20, marginBottom: 8 }]}>{desc}</Text>}
-        <ScrollView>
-          {options.map((o) => {
-            const on = o.value === value;
-            return (
-              <Pressable
-                key={String(o.value)}
-                accessibilityLabel={o.label}
-                onPress={() => {
-                  if (o.disabled) return showAlert('Kilitli', o.sub ?? 'Bu seçenek henüz açılmadı.');
-                  onPick(o.value);
-                  onClose();
-                }}
-                style={[styles.choice, on && { backgroundColor: 'rgba(52,211,153,0.12)' }, o.disabled && { opacity: 0.45 }]}>
-                {o.art && <Image source={o.art} style={styles.choiceArt} />}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, textAlign: o.sub || o.art ? 'left' : 'center' }}>{o.label}</Text>
-                  {o.sub && <Text style={styles.dim}>{o.sub}</Text>}
-                </View>
-                {on && <Ionicons name="checkmark" size={24} color={colors.green} />}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        <Pressable onPress={onClose} style={styles.cancel}>
-          <Text style={{ color: '#fff', fontSize: 16 }}>İptal et</Text>
-        </Pressable>
-      </View>
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { paddingHorizontal: 0, paddingBottom }]}>
+          {title && <Text style={[styles.sheetTitle, { textAlign: 'center', paddingHorizontal: 16 }]}>{title}</Text>}
+          {desc && <Text style={[styles.dim, { textAlign: 'center', paddingHorizontal: 20, marginBottom: 8 }]}>{desc}</Text>}
+          <ScrollView>
+            {options.map((o) => {
+              const on = o.value === value;
+              return (
+                <Pressable
+                  key={String(o.value)}
+                  accessibilityLabel={o.label}
+                  onPress={() => {
+                    if (o.disabled) return showAlert('Kilitli', o.sub ?? 'Bu seçenek henüz açılmadı.');
+                    onPick(o.value);
+                    onClose();
+                  }}
+                  style={[styles.choice, on && { backgroundColor: 'rgba(52,211,153,0.12)' }, o.disabled && { opacity: 0.45 }]}>
+                  {o.art && <Image source={o.art} style={styles.choiceArt} />}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, textAlign: o.sub || o.art ? 'left' : 'center' }}>{o.label}</Text>
+                    {o.sub && <Text style={styles.dim}>{o.sub}</Text>}
+                  </View>
+                  {on && <Ionicons name="checkmark" size={24} color={colors.green} />}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable onPress={onClose} style={styles.cancel}>
+            <Text style={{ color: '#fff', fontSize: 16 }}>İptal et</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }
@@ -229,6 +240,7 @@ export function RoomInfoSheet({
   onSettings,
   onShare,
   onInvite,
+  live = false,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -259,11 +271,14 @@ export function RoomInfoSheet({
   onSettings: () => void;
   onShare: () => void;
   onInvite: () => void;
+  /** A server room: room membership and Tayfa aren't on the server yet, so the card doesn't show them. */
+  live?: boolean;
 }) {
   const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
   const textEditor = owner || canEditText;
+  const paddingBottom = useSheetBottom();
   const editText = (which: 'title' | 'bulletin') => {
     setDraft(which === 'title' ? title : announcement);
     setSub(which);
@@ -272,7 +287,7 @@ export function RoomInfoSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { maxHeight: '82%', paddingTop: 18 }]}>
+      <View style={[styles.sheet, { maxHeight: '82%', paddingTop: 18, paddingBottom }]}>
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
             <Pressable onPress={() => owner && setSub('decor')} accessibilityLabel="Kapak seç">
@@ -306,54 +321,60 @@ export function RoomInfoSheet({
                 </ArtText>
               </LinearGradient>
             </Pressable>
-            <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Tayfa">
-              <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
-                <Text style={styles.cardLabel}>Tayfa</Text>
-                {clan?.art ? (
-                  <ArtText art={clan.art} size={26} style={styles.cardValue}>
-                    {clan.label}
-                  </ArtText>
-                ) : (
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {clan ? clan.label : owner ? '+ Tayfa kur / katıl' : 'Yok'}
-                  </Text>
-                )}
-              </LinearGradient>
-            </Pressable>
+            {!live && (
+              <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Tayfa">
+                <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
+                  <Text style={styles.cardLabel}>Tayfa</Text>
+                  {clan?.art ? (
+                    <ArtText art={clan.art} size={26} style={styles.cardValue}>
+                      {clan.label}
+                    </ArtText>
+                  ) : (
+                    <Text style={styles.cardValue} numberOfLines={1}>
+                      {clan ? clan.label : owner ? '+ Tayfa kur / katıl' : 'Yok'}
+                    </Text>
+                  )}
+                </LinearGradient>
+              </Pressable>
+            )}
           </View>
 
-          <Pressable onPress={() => setSub('members')} accessibilityLabel="Oda üyeleri">
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={[styles.h2, { flex: 1 }]}>
-                Oda üyesi ({memberTotal.toLocaleString('tr-TR')}/{memberLimit(level).toLocaleString('tr-TR')})
-              </Text>
-              {canManageMembers && applications.length > 0 && (
-                <View style={styles.bell}>
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>🔔 {applications.length}</Text>
-                </View>
-              )}
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-              {members.slice(0, 12).map((id) => (
-                <View key={id} style={{ alignItems: 'center', width: 58 }}>
-                  <Avatar uri={userById(id).avatar} size={52} />
-                  <Text style={styles.tiny} numberOfLines={1}>
-                    {id === 'me' ? '🏠 Sen' : userById(id).name}
+          {!live && (
+            <>
+              <Pressable onPress={() => setSub('members')} accessibilityLabel="Oda üyeleri">
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={[styles.h2, { flex: 1 }]}>
+                    Oda üyesi ({memberTotal.toLocaleString('tr-TR')}/{memberLimit(level).toLocaleString('tr-TR')})
                   </Text>
+                  {canManageMembers && applications.length > 0 && (
+                    <View style={styles.bell}>
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>🔔 {applications.length}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={20} color="#fff" />
                 </View>
-              ))}
-            </ScrollView>
-          </Pressable>
-          {membership === 'none' && (
-            <Pressable style={styles.joinBtn} onPress={onJoin}>
-              <ArtText art={ROOM_ICON_ART.join} size={24} style={{ color: '#fff', fontWeight: '800' }}>
-                Oda üyesi ol
-              </ArtText>
-            </Pressable>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                  {members.slice(0, 12).map((id) => (
+                    <View key={id} style={{ alignItems: 'center', width: 58 }}>
+                      <Avatar uri={userById(id).avatar} size={52} />
+                      <Text style={styles.tiny} numberOfLines={1}>
+                        {id === 'me' ? '🏠 Sen' : userById(id).name}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </Pressable>
+              {membership === 'none' && (
+                <Pressable style={styles.joinBtn} onPress={onJoin}>
+                  <ArtText art={ROOM_ICON_ART.join} size={24} style={{ color: '#fff', fontWeight: '800' }}>
+                    Oda üyesi ol
+                  </ArtText>
+                </Pressable>
+              )}
+              {membership === 'pending' && <Text style={[styles.dim, { textAlign: 'center' }]}>⏳ Üyelik başvurun oda sahibi/yöneticilerin onayını bekliyor</Text>}
+              {membership === 'member' && <Text style={[styles.dim, { textAlign: 'center', color: colors.green }]}>✓ Bu odanın üyesisin</Text>}
+            </>
           )}
-          {membership === 'pending' && <Text style={[styles.dim, { textAlign: 'center' }]}>⏳ Üyelik başvurun oda sahibi/yöneticilerin onayını bekliyor</Text>}
-          {membership === 'member' && <Text style={[styles.dim, { textAlign: 'center', color: colors.green }]}>✓ Bu odanın üyesisin</Text>}
 
           {owner && (
             <View style={{ gap: 10 }}>

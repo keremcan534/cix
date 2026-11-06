@@ -18,10 +18,11 @@ function reasonFor(me: User, host: User, room: Room, shared: string[], ctx: Cont
   return { reason: `Şu an ${room.listeners.toLocaleString('tr-TR')} kişi sohbette`, why: 'flame' };
 }
 
-/** Open rooms (no password, not yours, host not blocked), closest first. */
+/** Open rooms (no password, not yours, host not blocked, somebody in it), closest first. An empty room (its owner
+ *  left, or the app died without closing it) is never offered as the closest one. */
 export function closestRooms(me: User, rooms: readonly Room[], hostOf: (id: string) => User, ctx: Context): RoomMatch[] {
   return rooms
-    .filter((r) => !r.password && r.hostId !== me.id && r.hostId !== 'me' && !ctx.blocked?.has(r.hostId))
+    .filter((r) => !r.password && r.listeners > 0 && r.hostId !== me.id && r.hostId !== 'me' && !ctx.blocked?.has(r.hostId))
     .map((room) => {
       const host = hostOf(room.hostId);
       const sim = similarity(me, host);

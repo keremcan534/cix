@@ -18,17 +18,18 @@ import { countsForWealth, wealthLevelOf } from '@/data/wealth';
 import { charmBonusPct, charmLevelOf } from '@/data/charm';
 import { showAlert } from '@/lib/alert';
 import { exchangeOwnDiamonds } from '@/lib/coins-bank';
-import { addLock, diamondSplit, lockMs, lockedReason, locksFor, type DiamondLock } from '@/lib/diamond-locks';
+import { addLock, diamondSplit, fromServerLock, lockMs, lockedReason, locksFor, unlistedLocked, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { validAnyIban } from '@/lib/withdraw-rules';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
-import { ME_DEFAULT, readSnapshot, type Snapshot } from '@/lib/snapshot';
+import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
-import { forgetSeen } from '@/lib/live/messages';
+import { forgetSeen, hideDms, markLiveRead } from '@/lib/live/messages';
+import { applyThread, markSent, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
@@ -265,10 +266,21 @@ type AppState = {
   conversations: Conversation[];
   /** `room` turns the message into a room invite card that opens the room. */
   sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard, ref?: string) => void;
-  /** Live mode: marks my message (by its request id) as not sent with the reason, or sent again (null). */
-  setMessageFailed: (userId: string, ref: string, reason: string | null) => void;
-  /** A message from someone else arrived (live mode: from the server); counts as unread. */
+  /** Live mode: marks my message (by its request id) as not sent with the reason, or sent again (null).
+   *  `retry: false`: the refusal won't change (too long, blocked), so the bubble offers no "tekrar dene". */
+  setMessageFailed: (userId: string, ref: string, reason: string | null, retry?: boolean) => void;
+  /** Live mode: the server stored my message (by its request id); it takes the server's id and time. */
+  markMessageSent: (userId: string, ref: string, message: { id: number; createdAt: string }) => void;
+  /** A message from someone else arrived; counts as unread. */
   receiveMessage: (userId: string, text: string) => void;
+  /** Live mode (lib/live/messages): a thread read from the server joins the local copy (lib/dm-thread). */
+  importDms: (userId: string, dms: readonly ServerDm[], sync: ThreadSync, unread: number | null) => void;
+  /** Deletes a message on this phone only (a live chat's server copy stays; a sync doesn't bring it back). */
+  deleteMessage: (userId: string, messageId: string) => void;
+  /** Deletes a whole chat on this phone only; a new message starts it again. */
+  deleteConversation: (userId: string) => void;
+  /** Live mode, after signing in: the server's follow and block lists replace the ones on this phone. */
+  takeServerSocial: (lists: { following?: string[]; blocked?: string[] }) => void;
   /** Last "invite all followers" per room id (ms); managers can send it once every 24 hours. */
   followerInvites: Record<string, number>;
   markFollowerInvite: (roomId: string, at: number) => void;
@@ -300,6 +312,8 @@ export const now = () => {
 const uid = () => String(Date.now() + Math.random());
 /** Messages kept on the phone per chat; older ones drop off the saved copy (the server keeps real chats). */
 const MAX_SAVED_MESSAGES = 200;
+/** The demo's sample notices (store defaults below); a live build never shows them. */
+const DEMO_NOTICE_IDS = ['n1', 'n2', 'n3'];
 const toggle = (set: Set<string>, id: string) => {
   const next = new Set(set);
   if (next.has(id)) next.delete(id);
@@ -336,7 +350,12 @@ export function AppProvider({ children, onReady }: { children: ReactNode; onRead
   }, [ready, onReady]);
   if (!boot) return null;
   // The new store mounts only once the save is gone, so it starts from the defaults and saves those.
-  const reset = () => void resetLocalData().then(() => setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: null })));
+  // `keep` (signing out of a live account, or back in): what the next store starts from instead of the defaults.
+  const reset = (keep?: Partial<Snapshot>) =>
+    void resetLocalData().then(() => {
+      if (keep?.me) Object.assign(ME, keep.me);
+      setBoot((b) => ({ gen: (b?.gen ?? 0) + 1, initial: keep ?? null }));
+    });
   return (
     <StateProvider key={boot.gen} initial={boot.initial ?? {}} onReset={reset}>
       {children}
@@ -344,7 +363,7 @@ export function AppProvider({ children, onReady }: { children: ReactNode; onRead
   );
 }
 
-function StateProvider({ children, initial: s, onReset }: { children: ReactNode; initial: Partial<Snapshot>; onReset: () => void }) {
+function StateProvider({ children, initial: s, onReset }: { children: ReactNode; initial: Partial<Snapshot>; onReset: (keep?: Partial<Snapshot>) => void }) {
   const [loggedIn, setLoggedIn] = useState(s.loggedIn ?? false);
   const [me, setMe] = useState<User>({ ...ME });
   const [phone, setPhone] = useState('');
@@ -384,7 +403,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setDiamondLocksState(locksRef.current);
   };
   const [lockNow, setLockNow] = useState(() => Date.now());
-  const { locked: lockedDiamonds, withdrawable: withdrawableDiamonds } = diamondSplit(diamonds, diamondLocks, lockNow);
+  // Live mode: locked diamonds the server counted but did not list (lib/diamond-locks unlistedLocked).
+  const [unlisted, setUnlisted] = useState(0);
+  const { locked: lockedDiamonds, withdrawable: withdrawableDiamonds } = diamondSplit(diamonds, diamondLocks, lockNow, unlisted);
   const [totalDiamonds, setTotalDiamonds] = useState(s.totalDiamonds ?? 0);
   const [charmXp, setCharmXp] = useState(s.charmXp ?? s.totalDiamonds ?? 0);
   const charmRef = useRef(charmXp);
@@ -398,7 +419,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const recordGift = (toId: string, giftId: string, count: number) =>
     setGiftWall((w) => ({ ...w, [toId]: { ...w[toId], [giftId]: (w[toId]?.[giftId] ?? 0) + count } }));
   const [claimedTasks, setClaimedTasks] = useState<Set<string>>(new Set(s.claimedTasks));
-  const [checkInDay, setCheckInDay] = useState(s.checkInDay ?? 2); // demo: user already has a 2-day streak
+  // Demo: the user already has a 2-day streak. A live account starts at day 0.
+  const [checkInDay, setCheckInDay] = useState(s.checkInDay ?? (liveMode() ? 0 : 2));
   const [checkInDate, setCheckInDate] = useState(s.checkInDate ?? '');
   const [checkedInToday, setCheckedInToday] = useState(() => s.checkInDate === today());
 
@@ -486,11 +508,17 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     settingsRef.current = settings;
     setHapticsEnabled(settings.haptics);
   }, [settings]);
-  const [notifications, setNotifications] = useState<Notice[]>(s.notifications ?? [
-    { id: 'n1', kind: 'social', icon: 'hand-left', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
-    { id: 'n2', kind: 'system', icon: 'sparkles', title: "Similar Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
-    { id: 'n3', kind: 'social', icon: 'mic', title: 'Karaoke Akşamı başladı', body: 'Melis seni odaya davet ediyor.', time: '18:30', read: true, href: '/oda/r2' },
-  ]);
+  // The demo starts with three sample notices about sample people and rooms. A live build starts empty, and
+  // drops the samples once from a save made before (their ids are only ever used by these samples).
+  const [notifications, setNotifications] = useState<Notice[]>(() =>
+    liveMode()
+      ? (s.notifications ?? []).filter((n) => !DEMO_NOTICE_IDS.includes(n.id))
+      : (s.notifications ?? [
+          { id: 'n1', kind: 'social', icon: 'hand-left', title: 'Ayşe sana selam verdi', body: 'Hemen cevap ver!', time: '19:40', read: false, href: '/sohbet/u7' },
+          { id: 'n2', kind: 'system', icon: 'sparkles', title: "Similar Club'a hoş geldin", body: 'Günlük giriş ödülünü almayı unutma.', time: '19:00', read: false, href: '/gorevler' },
+          { id: 'n3', kind: 'social', icon: 'mic', title: 'Karaoke Akşamı başladı', body: 'Melis seni odaya davet ediyor.', time: '18:30', read: true, href: '/oda/r2' },
+        ]),
+  );
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [deletionRequested, setDeletionRequested] = useState(false);
 
@@ -552,8 +580,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const [transfer, setTransfer] = useState<TransferRequest | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(s.familyId ?? null);
 
-  const [following, setFollowing] = useState<Set<string>>(new Set(s.following ?? ['u1']));
-  const [blocked, setBlocked] = useState<Set<string>>(new Set(s.blocked));
+  // The demo account follows sample Elif. A live account follows nobody until the server's list arrives after
+  // signing in (takeServerSocial); sample ids from an older save don't count there.
+  const [following, setFollowing] = useState<Set<string>>(() => new Set(liveMode() ? (s.following ?? []).filter(isServerId) : (s.following ?? ['u1'])));
+  const [blocked, setBlocked] = useState<Set<string>>(() => new Set(liveMode() ? (s.blocked ?? []).filter(isServerId) : s.blocked));
   // A live build starts with real chats only: the sample conversations belong to the demo.
   const [conversations, setConversations] = useState(() => {
     const saved = s.conversations ?? CONVERSATIONS;
@@ -571,12 +601,15 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // The server account this phone's state belongs to (saved): another one must not inherit it.
   const [serverId, setServerId] = useState<string | null>(s.serverId ?? null);
   const serverIdRef = useRef(serverId);
+  // Signed out of a live account: its state, kept for when the same account signs in here again (login below).
+  const [parked, setParked] = useState(s.parked ?? null);
 
-  /** Everything on this phone goes back to the defaults, including what lib/live remembers of the account. */
-  const forgetAccount = () => {
+  /** Everything on this phone goes back to the defaults, including what lib/live remembers of the account.
+   *  `keep` survives it (signing out keeps this phone's settings, and parks the account's own state). */
+  const forgetAccount = (keep?: Partial<Snapshot>) => {
     forgetLiveAccount();
     forgetSeen();
-    onReset();
+    onReset(keep);
   };
 
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
@@ -588,6 +621,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
     agencyId, agencyRole, ownedAgency, familyRole, familyId, fanClubs, recentRooms,
     serverId, following: [...following], blocked: [...blocked], conversations: conversations.map((c) => (c.messages.length > MAX_SAVED_MESSAGES ? { ...c, messages: c.messages.slice(-MAX_SAVED_MESSAGES) } : c)), followerInvites, starter, safetyLog, ownedAnims: [...ownedAnims], micFx,
+    ...(parked && { parked }),
   };
   useEffect(() => {
     // Each render reschedules the write with the newest snapshot.
@@ -704,6 +738,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       setPhone(u.phone ?? '');
       setPhoneVerified(u.phoneVerified ?? !!u.phone);
     }
+    // Cömertlik as the server counts it (GET /api/me): the games open on the same value the server checks, also
+    // after signing in again on a phone that signing out cleared.
+    if (isFiniteNumber(u.wealthXp)) {
+      wealthRef.current = u.wealthXp;
+      setWealthXp(u.wealthXp);
+    }
     const prev = serverBalRef.current;
     serverBalRef.current = { coins: u.coins, diamonds: u.diamonds, gameCoins: u.gameCoins ?? 0 };
     // Game coins: only server games (Rüzgâr Gülü) move them there, the other games here, so the server's change
@@ -752,19 +792,14 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   const applyLocks = (e: ServerEarnings) => {
     const at = Date.now();
     setLockNow(at);
+    // The server's channel names, labels and lock lengths (lib/diamond-locks fromServerLock), sender ids as this phone
+    // names people. The server lists only the soonest 100; the locked diamonds it left off stay counted.
+    setUnlisted(unlistedLocked(e));
     setDiamondLocks(() =>
       e.locks.map((l): DiamondLock => {
         if (l.from) rememberUser(l.from);
-        const g = l.gift ? GIFTS.find((x) => x.id === l.gift!.id) : undefined;
-        return {
-          id: `srv-${l.id}`,
-          amount: l.amount,
-          unlockAt: Date.parse(l.unlockAt),
-          channel: l.channel === 'jeton' ? 'jeton' : 'store',
-          source: 'Hediye',
-          ...(l.from && { fromId: toLocal(l.from.id) }),
-          ...(l.gift && { gift: { id: l.gift.id, name: g?.name ?? 'Hediye', emoji: g?.emoji ?? '🎁', count: l.gift.count } }),
-        };
+        const x = fromServerLock(l, (id) => GIFTS.find((g) => g.id === id));
+        return x.fromId ? { ...x, fromId: toLocal(x.fromId) } : x;
       }),
     );
   };
@@ -778,9 +813,21 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       Object.assign(ME, patch);
       setMe({ ...ME });
     },
-    login: () => setLoggedIn(true),
+    login: () => {
+      const back = liveMode() ? unparkAccount(parked, myServerId()) : null;
+      if (!back) {
+        // Another account signed in here: the parked one stays gone.
+        if (parked) setParked(null);
+        return setLoggedIn(true);
+      }
+      // The same account signed in again: the store starts from what it had on this phone (items, VIP, progress,
+      // notices), as after an app restart, with the profile and balance the sign-in just read from the server.
+      onReset({ ...back, settings, me: { ...ME }, coins: coinsRef.current, diamonds: diamondsRef.current, loggedIn: true });
+    },
     // Live mode: the next account on this phone must not inherit this one's chats, follows, items or balance.
-    logout: () => (liveMode() ? forgetAccount() : setLoggedIn(false)),
+    // The phone's settings (theme, sounds, privacy choices) stay, and this account's own state is parked until it
+    // signs in here again (login); follows, blocks and chats come back from the server.
+    logout: () => (liveMode() ? forgetAccount(parkAccount(snapshot)) : setLoggedIn(false)),
     phone,
     setPhone,
     email,
@@ -1154,12 +1201,12 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     },
     requestDataExport: () => {
       logSafety('Veri dökümü istedi');
-      notify({ kind: 'security', icon: 'archive', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası 30 gün içinde kayıtlı e-postana gönderilir (KVKK md. 11).' });
+      notify({ kind: 'security', icon: 'archive', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası en geç 30 gün içinde kayıtlı e-postana gönderilir (UK GDPR, veriye erişim hakkı).' });
     },
     conversations,
     sendMessage: (userId, text, fromMe = true, room, ref) =>
       setConversations((prev) => {
-        const msg = { id: uid(), fromMe, text, time: now(), ...(room ? { room } : {}), ...(ref ? { ref } : {}) };
+        const msg = { id: uid(), fromMe, text, time: now(), at: new Date().toISOString(), ...(room ? { room } : {}), ...(ref ? { ref } : {}) };
         const existing = prev.find((c) => c.userId === userId);
         if (!existing) return [{ id: `c-${userId}`, userId, unread: 0, messages: [msg] }, ...prev];
         return [
@@ -1167,25 +1214,51 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
           ...prev.filter((c) => c.userId !== userId),
         ];
       }),
-    setMessageFailed: (userId, ref, reason) =>
+    setMessageFailed: (userId, ref, reason, retry = true) =>
       setConversations((prev) =>
-        prev.map((c) =>
-          c.userId !== userId
-            ? c
-            : { ...c, messages: c.messages.map((m) => (m.ref !== ref ? m : reason ? { ...m, failed: reason } : { id: m.id, fromMe: m.fromMe, text: m.text, time: m.time, ref: m.ref })) },
-        ),
+        prev.map((c) => {
+          if (c.userId !== userId) return c;
+          return {
+            ...c,
+            messages: c.messages.map((m) => {
+              if (m.ref !== ref) return m;
+              const { failed: _failed, noRetry: _noRetry, ...rest } = m;
+              return reason ? { ...rest, failed: reason, ...(retry ? {} : { noRetry: true }) } : rest;
+            }),
+          };
+        }),
       ),
+    markMessageSent: (userId, ref, message) => setConversations((prev) => markSent(prev, userId, ref, message)),
     receiveMessage: (userId, text) =>
       setConversations((prev) => {
-        const msg = { id: uid(), fromMe: false, text, time: now() };
+        const msg = { id: uid(), fromMe: false, text, time: now(), at: new Date().toISOString() };
         const existing = prev.find((c) => c.userId === userId);
         if (!existing) return [{ id: `c-${userId}`, userId, unread: 1, messages: [msg] }, ...prev];
         return [{ ...existing, unread: existing.unread + 1, messages: [...existing.messages, msg] }, ...prev.filter((c) => c.userId !== userId)];
       }),
     followerInvites,
     markFollowerInvite: (roomId, at) => setFollowerInvites((m) => ({ ...m, [roomId]: at })),
-    markRead: (userId) =>
-      setConversations((prev) => prev.map((c) => (c.userId === userId ? { ...c, unread: 0 } : c))),
+    markRead: (userId) => {
+      // Live mode: the server hears it too (read receipts, the unread count on another phone or after signing in).
+      const c = conversations.find((x) => x.userId === userId);
+      if (c && (c.unread > 0 || c.messages.some((m) => !m.fromMe))) markLiveRead(userId);
+      setConversations((prev) => (prev.some((x) => x.userId === userId && x.unread > 0) ? prev.map((x) => (x.userId === userId ? { ...x, unread: 0 } : x)) : prev));
+    },
+    importDms: (userId, dms, sync, unread) => setConversations((prev) => applyThread(prev, userId, dms, sync, unread)),
+    deleteMessage: (userId, messageId) => {
+      const m = conversations.find((c) => c.userId === userId)?.messages.find((x) => x.id === messageId);
+      if (m?.sid !== undefined) void hideDms(userId, [m.sid]);
+      setConversations((prev) => prev.map((c) => (c.userId === userId ? { ...c, messages: c.messages.filter((x) => x.id !== messageId) } : c)));
+    },
+    deleteConversation: (userId) => {
+      const c = conversations.find((x) => x.userId === userId);
+      if (c) void hideDms(userId, c.messages.map((m) => m.sid));
+      setConversations((prev) => prev.filter((x) => x.userId !== userId));
+    },
+    takeServerSocial: ({ following: f, blocked: b }) => {
+      if (f) setFollowing(new Set(f));
+      if (b) setBlocked(new Set(b));
+    },
     ownedAnims,
     micFx,
     buyMicFx: (animationId) => {
@@ -1207,7 +1280,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       log('coin', reward, 'İlk adımlar ödülü');
     },
     hideStarter: () => setStarter((st) => ({ ...st, hidden: true })),
-    resetAll: forgetAccount,
+    resetAll: () => forgetAccount(),
   };
 
   return (

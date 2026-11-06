@@ -10,6 +10,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { GIFTS, ROOMS, roomById, userById } from '@/data/mock';
+import { liveBuild } from '@/lib/live-flag';
 import { micUsersOf, onMicNow, roleOf } from '@/lib/room-presence';
 
 export const PK_DURATIONS = [15, 30, 60, 120] as const;
@@ -167,6 +168,9 @@ export const markPkSeen = (key: string) => !state.seen.includes(key) && emit({ s
 export type StartResult = { ok: true; pk: PkSession } | { ok: false; reason: string };
 function checkStart(kind: PkKind, mode: PkMode, roomId: string, starterId: string, durationMin: number): string | null {
   const c = state.config;
+  // PK has no server side yet (no invite, score ledger or result there): it would run on the starter's phone
+  // only, real gifts would not count and the other room's answer would be made up, so a live build starts none.
+  if (liveBuild()) return 'PK şu an kapalı.';
   if (kind === 'room' && mode === 'solo' && !c.soloPkEnabled) return 'Normal PK şu an kapalı.';
   if (kind === 'room' && mode === 'team' && !c.roomPkEnabled) return 'Oda içi takım PK şu an kapalı.';
   if (kind === 'cross' && !c.crossPkEnabled) return 'Odalar arası takım PK şu an kapalı.';
@@ -408,6 +412,7 @@ export function revokeGift(txId: string, reason: string, actor = 'Ödeme sistemi
 }
 
 function simulateOpponentRoom(pkId: string) {
+  if (liveBuild()) return; // never invent the other room's gifts in live mode
   const tick = () => {
     const pk = byId(pkId);
     if (!pk || pk.status !== 'active') return;
@@ -524,7 +529,8 @@ export function cancelPk(pkId: string, reason: string, actor = 'Sen (moderatör)
 
 export const roomTitle = (id: string) => (id === 'yeni' ? 'Benim Odam' : (roomById(id)?.title ?? id));
 /** Rooms that can be invited right now (not already in a PK). */
-export const invitableRooms = (roomId: string) => ROOMS.filter((r) => r.id !== roomId && !pkOfRoom(r.id));
+/** Demo rooms to invite; none in live mode, where cross-room PK is not offered. */
+export const invitableRooms = (roomId: string) => (liveBuild() ? [] : ROOMS.filter((r) => r.id !== roomId && !pkOfRoom(r.id)));
 
 /** Biggest supporters by PK points, for one team or (Normal PK) one recipient or the whole PK. */
 export function topSupporters(pk: PkSession, filter?: { teamId?: TeamId; recipientId?: string }, n = 3) {

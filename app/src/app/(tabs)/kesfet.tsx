@@ -2,14 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
-import { CharmBadge, StateIcon, VerifiedBadge, VipBadge } from '@/components/ui';
+import { Button, CharmBadge, StateIcon, VerifiedBadge, VipBadge } from '@/components/ui';
 import { roomById, USERS, userById, type User } from '@/data/mock';
 import { COUNTRIES, DISCOVER_PROMO, DISCOVER_SHORTCUTS, EXTRA_BIOS, PARTY_AVATAR_IDS, REAL_PERSON, countryOf, preciseKm } from '@/data/social-ui';
 import { charmRankBoost } from '@/data/charm';
@@ -21,7 +21,7 @@ import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
-import { callsAvailable, liveMode, useDiscoverPeople } from '@/lib/live';
+import { callsAvailable, liveMode, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
 
 const TABS = ['Benzer', 'Yakındaki'] as const;
 type Tab = (typeof TABS)[number];
@@ -41,6 +41,7 @@ export default function DiscoverScreen() {
   // A live build lists real people from the server (no sample profiles, no distances: the server knows cities only).
   const live = liveMode();
   const serverPeople = useDiscoverPeople();
+  const peopleState = useDiscoverState();
   const pool = live ? (serverPeople ?? []) : USERS;
   const { colors, dark } = useTheme();
   const styles = useStyles();
@@ -79,12 +80,13 @@ export default function DiscoverScreen() {
         ListHeaderComponent={
           <View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
-              {DISCOVER_SHORTCUTS.filter((s) => s.id !== 'call' || callsAvailable()).map((s) => (
+              {/* Tayfa (groups) is local-only: a live build doesn't offer it until the server has it. */}
+              {DISCOVER_SHORTCUTS.filter((s) => (s.id !== 'call' || callsAvailable()) && (s.id !== 'tribe' || !live)).map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
                   {/* The shortcut's color lights a navy card from the top instead of filling it. */}
                   <LinearGradient colors={[`${s.colors[1]}${dark ? '5C' : '33'}`, dark ? 'rgba(22,37,60,0.94)' : 'rgba(255,255,255,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
                     <ShortcutArt id={s.id} emoji={s.emoji} />
-                    <Text style={[styles.shortcutTitle, !s.wide && { textAlign: 'center' }]} numberOfLines={1}>
+                    <Text style={[styles.shortcutTitle, !s.wide && { textAlign: 'center' }]} numberOfLines={s.wide ? 1 : 2}>
                       {s.title}
                     </Text>
                     {s.wide && <Text style={styles.shortcutSub}>{s.subtitle}</Text>}
@@ -150,6 +152,13 @@ export default function DiscoverScreen() {
                 <Text style={{ color: colors.textDim }}>Şimdilik herkesi göster</Text>
               </Pressable>
             </View>
+          ) : live && serverPeople === null && peopleState === 'failed' ? (
+            <View style={styles.optIn}>
+              <StateIcon name="cloud-offline-outline" size={56} />
+              <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Bağlantı kurulamadı</Text>
+              <Text style={{ color: colors.textDim, textAlign: 'center', fontSize: 13 }}>Kişiler şu an yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>
+              <Button title="Tekrar dene" icon="refresh" small variant="tonal" onPress={() => void reloadDiscoverPeople()} />
+            </View>
           ) : (
             <View style={styles.optIn}>
               <StateIcon name="search-outline" size={56} />
@@ -200,12 +209,9 @@ function ShortcutArt({ id, emoji }: { id: string; emoji: string }) {
       <View style={styles.artCenter}>
         <Ionicons name="stats-chart" size={12} color={colors.text} style={{ position: 'absolute', left: 0, top: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* No photo: the person glyph, like every other face in the app (never an empty ring). */}
           {PARTY_AVATAR_IDS.map((uid, i) => (
-            <Image
-              key={uid}
-              source={{ uri: userById(uid).avatar }}
-              style={[styles.partyAvatar, i === 1 && styles.partyAvatarMid, i > 0 && { marginLeft: -10 }]}
-            />
+            <Photo key={uid} uri={userById(uid).avatar} kind="face" style={[styles.partyAvatar, i === 1 && styles.partyAvatarMid, i > 0 && { marginLeft: -10 }]} />
           ))}
         </View>
       </View>
@@ -272,10 +278,13 @@ function UserRow({
               <Text style={styles.chipText}>{preciseKm(user)}</Text>
             </View>
           )}
-          <View style={styles.chip}>
-            <Art name={female ? 'cinsiyet-kadin' : 'cinsiyet-erkek'} size={15} />
-            <Text style={styles.chipText}>{user.age}</Text>
-          </View>
+          {/* An age or gender the person didn't give stays out (never "0", never a guessed icon). */}
+          {(!!user.gender || user.age > 0) && (
+            <View style={styles.chip}>
+              {!!user.gender && <Art name={female ? 'cinsiyet-kadin' : 'cinsiyet-erkek'} size={15} />}
+              {user.age > 0 && <Text style={styles.chipText}>{user.age}</Text>}
+            </View>
+          )}
           <SimilarityChip score={sim.score} />
         </View>
         <Text style={styles.bio} numberOfLines={1}>
@@ -290,7 +299,7 @@ function UserRow({
           </View>
         </Pressable>
         <Pressable onPress={onToggleFollow} hitSlop={6} style={styles.followBtn}>
-          <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={14} color={isFollowing ? colors.pink : colors.textDim} />
+          <Ionicons name={isFollowing ? 'heart' : 'heart-outline'} size={14} color={isFollowing ? colors.pink : colors.text} />
           <Text style={[styles.followText, isFollowing && { color: colors.pink }]}>{isFollowing ? 'Takipte' : 'Takip et'}</Text>
         </Pressable>
       </View>
@@ -318,7 +327,7 @@ function PromoCard() {
         </View>
         <View style={styles.promoAvatars}>
           {DISCOVER_PROMO.avatarIds.map((id) => (
-            <Image key={id} source={{ uri: userById(id).avatar }} style={styles.promoAvatar} />
+            <Photo key={id} uri={userById(id).avatar} kind="face" style={styles.promoAvatar} />
           ))}
         </View>
       </LinearGradient>
@@ -340,12 +349,14 @@ function FilterSheet({
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => onChange({ ...filters, [k]: v });
   const { colors, dark } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   // The off track is a step darker than the sheet in the light scheme, where cardAlt would vanish on white.
   const off = dark ? colors.cardAlt : colors.border;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      {/* Above the system navigation bar too (edge-to-edge Android draws the sheet under it). */}
+      <View style={[styles.sheet, { paddingBottom: Math.max(34, insets.bottom + 8) }]}>
         <Text style={styles.sheetTitle}>Filtreler</Text>
 
         <Text style={styles.sheetLabel}>Ülke</Text>
@@ -394,7 +405,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
   shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, borderWidth: 1, borderColor: surface.hairline, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   shortcutWide: { width: 150 },
-  shortcutTitle: { color: colors.text, fontWeight: '800', fontSize: 15 },
+  // Two lines for the narrow cards, so "Canlı Odalar" and "Jeton Kazan" are never cut at 360 px.
+  shortcutTitle: { color: colors.text, fontWeight: '800', fontSize: 14, lineHeight: 17 },
   shortcutSub: { color: ink(0.8), fontSize: 12 },
   artRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   artCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
@@ -426,7 +438,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   hiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, minWidth: 76, justifyContent: 'center' },
   hiText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   followBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  followText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
+  followText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   promoWrap: { marginHorizontal: 16, marginVertical: 10 },
   promo: { borderRadius: 20, padding: 14, gap: 12, borderWidth: 1, borderColor: colors.border },
   promoTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },

@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/components/text';
 import { Art, artSource, type ArtName } from '@/components/Art';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
-import { roomStyles } from '@/components/room/parts';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { roomStyles, useSheetBottom } from '@/components/room/parts';
 import { Avatar, GradientButton, StateIcon } from '@/components/ui';
 import { MUSIC_CATALOG, type Track } from '@/data/catalog';
 import { userById } from '@/data/mock';
@@ -17,19 +18,23 @@ import { colors, semantic } from '@/theme';
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function Sheet({ visible, onClose, title, art, children, tall }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode; tall?: boolean }) {
+  const paddingBottom = useSheetBottom();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
-      <View style={[roomStyles.sheet, { maxHeight: tall ? '85%' : '70%' }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
-          <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
+        <View style={[roomStyles.sheet, { maxHeight: tall ? '85%' : '70%', paddingBottom }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
+            <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
+            </Pressable>
+          </View>
+          {children}
         </View>
-        {children}
-      </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }

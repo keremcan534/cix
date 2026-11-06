@@ -1,0 +1,116 @@
+// Live mode (lib/live): the profile screen (kullanici/[id]) on the server.
+// - Followers, following and the follow state come from GET /api/user, for my own profile too.
+// - My edits go to PATCH /api/me; the screen shows them (and says "kaydedildi") only after the server took them.
+// - A new profile photo goes straight to the storage (POST /api/media/upload-url, then PUT), then its address to
+//   PATCH /api/me, so other phones see it.
+// Ids here are server ids (lib/live toServer). Only lib/api is used, so the unit tests can run this under Node
+// (tests/live-profile.test.ts). Without a server address the screen never calls it.
+import * as api from '@/lib/api';
+import { putServerUser, type User } from '@/data/mock';
+
+/** `blockedByMe`: whether the server already has my block, so a read sent right after a block can be told apart. */
+export type SocialCounts = { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
+
+/** My profile as the server keeps it. Empty fields stay empty, so no demo value (a handle, a city) survives. */
+export function meFromServer(u: api.ServerMe): Partial<User> {
+  return {
+    name: u.name,
+    bio: u.bio ?? '',
+    interests: u.interests ?? [],
+    city: u.city ?? '',
+    username: u.username ?? '',
+    gender: u.gender ?? undefined,
+    ...(typeof u.age === 'number' && { age: u.age }),
+    ...(u.avatarUrl && { avatar: u.avatarUrl }),
+    ...(u.createdAt && { joinedAt: u.createdAt.slice(0, 10) }),
+  };
+}
+
+/** GET /api/me: my profile for the screen and the edit form. */
+export async function loadMe(): Promise<Partial<User>> {
+  const r = await api.apiRequest<{ user: api.ServerMe }>('GET', '/api/me');
+  return meFromServer(r.user);
+}
+
+/**
+ * Someone's public profile with their counts. Another person's age, city and interests also update what this
+ * phone knows about them (data/mock); `mine`: my own profile, of which only the counts are used.
+ */
+export async function loadPublicProfile(serverId: string, mine = false): Promise<SocialCounts> {
+  const p = await api.userProfile(serverId);
+  if (!mine) {
+    putServerUser({
+      id: p.id,
+      name: p.name,
+      // No age on the server stays unknown (0), never a made-up number.
+      ...(p.age ? { age: p.age } : {}),
+      city: p.city ?? '',
+      bio: p.bio,
+      interests: p.interests,
+      ...(p.gender && { gender: p.gender }),
+      ...(p.username && { username: p.username }),
+      ...(p.avatarUrl && { avatar: p.avatarUrl }),
+    });
+  }
+  return { followers: p.followers, following: p.following, isFollowing: p.isFollowing, blockedByMe: !!p.blockedByMe };
+}
+
+/** Follow or unfollow on the server; the answer is the server's follow state. */
+export const followOnServer = (serverId: string, on: boolean) => api.follow(serverId, on);
+
+/** What the edit form sends. The birth date only when it was never set (the server takes it once). */
+export type ProfileEdit = { name: string; username: string; bio: string; city: string; interests: string[]; gender?: 'Kadın' | 'Erkek'; birthDate?: string };
+
+/** The PATCH /api/me body: trimmed, without an empty username (none chosen yet) or a birth date not entered. */
+export function profilePatch(e: ProfileEdit): api.ProfilePatch & { username?: string } {
+  const username = e.username.trim().toLowerCase();
+  return {
+    name: e.name.trim(),
+    ...(username && { username }),
+    bio: e.bio.trim(),
+    city: e.city.trim(),
+    interests: [...new Set(e.interests)],
+    ...(e.gender && { gender: e.gender }),
+    ...(e.birthDate && { birthDate: e.birthDate }),
+  };
+}
+
+/** Saves my edit; the answer is my profile as the server now has it. A refusal (a taken username…) throws. */
+export async function saveMyProfile(e: ProfileEdit): Promise<Partial<User>> {
+  return meFromServer(await api.updateProfile(profilePatch(e)));
+}
+
+const TYPES: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic' };
+/** The photo's type: the picker's, else the file's, else from the file name (JPEG when nothing says). */
+export function imageType(uri: string, picked?: string | null, file?: string) {
+  if (picked) return picked;
+  if (file) return file;
+  const ext = uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  return TYPES[ext] ?? 'image/jpeg';
+}
+
+/** A photo the picker returned (expo-image-picker asset). */
+export type PickedImage = { uri: string; mimeType?: string | null };
+
+/**
+ * A new profile photo: a signed upload address for its exact type and size, the file PUT there, then its public
+ * address saved as my avatar. Resolves with my profile as the server now has it; any step failing throws (and
+ * nothing is saved), e.g. 503 while photo storage isn't set up on the server.
+ */
+export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
+  let file: Blob;
+  try {
+    file = await (await fetch(img.uri)).blob();
+  } catch {
+    throw new Error('Fotoğraf okunamadı. Başka bir fotoğraf seç.');
+  }
+  const target = await api.uploadUrl('avatar', imageType(img.uri, img.mimeType, file.type), file.size);
+  let res: Response;
+  try {
+    res = await fetch(target.uploadUrl, { method: target.method ?? 'PUT', headers: target.headers, body: file });
+  } catch {
+    throw new Error('Fotoğraf yüklenemedi. İnternetini kontrol edip tekrar dene.');
+  }
+  if (!res.ok) throw new Error(`Fotoğraf yüklenemedi (${res.status}). Tekrar dene.`);
+  return meFromServer(await api.updateProfile({ avatarUrl: target.publicUrl }));
+}

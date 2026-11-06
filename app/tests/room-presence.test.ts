@@ -30,6 +30,7 @@ import {
   setInviteAnswer,
   setLocks,
   setMicMute,
+  setServerBans,
   takeSeat,
 } from '@/lib/room-presence';
 
@@ -281,5 +282,25 @@ describe('İnceleme düzeltmeleri', () => {
     assert.deepEqual(activeBans(getRoom(R)!), ['u1']);
     mock.timers.tick(10 * 60_000 + 1);
     assert.deepEqual(activeBans(getRoom(R)!), []);
+  });
+
+  test('sunucu yasak listesi: yasaklı giremez, kara liste süresizdir, kaldırılan yasak girişi açar', () => {
+    smallRoom();
+    setServerBans(R, [
+      { uid: 'u1', until: Date.now() + 10 * 60_000 },
+      { uid: 'u2', until: null },
+    ]);
+    assert.equal(getRoom(R)!.bans.u2, Infinity, 'kara liste süresiz');
+    assert.equal(join(R, 'u1').ok, false);
+    assert.equal(join(R, 'u2').ok, false);
+    const before = getRoom(R);
+    setServerBans(R, [
+      { uid: 'u2', until: null },
+      { uid: 'u1', until: Date.now() + 10 * 60_000 },
+    ]);
+    assert.equal(getRoom(R), before, 'aynı liste odayı değiştirmez');
+    setServerBans(R, [{ uid: 'u2', until: null }]);
+    assert.equal(join(R, 'u1').ok, true, 'sunucuda kaldırılan yasak girişi açar');
+    assert.equal(join(R, 'u2').ok, false);
   });
 });

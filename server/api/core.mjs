@@ -226,9 +226,13 @@ export function bannedError(s, extra = {}) {
   return Object.assign(new HttpError(403, msg), { extra: { code: device ? 'device_banned' : 'account_banned', sanction: sanctionView(s), serverNow: new Date().toISOString(), ...extra } });
 }
 
-/** True when either of the two has blocked the other. */
-export async function blockedBetween(a, b) {
-  const r = await db.query('SELECT 1 FROM blocks WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)', [a, b]);
+/**
+ * True when either of the two has blocked the other. Inside a transaction pass its client as `q`: a second pool
+ * connection taken while the transaction holds row locks can wait forever once the pool is full of requests
+ * waiting on those locks.
+ */
+export async function blockedBetween(a, b, q = db) {
+  const r = await q.query('SELECT 1 FROM blocks WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)', [a, b]);
   return r.rowCount > 0;
 }
 

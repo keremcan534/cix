@@ -6,7 +6,7 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { AuthHeader } from '@/components/AuthHeader';
+import { SignupHeader } from '@/components/signup-header';
 import { GradientButton } from '@/components/ui';
 import { emailError, emailTypoHint, normalizeEmail } from '@/lib/email-address';
 import { errorHaptic } from '@/lib/haptics';

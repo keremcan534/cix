@@ -32,7 +32,7 @@ import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
-import { wheelRoutes } from './wheel.mjs';
+import { wealthPoints, wheelRoutes } from './wheel.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { HttpError, RawText, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, sha, userId } from './core.mjs';
@@ -102,8 +102,10 @@ const walletRoutes = {
     return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000), warnings: await warningCodes() };
   },
 
+  /** wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same value. */
   async 'GET /api/me'(req) {
-    return { user: await withSignIn(await auth(req)) };
+    const u = await auth(req);
+    return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id) } };
   },
 
   async 'GET /api/ledger'(req) {
@@ -120,7 +122,7 @@ const walletRoutes = {
     return once(u.id, 'coin', ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       // One daily cap for all play coins: test top-ups and test purchases together (wallet.mjs).
-      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+      if ((await playCoinsToday(c, u.id)) + amount > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
       await creditCoins(c, u.id, [{ channel: 'test', amount }], 'Test yüklemesi', ref);
     });
   },
@@ -158,12 +160,18 @@ const walletRoutes = {
     if (!n) throw new HttpError(400, 'Geçersiz miktar');
     const why = typeof reason === 'string' ? reason.trim().slice(0, 80) : '';
     if (!why) throw new HttpError(400, 'Harcama nedeni gerekli');
-    return once(u.id, 'coin', ref, async (c) => {
+    const out = await once(u.id, 'coin', ref, async (c) => {
       const row = await c.query('SELECT coins FROM users WHERE id = $1 FOR UPDATE', [u.id]);
       await claimRef(c, u.id, 'coin', ref);
       if (Number(row.rows[0].coins) < n) throw new HttpError(409, 'Yetersiz jeton');
       await spendCoins(c, u.id, n, `Uygulama içi: ${why}`, ref);
     });
+    // once() keys on (user, coin, ref), which gifts, bonds and Jeton Noktası share: their ref is not this spend's
+    // replay. Refused, nothing taken.
+    if (out.replay && !(await db.query("SELECT 1 FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref = $2 AND reason LIKE 'Uygulama içi:%'", [u.id, ref])).rowCount) {
+      throw new HttpError(409, 'Geçersiz istek kimliği');
+    }
+    return out;
   },
 
   /**
@@ -283,9 +291,11 @@ const server = http.createServer(async (req, res) => {
     gate(req.method, url.pathname);
     send(200, await route(req, url));
   } catch (err) {
-    // A malformed value that only Postgres caught (an id that isn't a uuid, a number or date out of range) is the
-    // request's fault: 400, not a server error.
-    const e = ['22P02', '22003', '22007', '22008'].includes(err?.code) && !(err instanceof HttpError) ? new HttpError(400, 'Geçersiz istek') : err;
+    // A malformed value that only Postgres caught is the request's fault: 400, not a server error. An id that
+    // isn't a uuid, a number or date out of range; text Postgres can't store, such as a NUL byte (22021). A
+    // missing row (23503) stays a 5xx: each route checks its own ids, so one that gets that far is a server bug.
+    const bad = err instanceof HttpError ? null : err?.code === '22021' ? 'Geçersiz metin' : ['22P02', '22003', '22007', '22008'].includes(err?.code) ? 'Geçersiz istek' : null;
+    const e = bad ? new HttpError(400, bad) : err;
     // 5xx: counted for the health warnings and reported (SENTRY_DSN).
     failed(e, req.method, url.pathname);
     // extra: structured detail for the app (a ban or mute for its screen, sanctions.mjs).

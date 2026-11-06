@@ -181,7 +181,7 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
     const campaign = sandbox || at === null ? null : await campaignAt(c, at);
     const kampanya = campaign ? campaignBonus(pack.coins, campaign, at) : 0;
     // Play coins share one daily cap with test top-ups (index.mjs), so test purchases can't mint more.
-    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus + kampanya > TEST_DAILY) throw new HttpError(429, `Günlük test yüklemesi sınırı ${TEST_DAILY}`);
+    if (play && (await playCoinsToday(c, u.id)) + pack.coins + bonus + kampanya > TEST_DAILY) throw new HttpError(429, `Günlük test yükleme sınırı: ${TEST_DAILY.toLocaleString('tr-TR')} jeton`);
     const p = await c.query(
       'INSERT INTO purchases (user_id, platform, product_id, transaction_id, coins, bonus, sandbox, campaign_bonus, campaign_ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
       [u.id, platform, pack.productId, transactionId, pack.coins, bonus, sandbox, kampanya, kampanya ? campaignRef(campaign) : null],

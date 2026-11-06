@@ -4,7 +4,8 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { EarningRow } from '@/app/gelir/index';
+import { EarningRow, ServerIncomeRow } from '@/app/gelir/index';
+import { LoadError } from '@/components/load-error';
 import { Art } from '@/components/Art';
 import { Card, Header } from '@/components/ui';
 import { Icon3D } from '@/components/Icon3D';
@@ -12,7 +13,9 @@ import { userById } from '@/data/mock';
 import { usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { liveMode } from '@/lib/live';
+import { LEDGER_PAGE, loadLedger, useLiveLedger } from '@/lib/live/earnings';
 import { loadWithdrawals, useServerWithdrawals } from '@/lib/live/withdraw';
+import { groupGifts, incomeKind, ledgerTime, type LedgerEntry } from '@/lib/ledger-view';
 import { useApp, type Earning, type EarningSource, type LedgerRow } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -37,11 +40,13 @@ export default function EarningsDetail() {
   const [refreshing, setRefreshing] = useState(false);
   const live = liveMode();
   const server = useServerWithdrawals();
+  // Live mode: the history is the server's ledger (its refs and times), not this phone's record of balance changes.
+  const history = useLiveLedger();
 
-  // Live mode re-reads the server's withdrawals; otherwise the data is local and "refresh" only shows the spinner.
+  // Live mode re-reads the server's withdrawals and ledger; otherwise the data is local and "refresh" only shows the spinner.
   const refresh = () => {
     setRefreshing(true);
-    if (live) void loadWithdrawals().catch(() => {}).finally(() => setRefreshing(false));
+    if (live) void Promise.all([loadWithdrawals().catch(() => {}), loadLedger()]).finally(() => setRefreshing(false));
     else setTimeout(() => setRefreshing(false), 700);
   };
 
@@ -58,6 +63,20 @@ export default function EarningsDetail() {
   const system = earnings.filter((e) => SYSTEM_SOURCES.includes(e.source));
   const social = earnings.filter((e) => SOCIAL_SOURCES.includes(e.source));
   const spends = ledger.filter((l) => l.currency === 'diamond' && l.amount < 0);
+  const serverRows = (k: Sub) => history.rows.filter((e) => incomeKind(e) === k);
+  // Live: an empty list only once the server has answered; until then "loading", and a failed read says so.
+  const liveList = (k: Sub) => {
+    if (history.status === 'error') return <LoadError text="Kayıtlar sunucudan okunamadı." onRetry={history.reload} />;
+    if (history.status !== 'ready') return <Text style={[styles.dim, { textAlign: 'center', paddingVertical: 30 }]}>Yükleniyor…</Text>;
+    const rows = serverRows(k);
+    if (!rows.length) return <Empty onRetry={refresh} />;
+    return (
+      <>
+        {rows.map((e) => (k === 'spend' ? <ServerSpendRow key={e.id} e={e} /> : <ServerIncomeRow key={e.id} e={e} />))}
+        {history.rows.length >= LEDGER_PAGE && <Text style={[styles.dim, { textAlign: 'center' }]}>Son {LEDGER_PAGE} cüzdan hareketin içinden gösteriliyor.</Text>}
+      </>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -82,19 +101,23 @@ export default function EarningsDetail() {
       >
         {main === 'diamonds' ? (
           <>
+            {/* Live: the server keeps no lifetime income or uncollected-income total yet, so only the withdrawals
+                (the server's own list) are summed; the two local counters would show a made-up 0. */}
             <View style={styles.summary}>
-              <SummaryRow label="Birikmiş gelir" value={`+${fmt(totalDiamonds)}`} hint={usd(totalDiamonds)} />
+              {!live && <SummaryRow label="Birikmiş gelir" value={`+${fmt(totalDiamonds)}`} hint={usd(totalDiamonds)} />}
               <SummaryRow label="Birikmiş çekilme" value={fmt(withdrawn)} hint={pendingWithdraw ? `${fmt(pendingWithdraw)} beklemede` : usd(withdrawn)} />
-              <SummaryRow
-                label="Toplanmamış Gelir"
-                value={fmt(uncollected)}
-                onInfo={() =>
-                  showAlert(
-                    'Toplanmamış Gelir',
-                    'Kazanılmış ancak henüz elmas bakiyene aktarılmamış gelirdir (ör. haftalık hesaplanan tayfa ve ajans bonusları, incelemedeki işlemler). Hesaplama tamamlanınca otomatik olarak bakiyene eklenir.',
-                  )
-                }
-              />
+              {!live && (
+                <SummaryRow
+                  label="Toplanmamış Gelir"
+                  value={fmt(uncollected)}
+                  onInfo={() =>
+                    showAlert(
+                      'Toplanmamış Gelir',
+                      'Kazanılmış ancak henüz elmas bakiyene aktarılmamış gelirdir (ör. haftalık hesaplanan tayfa ve ajans bonusları, incelemedeki işlemler). Hesaplama tamamlanınca otomatik olarak bakiyene eklenir.',
+                    )
+                  }
+                />
+              )}
             </View>
 
             <View style={styles.subTabs}>
@@ -107,11 +130,14 @@ export default function EarningsDetail() {
             </View>
 
             <View style={styles.list}>
-              {sub === 'system' && (system.length ? system.map((e) => <EarningRow key={e.id} e={e} />) : <Empty onRetry={refresh} />)}
-              {sub === 'social' && (social.length ? social.map((e) => <EarningRow key={e.id} e={e} />) : <Empty onRetry={refresh} />)}
-              {sub === 'spend' && (spends.length ? spends.map((l) => <SpendRow key={l.id} l={l} />) : <Empty onRetry={refresh} />)}
+              {live && liveList(sub)}
+              {!live && sub === 'system' && (system.length ? system.map((e) => <EarningRow key={e.id} e={e} />) : <Empty onRetry={refresh} />)}
+              {!live && sub === 'social' && (social.length ? social.map((e) => <EarningRow key={e.id} e={e} />) : <Empty onRetry={refresh} />)}
+              {!live && sub === 'spend' && (spends.length ? spends.map((l) => <SpendRow key={l.id} l={l} />) : <Empty onRetry={refresh} />)}
             </View>
           </>
+        ) : live ? (
+          <ServerGiftReceipts rows={history.rows} status={history.status} onRetry={refresh} onReload={history.reload} />
         ) : (
           <GiftReceipts earnings={earnings} onRetry={refresh} />
         )}
@@ -156,6 +182,70 @@ function SpendRow({ l }: { l: LedgerRow }) {
         <Text style={[styles.dim, { color: l.status === 'Beklemede' ? colors.gold : colors.textDim }]}>{l.status}</Text>
       </View>
     </Card>
+  );
+}
+
+/** A server row of diamonds that left (Çevir, a withdrawal, a refund) or came back from a withdrawal. */
+function ServerSpendRow({ e }: { e: LedgerEntry }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  return (
+    <Card style={styles.row}>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Text style={styles.rowTitle}>{e.reason}</Text>
+        <Text style={styles.dim} numberOfLines={1}>
+          {ledgerTime(e.createdAt)} · {e.ref}
+        </Text>
+      </View>
+      <Text style={[styles.rowTitle, { color: e.amount < 0 ? colors.red : colors.green }]}>
+        {e.amount > 0 ? '+' : ''}
+        {fmt(e.amount)} 💎
+      </Text>
+    </Card>
+  );
+}
+
+/** Live: gifts received, grouped by gift, from the server's ledger rows. */
+function ServerGiftReceipts({ rows, status, onRetry, onReload }: { rows: LedgerEntry[]; status: string; onRetry: () => void; onReload: () => void }) {
+  const styles = useStyles();
+  if (status === 'error')
+    return (
+      <View style={styles.list}>
+        <LoadError text="Hediye kayıtların sunucudan okunamadı." onRetry={onReload} />
+      </View>
+    );
+  if (status !== 'ready')
+    return (
+      <View style={styles.list}>
+        <Text style={[styles.dim, { textAlign: 'center', paddingVertical: 30 }]}>Yükleniyor…</Text>
+      </View>
+    );
+  const groups = groupGifts(rows);
+  if (!groups.length)
+    return (
+      <View style={styles.list}>
+        <Empty onRetry={onRetry} />
+      </View>
+    );
+  return (
+    <View style={[styles.list, { paddingTop: 14 }]}>
+      <Text style={styles.dim}>
+        Son {fmt(rows.length)} cüzdan hareketinden · +{fmt(groups.reduce((s, g) => s + g.total, 0))} 💎
+      </Text>
+      {groups.map((g) => (
+        <Card key={g.name} style={styles.row}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.rowTitle}>
+              🎁 {g.name} x{fmt(g.count)}
+            </Text>
+            <Text style={styles.senders} numberOfLines={1}>
+              {g.senders.map(([id, n]) => `${userById(id).name} (${n})`).join(', ') || '—'}
+            </Text>
+          </View>
+          <Text style={[styles.rowTitle, styles.diamondAmount]}>+{fmt(g.total)} 💎</Text>
+        </Card>
+      ))}
+    </View>
   );
 }
 

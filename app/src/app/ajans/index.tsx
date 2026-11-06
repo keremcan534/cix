@@ -137,7 +137,7 @@ function ApplyCard() {
   return (
     <Card style={{ gap: 10 }}>
       <Text style={styles.title}>Ajans kur</Text>
-      <Text style={styles.dim}>Başvurun SimilarClub ekibi ve BD tarafından değerlendirilir. Onaylanınca ajans kimliğin oluşur; sözleşme, komisyon ve Coins Bank adımlarından sonra ödeme yetkin açılır. Vergi numarası gerekmez.</Text>
+      <Text style={styles.dim}>Başvurun Similar Club ekibi ve BD tarafından değerlendirilir. Onaylanınca ajans kimliğin oluşur; sözleşme, komisyon ve Coins Bank adımlarından sonra ödeme yetkin açılır. Vergi numarası gerekmez.</Text>
       {mine && (
         <View style={styles.preview}>
           <Ionicons name="document-text" size={26} color={colors.primaryText} />

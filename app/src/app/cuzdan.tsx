@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LoadError } from '@/components/load-error';
 import { Text } from '@/components/text';
 import { RECHARGE_PACKS, type RechargePack } from '@/data/status';
 import { goBack } from '@/lib/nav';
@@ -15,7 +16,9 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
-import { liveMode, liveTopup, message, TEST_PACKS } from '@/lib/live';
+import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
+import { LEDGER_PAGE, useLiveLedger } from '@/lib/live/earnings';
+import { coinsAddedOn, ledgerTime } from '@/lib/ledger-view';
 import { buyCoins, openShop, useShop } from '@/lib/live/billing';
 import { activeCampaign, campaignCoins, useLiveCatalog } from '@/lib/live/catalog-live';
 import { fmtIstanbul } from '@/lib/live-settings-format';
@@ -48,6 +51,14 @@ export default function WalletScreen() {
   const campaign = live ? activeCampaign(now, liveCat) : null;
   useEffect(() => {
     if (live) void openShop();
+  }, [live]);
+  // Live mode: the history is the server's ledger (its refs), read when the tab opens; the balance is re-read here
+  // so a failed read says so instead of showing the last number as if it were current.
+  const history = useLiveLedger(live && tab === 'history');
+  const [walletError, setWalletError] = useState(false);
+  const readWallet = () => void refreshWallet().then(() => setWalletError(false), () => setWalletError(true));
+  useEffect(() => {
+    if (live) readWallet();
   }, [live]);
   const { colors, semantic } = useTheme();
   const styles = useStyles();
@@ -85,7 +96,8 @@ export default function WalletScreen() {
   };
   const rows = ledger.filter((r) => r.currency === filter);
   const day = today();
-  const loadedToday = ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
+  const loadedToday = live ? coinsAddedOn(history.rows) : ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
+  const serverRows = history.rows.filter((r) => r.currency === filter);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -121,6 +133,33 @@ export default function WalletScreen() {
               </Pressable>
             ))}
           </View>
+          {live ? (
+            history.status === 'error' ? (
+              <LoadError text="Hareketler sunucudan okunamadı." onRetry={history.reload} style={{ marginHorizontal: 16 }} />
+            ) : (
+              <FlatList
+                data={serverRows}
+                keyExtractor={(r) => String(r.id)}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
+                ListEmptyComponent={<Text style={[styles.note, { marginTop: 30 }]}>{history.status === 'ready' ? 'Henüz hareket yok.' : 'Yükleniyor…'}</Text>}
+                ListFooterComponent={history.rows.length >= LEDGER_PAGE ? <Text style={[styles.note, { marginTop: 12 }]}>Son {LEDGER_PAGE} hareket gösteriliyor.</Text> : undefined}
+                renderItem={({ item }) => (
+                  <View style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text }}>{item.reason}</Text>
+                      <Text style={{ color: colors.textDim, fontSize: 12 }}>
+                        {ledgerTime(item.createdAt)} · {item.ref}
+                      </Text>
+                    </View>
+                    <Text style={{ color: item.amount < 0 ? colors.red : colors.green, fontWeight: '800' }}>
+                      {item.amount > 0 ? '+' : ''}
+                      {item.amount.toLocaleString('tr-TR')}
+                    </Text>
+                  </View>
+                )}
+              />
+            )
+          ) : (
           <FlatList
             data={rows}
             keyExtractor={(r) => r.id}
@@ -141,6 +180,7 @@ export default function WalletScreen() {
               </View>
             )}
           />
+          )}
         </>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
@@ -150,6 +190,7 @@ export default function WalletScreen() {
               <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
             </View>
             <Text style={styles.balanceN}>{coins.toLocaleString('tr-TR')}</Text>
+            {live && walletError && <LoadError text="Bakiyen sunucudan güncellenemedi; son bilinen bakiye gösteriliyor." onRetry={readWallet} style={{ marginTop: 8 }} />}
             {IS_DEMO && !live && (
               <Pressable
                 onPress={() => {
@@ -233,7 +274,7 @@ export default function WalletScreen() {
             <Text style={styles.legalLink} onPress={() => openLegal('payment')} accessibilityRole="link">
               Ödeme Sözleşmesi
             </Text>
-            &apos;ni okuduğunu ve kabul ettiğini onaylarsın. {IS_DEMO ? 'Prototip: ödeme simüle edilir; ' : ''}İade ve itiraz için Destek&apos;e yazabilirsin.
+            &apos;ni okuduğunu ve kabul ettiğini onaylarsın. {IS_DEMO && !live ? 'Prototip: ödeme simüle edilir; ' : ''}İade ve itiraz için Destek&apos;e yazabilirsin.
           </Text>
         </ScrollView>
       )}
@@ -312,7 +353,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   section: { color: colors.text, fontWeight: '700', fontSize: 16, paddingHorizontal: 16, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
   packHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 18, marginBottom: 8 },
-  shopNotice: { color: colors.textDim, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
+  shopNotice: { color: colors.text, fontSize: 14, lineHeight: 20, paddingHorizontal: 20, paddingVertical: 18 },
   pack: { flex: 1, alignItems: 'center', gap: 6, paddingTop: 26, paddingBottom: 16, borderRadius: 16, minHeight: 130, borderWidth: 1, borderColor: surface.rim, ...(dark ? {} : { boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)' }) },
   packFirst: { borderColor: 'rgba(246,189,96,0.75)', paddingTop: 12 },
   svipLink: { alignItems: 'center', gap: 2, marginTop: 14, paddingVertical: 8 },

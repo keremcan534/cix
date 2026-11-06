@@ -5,9 +5,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Platform, Pressable, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { onWebEnter } from '@/lib/enter-sends';
 
+import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { useReport } from '@/components/report-sheet';
 import { Text, TextInput } from '@/components/text';
 import { EmojiPanel } from '@/components/EmojiPanel';
@@ -15,19 +17,26 @@ import { MessageText } from '@/components/ReactionArt';
 import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { Icon3D } from '@/components/Icon3D';
-import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from '@/data/mock';
+import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import { messageTime } from '@/data/messages-ui';
 import { showAlert } from '@/lib/alert';
+import { copyText } from '@/lib/clipboard';
 import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, scanMessage } from '@/lib/safety';
-import { CONTACT_MESSAGE, messageRefusal, noteSent } from '@/lib/contact-filter';
+import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { newRef } from '@/lib/api';
-import { isLiveUser, liveDm } from '@/lib/live/messages';
+import { liveMode, message as errorText } from '@/lib/live';
+import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, useLiveThread, type SendResult } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { showSanction } from '@/lib/sanctions';
+
+type ChatMessage = Conversation['messages'][number];
+/** The server's limit for one message (server/api/messages.mjs). */
+const MAX_LENGTH = 1000;
 
 export function ChatThread({
   user,
@@ -43,12 +52,19 @@ export function ChatThread({
   /** Off when the screen around it already keeps the composer above the keyboard (a bottom sheet rises as a whole). */
   avoidKeyboard?: boolean;
 }) {
-  const { conversations, sendMessage, setMessageFailed, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
+  const { conversations, sendMessage, setMessageFailed, markMessageSent, importDms, deleteMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
   const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
   // A real person on the test server: messages are free and go through the server, no demo replies.
   const real = isLiveUser(user.id);
+  // A live build only chats with real people: a sample person (a demo id in an old link or notice) isn't there,
+  // and nothing is sent or charged for them.
+  const missing = liveMode() && !real;
+  // An open chat with a real person reads its thread every few seconds (both sides, the server's times).
+  useLiveThread(user.id, { importDms });
+  const [picked, setPicked] = useState<ChatMessage | null>(null);
+  const [reporting, setReporting] = useState<ChatMessage | null>(null);
   // Muted for DMs by the server (lib/sanctions): the composer stays closed until it ends.
   const dmStopped = useStopped('dm');
   const dmMuted = real ? dmStopped : null;
@@ -75,8 +91,8 @@ export function ChatThread({
     [],
   );
 
-  // Index of the other person's latest message: everything I sent before it counts as read. A chat with a real
-  // person has no read receipts yet, so it shows one tick ("sent") and never a made-up "read".
+  // Demo: everything I sent before the other person's latest message counts as read. A chat with a real person
+  // shows the server's read receipt (two blue ticks once they read it, one tick until then).
   const lastTheirs = real ? -1 : messages.map((m) => m.fromMe).lastIndexOf(false);
   // Why the text in the input did not go out (contact details, lib/contact-filter); cleared when it is edited.
   const [refused, setRefused] = useState<string | null>(null);
@@ -86,27 +102,81 @@ export function ChatThread({
   };
   const thread = `dm:${user.id}`;
   const deliver = (text: string, ref: string) =>
-    liveDm(user.id, text, ref, (failed, contact) => {
-      if (!failed) return;
-      setMessageFailed(user.id, ref, failed);
+    liveDm(user.id, text, ref, (r: SendResult) => {
+      if (r.ok) return markMessageSent(user.id, ref, r.message);
+      setMessageFailed(user.id, ref, r.reason, r.retry);
       // The server refused contact details the app let through (an older rule on this phone): the bubble says
       // why, and the text comes back into an empty input to be changed.
-      if (!contact) return;
-      setRefused(failed);
+      if (!r.contact) return;
+      setRefused(r.reason);
       setDraft((d) => d || text);
     });
-  const retry = (m: (typeof messages)[number]) => {
-    if (!m.ref) return;
+  const retry = (m: ChatMessage) => {
+    if (!m.ref || m.noRetry) return;
     const refusal = messageRefusal(thread, m.text, 'dm');
     if (refusal) return setRefused(refusal);
     setMessageFailed(user.id, m.ref, null);
     deliver(m.text, m.ref);
   };
 
+  // Long press on a bubble: copy, report (the other person's message), delete on this phone.
+  const reportMessage = (m: ChatMessage) => {
+    if (real && m.sid !== undefined) {
+      // The options sheet is still closing: one sheet at a time.
+      setTimeout(() => setReporting(m), 300);
+      return;
+    }
+    // A message the server doesn't know by id (the demo, or kept from an older version): the person is reported
+    // with the message attached; the demo files a support ticket.
+    report.start({ type: 'user', id: user.id, name: user.name, note: `Mesaj: ${m.text}`, onBlock: isBlocked ? undefined : () => toggleBlock(user.id) }, () => {
+      const no = createTicket('Şikâyet', `${user.name} (${user.id}) · Mesaj: "${m.text}"`);
+      logSafety('Şikâyet etti', user.id, `Mesaj · #${no}`);
+      showAlert('Bildirildi', `Talep #${no}. Moderasyon ekibi mesajı inceleyecek.`);
+    });
+  };
+  const sendReport = async (m: ChatMessage, reason: string) => {
+    if (m.sid === undefined) return;
+    try {
+      await reportDm(m.sid, reason, m.text);
+    } catch (e) {
+      showAlert('Şikâyet gönderilemedi', `${errorText(e)}\n\nBiraz sonra tekrar deneyebilirsin.`);
+      return;
+    }
+    logSafety('Şikâyet etti', user.id, reason);
+    showAlert(
+      'Teşekkürler',
+      'Şikâyetin ekibimize ulaştı. İnceleyip gereğini yapacağız; kimliğin karşı tarafla paylaşılmaz.',
+      isBlocked
+        ? undefined
+        : [
+            { text: 'Tamam', style: 'cancel' },
+            { text: `${user.name} kişisini engelle`, style: 'destructive', onPress: () => toggleBlock(user.id) },
+          ],
+    );
+  };
+  const messageOptions: SheetOption[] = picked
+    ? [
+        { label: 'Kopyala', icon: 'copy-outline', onPress: () => void copyText(picked.text, 'Mesaj') },
+        ...(picked.fromMe ? [] : [{ label: 'Şikâyet et', icon: 'flag-outline' as const, onPress: () => reportMessage(picked) }]),
+        {
+          label: 'Sil',
+          icon: 'trash-outline',
+          destructive: true,
+          onPress: () =>
+            showAlert('Mesaj silinsin mi?', real ? 'Yalnızca bu telefondan silinir; karşı taraf görmeye devam eder.' : 'Mesaj bu sohbetten silinir.', [
+              { text: 'Vazgeç', style: 'cancel' },
+              { text: 'Sil', style: 'destructive', onPress: () => deleteMessage(user.id, picked.id) },
+            ]),
+        },
+      ]
+    : [];
+
   // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
   const send = (sticker?: string) => {
     const text = sticker ?? draft.trim();
     if (!text || isBlocked) return;
+    if (missing) return showAlert('Kullanıcı bulunamadı', 'Bu kişiye mesaj gönderilemiyor.');
+    if (text.length > MAX_LENGTH) return showAlert('Mesaj çok uzun', `Bir mesaj en fazla ${MAX_LENGTH} karakter olabilir.`);
     if (dmMuted) return showSanction(dmMuted);
     if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
     // No phone numbers, IBANs, e-mails, links or social media accounts (lib/contact-filter): refused before any
@@ -146,46 +216,45 @@ export function ChatThread({
           contentContainerStyle={{ padding: compact ? 12 : 16, gap: 8 }}
           ListFooterComponent={
             <View style={[styles.intro, compact && { paddingVertical: 12 }]}>
-              <Avatar uri={user.avatar} size={compact ? 52 : 72} ring />
-              <Text style={styles.introName}>
-                {user.name}, {user.age}
-              </Text>
-              <Text style={styles.status}>{user.bio}</Text>
+              <Avatar uri={missing ? '' : user.avatar} size={compact ? 52 : 72} ring />
+              <Text style={styles.introName}>{missing ? 'Kullanıcı bulunamadı' : user.age > 0 ? `${user.name}, ${user.age}` : user.name}</Text>
+              {!missing && !!user.bio && <Text style={styles.status}>{user.bio}</Text>}
             </View>
           }
           renderItem={({ item }) =>
             item.fromMe ? (
-              <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mine]}>
-                <MessageText text={item.text} style={styles.bubbleText} />
-                {item.room && <RoomCard room={item.room} />}
-                <Text style={styles.time}>
-                  {item.time}{' '}
-                  {item.failed ? (
-                    <Text style={{ color: '#FECACA' }}>!</Text>
-                  ) : real ? (
-                    <Text style={{ color: 'rgba(255,255,255,0.7)' }}>✓</Text>
-                  ) : (
-                    <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
-                  )}
-                </Text>
-                {item.failed === CONTACT_MESSAGE ? (
-                  // Refused for contact details: sending it again would fail the same way, so it says why instead.
-                  <Text style={[styles.time, styles.refusedText]}>Gönderilmedi · {CONTACT_MESSAGE}</Text>
-                ) : (
-                  item.failed && (
+              <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={styles.mine} accessibilityHint="Seçenekler için basılı tut">
+                <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
+                  <MessageText text={item.text} style={styles.bubbleText} />
+                  {item.room && <RoomCard room={item.room} />}
+                  <Text style={styles.time}>
+                    {messageTime(item)}{' '}
+                    {item.failed ? (
+                      <Text style={{ color: '#FECACA' }}>!</Text>
+                    ) : real ? (
+                      <Text style={{ color: item.read ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }} accessibilityLabel={item.read ? 'Okundu' : 'Gönderildi'}>
+                        {item.read ? '✓✓' : '✓'}
+                      </Text>
+                    ) : (
+                      <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
+                    )}
+                  </Text>
+                  {/* Why it didn't go (the server's words); "tekrar dene" only when a retry can help. */}
+                  {item.failed && <Text style={[styles.time, styles.failed]}>{`Gönderilemedi · ${item.failed}`}</Text>}
+                  {item.failed && !item.noRetry && (
                     <Pressable onPress={() => retry(item)} accessibilityRole="button" accessibilityLabel="Mesajı tekrar gönder" hitSlop={8}>
-                      <Text style={[styles.time, { color: '#FECACA', fontWeight: '700' }]}>Gönderilemedi · tekrar dene</Text>
+                      <Text style={[styles.time, styles.failed, { textDecorationLine: 'underline' }]}>Tekrar dene</Text>
                     </Pressable>
-                  )
-                )}
-              </LinearGradient>
+                  )}
+                </LinearGradient>
+              </Pressable>
             ) : (
               <View style={{ gap: 6 }}>
-                <View style={[styles.bubble, styles.theirs]}>
+                <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs]} accessibilityHint="Seçenekler için basılı tut">
                   <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />
                   {item.room && <RoomCard room={item.room} theirs />}
-                  <Text style={[styles.time, styles.theirsTime]}>{item.time}</Text>
-                </View>
+                  <Text style={[styles.time, styles.theirsTime]}>{messageTime(item)}</Text>
+                </Pressable>
                 <SafetyNote
                   text={item.text}
                   onReport={() =>
@@ -204,7 +273,9 @@ export function ChatThread({
             )
           }
         />
-        {isBlocked ? (
+        {missing ? (
+          <Text style={styles.notice}>Kullanıcı bulunamadı; bu kişiye mesaj gönderilemiyor.</Text>
+        ) : isBlocked ? (
           <Text style={styles.notice}>Bu kullanıcıyı engelledin; mesaj gönderemezsin.</Text>
         ) : !allowed.ok ? (
           <Text style={[styles.notice, { color: colors.gold, textAlign: 'center' }]}>{allowed.reason}</Text>
@@ -236,12 +307,18 @@ export function ChatThread({
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
           </Pressable>
+          {/* Wraps up to a few lines; the keyboard's send key sends and the keyboard stays open for the next one.
+              Web: Enter sends, Shift+Enter is a new line (lib/enter-sends). */}
           <TextInput
             value={draft}
             onChangeText={edit}
             onSubmitEditing={() => send()}
-            editable={!dmMuted}
-            placeholder={dmMuted ? 'Mesaj gönderemezsin' : 'Mesaj yaz...'}
+            onKeyPress={Platform.OS === 'web' ? (e) => onWebEnter(e, () => send()) : undefined}
+            submitBehavior="submit"
+            multiline
+            maxLength={MAX_LENGTH}
+            editable={!dmMuted && !missing}
+            placeholder={missing ? 'Kullanıcı bulunamadı' : dmMuted ? 'Mesaj gönderemezsin' : 'Mesaj yaz...'}
             placeholderTextColor={colors.textDim}
             maxLength={1000}
             style={styles.input}
@@ -255,6 +332,13 @@ export function ChatThread({
         </View>
       </Body>
       {report.sheet}
+      <ActionSheet visible={!!picked} options={messageOptions} onClose={() => setPicked(null)} />
+      <ActionSheet
+        visible={!!reporting}
+        title="Bu mesajı neden şikâyet ediyorsun?"
+        options={MESSAGE_REPORT_REASONS.map((r) => ({ label: r, onPress: () => reporting && void sendReport(reporting, r) }))}
+        onClose={() => setReporting(null)}
+      />
     </>
   );
 }
@@ -301,7 +385,10 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   intro: { alignItems: 'center', gap: 6, paddingVertical: 24 },
   introName: { color: colors.text, fontSize: 18, fontWeight: '700' },
   bubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
-  mine: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
+  // My bubble sits in a pressable row (long press): the row aligns right and the bubble inside keeps the width limit.
+  mine: { alignSelf: 'flex-end', maxWidth: '78%' },
+  mineBubble: { maxWidth: '100%', borderBottomRightRadius: 4 },
+  failed: { color: '#FECACA', fontWeight: '700' },
   // The other side's bubble is a themed card (a white card with a rim and soft shadow in the light scheme); my own
   // bubble stays on the deep turquoise gradient with white text.
   theirs: { alignSelf: 'flex-start', backgroundColor: dark ? colors.cardAlt : colors.card, borderBottomLeftRadius: 4, ...lift },
@@ -324,9 +411,11 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
     flex: 1,
     backgroundColor: colors.card,
     color: colors.text,
-    borderRadius: 999,
+    borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
+    maxHeight: 120,
     fontSize: 15,
     // Light: a white pill on the paper needs a rim to read as a field.
     ...(dark ? null : { borderWidth: 1, borderColor: colors.border }),

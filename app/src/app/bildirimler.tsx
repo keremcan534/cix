@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Header, StateIcon } from '@/components/ui';
+import { liveMode } from '@/lib/live';
+import { noticeHref } from '@/lib/notice-links';
 import { useApp, type Notice } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -32,10 +34,12 @@ export default function NotificationsScreen() {
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('all');
   const list = notifications.filter((n) => tab === 'all' || (tab === 'social' ? n.kind === 'social' : n.kind !== 'social'));
 
-  // Opening a notice reads it, even one without a link.
+  // Opening a notice reads it, even one without a link. A live build doesn't follow a link to a demo-only part
+  // or a sample person or room (lib/notice-links).
   const open = (n: Notice) => {
     markNoticeRead(n.id);
-    if (n.href) router.push(n.href as Href);
+    const href = noticeHref(n.href, liveMode());
+    if (href) router.push(href as Href);
   };
 
   return (

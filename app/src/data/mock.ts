@@ -92,12 +92,21 @@ export type Conversation = {
     id: string;
     fromMe: boolean;
     text: string;
+    /** Demo label as written ('21:02', 'Dün'). Live messages carry `at` and the screen formats that instead. */
     time: string;
+    /** When it was sent (ISO). Live mode: the server's createdAt, or the moment we sent it until the server answers. */
+    at?: string;
+    /** Live mode: the server's message id, so the same message is never imported twice. */
+    sid?: number;
     room?: RoomInviteCard;
     /** Live mode: the request id sent with it (a retry reuses it, so the server keeps one copy). */
     ref?: string;
-    /** Live mode: the server didn't take it; the bubble offers "tekrar dene". */
+    /** Live mode: the server didn't take it; the bubble shows why and offers "tekrar dene". */
     failed?: string;
+    /** Live mode: the refusal won't change on a retry (too long, blocked, no such person): no "tekrar dene". */
+    noRetry?: boolean;
+    /** Live mode, my message: the other person has read it. */
+    read?: boolean;
   }[];
   unread: number;
 };
@@ -111,6 +120,10 @@ const NO_PHOTO = '';
 // Random stock photos for room covers and moments appear only in demo builds; a store build leaves them empty.
 const photo = (seed: string, w = 600, h = 400) => (IS_DEMO ? `https://picsum.photos/seed/${seed}/${w}/${h}` : NO_PHOTO);
 
+// A live build (server address set) starts the profile without the sample badge, @username and dates: the
+// real ones come from the account, and showing the sample ones there would claim a verification nobody did.
+const LIVE_BUILD = !!process.env.EXPO_PUBLIC_API_URL;
+
 export const ME: User = {
   id: 'me',
   name: 'Sen',
@@ -118,14 +131,14 @@ export const ME: User = {
   city: 'İstanbul',
   distanceKm: 0,
   avatar: NO_PHOTO,
-  verified: true,
+  verified: !LIVE_BUILD,
   bio: 'Müzik, kahve ve gece sohbetleri ☕🎧',
   online: true,
   interests: ['🎧 Müzik', '☕ Kahve', '💬 Sohbet'],
-  username: 'sen',
+  username: LIVE_BUILD ? '' : 'sen',
   country: 'TR',
-  birthDate: '2002-03-14',
-  joinedAt: '2026-09-02',
+  birthDate: LIVE_BUILD ? '' : '2002-03-14',
+  joinedAt: LIVE_BUILD ? '' : '2026-09-02',
   photos: [],
   gender: 'Erkek',
   showGender: true,
@@ -201,10 +214,11 @@ const serverUsers = new Map<string, User>();
 const serverRooms = new Map<string, Room>();
 /** A server id (uuid): a real account or room, not a sample one. */
 export const isServerId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-/** Adds or updates a real person; fields not given keep what was known. */
+/** Adds or updates a real person; fields not given keep what was known. Nobody counts as online until the
+ *  server says so (age 0 means unknown, and the screens leave it out). */
 export function putServerUser(p: Partial<User> & { id: string; name: string }): User {
   const prev = serverUsers.get(p.id);
-  const u: User = { age: 0, city: '', distanceKm: 0, avatar: NO_PHOTO, verified: false, bio: '', online: true, country: 'TR', showGender: true, ...prev, ...p };
+  const u: User = { age: 0, city: '', distanceKm: 0, avatar: NO_PHOTO, verified: false, bio: '', online: false, country: 'TR', showGender: true, ...prev, ...p };
   serverUsers.set(p.id, u);
   return u;
 }

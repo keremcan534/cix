@@ -6,6 +6,7 @@
 // phone only decides whether to show the way in (useIsAdmin) and which sanction actions to offer (meta.perms).
 import { useEffect, useSyncExternalStore } from 'react';
 
+import { banBody } from '@/lib/admin-format';
 import * as api from '@/lib/api';
 import { liveMode, myServerId, onAccountChange } from '@/lib/live';
 import type { AppealOutcome, ApplyBody, DeviceRisk, SanctionAppeal, SanctionAudit, SanctionDevice, SanctionMeta, SanctionPolicy, SanctionType, StaffSanction } from '@/lib/sanction-format';
@@ -96,11 +97,13 @@ export type Report = {
   handledAt: string | null;
 };
 export const reports = (status: ReportStatus = 'open') => get<{ reports: Report[] }>(`/api/admin/reports${q({ status })}`).then((r) => r.reports);
-/** actioned (with an optional ban of the reported person) or dismissed. */
-export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDays?: number) =>
-  post<{ report: { id: number; status: ReportStatus }; bannedUntil: string | null }>('/api/admin/reports/handle', { id, status, ...(banDays ? { banDays } : {}) });
-/** days = null lifts the ban. */
-export const ban = (user: string, days: number | null) => post<{ bannedUntil: string | null }>('/api/admin/ban', { user, days });
+/** actioned (with an optional ban of the reported person) or dismissed. 'Süresiz' also sends permanent: true (banBody). */
+export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDays?: number) => {
+  const b = banDays ? banBody(banDays) : null;
+  return post<{ report: { id: number; status: ReportStatus }; bannedUntil: string | null }>('/api/admin/reports/handle', { id, status, ...(b ? { banDays: b.days, permanent: b.permanent } : {}) });
+};
+/** days = null lifts the ban; 'Süresiz' also sends permanent: true (banBody). */
+export const ban = (user: string, days: number | null) => post<{ bannedUntil: string | null }>('/api/admin/ban', { user, ...(days === null ? { days } : banBody(days)) });
 
 // --- Withdrawals -------------------------------------------------------------------------------------------
 export type WithdrawalStatus = 'pending' | 'paid' | 'rejected' | 'cancelled';
@@ -141,6 +144,8 @@ export type AgencyPayout = {
   paidAt: string | null;
   paymentRef: string | null;
   note: string;
+  /** false when the commission came from test coins on this server: the server refuses approve/pay then (as with user withdrawals). Older servers leave it out. */
+  payable?: boolean;
 };
 export const agencyPayouts = (status?: PayoutStatus) => get<{ payouts: AgencyPayout[] }>(`/api/admin/agency/payouts${q({ status })}`).then((r) => r.payouts);
 export type PayoutAction = 'approve' | 'pay' | 'reject' | 'cancel';

@@ -42,6 +42,16 @@ test('geri sayım yazısı en büyük iki birimi gösterir', () => {
   assert.equal(formatLeft(500), '0 dk 01 sn', 'son saniye sıfır gösterilmez');
 });
 
+test('yıllık süre "12 ay" yazmaz: artan aylar yıla eklenir, "0 ay" yazılmaz', () => {
+  // A 3650-day ban one day in: 9 years and 364 days left used to read "9 yıl 12 ay".
+  assert.equal(formatLeft(3649 * 86400_000), '10 yıl');
+  assert.equal(formatLeft(3650 * 86400_000), '10 yıl');
+  assert.equal(formatLeft(365 * 86400_000), '1 yıl');
+  assert.equal(formatLeft(729 * 86400_000), '2 yıl');
+  assert.equal(formatLeft((365 + 359) * 86400_000), '1 yıl 11 ay');
+  for (let d = 365; d < 3 * 365; d++) assert.doesNotMatch(formatLeft(d * 86400_000), /\b1[2-9] ay|\b0 ay/, `${d} gün`);
+});
+
 test('oda susturması yalnız kendi odasında, genel susturma her odada durdurur', () => {
   const now = at('2026-11-04T10:30:00.000Z');
   const room: SanctionView = { ...base, id: 2, type: 'mute_room_voice', restricts: ['room_voice'], roomId: 'oda-a' };

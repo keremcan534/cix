@@ -14,9 +14,11 @@ import {
   cancelSwitch,
   closeLeaveDialog,
   confirmSwitch,
+  connectionLine,
   continueLeave,
   dismissEnded,
   endRoom,
+  endedText,
   engineEvent,
   engineInfo,
   getSession,
@@ -283,7 +285,7 @@ describe('Gerçek ses motoru durumu bildirir', () => {
     assert.equal(s().status, 'connected');
   });
 
-  test('bağlantı kurulamazsa bekleyerek yeniden dener; sonunda bağlanınca "yeniden kuruldu"', () => {
+  test('bağlantı kurulamazsa bekleyerek yeniden dener; ilk katılım "yeniden kuruldu" demez, gerçek kopmadan dönüş der', () => {
     reporting();
     openRoom('r1', info);
     engineEvent('r1', { type: 'failed', final: false, message: 'Ses bağlantısı kurulamadı' });
@@ -292,7 +294,10 @@ describe('Gerçek ses motoru durumu bildirir', () => {
     assert.equal(s().status, 'reconnecting', 'motor bağlandı demeden bağlı gösterilmez');
     assert.equal(stats().reconnects, 1);
     engineEvent('r1', { type: 'connected' });
-    assert.deepEqual([s().status, s().reconnectAttempt, getSession().notice?.text], ['connected', 0, 'Oda bağlantısı yeniden kuruldu.']);
+    assert.deepEqual([s().status, s().reconnectAttempt, s().everConnected, getSession().notice?.text], ['connected', 0, true, undefined]);
+    engineEvent('r1', { type: 'lost' });
+    engineEvent('r1', { type: 'connected' });
+    assert.equal(getSession().notice?.text, 'Oda bağlantısı yeniden kuruldu.');
   });
 
   test('sunucu kesin reddederse (oda kapandı) oda sunucunun sözüyle kapanır, tekrar denenmez', () => {
@@ -331,5 +336,103 @@ describe('Gerçek ses motoru durumu bildirir', () => {
     // Another room's word changes nothing here.
     engineEvent('r2', { type: 'grant', canPublish: false, canChat: false });
     assert.equal(s().sanctionMuted, false);
+  });
+});
+
+describe('Hiç bağlanmamış oda "koptu" demez', () => {
+  const reporting = () => {
+    const e = createSimulatedEngine(() => isOnline());
+    setEngine({ ...e, name: e.name, capabilities: { ...e.capabilities, reportsState: true } });
+  };
+  const line = (offline = false) => connectionLine(s(), offline)?.text ?? null;
+
+  test('ilk katılım: önce "Bağlanılıyor…", hata olunca "Bağlanılamadı · yeniden deneniyor (n. deneme)"', () => {
+    reporting();
+    openRoom('r1', info);
+    assert.equal(s().everConnected, false);
+    assert.equal(line(), 'Bağlanılıyor…');
+    engineEvent('r1', { type: 'failed', final: false, message: 'Ses bağlantısı kurulamadı' });
+    assert.equal(line(), 'Bağlanılamadı · yeniden deneniyor.');
+    mock.timers.tick(RECONNECT_DELAYS[0]);
+    assert.equal(line(), 'Bağlanılamadı · yeniden deneniyor (1. deneme).');
+    assert.equal(connectionLine(s(), false)?.retry, true);
+    assert.doesNotMatch(line() ?? '', /koptu|son alınan/);
+  });
+
+  test('ilk katılım hiç olmazsa "Odaya bağlanılamadı"; bağlantı kesildi ve eski liste denmez', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'failed', final: false, message: 'Ses bağlantısı kurulamadı' });
+    for (const d of RECONNECT_DELAYS) mock.timers.tick(d);
+    assert.equal(s().status, 'disconnected');
+    assert.equal(line(), 'Odaya bağlanılamadı. Ağ dönünce yeniden denenecek.');
+    assert.equal(connectionLine(s(), false)?.bad, true);
+  });
+
+  test('bağlandıktan sonra gerçek kopma "Bağlantı koptu" der; bağlıyken satır yok', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    assert.equal(line(), null);
+    engineEvent('r1', { type: 'lost' });
+    assert.match(line() ?? '', /^Bağlantı koptu · yeniden bağlanılıyor\./);
+    mock.timers.tick(RECONNECT_DELAYS[0]);
+    assert.match(line() ?? '', /\(1\. deneme\)/);
+  });
+
+  test('basit motor: ağ yokken açılan oda ağ dönünce bağlanır, "yeniden kuruldu" demez', () => {
+    setConnection('offline');
+    openRoom('r1', info);
+    mock.timers.tick(CONNECT_MS);
+    assert.equal(s().status, 'reconnecting');
+    assert.equal(line(true), 'Bağlanılamadı · yeniden deneniyor.');
+    setConnection('online');
+    onNetwork(true);
+    assert.deepEqual([s().status, s().everConnected, getSession().notice?.text], ['connected', true, undefined]);
+  });
+});
+
+describe('Bitiş başlığı sunucunun sözünü kullanır', () => {
+  const reporting = () => {
+    const e = createSimulatedEngine(() => isOnline());
+    setEngine({ ...e, name: e.name, capabilities: { ...e.capabilities, reportsState: true } });
+  };
+  const refused = (message: string, reason: 'kicked' | 'server' = 'kicked') => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'failed', final: true, reason, message });
+    return endedText(s());
+  };
+
+  test('girişte 403: başlık "Bu odaya giremezsin" / "Oda şifresi yanlış", "Odadan çıkarıldın" değil', () => {
+    const blocked = refused('Bu odaya giremezsin');
+    assert.equal(blocked.title, 'Bu odaya giremezsin');
+    assert.equal(blocked.body, '“Gece Sohbeti” odasına girilemedi.', 'hiç girmeyene "mikrofonun kapatıldı" denmez');
+    resetSession();
+    assert.equal(refused('Oda şifresi yanlış').title, 'Oda şifresi yanlış');
+    resetSession();
+    assert.equal(refused('Oda kapandı', 'server').title, 'Oda kapandı');
+  });
+
+  test('içerideyken atılma (sunucu sözü yok) "Odadan çıkarıldın"; kapanan oda "Oda sona erdi"', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    engineEvent('r1', { type: 'removed', reason: 'kicked' });
+    const kicked = endedText(s());
+    assert.equal(kicked.title, 'Odadan çıkarıldın');
+    assert.match(kicked.body, /Mikrofonun ve ses bağlantın kapatıldı\.$/);
+    resetSession();
+    talking();
+    endRoom('server');
+    assert.equal(endedText(s()).title, 'Oda sona erdi');
+  });
+
+  test('bağlıyken gelen sunucu sözü başlık olur; gövde bağlantının kapandığını söyler', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    engineEvent('r1', { type: 'failed', final: true, reason: 'kicked', message: 'Bu odadan geçici olarak çıkarıldın' });
+    assert.deepEqual(endedText(s()), { title: 'Bu odadan geçici olarak çıkarıldın', body: 'Mikrofonun ve ses bağlantın kapatıldı.' });
   });
 });

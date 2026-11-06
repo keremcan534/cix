@@ -6,7 +6,7 @@
 // decided by the server; when a countdown reaches zero the store only asks the server again.
 import { useSyncExternalStore } from 'react';
 
-import { ApiError, apiEnabled, appealSanction, mySanctions, onBlocked, retrySignIn, type Block, type MyAppeal, type SanctionView } from '@/lib/api';
+import { ApiError, apiEnabled, appealSanction, mySanctions, onBlocked, onSignedIn, retrySignIn, type Block, type MyAppeal, type SanctionView } from '@/lib/api';
 import { onContactStrike } from '@/lib/contact-filter';
 import { remaining, resetClock, setServerNow } from '@/lib/sanction-time';
 
@@ -31,6 +31,8 @@ export const useSanctions = () => useSyncExternalStore(subscribe, getSanctions, 
 // --- Loading -----------------------------------------------------------------------------------------------
 let timer: ReturnType<typeof setTimeout> | undefined;
 let loading: Promise<void> | null = null;
+/** The last ask failed with the normal session (no network at start, not signed in yet): a sign-in asks again. */
+let stale = false;
 
 /** Asks the server again (on start, when a room opens, after a refusal, when a countdown ends). */
 export function refreshSanctions(): Promise<void> {
@@ -38,12 +40,14 @@ export function refreshSanctions(): Promise<void> {
   loading ??= (async () => {
     try {
       const r = await mySanctions(state.block?.appealSession);
+      stale = false;
       setServerNow(r.serverNow);
       emit({ sanctions: r.sanctions, appeals: r.appeals, loaded: true });
       // A ban that ended or was lifted: back to the app (it signs in again on its own).
       if (state.block && !r.sanctions.some((s) => s.id === state.block?.sanction.id)) clearBlock();
       schedule();
     } catch (e) {
+      if (!state.block) stale = true;
       if (!(e instanceof ApiError)) throw e;
       // The appeal session no longer works: the ban ended or was lifted, or the session ran out (one day). A sign-in
       // tells which: it succeeds (back to the app) or is refused with a new appeal session.
@@ -96,6 +100,11 @@ onBlocked((b) => {
   void refreshSanctions().catch(() => {});
 });
 
+// The first ask can come before the sign-in has worked (a cold start without network): ask again once it has.
+onSignedIn(() => {
+  if (stale) void refreshSanctions().catch(() => {});
+});
+
 export const showSanction = (s: SanctionView | null) => emit({ shown: s });
 
 /** The ban screen was opened by a sign-in attempt: forget it once the person signs in fine again. */
@@ -127,6 +136,7 @@ export const APPEAL_STATUS: Record<MyAppeal['status'], string> = {
 export function resetSanctions() {
   clearTimeout(timer);
   askedAppeal = false;
+  stale = false;
   state = { sanctions: [], appeals: [], block: null, loaded: false, shown: null };
   resetClock();
 }

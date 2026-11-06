@@ -10,6 +10,7 @@ import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
 import { PROFILE_VISITORS } from '@/data/messages-ui';
 import { FOLLOWS_ME } from '@/data/mock';
+import { displayId } from '@/data/profile';
 import { nobleInfo } from '@/data/status';
 import { confirmLogout, showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
@@ -19,18 +20,21 @@ import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 import { casinoVisible } from '@/lib/games';
-import { callsAvailable, liveMode } from '@/lib/live';
+import { callsAvailable, liveMode, myServerId, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
+import { useMeStats } from '@/lib/live/me-stats';
+import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Item = { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean; agencyOnly?: boolean; noAgencyOnly?: boolean; /** Admin screen: shown in demo builds only (lib/build). */ demoOnly?: boolean; /** Example data only: hidden when the app talks to the server. */ localOnly?: boolean };
+type Item = MenuFlags & { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean };
 
 const GROWTH: Item[] = [
   { icon: 'mic-outline', img: 'mic', label: 'Yayıncı Merkezi', onPress: () => router.push('/yayinci') },
   { icon: 'business-outline', img: 'briefcase', label: 'Ajans', onPress: () => router.push('/ajans'), agencyOnly: true },
-  { icon: 'chatbubbles-outline', img: 'chat', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true },
-  { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true },
+  // The agency chat group and the member network are demo screens; with a server, /ajans holds the real ones.
+  { icon: 'chatbubbles-outline', img: 'chat', label: 'Ajans sohbet grubu', onPress: () => router.push('/ajans/sohbet'), agencyOnly: true, localOnly: true },
+  { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true, localOnly: true },
   { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
   ...(callsAvailable() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
@@ -47,8 +51,6 @@ const SUPPORT: Item[] = [
   { icon: 'shield-checkmark-outline', label: 'Güvenlik Merkezi', onPress: () => router.push('/ayarlar') },
   { icon: 'settings-outline', label: 'Ayarlar', onPress: () => router.push('/ayarlar') },
 ];
-const COMPLETION = 46;
-
 /** Agency applications on the server are approved in Ajans Merkezi › Onaylar (platform admins). */
 const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
 
@@ -59,14 +61,25 @@ export default function ProfileScreen() {
   const isAdmin = useIsAdmin();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
-  // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through.
-  const followers = [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
-  const friendCount = new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
+  const live = liveMode();
+  // Live: my counts, id and agency from the server (null / undefined until read); my open room from /api/rooms.
+  const server = useMeStats();
+  const serverRooms = useServerRooms();
+  const ownRoom = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
+  // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through. Live:
+  // Mesajlar's friends are the people I follow, and profile visitors are not recorded on the server.
+  const followers = live ? (server.stats?.followers ?? null) : [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
+  const followingCount = live ? (server.stats?.following ?? following.size) : following.size;
+  const friendCount = live ? [...following].filter((id) => id !== 'me' && !blocked.has(id)).length : new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
   const visitorCount = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId)).length;
+  const completion = myCompletion(me, live);
+  // My public id: the one others see on my profile (data/profile displayId of my server id); none until known.
+  const serverId = server.stats?.serverId ?? myServerId();
+  const publicId = specialId ? specialId.name.replace('ID ', '') : live ? (serverId ? displayId(serverId) : null) : '10284731';
 
   const main: Item[] = [
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
-    { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank') },
+    { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank'), localOnly: true },
     { icon: 'storefront-outline', img: 'bag', label: 'Çarşı', onPress: () => router.push('/magaza') },
     {
       icon: 'checkmark-circle-outline',
@@ -77,7 +90,9 @@ export default function ProfileScreen() {
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
   ];
-  const visible = (m: Item) => ((m.demoOnly && !IS_DEMO) || (m.localOnly && liveMode()) ? false : m.agencyOnly ? !!agencyId : m.noAgencyOnly ? !agencyId : true);
+  // Live: agency rows follow my membership on the server (none shows until it is read).
+  const hasAgency = live ? (server.agency === undefined ? null : !!server.agency) : !!agencyId;
+  const visible = (m: Item) => rowVisible(m, { demo: IS_DEMO, live, hasAgency });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -88,7 +103,7 @@ export default function ProfileScreen() {
           </Pressable>
           <View style={{ flex: 1, gap: 5 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.name} numberOfLines={1}>
+              <Text style={styles.name} numberOfLines={2}>
                 {me.name}
               </Text>
               {me.verified && <VerifiedBadge size={16} />}
@@ -98,14 +113,16 @@ export default function ProfileScreen() {
               <LevelChips wealth={wealthLevel} charm={charmLevel} />
             </View>
             <AffiliationPills user={me} />
-            <Pressable onPress={() => copyText(specialId ? specialId.name : '10284731', 'ID')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${specialId.name.replace('ID ', '')} ✦` : '10284731'}</Text>
-              <Ionicons name="copy-outline" size={13} color={colors.textDim} />
-            </Pressable>
+            {publicId !== null && (
+              <Pressable onPress={() => copyText(publicId, 'ID')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[styles.id, specialId && { color: colors.gold, fontWeight: '800' }]}>ID:{specialId ? `${publicId} ✦` : publicId}</Text>
+                <Ionicons name="copy-outline" size={13} color={colors.textDim} />
+              </Pressable>
+            )}
           </View>
           <Pressable style={styles.completion} onPress={() => router.push('/kullanici/me')} accessibilityLabel="Profil tamamlama">
             <Ionicons name="person-outline" size={14} color={colors.text} />
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 12 }}>%{COMPLETION}</Text>
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 12 }}>%{completion}</Text>
             <View style={styles.redDot} />
             <Ionicons name="chevron-forward" size={14} color={colors.text} />
           </Pressable>
@@ -113,14 +130,16 @@ export default function ProfileScreen() {
 
         <View style={styles.stats}>
           <Stat n={followers} label="Takipçiler" />
-          <Stat n={following.size} label="Takip" />
+          <Stat n={followingCount} label="Takip" />
           <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
-          <Stat
-            n={visitorCount}
-            label="Ziyaretçiler"
-            dot
-            onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? `Son 7 günde profilini ${visitorCount} kişi ziyaret etti. (VIP ayrıcalığı)` : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
-          />
+          {!live && (
+            <Stat
+              n={visitorCount}
+              label="Ziyaretçiler"
+              dot
+              onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? `Son 7 günde profilini ${visitorCount} kişi ziyaret etti. (VIP ayrıcalığı)` : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
+            />
+          )}
         </View>
 
         <View style={styles.card}>
@@ -143,11 +162,27 @@ export default function ProfileScreen() {
 
         <View style={[styles.card, { flexDirection: 'row' }]}>
           <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
-          <Shortcut emoji="⛺" label="Tayfam" onPress={() => router.push('/aile')} />
-          <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />
+          {/* Tayfa and invite rewards run only in the demo; the server has neither yet. */}
+          {!live && <Shortcut emoji="⛺" label="Tayfam" onPress={() => router.push('/aile')} />}
+          {!live && <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />}
         </View>
 
-        {myRoom.profileVisible && (
+        {myRoom.profileVisible && live && (
+          // Live: my open room as the server has it (its id and who is in it now), or the way to open one.
+          <Pressable onPress={() => router.push(ownRoom ? `/oda/${ownRoom.id}` : '/oda/yeni')} style={styles.roomCta} accessibilityLabel={ownRoom ? 'Odam' : 'Odanı aç'}>
+            <Icon3D name="mic" size={28} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontWeight: '700' }} numberOfLines={1}>
+                {ownRoom ? ownRoom.title || 'Odam' : 'Odanı aç'}
+              </Text>
+              <Text style={{ color: colors.textDim, fontSize: 12 }} numberOfLines={1}>
+                {ownRoom ? `Odam · ID ${roomCode(ownRoom.id)} · ${ownRoom.listeners.toLocaleString('tr-TR')} kişi içeride` : 'Ad, tür ve istersen şifre seç; odan hemen açılsın.'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+        )}
+        {myRoom.profileVisible && !live && (
           <Pressable onPress={() => router.push('/oda/yeni')} style={styles.roomCta} accessibilityLabel="Odam">
             <Icon3D name="mic" size={28} />
             <View style={{ flex: 1 }}>
@@ -167,7 +202,8 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {casinoVisible(wealthLevel) && (
+        {/* Live: the game hall's games run on this phone only, so the card stays in the demo. */}
+        {!live && casinoVisible(wealthLevel) && (
           <View style={styles.gameCard}>
             <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
               <Icon3D name="wheel" size={30} />
@@ -197,7 +233,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <Group items={main} />
+        <Group items={main.filter(visible)} />
         <Group items={[...GROWTH.filter(visible), ...(isAdmin ? [CENTER] : [])]} />
         <Group items={SUPPORT} />
 
@@ -263,12 +299,13 @@ function Shortcut({ emoji, label, onPress }: { emoji: string; label: string; onP
   );
 }
 
-function Stat({ n, label, onPress, dot }: { n: number; label: string; onPress?: () => void; dot?: boolean }) {
+/** `n` null: not read from the server yet. */
+function Stat({ n, label, onPress, dot }: { n: number | null; label: string; onPress?: () => void; dot?: boolean }) {
   const styles = useStyles();
   return (
     <Pressable style={{ flex: 1, alignItems: 'center', gap: 4 }} onPress={onPress} disabled={!onPress}>
       <View style={{ flexDirection: 'row' }}>
-        <Text style={styles.statN}>{n.toLocaleString('tr-TR')}</Text>
+        <Text style={styles.statN}>{n === null ? '–' : n.toLocaleString('tr-TR')}</Text>
         {dot && <View style={[styles.redDot, { marginLeft: 2 }]} />}
       </View>
       <Text style={styles.statL}>{label}</Text>

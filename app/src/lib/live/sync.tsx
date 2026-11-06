@@ -1,6 +1,8 @@
 // Live mode background sync (lib/live): while signed in, keeps the balance and the Gelir locks in step with the
 // server (a gift someone sends from another phone shows up here within seconds), polls direct messages and
-// passes on the contact filter's refusals made on this phone.
+// passes on the contact filter's refusals made on this phone. On signing in it also takes the server's follow
+// and block lists (a reinstall or a new sign-in starts from them). An open chat reads its own thread more often
+// (lib/live/messages useLiveThread).
 // Mounted once above the stack (app/_layout); renders nothing and does nothing without a server address.
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
@@ -10,6 +12,7 @@ import { SignInAgain, countContactRefusal } from '@/lib/api';
 import { onContactRefusal } from '@/lib/contact-filter';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
+import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { pollMessages } from '@/lib/live/messages';
 import { settleWithdrawals } from '@/lib/live/withdraw';
 import { useApp } from '@/store';
@@ -49,6 +52,13 @@ export function LiveSync() {
           signedIn = true;
           // A Play purchase whose server answer was lost last time is verified now.
           resumePurchases();
+          // Follows and blocks are kept on the server; one failing leaves this phone's list as it is.
+          void loadFollowing()
+            .then((ids) => alive && appRef.current.takeServerSocial({ following: ids }))
+            .catch(() => {});
+          void loadBlocks()
+            .then((ids) => alive && appRef.current.takeServerSocial({ blocked: ids }))
+            .catch(() => {});
           await refreshEarnings();
         } else {
           // A rejected withdrawal gives diamonds back: known before the balance is read, so it isn't a gift.

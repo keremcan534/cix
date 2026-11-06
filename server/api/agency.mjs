@@ -14,6 +14,7 @@
 //   GET  /api/agency/subagencies?id=   GET /api/agency/commissions?id=&from&to&streamer&sub&kind&format=csv
 //   GET  /api/agency/performance?id=   GET /api/agency/report?id=&from&to&group=day|week|month
 //   GET  /api/agency/requests?id=      POST /api/agency/invite { id, user | username, note? }
+//   GET  /api/agency/invite/search?id=&q=  → { users }  (whom to invite, by name or username)
 //   POST /api/agency/requests/decide { id, requestId, approve, note? }
 //   POST /api/agency/sub/create { parentId, name, owner?, …, submit? }   POST /api/agency/sub/submit { id }
 //   POST /api/agency/sub/decide { id, approve, note? }    POST /api/agency/apply { name, parentCode?, owner?, … }
@@ -48,6 +49,15 @@ import {
   viewerOf,
 } from './agency-lib.mjs';
 import { approveTransfer, checkCanFoundSub, feeRule, linkStreamer, namesFor, openTransfer, payoutStep, rejectTransfer, setStatus, submitAgency, transferView } from './agency-ops.mjs';
+import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
+
+/**
+ * Commission is never paid out on a server that holds or held play money (test top-ups, test or sandbox
+ * purchases): the same rule as diamond withdrawals (withdraw.mjs). Coins are fungible, so no commission there is
+ * provably earned with real money. Requests, approvals and payments are refused; only reject or cancel remain.
+ */
+export const PLAY_PAYOUT = 'Test jetonundan gelen kazanç ödenemez';
+export const playMoneyOn = async (c) => PLAY_MONEY || (await everHadPlayMoney(c));
 
 // --- Small helpers -----------------------------------------------------------------------------------------
 const bad = (m) => {
@@ -540,6 +550,34 @@ export const agencyRoutes = {
     return { requests: r.rows.map((q) => ({ id: Number(q.id), kind: q.kind, method: q.method, status: q.status, user: { id: q.user_id, name: q.name, username: q.username }, note: q.note, createdAt: q.created_at, decidedAt: q.decided_at })) };
   },
 
+  /**
+   * "Yayıncı davet et": the people the app shows by name (few accounts have a username), found by name or
+   * username, so the invite can name them by id. Only for whoever may invite in this agency; deleted accounts,
+   * the caller and blocks either way are left out. `agency`: 'this' or 'other' when they already belong to one.
+   */
+  async 'GET /api/agency/invite/search'(req, url) {
+    const x = await ctx(db, req);
+    const a = await agencyRow(db, uuid(url.searchParams.get('id'), 'ajans'));
+    await actIn(db, x, a, 'streamers.invite');
+    const q = (url.searchParams.get('q') ?? '').trim().replace(/^@+/, '');
+    if (q.length < 2) return { users: [] };
+    if (q.length > 40) bad('Arama en fazla 40 karakter olabilir');
+    const esc = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+    const r = await db.query(
+      `SELECT u.id, u.name, u.username, u.avatar_url,
+              (SELECT s.agency_id FROM agency_streamers s WHERE s.streamer_id = u.id AND s.ended_at IS NULL LIMIT 1) AS agency_id
+         FROM users u
+        WHERE u.deleted_at IS NULL AND u.id <> $1 AND (u.name ILIKE $2 OR u.username ILIKE $2)
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
+        ORDER BY lower(u.username) = lower($3) IS TRUE DESC, lower(u.name) = lower($3) DESC, u.name ILIKE $4 DESC, u.name, u.id
+        LIMIT 20`,
+      [x.u.id, `%${esc}%`, q, `${esc}%`],
+    );
+    return {
+      users: r.rows.map((u) => ({ id: u.id, name: u.name, username: u.username ?? null, avatarUrl: u.avatar_url ?? null, agency: u.agency_id === a.id ? 'this' : u.agency_id ? 'other' : null })),
+    };
+  },
+
   async 'POST /api/agency/invite'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
@@ -755,6 +793,7 @@ export const agencyRoutes = {
       if (same.rowCount) return { payout: { id: Number(same.rows[0].id), amount: d4(same.rows[0].amount), status: same.rows[0].status }, replay: true };
       if (a.status !== 'approved') throw new HttpError(403, 'Askıdaki veya kapalı ajans ödeme talep edemez');
       if (!x.s.payout_policy.currencies.includes(b.currency)) bad(`Para birimi: ${x.s.payout_policy.currencies.join(', ')}`);
+      if (await playMoneyOn(c)) throw new HttpError(409, PLAY_PAYOUT);
       const open = await c.query("SELECT 1 FROM agency_payouts WHERE agency_id = $1 AND status IN ('pending', 'ready')", [a.id]);
       if (open.rowCount) throw new HttpError(409, 'Sonuçlanmamış bir ödeme talebin var');
       // Only earnings of closed periods that no payout has claimed; claimed in the same statement's lock.

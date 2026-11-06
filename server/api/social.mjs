@@ -7,7 +7,7 @@
 //   GET    /api/following                                 → { users }
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
-//   POST   /api/report  { type, id, reason, note? }       → { reported: true }
+//   POST   /api/report  { type, id, reason, note? }       → { reported: true, updated }
 //   POST   /api/contact/refusals { category, place }      → { counted: true, strikesLeft?, muted?, until? }  (a refusal the app made on its own)
 import { HttpError, ageOf, allow, assertClean, auth, blockedBetween, countRefusal, db, profileOf, publicText, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { CATEGORIES } from './contact-filter.mjs';
@@ -89,6 +89,9 @@ export const socialRoutes = {
    * sessions, push tokens, follows, blocks, messages, contact-filter refusal counts, own rooms. The id, ledger,
    * gifts and purchases stay, because financial records must be kept; they no longer point to anything personal.
    * The phone number, the address, the Google account and the device are free again for a new account.
+   * Never refused for a mute (UK GDPR erasure; a ban already stops auth): the sanction records and the device
+   * link stay, and a general mute still running moves to a new account made on the same device
+   * (sanctions.mjs carryMutes).
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
@@ -207,10 +210,18 @@ export const socialRoutes = {
     if (typeof b.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(b.id)) throw new HttpError(400, 'Geçersiz hedef');
     const reason = text(b.reason, 1, 60, 'Sebep');
     const note = b.note === undefined ? '' : text(b.note, 0, 500, 'Not');
-    await db.query('INSERT INTO reports (reporter, target_type, target_id, reason, note) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [me.id, b.type, b.id, reason, note]);
+    // One open report per person and target (reports_open_once): reporting it again while it is open keeps the
+    // newer reason (and note, if one is given) instead of dropping it. updated: it was such a repeat.
+    const r = await db.query(
+      `INSERT INTO reports (reporter, target_type, target_id, reason, note) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (reporter, target_type, target_id) WHERE status = 'open'
+       DO UPDATE SET reason = EXCLUDED.reason, note = CASE WHEN EXCLUDED.note <> '' THEN EXCLUDED.note ELSE reports.note END, created_at = now()
+       RETURNING (xmax::text <> '0') AS updated`,
+      [me.id, b.type, b.id, reason, note],
+    );
     // Many people reporting one account: the category's policy step (sanctions.mjs). Never fails the report.
     if (b.type === 'user' && b.id !== me.id) await autoFromReports(b.id, reason).catch((e) => console.error('auto sanction', e.message));
-    return { reported: true };
+    return { ok: true, reported: true, updated: r.rows[0].updated };
   },
 
   /**

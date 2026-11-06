@@ -13,7 +13,7 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
 import { icon3dSource } from '@/components/Icon3D';
 import { SimilarityChip, SimilarityRing } from '@/components/similarity';
-import { Avatar } from '@/components/ui';
+import { Avatar, Button } from '@/components/ui';
 import { roomCode } from '@/data/catalog';
 import { ROOMS, USERS, userById, type Room, type User } from '@/data/mock';
 import {
@@ -37,7 +37,7 @@ import { StarterPath } from '@/components/starter';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { callsAvailable, liveMode, useServerRooms } from '@/lib/live';
+import { callsAvailable, isLockedRoom, liveMode, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -66,13 +66,18 @@ export default function RoomsScreen() {
   // Live mode (test APK): only the rooms real people opened on our server; the demo rooms and people stay out.
   const live = liveMode();
   const serverRooms = useServerRooms();
+  const roomsState = useServerRoomsState();
   const visible = (live ? serverRooms : ROOMS).filter((r) => !blocked.has(r.hostId));
-  // The home screen leads with the open room whose host has the most in common with you (lib/closest).
-  const closest = closestRooms(me, visible, userById, { following, recent: recentRooms, blocked })[0];
+  // The home screen leads with the open room whose host has the most in common with you (lib/closest); a
+  // password room is never offered there.
+  const closest = closestRooms(me, visible.filter((r) => !isLockedRoom(r.id)), userById, { following, recent: recentRooms, blocked })[0];
+  // Live: my own open room on the server ("Odam"), and where the starter's "join a room" step leads.
+  const myLive = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
+  const starterRoom = live && closest ? (`/oda/${closest.room.id}` as const) : undefined;
 
   // Personalized suggestions with an explanation; blocked hosts and private rooms are excluded.
   const suggestions: Suggestion[] = visible
-    .filter((r) => !r.password && r.id !== closest?.room.id)
+    .filter((r) => !locked(r) && r.id !== closest?.room.id)
     .map((r) => {
       const reason = following.has(r.hostId)
         ? `Takip ettiğin ${userById(r.hostId).name} burada`
@@ -114,7 +119,9 @@ export default function RoomsScreen() {
   const emptyText =
     main === 'rec'
       ? live
-        ? 'Şu an açık oda yok. Sağ alttaki + ile ilk odayı sen aç.'
+        ? roomsState === 'loading'
+          ? 'Odalar yükleniyor…'
+          : 'Şu an açık oda yok. Sağ alttaki + ile ilk odayı sen aç.'
         : 'Bu kategoride şu an açık oda yok.'
       : mineTab === 'recent'
         ? 'Henüz bir odaya girmedin.'
@@ -169,7 +176,7 @@ export default function RoomsScreen() {
         ListHeaderComponent={
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
-              <StarterPath />
+              <StarterPath roomHref={starterRoom} />
               {closest && <ClosestRoomCard match={closest} />}
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
               {similarPeople.length > 0 && <SimilarPeople people={similarPeople} rooms={visible} />}
@@ -178,7 +185,19 @@ export default function RoomsScreen() {
             </View>
           ) : (
             <View style={{ gap: 14, paddingBottom: 4 }}>
-              <MyRoomCard title={myRoom.title} announcement={myRoom.announcement} cover={myRoom.cover} locked={myRoom.locked} avatar={me.avatar} />
+              {live ? (
+                // Live: my room as the server has it, or the way to open one (the create sheet at /oda/yeni).
+                <MyRoomCard
+                  title={myLive?.title ?? 'Odanı aç'}
+                  announcement={myLive ? (myLive.announcement ?? '') : 'Ad, tür ve istersen şifre seç; odan hemen açılsın.'}
+                  cover=""
+                  locked={!!myLive && isLockedRoom(myLive.id)}
+                  avatar={me.avatar}
+                  listeners={myLive?.listeners ?? 0}
+                />
+              ) : (
+                <MyRoomCard title={myRoom.title} announcement={myRoom.announcement} cover={myRoom.cover} locked={myRoom.locked} avatar={me.avatar} />
+              )}
               <View style={styles.subTabs}>
                 {MINE_TABS.map((t) => (
                   <Pressable key={t.key} onPress={() => setMineTab(t.key)} hitSlop={6} style={{ alignItems: 'center' }}>
@@ -190,7 +209,17 @@ export default function RoomsScreen() {
             </View>
           )
         }
-        ListEmptyComponent={<Text style={styles.empty}>{emptyText}</Text>}
+        ListEmptyComponent={
+          live && roomsState === 'failed' ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>Bağlantı kurulamadı</Text>
+              <Text style={styles.errorText}>Odalar şu an yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>
+              <Button title="Tekrar dene" icon="refresh" small variant="tonal" onPress={reloadServerRooms} />
+            </View>
+          ) : (
+            <Text style={styles.empty}>{emptyText}</Text>
+          )
+        }
         ListFooterComponent={main === 'mine' ? <PromoBanner /> : undefined}
         renderItem={({ item }) => <RoomRow room={item} match={similarity(me, userById(item.hostId)).score} />}
       />
@@ -224,6 +253,9 @@ export default function RoomsScreen() {
     </View>
   );
 }
+
+/** A demo room with its own password, or a live room that asks for one on the server. */
+const locked = (r: Room) => !!r.password || isLockedRoom(r.id);
 
 const WHY_ICON: Record<RoomMatch['why'], keyof typeof Ionicons.glyphMap> = { person: 'person', time: 'time', sparkles: 'sparkles', location: 'location', flame: 'flame' };
 
@@ -322,16 +354,26 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
             </Pressable>
           ))}
         </ScrollView>
-        <LinearGradient colors={[`rgba(${surface.veil},0)`, `rgba(${surface.veil},0.95)`]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.catFade} />
+        {/* A soft fade over the photo backdrop, never a solid block: it starts clear and stays see-through. */}
+        <LinearGradient
+          colors={[`rgba(${surface.veil},0)`, `rgba(${surface.veil},0.35)`, `rgba(${surface.veil},0.7)`]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.catFade}
+        />
       </View>
-      <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
-        <LinearGradient colors={gradientDeep} style={styles.catIcon}>
-          <Ionicons name="people" size={18} color="#fff" />
-          <View style={styles.plusBadge}>
-            <Ionicons name="add" size={10} color={colors.primaryText} />
-          </View>
-        </LinearGradient>
-      </Pressable>
+      {/* Tayfa (groups) is local-only: a live build doesn't offer it until the server has it. */}
+      {!liveMode() && (
+        <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
+          <LinearGradient colors={gradientDeep} style={styles.catIcon}>
+            <Ionicons name="people" size={18} color="#fff" />
+            <View style={styles.plusBadge}>
+              <Ionicons name="add" size={10} color={colors.primaryText} />
+            </View>
+          </LinearGradient>
+        </Pressable>
+      )}
       <Pressable onPress={onCountry} hitSlop={6} accessibilityLabel="Ülke seç" style={{ marginRight: 16 }}>
         <View style={[styles.catIcon, { backgroundColor: colors.cardAlt }]}>
           {flag ? <Text style={{ fontSize: 18 }}>{flag}</Text> : <Ionicons name="globe" size={20} color={dark ? '#38BDF8' : '#0284C7'} />}
@@ -421,7 +463,7 @@ function SuggestionsRow({ items }: { items: Suggestion[] }) {
   );
 }
 
-function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: string; announcement: string; cover: string; locked: boolean; avatar: string }) {
+function MyRoomCard({ title, announcement, cover, locked, avatar, listeners = 0 }: { title: string; announcement: string; cover: string; locked: boolean; avatar: string; listeners?: number }) {
   const { colors, semantic, dark } = useTheme();
   const styles = useStyles();
   return (
@@ -446,7 +488,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar }: { title: str
           </View>
           <View style={[styles.listeners, { alignSelf: 'flex-end', marginTop: 8 }]}>
             <Ionicons name="stats-chart" size={13} color={semantic.actionText} />
-            <Text style={styles.listenerText}>0</Text>
+            <Text style={styles.listenerText}>{listeners.toLocaleString('tr-TR')}</Text>
           </View>
         </View>
       </LinearGradient>
@@ -510,7 +552,7 @@ function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: bool
       <View style={{ flex: 1, gap: 5, justifyContent: 'center' }}>
         <View style={styles.titleRow}>
           <Text style={styles.flag}>{countryFlag(roomCountry(room.id))}</Text>
-          {!!room.password && <Ionicons name="lock-closed" size={13} color={colors.gold} />}
+          {locked(room) && <Ionicons name="lock-closed" size={13} color={colors.gold} accessibilityLabel="Şifreli oda" />}
           <Text style={styles.roomTitle} numberOfLines={1}>
             {room.title}
           </Text>
@@ -549,6 +591,7 @@ function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: bool
 function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room[]; onClose: () => void }) {
   const { colors, semantic } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const close = () => {
     setQ('');
@@ -565,7 +608,8 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} />
-      <View style={styles.searchSheet}>
+      {/* Above the system navigation bar too (edge-to-edge Android draws the sheet under it). */}
+      <View style={[styles.searchSheet, { paddingBottom: Math.max(34, insets.bottom + 8) }]}>
         <View style={styles.searchBox}>
           <Ionicons name="search" size={18} color={colors.textDim} />
           <TextInput
@@ -597,7 +641,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
               <Photo uri={r.cover} kind="cover" seed={r.id} style={styles.searchCover} />
               <View style={{ flex: 1, gap: 2 }}>
                 <View style={styles.titleRow}>
-                  {!!r.password && <Ionicons name="lock-closed" size={12} color={colors.gold} />}
+                  {locked(r) && <Ionicons name="lock-closed" size={12} color={colors.gold} accessibilityLabel="Şifreli oda" />}
                   <Text style={styles.roomTitle} numberOfLines={1}>
                     {r.title}
                   </Text>
@@ -661,7 +705,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   shelfText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   // category bar
   catBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  catFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 32, pointerEvents: 'none' },
+  catFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 40, pointerEvents: 'none' },
   catText: { color: colors.textDim, fontSize: 17, lineHeight: 24, fontFamily: fonts.displayBold },
   catTextActive: { color: colors.text, fontSize: 19, lineHeight: 26, fontFamily: fonts.display },
   catIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
@@ -697,6 +741,9 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   listeners: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   listenerText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   empty: { color: colors.textDim, textAlign: 'center', paddingVertical: 28, paddingHorizontal: 16 },
+  errorBox: { alignItems: 'center', gap: 8, paddingVertical: 28, paddingHorizontal: 24 },
+  errorTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  errorText: { color: colors.textDim, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   // Benim tab
   myRoom: { flexDirection: 'row', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   myCover: { width: 92, height: 92, borderRadius: 12, backgroundColor: colors.cardAlt },

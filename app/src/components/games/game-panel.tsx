@@ -23,7 +23,7 @@ import { GameNav } from '@/components/games/slot-kit';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
-import { casinoVisible, useGames, type Entry } from '@/lib/games';
+import { casinoVisible, gamblingLevelOk, useGames, type Entry } from '@/lib/games';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -91,7 +91,9 @@ export function GamePanel({
   const title = wheel ? WHEEL_NAME : (roomGame?.name ?? casinoGame?.name ?? '');
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
-    ...(casinoVisible(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
+    // Rüzgâr Gülü is played on the server: only the gambling level gates it. The other casino games are decided on
+    // this phone, so casinoVisible() is false for them in a live build.
+    ...(gamblingLevelOk(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
     ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = keyOf(open);
@@ -163,10 +165,10 @@ export function GamePanel({
               )}
             </>
           ) : (
-            <Text style={p.dim}>{roomGame.name} için sağlayıcı entegrasyonu bekleniyor. Katalogda görünür, sağlayıcı bağlanınca bu alanda açılır.</Text>
+            <Text style={p.dim}>Bu oyun yakında geliyor.</Text>
           ))}
-        {casinoGame && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
-        {wheel && casinoVisible(wealthLevel) && <WheelPlayer entry={entry} />}
+        {casinoGame && casinoVisible(wealthLevel) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
+        {wheel && gamblingLevelOk(wealthLevel) && <WheelPlayer entry={entry} />}
         <View style={p.volume}>
           <Text style={p.dim}>Oyun sesi</Text>
           {VOLUMES.map(([v, l]) => (

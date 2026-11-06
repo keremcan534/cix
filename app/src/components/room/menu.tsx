@@ -21,8 +21,8 @@ export type MenuItem = {
   colors?: [string, string];
   /** The item's own color (its light and plate); falls back to `colors[0]`, then a color by position. */
   hue?: string;
-  /** small corner tag: on/off state or a ribbon */
-  badge?: 'on' | 'off' | 'HOT' | 'NEW' | number;
+  /** small corner tag: on/off state or a ribbon; SOON = listed but not playable yet ("Yakında") */
+  badge?: 'on' | 'off' | 'HOT' | 'NEW' | 'SOON' | number;
 };
 export type MenuSection = { title: string; variant: 'round' | 'tile' | 'tool'; items: MenuItem[]; note?: string };
 
@@ -116,6 +116,7 @@ function Badge({ badge }: { badge: MenuItem['badge'] }) {
         <Ionicons name={badge === 'on' ? 'checkmark' : 'close'} size={12} color={badge === 'on' ? semantic.successInk : '#fff'} />
       </View>
     );
+  if (badge === 'SOON') return <Text style={[styles.ribbon, { backgroundColor: colors.cardAlt, color: colors.textDim }]}>Yakında</Text>;
   if (badge === 'HOT' || badge === 'NEW') return <Text style={[styles.ribbon, { backgroundColor: badge === 'HOT' ? colors.red : colors.primary }]}>{badge === 'NEW' ? 'YENİ' : badge}</Text>;
   if (typeof badge === 'number' && badge > 0) return <Text style={[styles.ribbon, { backgroundColor: colors.red, left: undefined, right: -4 }]}>{badge}</Text>;
   return null;

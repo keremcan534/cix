@@ -234,6 +234,7 @@ export async function registerDevice(sig) {
  */
 export async function linkDevice(dev, uid) {
   await db.query('INSERT INTO device_accounts (device_id, user_id) VALUES ($1, $2) ON CONFLICT (device_id, user_id) DO UPDATE SET last_seen_at = now()', [dev.id, uid]);
+  await carryMutes(dev, uid).catch((e) => console.error('carry mutes', uid, e.message));
   const others = await db.query(
     `SELECT a.user_id, EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = a.user_id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS banned
        FROM device_accounts a WHERE a.device_id = $1 AND a.user_id <> $2`,
@@ -248,6 +249,47 @@ export async function linkDevice(dev, uid) {
   if (next === cur.rows[0].risk_status) return;
   await db.query('UPDATE device_registry SET risk_status = $2 WHERE id = $1', [dev.id, next]);
   await audit(db, { action: 'device_risk', device: dev.id, target: uid, detail: { risk: next, accounts: others.rowCount + 1 } });
+}
+
+/**
+ * Deleting an account is never refused for a mute (social.mjs DELETE /api/me), but it frees the sign-in key. So a
+ * general mute still running on an account deleted on this device moves to an account made here after that
+ * deletion: same type, reason, start and end, applied by the same role. Accounts that were already here keep
+ * their own record; room mutes stay with their room. Once per mute: a copy `uid` already has (even one staff
+ * lifted since) is not made again.
+ */
+async function carryMutes(dev, uid) {
+  const moved = await tx(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`carry-mutes:${uid}`]);
+    const r = await c.query(
+      `SELECT DISTINCT ON (s.sanction_type, s.reason_code, s.expires_at) s.*, m.include_dm, m.include_calls
+         FROM user_sanctions s JOIN users old ON old.id = s.user_id JOIN users nu ON nu.id = $2
+         LEFT JOIN user_mute_records m ON m.sanction_id = s.id
+        WHERE s.user_id IN (SELECT user_id FROM device_accounts WHERE device_id = ANY($1::bigint[]) AND user_id <> $2)
+          AND old.deleted_at IS NOT NULL AND nu.created_at >= old.deleted_at AND s.scope = 'global' AND ${LIVE_SANCTION}
+          AND NOT EXISTS (SELECT 1 FROM user_sanctions x WHERE x.user_id = $2 AND x.sanction_type = s.sanction_type
+                            AND x.reason_code = s.reason_code AND x.expires_at IS NOT DISTINCT FROM s.expires_at)
+        ORDER BY s.sanction_type, s.reason_code, s.expires_at, s.id`,
+      [dev.matched?.length ? dev.matched : [dev.id], uid],
+    );
+    for (const s of r.rows) {
+      // Copied in SQL: the times keep Postgres' microseconds (a JS Date would cut them), so the check above matches.
+      const id = (
+        await c.query(
+          `INSERT INTO user_sanctions (user_id, sanction_type, scope, reason_code, reason_description, internal_note, start_at, expires_at, is_permanent, status,
+                                       created_by, created_role, source, report_id, policy_step)
+           SELECT $1, sanction_type, 'global', reason_code, reason_description, left(rtrim($2 || internal_note), 2000), start_at, expires_at, is_permanent, 'active',
+                  created_by, created_role, source, report_id, policy_step
+             FROM user_sanctions WHERE id = $3 RETURNING id`,
+          [uid, `Silinen hesaptan taşındı (yaptırım #${s.id}). `, s.id],
+        )
+      ).rows[0].id;
+      await c.query('INSERT INTO user_mute_records (sanction_id, include_dm, include_calls) VALUES ($1, $2, $3)', [id, !!s.include_dm, !!s.include_calls]);
+      await audit(c, { action: 'carry_over', sanction: id, target: uid, device: dev.id, detail: { from: Number(s.id), fromUser: s.user_id } });
+    }
+    return r.rowCount;
+  });
+  if (moved) await refreshVoice(uid);
 }
 
 // --- Enforcement -----------------------------------------------------------------------------------------------
@@ -676,6 +718,33 @@ async function contactRefusals(uid) {
   return out;
 }
 
+/** The rank a sanction was given with (room staff and the system: 0). */
+const ISSUER_RANK = { moderator: 1, admin: 2 };
+const LIFT_REFUSED = {
+  self: 'Kendi yaptırımını kaldıramazsın',
+  rank: 'Kendi yetki seviyende veya üstündeki birinin yaptırımını kaldıramazsın',
+  issuer: 'Bu yaptırımı senden üst yetkili biri verdi; yalnızca o seviyede biri kaldırabilir',
+};
+
+/**
+ * Whether `me` may lift `s`, with the rules of applying one (staffTarget): never one's own; a staff member's
+ * only from a higher rank (an admin may lift another admin's); never one given by a higher rank than `me` (the
+ * rank it was given with, or the giver's role now if higher). A refusal is audited and answers 403.
+ */
+export async function mayLift(me, s) {
+  const mine = RANK[me.role] ?? 0;
+  const roles = await db.query('SELECT id, role FROM users WHERE id = ANY($1::uuid[])', [[s.user_id, s.created_by].filter(Boolean)]);
+  const roleOf = (id) => roles.rows.find((x) => x.id === id)?.role;
+  const issuer = Math.max(ISSUER_RANK[s.created_role] ?? 0, s.created_by ? (RANK[roleOf(s.created_by)] ?? 0) : 0);
+  let why = null;
+  if (s.user_id === me.id) why = 'self';
+  else if (me.role !== 'admin' && (RANK[roleOf(s.user_id)] ?? 0) >= mine) why = 'rank';
+  else if (issuer > mine) why = 'issuer';
+  if (!why) return;
+  await audit(db, { actor: me.id, role: me.role, action: 'lift', sanction: s.id, target: s.user_id, result: 'denied', detail: { why } });
+  throw new HttpError(403, LIFT_REFUSED[why]);
+}
+
 export const sanctionRoutes = {
   // --- Staff --------------------------------------------------------------------------------------------------
   async 'GET /api/admin/sanctions/meta'(req) {
@@ -822,6 +891,7 @@ export const sanctionRoutes = {
     const s = await sanctionRow(db, idOf(b.id));
     if (!s) throw new HttpError(404, 'Yaptırım bulunamadı');
     const why = text(b.reason, 3, 300, 'Kaldırma gerekçesi');
+    await mayLift(me, s);
     // A lifetime ban comes off only with the lifetime permission.
     if (s.is_permanent && (s.sanction_type === 'account_ban' || s.sanction_type === 'device_ban')) {
       const need = s.sanction_type === 'account_ban' ? 'sanction.ban_permanent' : 'sanction.device_ban_permanent';

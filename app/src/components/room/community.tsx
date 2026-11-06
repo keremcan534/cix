@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ROOM_ICON_ART } from '@/components/RoomArt';
-import { roomStyles } from '@/components/room/parts';
+import { roomStyles, useSheetBottom } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
@@ -20,21 +21,25 @@ export type Question = { id: string; userId: string; text: string; picked: boole
 export type ModLog = { id: string; time: string; actor: string; action: string; target: string; reason: string };
 
 function Sheet({ visible, onClose, title, art, children }: { visible: boolean; onClose: () => void; title: string; art?: number; children: React.ReactNode }) {
+  const paddingBottom = useSheetBottom();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
-      <View style={[roomStyles.sheet, { maxHeight: '80%' }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
-          <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
+        <View style={[roomStyles.sheet, { maxHeight: '80%', paddingBottom }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
+            <Text style={[roomStyles.sheetTitle, { flex: 1, marginBottom: 0 }]}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
         </View>
-        <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
-          {children}
-        </ScrollView>
-      </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }

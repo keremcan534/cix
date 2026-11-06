@@ -6,15 +6,23 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
+import { ComingSoon } from '@/components/coming-soon';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { KABILE_ROUTES, KASA_GOAL, KASA_HISTORY_MOCK, ensureFresh, findKabile, fmt, kabileMemberIds, kabileMeta, memberPower, useKabileProgress } from '@/data/kabile';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { liveMode } from '@/lib/live';
 import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
+// Tayfa has no server yet (data/kabile tayfaAvailable): the treasury and its history are sample data, so a live
+// build shows a notice instead.
 export default function KabileKasa() {
+  return liveMode() ? <ComingSoon title="Tayfa Kasası" /> : <DemoKabileKasa />;
+}
+
+function DemoKabileKasa() {
   const { familyId, me } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();

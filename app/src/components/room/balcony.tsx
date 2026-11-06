@@ -4,12 +4,12 @@
 // the room, which calls the presence server where they are validated.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
 import { Icon3D } from '@/components/Icon3D';
-import { ROLE_RANK, type RoomRole } from '@/components/room/parts';
+import { ROLE_RANK, useSheetBottom, type RoomRole } from '@/components/room/parts';
 import { userById } from '@/data/mock';
 import type { MicInvite, RoomLive, RoomView } from '@/lib/room-presence';
 import { colors, semantic } from '@/theme';
@@ -34,7 +34,7 @@ export function BalconyBar({ view, stale, onOpen }: { view: RoomView; stale: boo
         {view.balcony > 0 ? (
           <View style={s.faces}>
             {faces.map((uid, i) => (
-              <Image key={uid} source={{ uri: userById(uid).avatar }} style={[s.face, { marginLeft: i ? -7 : 0 }]} />
+              <Photo key={uid} uri={userById(uid).avatar} kind="face" style={[s.face, { marginLeft: i ? -7 : 0 }]} />
             ))}
             {more > 0 && (
               <View style={[s.face, s.more, { marginLeft: -7 }]}>
@@ -110,11 +110,13 @@ export function ParticipantsSheet({
     setOpen(null);
     onClose();
   };
+  // Android modals draw edge to edge: the last row stays above the navigation bar.
+  const paddingBottom = useSheetBottom(24);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-      <View style={s.sheet}>
+      <View style={[s.sheet, { paddingBottom }]}>
         <View style={s.handle} />
         <View style={s.head}>
           <Icon3D name={inviteSeat !== null ? 'userAdd' : 'group'} size={34} />

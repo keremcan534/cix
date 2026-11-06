@@ -3,11 +3,15 @@
 // state from lib/pk; seats, microphones and membership stay with the room.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { useSheetBottom } from '@/components/room/parts';
 import { roomById, userById } from '@/data/mock';
+import { IS_DEMO } from '@/lib/build';
+import { liveMode } from '@/lib/live';
 import {
   PK_DURATIONS,
   cancelPk,
@@ -115,175 +119,187 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
   const teamOff = !config.roomPkEnabled;
   const modeOff = mode === 'solo' ? soloOff : teamOff;
   const canStart = !offline && !modeOff && (mode === 'solo' ? micUsers.length >= 2 : method === 'random' ? !!draft && !draftStale : manual.red.length >= config.teamMin && manual.blue.length >= config.teamMin);
+  // Cross-room PK has no server side yet (the rival room's answer and gifts are simulated): only in the demo.
+  const crossOn = !liveMode();
+  const paddingBottom = useSheetBottom(16);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
-      <View style={st.sheet}>
-        <View style={st.head}>
-          <Text style={st.title}>PK başlat</Text>
-          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="PK panelini kapat">
-            <Ionicons name="close" size={22} color={colors.textDim} />
-          </Pressable>
-        </View>
-        <View style={st.seg} accessibilityRole="tablist">
-          {(
-            [
-              ['room', 'Bu oda'],
-              ['cross', 'Odalar arası'],
-            ] as const
-          ).map(([k, l]) => (
-            <Pressable key={k} onPress={() => setTab(k)} style={[st.segBtn, tab === k && st.segOn]} accessibilityRole="tab" aria-selected={tab === k}>
-              <Text style={[st.segText, tab === k && { color: semantic.actionInk }]}>{l}</Text>
+      {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
+        <View style={[st.sheet, { paddingBottom }]}>
+          <View style={st.head}>
+            <Text style={st.title}>PK başlat</Text>
+            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="PK panelini kapat">
+              <Ionicons name="close" size={22} color={colors.textDim} />
             </Pressable>
-          ))}
-        </View>
-        <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
-          {offline && <Notice icon="cloud-offline-outline" text="Bağlantı yok. PK başlatmak için bağlantının dönmesini bekle." warn />}
-          {tab === 'room' && (
-            <>
-              <Text style={st.label}>PK modu</Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <ModeCard on={mode === 'solo'} off={soloOff} emoji="🎤" art="pk-normal-pk" title="Normal PK" sub="Herkes kendi adına · mikrofon düzeni değişmez" onPress={() => setMode('solo')} />
-                <ModeCard on={mode === 'team'} off={teamOff} emoji="⚔️" art="pk-takim-pk" title="Takım PK" sub="Kırmızı vs Mavi · alan ikiye ayrılır" onPress={() => setMode('team')} />
-              </View>
-            </>
-          )}
-          <Text style={st.label}>Süre · başladıktan sonra değişmez</Text>
-          <View style={st.chips}>
-            {PK_DURATIONS.map((d) => (
-              <Pressable key={d} disabled={!config.durations[d]} onPress={() => setDuration(d)} style={[st.chip, duration === d && st.chipOn, !config.durations[d] && { opacity: 0.35 }]} accessibilityLabel={`${d} dakika`} aria-selected={duration === d} aria-disabled={!config.durations[d]}>
-                <Text style={st.chipText}>{d} dk</Text>
-              </Pressable>
-            ))}
           </View>
-
-          {tab === 'room' && mode === 'solo' && (
-            <>
-              <Text style={st.label}>Katılımcılar · mikrofondaki {micUsers.length} kişi</Text>
-              <View style={st.people}>
-                {micUsers.map((u) => (
-                  <Person key={u} uid={u} />
-                ))}
-              </View>
-              {micUsers.length < 2 && <Notice icon="information-circle-outline" text="Normal PK için mikrofonda en az 2 kişi olmalı." warn />}
-              <Text style={st.dim}>Her kişi aldığı hediyelerin PK puanıyla yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi o andan itibaren katılır, mikrofondan inen kişinin puanı kalır ama yeni puan almaz.</Text>
-              <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startSolo} accessibilityLabel="Normal PK başlat">
-                <Text style={st.primaryText}>Normal PK’yı başlat · {duration} dk</Text>
-              </Pressable>
-            </>
+          {crossOn && (
+            <View style={st.seg} accessibilityRole="tablist">
+              {(
+                [
+                  ['room', 'Bu oda'],
+                  ['cross', 'Odalar arası'],
+                ] as const
+              ).map(([k, l]) => (
+                <Pressable key={k} onPress={() => setTab(k)} style={[st.segBtn, tab === k && st.segOn]} accessibilityRole="tab" aria-selected={tab === k}>
+                  <Text style={[st.segText, tab === k && { color: semantic.actionInk }]}>{l}</Text>
+                </Pressable>
+              ))}
+            </View>
           )}
+          <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
+            {offline && <Notice icon="cloud-offline-outline" text="Bağlantı yok. PK başlatmak için bağlantının dönmesini bekle." warn />}
+            {tab === 'room' && (
+              <>
+                <Text style={st.label}>PK modu</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <ModeCard on={mode === 'solo'} off={soloOff} emoji="🎤" art="pk-normal-pk" title="Normal PK" sub="Herkes kendi adına · mikrofon düzeni değişmez" onPress={() => setMode('solo')} />
+                  <ModeCard on={mode === 'team'} off={teamOff} emoji="⚔️" art="pk-takim-pk" title="Takım PK" sub="Kırmızı vs Mavi · alan ikiye ayrılır" onPress={() => setMode('team')} />
+                </View>
+              </>
+            )}
+            <Text style={st.label}>Süre · başladıktan sonra değişmez</Text>
+            <View style={st.chips}>
+              {PK_DURATIONS.map((d) => (
+                <Pressable key={d} disabled={!config.durations[d]} onPress={() => setDuration(d)} style={[st.chip, duration === d && st.chipOn, !config.durations[d] && { opacity: 0.35 }]} accessibilityLabel={`${d} dakika`} aria-selected={duration === d} aria-disabled={!config.durations[d]}>
+                  <Text style={st.chipText}>{d} dk</Text>
+                </Pressable>
+              ))}
+            </View>
 
-          {tab === 'room' && mode === 'team' && (
-            <>
-              <Text style={st.label}>Takım dağılımı</Text>
-              <View style={st.chips}>
-                {(
-                  [
-                    ['random', 'Rastgele', 'pk-rastgele-dagit'],
-                    ['manual', 'Manuel', 'pk-manuel-dagit'],
-                  ] as const
-                ).map(([k, l, art]) => (
-                  <Pressable key={k} onPress={() => setMethod(k)} style={[st.chip, st.artRow, method === k && st.chipOn]} accessibilityRole="radio" aria-checked={method === k}>
-                    <Art name={art} size={17} />
-                    <Text style={st.chipText}>{l}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {method === 'random' ? (
-                draft ? (
-                  <>
-                    <TeamPreview red={draft.red} blue={draft.blue} names={config.teamNames} colors={config.teamColors} />
-                    {draft.out.length > 0 && <Text style={st.dim}>Takımlar doldu, bu PK’ya katılmayacak: {draft.out.map(nameOf).join(', ')}</Text>}
-                    {draftStale && <Notice icon="alert-circle-outline" text="Mikrofondaki kişiler değişti. Takımları yeniden karıştır." warn />}
-                    <Pressable style={st.secondary} onPress={draw} accessibilityLabel="Takımları yeniden karıştır">
-                      <View style={st.artRow}>
-                        <Art name="pk-rastgele-dagit" size={18} />
-                        <Text style={st.secondaryText}>Yeniden karıştır</Text>
-                      </View>
+            {tab === 'room' && mode === 'solo' && (
+              <>
+                <Text style={st.label}>Katılımcılar · mikrofondaki {micUsers.length} kişi</Text>
+                <View style={st.people}>
+                  {micUsers.map((u) => (
+                    <Person key={u} uid={u} />
+                  ))}
+                </View>
+                {micUsers.length < 2 && <Notice icon="information-circle-outline" text="Normal PK için mikrofonda en az 2 kişi olmalı." warn />}
+                <Text style={st.dim}>Her kişi aldığı hediyelerin PK puanıyla yarışır; en yüksek puan kazanır. PK sırasında mikrofona geçen kişi o andan itibaren katılır, mikrofondan inen kişinin puanı kalır ama yeni puan almaz.</Text>
+                <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startSolo} accessibilityLabel="Normal PK başlat">
+                  <Text style={st.primaryText}>Normal PK’yı başlat · {duration} dk</Text>
+                </Pressable>
+              </>
+            )}
+
+            {tab === 'room' && mode === 'team' && (
+              <>
+                <Text style={st.label}>Takım dağılımı</Text>
+                <View style={st.chips}>
+                  {(
+                    [
+                      ['random', 'Rastgele', 'pk-rastgele-dagit'],
+                      ['manual', 'Manuel', 'pk-manuel-dagit'],
+                    ] as const
+                  ).map(([k, l, art]) => (
+                    <Pressable key={k} onPress={() => setMethod(k)} style={[st.chip, st.artRow, method === k && st.chipOn]} accessibilityRole="radio" aria-checked={method === k}>
+                      <Art name={art} size={17} />
+                      <Text style={st.chipText}>{l}</Text>
                     </Pressable>
-                  </>
+                  ))}
+                </View>
+                {method === 'random' ? (
+                  draft ? (
+                    <>
+                      <TeamPreview red={draft.red} blue={draft.blue} names={config.teamNames} colors={config.teamColors} />
+                      {draft.out.length > 0 && <Text style={st.dim}>Takımlar doldu, bu PK’ya katılmayacak: {draft.out.map(nameOf).join(', ')}</Text>}
+                      {draftStale && <Notice icon="alert-circle-outline" text="Mikrofondaki kişiler değişti. Takımları yeniden karıştır." warn />}
+                      <Pressable style={st.secondary} onPress={draw} accessibilityLabel="Takımları yeniden karıştır">
+                        <View style={st.artRow}>
+                          <Art name="pk-rastgele-dagit" size={18} />
+                          <Text style={st.secondaryText}>Yeniden karıştır</Text>
+                        </View>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={st.dim}>Mikrofondaki {micUsers.length} kişi sunucuda rastgele ve eşit sayıda iki takıma ayrılır (tek sayıda fark en fazla 1). Başlatmadan önce dağılımı görürsün.</Text>
+                      <Pressable style={[st.secondary, micUsers.length < config.teamMin * 2 && st.disabled]} disabled={micUsers.length < config.teamMin * 2} onPress={draw} accessibilityLabel="Takımları oluştur">
+                        <Text style={st.secondaryText}>Takımları oluştur</Text>
+                      </Pressable>
+                    </>
+                  )
                 ) : (
                   <>
-                    <Text style={st.dim}>Mikrofondaki {micUsers.length} kişi sunucuda rastgele ve eşit sayıda iki takıma ayrılır (tek sayıda fark en fazla 1). Başlatmadan önce dağılımı görürsün.</Text>
-                    <Pressable style={[st.secondary, micUsers.length < config.teamMin * 2 && st.disabled]} disabled={micUsers.length < config.teamMin * 2} onPress={draw} accessibilityLabel="Takımları oluştur">
-                      <Text style={st.secondaryText}>Takımları oluştur</Text>
-                    </Pressable>
+                    {micUsers.map((u) => (
+                      <View key={u} style={st.member}>
+                        <Photo uri={userById(u).avatar} kind="face" style={st.av} />
+                        <Text style={st.memberName} numberOfLines={1}>
+                          {nameOf(u)}
+                        </Text>
+                        {(['red', 'blue'] as TeamId[]).map((t) => (
+                          <Pressable
+                            key={t}
+                            onPress={() => setAssign((a) => ({ ...a, [u]: a[u] === t ? undefined : t }))}
+                            style={[st.teamBtn, assign[u] === t && { backgroundColor: config.teamColors[t], borderColor: config.teamColors[t] }]}
+                            accessibilityLabel={`${nameOf(u)} ${config.teamNames[t]}`}
+                            aria-selected={assign[u] === t}
+                          >
+                            <Text style={st.teamBtnText}>{t === 'red' ? 'Kırmızı' : 'Mavi'}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ))}
+                    <TeamPreview red={manual.red} blue={manual.blue} names={config.teamNames} colors={config.teamColors} />
+                    {imbalance && <Notice icon="alert-circle-outline" text={`Takımlar dengesiz (${manual.red.length}–${manual.blue.length}). Mümkünse farkı en fazla 1 kişiye indir.`} warn />}
+                    {unassigned.length > 0 && <Text style={st.dim}>Takım seçilmeyenler PK’ya katılmaz: {unassigned.map(nameOf).join(', ')}</Text>}
                   </>
-                )
-              ) : (
-                <>
-                  {micUsers.map((u) => (
-                    <View key={u} style={st.member}>
-                      <Photo uri={userById(u).avatar} kind="face" style={st.av} />
+                )}
+                <Text style={st.dim}>
+                  Takım başına {config.teamMin}–{config.teamMax} kişi · PK başladıktan sonra takımlar sabittir · hediyeyi alan kişi ve takımı puan kazanır
+                </Text>
+                <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startTeam} accessibilityLabel="Takımları onayla ve başlat">
+                  <Text style={st.primaryText}>Takımları onayla ve başlat · {duration} dk</Text>
+                </Pressable>
+              </>
+            )}
+
+            {crossOn && tab === 'cross' && (
+              <>
+                <TextInput value={query} onChangeText={setQuery} placeholder="Oda ID’si veya adı ara" placeholderTextColor={colors.textDim} style={st.input} />
+                {rooms.map((r) => (
+                  <View key={r.id} style={st.member}>
+                    <Photo uri={r.cover} kind="cover" seed={r.id} style={[st.av, { borderRadius: 10 }]} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={st.memberName} numberOfLines={1}>
-                        {nameOf(u)}
+                        {r.title}
                       </Text>
-                      {(['red', 'blue'] as TeamId[]).map((t) => (
-                        <Pressable
-                          key={t}
-                          onPress={() => setAssign((a) => ({ ...a, [u]: a[u] === t ? undefined : t }))}
-                          style={[st.teamBtn, assign[u] === t && { backgroundColor: config.teamColors[t], borderColor: config.teamColors[t] }]}
-                          accessibilityLabel={`${nameOf(u)} ${config.teamNames[t]}`}
-                          aria-selected={assign[u] === t}
-                        >
-                          <Text style={st.teamBtnText}>{t === 'red' ? 'Kırmızı' : 'Mavi'}</Text>
+                      <Text style={st.dim}>
+                        ID {r.id} · {r.listeners} kişi · Lv.{r.level ?? 1}
+                      </Text>
+                    </View>
+                    <Pressable style={[st.invite, (offline || !config.crossPkEnabled) && st.disabled]} disabled={offline || !config.crossPkEnabled} onPress={() => invite(r.id)} accessibilityLabel={`${r.title} odasını PK’ya davet et`}>
+                      <Text style={st.inviteText}>Davet et</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                <Text style={st.dim}>Odalar arası PK her zaman takım PK’sıdır: o odadaki geçerli hediyeler o odanın takımına sayılır. Rakip oda {config.inviteTimeoutSec} sn içinde kabul etmezse PK başlamaz.</Text>
+                {IS_DEMO && !liveMode() && (
+                  <>
+                    <Text style={st.label}>Test: rakip odanın yanıtı</Text>
+                    <View style={st.chips}>
+                      {(
+                        [
+                          ['accept', 'Kabul etsin'],
+                          ['decline', 'Reddetsin'],
+                          ['timeout', 'Yanıt vermesin'],
+                        ] as [InviteScenario, string][]
+                      ).map(([k, l]) => (
+                        <Pressable key={k} onPress={() => setInviteScenario(k)} style={[st.chip, scenario === k && st.chipOn]}>
+                          <Text style={st.chipText}>{l}</Text>
                         </Pressable>
                       ))}
                     </View>
-                  ))}
-                  <TeamPreview red={manual.red} blue={manual.blue} names={config.teamNames} colors={config.teamColors} />
-                  {imbalance && <Notice icon="alert-circle-outline" text={`Takımlar dengesiz (${manual.red.length}–${manual.blue.length}). Mümkünse farkı en fazla 1 kişiye indir.`} warn />}
-                  {unassigned.length > 0 && <Text style={st.dim}>Takım seçilmeyenler PK’ya katılmaz: {unassigned.map(nameOf).join(', ')}</Text>}
-                </>
-              )}
-              <Text style={st.dim}>
-                Takım başına {config.teamMin}–{config.teamMax} kişi · PK başladıktan sonra takımlar sabittir · hediyeyi alan kişi ve takımı puan kazanır
-              </Text>
-              <Pressable style={[st.primary, !canStart && st.disabled]} disabled={!canStart} onPress={startTeam} accessibilityLabel="Takımları onayla ve başlat">
-                <Text style={st.primaryText}>Takımları onayla ve başlat · {duration} dk</Text>
-              </Pressable>
-            </>
-          )}
-
-          {tab === 'cross' && (
-            <>
-              <TextInput value={query} onChangeText={setQuery} placeholder="Oda ID’si veya adı ara" placeholderTextColor={colors.textDim} style={st.input} />
-              {rooms.map((r) => (
-                <View key={r.id} style={st.member}>
-                  <Photo uri={r.cover} kind="cover" seed={r.id} style={[st.av, { borderRadius: 10 }]} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={st.memberName} numberOfLines={1}>
-                      {r.title}
-                    </Text>
-                    <Text style={st.dim}>
-                      ID {r.id} · {r.listeners} kişi · Lv.{r.level ?? 1}
-                    </Text>
-                  </View>
-                  <Pressable style={[st.invite, (offline || !config.crossPkEnabled) && st.disabled]} disabled={offline || !config.crossPkEnabled} onPress={() => invite(r.id)} accessibilityLabel={`${r.title} odasını PK’ya davet et`}>
-                    <Text style={st.inviteText}>Davet et</Text>
-                  </Pressable>
-                </View>
-              ))}
-              <Text style={st.dim}>Odalar arası PK her zaman takım PK’sıdır: o odadaki geçerli hediyeler o odanın takımına sayılır. Rakip oda {config.inviteTimeoutSec} sn içinde kabul etmezse PK başlamaz.</Text>
-              <Text style={st.label}>Test: rakip odanın yanıtı</Text>
-              <View style={st.chips}>
-                {(
-                  [
-                    ['accept', 'Kabul etsin'],
-                    ['decline', 'Reddetsin'],
-                    ['timeout', 'Yanıt vermesin'],
-                  ] as [InviteScenario, string][]
-                ).map(([k, l]) => (
-                  <Pressable key={k} onPress={() => setInviteScenario(k)} style={[st.chip, scenario === k && st.chipOn]}>
-                    <Text style={st.chipText}>{l}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-        </ScrollView>
-      </View>
+                  </>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }
@@ -534,7 +550,7 @@ function Supporters({ pk, team }: { pk: PkSession; team: TeamId }) {
   return (
     <View style={{ flexDirection: 'row' }}>
       {top.map(([uid]) => (
-        <Image key={uid} source={{ uri: userById(uid).avatar }} style={st.mini} />
+        <Photo key={uid} uri={userById(uid).avatar} kind="face" style={st.mini} />
       ))}
     </View>
   );

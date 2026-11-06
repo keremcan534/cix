@@ -8,24 +8,13 @@ import * as api from '@/lib/api';
 import { googleAvailable, googleIdToken, googleSignOut } from '@/lib/google-sign-in';
 import { applyServerUser, liveMode, liveSignIn, message, toServer } from '@/lib/live';
 import { retrySeconds, reusableCode, type SentCode } from '@/lib/verify-code';
-import { isServerId, type User } from '@/data/mock';
+import { isServerId } from '@/data/mock';
 
 /** "Google ile devam et" on the welcome screen: a live build with the client id and the native module. */
 export const googleSignInOffered = () => liveMode() && googleAvailable();
 
-/** The server profile as the phone's own profile (`me`). */
-export function profileFromServer(u: api.ServerMe): Partial<User> {
-  return {
-    name: u.name,
-    bio: u.bio,
-    interests: u.interests,
-    ...(u.gender && { gender: u.gender }),
-    ...(u.age !== null && { age: u.age }),
-    ...(u.city && { city: u.city }),
-    ...(u.username && { username: u.username }),
-    ...(u.avatarUrl && { avatar: u.avatarUrl }),
-  };
-}
+/** The server profile as the phone's own profile (`me`): every field from the server, nothing kept from the demo. */
+export { profileFromServer } from '@/lib/me-view';
 
 /**
  * Google's account picker, then the server session. Null when the person closed the picker. `needsProfile`:
@@ -158,7 +147,7 @@ export const reportsToServer = (type: ReportType, id: string) => liveMode() && (
 /** A report for the moderators' queue (POST /api/report). The same thing reported twice counts once. */
 export async function liveReport(type: ReportType, id: string, reason: string, note?: string) {
   const target = type === 'user' ? toServer(id) : id;
-  if (!target) throw new Error('Bu kişi test sunucusunda yok');
+  if (!target) throw new Error('Bu kişiye şu an ulaşılamıyor');
   const clean = note?.trim().slice(0, 500);
   await api.apiRequest('POST', '/api/report', { type, id: target, reason, ...(clean ? { note: clean } : {}) });
 }

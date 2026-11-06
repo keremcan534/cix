@@ -8,7 +8,7 @@
 import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client';
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
-import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportSignal, type RoomSignal } from '@/lib/live/room-bus';
+import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
 import type { EngineEvent } from '@/lib/room-session';
 
 export type LiveKitConfig = {
@@ -34,6 +34,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   let room: Room | null = null;
   // The mic I sit on, shown to the other phones as my `seat` attribute (lib/live/room-bus); set again after a reconnect.
   let seat: number | null = null;
+  // My own `seat` writes the server hasn't echoed yet: their echo is not the owner or an admin moving me.
+  let pendingSeats: { v: string; at: number }[] = [];
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
   /** Only for the room still current: a late answer from a room we already left says nothing. */
   const tell = (r: Room, e: EngineEvent) => {
@@ -78,6 +80,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (s.publishing) setMic(r, true);
       if (seat !== null) pushSeat(r);
       snapshot(r);
+      if (s.roomId) reportRoomMeta(s.roomId, r.metadata);
       tell(r, { type: 'connected' });
       tell(r, { type: 'grant', ...grant(r) });
     } catch (e) {
@@ -94,7 +97,25 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   }
 
   const pushSeat = (r: Room) => {
-    if (r.state === ConnectionState.Connected) r.localParticipant.setAttributes({ seat: seat === null ? '' : String(seat) }).catch((e) => fail('Koltuk', e));
+    if (r.state !== ConnectionState.Connected) return;
+    const v = seat === null ? '' : String(seat);
+    pendingSeats = [...pendingSeats.filter((p) => Date.now() - p.at < 10_000), { v, at: Date.now() }].slice(-10);
+    r.localParticipant.setAttributes({ seat: v }).catch((e) => fail('Koltuk', e));
+  };
+  /**
+   * My `seat` attribute changed and this phone didn't write it: the owner or an admin moved me or took me off
+   * (server/api/rooms.mjs POST /api/rooms/seat). The room screen follows; it isn't written back.
+   */
+  const seatFromServer = (r: Room, changed: Record<string, string>) => {
+    if (room !== r || !s.roomId || r.state !== ConnectionState.Connected || !('seat' in changed)) return;
+    const v = changed.seat;
+    pendingSeats = pendingSeats.filter((p) => Date.now() - p.at < 10_000);
+    const i = pendingSeats.findIndex((p) => p.v === v);
+    if (i >= 0) return void pendingSeats.splice(0, i + 1);
+    const next = parseSeat(v);
+    if (next === seat) return;
+    seat = next;
+    reportServerSeat(s.roomId, next);
   };
   /** Everyone else in the room for the room screen (lib/live/room-bus). */
   const snapshot = (r: Room) => {
@@ -108,7 +129,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       seat = next;
       if (room) pushSeat(room);
     },
-    send(msg: RoomSignal) {
+    send(msg: PeerSignal) {
       if (room?.state !== ConnectionState.Connected) return false;
       room.localParticipant.publishData(encodeSignal(msg), { reliable: true }).catch((e) => fail('Mesaj', e));
       return true;
@@ -124,6 +145,13 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       tell(r, { type: 'connected' });
     });
     r.on(RoomEvent.Reconnecting, () => tell(r, { type: 'lost' }));
+    r.on(RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
+      if (participant === r.localParticipant) seatFromServer(r, changed);
+    });
+    // Locked mics live in the room's metadata, written only by the server (server/api/rooms.mjs).
+    r.on(RoomEvent.RoomMetadataChanged, (metadata) => {
+      if (room === r && s.roomId) reportRoomMeta(s.roomId, metadata);
+    });
     // A mute starting or ending changes our permissions on the live connection (server/api/sanctions.mjs).
     r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant) => {
       if (participant !== r.localParticipant) return;
@@ -138,8 +166,9 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       else if (reason === DisconnectReason.DUPLICATE_IDENTITY) tell(r, { type: 'failed', final: true, reason: 'server', message: 'Bu hesapla başka bir cihazdan odaya girildi' });
       else tell(r, { type: 'lost' });
     });
+    // No participant = the server sent it (a paid gift's announcement); room-bus decides what each may say.
     r.on(RoomEvent.DataReceived, (payload, participant) => {
-      if (room === r && s.roomId && participant) reportSignal(s.roomId, participant.identity, decodeSignal(payload));
+      if (room === r && s.roomId) reportSignal(s.roomId, participant ? participant.identity : null, decodeSignal(payload));
     });
     if (cfg.attachAudio === false) return r;
     // Remote voices play through hidden <audio> elements, removed when the track goes away.
@@ -180,6 +209,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       s.publishing = false;
       s.roomId = null;
       seat = null;
+      pendingSeats = [];
       reportPeers(null, []);
       s.concurrent--;
       s.disconnects++;

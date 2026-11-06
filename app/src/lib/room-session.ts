@@ -46,6 +46,9 @@ export type RoomSession = {
   /** The engine can't run audio in the background, so audio is paused until the app is back. */
   audioSuspended: boolean;
   reconnectAttempt: number;
+  /** The voice connection was up at least once in this session. Until then a failure is "could not connect",
+   *  never "the connection dropped", and nothing on screen is a stale copy of what was loaded. */
+  everConnected: boolean;
   miniHidden: boolean;
 };
 export type Notice = { id: number; text: string; tone: 'info' | 'warn' };
@@ -97,7 +100,7 @@ export function useRoomSession() {
   return useSyncExternalStore(subscribe, getSession, getSession);
 }
 function patchSession(p: Partial<RoomSession>) {
-  if (state.session) emit({ session: { ...state.session, ...p } });
+  if (state.session) emit({ session: { ...state.session, ...p, ...(p.status === 'connected' ? { everConnected: true } : null) } });
 }
 const notify = (text: string, tone: Notice['tone'] = 'info') => emit({ notice: { id: ++noticeSeq, text, tone } });
 export function clearNotice(id: number) {
@@ -131,6 +134,22 @@ export const MIC_BLOCK_LABEL: Record<Exclude<MicBlock, null>, string> = {
   background: 'Uygulama arka planda; bu sürümde arka plan sesi yok',
   connection: 'Oda bağlantısı yok',
 };
+/** The in-room connection line (SessionBanner); null while the connection is fine. `retry`: offer "Yeniden dene". */
+export type ConnectionLine = { text: string; bad: boolean; retry: boolean };
+export function connectionLine(s: RoomSession, offline: boolean): ConnectionLine | null {
+  if (s.status === 'ended') return null;
+  const attempt = s.reconnectAttempt ? ` (${s.reconnectAttempt}. deneme)` : '';
+  if (!s.everConnected) {
+    // Never joined: nothing dropped, and nothing on screen came from this room's connection yet.
+    if (s.status === 'disconnected') return { text: 'Odaya bağlanılamadı. Ağ dönünce yeniden denenecek.', bad: true, retry: true };
+    if (s.status === 'reconnecting') return { text: `Bağlanılamadı · yeniden deneniyor${attempt}.`, bad: false, retry: true };
+    if (s.status === 'connecting') return { text: offline ? 'İnternet bağlantısı yok · bağlanılıyor…' : 'Bağlanılıyor…', bad: false, retry: false };
+    return null;
+  }
+  if (s.status === 'disconnected') return { text: 'Oda bağlantısı kesildi. Sayılar ve liste son alınan durumu gösteriyor.', bad: true, retry: true };
+  if (s.status === 'reconnecting' || offline) return { text: `Bağlantı koptu · yeniden bağlanılıyor${attempt}. Sayılar ve liste son alınan durumu gösteriyor.`, bad: false, retry: s.status === 'reconnecting' };
+  return null;
+}
 /** The engine always follows the session: one place decides whether the mic track is published. */
 function syncEngine() {
   const s = state.session;
@@ -180,6 +199,7 @@ function start(roomId: string, info: { title: string; cover: string; via?: strin
     appState: 'active',
     audioSuspended: false,
     reconnectAttempt: 0,
+    everConnected: false,
     miniHidden: false,
   };
   engine.connect(roomId);
@@ -219,6 +239,18 @@ export function endRoom(reason: EndReason, endText?: string) {
   // Ended by the room (kicked, closed by the server): keep an "ended" session so the UI can say why.
   const shown = reason === 'kicked' || reason === 'server';
   emit({ session: shown ? { ...s, micWant: false, status: 'ended', endReason: reason, endText } : null, leaveDialog: false });
+}
+/**
+ * What an ended session says. The title is the server's own words when it gave any ("Oda şifresi yanlış",
+ * "Bu odaya giremezsin", "Oda kapandı"); "Odadan çıkarıldın" only for a removal that came without words.
+ * Someone who never got in is not told that their mic and voice connection were closed.
+ */
+export function endedText(s: Pick<RoomSession, 'endReason' | 'endText' | 'everConnected' | 'title'>): { title: string; body: string } {
+  const own = s.endText?.trim().replace(/\.$/, '');
+  const closed = 'Mikrofonun ve ses bağlantın kapatıldı.';
+  if (own) return { title: own, body: s.everConnected ? closed : `“${s.title}” odasına girilemedi.` };
+  if (s.endReason === 'server') return { title: 'Oda sona erdi', body: `“${s.title}” odası sunucu tarafından kapatıldı. ${closed}` };
+  return { title: 'Odadan çıkarıldın', body: `Oda yönetimi seni “${s.title}” odasından çıkardı. ${closed}` };
 }
 /** Clears an ended session after the user read why it ended. */
 export function dismissEnded() {
@@ -321,7 +353,8 @@ function tryReconnect() {
   // A real engine reports the join itself (engineEvent 'connected'); until then the session stays "reconnecting".
   if (engine.reconnect() && !engine.capabilities.reportsState) {
     patchSession({ status: 'connected', reconnectAttempt: 0 });
-    notify('Oda bağlantısı yeniden kuruldu.');
+    // The first join that only worked on a retry is not a "re"-connection.
+    if (s.everConnected) notify('Oda bağlantısı yeniden kuruldu.');
     return;
   }
   patchSession({ status: 'reconnecting', reconnectAttempt: s.reconnectAttempt + 1 });
@@ -365,7 +398,7 @@ export function engineEvent(roomId: string, e: EngineEvent) {
       stopRetry();
       if (s.status === 'connected') return;
       patchSession({ status: 'connected', reconnectAttempt: 0 });
-      if (s.status === 'reconnecting' || s.status === 'disconnected') notify('Oda bağlantısı yeniden kuruldu.');
+      if (s.everConnected && (s.status === 'reconnecting' || s.status === 'disconnected')) notify('Oda bağlantısı yeniden kuruldu.');
       return;
     }
     case 'lost':

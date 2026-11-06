@@ -4,7 +4,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { decodeSignal, encodeSignal, onSignal, parseSeat, parseSignal, reportPeers, reportSignal, type RoomSignal } from '@/lib/live/room-bus';
+import {
+  decodeSignal,
+  encodeSignal,
+  getLivePeers,
+  onServerSeat,
+  onSignal,
+  parseRoomMeta,
+  parseSeat,
+  parseServerGift,
+  parseSignal,
+  reportPeers,
+  reportRoomMeta,
+  reportServerSeat,
+  reportSignal,
+  type RoomSignal,
+} from '@/lib/live/room-bus';
 
 test('sinyal: Türkçe harf ve emoji bozulmadan gider gelir', () => {
   const msg: RoomSignal = { t: 'chat', text: 'Çağrı şöyle dedi: ğüşiöç İĞÜŞÖÇ 🌹🎉' };
@@ -17,14 +32,72 @@ test('sinyal: Türkçe harf ve emoji bozulmadan gider gelir', () => {
 test('sinyal: bozuk veya eksik olan atılır, uzun yazı kısaltılır', () => {
   assert.equal(parseSignal(null), null);
   assert.equal(parseSignal({ t: 'chat', text: '   ' }), null);
-  assert.equal(parseSignal({ t: 'gift', giftId: 'g1', count: 0, to: ['a'] }), null);
-  assert.equal(parseSignal({ t: 'gift', giftId: 'g1', count: 1.5, to: ['a'] }), null);
-  assert.equal(parseSignal({ t: 'gift', giftId: 'g1', count: 1, to: [] }), null);
   assert.equal(parseSignal({ t: 'para', amount: 1000 }), null);
   assert.equal(decodeSignal(new Uint8Array([123, 34])), null);
   const long = parseSignal({ t: 'chat', text: 'a'.repeat(1000) });
   assert.equal(long?.t === 'chat' && long.text.length, 300);
-  assert.deepEqual(parseSignal({ t: 'gift', giftId: 'g1', count: 5, to: ['x', 7, 'y'] }), { t: 'gift', giftId: 'g1', count: 5, to: ['x', 'y'] });
+});
+
+test('hediye: bir telefonun gönderdiği hediye hiç gösterilmez, yalnızca sunucunun duyurusu', () => {
+  // A phone could otherwise draw a gift nobody paid for.
+  assert.equal(parseSignal({ t: 'gift', giftId: 'g1', count: 5, to: ['x'] }), null);
+  assert.equal(parseSignal({ type: 'gift', giftId: 'g1', count: 5, from: 'a', to: 'b', eventId: 1 }), null);
+  const ok = { type: 'gift', giftId: 'g4', count: 5, from: 'u-a', to: 'u-b', eventId: 42 };
+  assert.deepEqual(parseServerGift(ok), { from: 'u-a', msg: { t: 'gift', giftId: 'g4', count: 5, to: ['u-b'], eventId: 42 } });
+  assert.equal(parseServerGift({ ...ok, count: 0 }), null);
+  assert.equal(parseServerGift({ ...ok, count: 1.5 }), null);
+  assert.equal(parseServerGift({ ...ok, count: 10_001 }), null);
+  assert.equal(parseServerGift({ ...ok, eventId: 0 }), null);
+  assert.equal(parseServerGift({ ...ok, eventId: '42' }), null);
+  assert.equal(parseServerGift({ ...ok, to: ['u-b'] }), null);
+  assert.equal(parseServerGift({ ...ok, from: '' }), null);
+  assert.equal(parseServerGift({ ...ok, type: 'para' }), null);
+  assert.equal(parseServerGift(null), null);
+
+  const got: string[] = [];
+  const off = onSignal('oda-h', (from, msg) => got.push(msg.t === 'gift' ? `${from}>${msg.to.join()}:${msg.giftId}x${msg.count}#${msg.eventId}` : `${from}:chat`));
+  reportSignal('oda-h', 'u-x', { t: 'gift', giftId: 'g9', count: 99, to: ['u-y'] }); // a phone: dropped
+  reportSignal('oda-h', 'u-x', ok); // the server's format, but from a phone: dropped
+  reportSignal('oda-h', null, ok);
+  reportSignal('oda-h', null, ok); // the same gift again (reconnect): shown once
+  reportSignal('oda-h', null, { ...ok, eventId: 43, count: 1 });
+  reportSignal('oda-h', null, { t: 'chat', text: 'sunucudan sohbet değil' }); // the server sends no chat here
+  off();
+  assert.deepEqual(got, ['u-a>u-b:g4x5#42', 'u-a>u-b:g4x1#43']);
+});
+
+test('kilitli mikrofonlar oda bilgisinden gelir; kişi listesi değişince kalır, başka odada sıfırlanır', () => {
+  assert.deepEqual(parseRoomMeta('{"lockedSeats":[5,2,2,0,100,1.5,"3",7]}'), [2, 5, 7]);
+  assert.deepEqual(parseRoomMeta(''), []);
+  assert.deepEqual(parseRoomMeta(undefined), []);
+  assert.deepEqual(parseRoomMeta('bozuk'), []);
+  assert.deepEqual(parseRoomMeta('null'), []);
+  assert.deepEqual(parseRoomMeta('{"lockedSeats":"2"}'), []);
+
+  reportRoomMeta('oda-k', '{"lockedSeats":[3]}');
+  assert.deepEqual(getLivePeers('oda-k').lockedSeats, [3]);
+  reportPeers('oda-k', [{ identity: 'u1', name: 'Ali', seat: 1, speaking: false }]);
+  assert.deepEqual(getLivePeers('oda-k').lockedSeats, [3]);
+  assert.equal(getLivePeers('oda-k').peers.length, 1);
+  reportRoomMeta('oda-k', '{"lockedSeats":[]}');
+  assert.deepEqual(getLivePeers('oda-k').lockedSeats, []);
+  assert.equal(getLivePeers('oda-k').peers.length, 1);
+  reportRoomMeta('oda-k', '{"lockedSeats":[4]}');
+  reportPeers('oda-l', []);
+  assert.deepEqual(getLivePeers('oda-l').lockedSeats, []);
+  assert.deepEqual(getLivePeers('oda-k').lockedSeats, []); // not the current room any more
+  reportPeers(null, []);
+});
+
+test('sunucunun verdiği koltuk yalnızca o odanın dinleyicisine gider', () => {
+  const got: (number | null)[] = [];
+  const off = onServerSeat('oda-s', (seat) => got.push(seat));
+  reportServerSeat('oda-s', 4);
+  reportServerSeat('oda-t', 2);
+  reportServerSeat('oda-s', null);
+  off();
+  reportServerSeat('oda-s', 6);
+  assert.deepEqual(got, [4, null]);
 });
 
 test('koltuk özelliği: yalnızca sayı bir mikrofondur', () => {

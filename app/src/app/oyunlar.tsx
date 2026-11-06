@@ -18,7 +18,7 @@ import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { ME, USERS } from '@/data/mock';
-import { casinoAccess, casinoVisible, useGames } from '@/lib/games';
+import { casinoAccess, casinoVisible, gamblingLevelOk, useGames } from '@/lib/games';
 import { useApp } from '@/store';
 // Static `colors` is the dark scheme: only for the game panel modal, which is dark in both schemes.
 import { ThemeScope, colors, fonts, makeStyles, useTheme } from '@/theme';
@@ -33,9 +33,12 @@ export default function GameCenter() {
   const t = useTheme();
   const s = useStyles();
   // Below Cömertlik Lv.2 Oyun Salonu is not shown at all: no tab, and an old link to one of its games opens nothing.
+  // Rüzgâr Gülü runs on the server and needs only that level; the other casino games are decided on this phone,
+  // so a live build hides them at every level (casinoVisible).
+  const showSalon = gamblingLevelOk(wealthLevel);
   const showCasino = casinoVisible(wealthLevel);
-  const [tab, setTab] = useState<Tab>(showCasino ? 'casino' : 'room');
-  const [open, setOpen] = useState<OpenGame | null>(oyun && showCasino ? (oyun === 'ruzgar' ? { kind: 'wheel' } : { kind: 'casino', id: oyun }) : null);
+  const [tab, setTab] = useState<Tab>(showSalon ? 'casino' : 'room');
+  const [open, setOpen] = useState<OpenGame | null>(oyun === 'ruzgar' ? (showSalon ? { kind: 'wheel' } : null) : oyun && showCasino ? { kind: 'casino', id: oyun } : null);
   // Room games from the profile: the game's own matchmaking fills the table with online players.
   const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...USERS.filter((u) => u.online).slice(0, 5)]);
 
@@ -46,7 +49,7 @@ export default function GameCenter() {
       <View style={s.tabs}>
         {(
           [
-            ...(showCasino ? [['casino', 'Oyun Salonu']] : []),
+            ...(showSalon ? [['casino', 'Oyun Salonu']] : []),
             ['room', 'Oda oyunları'],
             ['history', 'Geçmiş'],
           ] as [Tab, string][]
@@ -57,7 +60,7 @@ export default function GameCenter() {
         ))}
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90 }}>
-        {tab === 'casino' && showCasino && (
+        {tab === 'casino' && showSalon && (
           <>
             <DepthCard style={s.banner}>
               <FloatIcon source={icon3dSourceFor('👑')} size={36} hue={t.semantic.money} />
@@ -81,37 +84,39 @@ export default function GameCenter() {
                 </View>
               </LinearGradient>
             </Pressable>
-            <View style={s.grid}>
-              {casino
-                .filter((g) => g.active)
-                .map((g, i, all) => {
-                  const access = casinoAccess(g, PROFILE, wealthLevel);
-                  const featured = i === 0;
-                  const wide = featured || (i === all.length - 1 && all.length % 2 === 0);
-                  return (
-                    <View key={g.id} style={wide ? s.full : s.half}>
-                      <BreakoutCard
-                        icon={{ source: gameArtOf(g.id), emoji: g.emoji }}
-                        hue={gameHueOf(g.id)}
-                        iconSize={featured ? 112 : 76}
-                        featured={featured}
-                        delay={i * 300}
-                        label={`${g.name} aç`}
-                        onPress={() => setOpen({ kind: 'casino', id: g.id })}
-                      >
-                        <Text style={featured ? s.heroName : s.name} numberOfLines={1}>
-                          {g.name}
-                        </Text>
-                        <Text style={s.dim} numberOfLines={2}>
-                          {g.bets[0].toLocaleString('tr-TR')}–{g.bets[g.bets.length - 1].toLocaleString('tr-TR')} jeton · {g.fromRoom ? 'odada da açılır' : 'yalnızca buradan'}
-                          {g.providerStatus !== 'online' ? ' · sağlayıcı sorunlu' : ''}
-                        </Text>
-                        <GlossButton label={access.ok ? 'Oyna' : `Cömertlik Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
-                      </BreakoutCard>
-                    </View>
-                  );
-                })}
-            </View>
+            {showCasino && (
+              <View style={s.grid}>
+                {casino
+                  .filter((g) => g.active)
+                  .map((g, i, all) => {
+                    const access = casinoAccess(g, PROFILE, wealthLevel);
+                    const featured = i === 0;
+                    const wide = featured || (i === all.length - 1 && all.length % 2 === 0);
+                    return (
+                      <View key={g.id} style={wide ? s.full : s.half}>
+                        <BreakoutCard
+                          icon={{ source: gameArtOf(g.id), emoji: g.emoji }}
+                          hue={gameHueOf(g.id)}
+                          iconSize={featured ? 112 : 76}
+                          featured={featured}
+                          delay={i * 300}
+                          label={`${g.name} aç`}
+                          onPress={() => setOpen({ kind: 'casino', id: g.id })}
+                        >
+                          <Text style={featured ? s.heroName : s.name} numberOfLines={1}>
+                            {g.name}
+                          </Text>
+                          <Text style={s.dim} numberOfLines={2}>
+                            {g.bets[0].toLocaleString('tr-TR')}–{g.bets[g.bets.length - 1].toLocaleString('tr-TR')} jeton · {g.fromRoom ? 'odada da açılır' : 'yalnızca buradan'}
+                            {g.providerStatus !== 'online' ? ' · sağlayıcı sorunlu' : ''}
+                          </Text>
+                          <GlossButton label={access.ok ? 'Oyna' : `Cömertlik Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
+                        </BreakoutCard>
+                      </View>
+                    );
+                  })}
+              </View>
+            )}
             <Text style={s.dim}>Jetonlar gerçek paraya çevrilemez. Gerçek para, para çekme veya gerçek değerli ödül içeren bir sistem hukuki inceleme olmadan açılmaz.</Text>
           </>
         )}
@@ -148,7 +153,7 @@ export default function GameCenter() {
                               {g.name}
                             </Text>
                             <Text style={s.dim}>
-                              {g.minPlayers}–{g.maxPlayers} oyuncu{ready ? '' : ` · ${g.active ? 'sağlayıcı bekleniyor' : 'pasif'}`}
+                              {g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers}–${g.maxPlayers} oyuncu${ready ? '' : ' · pasif'}`}
                             </Text>
                             {ready && <GlossButton label="Dene" tone="action" small />}
                           </BreakoutCard>

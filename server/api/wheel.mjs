@@ -29,11 +29,15 @@ export const DAILY = (() => {
 const BIG_MILLI = 10_000;
 const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
 
-/** Spending that counts for Cömertlik (as the app's countsForWealth): not coin games, not coins handed on. */
+/**
+ * Spending that counts for Cömertlik (as the app's countsForWealth): not coin games, not coins handed on, not a
+ * Jeton Noktası selling coins on (jeton.mjs) and not coins taken back for a refunded purchase ("İade: …").
+ */
 export async function wealthPoints(c, userId) {
   const r = await c.query(
     `SELECT coalesce(sum(-amount), 0) AS n FROM ledger
-      WHERE user_id = $1 AND currency = 'coin' AND amount < 0 AND reason !~ '· tur' AND reason !~* '(zar düellosu|zarf|transfer|jeton gönder)'`,
+      WHERE user_id = $1 AND currency = 'coin' AND amount < 0 AND reason !~ '· tur' AND reason !~* '(zar düellosu|zarf|transfer|jeton gönder)'
+        AND reason !~ '^(Jeton Noktası satışı|İade:)'`,
     [userId],
   );
   return Number(r.rows[0].n);
@@ -104,6 +108,10 @@ export const wheelRoutes = {
     if (!COUNTS.includes(b.count)) throw new HttpError(400, 'Geçersiz çevirme sayısı');
     if (!REF.test(b.ref ?? '') || b.ref.length > 60) throw new HttpError(400, 'Geçersiz istek kimliği');
     const { ref, count } = b;
+    // The ledger's idempotency key (user, currency, ref) is shared by every wallet feature: the wheel's own rows
+    // carry "wheel:" (a colon no client ref can hold), so a ref used elsewhere neither breaks a spin nor makes a
+    // later gift or purchase with this ref look like a replay. wheel_spins keeps the client's ref.
+    const lref = `wheel:${ref}`;
     const seen = async () => (await db.query('SELECT * FROM wheel_spins WHERE user_id = $1 AND ref = $2', [me.id, ref])).rows[0];
     const answer = async (row, replay) => ({ spin: spinOut(row), user: selfUser((await db.query('SELECT * FROM users WHERE id = $1', [me.id])).rows[0]), replay });
 
@@ -123,14 +131,14 @@ export const wheelRoutes = {
         const fromCoins = cost - fromGame;
         if (Number(u.coins) < fromCoins) throw new HttpError(409, 'Yetersiz jeton');
         const what = `Rüzgâr Gülü · tur (${t.label} ×${count})`;
-        if (fromGame) await move(c, me.id, 'game', -fromGame, what, ref);
+        if (fromGame) await move(c, me.id, 'game', -fromGame, what, lref);
         // "Uygulama içi:" makes it a coin_spend for the finance panel, like the other coin games.
-        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, ref);
+        if (fromCoins) await spendCoins(c, me.id, fromCoins, `Uygulama içi: ${what}`, lref);
 
         const fund = (await funds(c, tier))[tier];
         const r = playSpins(tier, count, fund, () => crypto.randomInt(0, WEIGHT_TOTAL));
         await c.query(`UPDATE wheel_funds SET jackpot = $2, updated_at = now()${r.jackpot ? ', won_at = now()' : ''} WHERE tier = $1`, [tier, r.fund]);
-        if (r.payout) await move(c, me.id, 'game', r.payout, r.jackpot ? `Rüzgâr Gülü JACKPOT (${t.label})` : `Rüzgâr Gülü kazancı (${t.label} ×${count})`, `${ref}-k`);
+        if (r.payout) await move(c, me.id, 'game', r.payout, r.jackpot ? `Rüzgâr Gülü JACKPOT (${t.label})` : `Rüzgâr Gülü kazancı (${t.label} ×${count})`, `${lref}-k`);
         const best = Math.max(...r.slices.map((s) => SLICES[s].milli ?? 0));
         const ins = await c.query(
           `INSERT INTO wheel_spins (user_id, ref, tier, spins, cost, from_game, payout, jackpot, best_milli, slices, wins)
@@ -140,10 +148,11 @@ export const wheelRoutes = {
         return ins.rows[0];
       });
     } catch (e) {
-      // The same request twice at once: the second waited for the first's lock and found its row.
+      // The same request twice at once: the second waited for the first's lock and found its row. A clash with no
+      // spin of this person's behind it is not a replay: refused, nothing taken.
       if (e.code !== '23505') throw e;
       const again = await seen();
-      if (!again) throw e;
+      if (!again) throw new HttpError(409, 'Geçersiz istek kimliği');
       return answer(again, true);
     }
     return answer(row, false);
