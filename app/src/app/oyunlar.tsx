@@ -19,6 +19,7 @@ import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { ME, USERS } from '@/data/mock';
 import { casinoAccess, casinoVisible, gamblingLevelOk, useGames } from '@/lib/games';
+import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 // Static `colors` is the dark scheme: only for the game panel modal, which is dark in both schemes.
 import { ThemeScope, colors, fonts, makeStyles, useTheme } from '@/theme';
@@ -39,8 +40,10 @@ export default function GameCenter() {
   const showCasino = casinoVisible(wealthLevel);
   const [tab, setTab] = useState<Tab>(showSalon ? 'casino' : 'room');
   const [open, setOpen] = useState<OpenGame | null>(oyun === 'ruzgar' ? (showSalon ? { kind: 'wheel' } : null) : oyun && showCasino ? { kind: 'casino', id: oyun } : null);
-  // Room games from the profile: the game's own matchmaking fills the table with online players.
-  const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...USERS.filter((u) => u.online).slice(0, 5)]);
+  // Room games from the profile: the demo fills the table with sample online players. A live build has no
+  // matchmaking here, so room games are played only inside a room, with the people sitting there.
+  const live = liveMode();
+  const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...(live ? [] : USERS.filter((u) => u.online).slice(0, 5))]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }}>
@@ -127,7 +130,7 @@ export default function GameCenter() {
               <FloatIcon source={icon3dSourceFor('🎁')} size={36} hue={t.semantic.action} />
               <View style={{ flex: 1 }}>
                 <Text style={s.bannerTitle}>Herkese ücretsiz</Text>
-                <Text style={s.dim}>Oda oyunları odanın içinde, odadakilerle oynanır; mikrofonun ve koltuğun aynen kalır. Buradan çevrimiçi oyuncularla deneyebilirsin.</Text>
+                <Text style={s.dim}>Oda oyunları odanın içinde, odadakilerle oynanır; mikrofonun ve koltuğun aynen kalır.{live ? ' Bir odaya gir, oyunlar menüsünden başlat.' : ' Buradan çevrimiçi oyuncularla deneyebilirsin.'}</Text>
               </View>
             </DepthCard>
             {[1, 2].map((phase) => (
@@ -137,7 +140,7 @@ export default function GameCenter() {
                   {roomGames
                     .filter((g) => g.phase === phase)
                     .map((g, i) => {
-                      const ready = g.active && g.playable;
+                      const ready = g.active && g.playable && !live;
                       return (
                         <View key={g.id} style={s.half}>
                           <BreakoutCard
@@ -153,7 +156,7 @@ export default function GameCenter() {
                               {g.name}
                             </Text>
                             <Text style={s.dim}>
-                              {g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers}–${g.maxPlayers} oyuncu${ready ? '' : ' · pasif'}`}
+                              {live && g.active && g.playable ? `${g.minPlayers}–${g.maxPlayers} oyuncu · odada oynanır` : g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers}–${g.maxPlayers} oyuncu${ready ? '' : ' · pasif'}`}
                             </Text>
                             {ready && <GlossButton label="Dene" tone="action" small />}
                           </BreakoutCard>

@@ -152,7 +152,7 @@ export default function UserProfile() {
   // Live mode: the server's counts (null = not read yet, shown as "—"). The server has no friend count yet.
   const followers = live ? (counts?.followers ?? null) : (user.age * 37) % 900;
   const followingCount = live ? (counts?.following ?? null) : isMe ? following.size : (user.age * 13) % 200;
-  const friends = isMe ? USERS.filter((u) => following.has(u.id) && FOLLOWS_ME.has(u.id)).length : (user.age * 7) % 60;
+  const friends = live ? null : isMe ? USERS.filter((u) => following.has(u.id) && FOLLOWS_ME.has(u.id)).length : (user.age * 7) % 60;
   const can = (a: Action) => checkInteraction(a, user, { blocked, following, myAge: me.age });
   const guard = (a: Action, run: () => void) => {
     const c = can(a);
