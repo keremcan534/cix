@@ -59,7 +59,6 @@ type Tab = 'balcony' | 'mic' | 'all';
 export type ParticipantActions = {
   invite: (uid: string) => void;
   micMute: (uid: string, muted: boolean) => void;
-  silence: (uid: string) => void;
   kick: (uid: string) => void;
   profile: (uid: string) => void;
   gift: (uid: string) => void;
@@ -75,7 +74,6 @@ export function ParticipantsSheet({
   myRole,
   offline,
   inviteSeat,
-  silenced,
   blocked,
   hiddenMe,
   actions,
@@ -88,7 +86,6 @@ export function ParticipantsSheet({
   offline: boolean;
   /** Opened from an empty mic's "Davet et": invites go to this mic. */
   inviteSeat: number | null;
-  silenced: Set<string>;
   blocked: Set<string>;
   hiddenMe: boolean;
   actions: ParticipantActions;
@@ -181,7 +178,6 @@ export function ParticipantsSheet({
               onBoss ? 'Dümen koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Güverte',
               onMic && room.micMuted.includes(uid) ? 'mikrofonu kapatıldı' : '',
               pending.has(uid) ? 'davet bekliyor' : '',
-              silenced.has(uid) ? 'senin için sessizde' : '',
               blocked.has(uid) ? 'engelledin' : '',
             ]
               .filter(Boolean)
@@ -215,7 +211,6 @@ export function ParticipantsSheet({
                     {onMic && outranks(uid) && (
                       <Action icon={room.micMuted.includes(uid) ? 'mic-outline' : 'mic-off-outline'} label={room.micMuted.includes(uid) ? 'Mikrofonunu aç' : 'Mikrofonunu sustur'} disabled={offline} onPress={() => actions.micMute(uid, !room.micMuted.includes(uid))} />
                     )}
-                    <Action icon={silenced.has(uid) ? 'volume-high-outline' : 'volume-mute-outline'} label={silenced.has(uid) ? 'Sesini benim için aç' : 'Benim için sessize al'} onPress={() => actions.silence(uid)} />
                     <Action icon="person-circle-outline" label="Profil" onPress={() => actions.profile(uid)} />
                     <Action icon="gift-outline" label="Hediye gönder" disabled={offline} onPress={() => actions.gift(uid)} />
                     {outranks(uid) && <Action icon="exit-outline" label="Odadan çıkar" danger disabled={offline} onPress={() => actions.kick(uid)} />}

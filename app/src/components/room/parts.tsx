@@ -43,7 +43,6 @@ export function Seat({
   camera,
   teamColor,
   pkPoints,
-  silenced,
   avatarSize,
   slotWidth,
   modMuted,
@@ -76,8 +75,6 @@ export function Seat({
   teamColor?: string;
   /** PK running: points this person received since the PK started (server value). */
   pkPoints?: number;
-  /** I muted this person for myself only. */
-  silenced?: boolean;
   /** Layout overrides (team PK arena). */
   avatarSize?: number;
   slotWidth?: number;
@@ -107,7 +104,7 @@ export function Seat({
   const size = avatarSize ?? (host ? 70 : small ? 48 : 56);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
   const label = user
-    ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${silenced ? ', senin için sessizde' : ''}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
+    ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
     : `${index + 1}. mikrofon, ${locked ? 'kilitli' : invitee ? `${invitee} için davet bekliyor` : 'boş'}`;
 
   return (
@@ -150,11 +147,6 @@ export function Seat({
         {role === 'admin' && (
           <View style={styles.roleBadge} accessibilityLabel="Oda yöneticisi">
             <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
-          </View>
-        )}
-        {silenced && user && (
-          <View style={styles.silencedBadge}>
-            <Ionicons name="volume-mute" size={10} color="#fff" />
           </View>
         )}
         {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
@@ -501,7 +493,6 @@ const styles = StyleSheet.create({
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
   roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.action, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: colors.bg },
-  silencedBadge: { position: 'absolute', right: 0, top: 0, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: colors.border },
   pkWrap: { alignItems: 'center', marginTop: -1 },
   pkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 76 },
   pkPillBig: { backgroundColor: 'rgba(246,189,96,0.3)' },
