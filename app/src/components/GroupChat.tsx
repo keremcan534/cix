@@ -6,8 +6,10 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
 import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
+import { ContactNote } from '@/components/contact-note';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import { MessageText } from '@/components/ReactionArt';
+import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { roomById, userById, type User } from '@/data/mock';
@@ -35,10 +37,13 @@ export function GroupChat({
   roomId,
   quickActions,
   onGift,
+  place,
 }: {
   members: User[];
   messages: GroupMsg[];
   onSend: (text: string) => void;
+  /** Where this chat is, for the contact filter's count (lib/contact-filter), e.g. 'tayfa.chat'. */
+  place: string;
   pinned?: string;
   lastActive: (u: User) => string;
   /** The group's own room, pinned under the announcement. */
@@ -50,6 +55,12 @@ export function GroupChat({
   const styles = useStyles();
   const [tab, setTab] = useState<'chat' | 'members'>('chat');
   const [draft, setDraft] = useState('');
+  // Why the last text did not go out (contact details); cleared as soon as the text changes.
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string | ((d: string) => string)) => {
+    setDraft(next);
+    setRefused(null);
+  };
   const [emoji, setEmoji] = useState(false);
   const [pinOpen, setPinOpen] = useState(true);
   // In-room members first, then online, then the rest.
@@ -59,8 +70,13 @@ export function GroupChat({
   const room = roomId ? roomById(roomId) : null;
 
   const send = () => {
-    if (!draft.trim()) return;
-    onSend(draft.trim());
+    const text = draft.trim();
+    if (!text) return;
+    // Contact details are refused, not masked: nothing goes out and the text stays in the input.
+    const refusal = messageRefusal(place, text, place);
+    if (refusal) return setRefused(refusal);
+    noteSent(place, text);
+    onSend(text);
     setDraft('');
     setEmoji(false);
   };
@@ -156,17 +172,18 @@ export function GroupChat({
             <EmojiPanel
               onPick={(e) => {
                 // A sticker goes out on its own; an emoji is typed into the draft.
-                if (!stickerIdOf(e)) return setDraft((d) => d + e);
+                if (!stickerIdOf(e)) return edit((d) => d + e);
                 onSend(e);
                 setEmoji(false);
               }}
             />
           )}
+          <ContactNote text={refused} style={{ marginTop: 6 }} />
           <View style={styles.inputRow}>
             <Pressable onPress={() => setEmoji((v) => !v)} accessibilityLabel="Emoji">
               <Ionicons name={emoji ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
             </Pressable>
-            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={send} placeholder="Mesaj yaz…" placeholderTextColor={colors.textDim} style={styles.input} returnKeyType="send" />
+            <TextInput value={draft} onChangeText={edit} onSubmitEditing={send} placeholder="Mesaj yaz…" placeholderTextColor={colors.textDim} maxLength={300} style={styles.input} returnKeyType="send" />
             {onGift && (
               <Pressable onPress={onGift} accessibilityLabel="Hediye">
                 <Text style={{ fontSize: 24 }}>🎁</Text>

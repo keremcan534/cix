@@ -81,6 +81,8 @@ import { callsAvailable, isLiveRoom, liveGift, message as errorText, myServerId,
 import { useLiveRoomSync } from '@/lib/live/room';
 import { sendSignal, type RoomSignal } from '@/lib/live/room-bus';
 import { showAlert } from '@/lib/alert';
+import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
+import { ContactNote } from '@/components/contact-note';
 import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
@@ -345,6 +347,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     ...(invisible ? [{ id: 'inv', system: true, text: '👻 Gizli girişle girdin. Diğer kullanıcılar katıldığını görmez; moderasyon kayıtlarında görünürsün.' }] : []),
   ]);
   const [draft, setDraft] = useState('');
+  // Why the line in the input did not go out (contact details, lib/contact-filter); cleared when it is edited.
+  const [chatRefused, setChatRefused] = useState<string | null>(null);
+  const editDraft = (next: string | ((d: string) => string)) => {
+    setDraft(next);
+    setChatRefused(null);
+  };
   const [emojiOpen, setEmojiOpen] = useState(false);
   // Seat emoji reactions currently playing, by user id.
   const [reactions, setReactions] = useState<Record<string, SeatReactionData>>({});
@@ -585,7 +593,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
     onSignal: (from, msg: RoomSignal) => {
       if (blocked.has(from) || silenced.has(from)) return;
-      if (msg.t === 'chat') return addMsg({ userId: from, text: msg.text });
+      // Room chat goes phone to phone and the server never reads it, so a line with contact details from an older
+      // or modified app is dropped here. Not counted: the refusal would be mine, and I only received it.
+      if (msg.t === 'chat') return checkText(msg.text).ok ? addMsg({ userId: from, text: msg.text }) : undefined;
       const gift = GIFTS.find((g) => g.id === msg.giftId);
       if (gift) showGift(from, msg.to.map((t) => (t === myServerId() ? 'me' : t)), gift, msg.count);
     },
@@ -1369,6 +1379,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const text = sticker ?? draft.trim();
     if (!text) return;
     if (chatBlocked) return chatMuted ? showSanction(chatMuted) : undefined;
+    // No phone numbers, IBANs, e-mails, links or social media accounts (lib/contact-filter). The server never
+    // sees room chat, so this is the check on the way out: refused, and the line stays in the input.
+    const thread = `room:${id}`;
+    const refusal = sticker ? null : messageRefusal(thread, text, 'room.chat');
+    if (refusal) return setChatRefused(refusal);
+    if (!sticker) noteSent(thread, text);
     if (!sticker) setDraft('');
     // Server room: the line goes out over the voice connection, which may still be joining or have dropped.
     if (!isOnline() || (real && !sendSignal({ t: 'chat', text: mask(text) }))) {
@@ -2156,7 +2172,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   react('me', e);
                   setEmojiOpen(false);
                 } else if (stickerIdOf(e)) send(e);
-                else setDraft((d) => d + e);
+                else editDraft((d) => d + e);
               }}
             />
           )}
@@ -2166,6 +2182,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               {voiceMuted && voiceMuted.id !== chatMuted?.id && <MuteBanner s={voiceMuted} text="Sesli susturma" />}
             </View>
           ) : null}
+          <ContactNote text={chatRefused} />
           <View style={styles.bottom}>
             <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />
             <View style={styles.inputWrap}>
@@ -2174,11 +2191,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               </Pressable>
               <TextInput
                 value={draft}
-                onChangeText={setDraft}
+                onChangeText={editDraft}
                 onSubmitEditing={() => send()}
                 editable={!chatBlocked}
                 placeholder={chatBlocked ? 'Sohbete yazman kısıtlı' : 'Yaz…'}
                 placeholderTextColor={colors.textDim}
+                maxLength={300}
                 style={styles.input}
                 returnKeyType="send"
               />
@@ -2282,7 +2300,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           if (!Object.keys(patch).length) return;
           updateServerRoom(id, patch)
             .then(() => setRoomEdits((n) => n + 1))
-            .catch((e) => showAlert('Kaydedilemedi', errorText(e)));
+            .catch((e) => showAlert(refusalTitle(e, 'Kaydedilemedi'), errorText(e)));
         }}
         onSettings={() => setPanel('settings')}
         onShare={shareRoom}

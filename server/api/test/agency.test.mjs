@@ -44,7 +44,7 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     [admin, tOwner, sOwner, s2Owner, outsider, gifter, staffU, staffV, bdU, fin1, fin2] = await Promise.all(
       ['Merkez', 'Üst Sahip', 'Alt Sahip', 'Alt2 Sahip', 'Yabancı', 'Hediyeci', 'Personel', 'Personel2', 'BD', 'Finans1', 'Finans2'].map(account),
     );
-    [tA, sA, sB, sC, s2A] = await Promise.all(['Yayıncı tA', 'Yayıncı sA', 'Yayıncı sB', 'Yayıncı sC', 'Yayıncı s2A'].map(account));
+    [tA, sA, sB, sC, s2A] = await Promise.all(['Yayıncı tA', 'Yayıncı sA', 'Yayıncı sB', 'Yayıncı sC1', 'Yayıncı s2A'].map(account));
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.id]);
     roles = Object.fromEntries(ok(await admin.get('/api/agency/roles')).roles.map((r) => [r.name, r.id]));
     assert.ok(roles['Yayıncı asistanı'] && roles['BD yöneticisi'] && roles['Finans sorumlusu']);

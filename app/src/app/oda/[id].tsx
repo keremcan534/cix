@@ -8,6 +8,7 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { isServerId, roomById, serverRoomKnown } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { refusalTitle } from '@/lib/contact-filter';
 import { liveMode, loadRooms, message, openServerRoom } from '@/lib/live';
 import { endRoom, getSession, openRoom, registerOpener, requestLeave, setLeaving, useRoomSession } from '@/lib/room-session';
 import { savedAtStart } from '@/lib/room-session-persist';
@@ -37,7 +38,7 @@ export default function RoomRoute() {
       id === 'yeni'
         ? openServerRoom(myRoom.title, myRoom.announcement).then((r) => alive && router.replace(`/oda/${r.id}`))
         : loadRooms().then(() => (serverRoomKnown(id) ? alive && setLoaded((n) => n + 1) : fail('Oda bulunamadı', 'Bu oda kapanmış olabilir.')));
-    work.catch((e) => fail('Oda açılamadı', message(e)));
+    work.catch((e) => fail(refusalTitle(e, 'Oda açılamadı'), message(e)));
     return () => {
       alive = false;
     };

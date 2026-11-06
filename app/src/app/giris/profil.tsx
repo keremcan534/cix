@@ -13,6 +13,7 @@ import { AuthHeader } from '@/components/AuthHeader';
 import { GradientButton } from '@/components/ui';
 import { INTERESTS, ME } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { contactRefusal, isContactBlocked, refusalTitle } from '@/lib/contact-filter';
 import { liveMode, message, saveProfile } from '@/lib/live';
 import { GENDER_ART, interestParts } from '@/data/profile-art';
 import { useApp } from '@/store';
@@ -33,6 +34,16 @@ export default function ProfileSetupScreen() {
   const [city, setCity] = useState('İstanbul');
   const [interests, setInterests] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // Contact details in the name or city (lib/contact-filter): said under the fields, cleared when either changes.
+  const [contactError, setContactError] = useState<string | null>(null);
+  const editName = (t: string) => {
+    setName(t);
+    setContactError(null);
+  };
+  const editCity = (t: string) => {
+    setCity(t);
+    setContactError(null);
+  };
 
   const age = year.length === 4 ? THIS_YEAR - Number(year) : null;
   const ageError = age !== null && (age < 18 || age > 99) ? 'Uygulamayı kullanmak için 18 yaşından büyük olmalısın.' : null;
@@ -48,6 +59,8 @@ export default function ProfileSetupScreen() {
 
   const submit = async () => {
     if (!valid || busy) return;
+    const refusal = contactRefusal(name.trim(), 'profile.name') ?? contactRefusal(city.trim(), 'profile.city');
+    if (refusal) return setContactError(refusal);
     updateMe({
       name: name.trim(),
       gender: gender!,
@@ -64,7 +77,9 @@ export default function ProfileSetupScreen() {
       try {
         await saveProfile({ ...ME }, Number(year));
       } catch (e) {
-        showAlert('Hesap açılamadı', `${message(e)}\n\nİnternet bağlantını kontrol edip tekrar dene.`);
+        // The server's contact note is the whole answer: the connection is fine, the text has to change.
+        if (isContactBlocked(e)) setContactError(message(e));
+        showAlert(refusalTitle(e, 'Hesap açılamadı'), isContactBlocked(e) ? message(e) : `${message(e)}\n\nİnternet bağlantını kontrol edip tekrar dene.`);
         return;
       } finally {
         setBusy(false);
@@ -94,7 +109,7 @@ export default function ProfileSetupScreen() {
           </Pressable>
 
           <Field label="Adın">
-            <TextInput value={name} onChangeText={setName} placeholder="Örn. Elif" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
+            <TextInput value={name} onChangeText={editName} placeholder="Örn. Elif" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
           </Field>
 
           <Field label="Cinsiyet">
@@ -120,11 +135,16 @@ export default function ProfileSetupScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Field label="Şehir">
-                <TextInput value={city} onChangeText={setCity} placeholderTextColor={colors.textDim} style={styles.input} />
+                <TextInput value={city} onChangeText={editCity} placeholderTextColor={colors.textDim} style={styles.input} />
               </Field>
             </View>
           </View>
           {ageError && <Text style={styles.error}>{ageError}</Text>}
+          {contactError && (
+            <Text style={styles.error} accessibilityRole="alert">
+              {contactError}
+            </Text>
+          )}
 
           <Field label={`İlgi alanları (${interests.length}/5)`}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

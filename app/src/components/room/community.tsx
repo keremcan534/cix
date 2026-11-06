@@ -8,6 +8,7 @@ import { roomStyles } from '@/components/room/parts';
 import { Avatar, GradientButton } from '@/components/ui';
 import { userById, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { followerInviteLeft, formatWait } from '@/lib/room-invites';
 import type { Settings } from '@/store';
 import { colors, semantic } from '@/theme';
@@ -88,6 +89,9 @@ export function PollCreate({ visible, onClose, onCreate }: { visible: boolean; o
   const create = () => {
     const clean = opts.map((o) => o.trim()).filter(Boolean);
     if (q.trim().length < 4 || clean.length < 2) return showAlert('Soru ve en az 2 seçenek gerekli');
+    // The whole room sees the poll: contact details are refused and the sheet keeps what was typed.
+    const refusal = contactRefusal([q.trim(), ...clean], 'room.poll');
+    if (refusal) return showAlert(CONTACT_TITLE, refusal);
     onCreate(q.trim(), clean, seconds, live);
     setQ('');
     setOpts(['', '']);
@@ -256,6 +260,8 @@ export function EventsSheet({
             icon="calendar"
             onPress={() => {
               if (title.trim().length < 3) return showAlert('Etkinlik adı gerekli');
+              const refusal = contactRefusal([title.trim(), desc.trim()], 'room.event');
+              if (refusal) return showAlert(CONTACT_TITLE, refusal);
               onCreate({ title: title.trim(), desc: desc.trim(), when, type });
               setTitle('');
               setDesc('');
@@ -294,6 +300,8 @@ export function QuestionsSheet({ visible, onClose, questions, canManage, onAsk, 
         title="Soru gönder"
         onPress={() => {
           if (text.trim().length < 3) return;
+          const refusal = contactRefusal(text.trim(), 'room.question');
+          if (refusal) return showAlert(CONTACT_TITLE, refusal);
           onAsk(text.trim());
           setText('');
         }}

@@ -1,7 +1,9 @@
 // Profile field rules. They mirror what the server must enforce on every profile update;
-// the app runs them first only to show errors before sending.
+// the app runs them first only to show errors before sending. Contact details (lib/contact-filter, the same
+// filter as the server's) are refused in the name, @username, bio and city. validateProfile only checks, so it
+// can run as often as a screen likes; the save that it turns down is counted once, with noteProfileRefusal.
 import { USERS } from '@/data/mock';
-import { scanMessage } from '@/lib/safety';
+import { CONTACT_MESSAGE, checkText, contactRefusal, usernameText } from '@/lib/contact-filter';
 
 export const LIMITS = { name: 20, bio: 150, city: 30, interests: 5, photos: 6 } as const;
 const RESERVED = ['admin', 'yonetici', 'moderator', 'destek', 'similarclub', 'similar', 'sistem', 'support', 'official', 'resmi'];
@@ -32,6 +34,12 @@ export const formatTrDate = (iso?: string) => (iso ? iso.split('-').reverse().jo
 export type ProfileDraft = { name: string; username: string; bio: string; city: string; birth: string };
 export type ProfileErrors = Partial<Record<keyof ProfileDraft, string>>;
 
+/** The fields other people read, in the order the server checks them (PATCH /api/me). */
+const CONTACT_FIELDS = ['name', 'username', 'bio', 'city'] as const;
+/** A field as the contact filter reads it: a username with its dots and underscores as spaces ('ig_ayse' is 'ig ayse'), as on the server. */
+const contactText = (d: ProfileDraft, field: (typeof CONTACT_FIELDS)[number]) => (field === 'username' ? usernameText(d.username) : d[field].trim());
+const hasContact = (d: ProfileDraft, field: (typeof CONTACT_FIELDS)[number]) => !checkText(contactText(d, field)).ok;
+
 /** `today` is only passed by tests, so the 18+ check doesn't depend on the day they run. */
 export function validateProfile(d: ProfileDraft, selfId = 'me', today = new Date()): ProfileErrors {
   const e: ProfileErrors = {};
@@ -39,6 +47,7 @@ export function validateProfile(d: ProfileDraft, selfId = 'me', today = new Date
   if (!name) e.name = 'Görünen ad boş olamaz.';
   else if (name.length > LIMITS.name) e.name = `En fazla ${LIMITS.name} karakter.`;
   else if (hasProfanity(name)) e.name = 'Bu ad topluluk kurallarına uymuyor.';
+  else if (hasContact(d, 'name')) e.name = CONTACT_MESSAGE;
 
   const u = d.username.trim().toLowerCase();
   if (!/^[a-z][a-z0-9._]{2,19}$/.test(u)) e.username = '3–20 karakter; harfle başlamalı, yalnızca a-z, 0-9, nokta ve alt çizgi.';
@@ -46,14 +55,16 @@ export function validateProfile(d: ProfileDraft, selfId = 'me', today = new Date
   else if (RESERVED.some((r) => u.includes(r))) e.username = 'Bu kullanıcı adı ayrılmış; başka bir tane seç.';
   else if (USERS.some((x) => x.id !== selfId && x.username === u)) e.username = 'Bu kullanıcı adı alınmış.';
   else if (hasProfanity(u)) e.username = 'Bu kullanıcı adı topluluk kurallarına uymuyor.';
+  else if (hasContact(d, 'username')) e.username = CONTACT_MESSAGE;
 
   const bio = d.bio.trim();
   if (bio.length > LIMITS.bio) e.bio = `En fazla ${LIMITS.bio} karakter.`;
   else if (hasProfanity(bio)) e.bio = 'Biyografide uygunsuz ifade var.';
-  else if (scanMessage(bio).some((r) => r !== 'link' || /https?:|www\./i.test(bio)))
-    e.bio = 'Biyografide telefon, IBAN, bağlantı veya başka uygulama hesabı paylaşılamaz.';
+  else if (hasContact(d, 'bio')) e.bio = CONTACT_MESSAGE;
 
-  if (d.city.trim().length > LIMITS.city) e.city = `En fazla ${LIMITS.city} karakter.`;
+  const city = d.city.trim();
+  if (city.length > LIMITS.city) e.city = `En fazla ${LIMITS.city} karakter.`;
+  else if (hasContact(d, 'city')) e.city = CONTACT_MESSAGE;
 
   const iso = parseTrDate(d.birth);
   if (!iso) e.birth = 'Tarihi GG.AA.YYYY biçiminde yaz (ör. 14.03.2002).';
@@ -63,4 +74,13 @@ export function validateProfile(d: ProfileDraft, selfId = 'me', today = new Date
     else if (age > 100) e.birth = 'Geçerli bir doğum tarihi gir.';
   }
   return e;
+}
+
+/**
+ * A save that validateProfile turned down for contact details is counted here, once (at the first such field,
+ * 'profile.name' …), as the server counts one refusal per PATCH /api/me. Call it once per save attempt.
+ */
+export function noteProfileRefusal(d: ProfileDraft, e: ProfileErrors) {
+  const field = CONTACT_FIELDS.find((k) => e[k] === CONTACT_MESSAGE);
+  if (field) contactRefusal(contactText(d, field), `profile.${field}`);
 }

@@ -1,11 +1,13 @@
 // Live mode background sync (lib/live): while signed in, keeps the balance and the Gelir locks in step with the
-// server (a gift someone sends from another phone shows up here within seconds) and polls direct messages.
+// server (a gift someone sends from another phone shows up here within seconds), polls direct messages and
+// passes on the contact filter's refusals made on this phone.
 // Mounted once above the stack (app/_layout); renders nothing and does nothing without a server address.
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { showAlert } from '@/lib/alert';
-import { SignInAgain } from '@/lib/api';
+import { SignInAgain, countContactRefusal } from '@/lib/api';
+import { onContactRefusal } from '@/lib/contact-filter';
 import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@/lib/live';
 import { resumePurchases } from '@/lib/live/billing';
 import { pollMessages } from '@/lib/live/messages';
@@ -22,6 +24,13 @@ export function LiveSync() {
     appRef.current = app;
   });
   const name = app.me.name;
+
+  // Room and group chats, moments, room polls … are refused on this phone and never reach the server, so the
+  // refusal is reported for the moderators' count: its kind and place only, never the text. Best effort.
+  useEffect(() => {
+    if (!liveMode()) return;
+    return onContactRefusal((r) => void countContactRefusal(r.category, r.place).catch(() => {}));
+  }, []);
 
   useEffect(() => {
     if (!liveMode()) return;

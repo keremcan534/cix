@@ -18,7 +18,9 @@ import { Icon3D } from '@/components/Icon3D';
 import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type RoomInviteCard, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { checkInteraction } from '@/lib/interaction';
-import { incomingWarning, outgoingWarning, scanMessage } from '@/lib/safety';
+import { incomingWarning, scanMessage } from '@/lib/safety';
+import { CONTACT_MESSAGE, messageRefusal, noteSent } from '@/lib/contact-filter';
+import { ContactNote } from '@/components/contact-note';
 import { newRef } from '@/lib/api';
 import { isLiveUser, liveDm } from '@/lib/live/messages';
 import { useApp } from '@/store';
@@ -76,27 +78,41 @@ export function ChatThread({
   // Index of the other person's latest message: everything I sent before it counts as read. A chat with a real
   // person has no read receipts yet, so it shows one tick ("sent") and never a made-up "read".
   const lastTheirs = real ? -1 : messages.map((m) => m.fromMe).lastIndexOf(false);
+  // Why the text in the input did not go out (contact details, lib/contact-filter); cleared when it is edited.
+  const [refused, setRefused] = useState<string | null>(null);
+  const edit = (next: string | ((d: string) => string)) => {
+    setDraft(next);
+    setRefused(null);
+  };
+  const thread = `dm:${user.id}`;
+  const deliver = (text: string, ref: string) =>
+    liveDm(user.id, text, ref, (failed, contact) => {
+      if (!failed) return;
+      setMessageFailed(user.id, ref, failed);
+      // The server refused contact details the app let through (an older rule on this phone): the bubble says
+      // why, and the text comes back into an empty input to be changed.
+      if (!contact) return;
+      setRefused(failed);
+      setDraft((d) => d || text);
+    });
   const retry = (m: (typeof messages)[number]) => {
     if (!m.ref) return;
-    const ref = m.ref;
-    setMessageFailed(user.id, ref, null);
-    liveDm(user.id, m.text, ref, (failed) => failed && setMessageFailed(user.id, ref, failed));
+    const refusal = messageRefusal(thread, m.text, 'dm');
+    if (refusal) return setRefused(refusal);
+    setMessageFailed(user.id, m.ref, null);
+    deliver(m.text, m.ref);
   };
 
   // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
-  const send = (checked = false, sticker?: string) => {
+  const send = (sticker?: string) => {
     const text = sticker ?? draft.trim();
     if (!text || isBlocked) return;
     if (dmMuted) return showSanction(dmMuted);
     if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
-    const warning = checked ? null : outgoingWarning(scanMessage(text));
-    if (warning) {
-      showAlert('Kişisel bilgi paylaşıyorsun', warning, [
-        { text: 'Düzenle', style: 'cancel' },
-        { text: 'Yine de gönder', onPress: () => send(true, sticker) },
-      ]);
-      return;
-    }
+    // No phone numbers, IBANs, e-mails, links or social media accounts (lib/contact-filter): refused before any
+    // coin is spent or a bubble is added, and the text stays in the input. Stickers are catalogue tokens.
+    const refusal = sticker ? null : messageRefusal(thread, text, 'dm');
+    if (refusal) return setRefused(refusal);
     // Mutual follow chats are free; otherwise each message costs coins (price shown before sending).
     if (!mutual && !spendCoins(DM_PRICE, `Mesaj: ${user.name}`)) {
       showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${DM_PRICE} jeton.`, [
@@ -107,9 +123,10 @@ export function ChatThread({
     }
     const ref = real ? newRef() : undefined;
     sendMessage(user.id, text, true, undefined, ref);
+    noteSent(thread, text);
     setEmojiOpen(false);
     if (!sticker) setDraft('');
-    if (ref) return liveDm(user.id, text, ref, (failed) => failed && setMessageFailed(user.id, ref, failed));
+    if (ref) return deliver(text, ref);
     // Fake reply so the prototype feels real.
     setTyping(true);
     replyTimer.current = setTimeout(() => {
@@ -151,10 +168,15 @@ export function ChatThread({
                     <Text style={{ color: messages.indexOf(item) < lastTheirs ? '#7DD3FC' : 'rgba(255,255,255,0.7)' }}>✓✓</Text>
                   )}
                 </Text>
-                {item.failed && (
-                  <Pressable onPress={() => retry(item)} accessibilityRole="button" accessibilityLabel="Mesajı tekrar gönder" hitSlop={8}>
-                    <Text style={[styles.time, { color: '#FECACA', fontWeight: '700' }]}>Gönderilemedi · tekrar dene</Text>
-                  </Pressable>
+                {item.failed === CONTACT_MESSAGE ? (
+                  // Refused for contact details: sending it again would fail the same way, so it says why instead.
+                  <Text style={[styles.time, styles.refusedText]}>Gönderilmedi · {CONTACT_MESSAGE}</Text>
+                ) : (
+                  item.failed && (
+                    <Pressable onPress={() => retry(item)} accessibilityRole="button" accessibilityLabel="Mesajı tekrar gönder" hitSlop={8}>
+                      <Text style={[styles.time, { color: '#FECACA', fontWeight: '700' }]}>Gönderilemedi · tekrar dene</Text>
+                    </Pressable>
+                  )
                 )}
               </LinearGradient>
             ) : (
@@ -208,18 +230,20 @@ export function ChatThread({
             <MuteBanner s={dmMuted} text="Mesaj gönderme kısıtlı" />
           </View>
         )}
-        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(false, e) : setDraft((d) => d + e))} />}
+        <ContactNote text={refused} />
+        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} />}
         <View style={styles.inputRow}>
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
           </Pressable>
           <TextInput
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={edit}
             onSubmitEditing={() => send()}
             editable={!dmMuted}
             placeholder={dmMuted ? 'Mesaj gönderemezsin' : 'Mesaj yaz...'}
             placeholderTextColor={colors.textDim}
+            maxLength={1000}
             style={styles.input}
             returnKeyType="send"
           />
@@ -284,6 +308,7 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   bubbleText: { color: '#fff', fontSize: 15 },
   theirsText: { color: colors.text },
   time: { color: 'rgba(255,255,255,0.6)', fontSize: 11, alignSelf: 'flex-end', marginTop: 2 },
+  refusedText: { color: '#FECACA', fontWeight: '700', alignSelf: 'stretch', textAlign: 'right', lineHeight: 15 },
   theirsTime: { color: ink(0.6) },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 200 },
   roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },

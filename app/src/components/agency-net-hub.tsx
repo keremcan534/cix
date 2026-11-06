@@ -17,6 +17,7 @@ import { Button, Header } from '@/components/ui';
 import { demoMe } from '@/data/agency-net-demo';
 import { LEVEL_TEXT, PARTY_TEXT, STATUS_TEXT, TRANSFER_STATUS, TRANSFER_TEXT, VIEWER_TEXT, agencyNet, errorText, fmtDate, runAction, unavailable, useNet, type Me, type Transfer } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
+import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
@@ -133,11 +134,11 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
 function Membership({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: () => void; askFor: ReturnType<typeof useAsk>[1] }) {
   const m = d.membership!;
   const move = async () => {
-    const r = await askFor({ title: 'Başka ajansa geç', message: 'Yeni ajansın kodunu yaz. Mevcut ajansın, yeni ajans ve gerekirse merkez onaylar; ücret kuralı sunucuda belirlenir. Geçmiş kazançların değişmez.', field: { label: 'Yeni ajans kodu', placeholder: 'Örn. MVD4K2' }, confirm: 'Talep gönder' });
+    const r = await askFor({ title: 'Başka ajansa geç', message: 'Yeni ajansın kodunu yaz. Mevcut ajansın, yeni ajans ve gerekirse merkez onaylar; ücret kuralı sunucuda belirlenir. Geçmiş kazançların değişmez.', field: { label: 'Yeni ajans kodu', placeholder: 'Örn. MVD4K2' }, confirm: 'Talep gönder', place: 'agency.transfer' });
     if (r) await runAction(demo, () => agencyNet.transfer(r.field.toUpperCase(), r.reason), 'Transfer talebin gönderildi.', reload);
   };
   const leave = async () => {
-    const r = await askFor({ title: 'Ajanstan ayrıl', message: 'Ayrılma talebin ajansına ve gerekirse merkeze iletilir. Bu sürede kazandığın komisyon kayıtları silinmez.', confirm: 'Ayrılma talebi', danger: true });
+    const r = await askFor({ title: 'Ajanstan ayrıl', message: 'Ayrılma talebin ajansına ve gerekirse merkeze iletilir. Bu sürede kazandığın komisyon kayıtları silinmez.', confirm: 'Ayrılma talebi', danger: true, place: 'agency.transfer' });
     if (r) await runAction(demo, () => agencyNet.transfer(null, r.reason), 'Ayrılma talebin gönderildi.', reload);
   };
   return (
@@ -260,7 +261,17 @@ function Join({ demo, reload }: { demo: boolean; reload: () => void }) {
         </View>
       )}
       {found && <TextInput value={note} onChangeText={setNote} placeholder="Ajansa kısa bir not (isteğe bağlı)" placeholderTextColor={colors.textDim} maxLength={300} style={ns.input} />}
-      <Button title="Katılma isteği gönder" disabled={!found} onPress={() => found && runAction(demo, () => agencyNet.join(found.code, 'code', note || undefined), 'İsteğin ajansa iletildi.', reload)} />
+      <Button
+        title="Katılma isteği gönder"
+        disabled={!found}
+        onPress={() => {
+          if (!found) return;
+          // The agency reads the note: contact details are refused before anything is sent.
+          const refusal = contactRefusal(note.trim(), 'agency.join');
+          if (refusal) return showAlert(CONTACT_TITLE, refusal);
+          void runAction(demo, () => agencyNet.join(found.code, 'code', note || undefined), 'İsteğin ajansa iletildi.', reload);
+        }}
+      />
     </Panel>
   );
 }
@@ -268,8 +279,11 @@ function Join({ demo, reload }: { demo: boolean; reload: () => void }) {
 function Apply({ demo, reload }: { demo: boolean; reload: () => void }) {
   const [f, setF] = useState({ name: '', parentCode: '', region: '', contactName: '', contactPhone: '', expected: '', description: '' });
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
-  const send = () =>
-    runAction(
+  const send = () => {
+    // The name and region are shown to others; the contact fields and the description go to reviewers only.
+    const refusal = contactRefusal(f.name.trim(), 'agency.name') ?? contactRefusal(f.region.trim(), 'agency.region');
+    if (refusal) return showAlert(CONTACT_TITLE, refusal);
+    void runAction(
       demo,
       () =>
         agencyNet.apply({
@@ -285,6 +299,7 @@ function Apply({ demo, reload }: { demo: boolean; reload: () => void }) {
       f.parentCode ? 'Alt ajans başvurun üst ajansa ve merkeze iletildi.' : 'Başvurun merkeze iletildi. Sonuç bildirim olarak gelecek.',
       reload,
     );
+  };
   return (
     <Panel>
       <Text style={ns.title}>Ajans başvurusu</Text>

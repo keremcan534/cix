@@ -24,6 +24,7 @@ export default function AgencyChat() {
           members={USERS.slice(0, 10)}
           messages={agencyChat}
           onSend={sendAgencyMessage}
+          place="agency.chat"
           pinned="📢 Bu hafta: PK turnuvası Cumartesi 21:00 · Aylık 100 saat hedefi"
           lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length]}
           roomId="r2"

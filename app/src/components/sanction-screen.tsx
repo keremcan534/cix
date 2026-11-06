@@ -10,6 +10,7 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import type { SanctionView } from '@/lib/api';
+import { CONTACT_MUTE_REASON } from '@/lib/contact-filter';
 import { message } from '@/lib/live';
 import { APPEAL_STATUS, formatAt, formatLeft, refreshSanctions, remaining, sendAppeal, showSanction, stopping, useSanctions, type Action } from '@/lib/sanctions';
 import { makeStyles, radius, space } from '@/theme';
@@ -197,16 +198,27 @@ export function useStopped(action: Action, roomId?: string | null) {
   return s;
 }
 
-/** A thin bar above a composer or mic: what is stopped and for how long; tap for details and the appeal. */
+/**
+ * A thin bar above a composer or mic: what is stopped and for how long; tap for details and the appeal. The
+ * contact filter's automatic mute also says why under it ("Otomatik: iletişim bilgisi paylaşma denemesi").
+ */
 export function MuteBanner({ s, text }: { s: SanctionView; text: string }) {
   const styles = useStyles();
   const left = remaining(s);
+  const why = s.reasonCode === CONTACT_MUTE_REASON ? s.reasonText : null;
   return (
-    <Pressable style={styles.banner} onPress={() => showSanction(s)} accessibilityRole="button" accessibilityLabel={`${text}. Ayrıntı`}>
+    <Pressable style={styles.banner} onPress={() => showSanction(s)} accessibilityRole="button" accessibilityLabel={`${text}${why ? `. ${why}` : ''}. Ayrıntı`}>
       <Ionicons name="volume-mute" size={16} color={styles.danger.color} />
-      <Text style={styles.bannerText} numberOfLines={1}>
-        {text} · {left === Infinity ? 'süresiz' : `${formatLeft(left)} kaldı`}
-      </Text>
+      <View style={styles.bannerBody}>
+        <Text style={styles.bannerText} numberOfLines={1}>
+          {text} · {left === Infinity ? 'süresiz' : `${formatLeft(left)} kaldı`}
+        </Text>
+        {why ? (
+          <Text style={styles.bannerWhy} numberOfLines={2}>
+            {why}
+          </Text>
+        ) : null}
+      </View>
       <Text style={styles.bannerLink}>Ayrıntı</Text>
     </Pressable>
   );
@@ -241,6 +253,8 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: semantic.danger },
-  bannerText: { color: colors.text, fontSize: 13, flex: 1 },
+  bannerBody: { flex: 1, gap: 2 },
+  bannerText: { color: colors.text, fontSize: 13 },
+  bannerWhy: { color: colors.textDim, fontSize: 12, lineHeight: 16 },
   bannerLink: { color: colors.primaryText, fontSize: 13, fontWeight: '700' },
 }));

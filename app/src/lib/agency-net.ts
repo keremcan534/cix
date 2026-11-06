@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError, apiEnabled, apiRequest, ensureSignedIn, newRef } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
+import { refusalTitle } from '@/lib/contact-filter';
 
 // --- Types (mirroring the server's responses) ---------------------------------------------------------------
 export type AgencyStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'suspended' | 'closed';
@@ -433,7 +434,8 @@ export async function runAction(demo: boolean, fn: () => Promise<unknown>, done?
     after?.();
     return true;
   } catch (e) {
-    showAlert(unavailable(e) ? 'Sunucuya ulaşılamadı' : 'İşlem yapılmadı', unavailable(e) ? 'Bağlantını kontrol edip tekrar dene.' : errorText(e));
+    // A contact refusal (code contact_blocked) reads as the friendly note, under its own title.
+    showAlert(unavailable(e) ? 'Sunucuya ulaşılamadı' : refusalTitle(e, 'İşlem yapılmadı'), unavailable(e) ? 'Bağlantını kontrol edip tekrar dene.' : errorText(e));
     return false;
   }
 }
