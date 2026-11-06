@@ -218,3 +218,10 @@ export const sanctionPerms = (user: string) => get<SanctionPerms>(`/api/admin/sa
 export const setSanctionPerm = (user: string, permission: string, grant: boolean) =>
   post<{ permissions: string[] }>('/api/admin/sanction-permissions', { user, permission, grant }).then((r) => r.permissions);
 export const reviewDevice = (device: number, status: DeviceRisk, note: string) => post<{ device: SanctionDevice }>('/api/admin/devices/risk', { device, status, note }).then((r) => r.device);
+
+// --- Kullanıcılar (admin.mjs) ------------------------------------------------------------------------------
+export type AdminUser = { id: string; name: string; username: string | null; role: string; createdAt: string; signIn: string[]; test: boolean };
+export const users = (text = '', offset = 0) =>
+  get<{ users: AdminUser[]; total: number; tests: number; next: number | null }>(`/api/admin/users${q({ q: text.trim() || undefined, offset: offset ? String(offset) : undefined })}`);
+export const deleteUser = (id: string) => post<{ deleted: number }>('/api/admin/users/delete', { id });
+export const deleteTestUsers = () => post<{ deleted: number }>('/api/admin/users/delete', { tests: true });

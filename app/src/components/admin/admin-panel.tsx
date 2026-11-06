@@ -1,5 +1,5 @@
 // Yönetim: the owner's panel in a live build, opened from Ayarlar for admin accounts (lib/live/admin useIsAdmin).
-// A full-screen sheet, not a route: Özet, Canlı ayarlar, Para çekme, Ajans ödemeleri, Şikâyetler, İadeler and
+// A full-screen sheet, not a route: Özet, Kullanıcılar, Canlı ayarlar, Para çekme, Ajans ödemeleri, Şikâyetler, İadeler and
 // Yaptırımlar on the server's admin routes. Every money or account action asks first, then shows a short result and reloads
 // its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
 // sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
@@ -25,10 +25,12 @@ import { RefundsSection } from './refunds';
 import { ReportsSection } from './reports';
 import { SanctionUserScreen } from './sanction-user';
 import { SanctionsSection } from './sanctions';
+import { UsersSection } from './users';
 import { WithdrawalsSection } from './withdrawals';
 
 const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ozet', label: 'Özet' },
+  { key: 'kullanici', label: 'Kullanıcılar' },
   { key: 'ayarlar', label: 'Canlı ayarlar' },
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
@@ -204,6 +206,7 @@ function PanelBody({
           <View style={{ flex: 1 }}>
             {tab === 'ayarlar' && <LiveSettingsSection load={live} />}
             {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
+            {tab === 'kullanici' && <UsersSection />}
             {tab === 'sikayet' && <ReportsSection />}
             {tab === 'cekim' && <WithdrawalsSection />}
             {tab === 'ajans' && <AgencyPayoutsSection />}

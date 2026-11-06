@@ -54,6 +54,30 @@ async function liveUser(id) {
   return r.rows[0];
 }
 
+/** The erasure of DELETE /api/me inside transaction `c`, for account `id` (its phone `phone`); also the admin's
+ * deletion of test accounts (admin.mjs). */
+export async function eraseAccount(c, id, phone) {
+    await c.query(
+      `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
+         interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}', deleted_at = now() WHERE id = $1`,
+      [id],
+    );
+    // Shop items are revoked (a special ID is free again); the rows stay as accounting records.
+    await revokeAllForDelete(c, id);
+    if (phone) await c.query("DELETE FROM otp_codes WHERE channel = 'sms' AND target = $1", [phone]);
+    await c.query("DELETE FROM otp_codes WHERE channel = 'email' AND target IN (SELECT subject FROM auth_identities WHERE user_id = $1 AND provider = 'email')", [id]);
+    await c.query('DELETE FROM phone_claims WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM auth_identities WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM push_tokens WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM sessions WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
+    await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
+    await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
+    await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM room_admins WHERE user_id = $1', [id]);
+    await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
+}
+
 export const socialRoutes = {
   async 'PATCH /api/me'(req) {
     const u = await auth(req);
@@ -115,27 +139,7 @@ export const socialRoutes = {
    */
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
-    await tx(async (c) => {
-      await c.query(
-        `UPDATE users SET name = 'Silinmiş hesap', username = NULL, gender = NULL, birth_date = NULL, city = NULL, bio = '',
-           interests = '{}', avatar_url = NULL, device_key_hash = NULL, phone = NULL, equipped = '{}', deleted_at = now() WHERE id = $1`,
-        [u.id],
-      );
-      // Shop items are revoked (a special ID is free again); the rows stay as accounting records.
-      await revokeAllForDelete(c, u.id);
-      if (u.phone) await c.query("DELETE FROM otp_codes WHERE channel = 'sms' AND target = $1", [u.phone]);
-      await c.query("DELETE FROM otp_codes WHERE channel = 'email' AND target IN (SELECT subject FROM auth_identities WHERE user_id = $1 AND provider = 'email')", [u.id]);
-      await c.query('DELETE FROM phone_claims WHERE user_id = $1', [u.id]);
-      await c.query('DELETE FROM auth_identities WHERE user_id = $1', [u.id]);
-      await c.query('DELETE FROM push_tokens WHERE user_id = $1', [u.id]);
-      await c.query('DELETE FROM sessions WHERE user_id = $1', [u.id]);
-      await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [u.id]);
-      await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [u.id]);
-      await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [u.id]);
-      await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [u.id]);
-      await c.query('DELETE FROM room_admins WHERE user_id = $1', [u.id]);
-      await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [u.id]);
-    });
+    await tx((c) => eraseAccount(c, u.id, u.phone));
     return { deleted: true };
   },
 
