@@ -507,8 +507,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const amSeated = mySeat >= 0 || bossId === 'me';
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
   // "%82 benzer" for everyone else on a mic: the bead ring around their seat and the seat menu title
-  // (a handful of small set lookups, cheap enough to redo each render).
-  const simScores = new Map(seatedOthers.map((u) => [u, similarity(app.me, userById(u)).score]));
+  // (a handful of small set lookups, cheap enough to redo each render). Not in a server room: the server keeps
+  // no interests, so everyone would get about the same score.
+  const simScores = new Map(real ? [] : seatedOthers.map((u) => [u, similarity(app.me, userById(u)).score]));
 
   // --- Mic/camera arbitration with one-to-one calls (Hemen Tanış spec §3–4, lib/media) -----------------
   const media = useMedia();
