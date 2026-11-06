@@ -25,9 +25,15 @@
 //   setRules(overrides), resetRules() → live settings over DEFAULT_RULES (lists and thresholds)
 // App only (not in the server module):
 //   contactRefusal(texts, place)      → CONTACT_MESSAGE when a screen must not send, else null (and counts it)
+//   fieldRefusal()                    → the same for a field checked when editing ends: each text counted once
 //   messageRefusal(thread, text, place), noteSent(thread, text)
 //                                     → the same for chat lines, with numbers split over a few messages
 //   isContactBlocked(error)           → a server refusal (400 code contact_blocked); refusalTitle for its alert
+//   noteContactStrike(answer), getContactStrike(), onContactStrike(fn), strikeWarning(strike)
+//                                     → what the server said about the latest refusal: tries left before the
+//                                       automatic mute (5 in an hour → 1 hour without messages), or that it began
+
+import type { SanctionView } from '@/lib/api';
 
 export const CONTACT_MESSAGE = 'Güvenliğin için telefon numarası, IBAN, e-posta, bağlantı veya sosyal medya hesabı paylaşılamaz.';
 /** Title of the alert on screens that show errors as alerts. */
@@ -1028,6 +1034,11 @@ export function checkSequence(previous: readonly string[], current: string, rule
  */
 export type ContactRefusal = { category: ContactCategory; place: string; at: number };
 const refusalListeners = new Set<(r: ContactRefusal) => void>();
+/** A new refusal: the server's word on the last one no longer applies, its answer to this one comes next. */
+const announce = (note: ContactRefusal) => {
+  noteContactStrike(null);
+  refusalListeners.forEach((l) => l(note));
+};
 
 /**
  * Hears every refusal the app makes on its own (category, place and time; never the text), e.g. to send the
@@ -1049,11 +1060,26 @@ export function contactRefusal(texts: string | readonly (string | null | undefin
     if (!t) continue;
     const r = checkText(t);
     if (r.ok) continue;
-    const note: ContactRefusal = { category: r.category, place, at: Date.now() };
-    refusalListeners.forEach((l) => l(note));
+    announce({ category: r.category, place, at: Date.now() });
     return CONTACT_MESSAGE;
   }
   return null;
+}
+
+/**
+ * contactRefusal for a field that is checked when editing ends and has no save button (the agency description):
+ * leaving it again with the same refused text shows the note again but counts no new refusal, since nothing new
+ * was tried and every count brings the automatic mute nearer. A changed text is checked and counted as usual.
+ * One per field: `const [check] = useState(fieldRefusal)`.
+ */
+export function fieldRefusal() {
+  let counted: string | null = null;
+  return (text: string, place: string): string | null => {
+    if (text && text === counted) return checkText(text).ok ? null : CONTACT_MESSAGE;
+    const refusal = contactRefusal(text, place);
+    counted = refusal ? text : null;
+    return refusal;
+  };
 }
 
 // What this phone sent lately, per conversation, for a number typed over several short messages ('0532',
@@ -1081,14 +1107,71 @@ export function messageRefusal(thread: string, text: string, place: string, now 
     text,
   );
   if (r.ok) return null;
-  const note: ContactRefusal = { category: r.category, place: `${place}.sequence`, at: now };
-  refusalListeners.forEach((l) => l(note));
+  announce({ category: r.category, place: `${place}.sequence`, at: now });
   return CONTACT_MESSAGE;
 }
 
 /** Remembers a message that went out in `thread`, for messageRefusal. */
 export function noteSent(thread: string, text: string, now = Date.now()) {
   sentLately.set(thread, [...lately(thread, now), { text, at: now }]);
+}
+
+// The automatic mute (server/api/sanctions.mjs contactStrike): 5 refusals in an hour, the server's and this
+// phone's alike, and the person can't send messages (DMs and room chat) for an hour. The server's answer to a
+// refusal says how many tries are left once one or two are, or that this one started the mute; it is kept until
+// the next refusal so the note under the input (components/contact-note) can say it.
+
+/** The automatic mute's reason (migration 018): its banner also shows the reason text. */
+export const CONTACT_MUTE_REASON = 'contact_sharing';
+
+/** What the server answers about a refusal: a 400 contact_blocked body, or POST /api/contact/refusals. */
+export type ContactStrike = { strikesLeft?: number; muteMinutes?: number; muted?: boolean; until?: string; sanction?: SanctionView; serverNow?: string };
+let strike: ContactStrike | null = null;
+const strikeListeners = new Set<(s: ContactStrike | null) => void>();
+
+/** The server's word on the latest refusal, or null (none yet, nothing to warn about, or a new refusal is on its way). */
+export const getContactStrike = () => strike;
+
+/** Hears each change of getContactStrike (the sanctions store shows a mute that started at once). Returns the unsubscribe. */
+export function onContactStrike(listener: (s: ContactStrike | null) => void) {
+  strikeListeners.add(listener);
+  return () => {
+    strikeListeners.delete(listener);
+  };
+}
+
+/** Keeps what the server said about a refusal; anything without tries left or a mute clears it. */
+export function noteContactStrike(answer: ContactStrike | null | undefined) {
+  const { strikesLeft, muteMinutes, muted, until, sanction, serverNow } = answer ?? {};
+  const next = muted || (strikesLeft ?? 0) > 0 ? { strikesLeft, muteMinutes, muted, until, sanction, serverNow } : null;
+  if (!next && !strike) return;
+  strike = next;
+  strikeListeners.forEach((l) => l(next));
+}
+
+/** A length of time in words: '45 dakika', '1 saat', '1 saat 30 dakika', '2 gün'. */
+export function durationWords(minutes: number) {
+  const m = Math.max(1, Math.ceil(minutes));
+  if (m < 60) return `${m} dakika`;
+  if (m % 1440 === 0) return `${m / 1440} gün`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} saat ${m % 60} dakika` : `${h} saat`;
+}
+
+/**
+ * The warning under a refusal: tries left (only the last two are told), or how long messages are off once the
+ * mute began. `now` is the server's clock (lib/sanction-time serverNow); null when there is nothing to say.
+ */
+export function strikeWarning(s: ContactStrike | null | undefined, now = Date.now()): string | null {
+  if (!s) return null;
+  if (s.muted) {
+    const left = s.until ? (Date.parse(s.until) - now) / 60_000 : (s.muteMinutes ?? 0);
+    return left > 0 ? `Art arda denediğin için ${durationWords(left)} mesaj yazamazsın.` : null;
+  }
+  const length = durationWords(s.muteMinutes ?? 60);
+  if (s.strikesLeft === 1) return `Bir kez daha denersen ${length} mesaj yazamazsın.`;
+  if (s.strikesLeft === 2) return `2 deneme hakkın kaldı; sonra ${length} mesaj yazamazsın.`;
+  return null;
 }
 
 /** Title of the alert for a failed save: CONTACT_TITLE when the server refused contact details, else `fallback`. */

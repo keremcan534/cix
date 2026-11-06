@@ -3,6 +3,8 @@
 // refused with 400 { code: 'contact_blocked', category }, ordinary text still goes through, each refusal is
 // counted for staff without its text (the app's own refusals too, POST /api/contact/refusals), and the places
 // that are not filtered (withdrawal details, reports, receipts, staff tools) still take contact details.
+// The automatic mute is off here (AUTO_MUTE_REFUSALS=0), which is checked too; it has its own file
+// (contact-auto-mute.test.mjs).
 //   POSTGRES_PASSWORD=… node --test test/contact-filter-api.test.mjs
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +12,7 @@ import assert from 'node:assert/strict';
 import { CONTACT_MESSAGE } from '../contact-filter.mjs';
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi({ LOCK_DAYS_STORE: '0', TEST_TOPUP_DAILY: '1000000', AGENCY_JOBS: '0' });
+const h = startApi({ LOCK_DAYS_STORE: '0', TEST_TOPUP_DAILY: '1000000', AGENCY_JOBS: '0', AUTO_MUTE_REFUSALS: '0' });
 const { call, signUp } = h;
 const ref = () => `c${rnd(8)}`;
 const q = async (sql, vals = []) => (await h.sql.query(sql, vals)).rows;
@@ -171,8 +173,13 @@ describe('iletişim filtresi: uçlar', () => {
     assert.equal(r.byCategory.phone, mine.filter((x) => x.category === 'phone').length);
     assert.equal(r.byPlace.dm, mine.filter((x) => x.place === 'dm').length);
     assert.ok(r.lastAt);
-    // Not a sanction: nothing was given on its own.
+    // With AUTO_MUTE_REFUSALS=0 the rule is off: many refusals, no sanction, no warning.
+    assert.ok(mine.length >= 5, String(mine.length));
     assert.equal(view.sanctions.length, 0);
+    const more = await blocked(patchMe({ bio: 'wp 0532 123 45 67' }), 'phone', 'bio');
+    assert.equal(more.strikesLeft, undefined);
+    assert.equal(more.muted, undefined);
+    assert.deepEqual(await ok(call('POST', '/api/contact/refusals', { category: 'phone', place: 'room.chat' }, a.session)), { counted: true });
     // Moderators only.
     assert.equal((await call('GET', `/api/admin/sanctions/user?id=${a.user.id}`, null, b.session))[0], 403);
   });

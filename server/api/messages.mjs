@@ -31,8 +31,7 @@ async function assertNoSplitNumber(me, to, body, ref) {
   );
   const verdict = checkSequence(r.rows.map((m) => m.body).reverse(), body);
   if (verdict.ok) return;
-  await countRefusal(me.id, verdict.category, 'dm.sequence');
-  throw contactError(verdict.category, 'text');
+  throw contactError(verdict.category, 'text', await countRefusal(me.id, verdict.category, 'dm.sequence'));
 }
 
 export const messageRoutes = {

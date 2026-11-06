@@ -8,7 +8,7 @@
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true }
-//   POST   /api/contact/refusals { category, place }      → { counted: true }  (a refusal the app made on its own)
+//   POST   /api/contact/refusals { category, place }      → { counted: true, strikesLeft?, muted?, until? }  (a refusal the app made on its own)
 import { HttpError, ageOf, allow, assertClean, auth, blockedBetween, countRefusal, db, profileOf, publicText, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { CATEGORIES } from './contact-filter.mjs';
 import { notify } from './push.mjs';
@@ -213,14 +213,14 @@ export const socialRoutes = {
   /**
    * A refusal the app made before sending (room and group chats, moments, room polls …, lib/contact-filter):
    * nothing reached the server, so the app reports which kind and where, never the text, and it is counted
-   * like the server's own refusals (core.mjs countRefusal, at most 20 a minute).
+   * like the server's own refusals (core.mjs countRefusal, at most 20 a minute), the automatic mute included:
+   * the answer carries strikesLeft near the limit, or muted / until when this one started the mute.
    */
   async 'POST /api/contact/refusals'(req) {
     const me = await auth(req);
     const b = await readJson(req);
     if (!CATEGORIES.includes(b.category)) throw new HttpError(400, 'Geçersiz tür');
     if (typeof b.place !== 'string' || b.place.length > 40 || !APP_PLACE.test(b.place)) throw new HttpError(400, 'Geçersiz yer');
-    await countRefusal(me.id, b.category, b.place);
-    return { counted: true };
+    return { counted: true, ...(await countRefusal(me.id, b.category, b.place)) };
   },
 };

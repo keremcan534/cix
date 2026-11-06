@@ -7,6 +7,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { ApiError, apiEnabled, appealSanction, mySanctions, onBlocked, retrySignIn, type Block, type MyAppeal, type SanctionView } from '@/lib/api';
+import { onContactStrike } from '@/lib/contact-filter';
 import { remaining, resetClock, setServerNow } from '@/lib/sanction-time';
 
 export { formatAt, formatLeft, remaining, serverNow, stopping, type Action } from '@/lib/sanction-time';
@@ -60,16 +61,25 @@ function schedule() {
   timer = setTimeout(() => void refreshSanctions().catch(() => {}), Math.min(Math.max(left + 1500, 2000), 60_000));
 }
 
-/** A refusal from the server (403 code muted): the sanction it names is shown at once, then the list is asked again. */
-export function noteRefusal(e: unknown, show = false) {
-  if (!(e instanceof ApiError) || e.data.code !== 'muted' || !e.data.sanction) return false;
-  if (e.data.serverNow) setServerNow(e.data.serverNow);
-  const s = e.data.sanction;
+/** A mute the server just named: it counts at once (composers close, banners show), then the list is asked again. */
+function noteMute(s: SanctionView, now?: string, show = false) {
+  if (now) setServerNow(now);
   emit({ sanctions: [s, ...state.sanctions.filter((x) => x.id !== s.id)], ...(show ? { shown: s } : {}) });
   schedule();
   void refreshSanctions().catch(() => {});
+}
+
+/** A refusal from the server (403 code muted): the sanction it names is shown at once, then the list is asked again. */
+export function noteRefusal(e: unknown, show = false) {
+  if (!(e instanceof ApiError) || e.data.code !== 'muted' || !e.data.sanction) return false;
+  noteMute(e.data.sanction, e.data.serverNow, show);
   return true;
 }
+
+// The contact filter's automatic mute began with this refusal (lib/contact-filter): no waiting for the next poll.
+onContactStrike((s) => {
+  if (s?.muted && s.sanction) noteMute(s.sanction, s.serverNow);
+});
 
 let askedAppeal = false;
 onBlocked((b) => {

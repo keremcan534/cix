@@ -340,28 +340,44 @@ export const text = (v, min, max, field) => {
 };
 
 // --- Contact filter: no phone numbers, IBANs, e-mails, links or social media accounts (contact-filter.mjs) ---
-// Refused, never masked, and never a sanction by itself. Each refusal is counted for moderators (who, which
-// kind, where, when; 017_contact_refusals.sql), and the refused text is not stored or logged anywhere.
+// Refused, never masked. Each refusal is counted for moderators (who, which kind, where, when;
+// 017_contact_refusals.sql), and the refused text is not stored or logged anywhere. Too many in an hour mute the
+// person's messages for a while (sanctions.mjs contactStrike, AUTO_MUTE_*).
 const REFUSAL_DAYS = 180;
+const REFUSALS_PER_MINUTE = 20;
 let refusalsPrunedAt = 0;
 
-/** Counts one refusal; at most 20 a minute per person are written. Never fails the request. */
+/**
+ * Counts one refusal (at most 20 a minute per person are written; the rest still count for the automatic mute,
+ * sanctions.mjs keeps their times in memory) and applies the automatic mute rule. Answers
+ * what the person is told: { strikesLeft, muteMinutes } near the limit, { muted, until, sanction, serverNow } when
+ * this refusal started the mute, else {}. Never fails the request, and waits for the rule at most 2 seconds.
+ */
 export async function countRefusal(uid, category, place) {
-  if (!allow(`contact-refusal:${uid}`, 20)) return;
-  try {
-    await db.query('INSERT INTO contact_refusals (user_id, category, place) VALUES ($1, $2, $3)', [uid, category, place]);
-    if (Date.now() - refusalsPrunedAt > 3_600_000) {
-      refusalsPrunedAt = Date.now();
-      await db.query(`DELETE FROM contact_refusals WHERE created_at < now() - interval '${REFUSAL_DAYS} days'`);
+  const written = allow(`contact-refusal:${uid}`, REFUSALS_PER_MINUTE);
+  if (written) {
+    try {
+      await db.query('INSERT INTO contact_refusals (user_id, category, place) VALUES ($1, $2, $3)', [uid, category, place]);
+      if (Date.now() - refusalsPrunedAt > 3_600_000) {
+        refusalsPrunedAt = Date.now();
+        await db.query(`DELETE FROM contact_refusals WHERE created_at < now() - interval '${REFUSAL_DAYS} days'`);
+      }
+    } catch (e) {
+      console.error('contact refusal count', e.message);
     }
-  } catch (e) {
-    console.error('contact refusal count', e.message);
   }
+  // Imported here, not at the top: sanctions.mjs imports this file.
+  const rule = import('./sanctions.mjs')
+    .then((m) => m.contactStrike(uid, !written))
+    .catch((e) => (console.error('contact auto mute', e.message), {}));
+  let timer;
+  const late = new Promise((done) => (timer = setTimeout(done, 2000, {})));
+  return Promise.race([rule, late]).finally(() => clearTimeout(timer));
 }
 
-/** The refusal the app shows: 400 { error, code: 'contact_blocked', category, field? }. */
-export const contactError = (category, field) =>
-  Object.assign(new HttpError(400, CONTACT_MESSAGE), { extra: { code: 'contact_blocked', category, ...(field ? { field } : {}) } });
+/** The refusal the app shows: 400 { error, code: 'contact_blocked', category, field?, strikesLeft?, muted? … } (countRefusal). */
+export const contactError = (category, field, strike = {}) =>
+  Object.assign(new HttpError(400, CONTACT_MESSAGE), { extra: { code: 'contact_blocked', category, ...(field ? { field } : {}), ...strike } });
 
 /**
  * Refuses `s` when it shares contact details, counting it for `user` at `place` (e.g. 'profile.bio');
@@ -371,8 +387,7 @@ export async function assertClean(s, user, place, field) {
   if (!s) return s;
   const r = checkText(s);
   if (r.ok) return s;
-  await countRefusal(user.id, r.category, place);
-  throw contactError(r.category, field);
+  throw contactError(r.category, field, await countRefusal(user.id, r.category, place));
 }
 
 /** text() for what other people read: trimmed, `min`–`max` characters, and no contact details. */

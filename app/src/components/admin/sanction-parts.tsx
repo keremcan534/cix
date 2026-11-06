@@ -15,7 +15,6 @@ import { message } from '@/lib/live';
 import * as admin from '@/lib/live/admin';
 import {
   APPEAL_LABEL,
-  SOURCE_LABEL,
   STATE_LABEL,
   UNITS,
   coverage,
@@ -25,6 +24,7 @@ import {
   mayLift,
   minutesFrom,
   roleLabel,
+  sourceLabel,
   stateOf,
   type DurationOption,
   type SanctionMeta,
@@ -156,7 +156,7 @@ export function SanctionCard({
   const [label, tone] = STATE_LABEL[state];
   const len = lengthOf(x);
   const by = x.createdBy.role === 'system' ? 'Otomatik sistem' : [x.createdBy.name, roleLabel(x.createdBy.role)].filter(Boolean).join(' · ');
-  const source = [SOURCE_LABEL[x.source] ?? x.source, x.policyStep ? `${x.policyStep}. kademe` : '', x.reportId ? `şikâyet #${x.reportId}` : ''].filter(Boolean).join(' · ');
+  const source = [sourceLabel(x), x.policyStep ? `${x.policyStep}. kademe` : '', x.reportId ? `şikâyet #${x.reportId}` : ''].filter(Boolean).join(' · ');
   const canLift = mayLift(x, perms) && x.status === 'active' && x.live;
   const s = useStyles();
   return (

@@ -13,6 +13,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
+import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 
 export type ServerUser = { id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number };
@@ -112,6 +113,8 @@ async function call<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string
       if (session === sent) await forgetSession();
       blockListener({ code: data.code, sanction: data.sanction, serverNow: data.serverNow ?? new Date().toISOString(), appealSession: data.appealSession ?? null });
     }
+    // Contact details refused: how many tries are left before the automatic mute, or that it began (lib/contact-filter).
+    if (res.status === 400 && data.code === 'contact_blocked') noteContactStrike(data);
     throw new ApiError(res.status, data.error ?? `Sunucu hatası (${res.status})`, data);
   }
   return data as T;
@@ -352,8 +355,16 @@ export const sendDm = (to: string, text: string, ref = newRef()) => call<{ messa
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
 export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });
-/** A refusal the app made before sending (lib/contact-filter), for the moderators' count: the kind and the place, never the text. */
-export const countContactRefusal = (category: string, place: string) => call<{ counted: boolean }>('POST', '/api/contact/refusals', { category, place });
+/**
+ * A refusal the app made before sending (lib/contact-filter), for the moderators' count: the kind and the place,
+ * never the text. It counts towards the automatic mute too; the answer (tries left, or that the mute began) goes
+ * to the contact filter's note.
+ */
+export async function countContactRefusal(category: string, place: string) {
+  const r = await call<{ counted: boolean } & ContactStrike>('POST', '/api/contact/refusals', { category, place });
+  noteContactStrike(r);
+  return r;
+}
 
 export const earnings = () => call<ServerEarnings>('GET', '/api/wallet/earnings');
 /** An in-app purchase paid with coins (VIP, store items, game entries): the server takes the coins once. */

@@ -24,6 +24,7 @@ import {
   normalizeStep,
   permFor,
   policyError,
+  sourceLabel,
   splitSanctions,
   stateOf,
   typeAllowed,
@@ -306,5 +307,12 @@ describe('sanction-format: uygulama formu', () => {
       ]),
       '2 cihaz banı onaya gönderildi',
     );
+  });
+
+  test('sourceLabel tells the two automatic rules apart', () => {
+    assert.equal(sourceLabel({ source: 'auto', reasonCode: 'contact_sharing' }), 'Otomatik (iletişim filtresi)');
+    assert.equal(sourceLabel({ source: 'auto', reasonCode: 'harassment' }), 'Otomatik (şikâyet sayısı)');
+    assert.equal(sourceLabel({ source: 'manual', reasonCode: 'contact_sharing' }), 'Elle');
+    assert.equal(sourceLabel({ source: 'other', reasonCode: 'spam' }), 'other');
   });
 });

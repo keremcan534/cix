@@ -10,7 +10,7 @@ import { Avatar, Card, GradientButton, Header, StateIcon, TextLink } from '@/com
 import { AGENCY_EVENTS, AGENCY_MEMBERS, PENDING_APPLICATIONS, ROLE_LABEL, can, type AgencyMember, type AgencyRole, type Permission } from '@/data/agency';
 import { RULES, pct, settlement, usd, agencyStatus } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
-import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
+import { CONTACT_TITLE, contactRefusal, fieldRefusal } from '@/lib/contact-filter';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -434,8 +434,10 @@ function Settings() {
   const { ownedAgency } = useApp();
   const [desc, setDesc] = useState('Yetenekli yayıncıları büyüten topluluk ajansı.');
   // The description is the agency's public text: checked when editing ends (it has no save button); a refused
-  // text stays in the input with the note under it.
+  // text stays in the input with the note under it. Leaving the field again with the same text counts no new
+  // refusal (fieldRefusal), so tapping in and out can't bring the automatic mute.
   const [refused, setRefused] = useState<string | null>(null);
+  const [checkDescription] = useState(fieldRefusal);
   const [notify, setNotify] = useState(true);
   return (
     <Card style={{ gap: 10 }}>
@@ -448,7 +450,7 @@ function Settings() {
           setDesc(t);
           setRefused(null);
         }}
-        onBlur={() => setRefused(contactRefusal(desc.trim(), 'agency.description'))}
+        onBlur={() => setRefused(checkDescription(desc.trim(), 'agency.description'))}
         maxLength={300}
         style={[styles.input, { minHeight: 60 }]}
         multiline
