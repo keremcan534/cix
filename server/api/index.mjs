@@ -44,6 +44,7 @@ import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } fr
 import { mediaRoutes } from './media.mjs';
 import { messageRoutes } from './messages.mjs';
 import { purchaseRoutes } from './purchases.mjs';
+import { pkRoutes } from './pk.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
@@ -225,6 +226,7 @@ const routes = {
   ...whatsappRoutes,
   ...pushRoutes,
   ...giftRoutes,
+  ...pkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
   ...purchaseRoutes,

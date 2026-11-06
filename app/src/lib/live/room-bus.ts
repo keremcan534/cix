@@ -7,7 +7,8 @@
 //  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
 //    later joiner doesn't. The phones send each other chat lines only. A gift is announced by the server after
 //    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
-//    fake one; a gift packet from a phone is dropped;
+//    fake one; a gift packet from a phone is dropped. The server also says when a PK starts or is cancelled
+//    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does;
 //  - the room's state the server keeps on LiveKit: locked mics (room metadata, server/api/rooms.mjs) and a seat
 //    the owner or an admin set for me (my own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
@@ -29,6 +30,7 @@ let link: Link | null = null;
 const listeners = new Set<() => void>();
 const signalListeners = new Set<(roomId: string, from: string, msg: RoomSignal) => void>();
 const seatListeners = new Set<(roomId: string, seat: number | null) => void>();
+const pkListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 
@@ -84,6 +86,7 @@ export function reportServerSeat(roomId: string, seat: number | null) {
  */
 export function reportSignal(roomId: string, from: string | null, raw: unknown) {
   if (from === null) {
+    if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
     const g = parseServerGift(raw);
     if (!g || seenGifts.includes(g.msg.eventId)) return;
     seenGifts.push(g.msg.eventId);
@@ -113,6 +116,9 @@ export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal }
   return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
 }
 
+/** The server's PK packet: a PK started or was cancelled in the room (server/api/pk.mjs); read it from the server. */
+export const isServerPk = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'pk';
+
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
 
@@ -138,6 +144,12 @@ export function onServerSeat(roomId: string, fn: (seat: number | null) => void) 
   const l = (r: string, seat: number | null) => r === roomId && fn(seat);
   seatListeners.add(l);
   return () => void seatListeners.delete(l);
+}
+/** The server announced a PK change in this room (lib/live/pk reads it again); returns the unsubscribe. */
+export function onServerPk(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  pkListeners.add(l);
+  return () => void pkListeners.delete(l);
 }
 /** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);

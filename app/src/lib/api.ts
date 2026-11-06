@@ -469,6 +469,29 @@ export const followList = (side: 'followers' | 'following', user?: string) =>
   call<{ users: FollowCard[] }>('GET', `/api/${side}${user ? `?user=${encodeURIComponent(user)}` : ''}`).then((r) => r.users);
 
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
+
+/** Oda içi PK on the server (server/api/pk.mjs): ids are server user ids, times ISO; `now` is the server's clock. */
+export type ServerPk = {
+  id: string;
+  room: string;
+  mode: 'solo' | 'team';
+  status: 'active' | 'done' | 'cancelled';
+  startedBy: string;
+  durationMin: number;
+  participants: string[];
+  red: string[];
+  blue: string[];
+  startAt: string;
+  endAt: string;
+  /** Points per sender → recipient (team: the recipient's team). */
+  pairs: { from: string; to: string; team: 'red' | 'blue' | null; points: number; gifts: number }[];
+  people: UserCard[];
+};
+export type ServerPkAnswer = { pk: ServerPk | null; now: string };
+export type ServerPkStart = { room: string; mode: 'solo'; durationMin: number; participants: string[]; ref: string } | { room: string; mode: 'team'; durationMin: number; red: string[]; blue: string[]; ref: string };
+export const roomPk = (room: string) => call<ServerPkAnswer>('GET', `/api/rooms/pk?room=${encodeURIComponent(room)}`);
+export const startServerPk = (body: ServerPkStart) => call<ServerPkAnswer>('POST', '/api/rooms/pk', body);
+export const cancelServerPk = (room: string) => call<ServerPkAnswer>('POST', '/api/rooms/pk/cancel', { room });
 /** `password` (4–32 characters, optional): only people who type it get into the room's voice. */
 export const createRoom = (title: string, announcement = '', roomType = 'free', password?: string) =>
   call<{ room: ServerRoom }>('POST', '/api/rooms', { title, announcement, roomType, ...(password ? { password } : {}) }).then((r) => r.room);
