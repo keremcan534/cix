@@ -55,6 +55,8 @@ export type Room = {
   micQueue?: boolean;
   /** Mic layout (data/room-layouts); absent = classic grid. */
   layoutId?: string;
+  /** Classic-grid mics the owner (or a room admin) chose on the server; absent = the room level's most. */
+  micCount?: number;
 };
 
 export type Moment = {

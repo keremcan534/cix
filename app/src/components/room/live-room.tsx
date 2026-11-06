@@ -78,9 +78,9 @@ import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { callsAvailable, isLiveRoom, liveGift, liveMode, message as errorText, myServerId, toServer, updateServerRoom } from '@/lib/live';
+import { callsAvailable, isLiveRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
-import { sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
+import { onServerRoom, sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
 import { banLeft, roomBan, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type SeatAction } from '@/lib/live/room-staff';
 import { roomUnmute } from '@/lib/api';
@@ -127,7 +127,7 @@ import {
 } from '@/lib/room-presence';
 import { kindOf, mergeFeed, type FeedMsg } from '@/lib/chat-feed';
 import { blockedFeature } from '@/lib/remote-control';
-import { ALL_FEATURES, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
+import { ALL_FEATURES, applyServerStage, changeLayout, layoutById, modeById, seedStage, setClassicCapacity, setStageInfo, slotStates, stagePermission, useStages, type StageInfo } from '@/lib/room-modes';
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
@@ -196,6 +196,13 @@ const HELD_CAPTION: Record<Exclude<MicBlock, null>, string> = {
   connection: 'BAĞLANTI',
 };
 
+/** Reads a server room again and puts its layout and classic mic count (as the server keeps them) on this phone. */
+const syncServerStage = (id: string) =>
+  refreshServerRoom(id).then((r) => {
+    const max = micCapacity(!!r.agency, r.level ?? 1);
+    applyServerStage(id, { layoutId: r.layoutId ?? null, classicCapacity: Math.min(r.micCount ?? max, max) });
+  });
+
 /**
  * The live room. Rendered once by RoomHost for the session's room and kept mounted while the user is
  * elsewhere in the app (`full` false): the chat, mic, PK and timers keep going, but nothing is drawn,
@@ -223,11 +230,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const cover = isOwn ? myRoom.cover : base!.cover;
   const announcement = isOwn ? myRoom.announcement : base!.announcement;
   const password = isOwn ? '' : (base!.password ?? '');
+  // The classic grid's mic count (room settings; a server room: as the server keeps it, none = the level's most);
+  // a selected layout (lib/room-modes) replaces it.
+  const roomMics = isOwn ? myRoom.micCount : base!.micCount;
   const level = isOwn ? roomLevel(myRoom.xp) : (base!.level ?? 1);
   const agencyRoom = isOwn ? !!agencyId : !!base!.agency;
   const maxMics = micCapacity(agencyRoom, level);
-  /** The classic grid's mic count (room settings); a selected layout (lib/room-modes) replaces it. */
-  const classicCapacity = isOwn ? Math.min(myRoom.micCount, maxMics) : maxMics;
   const theme = isOwn ? myRoom.theme : (base!.theme ?? 'chat');
   const bossOn = isOwn ? myRoom.bossSeat && level >= BOSS_SEAT_MIN_LEVEL : !!base!.bossSeat;
   const micPermission = isOwn ? myRoom.micPermission : (base!.micPermission ?? 'everyone');
@@ -237,9 +245,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const adminIds = isOwn ? myRoom.adminIds : real ? staff.admins : (base!.adminIds ?? []);
   // What the stage server knows about the room: level, theme, who manages room functions, the classic mic count.
   const stageInfo: StageInfo = useMemo(
-    () => ({ level, theme, manageFunctions: functionsBy, classicCapacity, classicMax: maxMics, features: ALL_FEATURES }),
-    [level, theme, functionsBy, classicCapacity, maxMics],
+    () => ({ level, theme, manageFunctions: functionsBy, classicCapacity: Math.min(roomMics ?? maxMics, maxMics), classicMax: maxMics, features: ALL_FEATURES }),
+    [level, theme, functionsBy, roomMics, maxMics],
   );
+  const classicCapacity = stageInfo.classicCapacity;
   const myRole: RoomRole = hostId === 'me' ? 'owner' : adminIds.includes('me') ? 'admin' : 'member';
   const roleOf = (uid: string): RoomRole => (uid === hostId ? 'owner' : adminIds.includes(uid) ? 'admin' : 'member');
   const canManage = myRole !== 'member';
@@ -306,6 +315,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => {
     if (isOwn && stageLayoutId !== myRoom.layoutId) updateMyRoom({ layoutId: stageLayoutId });
   }, [isOwn, stageLayoutId, myRoom.layoutId, updateMyRoom]);
+  // A server room's level, mics and layout live on the server: read once on entry and again whenever the server
+  // says they changed (the owner or an admin picked a layout, a gift raised the level), so every phone matches.
+  useEffect(() => {
+    if (!real) return;
+    const sync = () =>
+      syncServerStage(id)
+        .then(() => setRoomEdits((n) => n + 1))
+        .catch(() => {});
+    sync();
+    return onServerRoom(id, sync);
+  }, [id, real]);
   const seats = live.seats;
   const mutedUsers = useMemo(() => new Set(live.micMuted), [live.micMuted]);
   // People who can't be in the room right now (running kick ban or blacklist); expired bans don't count.
@@ -330,6 +350,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => {
     if (real) void refreshSanctions().catch(() => {});
   }, [real, id, sanctionMic, sanctionChat]);
+  // A voice mute turns my mic off on this phone too, not only through the voice server's permission.
+  useEffect(() => {
+    if (voiceMuted && getSession().session?.micWant) setMicWant(false);
+  }, [voiceMuted]);
   // Visual-only work (talk indicators, seat reactions, effects) runs only while the room is on screen.
   const visible = full && session?.appState !== 'background';
   // Read by the room's timers, which outlive a single render.
@@ -698,6 +722,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       return r;
     }
     if (changed) {
+      // A server room: the server keeps the layout and tells the other phones; a refusal puts its layout back.
+      if (real)
+        updateServerRoom(id, { layoutId })
+          .catch((e) => {
+            showAlert(refusalTitle(e, 'Düzen kaydedilemedi'), errorText(e));
+            return syncServerStage(id);
+          })
+          .catch(() => {});
       const l = layoutById(layoutId);
       const name = l ? `${modeById(l.modeId).name} · ${l.name}` : `Klasik düzen · ${classicCapacity} mikrofon`;
       logMod('Oda düzenini değiştirdi', name);
@@ -2237,9 +2269,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics. Capped so the Güverte and the chat always keep their space on small phones; scrolls when taller.
-              Folded away (still mounted) while typing, so the chat keeps its lines above the keyboard. */}
-          <ScrollView style={{ flexGrow: 0, maxHeight: Math.round(win.height * 0.58), display: typing ? 'none' : 'flex' }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+          {/* Stage: boards and mics, in what the chat leaves (the chat keeps the height the person chose, so it never
+              jumps when a banner comes or goes); scrolls when taller. Folded away (still mounted) while typing, so the
+              chat keeps its lines above the keyboard. */}
+          <ScrollView style={{ flex: 1, minHeight: 120, display: typing ? 'none' : 'flex' }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
@@ -2343,7 +2376,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             />
           )}
 
-          <ChatFeed messages={feed} visible={visibleInAll} renderItem={renderChat} />
+          <ChatFeed messages={feed} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} />
 
           {emojiOpen && (
             <EmojiPanel

@@ -59,7 +59,7 @@ import {
   userId,
 } from './core.mjs';
 import { accessOf, permsOn, settingsAt } from './agency-lib.mjs';
-import { deleteVoiceRoom, removeFromVoice, roomService } from './live.mjs';
+import { deleteVoiceRoom, openVoiceRooms, removeFromVoice, roomService } from './live.mjs';
 
 export const TYPES = Object.keys(SANCTION_LABEL);
 const MUTES = ['mute_room_text', 'mute_room_voice', 'mute_global_text', 'mute_global_voice', 'mute_all'];
@@ -331,16 +331,20 @@ export async function voiceGrant(uid, roomName) {
 /**
  * Applies the person's current permissions to every voice room they are in now (a mute started, was lifted or
  * ran out). LiveKit replaces the whole permission, so every field is sent; the mic seat (an attribute) stays.
+ * The rooms are the ones LiveKit has open now as well as room_presence: when LiveKit's webhooks don't reach
+ * us, room_presence is empty and a mute would otherwise only bite at the next token. A room the person isn't
+ * in answers 404, which changes nothing.
  */
 export async function refreshVoice(uid) {
   const r = await db.query('SELECT room FROM room_presence WHERE identity = $1', [uid]);
-  for (const x of r.rows) {
-    const g = await voiceGrant(uid, x.room);
+  const rooms = new Set([...r.rows.map((x) => x.room), ...(await openVoiceRooms()).filter((n) => roomUuid(n))]);
+  for (const room of rooms) {
+    const g = await voiceGrant(uid, room);
     await roomService(
       'UpdateParticipant',
-      { room: x.room, identity: uid, permission: { canSubscribe: true, canPublish: g.canPublish, canPublishData: g.canPublishData, canPublishSources: ['MICROPHONE'], canUpdateMetadata: true } },
-      { roomAdmin: true, room: x.room },
-    ).catch((e) => console.error('livekit UpdateParticipant', x.room, String(e).slice(0, 200)));
+      { room, identity: uid, permission: { canSubscribe: true, canPublish: g.canPublish, canPublishData: g.canPublishData, canPublishSources: ['MICROPHONE'], canUpdateMetadata: true } },
+      { roomAdmin: true, room },
+    ).catch((e) => console.error('livekit UpdateParticipant', room, String(e).slice(0, 200)));
   }
 }
 

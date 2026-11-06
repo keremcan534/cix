@@ -12,11 +12,15 @@
 // Kullanıcılar (admins only): every account, newest first, and deleting one the way DELETE /api/me does.
 //   GET  /api/admin/users?q=&offset=   → { users, total, tests }  (50 a page; tests: the smoke-test accounts)
 //   POST /api/admin/users/delete { id } | { tests: true } → { deleted }
+//   POST /api/admin/users/room-level { id, level }  (1–15)  → { level, xp }   sets the owner's room level
+// The search also takes a room's 8-digit ID (the number the app shows on the room): its owner is listed.
 // A staff account and your own can't be deleted here. `tests: true` deletes the accounts smoke-test.mjs makes:
 // named "Test A" or "Test B", development sign-in only (no Google or e-mail), role user.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, readJson, tx, userId } from './core.mjs';
 import { applySanction, audit, liftSanction, mayLift, permsOf } from './sanctions.mjs';
 import { eraseAccount } from './social.mjs';
+import { announceRoom } from './live.mjs';
+import { ROOM_MAX_LEVEL, ROOM_XP_THRESHOLDS, liveKitName, roomCode, roomLevel } from './rooms.mjs';
 
 async function owner(req) {
   const u = await auth(req);
@@ -107,20 +111,34 @@ export const adminRoutes = {
     const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
     const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
     const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
-    const where = `u.deleted_at IS NULL AND ($1 = '' OR u.name ILIKE $2 OR u.username ILIKE $2 OR u.id::text = $1
+    // A room ID is a hash of the room's uuid (rooms.mjs roomCode), so it is matched here, not in SQL.
+    const owners = /^\d{8}$/.test(q) ? (await db.query('SELECT id, owner FROM rooms')).rows.filter((r) => roomCode(r.id) === q).map((r) => r.owner) : [];
+    const where = `u.deleted_at IS NULL AND ($1 = '' OR u.name ILIKE $2 OR u.username ILIKE $2 OR u.id::text = $1 OR u.id = ANY($3::uuid[])
       OR EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.email ILIKE $2))`;
     const [rows, count] = await Promise.all([
       db.query(
-        `SELECT u.id, u.name, u.username, u.role, u.created_at,
+        `SELECT u.id, u.name, u.username, u.role, u.created_at, u.room_xp,
                 coalesce((SELECT array_agg(i.provider ORDER BY i.provider) FROM auth_identities i WHERE i.user_id = u.id), '{}') AS sign_in,
+                (SELECT r.id FROM rooms r WHERE r.owner = u.id ORDER BY (r.closed_at IS NULL) DESC, r.created_at DESC LIMIT 1) AS room_id,
                 (${TEST_ACCOUNT}) AS test
-           FROM users u WHERE ${where} ORDER BY u.created_at DESC LIMIT ${PAGE} OFFSET $3`,
-        [q, like, offset],
+           FROM users u WHERE ${where} ORDER BY u.created_at DESC LIMIT ${PAGE} OFFSET $4`,
+        [q, like, owners, offset],
       ),
-      db.query(`SELECT count(*) AS n, count(*) FILTER (WHERE ${TEST_ACCOUNT}) AS tests FROM users u WHERE ${where}`, [q, like]),
+      db.query(`SELECT count(*) AS n, count(*) FILTER (WHERE ${TEST_ACCOUNT}) AS tests FROM users u WHERE ${where}`, [q, like, owners]),
     ]);
     return {
-      users: rows.rows.map((x) => ({ id: x.id, name: x.name, username: x.username, role: x.role, createdAt: x.created_at, signIn: x.sign_in, test: x.test })),
+      users: rows.rows.map((x) => ({
+        id: x.id,
+        name: x.name,
+        username: x.username,
+        role: x.role,
+        createdAt: x.created_at,
+        signIn: x.sign_in,
+        test: x.test,
+        // Their room (the open one, else the latest) and its level, which is the owner's.
+        room: x.room_id ? { id: x.room_id, code: roomCode(x.room_id) } : null,
+        roomLevel: roomLevel(x.room_xp),
+      })),
       total: Number(count.rows[0].n),
       tests: Number(count.rows[0].tests),
       next: offset + PAGE < Number(count.rows[0].n) ? offset + PAGE : null,
@@ -137,6 +155,25 @@ export const adminRoutes = {
     }
     await deleteAccount(me, userId(b.id));
     return { deleted: 1 };
+  },
+
+  /** Sets an owner's room level (their room XP to that level's start); their open rooms' phones read it again. */
+  async 'POST /api/admin/users/room-level'(req) {
+    const me = await owner(req);
+    const b = await readJson(req);
+    const id = userId(b.id);
+    const level = int(b.level, 1, ROOM_MAX_LEVEL);
+    if (level === null) throw new HttpError(400, `Seviye 1 ile ${ROOM_MAX_LEVEL} arasında olmalı`);
+    const xp = ROOM_XP_THRESHOLDS[level - 1];
+    const before = await tx(async (c) => {
+      const r = await c.query('SELECT room_xp FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id]);
+      if (!r.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
+      await c.query('UPDATE users SET room_xp = $2 WHERE id = $1', [id, xp]);
+      await audit(c, { actor: me.id, role: me.role, action: 'room_level', target: id, detail: { level, before: roomLevel(r.rows[0].room_xp) } });
+      return r.rows[0].room_xp;
+    });
+    if (Number(before) !== xp) for (const r of (await db.query('SELECT id FROM rooms WHERE owner = $1 AND closed_at IS NULL', [id])).rows) announceRoom(liveKitName(r.id));
+    return { level, xp };
   },
 
   async 'GET /api/admin/reports'(req, url) {

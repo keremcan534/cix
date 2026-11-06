@@ -31,6 +31,7 @@ const listeners = new Set<() => void>();
 const signalListeners = new Set<(roomId: string, from: string, msg: RoomSignal) => void>();
 const seatListeners = new Set<(roomId: string, seat: number | null) => void>();
 const pkListeners = new Set<(roomId: string) => void>();
+const roomListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 
@@ -87,6 +88,7 @@ export function reportServerSeat(roomId: string, seat: number | null) {
 export function reportSignal(roomId: string, from: string | null, raw: unknown) {
   if (from === null) {
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
+    if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
     const g = parseServerGift(raw);
     if (!g || seenGifts.includes(g.msg.eventId)) return;
     seenGifts.push(g.msg.eventId);
@@ -118,6 +120,9 @@ export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal }
 
 /** The server's PK packet: a PK started or was cancelled in the room (server/api/pk.mjs); read it from the server. */
 export const isServerPk = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'pk';
+/** The server's room packet: the room's level, mics or layout changed (server/api/rooms.mjs, gifts.mjs, admin.mjs);
+ *  read the room from the server. */
+export const isServerRoom = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'room';
 
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
@@ -150,6 +155,12 @@ export function onServerPk(roomId: string, fn: () => void) {
   const l = (r: string) => r === roomId && fn();
   pkListeners.add(l);
   return () => void pkListeners.delete(l);
+}
+/** The server says this room changed (level, mics, layout); returns the unsubscribe. */
+export function onServerRoom(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  roomListeners.add(l);
+  return () => void roomListeners.delete(l);
 }
 /** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);
