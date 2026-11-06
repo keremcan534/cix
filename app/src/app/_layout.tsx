@@ -11,6 +11,7 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 
 import { RootCrashScreen, ScreenCrashScreen } from '@/components/crash-screen';
+import { Intro } from '@/components/fx/intro';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
@@ -67,6 +68,8 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <RootStack />
       </ThemeProvider>
+      {/* Over everything while the first screen draws beneath it: the opening (components/fx/intro). */}
+      <Intro />
     </AppProvider>
   );
 }
