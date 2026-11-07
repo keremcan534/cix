@@ -244,7 +244,7 @@ describe('Odalar ve ses token’ı', () => {
     assert.equal((await call('POST', '/api/rooms', { title: 'Yeni oda' }, owner.session))[0], 200, 'kapanınca yeni oda açılır');
   });
 
-  test('ses sunucusu (LIVEKIT_API_URL) bağlı değilken odada hediye yine gider; koltuk işlemi açıkça reddedilir', async () => {
+  test('ses sunucusu (LIVEKIT_API_URL) bağlı değilken odada hediye yine gider; koltuk taşıma açıkça reddedilir', async () => {
     const owner = await signUp('Bağlantısız Sahip');
     const fan = await signUp('Hayran');
     const [, j] = await call('POST', '/api/rooms', { title: 'Sessiz Oda' }, owner.session);
@@ -252,7 +252,9 @@ describe('Odalar ve ses token’ı', () => {
     const [st, g] = await call('POST', '/api/gifts/send', { to: owner.user.id, giftId: 'g4', count: 1, room: j.room.id, ref: rnd(6) }, fan.session);
     assert.equal(st, 200, g.error);
     assert.equal(g.user.coins, 800);
-    assert.equal((await call('POST', '/api/rooms/seat', { room: j.room.id, action: 'lock', seat: 2 }, owner.session))[0], 503);
+    assert.equal((await call('POST', '/api/rooms/seat', { room: j.room.id, action: 'remove', user: fan.user.id }, owner.session))[0], 503);
+    // A lock is kept on the room itself: it needs no voice server.
+    assert.deepEqual((await call('POST', '/api/rooms/seat', { room: j.room.id, action: 'lock', seat: 2 }, owner.session))[1].lockedSeats, [2]);
   });
 
   test('sahibini engellediğin oda listede yok ve girilmez', async () => {

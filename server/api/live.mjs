@@ -19,7 +19,7 @@
 import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
-import { mayStay, voiceAccess } from './rooms.mjs';
+import { leftVoiceRoom, mayStay, voiceAccess, voiceRoomStarted } from './rooms.mjs';
 import { voiceGrant } from './sanctions.mjs';
 
 export const [LK_KEY, LK_SECRET] = (env.LIVEKIT_KEYS ?? '').split(/:\s*/);
@@ -106,12 +106,19 @@ async function onEvent(e) {
     case 'participant_left':
     case 'participant_connection_aborted':
       // Only this connection: after a reconnect the new one has another sid.
-      if (who) await logPresence(await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '') RETURNING room, identity, joined_at", [room, who, sid]));
+      if (who) {
+        const gone = await db.query("DELETE FROM room_presence WHERE room = $1 AND identity = $2 AND (sid = $3 OR $3 = '') RETURNING room, identity, joined_at", [room, who, sid]);
+        await logPresence(gone);
+        // Gone from the room: no longer waiting for a mic (not after a reconnect, which keeps another sid).
+        if (gone.rowCount) await leftVoiceRoom(room, who);
+      }
       break;
     case 'room_started':
       // Someone with a still-valid token can start a room again after it was closed.
       if ((await mayStay(room, '')) === 'closed') await deleteVoiceRoom(room);
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
+      // The new LiveKit room gets the room's locked mics, layout and mic queue (rooms.mjs pushRoomMeta).
+      await voiceRoomStarted(room);
       break;
     case 'room_finished':
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
