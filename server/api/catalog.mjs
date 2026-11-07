@@ -151,11 +151,11 @@ const SHOP_ROWS = [
   ['an-mic-neon', 'micfx', 'Neon Halka', 500, null, 0],
   ['an-mic-stars', 'micfx', 'Dönen Yıldızlar', 800, null, 0],
   ['an-mic-notes', 'micfx', 'Müzik Notaları', 600, null, 0],
-  ['noble-1', 'noble', 'Gemici', 15_000, 30, 0],
-  ['noble-2', 'noble', 'Dümenci', 60_000, 30, 0],
-  ['noble-3', 'noble', 'Lostromo', 150_000, 30, 0],
-  ['noble-4', 'noble', 'Amiral', 400_000, 30, 0],
-  ['noble-5', 'noble', 'Kaptan-ı Derya', 1_000_000, 30, 0],
+  ['noble-1', 'noble', 'Çavuş', 15_000, 30, 0],
+  ['noble-2', 'noble', 'Yüzbaşı', 60_000, 30, 0],
+  ['noble-3', 'noble', 'Binbaşı', 150_000, 30, 0],
+  ['noble-4', 'noble', 'Albay', 400_000, 30, 0],
+  ['noble-5', 'noble', 'Paşa', 1_000_000, 30, 0],
 ];
 export const SHOP = new Map(
   SHOP_ROWS.map(([sku, kind, name, price, days, minVip]) => [sku, Object.freeze({ sku, kind, name, price, days, minVip, tier: kind === 'noble' ? Number(sku.slice(6)) : null })]),

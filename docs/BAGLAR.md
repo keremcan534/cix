@@ -29,7 +29,7 @@
 ## Odada
 
 - **Lv4 bağ çizgisi:** bağlı iki kişi mikrofonda yan yana (aynı sırada, biri ev sahibi değil) oturunca avatarları arasında bağ renginde parlayan çizgi ve ortasında bağ simgesi. Çift pembe, diğerleri mavi.
-- **Lv8 birlikte giriş:** iki kişi de odadaysa ve biri yeni geldiyse "A & B · Çift Lv8 · birlikte güverteye çıktı" giriş efekti, iki fotoğrafla. Her ikili bir ziyarette bir kez. Ben odaya girdiğimde yalnız kendi bağlarım gösterilir (diğerleri zaten içerideydi). Giriş efektleri sırayla oynar (en fazla 3 bekler); efektleri kapatan ya da görünmez giren görmez, engellenen kişiler gösterilmez.
+- **Lv8 birlikte giriş:** iki kişi de odadaysa ve biri yeni geldiyse "A & B · Çift Lv8 · birlikte odaya girdi" giriş efekti, iki fotoğrafla. Her ikili bir ziyarette bir kez. Ben odaya girdiğimde yalnız kendi bağlarım gösterilir (diğerleri zaten içerideydi). Giriş efektleri sırayla oynar (en fazla 3 bekler); efektleri kapatan ya da görünmez giren görmez, engellenen kişiler gösterilmez.
 - **Lv10 sohbet balonu:** kişinin mesajı bağ renginde balonla ve adının yanında "Çift Lv10" etiketiyle görünür. Takılı özel balon varsa o önce gelir. Birden çok Lv10 bağı varsa Çift önce, sonra en yüksek seviye.
 - Sunucu odalarında bağlar `POST /api/bonds/among { ids }` ile gelir (odadakilerin etkin bağları, eşi odada olmasa da; en fazla 80 kişi). Gizleyen birinin bağı başkasına gelmez, kendisine gelir. Katılma ve ayrılmalardan 1,2 saniye sonra yeniden sorulur.
 

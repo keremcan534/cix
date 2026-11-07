@@ -80,7 +80,7 @@ export default function DiscoverScreen() {
         ListHeaderComponent={
           <View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
-              {/* Tayfa (groups) is local-only: a live build doesn't offer it until the server has it. */}
+              {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
               {DISCOVER_SHORTCUTS.filter((s) => (s.id !== 'call' || callsAvailable()) && (s.id !== 'tribe' || !live)).map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
                   {/* The shortcut's color lights a navy card from the top instead of filling it. */}

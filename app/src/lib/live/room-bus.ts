@@ -162,7 +162,7 @@ export function onServerRoom(roomId: string, fn: () => void) {
   roomListeners.add(l);
   return () => void roomListeners.delete(l);
 }
-/** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
+/** Shows the other phones which mic I sit on (null = Balkon). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);
 /** False when it could not go out (no voice connection yet, or it dropped). */
 export const sendSignal = (msg: PeerSignal) => link?.send(msg) ?? false;

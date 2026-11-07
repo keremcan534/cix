@@ -103,7 +103,7 @@ silerek aşılabilir. Play Integrity / App Attest henüz bağlı değildir.
 - Otomatik susturmanın "son iki deneme" uyarısı yalnızca ret notu gösteren yazma kutularında görünür: DM, oda ve
   grup sohbeti, anlar (paylaşım ve yorum), ajans açıklaması (Ajans paneli › Ayarlar) ve ajans ağındaki gerekçe
   kutusu. Reddi uyarı penceresiyle bildiren ekranlarda görünmez: profil ve giriş (ad, şehir, hakkında), oda adı ve
-  duyurusu, oda anketi, etkinliği ve sorusu, tayfa adı ve duyurusu, ajans başvurusu ve katılma notu (ajans ağı),
+  duyurusu, oda anketi, etkinliği ve sorusu, aile adı ve duyurusu, ajans başvurusu ve katılma notu (ajans ağı),
   ajans ofisi adı ve bölgesi, ajans değiştirme gerekçesi, ajans paneli görev ve etkinlik başlıkları. Bu ekranlarda
   3. ve 4. ret uyarısız geçer; sayım ve susturma oralarda da işler.
 - Ajans açıklaması kaydet düğmesi olmadığı için alandan çıkınca denetlenir; aynı metinle alana girip çıkmak yeni

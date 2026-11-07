@@ -113,7 +113,7 @@ export default function EarningsDetail() {
                   onInfo={() =>
                     showAlert(
                       'Toplanmamış Gelir',
-                      'Kazanılmış ancak henüz elmas bakiyene aktarılmamış gelirdir (ör. haftalık hesaplanan tayfa ve ajans bonusları, incelemedeki işlemler). Hesaplama tamamlanınca otomatik olarak bakiyene eklenir.',
+                      'Kazanılmış ancak henüz elmas bakiyene aktarılmamış gelirdir (ör. haftalık hesaplanan aile ve ajans bonusları, incelemedeki işlemler). Hesaplama tamamlanınca otomatik olarak bakiyene eklenir.',
                     )
                   }
                 />

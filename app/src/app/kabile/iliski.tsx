@@ -20,7 +20,7 @@ import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
 const CP_GIFTS = CP_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
-// Tayfa has no server yet (data/kabile tayfaAvailable): the pairs are sample people and an İkili gift would take
+// Aile has no server yet (data/kabile tayfaAvailable): the pairs are sample people and an İkili gift would take
 // real coins for no one, so a live build shows a notice instead.
 export default function IliskiMeydani() {
   return liveMode() ? <ComingSoon title="Uyum Köşesi" /> : <DemoIliski />;
@@ -68,7 +68,7 @@ function DemoIliski() {
             onPress={() =>
               showAlert(
                 'Uyum Köşesi',
-                'İkili ve dost sıralaması, bu hafta birbirine gönderilen İkili hediyelerinden gelen yakınlık puanına göre yapılır. Dostlar aynı tayfadaysa tayfa avantajlarından da yararlanır.',
+                'İkili ve dost sıralaması, bu hafta birbirine gönderilen İkili hediyelerinden gelen yakınlık puanına göre yapılır. Dostlar aynı ailedeyse aile avantajlarından da yararlanır.',
               )
             }>
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>?</Text>
@@ -102,7 +102,7 @@ function DemoIliski() {
             <Art name={mode === 'cp' ? 'iliski-cift-cp-en-tatli-cift' : 'iliski-dost-en-yakin-dostlar'} size={22} />
             <Text style={styles.sectionTitle}>{mode === 'cp' ? 'En uyumlu ikili' : 'En yakın dostlar'}</Text>
           </View>
-          <Text style={[styles.dim, { textAlign: 'center' }]}>Dostlar aynı tayfadaysa tayfa avantajlarından da yararlanır.</Text>
+          <Text style={[styles.dim, { textAlign: 'center' }]}>Dostlar aynı ailedeyse aile avantajlarından da yararlanır.</Text>
           {list.map((pair, i) => (
             <View key={`${pair.a}-${pair.b}`} style={styles.rankRow}>
               <Text style={[styles.rank, i < 3 && { color: colors.gold }]}>{i + 1}</Text>
@@ -115,7 +115,7 @@ function DemoIliski() {
 
         {family ? (
           <Card style={{ gap: 8 }}>
-            <Text style={styles.sectionTitle}>Tayfa üyelerine İkili hediyesi gönder</Text>
+            <Text style={styles.sectionTitle}>Aile üyelerine İkili hediyesi gönder</Text>
             <Text style={styles.dim}>İkili hediyeleri yakınlık puanı kazandırır. Görevler&apos;de her 350 🪙 için +2 katkı puanı (sınırsız).</Text>
             <GradientButton title="İkili hediyesi gönder" icon="heart" onPress={() => setPickTo(true)} />
             <Pressable onPress={() => router.push(KABILE_ROUTES.merkez)} style={{ alignItems: 'center', padding: 4 }}>
@@ -123,7 +123,7 @@ function DemoIliski() {
             </Pressable>
           </Card>
         ) : (
-          <GradientButton title="Tayfaya katıl" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+          <GradientButton title="Aileye katıl" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         )}
       </ScrollView>
 

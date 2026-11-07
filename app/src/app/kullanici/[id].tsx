@@ -797,11 +797,11 @@ export default function UserProfile() {
             {/* Live mode: only my own agency, as the server has it; someone else's isn't on the server yet. */}
             {showAgency && <AffiliationSection title="Ajans" item={agency} empty={isMe ? 'Katıl' : 'Ajansı yok'} emptyHref={isMe ? '/ajans' : undefined} />}
 
-            {/* Live mode: no Tayfa on the server yet. */}
+            {/* Live mode: no Aile on the server yet. */}
             {!live && (
               <>
                 <Band />
-                <AffiliationSection title="Tayfa" item={kabile} empty={isMe ? 'Katıl' : 'Tayfası yok'} emptyHref={isMe ? '/aile' : undefined} />
+                <AffiliationSection title="Aile" item={kabile} empty={isMe ? 'Katıl' : 'Ailesi yok'} emptyHref={isMe ? '/aile' : undefined} />
               </>
             )}
           </View>

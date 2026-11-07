@@ -28,7 +28,7 @@ export { KINDS, LEVELS, REWARDS, levelOf };
 const TALK_DAILY = 10;
 const PENDING_MAX = 10;
 const COOLDOWN_DAYS = 7;
-/** People asked about at once by /api/bonds/among (a room's mics and Güverte). */
+/** People asked about at once by /api/bonds/among (a room's mics and Balkon). */
 const AMONG_MAX = 80;
 
 export const scoreOf = (b) => Math.floor(Number(b.gift_coins) / 100) + Number(b.talk_points);

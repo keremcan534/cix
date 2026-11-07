@@ -295,7 +295,7 @@ export default function SettingsScreen() {
                 k="invisibleEntry"
                 icon="eye-off-outline"
                 title="Odalara gizli giriş"
-                subtitle="Rütbe: Amiral ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
+                subtitle="Rütbe: Albay ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
                 disabled={!GATES.invisibleEntry(nobleTier)}
               />
             </ListGroup>

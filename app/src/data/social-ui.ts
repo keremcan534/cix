@@ -20,7 +20,7 @@ export type DiscoverShortcut = {
 export const DISCOVER_SHORTCUTS: DiscoverShortcut[] = [
   { id: 'call', title: 'Hemen Tanış', subtitle: 'Görüntülü & sesli', emoji: '📞', colors: ['#0E7C9A', '#0A8F95'], href: '/eslesme', wide: true },
   { id: 'party', title: 'Canlı Odalar', subtitle: 'Odalara katıl', emoji: '🎉', colors: ['#14B8A6', '#0E7C9A'], href: '/(tabs)' },
-  { id: 'tribe', title: 'Tayfa', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#0A8F95', '#0FB8BE'], href: '/aile' },
+  { id: 'tribe', title: 'Aile', subtitle: 'Birlikte sohbet', emoji: '⛺', colors: ['#0A8F95', '#0FB8BE'], href: '/aile' },
   { id: 'free', title: 'Jeton Kazan', subtitle: 'Günlük görevler', emoji: '🪙', colors: ['#FF8A97', '#FF6576'], href: '/gorevler' },
 ];
 

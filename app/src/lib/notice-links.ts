@@ -1,4 +1,4 @@
-// Where a notice may lead. A live build doesn't open the demo-only parts (Anlar, Tayfa, Kabile, Hemen Tanış,
+// Where a notice may lead. A live build doesn't open the demo-only parts (Anlar, Aile, Kabile, Hemen Tanış,
 // calls) or a sample person or room (u1…, r1… from the demo), so a notice pointing there opens nothing: it is
 // only marked read. Pure, so the node tests can check it.
 

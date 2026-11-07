@@ -61,7 +61,7 @@ describe('details', () => {
   });
 
   test('in-app IDs and everyday numbers pass', () => {
-    for (const t of ['ID: 100000000001', 'ID 107919123456', 'oda 10000000', 'odam 87654321', 'Tayfa 1234567', 'hesabımda 150000 jeton var', 'etkinlik 05.11.2026 21.30', '', '   ', '🙂']) {
+    for (const t of ['ID: 100000000001', 'ID 107919123456', 'oda 10000000', 'odam 87654321', 'Aile 1234567', 'hesabımda 150000 jeton var', 'etkinlik 05.11.2026 21.30', '', '   ', '🙂']) {
       assert.deepEqual(checkText(t), { ok: true }, t);
     }
   });

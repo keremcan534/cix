@@ -1,5 +1,5 @@
 // Room access rules that sit next to the presence model: the mic queue ("Mikrofon kuyruğu"), the speak
-// request list kept in step with the Güverte, and room invites (to in-app friends, and the managers'
+// request list kept in step with the Balkon, and room invites (to in-app friends, and the managers'
 // once-a-day invite to every follower of the room's account).
 import type { RoomType } from '@/data/catalog';
 import { FOLLOWS_ME, USERS, userById } from '@/data/mock';
@@ -16,7 +16,7 @@ export const defaultMicQueue = (roomType: RoomType = 'free') => roomType !== 'fr
 export const seatAccess = (micQueue: boolean, role: Role): 'direct' | 'request' => (micQueue && role === 'member' ? 'request' : 'direct');
 
 /**
- * Speak requests that still mean something: only people on the Güverte (in the room, not on a mic, not
+ * Speak requests that still mean something: only people on the Balkon (in the room, not on a mic, not
  * hidden), once each, in the order they asked. Someone who got a mic or left the room drops out.
  */
 export function balconyOnly(ids: string[], view: RoomView): string[] {

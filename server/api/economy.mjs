@@ -260,12 +260,15 @@ const PREFIX = [
   ['Mikrofon efekti: ', ['micfx']],
   ['Rütbe: ', ['noble']],
 ];
-/** The catalog row an old app's spend reason names ("Mağaza: Ses Dalgası", "Rütbe: Dümenci (30 gün)"), or null. */
+/** Rütbe names before the rename (app versions up to preview-89 still send them in the spend reason). */
+const OLD_NOBLE = { Gemici: 'noble-1', Dümenci: 'noble-2', Lostromo: 'noble-3', Amiral: 'noble-4', 'Kaptan-ı Derya': 'noble-5' };
+/** The catalog row an old app's spend reason names ("Mağaza: Ses Dalgası", "Rütbe: Yüzbaşı (30 gün)"), or null. */
 export function itemOfReason(reason) {
   for (const [p, kinds] of PREFIX) {
     if (!reason.startsWith(p)) continue;
     const name = reason.slice(p.length).replace(/\s*\(\d+ gün\)$/, '').trim();
-    return [...SHOP.values()].find((x) => kinds.includes(x.kind) && x.name === name) ?? null;
+    const old = kinds.includes('noble') && Object.hasOwn(OLD_NOBLE, name) ? SHOP.get(OLD_NOBLE[name]) : null;
+    return old ?? [...SHOP.values()].find((x) => kinds.includes(x.kind) && x.name === name) ?? null;
   }
   return null;
 }

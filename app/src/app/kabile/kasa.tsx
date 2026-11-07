@@ -16,10 +16,10 @@ import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
-// Tayfa has no server yet (data/kabile tayfaAvailable): the treasury and its history are sample data, so a live
+// Aile has no server yet (data/kabile tayfaAvailable): the treasury and its history are sample data, so a live
 // build shows a notice instead.
 export default function KabileKasa() {
-  return liveMode() ? <ComingSoon title="Tayfa Kasası" /> : <DemoKabileKasa />;
+  return liveMode() ? <ComingSoon title="Aile Kasası" /> : <DemoKabileKasa />;
 }
 
 function DemoKabileKasa() {
@@ -33,12 +33,12 @@ function DemoKabileKasa() {
   if (!family)
     return (
       <SafeAreaView style={styles.safe}>
-        <Header title="Tayfa Kasası" />
+        <Header title="Aile Kasası" />
         <View style={{ paddingTop: 96, paddingHorizontal: 32, gap: 12, alignItems: 'center' }}>
           <StateIcon name="lock-closed" />
-          <Text style={[styles.title, { textAlign: 'center' }]}>Kasa tayfa üyelerine açıktır</Text>
-          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>Bir tayfaya katıldığında bağışlar, kasa ödülleri ve harcamalar burada görünür.</Text>
-          <GradientButton title="Tayfa bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+          <Text style={[styles.title, { textAlign: 'center' }]}>Kasa aile üyelerine açıktır</Text>
+          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>Bir aileye katıldığında bağışlar, kasa ödülleri ve harcamalar burada görünür.</Text>
+          <GradientButton title="Aile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>
       </SafeAreaView>
     );
@@ -55,14 +55,14 @@ function DemoKabileKasa() {
   return (
     <SafeAreaView style={styles.safe}>
       <Header
-        title="Tayfa Kasası"
+        title="Aile Kasası"
         right={
           <Pressable
             hitSlop={8}
             onPress={() =>
               showAlert(
-                'Tayfa Kasası nasıl çalışır?',
-                `Tayfanın haftalık katkı puanı ${fmt(KASA_GOAL)} hedefine ulaşırsa, haftalık kapanışta sandık değeri katkı oranına göre dağıtılır:\n\nPayın = sandık değeri × senin katkın ÷ tayfanın haftalık katkı puanı\n\nRastgele ödül yoktur.`,
+                'Aile Kasası nasıl çalışır?',
+                `Ailenin haftalık katkı puanı ${fmt(KASA_GOAL)} hedefine ulaşırsa, haftalık kapanışta sandık değeri katkı oranına göre dağıtılır:\n\nPayın = sandık değeri × senin katkın ÷ ailenin haftalık katkı puanı\n\nRastgele ödül yoktur.`,
               )
             }
             accessibilityLabel="Kasa kuralları">

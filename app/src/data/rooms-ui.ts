@@ -42,7 +42,7 @@ type RoomExtra = {
   note?: string;
 };
 const ROOM_EXTRA: Record<string, RoomExtra> = {
-  r1: { familyId: 'f1', video: true, note: 'Tayfa davet kodu GECE01 · hoş geldin 🌙' },
+  r1: { familyId: 'f1', video: true, note: 'Aile davet kodu GECE01 · hoş geldin 🌙' },
   r2: { agencyId: 'a1', top: 1, pk: true },
   r3: { familyId: 'f3' },
   r4: { familyId: 'f4', top: 2, cp: true, video: true },

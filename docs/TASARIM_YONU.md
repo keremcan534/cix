@@ -81,9 +81,9 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
    | Ad | Ne anlatır |
    | --- | --- |
    | **İnci** (İnci 1–10) | Yüklemeyle büyüyen üyelik seviyesi |
-   | **Rütbe** (Gemici, Dümenci, Lostromo, Amiral, Kaptan-ı Derya) | 30 günlük ayrıcalık programı |
-   | **Tayfa** | Topluluk; Tayfa sohbeti, Tayfa kasası |
-   | **Güverte** | Odadaki ama mikrofonda olmayan dinleyiciler |
+   | **Rütbe** (Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa) | 30 günlük ayrıcalık programı |
+   | **Aile** | Topluluk; Aile sohbeti, Aile kasası |
+   | **Balkon** | Odadaki ama mikrofonda olmayan dinleyiciler |
    | **Dümen koltuğu** | Oturumun en çok hediye gönderen kişisinin koltuğu |
    | **Fener** | Yol gösteren ışık; Fener Kayalığı oyunu, Fener Bekçisi rozeti |
    | **Cömertlik** ve **Yankı** | Gönderilen ve alınan hediyelerden gelen iki seviye |

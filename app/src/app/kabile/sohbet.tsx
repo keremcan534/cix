@@ -25,13 +25,13 @@ const CHAT_GIFTS = CHAT_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).fil
 const QUICK: QuickAction[] = [
   { key: 'iliski', label: 'Uyum Köşesi', emoji: '💞', art: 'iliski-cift-cp-en-tatli-cift', onPress: () => router.push(KABILE_ROUTES.iliski) },
   { key: 'merkez', label: 'Görevler', emoji: '🎯', tag: 'ücretsiz', onPress: () => router.push(KABILE_ROUTES.merkez) },
-  { key: 'kasa', label: 'Tayfa Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
+  { key: 'kasa', label: 'Aile Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];
 
-// Tayfa has no server yet (data/kabile tayfaAvailable): in a live build the chat would reach no one and its gifts
+// Aile has no server yet (data/kabile tayfaAvailable): in a live build the chat would reach no one and its gifts
 // would take real coins for sample members, so it shows a notice instead.
 export default function KabileChat() {
-  return liveMode() ? <ComingSoon title="Tayfa sohbeti" /> : <DemoKabileChat />;
+  return liveMode() ? <ComingSoon title="Aile sohbeti" /> : <DemoKabileChat />;
 }
 
 function DemoKabileChat() {
@@ -50,8 +50,8 @@ function DemoKabileChat() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.locked}>
           <StateIcon name="lock-closed" />
-          <Text style={styles.title}>Tayfa sohbetine yalnızca tayfa üyeleri girebilir</Text>
-          <GradientButton title="Tayfa bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+          <Text style={styles.title}>Aile sohbetine yalnızca aile üyeleri girebilir</Text>
+          <GradientButton title="Aile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>
       </SafeAreaView>
     );
@@ -64,7 +64,7 @@ function DemoKabileChat() {
   const welcome: GroupMsg = {
     id: 'kabile-welcome',
     userId: 'system',
-    text: `Hoş geldin @${me.name}! Tayfada bugün kimler var, bir selam ver. Günlük görevler Görevler sekmesinde.`,
+    text: `Hoş geldin @${me.name}! Ailede bugün kimler var, bir selam ver. Günlük görevler Görevler sekmesinde.`,
     time: '',
     system: true,
     actionLabel: 'Tamamlamaya git',
@@ -77,7 +77,7 @@ function DemoKabileChat() {
   };
 
   const sendGift = (g: Gift) => {
-    const paid = payKabileGift(g.price, `Tayfa sohbeti hediyesi: ${g.name}`, spendCoins);
+    const paid = payKabileGift(g.price, `Aile sohbeti hediyesi: ${g.name}`, spendCoins);
     if (paid === 'off') return;
     if (paid === 'coins') {
       showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [
@@ -87,7 +87,7 @@ function DemoKabileChat() {
       return;
     }
     kabile.trackChatGift(g.price);
-    sendFamilyMessage(`🎁 Tayfaya ${g.emoji} ${g.name} gönderdi (${g.price} 🪙)`);
+    sendFamilyMessage(`🎁 Aileye ${g.emoji} ${g.name} gönderdi (${g.price} 🪙)`);
   };
 
   return (
@@ -96,7 +96,7 @@ function DemoKabileChat() {
         <Pressable onPress={() => goBack()} hitSlop={10} accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
-        <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.profile)} accessibilityLabel="Tayfa profili">
+        <Pressable style={{ flex: 1 }} onPress={() => router.push(KABILE_ROUTES.profile)} accessibilityLabel="Aile profili">
           <Text style={styles.headerTitle} numberOfLines={1}>
             {family.emoji} {family.name}({family.members})
           </Text>
@@ -104,7 +104,7 @@ function DemoKabileChat() {
             📶 {online} kişi çevrimiçi{familyMuted ? ' · 🔕' : ''}
           </Text>
         </Pressable>
-        <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)} style={styles.iconBtn} accessibilityLabel="Tayfa Kasası">
+        <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)} style={styles.iconBtn} accessibilityLabel="Aile Kasası">
           <Text style={{ fontSize: 20 }}>💰</Text>
         </Pressable>
         <Pressable onPress={() => setMenu(true)} style={styles.iconBtn} accessibilityLabel="Menü">
@@ -116,7 +116,7 @@ function DemoKabileChat() {
         messages={[welcome, ...familyChat]}
         onSend={send}
         place="tayfa.chat"
-        pinned={`Tayfa duyurusu: ${meta.announcement}`}
+        pinned={`Aile duyurusu: ${meta.announcement}`}
         roomId={meta.roomId}
         lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length] ?? LAST_ACTIVE[0]}
         quickActions={QUICK}
@@ -128,15 +128,15 @@ function DemoKabileChat() {
         onClose={() => setMenu(false)}
         options={[
           { label: familyMuted ? 'Bildirimleri aç' : 'Sohbeti sessize al', icon: familyMuted ? 'notifications-outline' : 'notifications-off-outline', onPress: () => setFamilyMuted(!familyMuted) },
-          { label: 'Tayfa profili', icon: 'shield-outline', onPress: () => router.push(KABILE_ROUTES.profile) },
+          { label: 'Aile profili', icon: 'shield-outline', onPress: () => router.push(KABILE_ROUTES.profile) },
           { label: 'Görevler', icon: 'checkbox-outline', onPress: () => router.push(KABILE_ROUTES.merkez) },
-          { label: 'Tayfa Kasası', icon: 'wallet-outline', onPress: () => router.push(KABILE_ROUTES.kasa) },
+          { label: 'Aile Kasası', icon: 'wallet-outline', onPress: () => router.push(KABILE_ROUTES.kasa) },
           { label: 'Uyum Köşesi', icon: 'heart-outline', onPress: () => router.push(KABILE_ROUTES.iliski) },
         ]}
       />
       <ActionSheet
         visible={gifts}
-        title="Tayfa sohbetine hediye · her 400 🪙 için +2 katkı puanı"
+        title="Aile sohbetine hediye · her 400 🪙 için +2 katkı puanı"
         onClose={() => setGifts(false)}
         options={chatGifts.map((g) => ({ label: `${g.emoji} ${g.name} · ${g.price} 🪙`, onPress: () => sendGift(g) }))}
       />
