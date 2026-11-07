@@ -110,7 +110,7 @@ describe('Kayıt okuyucu (readSnapshot)', () => {
     assert.equal(ok.agencyId, 'own');
   });
 
-  test('sonraki sürümde adı değişen tayfa rolü varsayılana döner', () => {
+  test('sonraki sürümde adı değişen aile rolü varsayılana döner', () => {
     assert.equal(readSnapshot({ familyRole: 'captain' })!.familyRole, null);
     assert.equal(readSnapshot({ familyRole: 'helper' })!.familyRole, 'helper');
   });

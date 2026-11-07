@@ -3,15 +3,15 @@
 Yeni adlarla uyumlu, rakip uygulamaların görünümünü taşımayan görseller. Çizimleri ChatGPT üretir; bu liste onun için hazırlandı. Teslim edilen dosyalar `app/assets/art` altına Türkçe adlarla konur.
 
 1. İnci 1–10 rozet ailesi: mevcut svip-01…svip-10.png taç motifli (svip-03 kontrol edildi: altın taç). Taç yerine inci ve istiridye motifi, seviyeyle büyüyen parıltı. Ayrıca svip-svip-isareti.png, ayricalik-svip-rozeti.png, ayricalik-svip-etiket.png, ayricalik-svip-e-ozel-hediye.png yeniden çizilmeli; üzerlerinde 'SVIP' yazısı veya taç olmasın.
-2. Rütbe 5 amblemi: Gemici, Dümenci, Lostromo, Amiral, Kaptan-ı Derya (asil-1-sovalye … asil-5-duk.png yerine). Soylu kalkan ve aslan motifi yok; dümen, halat, çapa, yıldızlı apolet gibi denizci öğeler kullanılsın. Ayrıca ayricalik-asil-etiketi / -koltugu / -madalyasi.png → 'Rütbe Nişanı' ve rütbe koltuğu.
+2. Rütbe 5 amblemi: Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa (asil-1-sovalye … asil-5-duk.png yerine). Soylu kalkan ve aslan motifi yok; dümen, halat, çapa, yıldızlı apolet gibi denizci öğeler kullanılsın. Ayrıca ayricalik-asil-etiketi / -koltugu / -madalyasi.png → 'Rütbe Nişanı' ve rütbe koltuğu.
 3. Oda sahibi 'Kaptan' rozeti (koltukta taç yerine) ve 'Dümen koltuğu' çerçevesi ve ikonu.
 4. Boş koltuk kabuğu, 3 durum: boş, davetli, kilitli (sade deniz camı halka).
 5. Fener ışık konisi dokusu: şeffaf PNG, 2 yoğunluk (konuşma göstergesi ve sıralama podyumu için).
-6. 'Güverteye çıktı' giriş şeridinin köpük kenarı dokusu.
+6. 'Balkona çıktı' giriş şeridinin köpük kenarı dokusu.
 7. Oda dok'u için hediye düğmesi zemini 'deniz camı'.
 8. Cömertlik seviye amblemleri, 11 adet: Damla, Kaynak, Dere, Irmak, Şelale, Göl, Koy, Körfez, Deniz, Okyanus, Derya.
 9. Yankı seviye amblemleri, 10 adet: Kıvılcım, Işıltı, Yakamoz, Şafak, Ay Işığı, Yıldız, Kutup Yıldızı, Gökkuşağı, Kutup Işığı, Efsane Yankı.
-10. Tayfa güç rozetleri, 6 tekne: Sandal, Kayık, Yelkenli, Gulet, Fırkateyn, Kalyon (I/II/III rakamla gösterilir, ayrı çizim gerekmez).
+10. Aile güç rozetleri, 6 tekne: Sandal, Kayık, Yelkenli, Gulet, Fırkateyn, Kalyon (I/II/III rakamla gösterilir, ayrı çizim gerekmez).
 11. Fener Kayalığı (ışık huzmesi oyunu): 3 boy gemi (sandal: ×0,1–0,5 yük, koster: ×1–5, altın yüklü şilep: ×10–50), 'Kandil' simgesi, solda duran fener kulesi (sıraya ışık veren lamba başlığıyla), yatay ışık huzmesi dokusu (şeffaf PNG, sağa doğru sönen), gece denizi zemini ve oyun kapağı; 3D cam stilinde. Şimdilik ekranda Ionicons gemi/alev simgeleri kullanılıyor.
 12. Liman Pazarı: 6 ürün ikonu (midye, karides, kalamar, balık, ıstakoz, ahtapot) ve kapak.
 13. Gece Yarısı Çarkı ve Sihir Destesi: '77', meyve ve burç motifleri olmadan yeni dilim ve kart görselleri (8 takımyıldız + 'Pusula' kartı).

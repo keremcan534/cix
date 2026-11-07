@@ -3,7 +3,8 @@
 // Yaptırımlar on the server's admin routes. Every money or account action asks first, then shows a short result and reloads
 // its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
 // sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
-// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it).
+// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it); Uğurlu hediyeler
+// (packages, odds, limits, sends) only for admins.
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import { makeStyles, radius, space, useTheme } from '@/theme';
 import { AccountSheet } from './account-sheet';
 import { AgencyPayoutsSection } from './agency-payouts';
 import { LiveSettingsSection, loadLiveAccess, type LiveAccess } from './live-settings';
+import { LuckySection } from './lucky';
 import { OverviewSection, type Tab } from './overview';
 import { AdminContext, InputSheet, LoadState, SectionScroll, Toast, useLoad, type AdminCtx, type Load, type SheetSpec } from './parts';
 import { RefundsSection } from './refunds';
@@ -32,6 +34,7 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ozet', label: 'Özet' },
   { key: 'kullanici', label: 'Kullanıcılar' },
   { key: 'ayarlar', label: 'Canlı ayarlar' },
+  { key: 'ugurlu', label: 'Uğurlu hediyeler' },
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
   { key: 'sikayet', label: 'Şikâyetler', count: 'reports' },
@@ -146,7 +149,7 @@ function PanelBody({
   const showLive = isAdmin && !moderator && (!!live.data?.view || !!live.error);
   const tabs = moderator
     ? TABS.filter((t) => t.key === 'yaptirim')
-    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive));
+    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin));
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
@@ -205,6 +208,7 @@ function PanelBody({
           </View>
           <View style={{ flex: 1 }}>
             {tab === 'ayarlar' && <LiveSettingsSection load={live} />}
+            {tab === 'ugurlu' && <LuckySection />}
             {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
             {tab === 'kullanici' && <UsersSection />}
             {tab === 'sikayet' && <ReportsSection />}

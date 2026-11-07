@@ -546,6 +546,33 @@ export type ServerWheel = {
 export const wheel = () => call<ServerWheel>('GET', '/api/wheel');
 export const wheelSpin = (tier: string, count: number, ref = newRef()) => call<{ spin: ServerWheelSpin; user: ServerUser; replay: boolean }>('POST', '/api/wheel/spin', { tier, count, ref });
 
+// Uğurlu hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
+// their share as diamonds. `draws`: one multiplier per gift, recipient by recipient (`count` each).
+export type ServerLuckyTier = { mult: number; weight: number };
+export type ServerLuckyGift = { id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean };
+export type ServerLuckySend = {
+  id: number; ref: string; giftId: string; room: string | null; count: number; to: string[]; price: number; cost: number; shared: number;
+  payout: number; best: number; draws: number[]; configVersion: number; odds: ServerLuckyTier[]; at: string;
+};
+export type ServerLucky = {
+  version: number; gifts: ServerLuckyGift[]; announceFrom: number; share: number; counts: number[]; needLevel: number; allowed: boolean;
+  minAge: number; gameCoins: number; mine: ServerLuckySend[];
+};
+export const lucky = () => call<ServerLucky>('GET', '/api/lucky');
+export const luckySend = (giftId: string, to: string[], count: number, room?: string, ref = newRef()) =>
+  call<{ send: ServerLuckySend; user: ServerUser; replay: boolean }>('POST', '/api/lucky/send', { giftId, to, count, room, ref });
+export type ServerLuckyConfig = { gifts: ServerLuckyGift[]; dailyPayoutLimit: number; announceFrom: number };
+export type ServerLuckyStats = { sends: number; spent: number; paid: number; shared: number };
+export type ServerLuckyAdminSend = ServerLuckySend & { sender: { id: string; name: string } };
+export type ServerLuckyAdmin = {
+  config: ServerLuckyConfig; version: number; updatedAt: string | null; stats: { today: ServerLuckyStats; total: ServerLuckyStats };
+  recent: ServerLuckyAdminSend[]; winners: ServerLuckyAdminSend[];
+};
+/** Admins only (403 otherwise). A save on an older version answers 409: read again and retry. */
+export const luckyAdmin = () => call<ServerLuckyAdmin>('GET', '/api/admin/lucky');
+export const saveLuckyConfig = (config: ServerLuckyConfig, version: number) =>
+  call<{ config: ServerLuckyConfig; version: number; updatedAt: string }>('POST', '/api/admin/lucky/config', { config, version });
+
 export const sendDm = (to: string, text: string, ref = newRef()) => call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref }).then((r) => r.message);
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);

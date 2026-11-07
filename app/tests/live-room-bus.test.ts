@@ -13,6 +13,7 @@ import {
   parseRoomMeta,
   parseSeat,
   parseServerGift,
+  parseServerLucky,
   parseSignal,
   reportPeers,
   reportRoomMeta,
@@ -119,4 +120,25 @@ test('sinyaller yalnızca kendi odasının dinleyicisine gider', () => {
   reportSignal('oda-a', 'u4', { t: 'chat', text: 'kapandıktan sonra' });
   assert.deepEqual(got, ['u1:chat']);
   reportPeers(null, []);
+});
+
+test('sunucunun Uğurlu paketi: doğru biçim okunur, bozuk olan bırakılır, aynı gönderim bir kez', () => {
+  const ok = { type: 'lucky', giftId: 'lk2', name: 'Uğur Böceği', emoji: '🐞', count: 5, from: 'u-a', to: ['u-b', 'u-c'], eventIds: [7, 8], best: 50, bigWin: 5000 };
+  assert.deepEqual(parseServerLucky(ok), {
+    from: 'u-a',
+    msg: { t: 'lucky', giftId: 'lk2', name: 'Uğur Böceği', emoji: '🐞', count: 5, to: ['u-b', 'u-c'], eventId: 7, best: 50, bigWin: 5000 },
+  });
+  assert.equal(parseServerLucky({ ...ok, eventIds: [] }), null);
+  assert.equal(parseServerLucky({ ...ok, to: [] }), null);
+  assert.equal(parseServerLucky({ ...ok, count: 0 }), null);
+  assert.equal(parseServerLucky({ ...ok, type: 'gift' }), null);
+  assert.equal(parseServerLucky({ ...ok, best: -1, bigWin: 'çok' })?.msg.bigWin, 0);
+
+  const got: string[] = [];
+  const off = onSignal('oda-l', (from, msg) => got.push(msg.t === 'lucky' ? `${from}:${msg.giftId}#${msg.eventId}` : msg.t));
+  reportSignal('oda-l', 'u-x', ok); // from a phone: dropped
+  reportSignal('oda-l', null, ok);
+  reportSignal('oda-l', null, ok); // again after a reconnect: shown once
+  off();
+  assert.deepEqual(got, ['u-a:lk2#7']);
 });

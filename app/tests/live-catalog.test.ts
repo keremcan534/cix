@@ -68,7 +68,7 @@ describe('Canlı katalog: hediye rafı', () => {
     assert.equal(visibleGifts(GIFTS, c), GIFTS);
   });
 
-  test('alt liste (İkili, Tayfa sohbeti): gizlenenler düşer; hepsi gizlenirse alt listenin tamamı, raf boş açılmaz', () => {
+  test('alt liste (İkili, Aile sohbeti): gizlenenler düşer; hepsi gizlenirse alt listenin tamamı, raf boş açılmaz', () => {
     // data/kabile CP_GIFT_IDS and CHAT_GIFT_IDS, as iliski.tsx and sohbet.tsx pass them.
     const subset = (list: string[]) => list.map((id) => GIFTS.find((g) => g.id === id)!);
     const cp = subset(['c9', 'c12', 'c1']);

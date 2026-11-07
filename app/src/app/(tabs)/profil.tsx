@@ -172,8 +172,8 @@ export default function ProfileScreen() {
 
         <View style={[styles.card, { flexDirection: 'row' }]}>
           <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
-          {/* Tayfa and invite rewards run only in the demo; the server has neither yet. */}
-          {!live && <Shortcut emoji="⛺" label="Tayfam" onPress={() => router.push('/aile')} />}
+          {/* Aile and invite rewards run only in the demo; the server has neither yet. */}
+          {!live && <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />}
           {!live && <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />}
         </View>
 

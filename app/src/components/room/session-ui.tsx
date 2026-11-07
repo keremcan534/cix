@@ -87,13 +87,14 @@ export function sessionStatus(s: RoomSession, invited = false): { text: string; 
 // --- Two-choice sheet -----------------------------------------------------------------------------------
 type Choice = { label: string; desc: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void };
 /** Primary (filled turquoise) and exit (outlined red) never look alike, so a wrong tap is unlikely. */
-function ChoiceSheet({ visible, title, primary, exit, extra, onCancel }: { visible: boolean; title: string; primary: Choice; exit: Choice; /** A rarer third choice, shown as a quiet text button. */ extra?: Choice; onCancel: () => void }) {
+function ChoiceSheet({ visible, title, primary, exit, extra, onCancel, top = false }: { visible: boolean; title: string; primary: Choice; exit: Choice; /** A rarer third choice, shown as a quiet text button. */ extra?: Choice; onCancel: () => void; /** Opens under the top edge, near the room's close button, instead of from the bottom. */ top?: boolean }) {
   const insets = useSafeAreaInsets();
+  const backdrop = <Pressable style={s.backdrop} onPress={onCancel} accessibilityLabel="Vazgeç" />;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
-      <Pressable style={s.backdrop} onPress={onCancel} accessibilityLabel="Vazgeç" />
-      <View style={[s.sheet, { paddingBottom: space.xl + insets.bottom }]} accessibilityViewIsModal>
-        <View style={s.handle} />
+    <Modal visible={visible} transparent animationType={top ? 'fade' : 'slide'} onRequestClose={onCancel}>
+      {!top && backdrop}
+      <View style={top ? [s.sheet, s.sheetTop, { paddingTop: space.md + insets.top }] : [s.sheet, { paddingBottom: space.xl + insets.bottom }]} accessibilityViewIsModal>
+        {!top && <View style={s.handle} />}
         <Text style={s.sheetTitle} accessibilityRole="header">
           {title}
         </Text>
@@ -119,7 +120,9 @@ function ChoiceSheet({ visible, title, primary, exit, extra, onCancel }: { visib
         <Pressable style={s.cancel} onPress={onCancel} accessibilityRole="button">
           <Text style={s.cancelText}>Vazgeç</Text>
         </Pressable>
+        {top && <View style={s.handle} />}
       </View>
+      {top && backdrop}
     </Modal>
   );
 }
@@ -130,6 +133,7 @@ export function LeaveSheet() {
   return (
     <ChoiceSheet
       visible={leaveDialog && !!session}
+      top
       title="Odadan ayrılmak mı istiyorsun?"
       primary={{ label: 'Odayı küçült', desc: 'Oda bağlantın devam eder. Uygulamada diğer işlemlerini yapabilirsin.', icon: 'contract', onPress: () => continueLeave() }}
       exit={{
@@ -520,6 +524,7 @@ const shadow = { shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 12, sha
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.6)' },
   sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.xl, gap: space.md, borderTopWidth: 1, borderColor: colors.border },
+  sheetTop: { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTopWidth: 0, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl, borderBottomWidth: 1, paddingBottom: space.md },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetTitle: { color: colors.text, fontWeight: '900', fontSize: type.title, textAlign: 'center', marginVertical: space.xs },
   choice: { flexDirection: 'row', alignItems: 'center', gap: space.md, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: space.md, minHeight: 64 },

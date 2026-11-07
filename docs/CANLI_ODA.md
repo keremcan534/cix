@@ -1,4 +1,4 @@
-# Canlı Oda: Güverte, oda sayacı, katılımcı yönetimi ve sohbet filtreleri
+# Canlı Oda: Balkon, oda sayacı, katılımcı yönetimi ve sohbet filtreleri
 
 Kaynak: *SimilarClub — Canlı Oda UX/UI ve İşlevsel Geliştirme Şartnamesi*.
 
@@ -10,7 +10,7 @@ Kaynak: *SimilarClub — Canlı Oda UX/UI ve İşlevsel Geliştirme Şartnamesi*
 |---|---|
 | `src/lib/room-presence.ts` | Oda başına **tek katılımcı modeli**: odadaki benzersiz kişiler, mikrofon koltukları, moderatör mikrofon susturması, odadan çıkarma yasakları, mikrofon davetleri, olay tekilleştirme, izleyicinin bağlantı durumu. |
 | `src/lib/chat-feed.ts` | Sohbet olaylarının türü (sohbet / hediye / sistem / bot), filtreler, tekilleştirme, tür başına geçmiş sınırı. |
-| `src/components/room/balcony.tsx` | Güverte şeridi, toplam kullanıcı sayacı, "Odadaki Kullanıcılar" penceresi, mikrofon daveti istemi, bağlantı bandı. |
+| `src/components/room/balcony.tsx` | Balkon şeridi, toplam kullanıcı sayacı, "Odadaki Kullanıcılar" penceresi, mikrofon daveti istemi, bağlantı bandı. |
 | `src/components/room/chat-feed.tsx` | Tümü / Hediyeler / Sohbet sekmeleri ve listeleri. |
 | `src/components/room/parts.tsx` | Sohbet satırı (hediye satırı ve "gönderilemedi" durumu), koltuk (kişisel sessiz rozeti). |
 | `src/components/room/live-room.tsx` (eski `src/app/oda/[id].tsx`) | Entegrasyon: koltuklar artık oda katılımcı modelinden okunur; tüm koltuk, moderasyon ve davet işlemleri o katmandan geçer. |
@@ -23,31 +23,31 @@ Tek kaynak: `deriveView(room)` (başka hiçbir yerde sayı hesaplanmaz).
 
 - **Toplam** = odadaki benzersiz kişiler.
 - **Mikrofonda** = odadaki ve bir mikrofon koltuğunda veya **patron koltuğunda** oturan benzersiz kişiler (patron koltuğu konuşan bir koltuktur; PK'ye de katılır).
-- **Güverte** = odadaki ama mikrofonda olmayan kişiler. Toplam = Mikrofonda + Güverte her zaman.
+- **Balkon** = odadaki ama mikrofonda olmayan kişiler. Toplam = Mikrofonda + Balkon her zaman.
 - Bir kişi aynı anda iki listede olamaz; koltukta görünüp odada olmayan biri sayılmaz.
 - Mikrofon **kapasitesi** (ör. 12) ile mikrofondaki kişi sayısı ayrı tutulur.
 - Katılma ve ayrılma olayları olay kimliği taşır; aynı olay bir kez uygulanır. Gecikmiş bir "katıldı" olayı, sonradan ayrılmış birini geri eklemez.
-- Gizli giriş: Güverte'deyken listede ve sayıda görünmez; mikrofona geçince görünür.
-- Mikrofon sayısı azalırsa kaldırılan koltuktakiler Güverte'ye geçer, odadan düşmez.
+- Gizli giriş: Balkon'deyken listede ve sayıda görünmez; mikrofona geçince görünür.
+- Mikrofon sayısı azalırsa kaldırılan koltuktakiler Balkon'ye geçer, odadan düşmez.
 - Odalar ilk açıldıklarında oda kartındaki dinleyici sayısıyla başlar; sonraki ziyaretlerde oda olduğu gibi bulunur. Odadan çıkınca yalnızca sen ayrılırsın.
 - Aynı oda iki kez açılmış olabilir (oda → profil → aynı oda). Odadan ancak o odanın son ekranı kapanınca ayrılırsın.
 - Kara liste (oda ayarları) sunucu modeline eşitlenir: listedekiler odadan çıkar ve giremez; listeden çıkarılan tekrar girebilir. Süresi dolan 10 dk yasaklar etkin sayılmaz.
 
-Örnek (test edildi): 20 mikrofonun hepsi dolu, odada 50 kişi → Güverte 30, Mikrofonda 20, Toplam 50.
+Örnek (test edildi): 20 mikrofonun hepsi dolu, odada 50 kişi → Balkon 30, Mikrofonda 20, Toplam 50.
 
-## Güverte ve toplam sayaç
+## Balkon ve toplam sayaç
 
-- Mikrofonların hemen altında: solda **Güverte · N kişi** ve birkaç küçük avatar + "+kalan"; sağda turkuaz **👥 Toplam** sayacı. Dar ekranda daha az avatar gösterilir, etiket ve sayı kısalmaz.
-- Sayacın tamamı dokunulabilir (≥ 40 px yükseklik, erişilebilir etiket). Güverte şeridine dokunmak da aynı pencereyi açar; iki farklı davranış yoktur.
-- Mikrofon alanı (panolar ve koltuklar) ekranın en fazla %58'ini kaplar, daha uzunsa kendi içinde kayar. Böylece Güverte ve sohbet küçük telefonlarda da yerini korur.
+- Mikrofonların hemen altında: solda **Balkon · N kişi** ve birkaç küçük avatar + "+kalan"; sağda turkuaz **👥 Toplam** sayacı. Dar ekranda daha az avatar gösterilir, etiket ve sayı kısalmaz.
+- Sayacın tamamı dokunulabilir (≥ 40 px yükseklik, erişilebilir etiket). Balkon şeridine dokunmak da aynı pencereyi açar; iki farklı davranış yoktur.
+- Mikrofon alanı (panolar ve koltuklar) ekranın en fazla %58'ini kaplar, daha uzunsa kendi içinde kayar. Böylece Balkon ve sohbet küçük telefonlarda da yerini korur.
 - Bağlantı yokken sayaç bulut ikonuna döner ve soluklaşır; bant "son alınan durumu gösteriyor" der.
 
 ## Odadaki Kullanıcılar penceresi
 
 - Başlık: `N kişi · M mikrofonda · B balkonda` (canlı, modelden).
-- Sekmeler: **Güverte** (varsayılan), Mikrofonda, Tümü; isimle arama; kaydırılabilir, sanallaştırılmış liste (yüzlerce kişi).
+- Sekmeler: **Balkon** (varsayılan), Mikrofonda, Tümü; isimle arama; kaydırılabilir, sanallaştırılmış liste (yüzlerce kişi).
 - Sıra: önce sen, sonra oda sahibi ve yöneticiler, sonra katılma sırası.
-- Her satır: avatar, isim (👑 sahip, 🛡️ yönetici), durum (Güverte / N. mikrofon, "mikrofonu kapatıldı", "davet bekliyor", "senin için sessizde", "engelledin"). Satıra dokununca işlemler açılır.
+- Her satır: avatar, isim (👑 sahip, 🛡️ yönetici), durum (Balkon / N. mikrofon, "mikrofonu kapatıldı", "davet bekliyor", "senin için sessizde", "engelledin"). Satıra dokununca işlemler açılır.
 
 ### İşlemler ve yetkiler
 
@@ -55,8 +55,8 @@ Arayüz yalnızca yetkili olunan işlemleri gösterir; **her işlem ayrıca sunu
 
 | İşlem | Kim görür | Sunucu kuralı |
 |---|---|---|
-| Mikrofona davet et | Sahip, yönetici; hedef Güverte'de | Hedef odada ve mikrofonda değil; bekleyen davet yok; aynı kişiye 20 sn içinde yeni davet yok; o an boş (kilitsiz) mikrofon var. |
-| Mikrofonunu sustur / aç | Yalnızca **mikrofondaki** kişi için, hedeften üst rol | Güverte'deki kişiye uygulanamaz (açık mikrofonu yok). |
+| Mikrofona davet et | Sahip, yönetici; hedef Balkon'de | Hedef odada ve mikrofonda değil; bekleyen davet yok; aynı kişiye 20 sn içinde yeni davet yok; o an boş (kilitsiz) mikrofon var. |
+| Mikrofonunu sustur / aç | Yalnızca **mikrofondaki** kişi için, hedeften üst rol | Balkon'deki kişiye uygulanamaz (açık mikrofonu yok). |
 | Benim için sessize al | Herkes (kendisi hariç) | Yalnızca senin ekranında: o kişinin sohbet satırları ve konuşma göstergesi gizlenir. Kimseyi etkilemez, odadan çıkarma veya engelleme değildir. |
 | Odadan çıkar | Hedeften üst rol | Onay sorulur. Kişi odadan ve mikrofondan çıkar, **10 dk** tekrar giremez (kalıcı engel değildir; süre dolunca normal oda kurallarıyla girebilir). Kendini ve oda sahibini çıkaramazsın; yönetici yöneticiyi çıkaramaz. |
 | Kara listeye ekle (koltuk menüsü, sahip) | Oda sahibi | Kalıcı giriş yasağı. |
@@ -68,7 +68,7 @@ Koltuk menüsündeki "Mikrodan at", "Mikrofonu kilitle", "Odadan at" (artık ona
 
 1. Yönetici davet eder (pencereden veya boş koltuğun "Davet et" seçeneğinden, o koltuk için).
 2. Sunucu yetkiyi, hedefi, sınırı ve boş mikrofonu kontrol eder; davet 30 sn geçerlidir.
-3. Davet edilen kişi **kabul eder veya reddeder**; davet kimseyi otomatik oturtmaz. Sana gelen davette ekranın üstünde Kabul / Reddet istemi açılır (başkasının odasında Güverte'deyken oda sahibi bir kez davet eder).
+3. Davet edilen kişi **kabul eder veya reddeder**; davet kimseyi otomatik oturtmaz. Sana gelen davette ekranın üstünde Kabul / Reddet istemi açılır (başkasının odasında Balkon'deyken oda sahibi bir kez davet eder).
 4. Kabulde o anki boş mikrofona geçilir. Bu arada mikrofonlar dolduysa kimse oturtulmaz ve "boş mikrofon kalmadı" denir.
 5. Sonuç (kabul, ret, yanıt yok, boş mikrofon kalmadı) daveti gönderenin sohbetine bir kez yazılır. Davet edilen odadan ayrılırsa davet iptal olur.
 
@@ -105,7 +105,7 @@ Davranış:
 
 | Durum | Davranış |
 |---|---|
-| Güverte boş | Şerit kısa kalır: "Herkes mikrofonda". Pencerede açıklamalı boş durum. |
+| Balkon boş | Şerit kısa kalır: "Herkes mikrofonda". Pencerede açıklamalı boş durum. |
 | Mikrofonda kimse yok / oda boş | Sayılar 0; sekmelerde açıklamalı boş durum. |
 | Sayının hızla değişmesi | Tek modelden türetildiği için sayılar her an tutarlı. |
 | Mikrofon değiştirirken odadan ayrılma | Ayrılma koltuğu boşaltır, bekleyen davetleri iptal eder. |
@@ -117,13 +117,13 @@ Davranış:
 | Mesaj gönderilemedi | Satır işaretlenir, tekrar denenebilir. |
 | Hediye olayı tekrar gelirse | Tek satır, tek puan. |
 | Bağlantı kopması / yeniden bağlanma | Yukarıdaki kurallar. |
-| Uzun mesaj, çok katılımcı | Satırlar sarılır; listeler sanallaştırılmış; Güverte şeridi en fazla 5 avatar gösterir. |
+| Uzun mesaj, çok katılımcı | Satırlar sarılır; listeler sanallaştırılmış; Balkon şeridi en fazla 5 avatar gösterir. |
 
 ## Testler
 
-`cd app && npm test` — `tests/room-presence.test.ts` (sayım, Güverte/mikrofon geçişleri, ayrılma, tekrar olaylar, çevrimdışı görüntü, gizli giriş, kapasite azalması, yetkiler, odadan çıkarma ve yasak süresi, mikrofon susturma, davet kabul/ret/zaman aşımı/sınır/dolan mikrofon/iptal) ve `tests/chat-feed.test.ts` (sınıflandırma, filtrelerin kaynağı değiştirmemesi, tekilleştirme, yoğun sohbette hediye geçmişi, yeniden bağlanmada sıra).
+`cd app && npm test` — `tests/room-presence.test.ts` (sayım, Balkon/mikrofon geçişleri, ayrılma, tekrar olaylar, çevrimdışı görüntü, gizli giriş, kapasite azalması, yetkiler, odadan çıkarma ve yasak süresi, mikrofon susturma, davet kabul/ret/zaman aşımı/sınır/dolan mikrofon/iptal) ve `tests/chat-feed.test.ts` (sınıflandırma, filtrelerin kaynağı değiştirmemesi, tekilleştirme, yoğun sohbette hediye geçmişi, yeniden bağlanmada sıra).
 
-Playwright (web, 390/360/320 px): sayaç ve pencere başlığı tutarlılığı, Güverte varsayılan sekmesi, davet ve sonucunun duyurulması, tekrar davetin engellenmesi, onaylı odadan çıkarmada sayaçların birlikte düşmesi, kişisel sessiz, oda sahibinin daveti ve kabulde mikrofona geçiş, odadan çıkıp girince tek kayıt, filtre sekmeleri, kaydırma konumunun korunması ve "yeni" düğmesi, bağlantı kopması/geri gelmesi, yatay taşma olmaması.
+Playwright (web, 390/360/320 px): sayaç ve pencere başlığı tutarlılığı, Balkon varsayılan sekmesi, davet ve sonucunun duyurulması, tekrar davetin engellenmesi, onaylı odadan çıkarmada sayaçların birlikte düşmesi, kişisel sessiz, oda sahibinin daveti ve kabulde mikrofona geçiş, odadan çıkıp girince tek kayıt, filtre sekmeleri, kaydırma konumunun korunması ve "yeni" düğmesi, bağlantı kopması/geri gelmesi, yatay taşma olmaması.
 
 ## Bilinen sınırlar ve karar bekleyenler
 

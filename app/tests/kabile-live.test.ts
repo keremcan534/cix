@@ -1,6 +1,6 @@
 /// <reference types="node" />
-// Tayfa has no server yet, so a live build must never charge or credit coins for it on the phone: founding a
-// tayfa, a tayfa gift and a chest all refuse before touching the balance. The demo build keeps working.
+// Aile has no server yet, so a live build must never charge or credit coins for it on the phone: founding a
+// aile, a aile gift and a chest all refuse before touching the balance. The demo build keeps working.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -15,19 +15,19 @@ const spy = <T,>(answer: T) => {
   return { fn, calls };
 };
 
-describe('Tayfa canlı sürümde jeton oynatmaz', () => {
+describe('Aile canlı sürümde jeton oynatmaz', () => {
   test('canlıda kapalı, demoda açık', () => {
     assert.equal(tayfaAvailable(true), false);
     assert.equal(tayfaAvailable(false), true);
   });
 
-  test('canlıda tayfa kurmak jeton almaz, tayfa oluşmaz', () => {
+  test('canlıda aile kurmak jeton almaz, aile oluşmaz', () => {
     const spend = spy(true);
     assert.equal(createKabile('Deneme', spend.fn, true), 'off');
     assert.deepEqual(spend.calls, []);
   });
 
-  test('demoda tayfa kurmak ücreti alır; jeton yetmezse kurulmaz', () => {
+  test('demoda aile kurmak ücreti alır; jeton yetmezse kurulmaz', () => {
     const spend = spy(true);
     const made = createKabile('Gece', spend.fn, false);
     assert.ok(typeof made === 'object');
@@ -37,9 +37,9 @@ describe('Tayfa canlı sürümde jeton oynatmaz', () => {
     assert.equal(createKabile('Boş', broke.fn, false), 'coins');
   });
 
-  test('canlıda tayfa hediyesi jeton almaz', () => {
+  test('canlıda aile hediyesi jeton almaz', () => {
     const spend = spy(true);
-    assert.equal(payKabileGift(100, 'Tayfa sohbeti hediyesi: Gül', spend.fn, true), 'off');
+    assert.equal(payKabileGift(100, 'Aile sohbeti hediyesi: Gül', spend.fn, true), 'off');
     assert.deepEqual(spend.calls, []);
     assert.equal(payKabileGift(100, 'x', spy(true).fn, false), 'ok');
     assert.equal(payKabileGift(100, 'x', spy(false).fn, false), 'coins');

@@ -13,7 +13,8 @@ import { Art } from '@/components/Art';
 import { ContactNote } from '@/components/contact-note';
 import { useReport } from '@/components/report-sheet';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
-import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
+import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
+import { GIFTS, MOMENTS, userById, type Gift, type Moment, type User } from '@/data/mock';
 import {
   AUTHOR_SVIP,
   EXTRA_MOMENTS,
@@ -29,7 +30,8 @@ import {
 import { showAlert } from '@/lib/alert';
 import { newRef } from '@/lib/api';
 import { contactRefusal } from '@/lib/contact-filter';
-import { liveMode, message, toLocal } from '@/lib/live';
+import { liveGift, liveMode, message, toLocal } from '@/lib/live';
+import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import * as live from '@/lib/live/moments';
 import type { PickedImage } from '@/lib/live/profile';
 import { useGreet } from '@/components/use-greet';
@@ -62,6 +64,7 @@ function DemoMoments() {
   const { hasGreeted, greet } = useGreet();
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const gift = useMomentGift();
   const { colors } = useTheme();
   const styles = useStyles();
 
@@ -91,7 +94,12 @@ function DemoMoments() {
         data={feed}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ paddingBottom: 100 }}
-        ListHeaderComponent={<TopicStrip topic={topic} onTopic={setTopic} />}
+        ListHeaderComponent={
+          <>
+            <ComposeBar me={me} onPress={() => setComposing(true)} />
+            <TopicStrip topic={topic} onTopic={setTopic} />
+          </>
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <StateIcon name={tab === 'Arkadaşlar' ? 'people-outline' : 'moon-outline'} />
@@ -133,16 +141,19 @@ function DemoMoments() {
               onComment={() => setCommentsFor(item.id)}
               onShare={() => share(item)}
               onGreet={() => greet(author)}
+              onGift={() => gift.open(author)}
             />
           );
         }}
       />
 
-      <Pressable style={styles.fab} onPress={() => setComposing(true)} accessibilityLabel="Yeni an paylaş">
-        <Ionicons name="paper-plane" size={24} color="#fff" />
+      <Pressable style={styles.fab} onPress={() => setComposing(true)} accessibilityRole="button" accessibilityLabel="Yeni an paylaş">
+        <Ionicons name="add" size={22} color="#fff" />
+        <Text style={styles.fabText}>Paylaş</Text>
       </Pressable>
 
       <Composer visible={composing} onClose={() => setComposing(false)} onPost={post} />
+      {gift.sheet}
       <CommentsSheet
         visible={!!openMoment}
         comments={(openMoment ? (comments[openMoment.id] ?? []) : []).filter((c) => !blocked.has(c.userId))}
@@ -180,6 +191,7 @@ function LiveMoments() {
   const [thread, setThread] = useState<live.LiveComment[] | null>(null);
   const { hasGreeted, greet } = useGreet();
   const report = useReport();
+  const gift = useMomentGift();
   const { colors } = useTheme();
   const styles = useStyles();
   // Only the newest load fills the list (a tab tapped while a slower one is still on its way).
@@ -392,7 +404,12 @@ function LiveMoments() {
         data={shown}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ paddingBottom: 100 }}
-        ListHeaderComponent={<TopicStrip topic={topic} onTopic={pickTopic} showViews={false} />}
+        ListHeaderComponent={
+          <>
+            <ComposeBar me={me} onPress={() => setComposing(true)} />
+            <TopicStrip topic={topic} onTopic={pickTopic} showViews={false} />
+          </>
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
@@ -447,17 +464,20 @@ function LiveMoments() {
               onComment={() => openComments(item)}
               onShare={() => shareMoment(author.name, item.text)}
               onGreet={() => greet(author)}
+              onGift={() => gift.open(author)}
               onMore={() => setMenuFor(item)}
             />
           );
         }}
       />
 
-      <Pressable style={styles.fab} onPress={() => setComposing(true)} accessibilityLabel="Yeni an paylaş">
-        <Ionicons name="paper-plane" size={24} color="#fff" />
+      <Pressable style={styles.fab} onPress={() => setComposing(true)} accessibilityRole="button" accessibilityLabel="Yeni an paylaş">
+        <Ionicons name="add" size={22} color="#fff" />
+        <Text style={styles.fabText}>Paylaş</Text>
       </Pressable>
 
       <Composer visible={composing} onClose={() => setComposing(false)} onPost={post} />
+      {gift.sheet}
       <CommentsSheet
         visible={!!commentsFor}
         loading={thread === null}
@@ -498,6 +518,60 @@ function FeedHeader({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
       </Pressable>
     </View>
   );
+}
+
+/** The row above the feed that says where a post starts (the Paylaş button does the same). */
+function ComposeBar({ me, onPress }: { me: User; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  return (
+    <Pressable style={styles.composeBar} onPress={onPress} accessibilityRole="button" accessibilityLabel="Yeni an paylaş">
+      <FramedAvatar uri={me.avatar} size={38} />
+      <Text style={styles.composeHint} numberOfLines={1}>
+        Bugün neler oluyor? Bir an paylaş…
+      </Text>
+      <Ionicons name="image-outline" size={22} color={colors.primaryText} />
+    </Pressable>
+  );
+}
+
+/**
+ * A gift to a post's writer, from the post (no confirmation, as every gift). Live mode: the server takes the coins at
+ * its price and pays the writer (POST /api/gifts/send, no room); the prototype spends on this phone.
+ */
+function useMomentGift() {
+  const { coins, svipLevel, spendCoins, spendBlock, recordGift, bump } = useApp();
+  const gifts = visibleGifts(GIFTS, useLiveCatalog());
+  const [to, setTo] = useState<User | null>(null);
+  const toWallet = { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') };
+  const send = async (g: Gift): Promise<boolean> => {
+    if (!to) return false;
+    if ((g.minSvip ?? 0) > svipLevel) {
+      showAlert('Üyelere özel hediye', `${g.name}, İnci ${g.minSvip} ve üstü için. Senin seviyen: İnci ${svipLevel}.`);
+      return false;
+    }
+    if (liveMode()) {
+      const limited = spendBlock(g.price);
+      if (limited && limited !== 'Yetersiz bakiye.') {
+        showAlert('Hediye gönderilemedi', limited);
+        return false;
+      }
+      try {
+        await liveGift(to.id, g.id, 1);
+      } catch (e) {
+        showAlert('Hediye gönderilemedi', message(e), [{ text: 'Tamam', style: 'cancel' }, toWallet]);
+        return false;
+      }
+    } else if (!spendCoins(g.price, `Hediye: ${g.name} → ${to.name}`)) {
+      showAlert('Yetersiz jeton', 'Hediye göndermek için jeton yükle.', [{ text: 'Vazgeç', style: 'cancel' }, toWallet]);
+      return false;
+    }
+    recordGift(to.id, g.id, 1);
+    bump('giftsSent', 1);
+    return true;
+  };
+  const sheet = to ? <ProfileGiftSheet visible name={to.name} gifts={gifts} coins={coins} svipLevel={svipLevel} onClose={() => setTo(null)} onSend={send} /> : null;
+  return { open: setTo, sheet };
 }
 
 async function shareMoment(name: string, text: string) {
@@ -571,6 +645,7 @@ function MomentCard({
   onComment,
   onShare,
   onGreet,
+  onGift,
   onMore,
 }: {
   moment: Moment;
@@ -588,10 +663,12 @@ function MomentCard({
   onComment: () => void;
   onShare: () => void;
   onGreet: () => void;
+  /** A gift to the writer (not on my own posts). */
+  onGift?: () => void;
   /** The post's menu (delete my own, report someone else's). */
   onMore?: () => void;
 }) {
-  const { colors, dark } = useTheme();
+  const { colors, dark, semantic } = useTheme();
   const styles = useStyles();
   const female = author.gender === 'Kadın';
   const nameColor = NAME_COLORS[author.id] ? (dark ? NAME_COLORS[author.id] : (LIGHT_NAME_COLOR[NAME_COLORS[author.id]] ?? NAME_COLORS[author.id])) : null;
@@ -651,6 +728,12 @@ function MomentCard({
             </Pressable>
           )}
           <View style={{ flex: 1 }} />
+          {!isMe && onGift && (
+            <Pressable style={styles.action} onPress={onGift} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${author.name} kişisine hediye gönder`}>
+              <Ionicons name="gift-outline" size={20} color={semantic.moneyText} />
+              <Text style={[styles.actionText, { color: semantic.moneyText }]}>Hediye</Text>
+            </Pressable>
+          )}
           <Pressable style={styles.action} onPress={onLike} hitSlop={8}>
             <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={21} color={liked ? colors.pink : colors.textDim} />
             <Text style={[styles.actionText, liked && { color: colors.pink }]}>{likeCount}</Text>
@@ -893,9 +976,11 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     position: 'absolute',
     right: 18,
     bottom: 22,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    height: 52,
+    paddingHorizontal: 20,
+    borderRadius: 26,
+    flexDirection: 'row',
+    gap: 6,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -905,6 +990,9 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
+  fabText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  composeBar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 10, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  composeHint: { flex: 1, color: colors.textDim, fontSize: 14 },
   sheetWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { backgroundColor: colors.card, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 12, paddingBottom: 34 },
   sheetTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },

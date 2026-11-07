@@ -18,7 +18,13 @@ export type LivePeer = { identity: string; name: string; seat: number | null; sp
 export type PeerSignal = { t: 'chat'; text: string };
 /** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
 export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number };
-export type RoomSignal = PeerSignal | GiftSignal;
+/**
+ * An Uğurlu send the server announced (server/api/lucky.mjs): `count` of the package to each of `to`; `best` the
+ * highest multiplier drawn and `bigWin` its reward when the room is told about it (0 otherwise). The name and
+ * emoji come along, so a phone that never opened the Uğurlu shelf still draws it.
+ */
+export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number };
+export type RoomSignal = PeerSignal | GiftSignal | LuckySignal;
 
 /** `send` is false when the voice connection isn't up and nothing went out. */
 type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) => boolean };
@@ -89,7 +95,7 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
   if (from === null) {
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
     if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
-    const g = parseServerGift(raw);
+    const g = parseServerGift(raw) ?? parseServerLucky(raw);
     if (!g || seenGifts.includes(g.msg.eventId)) return;
     seenGifts.push(g.msg.eventId);
     if (seenGifts.length > 200) seenGifts.shift();
@@ -116,6 +122,23 @@ export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal }
   if (!Number.isInteger(m.count) || (m.count as number) <= 0 || (m.count as number) > 10_000) return null;
   if (!Number.isSafeInteger(m.eventId) || (m.eventId as number) <= 0) return null;
   return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
+}
+
+/** The server's Uğurlu packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin }`. */
+export function parseServerLucky(raw: unknown): { from: string; msg: LuckySignal } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (m.type !== 'lucky' || typeof m.giftId !== 'string' || typeof m.from !== 'string' || !m.from) return null;
+  if (typeof m.name !== 'string' || typeof m.emoji !== 'string') return null;
+  if (!Array.isArray(m.to) || !m.to.length || m.to.length > 20 || !m.to.every((t) => typeof t === 'string' && t)) return null;
+  if (!Number.isInteger(m.count) || (m.count as number) <= 0 || (m.count as number) > 10_000) return null;
+  const ids = Array.isArray(m.eventIds) ? m.eventIds : [];
+  if (!ids.length || !ids.every((x) => Number.isSafeInteger(x) && (x as number) > 0)) return null;
+  const n = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : 0);
+  return {
+    from: m.from,
+    msg: { t: 'lucky', giftId: m.giftId.slice(0, 32), name: m.name.slice(0, 30), emoji: m.emoji.slice(0, 8), count: m.count as number, to: m.to as string[], eventId: ids[0] as number, best: n(m.best), bigWin: n(m.bigWin) },
+  };
 }
 
 /** The server's PK packet: a PK started or was cancelled in the room (server/api/pk.mjs); read it from the server. */
@@ -162,7 +185,7 @@ export function onServerRoom(roomId: string, fn: () => void) {
   roomListeners.add(l);
   return () => void roomListeners.delete(l);
 }
-/** Shows the other phones which mic I sit on (null = Güverte). Kept across reconnects by the engine. */
+/** Shows the other phones which mic I sit on (null = Balkon). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);
 /** False when it could not go out (no voice connection yet, or it dropped). */
 export const sendSignal = (msg: PeerSignal) => link?.send(msg) ?? false;

@@ -33,7 +33,7 @@ export const INCOME_LABEL: Record<EarningSource, string> = {
   Görev: 'Görev Ödülü',
   'Ajans bonusu': 'Ajans bonusu',
   'Oda sahibi bonusu': 'Oda sahibi bonusu',
-  'Aile bonusu': 'Tayfa bonusu',
+  'Aile bonusu': 'Aile bonusu',
   'Arama bonusu': 'Arama bonusu',
 };
 

@@ -15,7 +15,7 @@
 // words like 've' between the groups skipped), the word detectors a word view (leetspeak, spaced, dotted or
 // underscored letters, repeated letters, one typo, Turkish suffixes).
 // Ordinary text keeps working: prices and coin amounts, lists of amounts, gift counts, ages, years, times,
-// dates, scores, room numbers and the in-app IDs (12-digit user ID, 8-digit room code, 7-digit Tayfa ID).
+// dates, scores, room numbers and the in-app IDs (12-digit user ID, 8-digit room code, 7-digit Aile ID).
 //
 // Pure module (no React Native imports), so it is unit tested.
 //
@@ -1030,7 +1030,7 @@ export function checkSequence(previous: readonly string[], current: string, rule
 
 /**
  * Where a refusal happened, named like the server's places (core.mjs assertClean): 'dm', 'profile.name',
- * 'room.title', 'room.chat', 'moment.post', 'group.tayfa' …
+ * 'room.title', 'room.chat', 'moment.post', 'group.aile' …
  */
 export type ContactRefusal = { category: ContactCategory; place: string; at: number };
 const refusalListeners = new Set<(r: ContactRefusal) => void>();

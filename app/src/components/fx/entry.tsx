@@ -86,9 +86,9 @@ export function EntryEffect({ show, still, onDone, top = 104 }: { show: EntrySho
   }, [still, enter, exit, shine, burst, travel, flash, look.flash]);
 
   const bannerW = Math.min(width - 24, 420);
-  // A status badge (e.g. "İnci 3") leads the line: "İnci 3 · Ada güverteye çıktı".
+  // A status badge (e.g. "İnci 3") leads the line: "İnci 3 · Ada odaya girdi".
   const who = show.partner ? `${show.name} & ${show.partner.name}` : show.badge ? `${show.badge} · ${show.name}` : show.name;
-  const sub = `${show.partner ? `${show.badge ? `${show.badge} · ` : ''}birlikte ` : show.ride ? `${show.ride} ile ` : ''}güverteye çıktı`;
+  const sub = `${show.partner ? `${show.badge ? `${show.badge} · ` : ''}birlikte ` : show.ride ? `${show.ride} ile ` : ''}odaya girdi`;
   const opacity = exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   return (

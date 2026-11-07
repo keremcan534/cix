@@ -119,11 +119,11 @@ export const familyLevel = (xp: number) => {
   return lvl;
 };
 export const FAMILY_PERKS = [
-  { from: 1, to: 3, text: 'Tayfa sohbeti, temel tayfa rozeti, aktif üye listesi' },
-  { from: 4, to: 6, text: 'Gelişmiş tayfa profili, haftalık hedefler, ek tayfa görselleri' },
-  { from: 7, to: 9, text: 'Özel tayfa temaları, gelişmiş istatistikler, etkinlik araçları' },
-  { from: 10, to: 12, text: 'Daha yüksek üye kapasitesi, gelişmiş tayfa sıralaması, özel rozetler' },
-  { from: 13, to: 15, text: 'Seçkin tayfa görselleri, gelişmiş raporlar, en yüksek bonus oranları' },
+  { from: 1, to: 3, text: 'Aile sohbeti, temel aile rozeti, aktif üye listesi' },
+  { from: 4, to: 6, text: 'Gelişmiş aile profili, haftalık hedefler, ek aile görselleri' },
+  { from: 7, to: 9, text: 'Özel aile temaları, gelişmiş istatistikler, etkinlik araçları' },
+  { from: 10, to: 12, text: 'Daha yüksek üye kapasitesi, gelişmiş aile sıralaması, özel rozetler' },
+  { from: 13, to: 15, text: 'Seçkin aile görselleri, gelişmiş raporlar, en yüksek bonus oranları' },
 ];
 export const familyCapacity = (level: number) => 50 + (level - 1) * 25;
 /** Weekly family bonus = eligible family earnings × level rate; distributed by contribution. */

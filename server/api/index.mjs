@@ -39,6 +39,7 @@ import { HttpError, RawText, allow, auth, claimRef, clientIp, db, env, int, migr
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
+import { luckyRoutes } from './lucky.mjs';
 import { economyRoutes } from './economy.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
@@ -205,6 +206,7 @@ const routes = {
   ...pkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
+  ...luckyRoutes,
   ...purchaseRoutes,
   ...mediaRoutes,
   ...liveRoutes,

@@ -58,7 +58,7 @@ export type Affiliation = { emoji: string; name: string; sub: string; href?: Hre
  * href is set only when the page it opens shows that same agency / kabile (or lets me join it).
  *
  * Live mode: my agency is the server's (lib/live/me-stats, the answer /ajans shows), `known` false until it is
- * in. Kabile (Tayfa) and other people's agencies exist only in the demo, so live mode shows none of them.
+ * in. Kabile (Aile) and other people's agencies exist only in the demo, so live mode shows none of them.
  */
 export function useAffiliations(user: User): { agency: Affiliation | null; kabile: Affiliation | null; known: boolean } {
   const { agencyId, agencyRole, ownedAgency, familyId } = useApp();
@@ -116,9 +116,9 @@ export function AffiliationPills({ user }: { user: User }) {
   const styles = useStyles();
   const { agency, kabile, known } = useAffiliations(user);
   const isMe = user.id === 'me';
-  // Live mode has no Tayfa yet: no pill and no "join" prompt for it.
-  const tayfa = !liveMode();
-  if (!agency && !kabile && (!isMe || (!known && !tayfa))) return null;
+  // Live mode has no Aile yet: no pill and no "join" prompt for it.
+  const aile = !liveMode();
+  if (!agency && !kabile && (!isMe || (!known && !aile))) return null;
   return (
     <View style={styles.pills}>
       {agency ? (
@@ -127,9 +127,9 @@ export function AffiliationPills({ user }: { user: User }) {
         isMe && known && <Pill icon="business" label="Ajans yok · Katıl" empty a11y="Ajans: yok. Ajansa katıl" href="/ajans" />
       )}
       {kabile ? (
-        <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Tayfa: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
+        <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Aile: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
       ) : (
-        isMe && tayfa && <Pill icon="people" label="Tayfa yok · Katıl" empty a11y="Tayfa: yok. Bir tayfaya katıl" href={KABILE_ROUTES.profile} />
+        isMe && aile && <Pill icon="people" label="Aile yok · Katıl" empty a11y="Aile: yok. Bir aileye katıl" href={KABILE_ROUTES.profile} />
       )}
     </View>
   );

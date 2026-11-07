@@ -11,7 +11,7 @@
 // words like 've' between the groups skipped), the word detectors a word view (leetspeak, spaced, dotted or
 // underscored letters, repeated letters, one typo, Turkish suffixes).
 // Ordinary text keeps working: prices and coin amounts, lists of amounts, gift counts, ages, years, times,
-// dates, scores, room numbers and the in-app IDs (12-digit user ID, 8-digit room code, 7-digit Tayfa ID).
+// dates, scores, room numbers and the in-app IDs (12-digit user ID, 8-digit room code, 7-digit Aile ID).
 //
 // Pure module (no Node or database imports) so the app can run the same rules before it sends.
 //

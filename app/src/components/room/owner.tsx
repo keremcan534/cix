@@ -271,7 +271,7 @@ export function RoomInfoSheet({
   onSettings: () => void;
   onShare: () => void;
   onInvite: () => void;
-  /** A server room: room membership and Tayfa aren't on the server yet, so the card doesn't show them. */
+  /** A server room: room membership and Aile aren't on the server yet, so the card doesn't show them. */
   live?: boolean;
 }) {
   const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
@@ -322,16 +322,16 @@ export function RoomInfoSheet({
               </LinearGradient>
             </Pressable>
             {!live && (
-              <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Tayfa">
+              <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Aile">
                 <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
-                  <Text style={styles.cardLabel}>Tayfa</Text>
+                  <Text style={styles.cardLabel}>Aile</Text>
                   {clan?.art ? (
                     <ArtText art={clan.art} size={26} style={styles.cardValue}>
                       {clan.label}
                     </ArtText>
                   ) : (
                     <Text style={styles.cardValue} numberOfLines={1}>
-                      {clan ? clan.label : owner ? '+ Tayfa kur / katıl' : 'Yok'}
+                      {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
                     </Text>
                   )}
                 </LinearGradient>

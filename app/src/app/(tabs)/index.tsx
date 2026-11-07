@@ -363,7 +363,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
           style={styles.catFade}
         />
       </View>
-      {/* Tayfa (groups) is local-only: a live build doesn't offer it until the server has it. */}
+      {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
       {!liveMode() && (
         <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
           <LinearGradient colors={gradientDeep} style={styles.catIcon}>

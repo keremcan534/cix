@@ -34,7 +34,7 @@ Finans yönetimi (kurallar, ödeme onayı/reddi, mutabakat) mobil uygulamada yer
 - **Gelir** ekranı: toplam elmasın altında iki parça (çubuk + iki kutu) **Çekilebilir kazanç** ve **Kilitli elmas**; ilk kilidin ne zaman açılacağı yazar. Altında **Kilitli elmas** listesi: tutar, gönderen, hangi jetonla (Mağaza jetonu · 7 gün / Jeton Noktası · 1 gün), kalan süre ve ilerleme çubuğu.
 - Çevir, Para çek, Anında bozdur ve Jeton Noktası > Yayıncı kazancı yalnız çekilebilir kısmı kullanır; kilitli tutar istenirse sunucuyla aynı mesaj çıkar ("… elmasın kilidi henüz açılmadı; çekilebilir bakiyen … elmas").
 - Kilit süresi dolunca elmas kendiliğinden çekilebilir kazanca geçer ve "Kilitli elmasların açıldı" bildirimi gelir (uygulama kapalıyken açılanlar için ilk açılışta).
-- Hediye, arama ve bunların bonusları kilitlenir; görev, ajans ve tayfa bonusu kilitlenmez. Uygulama gönderenin jetonunun kaynağını göremediği için yerel demoda hep 7 gün varsayar; gerçek kaynak ve kilit sunucudadır (`GET /api/wallet/earnings`). Süreler `rules.ts`: `pendingDays` (7), `jetonPendingDays` (1). Testler: `app/tests/diamond-locks.test.ts`.
+- Hediye, arama ve bunların bonusları kilitlenir; görev, ajans ve aile bonusu kilitlenmez. Uygulama gönderenin jetonunun kaynağını göremediği için yerel demoda hep 7 gün varsayar; gerçek kaynak ve kilit sunucudadır (`GET /api/wallet/earnings`). Süreler `rules.ts`: `pendingDays` (7), `jetonPendingDays` (1). Testler: `app/tests/diamond-locks.test.ts`.
 
 ## Komisyonlar (yayıncıdan kesilmez)
 - Ajans: `agencyCommission` (%40) × bağlı yayıncıların uygun kazancı.

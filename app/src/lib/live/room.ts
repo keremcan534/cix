@@ -75,8 +75,9 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
     if (!enabled) return;
     return onSignal(roomId, (from, msg) => {
       const sender = toLocal(from);
-      if (msg.t === 'gift' && sender === 'me') return;
-      if (msg.t === 'gift' && msg.to.some((t) => toLocal(t) === 'me')) void refreshWallet().catch(() => {});
+      const gift = msg.t === 'gift' || msg.t === 'lucky';
+      if (gift && sender === 'me') return;
+      if (gift && msg.to.some((t) => toLocal(t) === 'me')) void refreshWallet().catch(() => {});
       hooksRef.current.onSignal(sender, msg);
     });
   }, [enabled, roomId]);

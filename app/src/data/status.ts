@@ -36,11 +36,11 @@ export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?
 
 // --- Rütbe (noble): bought with coins for 30 days -------------------------------------
 export const NOBLE_TIERS = [
-  { tier: 1, name: 'Gemici', emoji: '🛡️', art: 'asil-1-sovalye' as ArtName, price: 15_000, rights: 4, colors: ['#94A3B8', '#334155'] as [string, string] },
-  { tier: 2, name: 'Dümenci', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 6, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
-  { tier: 3, name: 'Lostromo', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 8, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
-  { tier: 4, name: 'Amiral', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 10, colors: ['#F472B6', '#BE123C'] as [string, string] },
-  { tier: 5, name: 'Kaptan-ı Derya', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 12, colors: ['#FCD34D', '#B45309'] as [string, string] },
+  { tier: 1, name: 'Çavuş', emoji: '🛡️', art: 'asil-1-sovalye' as ArtName, price: 15_000, rights: 4, colors: ['#94A3B8', '#334155'] as [string, string] },
+  { tier: 2, name: 'Yüzbaşı', emoji: '🗡️', art: 'asil-2-vikont' as ArtName, price: 60_000, rights: 6, colors: ['#2DD4BF', '#0F766E'] as [string, string] },
+  { tier: 3, name: 'Binbaşı', emoji: '⚔️', art: 'asil-3-kont' as ArtName, price: 150_000, rights: 8, colors: ['#60A5FA', '#1D4ED8'] as [string, string] },
+  { tier: 4, name: 'Albay', emoji: '🏹', art: 'asil-4-markiz' as ArtName, price: 400_000, rights: 10, colors: ['#F472B6', '#BE123C'] as [string, string] },
+  { tier: 5, name: 'Paşa', emoji: '🦁', art: 'asil-5-duk' as ArtName, price: 1_000_000, rights: 12, colors: ['#FCD34D', '#B45309'] as [string, string] },
 ];
 export const NOBLE_DAYS = 30;
 /** Ordered so that tier n has the first `rights` entries; GATES below read rights by name. */
@@ -56,7 +56,7 @@ export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName }[] = [
   { name: 'Gizli oda girişi', emoji: '👻' },
   { name: 'Arkadaşına jeton gönder', emoji: '💗', art: 'ayricalik-jeton-hediye-et' },
   { name: 'Sıralamada gizli kalma', emoji: '🕵️' },
-  { name: 'Tayfa içinde görünmezlik', emoji: '🎭' },
+  { name: 'Aile içinde görünmezlik', emoji: '🎭' },
 ];
 export const nobleInfo = (tier: number) => NOBLE_TIERS.find((t) => t.tier === tier);
 export const hasNobleRight = (tier: number, name: string) => {
@@ -103,9 +103,9 @@ export const VIP_GIFT_PACK: { name: string; emoji: string; art: ArtName; days: n
 
 // --- Gates used across the app (admin-configurable in the real product) -------------------
 export const GATES = {
-  /** Game center: İnci 2 or Dümenci+ */
+  /** Game center: İnci 2 or Yüzbaşı+ */
   games: (svip: number, noble: number) => svip >= 2 || noble >= 2,
-  /** Invisible room entry: Rütbe right "Gizli oda girişi" (Amiral+) */
+  /** Invisible room entry: Rütbe right "Gizli oda girişi" (Albay+) */
   invisibleEntry: (noble: number) => hasNobleRight(noble, 'Gizli oda girişi'),
   /** Entry banner: Rütbe "Giriş karşılaması" or İnci "Özel giriş duyurusu" */
   entryBanner: (svip: number, noble: number) => noble >= 1 || svip >= 1,

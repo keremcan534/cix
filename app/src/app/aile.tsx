@@ -65,10 +65,10 @@ const WEEK_SHARE = [0.1, 0.12, 0.15, 0.13, 0.18, 0.17, 0.15];
 const activity = (id: string, i: number) => ({ days: id === 'me' ? 4 : (i * 3 + 2) % 8, contribution: id === 'me' ? 2_500 : Math.max(0, (9 - i) * 2_600 - (i % 3) * 900) });
 const isActive = (a: { days: number; contribution: number }) => a.days >= 3 && a.contribution >= 1_000;
 
-// Tayfa has no server yet (data/kabile tayfaAvailable): a live build shows a notice instead of sample tayfas and
-// a "Tayfa kur" that would take real coins for a tayfa that exists only on this phone.
+// Aile has no server yet (data/kabile tayfaAvailable): a live build shows a notice instead of sample families and
+// a "Aile kur" that would take real coins for a aile that exists only on this phone.
 export default function FamilyScreen() {
-  return liveMode() ? <ComingSoon title="Tayfalar" /> : <DemoFamilies />;
+  return liveMode() ? <ComingSoon title="Aileler" /> : <DemoFamilies />;
 }
 
 function DemoFamilies() {
@@ -85,33 +85,33 @@ function DemoFamilies() {
   return (
     <SafeAreaView style={styles.safe}>
       <Backdrop scene={SCENES.family} />
-      <Header title="Tayfalar" />
+      <Header title="Aileler" />
       <KeyboardAvoid style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
           {creating ? (
             <Card style={{ gap: 10 }}>
-              <Text style={styles.title}>Tayfa kur · 🪙 {KABILE_CREATE_COST}</Text>
-              <TextInput value={newName} onChangeText={setNewName} placeholder="Tayfa adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
-              <Text style={styles.dim}>Tayfayı kuran kişi tayfa lideri olur; yardımcı atayabilir, üye davet edebilir ve başvuruları onaylayabilir.</Text>
+              <Text style={styles.title}>Aile kur · 🪙 {KABILE_CREATE_COST}</Text>
+              <TextInput value={newName} onChangeText={setNewName} placeholder="Aile adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={20} />
+              <Text style={styles.dim}>Aileyi kuran kişi aile lideri olur; yardımcı atayabilir, üye davet edebilir ve başvuruları onaylayabilir.</Text>
               <GradientButton
                 title="Kur"
                 onPress={() => {
-                  if (newName.trim().length < 3) return showAlert('Tayfa adı en az 3 karakter olmalı');
+                  if (newName.trim().length < 3) return showAlert('Aile adı en az 3 karakter olmalı');
                   // Checked before the coins are spent; the name stays in the input.
                   const refusal = contactRefusal(newName.trim(), 'tayfa.name');
                   if (refusal) return showAlert(CONTACT_TITLE, refusal);
                   const made = createKabile(newName.trim(), spendCoins);
                   if (made === 'off') return;
-                  if (made === 'coins') return showAlert('Yetersiz jeton', `Tayfa kurmak ${KABILE_CREATE_COST} jeton.`);
+                  if (made === 'coins') return showAlert('Yetersiz jeton', `Aile kurmak ${KABILE_CREATE_COST} jeton.`);
                   setFamily(made.id);
                   setFamilyRole('owner');
                 }}
               />
             </Card>
           ) : (
-            <GradientButton title="Kendi tayfanı kur" icon="add" onPress={() => setCreating(true)} />
+            <GradientButton title="Kendi aileni kur" icon="add" onPress={() => setCreating(true)} />
           )}
-          <Text style={[styles.title, { marginTop: 6 }]}>Haftalık tayfa sıralaması</Text>
+          <Text style={[styles.title, { marginTop: 6 }]}>Haftalık aile sıralaması</Text>
           {ranked.map((f, i) => {
             const lvl = familyLevel(f.xp);
             return (
@@ -137,14 +137,14 @@ function DemoFamilies() {
                   onPress={() => {
                     setFamily(f.id);
                     setFamilyRole('member');
-                    showAlert('Başvurun onaylandı', `${f.name} tayfasına katıldın. (Demo: başvuru lider/yardımcı tarafından anında onaylandı.)`);
+                    showAlert('Başvurun onaylandı', `${f.name} ailesine katıldın. (Demo: başvuru lider/yardımcı tarafından anında onaylandı.)`);
                   }}>
                   <Text style={{ color: '#fff', fontWeight: '700' }}>Katıl</Text>
                 </Pressable>
               </Card>
             );
           })}
-          <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kullanıcı aynı anda yalnızca bir tayfaya üye olabilir.</Text>
+          <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kullanıcı aynı anda yalnızca bir aileye üye olabilir.</Text>
         </ScrollView>
       </KeyboardAvoid>
     </SafeAreaView>
@@ -197,8 +197,8 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
   const featured = rows.find((r) => r.id !== 'me') ?? rows[0];
 
   const leave = () => {
-    if (role === 'owner') return showAlert('Önce liderliği devret', 'Tayfa lideri ayrılmadan önce liderliği bir yardımcıya devretmelidir.');
-    showAlert('Tayfadan ayrıl', 'Ayrılırsan bu haftaki tayfa bonusu payını kaybedersin.', [
+    if (role === 'owner') return showAlert('Önce liderliği devret', 'Aile lideri ayrılmadan önce liderliği bir yardımcıya devretmelidir.');
+    showAlert('Aileden ayrıl', 'Ayrılırsan bu haftaki aile bonusu payını kaybedersin.', [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Ayrıl', style: 'destructive', onPress: onLeave },
     ]);
@@ -215,7 +215,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         ...(role === 'owner' && roleOf(menuFor) === 'member' ? [{ label: 'Yardımcı yap', icon: 'shield-checkmark-outline' as const, onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'helper' })) }] : []),
         ...(role === 'owner' && roleOf(menuFor) === 'helper' ? [{ label: 'Yardımcılığı kaldır', icon: 'shield-outline' as const, onPress: () => setRoles((r) => ({ ...r, [menuFor]: 'member' })) }] : []),
         ...(canManage && roleOf(menuFor) === 'member'
-          ? [{ label: 'Tayfadan çıkar', icon: 'person-remove-outline' as const, destructive: true, onPress: () => setMemberIds((m) => m.filter((x) => x !== menuFor)) }]
+          ? [{ label: 'Aileden çıkar', icon: 'person-remove-outline' as const, destructive: true, onPress: () => setMemberIds((m) => m.filter((x) => x !== menuFor)) }]
           : []),
         { label: 'Engelle', icon: 'ban-outline' as const, destructive: true, onPress: () => toggleBlock(menuFor) },
         { label: 'Şikâyet et', icon: 'flag-outline' as const, onPress: () => showAlert('Şikâyet alındı', 'Moderasyon ekibi inceleyecek.') },
@@ -223,7 +223,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
     : [];
 
   const report = () => {
-    const number = createTicket('Şikâyet', `Tayfa şikayeti: ${family.name} (ID ${meta.tagId})`);
+    const number = createTicket('Şikâyet', `Aile şikayeti: ${family.name} (ID ${meta.tagId})`);
     showAlert('Şikayet alındı', `Talep #${number} oluşturuldu. Moderasyon ekibi inceleyecek.`);
   };
 
@@ -240,7 +240,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 <Ionicons name="arrow-back" size={26} color="#fff" />
               </Pressable>
               <View style={{ flex: 1 }} />
-              <Pressable style={styles.topBtn} onPress={() => setSheet('rules')} accessibilityLabel="Tayfa kuralları">
+              <Pressable style={styles.topBtn} onPress={() => setSheet('rules')} accessibilityLabel="Aile kuralları">
                 <Ionicons name="document-text-outline" size={20} color="#fff" />
               </Pressable>
               <Pressable style={[styles.topBtn, { flexDirection: 'row', gap: 6, paddingHorizontal: 12 }]} onPress={() => setSheet('stats')} accessibilityLabel="Veri Merkezi">
@@ -279,7 +279,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               </View>
             </View>
 
-            <Pressable onPress={() => setTab('durum')} accessibilityLabel="Tayfa seviyesi">
+            <Pressable onPress={() => setTab('durum')} accessibilityLabel="Aile seviyesi">
               <LinearGradient colors={['#047857', '#14532D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.levelCard}>
                 <View style={styles.row}>
                   <View style={{ flex: 1 }}>
@@ -301,7 +301,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 </View>
                 <Pressable
                   style={[styles.row, { marginTop: 8, gap: 6 }]}
-                  onPress={() => showAlert('Seviyeyi koruma', `Tayfanın ${tier.name} kademesinde kalması için her hafta toplam ${fmt(KEEP_GOAL)} katkı puanı toplaması gerekir. Hedefe ulaşılamazsa haftalık kapanışta bir kademe düşer.`)}>
+                  onPress={() => showAlert('Seviyeyi koruma', `Ailenin ${tier.name} kademesinde kalması için her hafta toplam ${fmt(KEEP_GOAL)} katkı puanı toplaması gerekir. Hedefe ulaşılamazsa haftalık kapanışta bir kademe düşer.`)}>
                   <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>Seviyeyi koruma ilerlemesi ⓘ</Text>
                   <Text style={{ color: '#fff', fontWeight: '800' }}>
                     {fmt(keep)}/{fmt(KEEP_GOAL)}
@@ -314,7 +314,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
 
           <View style={styles.body}>
             <View style={styles.row}>
-              <Text style={[styles.sectionTitle, { flex: 1 }]}>Tayfa Duyurusu</Text>
+              <Text style={[styles.sectionTitle, { flex: 1 }]}>Aile Duyurusu</Text>
               {canManage && annDraft === null && (
                 <Pressable onPress={() => setAnnDraft(announcement)} hitSlop={8} accessibilityLabel="Duyuruyu düzenle">
                   <Ionicons name="create-outline" size={18} color={colors.textDim} />
@@ -346,8 +346,8 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             )}
 
             <View style={[styles.row, { marginTop: 16 }]}>
-              <Text style={styles.sectionTitle}>Tayfa Etiketi</Text>
-              <Pressable style={[styles.row, { gap: 4 }]} onPress={() => copyText(String(meta.tagId), 'Tayfa ID')} accessibilityLabel="Tayfa ID kopyala">
+              <Text style={styles.sectionTitle}>Aile Etiketi</Text>
+              <Pressable style={[styles.row, { gap: 4 }]} onPress={() => copyText(String(meta.tagId), 'Aile ID')} accessibilityLabel="Aile ID kopyala">
                 <Text style={styles.dim}>ID:{meta.tagId}</Text>
                 <Ionicons name="copy-outline" size={14} color={colors.textDim} />
               </Pressable>
@@ -379,7 +379,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
               </Pressable>
               <Pressable style={[styles.miniCard, { backgroundColor: '#065A60' }]} onPress={() => setSheet('ranking')}>
                 <Text style={styles.miniTitle} numberOfLines={1}>
-                  Haftalık Tayfa Sıralaması
+                  Haftalık Aile Sıralaması
                 </Text>
                 <Text style={{ color: '#fff', fontSize: 13 }}>{meta.weeklyRank ? `No.${meta.weeklyRank}` : 'Sırasız'}</Text>
                 <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{fmtK(weeklyPower)} puan</Text>
@@ -416,11 +416,11 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                       ))}
                     </ScrollView>
                   )}
-                  <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Tayfa odası">
+                  <Pressable style={styles.roomCard} onPress={() => router.push(`/oda/${meta.roomId}`)} accessibilityLabel="Aile odası">
                     <Text style={{ fontSize: 22 }}>🎙️</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.text, fontWeight: '800' }}>Tayfa odası</Text>
-                      <Text style={styles.dim}>Tayfa odasında 15 dakika kal görevi buradan sayılır</Text>
+                      <Text style={{ color: colors.text, fontWeight: '800' }}>Aile odası</Text>
+                      <Text style={styles.dim}>Aile odasında 15 dakika kal görevi buradan sayılır</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
                   </Pressable>
@@ -467,7 +467,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             {tab === 'durum' && (
               <>
                 <Card style={{ gap: 6 }}>
-                  <Text style={styles.title}>Tayfa seviyesi · Lv.{lvl}</Text>
+                  <Text style={styles.title}>Aile seviyesi · Lv.{lvl}</Text>
                   <Text style={styles.dim}>
                     {totalMembers}/{familyCapacity(lvl)} üye · {activeRows.length} aktif · Lider: {userOf(family.leaderId).name} · Rolün: {ROLE_LABEL[role]}
                   </Text>
@@ -477,9 +477,9 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                   <Text style={styles.dim}>{next ? `${fmt(family.xp)} / ${fmt(next)} XP → Lv.${lvl + 1}` : 'En yüksek seviye'}</Text>
                 </Card>
                 <Card style={{ gap: 6 }}>
-                  <Text style={styles.title}>Bu haftaki tayfa bonusu</Text>
+                  <Text style={styles.title}>Bu haftaki aile bonusu</Text>
                   <Text style={styles.dim}>
-                    Uygun tayfa kazancı 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = <Text style={{ color: colors.gold, fontWeight: '800' }}>💎 {fmt(pool)}</Text>
+                    Uygun aile kazancı 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = <Text style={{ color: colors.gold, fontWeight: '800' }}>💎 {fmt(pool)}</Text>
                   </Text>
                   <Text style={styles.dim}>
                     Senin tahmini payın: <Text style={{ color: colors.text, fontWeight: '700' }}>💎 {fmt(myShare)}</Text>
@@ -521,7 +521,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                           <Pressable
                             style={[styles.small, { backgroundColor: semantic.successFill }]}
                             onPress={() => {
-                              if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `Lv.${lvl} tayfa en fazla ${familyCapacity(lvl)} üye alabilir.`);
+                              if (totalMembers >= familyCapacity(lvl)) return showAlert('Kapasite dolu', `Lv.${lvl} aile en fazla ${familyCapacity(lvl)} üye alabilir.`);
                               setPending((p) => p.filter((x) => x !== id));
                               setMemberIds((m) => [...m, id]);
                             }}>
@@ -537,9 +537,9 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 )}
                 <Card style={{ gap: 4 }}>
                   <Text style={styles.title}>Roller</Text>
-                  <Text style={styles.dim}>👑 Lider: yardımcı atar/kaldırır, üye çıkarır, tayfa ayarlarını ve duyuruyu yönetir, liderliği devreder.</Text>
+                  <Text style={styles.dim}>👑 Lider: yardımcı atar/kaldırır, üye çıkarır, aile ayarlarını ve duyuruyu yönetir, liderliği devreder.</Text>
                   <Text style={styles.dim}>🛡️ Yardımcı: üye davet eder, başvuruları onaylar, sohbeti ve duyuruyu yönetir, normal üyeleri çıkarabilir.</Text>
-                  <Text style={styles.dim}>Üye: sohbete katılır, tayfa odalarına girer, katkı verir ve aktifse bonus payı alır.</Text>
+                  <Text style={styles.dim}>Üye: sohbete katılır, aile odalarına girer, katkı verir ve aktifse bonus payı alır.</Text>
                   <Text style={[styles.dim, { marginTop: 4 }]}>Üye yönetimi için Oda sekmesindeki üyeye dokun.</Text>
                 </Card>
                 <Card style={{ gap: 6 }}>
@@ -548,10 +548,10 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                 </Card>
                 <Card style={{ gap: 6 }}>
                   <Text style={styles.title}>Haftalık bonus hesaplama</Text>
-                  <Text style={styles.dim}>Tayfa bonusu = haftalık uygun tayfa kazancı × seviye oranı</Text>
+                  <Text style={styles.dim}>Aile bonusu = haftalık uygun aile kazancı × seviye oranı</Text>
                   <Text style={styles.dim}>Örnek: 💎 100.000 × %3,25 = 💎 {fmt(Math.round(100_000 * 0.0325))}</Text>
                   <Text style={styles.dim}>
-                    Bu tayfa: 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = 💎 {fmt(pool)} → {activeRows.length} aktif üyeye katkıya göre
+                    Bu aile: 💎 {fmt(family.weekly)} × {pct(RULES.familyRates[lvl - 1])} = 💎 {fmt(pool)} → {activeRows.length} aktif üyeye katkıya göre
                   </Text>
                   {activeRows.slice(0, 5).map((r) => (
                     <Text key={r.id} style={styles.dim}>
@@ -590,7 +590,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                   <Text style={styles.dim}>Oranlar merkezi yönetim panelinden değiştirilebilir; geçmiş haftalar değişmez.</Text>
                 </Card>
                 <Pressable onPress={leave} style={{ alignItems: 'center', padding: 8 }}>
-                  <Text style={{ color: colors.red, fontWeight: '600' }}>Tayfadan ayrıl</Text>
+                  <Text style={{ color: colors.red, fontWeight: '600' }}>Aileden ayrıl</Text>
                 </Pressable>
               </>
             )}
@@ -618,11 +618,11 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
       <ActionSheet visible={!!menuFor} title={target?.name ?? ''} onClose={() => setMenuFor(null)} options={memberOptions} />
       <ActionSheet
         visible={inviteOpen}
-        title="Tayfaya davet et"
+        title="Aileye davet et"
         onClose={() => setInviteOpen(false)}
         options={USERS.filter((u) => !memberIds.includes(u.id) && !pending.includes(u.id))
           .slice(0, 6)
-          .map((u) => ({ label: u.name, onPress: () => showAlert('Davet gönderildi', `${u.name} kabul ederse tayfaya katılır.`) }))}
+          .map((u) => ({ label: u.name, onPress: () => showAlert('Davet gönderildi', `${u.name} kabul ederse aileye katılır.`) }))}
       />
       <ActionSheet
         visible={moreOpen}
@@ -630,20 +630,20 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         onClose={() => setMoreOpen(false)}
         options={[
           { label: 'Veri Merkezi', icon: 'stats-chart-outline' as const, onPress: () => setSheet('stats') },
-          { label: 'Tayfa kuralları', icon: 'document-text-outline' as const, onPress: () => setSheet('rules') },
+          { label: 'Aile kuralları', icon: 'document-text-outline' as const, onPress: () => setSheet('rules') },
           { label: familyMuted ? 'Sohbet bildirimlerini aç' : 'Sohbeti sessize al', icon: familyMuted ? ('notifications-outline' as const) : ('notifications-off-outline' as const), onPress: () => setFamilyMuted(!familyMuted) },
           ...(canManage ? [{ label: 'Üye davet et', icon: 'person-add-outline' as const, onPress: () => setInviteOpen(true) }] : []),
-          { label: 'Tayfayı şikâyet et', icon: 'flag-outline' as const, onPress: report },
-          { label: 'Tayfadan ayrıl', icon: 'exit-outline' as const, destructive: true, onPress: leave },
+          { label: 'Aileyi şikâyet et', icon: 'flag-outline' as const, onPress: report },
+          { label: 'Aileden ayrıl', icon: 'exit-outline' as const, destructive: true, onPress: leave },
         ]}
       />
       <ActionSheet
         visible={shareOpen}
-        title="Tayfayı paylaş"
+        title="Aileyi paylaş"
         onClose={() => setShareOpen(false)}
         options={[
-          { label: 'Bağlantıyı paylaş', icon: 'link-outline' as const, onPress: () => Share.share({ message: `${family.emoji} ${family.name} tayfasına katıl! Tayfa ID: ${meta.tagId}` }).catch(() => {}) },
-          { label: 'Arkadaşlarını davet et', icon: 'people-outline' as const, onPress: () => (canManage ? setInviteOpen(true) : copyText(`Tayfa ID: ${meta.tagId}`, 'Davet bilgisi')) },
+          { label: 'Bağlantıyı paylaş', icon: 'link-outline' as const, onPress: () => Share.share({ message: `${family.emoji} ${family.name} ailesine katıl! Aile ID: ${meta.tagId}` }).catch(() => {}) },
+          { label: 'Arkadaşlarını davet et', icon: 'people-outline' as const, onPress: () => (canManage ? setInviteOpen(true) : copyText(`Aile ID: ${meta.tagId}`, 'Davet bilgisi')) },
         ]}
       />
 
@@ -654,7 +654,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
           <Stat label="Haftalık sıra" value={meta.weeklyRank ? `No.${meta.weeklyRank}` : '—'} />
           <Stat label="Üyeler" value={`${totalMembers}/${familyCapacity(lvl)}`} />
           <Stat label="Aktif üye" value={String(activeRows.length)} />
-          <Stat label="Tayfa Sandığı" value={`🔮 ${fmt(meta.treasure + progress.addedTreasure)}`} />
+          <Stat label="Aile Sandığı" value={`🔮 ${fmt(meta.treasure + progress.addedTreasure)}`} />
           <Stat label="Haftalık uygun kazanç" value={`💎 ${fmt(family.weekly)}`} />
           <Stat label="Bonus havuzu" value={`💎 ${fmt(pool)}`} />
           <Stat label="Tahmini payın" value={`💎 ${fmt(myShare)}`} />
@@ -672,16 +672,16 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
         <Text style={[styles.dim, { marginTop: 8 }]}>Günlük dağılım örnek veridir (demo).</Text>
       </InfoSheet>
 
-      <InfoSheet visible={sheet === 'rules'} title="📜 Tayfa kuralları" onClose={() => setSheet(null)}>
-        <Text style={styles.dim}>• Bir kullanıcı aynı anda yalnızca bir tayfaya üye olabilir.</Text>
+      <InfoSheet visible={sheet === 'rules'} title="📜 Aile kuralları" onClose={() => setSheet(null)}>
+        <Text style={styles.dim}>• Bir kullanıcı aynı anda yalnızca bir aileye üye olabilir.</Text>
         <Text style={styles.dim}>• Aktif üye: hafta içinde en az 3 gün aktif ve en az 1.000 geçerli katkı puanı.</Text>
-        <Text style={styles.dim}>• Haftalık tayfa bonusu = uygun tayfa kazancı × seviye oranı ({pct(RULES.familyRates[lvl - 1])}); aktif üyelere katkı oranına göre dağıtılır.</Text>
+        <Text style={styles.dim}>• Haftalık aile bonusu = uygun aile kazancı × seviye oranı ({pct(RULES.familyRates[lvl - 1])}); aktif üyelere katkı oranına göre dağıtılır.</Text>
         <Text style={styles.dim}>• Kademeyi korumak için haftalık {fmt(KEEP_GOAL)} katkı puanı gerekir.</Text>
         <Text style={styles.dim}>• Sandık ve görev ödülleri sabittir; rastgele ödül yoktur.</Text>
         <Text style={styles.dim}>• Taciz, sahte etkileşim ve hediye iadesi istismarı yasaktır; bu katkılar sayılmaz.</Text>
       </InfoSheet>
 
-      <InfoSheet visible={sheet === 'ranking'} title="🏆 Haftalık Tayfa Sıralaması" onClose={() => setSheet(null)}>
+      <InfoSheet visible={sheet === 'ranking'} title="🏆 Haftalık Aile Sıralaması" onClose={() => setSheet(null)}>
         {[...FAMILIES]
           .sort((a, b) => kabileMeta(b.id).weeklyPower - kabileMeta(a.id).weeklyPower)
           .map((f) => {
@@ -777,7 +777,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
         <Text style={{ fontSize: 30 }}>🧰</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Haftalık sandıklar</Text>
-          <Text style={styles.dim}>{readyChests ? `${readyChests} sandık alınmayı bekliyor` : 'Yeni sandık için tayfanın katkı puanını artır'}</Text>
+          <Text style={styles.dim}>{readyChests ? `${readyChests} sandık alınmayı bekliyor` : 'Yeni sandık için ailenin katkı puanını artır'}</Text>
         </View>
         <Pressable style={[styles.small, { backgroundColor: colors.primary }]} onPress={() => router.push(KABILE_ROUTES.merkez)}>
           <Text style={styles.smallText}>Aç</Text>
@@ -785,7 +785,7 @@ function TasksTab({ roomId, weeklyPower }: { roomId: string; weeklyPower: number
       </Card>
       <Pressable style={[styles.roomCard, { backgroundColor: colors.card }, lift]} onPress={() => router.push(`/oda/${roomId}`)}>
         <Text style={{ fontSize: 22 }}>🎙️</Text>
-        <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}>Tayfa odasına git</Text>
+        <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}>Aile odasına git</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
       </Pressable>
     </>
@@ -833,7 +833,7 @@ function CoupleTab() {
             <Text style={{ color: dark ? '#F9A8D4' : semantic.socialText, fontWeight: '700' }}>{fmtK(c.score)} ❤</Text>
           </View>
         ))}
-        <Text style={styles.dim}>Dostlar aynı tayfadaysa tayfa avantajlarından da yararlanır.</Text>
+        <Text style={styles.dim}>Dostlar aynı ailedeyse aile avantajlarından da yararlanır.</Text>
       </Card>
       <GradientButton title="Uyum Köşesi" icon="heart" onPress={() => router.push(KABILE_ROUTES.iliski)} />
     </>
@@ -845,8 +845,8 @@ function ThemeTab({ themeId, onPick, level, canManage }: { themeId: string; onPi
   const styles = useStyles();
   return (
     <Card style={{ gap: 10 }}>
-      <Text style={styles.title}>Tayfa teması</Text>
-      <Text style={styles.dim}>{canManage ? 'Tema tayfa profilinin üst kısmında herkes için görünür.' : 'Temayı yalnızca lider ve yardımcılar değiştirebilir.'}</Text>
+      <Text style={styles.title}>Aile teması</Text>
+      <Text style={styles.dim}>{canManage ? 'Tema aile profilinin üst kısmında herkes için görünür.' : 'Temayı yalnızca lider ve yardımcılar değiştirebilir.'}</Text>
       <View style={styles.themeGrid}>
         {KABILE_THEMES.map((t) => {
           const locked = level < t.minLevel;
@@ -856,7 +856,7 @@ function ThemeTab({ themeId, onPick, level, canManage }: { themeId: string; onPi
               key={t.id}
               style={[styles.themeItem, active && { borderColor: colors.gold }]}
               onPress={() => {
-                if (locked) return showAlert('Kilitli tema', `${t.name} Lv.${t.minLevel} tayfalarda açılır.`);
+                if (locked) return showAlert('Kilitli tema', `${t.name} Lv.${t.minLevel} ailelerde açılır.`);
                 if (!canManage) return showAlert('Yetki yok', 'Temayı yalnızca lider ve yardımcılar değiştirebilir.');
                 onPick(t.id);
               }}

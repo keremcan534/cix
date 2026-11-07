@@ -28,17 +28,20 @@ import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
 import { roomLevel } from './rooms.mjs';
 
-const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
+export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
 const PERIODS = ['day', 'week', 'month'];
 /** A server room's LiveKit name (rooms.mjs liveKitName), from its id or that name; null for anything else. */
-const liveKitRoom = (room) => {
+export const liveKitRoom = (room) => {
   const m = /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(room ?? '');
   return m ? `oda-${m[1]}` : null;
 };
 
-/** Tells everyone in the room's voice connection about a paid gift. Best effort: never slows or fails the gift. */
-function announceGift(room, packet) {
+/**
+ * Tells everyone in the room's voice connection about a paid gift. Best effort: never slows or fails the gift.
+ * A packet with its own type (lucky.mjs: 'lucky') keeps it.
+ */
+export function announceGift(room, packet) {
   const data = Buffer.from(JSON.stringify({ type: 'gift', ...packet })).toString('base64');
   roomService('SendData', { room, data, kind: 'RELIABLE' }, { roomAdmin: true, room }).catch((e) => console.error('livekit SendData', room, String(e).slice(0, 200)));
 }

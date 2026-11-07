@@ -4,7 +4,11 @@
 // (LUCKY_RECIPIENT_SHARE, 20 %) as diamonds, and the same 20 % is what the gift scores in PK; the rest of
 // the price funds the rewards. Both are recorded on the send.
 //
-// This file plays the Lucky server: it owns the odds, the draw, the reward reserve and records.
+// Rewards are game coins: they can only be played in the Oyun Salonu, never gifted, exchanged or withdrawn.
+//
+// Live mode: the server (server/api/lucky.mjs) owns the packages, the odds, the draw and the records; lib/live/lucky
+// reads them into this store (applyServerLucky) and this phone only shows them.
+// Offline demo: this file plays the Lucky server: it owns the odds, the draw, the reward reserve and records.
 // There is no per-user send cap: a user can send as many Lucky gifts as their coins cover.
 // The client only sends (txId, gift, recipient) and shows the stored result. Each txId is processed once.
 import { useSyncExternalStore } from 'react';
@@ -62,6 +66,8 @@ type State = {
   duplicates: number;
   /** Test tool only: the next draw returns this multiplier. Never reachable from a user screen. */
   forceNext: number | null;
+  /** Live mode: what the server said (which packages take sends today); null in the demo. */
+  server: { open: Record<string, boolean>; allowed: boolean } | null;
 };
 
 const tiers = (w: Partial<Record<number, number>>): LuckyTier[] => {
@@ -87,7 +93,7 @@ const DEFAULT_CONFIG: LuckyConfig = {
   announceFrom: 50,
 };
 
-let state: State = { config: DEFAULT_CONFIG, pool: 50_000_000, day: today(), paidToday: 0, spentTotal: 0, paidTotal: 0, records: [], audit: [], duplicates: 0, forceNext: null };
+let state: State = { config: DEFAULT_CONFIG, pool: 50_000_000, day: today(), paidToday: 0, spentTotal: 0, paidTotal: 0, records: [], audit: [], duplicates: 0, forceNext: null, server: null };
 const listeners = new Set<() => void>();
 const emit = (patch: Partial<State>) => {
   state = { ...state, ...patch };
@@ -137,6 +143,8 @@ export function unavailable(g: LuckyGift): string | null {
   if (!g.enabled) return 'Bu Uğurlu hediye şu an kapalı.';
   const bad = validate(g);
   if (bad) return `Bu Uğurlu hediye yapılandırması geçersiz: ${bad}`;
+  // Live: the server keeps the reward limit and says per package; it checks again on every send.
+  if (state.server) return state.server.open[g.id] === false ? 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır.' : null;
   const top = g.price * maxMult(g);
   if (state.pool < top) return 'Ödül rezervi bu hediyenin en yüksek ödülünü karşılayamıyor; gönderime geçici olarak kapalı.';
   if (paidToday() + top > state.config.dailyPayoutLimit) return 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır.';
@@ -145,7 +153,14 @@ export function unavailable(g: LuckyGift): string | null {
 
 export type SendResult = { ok: true; record: LuckyRecord; replay: boolean } | { ok: false; reason: string };
 /** `blocked` (optional) says why `n` coins can't be spent (balance, daily limit), so the error is the real one. */
-export type Wallet = { spend: (n: number, reason: string) => boolean; credit: (n: number, reason: string) => void; blocked?: (n: number) => string | null };
+export type Wallet = {
+  spend: (n: number, reason: string) => boolean;
+  /** Coins back (a gift that could not go out); also the reward when there is no `reward`. */
+  credit: (n: number, reason: string) => void;
+  /** Where a reward goes (the store's game coins). */
+  reward?: (n: number, reason: string) => void;
+  blocked?: (n: number) => string | null;
+};
 
 function draw(t: LuckyTier[]): number {
   if (state.forceNext !== null && t.some((x) => x.mult === state.forceNext && x.weight > 0)) {
@@ -189,7 +204,7 @@ export function sendLucky(
   const odds = g.tiers.map((t) => ({ ...t }));
   const mult = draw(odds);
   const reward = g.price * mult;
-  if (reward > 0) wallet.credit(reward, `Uğurlu ödülü: ${g.name} ×${fmt(mult)}`);
+  if (reward > 0) (wallet.reward ?? wallet.credit)(reward, `Uğurlu ödülü: ${g.name} ×${fmt(mult)}`);
   const record: LuckyRecord = {
     txId: req.txId,
     at: clock(),
@@ -257,8 +272,23 @@ export function sendLuckyBatch(
   }
   const unsent = n - records.length;
   if (unsent) wallet.credit(g.price * unsent, `Uğurlu iade: ${g.name} x${fmt(unsent)} gönderilemedi`);
-  if (won) wallet.credit(won, `Uğurlu ödülü: ${label}`);
+  if (won) (wallet.reward ?? wallet.credit)(won, `Uğurlu ödülü: ${label}`);
   return { records, error };
+}
+
+// --- Live -------------------------------------------------------------------------------------------
+/** The server's packages (GET /api/lucky) and my own sends, already as this phone's records (newest first). */
+export function applyServerLucky(r: { version: number; gifts: LuckyGift[]; announceFrom: number; open: Record<string, boolean>; allowed: boolean; records?: LuckyRecord[] }) {
+  emit({
+    config: { ...state.config, version: r.version, gifts: r.gifts, announceFrom: r.announceFrom },
+    server: { open: r.open, allowed: r.allowed },
+    ...(r.records && { records: r.records.slice(0, 500) }),
+  });
+}
+/** A send the server just played, at the top of my history. */
+export function addServerRecords(records: LuckyRecord[]) {
+  const seen = new Set(records.map((r) => r.txId));
+  emit({ records: [...records, ...state.records.filter((r) => !seen.has(r.txId))].slice(0, 500) });
 }
 
 // --- Admin ------------------------------------------------------------------------------------------

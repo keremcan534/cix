@@ -47,7 +47,7 @@ Ekran adları: **Profil** = `src/app/kullanici/[id].tsx`, **Ayarlar** = `src/app
 | Takipçi / takip sayısı | 2 | ✓ | Diğer kullanıcılarda sayılar örnek veri. |
 | Arkadaş sayısı | 2 | 🆕 | Arkadaş = karşılıklı takip. Ayrı bir istek sistemi için 3. bölümdeki ürün kararına bak. |
 | Profil ziyaretçileri | 2 | ✓ | *Mesajlar → Profilimi kimler ziyaret etti* (VIP ayrıcalığı). |
-| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Tayfa* kartları; ajans ve tayfa adı ayrıca adın altında küçük etiket olarak görünür (Profil sekmesinde de). Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya tayfası olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Tayfası yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/tayfayı gösteriyorsa bağlantı vardır. |
+| Katıldığı odalar / topluluklar | 2 | ✓ (ajans 🆕) | Profilde *Oda*, *Ajans* ve *Aile* kartları; ajans ve aile adı ayrıca adın altında küçük etiket olarak görünür (Profil sekmesinde de). Ajans herkese açık, odadaki ajans etiketi gibi; başkalarına yalnızca "Ajans sahibi" veya "Ajans yayıncısı" yazar, kazanç gösterilmez. Kapanmış ajans gösterilmez. Ajansı veya ailesi olmayan kişide etiket çıkmaz, kartta "Ajansı yok" / "Ailesi yok" yazar; sahibine "Katıl" önerilir. Etikete dokununca açılan sayfa o ajansı/aileyi gösteriyorsa bağlantı vardır. |
 | Rozetler ve başarılar | 2 | ✓ | *Onur* sekmesi: madalyalar, unvanlar, hediye duvarı, koleksiyonlar. |
 
 ## 2-D. Görseller ve kişiselleştirme

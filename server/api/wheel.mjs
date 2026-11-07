@@ -20,7 +20,7 @@ export { COUNTS, SLICES, TIERS };
 
 /** Cömertlik Lv.2 starts at 35 points (app/src/data/wealth.ts WEALTH_XP). */
 export const NEED_LEVEL = 2;
-const NEED_POINTS = 35;
+export const NEED_POINTS = 35;
 export const DAILY = (() => {
   const n = Number(env.WHEEL_DAILY ?? 1_000_000);
   return Number.isSafeInteger(n) && n > 0 ? n : 1_000_000;

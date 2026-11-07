@@ -38,7 +38,7 @@ import { makeStyles, useTheme } from '@/theme';
 type Counters = { roomMinutes: number; giftsSent: number; spentTotal: number };
 const CHECKIN = KABILE_TASKS.find((t) => t.source === 'checkIn') ?? KABILE_TASKS[0];
 
-// Tayfa has no server yet (data/kabile tayfaAvailable): chest coins credited here would exist only on this phone,
+// Aile has no server yet (data/kabile tayfaAvailable): chest coins credited here would exist only on this phone,
 // so a live build shows a notice instead of the tasks and chests.
 export default function KabileMerkez() {
   return liveMode() ? <ComingSoon title="Görevler" /> : <DemoKabileMerkez />;
@@ -58,9 +58,9 @@ function DemoKabileMerkez() {
         <Header title="Görevler" />
         <View style={{ paddingTop: 96, paddingHorizontal: 32, gap: 12, alignItems: 'center' }}>
           <StateIcon name="lock-closed" />
-          <Text style={[styles.title, { textAlign: 'center' }]}>Görevler tayfa üyelerine açıktır</Text>
-          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>Bir tayfaya katıldığında günlük yoklama ve tayfa görevleri burada açılır.</Text>
-          <GradientButton title="Tayfa bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+          <Text style={[styles.title, { textAlign: 'center' }]}>Görevler aile üyelerine açıktır</Text>
+          <Text style={{ color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>Bir aileye katıldığında günlük yoklama ve aile görevleri burada açılır.</Text>
+          <GradientButton title="Aile bul" onPress={() => router.replace(KABILE_ROUTES.profile)} />
         </View>
       </SafeAreaView>
     );
@@ -111,7 +111,7 @@ function DemoKabileMerkez() {
     const c = KABILE_CHESTS.find((x) => x.id === id);
     if (!c) return;
     if (p.chests.includes(id)) return showAlert(`${c.name} alındı`, `İçerik: ${chestRewardText(c.reward)}`);
-    if (weekly < c.need) return showAlert(c.name, `Tayfanın haftalık katkı puanı ${fmt(c.need)} olunca açılır.\n\nİçerik (sabit): ${chestRewardText(c.reward)}`);
+    if (weekly < c.need) return showAlert(c.name, `Ailenin haftalık katkı puanı ${fmt(c.need)} olunca açılır.\n\nİçerik (sabit): ${chestRewardText(c.reward)}`);
     if (p.myPower < CHEST_MIN_CONTRIBUTION) return showAlert('Önce katkı yap', `Sandık almak için bu hafta en az ${CHEST_MIN_CONTRIBUTION} katkı puanın olmalı. Aşağıdaki günlük görevlerden birini tamamla.`);
     const r = openKabileChest(id, addCoins);
     if (!r) return;
@@ -123,7 +123,7 @@ function DemoKabileMerkez() {
       <Header
         title="Görevler"
         right={
-          <Pressable style={[styles.pill, checkedIn && { opacity: 0.6 }]} onPress={() => !checkedIn && claim(CHECKIN)} accessibilityLabel="Tayfa yoklaması">
+          <Pressable style={[styles.pill, checkedIn && { opacity: 0.6 }]} onPress={() => !checkedIn && claim(CHECKIN)} accessibilityLabel="Aile yoklaması">
             <Text style={styles.pillText}>{checkedIn ? 'Yoklama alındı' : 'Yoklama ver'}</Text>
           </Pressable>
         }
@@ -132,7 +132,7 @@ function DemoKabileMerkez() {
         <Pressable onPress={() => router.push(KABILE_ROUTES.kasa)}>
           <LinearGradient colors={['#0B3B4A', '#831843']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.treasury}>
             <View style={styles.treasureBadge}>
-              <Text style={styles.treasureLabel}>Tayfa Sandığı</Text>
+              <Text style={styles.treasureLabel}>Aile Sandığı</Text>
               <Text style={styles.treasureValue}>🔮 {fmt(treasure)}</Text>
             </View>
             <View style={{ flex: 1, gap: 6 }}>
@@ -151,7 +151,7 @@ function DemoKabileMerkez() {
           <View style={styles.row}>
             <StateIcon name="shield-checkmark-outline" />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: semantic.tonalText, fontWeight: '600' }}>Tayfanın haftalık katkı puanı</Text>
+              <Text style={{ color: semantic.tonalText, fontWeight: '600' }}>Ailenin haftalık katkı puanı</Text>
               <Text style={styles.bigPower}>{fmtK(weekly)}</Text>
             </View>
             <View style={styles.mineBox}>
