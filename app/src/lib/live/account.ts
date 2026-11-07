@@ -140,9 +140,11 @@ export function confirmDeleteLiveAccount(clearPhone: () => void) {
   );
 }
 
-export type ReportType = 'user' | 'room';
-/** True when the report goes to the server: a real person (not me) or a real room in a live build. */
-export const reportsToServer = (type: ReportType, id: string) => liveMode() && (type === 'user' ? id !== 'me' && !!toServer(id) : isServerId(id));
+/** 'moment' / 'comment': an Anlar post or comment (its server id). */
+export type ReportType = 'user' | 'room' | 'moment' | 'comment';
+/** True when the report goes to the server: a real person (not me), a real room or an Anlar post in a live build. */
+export const reportsToServer = (type: ReportType, id: string) =>
+  liveMode() && (type === 'user' ? id !== 'me' && !!toServer(id) : type === 'room' ? isServerId(id) : /^\d{1,18}$/.test(id));
 
 /** A report for the moderators' queue (POST /api/report). The same thing reported twice counts once. */
 export async function liveReport(type: ReportType, id: string, reason: string, note?: string) {

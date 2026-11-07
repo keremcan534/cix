@@ -2,15 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, Share, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, Share, View, type AlertButton } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
+import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Art } from '@/components/Art';
 import { ContactNote } from '@/components/contact-note';
-import { ComingSoon } from '@/components/coming-soon';
+import { useReport } from '@/components/report-sheet';
 import { FramedAvatar, GradientButton, StateIcon, VerifiedBadge } from '@/components/ui';
 import { MOMENTS, userById, type Moment, type User } from '@/data/mock';
 import {
@@ -26,8 +27,11 @@ import {
   type MomentComment,
 } from '@/data/social-ui';
 import { showAlert } from '@/lib/alert';
+import { newRef } from '@/lib/api';
 import { contactRefusal } from '@/lib/contact-filter';
-import { liveMode } from '@/lib/live';
+import { liveMode, message, toLocal } from '@/lib/live';
+import * as live from '@/lib/live/moments';
+import type { PickedImage } from '@/lib/live/profile';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -42,14 +46,14 @@ const INITIAL: FeedMoment[] = [...EXTRA_MOMENTS, ...MOMENTS].map((m) => ({ ...m,
 // Privileged name colors are drawn for the night background; on light paper each takes a deeper shade of its hue.
 const LIGHT_NAME_COLOR: Record<string, string> = { '#FBBF24': '#9A6408', '#FF8A97': '#C8304A', '#FB923C': '#C2410C', '#A5F3F5': '#00757B' };
 
-// The server has no moments yet (no feed, no posting, likes or comments), so a live build shows a notice instead of
-// sample people's posts and a composer whose posts would never leave this phone. The tab itself is hidden there.
+// A live build shows the server's Anlar (lib/live/moments): real posts, likes, comments and reports. The prototype
+// keeps its sample feed, which never leaves this phone.
 export default function MomentsScreen() {
-  return liveMode() ? <ComingSoon title="Anlar" /> : <DemoMoments />;
+  return liveMode() ? <LiveMoments /> : <DemoMoments />;
 }
 
 function DemoMoments() {
-  const { bump, blocked, following, me, notifications, settings, vipLevel, equipped } = useApp();
+  const { bump, blocked, following, me, settings, vipLevel, equipped } = useApp();
   const [tab, setTab] = useState<Tab>('Önerilen');
   const [topic, setTopic] = useState<string | null>(null);
   const [moments, setMoments] = useState<FeedMoment[]>(INITIAL);
@@ -58,7 +62,6 @@ function DemoMoments() {
   const { hasGreeted, greet } = useGreet();
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
-  const unread = notifications.filter((n) => !n.read).length;
   const { colors } = useTheme();
   const styles = useStyles();
 
@@ -69,80 +72,26 @@ function DemoMoments() {
 
   const authorOf = (m: Moment): User => (m.userId === 'me' ? me : userById(m.userId));
 
-  const post = (text: string, image: string | undefined, topicId: string | undefined) => {
-    setMoments((m) => [{ id: String(Date.now()), userId: 'me', text, image, likes: 0, comments: 0, time: 'şimdi', topicId }, ...m]);
+  const post = (text: string, image: PickedImage | undefined, topicId: string | undefined) => {
+    setMoments((m) => [{ id: String(Date.now()), userId: 'me', text, image: image?.uri, likes: 0, comments: 0, time: 'şimdi', topicId }, ...m]);
     setComposing(false);
     bump('moments');
   };
 
-  const share = async (m: Moment) => {
-    try {
-      await Share.share({ message: `${authorOf(m).name} bir an paylaştı: “${m.text}” · Similar Club` });
-    } catch {
-      showAlert('Paylaşılamadı', 'Bu cihazda paylaşım desteklenmiyor.');
-    }
-  };
+  const share = (m: Moment) => shareMoment(authorOf(m).name, m.text);
 
   const commentCount = (m: Moment) => m.comments + (comments[m.id]?.length ?? 0) - (SEED_COMMENTS[m.id]?.length ?? 0);
   const openMoment = moments.find((m) => m.id === commentsFor);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <View style={styles.header}>
-        {TABS.map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)} style={{ alignItems: 'center' }}>
-            <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
-            {t === tab && <View style={styles.underline} />}
-          </Pressable>
-        ))}
-        <View style={{ flex: 1 }} />
-        <Pressable onPress={() => router.push('/bildirimler')} hitSlop={10}>
-          <Ionicons name="notifications-outline" size={25} color={colors.text} />
-          {unread > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
+      <FeedHeader tab={tab} onTab={setTab} />
 
       <FlatList
         data={feed}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ paddingBottom: 100 }}
-        ListHeaderComponent={
-          <View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topics}>
-              {MOMENT_TOPICS.map((t) => (
-                <Pressable key={t.id} onPress={() => setTopic((cur) => (cur === t.id ? null : t.id))}>
-                  <LinearGradient
-                    colors={t.colors}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[styles.topic, topic === t.id && styles.topicActive, topic && topic !== t.id && { opacity: 0.55 }]}
-                  >
-                    <Text style={styles.topicTitle} numberOfLines={1}>
-                      # {t.title}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="eye-outline" size={12} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.topicViews}>{t.views}</Text>
-                    </View>
-                    <Text style={styles.topicEmoji}>{t.emoji}</Text>
-                  </LinearGradient>
-                </Pressable>
-              ))}
-            </ScrollView>
-            {topic && (
-              <View style={styles.topicFilter}>
-                <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}># {MOMENT_TOPICS.find((t) => t.id === topic)?.title}</Text>
-                <Pressable onPress={() => setTopic(null)} hitSlop={8}>
-                  <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Tümünü göster</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        }
+        ListHeaderComponent={<TopicStrip topic={topic} onTopic={setTopic} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <StateIcon name={tab === 'Arkadaşlar' ? 'people-outline' : 'moon-outline'} />
@@ -169,6 +118,8 @@ function DemoMoments() {
               frameId={isMe ? equipped.frame : undefined}
               showDistance={settings.cityDiscovery}
               liked={liked.has(item.id)}
+              likeCount={item.likes + (liked.has(item.id) ? 1 : 0)}
+              timeLabel={agoLabel(item.time)}
               commentCount={commentCount(item)}
               greeted={hasGreeted(author.id)}
               onLike={() =>
@@ -207,9 +158,401 @@ function DemoMoments() {
   );
 }
 
+const FEED_TAB: Record<Tab, live.FeedTab> = { Arkadaşlar: 'friends', Önerilen: 'popular', Son: 'recent' };
+/** The server's page size (moments.mjs): a full page means older posts may follow. */
+const PAGE = 50;
+
+const toSheet = (c: live.LiveComment): MomentComment => ({ id: c.id, userId: toLocal(c.author.id), text: c.text, time: live.agoText(c.createdAt) });
+
+// The server's Anlar. A post or comment shows once the server has taken it (and stays in the composer if it
+// didn't); a like shows at once and goes back if the server refuses it.
+function LiveMoments() {
+  const { bump, blocked, me, toggleBlock } = useApp();
+  const [tab, setTab] = useState<Tab>('Önerilen');
+  const [topic, setTopic] = useState<string | null>(null);
+  const [items, setItems] = useState<live.LiveMoment[] | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [menuFor, setMenuFor] = useState<live.LiveMoment | null>(null);
+  const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [thread, setThread] = useState<live.LiveComment[] | null>(null);
+  const { hasGreeted, greet } = useGreet();
+  const report = useReport();
+  const { colors } = useTheme();
+  const styles = useStyles();
+  // Only the newest load fills the list (a tab tapped while a slower one is still on its way).
+  const loadId = useRef(0);
+  const paging = useRef(false);
+  const openFor = useRef<string | null>(null);
+  // A post or comment sent again after a failure keeps its request id, so the server stores it once.
+  const postRef = useRef<string | null>(null);
+  const commentRef = useRef<string | null>(null);
+
+  // `nonce` loads the same tab again (pull to refresh, Tekrar dene); `pulled` makes a failed refresh say so,
+  // since the list keeps what it had.
+  const [nonce, setNonce] = useState(0);
+  const pulled = useRef(false);
+  useEffect(() => {
+    const id = ++loadId.current;
+    live
+      .feed({ tab: FEED_TAB[tab], topic })
+      .then(
+        (page) => {
+          if (id !== loadId.current) return;
+          setItems(page);
+          setFailed(null);
+          setHasMore(tab !== 'Önerilen' && page.length >= PAGE);
+        },
+        (e) => {
+          if (id !== loadId.current) return;
+          setFailed(message(e));
+          if (pulled.current) showAlert('Yenilenemedi', 'Bağlantını kontrol edip tekrar dene.');
+        },
+      )
+      .finally(() => {
+        if (id !== loadId.current) return;
+        pulled.current = false;
+        setRefreshing(false);
+      });
+  }, [tab, topic, nonce]);
+
+  const pickTab = (t: Tab) => {
+    if (t === tab) return;
+    setTab(t);
+    setItems(null);
+    setFailed(null);
+  };
+  const pickTopic = (t: string | null) => {
+    setTopic(t);
+    setItems(null);
+    setFailed(null);
+  };
+  const refresh = () => {
+    pulled.current = true;
+    setRefreshing(true);
+    setNonce((n) => n + 1);
+  };
+  const retry = () => {
+    setFailed(null);
+    setNonce((n) => n + 1);
+  };
+
+  const loadMore = async () => {
+    const last = items?.[items.length - 1];
+    if (!hasMore || !last || paging.current) return;
+    paging.current = true;
+    const id = loadId.current;
+    try {
+      const page = await live.feed({ tab: FEED_TAB[tab], topic, before: last.id });
+      if (id !== loadId.current) return;
+      setItems((cur) => [...(cur ?? []), ...page.filter((m) => !cur?.some((c) => c.id === m.id))]);
+      setHasMore(page.length >= PAGE);
+    } catch {
+      // The next scroll to the end tries again.
+    } finally {
+      paging.current = false;
+    }
+  };
+
+  const patch = (id: string, f: (m: live.LiveMoment) => live.LiveMoment) => setItems((cur) => cur && cur.map((m) => (m.id === id ? f(m) : m)));
+
+  const like = (m: live.LiveMoment) => {
+    const on = !m.liked;
+    const step = (x: live.LiveMoment, up: boolean) => ({ ...x, liked: up, likes: Math.max(0, x.likes + (up ? 1 : -1)) });
+    patch(m.id, (x) => step(x, on));
+    live.like(m.id, on).then(
+      (r) => patch(m.id, (x) => ({ ...x, liked: r.liked, likes: r.likes })),
+      (e) => {
+        patch(m.id, (x) => (x.liked === on ? step(x, !on) : x));
+        showAlert(on ? 'Beğenilemedi' : 'Beğeni geri alınamadı', message(e));
+      },
+    );
+  };
+
+  const post = async (text: string, image: PickedImage | undefined, topicId: string | undefined) => {
+    postRef.current ??= newRef();
+    try {
+      const m = await live.post(text, image ?? null, topicId ?? null, postRef.current);
+      postRef.current = null;
+      setComposing(false);
+      bump('moments');
+      if (!topic || m.topic === topic) setItems((cur) => [m, ...(cur ?? []).filter((x) => x.id !== m.id)]);
+      return true;
+    } catch (e) {
+      showAlert(image ? 'An paylaşılamadı' : 'Paylaşılamadı', message(e));
+      return false;
+    }
+  };
+
+  const removePost = (m: live.LiveMoment) =>
+    showAlert('An silinsin mi?', 'Bu an ve yorumları herkesten kaldırılır.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: () =>
+          live.remove(m.id).then(
+            () => setItems((cur) => cur && cur.filter((x) => x.id !== m.id)),
+            (e) => showAlert('Silinemedi', message(e)),
+          ),
+      },
+    ]);
+
+  const block = (localId: string, name: string) =>
+    showAlert(`${name} engellensin mi?`, 'Anlarını ve yorumlarını görmezsin, sana mesaj gönderemez. Engeli istediğin zaman kaldırabilirsin.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Engelle', style: 'destructive', onPress: () => toggleBlock(localId) },
+    ]);
+
+  const menuOptions = (m: live.LiveMoment): SheetOption[] => {
+    const localId = toLocal(m.author.id);
+    if (localId === 'me') return [{ label: 'Anı sil', destructive: true, icon: 'trash-outline', onPress: () => removePost(m) }];
+    return [
+      { label: 'Şikâyet et', icon: 'flag-outline', onPress: () => report.start({ type: 'moment', id: m.id, name: m.author.name, onBlock: () => toggleBlock(localId) }, () => {}) },
+      { label: `${m.author.name} kişisini engelle`, destructive: true, icon: 'ban-outline', onPress: () => block(localId, m.author.name) },
+    ];
+  };
+
+  const openComments = (m: live.LiveMoment) => {
+    openFor.current = m.id;
+    commentRef.current = null;
+    setCommentsFor(m.id);
+    setThread(null);
+    live.comments(m.id).then(
+      (list) => openFor.current === m.id && setThread(list),
+      (e) => {
+        if (openFor.current !== m.id) return;
+        setThread([]);
+        showAlert('Yorumlar açılamadı', message(e));
+      },
+    );
+  };
+  const closeComments = () => {
+    openFor.current = null;
+    setCommentsFor(null);
+  };
+
+  const sendComment = async (text: string) => {
+    const id = commentsFor;
+    if (!id) return false;
+    commentRef.current ??= newRef();
+    try {
+      const list = await live.comment(id, text, commentRef.current);
+      commentRef.current = null;
+      if (openFor.current === id) setThread(list);
+      patch(id, (x) => ({ ...x, comments: list.length }));
+      return true;
+    } catch (e) {
+      showAlert('Yorum gönderilemedi', message(e));
+      return false;
+    }
+  };
+
+  const openMoment = items?.find((m) => m.id === commentsFor);
+  const commentMenu = (c: MomentComment) => {
+    const lc = thread?.find((x) => x.id === c.id);
+    const postId = commentsFor;
+    if (!lc || !postId) return;
+    const mine = c.userId === 'me';
+    const buttons: AlertButton[] = [{ text: 'Vazgeç', style: 'cancel' }];
+    if (mine || (openMoment && toLocal(openMoment.author.id) === 'me'))
+      buttons.push({
+        text: 'Sil',
+        style: 'destructive',
+        onPress: () =>
+          live.removeComment(c.id).then(
+            () => {
+              setThread((cur) => cur && cur.filter((x) => x.id !== c.id));
+              patch(postId, (x) => ({ ...x, comments: Math.max(0, x.comments - 1) }));
+            },
+            (e) => showAlert('Silinemedi', message(e)),
+          ),
+      });
+    if (!mine)
+      buttons.push({
+        text: 'Şikâyet et',
+        onPress: () => {
+          // One sheet at a time: the comments close, the reasons open.
+          closeComments();
+          report.start({ type: 'comment', id: c.id, name: lc.author.name, note: c.text, onBlock: () => toggleBlock(c.userId) }, () => {});
+        },
+      });
+    showAlert('Yorum', c.text.length > 80 ? `${c.text.slice(0, 80)}…` : c.text, buttons);
+  };
+
+  const shown = (items ?? []).filter((m) => !blocked.has(toLocal(m.author.id)));
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
+      <FeedHeader tab={tab} onTab={pickTab} />
+
+      <FlatList
+        data={shown}
+        keyExtractor={(m) => m.id}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        ListHeaderComponent={<TopicStrip topic={topic} onTopic={pickTopic} showViews={false} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={hasMore && shown.length > 0 ? <ActivityIndicator color={colors.primary} style={{ padding: 16 }} /> : undefined}
+        ListEmptyComponent={
+          items === null && !failed ? (
+            <ActivityIndicator color={colors.primary} style={{ padding: 40 }} />
+          ) : failed ? (
+            <View style={styles.empty}>
+              <StateIcon name="cloud-offline-outline" />
+              <Text style={{ color: colors.textDim, textAlign: 'center' }}>Anlar yüklenemedi. {failed}</Text>
+              <Pressable
+                style={styles.emptyBtn}
+                onPress={retry}
+              >
+                <Text style={{ color: '#fff', fontWeight: '800' }}>Tekrar dene</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <StateIcon name={tab === 'Arkadaşlar' ? 'people-outline' : 'moon-outline'} />
+              <Text style={{ color: colors.textDim, textAlign: 'center' }}>
+                {tab === 'Arkadaşlar' ? 'Takip ettiklerinin anları burada görünür.' : topic ? 'Bu konuda henüz an yok. İlk paylaşan sen ol!' : 'Henüz an yok. İlk paylaşan sen ol!'}
+              </Text>
+              {tab === 'Arkadaşlar' && (
+                <Pressable style={styles.emptyBtn} onPress={() => router.push('/(tabs)/kesfet')}>
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>Yeni insanlar keşfet</Text>
+                </Pressable>
+              )}
+            </View>
+          )
+        }
+        ItemSeparatorComponent={Separator}
+        renderItem={({ item }) => {
+          const localId = toLocal(item.author.id);
+          const isMe = localId === 'me';
+          const author = isMe ? me : userById(localId);
+          return (
+            <MomentCard
+              moment={{ id: item.id, userId: localId, text: item.text, image: item.imageUrl ?? undefined, likes: item.likes, comments: item.comments, time: '' }}
+              author={author}
+              isMe={isMe}
+              svip={item.author.vipLevel}
+              frameId={item.author.frame ?? undefined}
+              showDistance={false}
+              liked={item.liked}
+              likeCount={item.likes}
+              timeLabel={live.agoText(item.createdAt)}
+              commentCount={item.comments}
+              greeted={hasGreeted(author.id)}
+              onLike={() => like(item)}
+              onComment={() => openComments(item)}
+              onShare={() => shareMoment(author.name, item.text)}
+              onGreet={() => greet(author)}
+              onMore={() => setMenuFor(item)}
+            />
+          );
+        }}
+      />
+
+      <Pressable style={styles.fab} onPress={() => setComposing(true)} accessibilityLabel="Yeni an paylaş">
+        <Ionicons name="paper-plane" size={24} color="#fff" />
+      </Pressable>
+
+      <Composer visible={composing} onClose={() => setComposing(false)} onPost={post} />
+      <CommentsSheet
+        visible={!!commentsFor}
+        loading={thread === null}
+        comments={(thread ?? []).map(toSheet).filter((c) => !blocked.has(c.userId))}
+        me={me}
+        onClose={closeComments}
+        onSend={sendComment}
+        onLongPress={commentMenu}
+      />
+      <ActionSheet visible={!!menuFor} onClose={() => setMenuFor(null)} options={menuFor ? menuOptions(menuFor) : []} />
+      {report.sheet}
+    </SafeAreaView>
+  );
+}
+
+/** Arkadaşlar · Önerilen · Son, and the bell. */
+function FeedHeader({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
+  const { notifications } = useApp();
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const unread = notifications.filter((n) => !n.read).length;
+  return (
+    <View style={styles.header}>
+      {TABS.map((t) => (
+        <Pressable key={t} onPress={() => onTab(t)} style={{ alignItems: 'center' }}>
+          <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
+          {t === tab && <View style={styles.underline} />}
+        </Pressable>
+      ))}
+      <View style={{ flex: 1 }} />
+      <Pressable onPress={() => router.push('/bildirimler')} hitSlop={10}>
+        <Ionicons name="notifications-outline" size={25} color={colors.text} />
+        {unread > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+async function shareMoment(name: string, text: string) {
+  try {
+    await Share.share({ message: `${name} bir an paylaştı: “${text}” · Similar Club` });
+  } catch {
+    showAlert('Paylaşılamadı', 'Bu cihazda paylaşım desteklenmiyor.');
+  }
+}
+
 function Separator() {
   const { colors } = useTheme();
   return <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 16 }} />;
+}
+
+/** The topic cards above the feed; tapping one filters by it, tapping it again shows all. The view counts are the
+ * prototype's sample figures, so a live build leaves them out. */
+function TopicStrip({ topic, onTopic, showViews = true }: { topic: string | null; onTopic: (t: string | null) => void; showViews?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  return (
+    <View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topics}>
+        {MOMENT_TOPICS.map((t) => (
+          <Pressable key={t.id} onPress={() => onTopic(topic === t.id ? null : t.id)}>
+            <LinearGradient
+              colors={t.colors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.topic, topic === t.id && styles.topicActive, topic && topic !== t.id && { opacity: 0.55 }]}
+            >
+              <Text style={styles.topicTitle} numberOfLines={1}>
+                # {t.title}
+              </Text>
+              {showViews && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="eye-outline" size={12} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.topicViews}>{t.views}</Text>
+                </View>
+              )}
+              <Text style={styles.topicEmoji}>{t.emoji}</Text>
+            </LinearGradient>
+          </Pressable>
+        ))}
+      </ScrollView>
+      {topic && (
+        <View style={styles.topicFilter}>
+          <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}># {MOMENT_TOPICS.find((t) => t.id === topic)?.title}</Text>
+          <Pressable onPress={() => onTopic(null)} hitSlop={8}>
+            <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Tümünü göster</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
 }
 
 function MomentCard({
@@ -220,12 +563,15 @@ function MomentCard({
   frameId,
   showDistance,
   liked,
+  likeCount,
+  timeLabel,
   commentCount,
   greeted,
   onLike,
   onComment,
   onShare,
   onGreet,
+  onMore,
 }: {
   moment: Moment;
   author: User;
@@ -234,18 +580,22 @@ function MomentCard({
   frameId?: string;
   showDistance: boolean;
   liked: boolean;
+  likeCount: number;
+  timeLabel: string;
   commentCount: number;
   greeted: boolean;
   onLike: () => void;
   onComment: () => void;
   onShare: () => void;
   onGreet: () => void;
+  /** The post's menu (delete my own, report someone else's). */
+  onMore?: () => void;
 }) {
   const { colors, dark } = useTheme();
   const styles = useStyles();
   const female = author.gender === 'Kadın';
   const nameColor = NAME_COLORS[author.id] ? (dark ? NAME_COLORS[author.id] : (LIGHT_NAME_COLOR[NAME_COLORS[author.id]] ?? NAME_COLORS[author.id])) : null;
-  const meta = [agoLabel(moment.time), !isMe && showDistance ? distanceLabel(author.distanceKm) : null].filter(Boolean).join('  |  ');
+  const meta = [timeLabel, !isMe && showDistance ? distanceLabel(author.distanceKm) : null].filter(Boolean).join('  |  ');
   const openProfile = () => (isMe ? router.push('/(tabs)/profil') : router.push(`/kullanici/${author.id}`));
 
   return (
@@ -292,13 +642,18 @@ function MomentCard({
         <Text style={styles.text}>{moment.text}</Text>
         {moment.image && <Image source={{ uri: moment.image }} style={styles.image} />}
         <View style={styles.actions}>
-          <Pressable onPress={onShare} hitSlop={8}>
+          <Pressable onPress={onShare} hitSlop={8} accessibilityLabel="Paylaş">
             <Ionicons name="arrow-redo-outline" size={22} color={colors.textDim} />
           </Pressable>
+          {onMore && (
+            <Pressable onPress={onMore} hitSlop={8} accessibilityLabel="Diğer seçenekler">
+              <Ionicons name="ellipsis-horizontal" size={20} color={colors.textDim} />
+            </Pressable>
+          )}
           <View style={{ flex: 1 }} />
           <Pressable style={styles.action} onPress={onLike} hitSlop={8}>
             <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={21} color={liked ? colors.pink : colors.textDim} />
-            <Text style={[styles.actionText, liked && { color: colors.pink }]}>{moment.likes + (liked ? 1 : 0)}</Text>
+            <Text style={[styles.actionText, liked && { color: colors.pink }]}>{likeCount}</Text>
           </Pressable>
           <Pressable style={styles.action} onPress={onComment} hitSlop={8}>
             <Ionicons name="chatbubble-outline" size={20} color={colors.textDim} />
@@ -310,7 +665,10 @@ function MomentCard({
   );
 }
 
-function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () => void; onPost: (text: string, image: string | undefined, topicId: string | undefined) => void }) {
+/** `onPost` may answer false (or a promise of it) when the post didn't go through: the draft then stays. */
+type Sent = boolean | void | Promise<boolean | void>;
+
+function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () => void; onPost: (text: string, image: PickedImage | undefined, topicId: string | undefined) => Sent }) {
   const [draft, setDraft] = useState('');
   // Why the text was not shared (contact details, lib/contact-filter); cleared as soon as it changes.
   const [refused, setRefused] = useState<string | null>(null);
@@ -318,8 +676,9 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
     setDraft(next);
     setRefused(null);
   };
-  const [image, setImage] = useState<string | undefined>();
+  const [image, setImage] = useState<PickedImage | undefined>();
   const [topicId, setTopicId] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
   const { colors } = useTheme();
   const styles = useStyles();
   // Android modals draw edge to edge: keep the last row above the navigation bar.
@@ -327,14 +686,21 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (!res.canceled && res.assets[0]) setImage(res.assets[0].uri);
+    const a = !res.canceled ? res.assets[0] : undefined;
+    if (a) setImage({ uri: a.uri, mimeType: a.mimeType });
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     if (!draft.trim() && !image) return showAlert('Boş an paylaşılamaz', 'Bir şeyler yaz ya da fotoğraf ekle.');
     const refusal = contactRefusal(draft.trim(), 'moment.post');
     if (refusal) return setRefused(refusal);
-    onPost(draft.trim(), image, topicId);
+    setBusy(true);
+    try {
+      if ((await onPost(draft.trim(), image, topicId)) === false) return;
+    } finally {
+      setBusy(false);
+    }
     setDraft('');
     setImage(undefined);
     setTopicId(undefined);
@@ -359,7 +725,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
           <ContactNote text={refused} style={styles.contactNote} />
           {image && (
             <View style={{ alignSelf: 'flex-start' }}>
-              <Image source={{ uri: image }} style={styles.preview} />
+              <Image source={{ uri: image.uri }} style={styles.preview} />
               <Pressable style={styles.removeImage} onPress={() => setImage(undefined)} hitSlop={8}>
                 <Ionicons name="close" size={14} color="#fff" />
               </Pressable>
@@ -381,7 +747,7 @@ function Composer({ visible, onClose, onPost }: { visible: boolean; onClose: () 
               <Pressable onPress={onClose}>
                 <Text style={{ color: colors.textDim }}>Vazgeç</Text>
               </Pressable>
-              <GradientButton small title="Paylaş" onPress={submit} />
+              {busy ? <ActivityIndicator color={colors.primary} style={{ paddingHorizontal: 22 }} /> : <GradientButton small title="Paylaş" onPress={submit} />}
             </View>
           </View>
         </View>
@@ -396,12 +762,19 @@ function CommentsSheet({
   me,
   onClose,
   onSend,
+  onLongPress,
+  loading = false,
 }: {
   visible: boolean;
+  /** The comments are still on their way. */
+  loading?: boolean;
   comments: MomentComment[];
   me: User;
   onClose: () => void;
-  onSend: (text: string) => void;
+  /** May answer false (or a promise of it) when the comment didn't go through: it then stays in the input. */
+  onSend: (text: string) => Sent;
+  /** A comment's menu (delete, report). */
+  onLongPress?: (c: MomentComment) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [refused, setRefused] = useState<string | null>(null);
@@ -412,13 +785,19 @@ function CommentsSheet({
   const { colors } = useTheme();
   const styles = useStyles();
   const paddingBottom = Math.max(34, useSafeAreaInsets().bottom + 8);
-  const send = () => {
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || busy) return;
     // Contact details are refused, not masked: the comment stays in the input.
     const refusal = contactRefusal(text, 'moment.comment');
     if (refusal) return setRefused(refusal);
-    onSend(text);
+    setBusy(true);
+    try {
+      if ((await onSend(text)) === false) return;
+    } finally {
+      setBusy(false);
+    }
     setDraft('');
   };
 
@@ -427,9 +806,10 @@ function CommentsSheet({
       <KeyboardAvoid style={styles.sheetWrap}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.sheet, { maxHeight: '70%', paddingBottom }]}>
-          <Text style={styles.sheetTitle}>Yorumlar ({comments.length})</Text>
+          <Text style={styles.sheetTitle}>{loading ? 'Yorumlar' : `Yorumlar (${comments.length})`}</Text>
           <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 14, paddingVertical: 4 }}>
-            {comments.length === 0 && <Text style={{ color: colors.textDim, textAlign: 'center', paddingVertical: 20 }}>İlk yorumu sen yap 💬</Text>}
+            {loading && <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} />}
+            {!loading && comments.length === 0 && <Text style={{ color: colors.textDim, textAlign: 'center', paddingVertical: 20 }}>İlk yorumu sen yap 💬</Text>}
             {comments.map((c) => {
               const u = c.userId === 'me' ? me : userById(c.userId);
               return (
@@ -441,6 +821,7 @@ function CommentsSheet({
                     onClose();
                     router.push(`/kullanici/${u.id}`);
                   }}
+                  onLongPress={onLongPress && (() => onLongPress(c))}
                 >
                   <Photo uri={u.avatar} kind="face" style={styles.commentAvatar} />
                   <View style={{ flex: 1, gap: 2 }}>
@@ -465,8 +846,8 @@ function CommentsSheet({
               onSubmitEditing={send}
               returnKeyType="send"
             />
-            <Pressable onPress={send} hitSlop={8} style={styles.sendBtn}>
-              <Ionicons name="send" size={16} color="#fff" />
+            <Pressable onPress={send} hitSlop={8} style={styles.sendBtn} accessibilityLabel="Gönder">
+              {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={16} color="#fff" />}
             </Pressable>
           </View>
         </View>

@@ -98,13 +98,19 @@ export type PickedImage = { uri: string; mimeType?: string | null };
  * nothing is saved), e.g. 503 while photo storage isn't set up on the server.
  */
 export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
+  return meFromServer(await api.updateProfile({ avatarUrl: await uploadPhoto('avatar', img) }));
+}
+
+/** The picked photo put in the app's storage for `kind` (a signed address for its exact type and size, then PUT);
+ *  resolves with its public address. Throws when a step fails, e.g. 503 while storage isn't set up. */
+export async function uploadPhoto(kind: 'avatar' | 'moment', img: PickedImage): Promise<string> {
   let file: Blob;
   try {
     file = await (await fetch(img.uri)).blob();
   } catch {
     throw new Error('Fotoğraf okunamadı. Başka bir fotoğraf seç.');
   }
-  const target = await api.uploadUrl('avatar', imageType(img.uri, img.mimeType, file.type), file.size);
+  const target = await api.uploadUrl(kind, imageType(img.uri, img.mimeType, file.type), file.size);
   let res: Response;
   try {
     res = await fetch(target.uploadUrl, { method: target.method ?? 'PUT', headers: target.headers, body: file });
@@ -112,5 +118,5 @@ export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
     throw new Error('Fotoğraf yüklenemedi. İnternetini kontrol edip tekrar dene.');
   }
   if (!res.ok) throw new Error(`Fotoğraf yüklenemedi (${res.status}). Tekrar dene.`);
-  return meFromServer(await api.updateProfile({ avatarUrl: target.publicUrl }));
+  return target.publicUrl;
 }

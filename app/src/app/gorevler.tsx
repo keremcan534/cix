@@ -35,9 +35,9 @@ const secsToMidnight = () => {
   const d = new Date();
   return Math.max(0, Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - d.getTime()) / 1000));
 };
-// Only the rows a user can actually do are listed: calls are 'Yakında' while callsAvailable() is false, and Anlar
-// is not open in a live build. Display only; the reward and claim rules are untouched.
-const shownTask = (key: TaskKey) => (key === 'calls' ? callsAvailable() : key === 'moments' ? !liveMode() : true);
+// Only the rows a user can actually do are listed: calls are 'Yakında' while callsAvailable() is false. Display
+// only; the reward and claim rules are untouched.
+const shownTask = (key: TaskKey) => (key === 'calls' ? callsAvailable() : true);
 const pad = (n: number) => String(n).padStart(2, '0');
 const hms = (s: number) => `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 

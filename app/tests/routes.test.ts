@@ -60,14 +60,18 @@ describe('Canlı sürümde demo ekranları', () => {
   });
 
   test('örnek veriyle dolu ekranlar canlıda "yakında" gösterir', () => {
-    for (const route of ['(tabs)/anlar', 'aile', 'kabile/index', 'kabile/sohbet', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
+    for (const route of ['aile', 'kabile/index', 'kabile/sohbet', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
       const src = readFileSync(join(APP, `${route}.tsx`), 'utf8');
       assert.match(src, /liveMode\(\)[^\n]*<ComingSoon /, `${route}: canlıda ComingSoon yok`);
     }
   });
 
-  test('Anlar sekmesi canlıda gizli', () => {
+  // Anlar is on the server (lib/live/moments): a live build shows the tab and the server's feed, never the sample one.
+  test('Anlar canlıda sunucudan, sekme görünür', () => {
     const tabs = readFileSync(join(APP, '(tabs)/_layout.tsx'), 'utf8');
-    assert.match(tabs, /name="anlar"[^\n]*liveMode\(\) \? \{ href: null \}/);
+    assert.doesNotMatch(tabs, /name="anlar"[^\n]*href: null/);
+    const src = readFileSync(join(APP, '(tabs)/anlar.tsx'), 'utf8');
+    assert.match(src, /liveMode\(\) \? <LiveMoments \/> : <DemoMoments \/>/);
+    assert.match(src, /from '@\/lib\/live\/moments'/);
   });
 });
