@@ -297,6 +297,8 @@ export function roomOf(r: api.ServerRoom): Room {
     announcement: r.announcement || undefined,
     micCount: r.micCount ?? undefined,
     layoutId: r.layoutId ?? undefined,
+    lockedSeats: r.lockedSeats ?? [],
+    micQueue: !!r.micQueue,
   };
   putServerRoom(room);
   return room;

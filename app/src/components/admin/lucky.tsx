@@ -84,18 +84,18 @@ export function LuckySection() {
         {(d) => (
           <>
             <Notice
-              text={`Ayar sürümü v${d.version}${d.updatedAt ? ` · son değişiklik ${fmtDate(d.updatedAt)}` : ' · hazır paketler'}. Ödüller oyun jetonu olarak ödenir; alıcıya fiyatın %20’si elmas yazılır.`}
+              text={`Ayar sürümü v${d.version}${d.updatedAt ? ` · son değişiklik ${fmtDate(d.updatedAt)}` : ' · hazır paketler'}. Ödüller jeton olarak ödenir (Cömertlik puanına sayılmaz); alıcıya fiyatın %20’si elmas yazılır.`}
             />
             <ItemCard title="Bugün" sub="İstanbul saatiyle gece yarısından beri">
               <Line label="Gönderim" value={fmt(d.stats.today.sends)} />
               <Line label="Harcanan jeton" value={fmt(d.stats.today.spent)} />
-              <Line label="Ödenen oyun jetonu" value={`${fmt(d.stats.today.paid)} / ${fmt(d.config.dailyPayoutLimit)}`} />
+              <Line label="Ödenen ödül" value={`${fmt(d.stats.today.paid)} / ${fmt(d.config.dailyPayoutLimit)}`} />
               <Line label="Alıcılara elmas" value={fmt(d.stats.today.shared)} />
             </ItemCard>
             <ItemCard title="Toplam">
               <Line label="Gönderim" value={fmt(d.stats.total.sends)} />
               <Line label="Harcanan jeton" value={fmt(d.stats.total.spent)} />
-              <Line label="Ödenen oyun jetonu" value={fmt(d.stats.total.paid)} />
+              <Line label="Ödenen ödül" value={fmt(d.stats.total.paid)} />
               <Line label="Alıcılara elmas" value={fmt(d.stats.total.shared)} />
             </ItemCard>
             <Filters
@@ -123,7 +123,7 @@ export function LuckySection() {
                   <ItemCard
                     key={g.id}
                     title={`${g.emoji} ${g.name}`}
-                    sub={`${fmt(g.price)} jeton · en yüksek ×${fmt(top)} = ${fmt(g.price * top)} oyun jetonu`}
+                    sub={`${fmt(g.price)} jeton · en yüksek ×${fmt(top)} = ${fmt(g.price * top)} jeton`}
                     pill={<StatusPill text={g.enabled ? 'Açık' : 'Kapalı'} tone={g.enabled ? 'success' : 'neutral'} />}
                     actions={
                       <>
@@ -162,13 +162,13 @@ export function LuckySection() {
 
             {part === 'limit' && (
               <>
-                <Text style={s.label}>Günlük toplam ödül limiti (oyun jetonu)</Text>
+                <Text style={s.label}>Günlük toplam ödül limiti (jeton)</Text>
                 <Text style={s.hint}>Bir paketin en yüksek ödülü bugünkü kalan limite sığmıyorsa o paket yarına kadar gönderim almaz.</Text>
                 <Filters
                   value={String(d.config.dailyPayoutLimit)}
                   options={(LIMITS.includes(d.config.dailyPayoutLimit) ? LIMITS : [...LIMITS, d.config.dailyPayoutLimit].sort((a, b) => a - b)).map((n) => [String(n), fmt(n)] as [string, string])}
                   onChange={(v) =>
-                    save(d, { ...d.config, dailyPayoutLimit: Number(v) }, { title: 'Günlük limit', message: `Günlük toplam ödül limiti ${fmt(Number(v))} oyun jetonu olsun mu?`, confirm: 'Kaydet' }, 'Günlük limit kaydedildi')
+                    save(d, { ...d.config, dailyPayoutLimit: Number(v) }, { title: 'Günlük limit', message: `Günlük toplam ödül limiti ${fmt(Number(v))} jeton olsun mu?`, confirm: 'Kaydet' }, 'Günlük limit kaydedildi')
                   }
                 />
                 <Text style={s.label}>Odada duyurulan en düşük çarpan</Text>
@@ -209,7 +209,7 @@ function SendCard({ x, gifts }: { x: ServerLuckyAdminSend; gifts: ServerLuckyGif
       <Line label="Gönderen" value={x.sender.name} onPress={() => openAccount(x.sender.id, x.sender.name)} />
       <Line label="Harcanan" value={`${fmt(x.cost)} jeton`} />
       <Line label="Alıcılara elmas" value={fmt(x.shared)} />
-      <Line label="Ödül" value={x.payout ? `${fmt(x.payout)} oyun jetonu · ${wins}/${x.draws.length} çekiliş` : `0 · ${x.draws.length} çekiliş`} />
+      <Line label="Ödül" value={x.payout ? `${fmt(x.payout)} jeton · ${wins}/${x.draws.length} çekiliş` : `0 · ${x.draws.length} çekiliş`} />
       <Line label="Ayar sürümü" value={`v${x.configVersion}`} />
       <Line label="Zaman" value={fmtDate(x.at)} />
     </ItemCard>

@@ -2,13 +2,15 @@
 // tab stays mounted, so switching tabs keeps each tab's own reading position and never reloads, rebuilds or
 // replays anything. A reader scrolled up is never pulled down by new events; a pill offers to jump instead.
 // The chat keeps the height the person chose (drag the handle above the tabs, or tap it: lib/room-chat-size);
-// the stage above takes what is left, so banners and mics coming and going never make the chat jump.
+// the stage above takes what is left, so banners and mics coming and going never make the chat jump. The tab
+// at the handle's right folds the chat down to its smallest and opens it back to the size it had.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Animated, FlatList, PanResponder, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
 import { Text } from '@/components/text';
 import { filterFeed, type FeedMsg, type FeedTab } from '@/lib/chat-feed';
-import { CHAT_MAX, CHAT_MIN, clampChatShare, getChatShare, setChatShare, toggledChatShare } from '@/lib/room-chat-size';
+import { CHAT_DEFAULT, CHAT_MAX, CHAT_MIN, clampChatShare, getChatShare, setChatShare, toggledChatShare } from '@/lib/room-chat-size';
 import { colors, semantic } from '@/theme';
 
 const TABS: [FeedTab, string][] = [
@@ -52,7 +54,12 @@ export function ChatFeed({
   );
   return (
     <Animated.View style={[{ marginHorizontal: 12 }, fill ? { flex: 1 } : { height: height.value, flexShrink: 1, minHeight: 96 }]}>
-      {!fill && <Handle height={height} />}
+      {!fill && (
+        <View>
+          <Handle height={height} />
+          <FoldTab height={height} />
+        </View>
+      )}
       <View style={[s.tabs, !fill && { paddingTop: 0 }]} accessibilityRole="tablist">
         {TABS.map(([k, l]) => (
           <Pressable key={k} onPress={() => setTab(k)} hitSlop={{ top: 8, bottom: 8 }} style={[s.tab, tab === k && s.tabOn]} accessibilityRole="tab" aria-selected={tab === k} accessibilityLabel={`${l} mesajları`}>
@@ -70,11 +77,19 @@ export function ChatFeed({
 /** The chat's height as an animated value, so dragging moves it without drawing the room again. One per chat. */
 class ChatHeight {
   share = getChatShare();
+  /** The size to open back to from folded (the last one that was not folded). */
+  open = isFolded(this.share) ? CHAT_DEFAULT : this.share;
   screenHeight: number;
   value: Animated.Value;
+  listeners = new Set<() => void>();
   constructor(screenHeight: number) {
     this.screenHeight = screenHeight;
     this.value = new Animated.Value(this.share * screenHeight);
+  }
+  private saved(x: number) {
+    this.share = setChatShare(x);
+    if (!isFolded(this.share)) this.open = this.share;
+    this.listeners.forEach((f) => f());
   }
   resize(screenHeight: number) {
     this.screenHeight = screenHeight;
@@ -85,14 +100,15 @@ class ChatHeight {
     this.value.setValue(clampChatShare(x) * this.screenHeight);
   }
   commit(x: number) {
-    this.share = setChatShare(x);
+    this.saved(x);
     this.value.setValue(this.share * this.screenHeight);
   }
   animateTo(x: number) {
-    this.share = setChatShare(x);
+    this.saved(x);
     Animated.spring(this.value, { toValue: this.share * this.screenHeight, useNativeDriver: false, bounciness: 4 }).start();
   }
 }
+const isFolded = (share: number) => share <= CHAT_MIN + 0.01;
 function useChatHeight(screenHeight: number) {
   const [h] = useState(() => new ChatHeight(screenHeight));
   useEffect(() => h.resize(screenHeight), [h, screenHeight]);
@@ -137,6 +153,28 @@ function Handle({ height }: { height: ChatHeight }) {
     >
       <View style={s.grip} />
     </View>
+  );
+}
+
+/** The tab at the handle's right: folds the chat to its smallest, or opens it back to the size it had. */
+function FoldTab({ height }: { height: ChatHeight }) {
+  const [folded, setFolded] = useState(() => isFolded(height.share));
+  useEffect(() => {
+    const f = () => setFolded(isFolded(height.share));
+    height.listeners.add(f);
+    return () => void height.listeners.delete(f);
+  }, [height]);
+  return (
+    <Pressable
+      onPress={() => height.animateTo(folded ? height.open : CHAT_MIN)}
+      hitSlop={8}
+      style={s.fold}
+      accessibilityRole="button"
+      accessibilityLabel={folded ? 'Sohbeti büyüt' : 'Sohbeti küçült'}
+    >
+      <Ionicons name={folded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.text} />
+      <Text style={s.foldText}>{folded ? 'Büyüt' : 'Küçült'}</Text>
+    </Pressable>
   );
 }
 
@@ -201,6 +239,8 @@ const s = StyleSheet.create({
   hidden: { display: 'none' },
   handle: { height: 22, alignItems: 'center', justifyContent: 'center' },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.38)' },
+  fold: { position: 'absolute', right: 0, top: 0, height: 22, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  foldText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   empty: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginTop: 24 },
   pill: { position: 'absolute', alignSelf: 'center', bottom: 8, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   pillText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },

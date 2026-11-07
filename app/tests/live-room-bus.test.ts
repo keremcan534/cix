@@ -11,6 +11,7 @@ import {
   onServerSeat,
   onSignal,
   parseRoomMeta,
+  parseRoomState,
   parseSeat,
   parseServerGift,
   parseServerLucky,
@@ -87,6 +88,30 @@ test('kilitli mikrofonlar oda bilgisinden gelir; kişi listesi değişince kalı
   reportPeers('oda-l', []);
   assert.deepEqual(getLivePeers('oda-l').lockedSeats, []);
   assert.deepEqual(getLivePeers('oda-k').lockedSeats, []); // not the current room any more
+  reportPeers(null, []);
+});
+
+test('oda durumu (düzen, mikrofon sayısı, kuyruk) oda bilgisinden gelir; bozuk olan atılır', () => {
+  // Only the server writes micQueue, and it writes everything at once: without it there is no state.
+  assert.equal(parseRoomState('{"lockedSeats":[2]}'), null);
+  assert.equal(parseRoomState(''), null);
+  assert.equal(parseRoomState('bozuk'), null);
+  assert.equal(parseRoomState('null'), null);
+  assert.deepEqual(parseRoomState('{"lockedSeats":[],"layoutId":"sofra","micCount":12,"micQueue":true,"queue":["u1","u2","u1"]}'), {
+    layoutId: 'sofra',
+    micCount: 12,
+    micQueue: true,
+    queue: ['u1', 'u2'],
+  });
+  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"]}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'] });
+  assert.deepEqual(parseRoomState(`{"layoutId":"${'x'.repeat(41)}","micCount":2.5,"micQueue":false,"queue":"u1"}`), { layoutId: null, micCount: null, micQueue: false, queue: [] });
+
+  reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":true,"queue":["u9"]}');
+  assert.deepEqual(getLivePeers('oda-d').state, { layoutId: null, micCount: 8, micQueue: true, queue: ['u9'] });
+  assert.deepEqual(getLivePeers('oda-d').lockedSeats, [1]);
+  reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":false,"queue":[]}');
+  assert.equal(getLivePeers('oda-d').state?.micQueue, false);
+  assert.equal(getLivePeers('oda-e').state, null); // another room
   reportPeers(null, []);
 });
 

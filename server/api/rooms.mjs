@@ -6,10 +6,10 @@
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
-//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId? } → { room } (title, bulletin,
-//                          password (null = no lock): owner; mic count and layout: owner or room admin; the room's
-//                          phones are told to read it again)
-//   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
+//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId?, micQueue? } → { room }
+//                          (title, bulletin: owner or Süper Yönetici; password (null = no lock): owner; mic count,
+//                          layout and the mic queue on/off: owner or any room admin; the room's phones see it at once)
+//   POST /api/rooms/admin  { room, user, admin, super? }                    → { admin, super } (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
 //   POST /api/rooms/mute   { room, user, kind: text|voice, minutes|null, reason, description? } → { sanction }
@@ -17,11 +17,17 @@
 //   GET  /api/rooms/mutes?room=                                             → { mutes }    (owner or admin)
 //   GET  /api/rooms/staff?room=                                             → { owner, admins, bans? } (bans: staff only)
 //   POST /api/rooms/seat   { room, action: remove|move, user, seat? }       → { done }     (owner or admin)
-//   POST /api/rooms/seat   { room, action: lock|unlock, seat, locked? }     → { lockedSeats }
+//   POST /api/rooms/seat   { room, action: lock|unlock, seat }              → { lockedSeats }
+//   POST /api/rooms/queue  { room, action: join|leave }                     → { queue }    (the mic queue, when on)
+//   POST /api/rooms/queue  { room, action: approve|reject, user, seat? }    → { queue }    (owner or admin)
+// Ranks (migration 025): owner > Süper Yönetici > Yönetici > everyone else. Staff act only on people below their
+// own rank: a Yönetici on members, a Süper Yönetici also on Yöneticiler, the owner on everyone.
 // Room mutes are sanctions (sanctions.mjs): their own row, server time, audited. A room admin mutes for up to
-// 7 days; the owner also without an end. Nobody mutes the owner, platform staff or (unless owner) another admin.
+// 7 days; the owner also without an end. Nobody mutes the owner or platform staff.
 // Seats live in LiveKit, not here: a phone's mic is its own `seat` participant attribute, which room staff can
-// set for someone else (taken off the mic or moved), and locked mics are the LiveKit room's metadata.
+// set for someone else (taken off the mic, moved, or let up from the mic queue). The room's locked mics, layout,
+// mic count and mic queue are kept here and written into the LiveKit room's metadata (pushRoomMeta), which
+// LiveKit hands every phone in the room the moment it changes, and again on joining.
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
@@ -66,6 +72,8 @@ const out = (r) => ({
   // null: the classic grid with as many mics as the level gives.
   micCount: r.mic_count ?? null,
   layoutId: r.layout_id ?? null,
+  lockedSeats: (r.locked_seats ?? []).map(Number),
+  micQueue: !!r.mic_queue,
 });
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
 const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
@@ -86,6 +94,69 @@ async function roomRow(id) {
   return r.rows[0];
 }
 const isAdmin = async (roomId, uid) => (await db.query('SELECT 1 FROM room_admins WHERE room_id = $1 AND user_id = $2', [roomId, uid])).rowCount > 0;
+/** Owner 3, Süper Yönetici 2, Yönetici 1, anyone else 0. */
+const OWNER = 3;
+const SUPER = 2;
+async function rankOf(room, uid) {
+  if (room.owner === uid) return OWNER;
+  const r = await db.query('SELECT super FROM room_admins WHERE room_id = $1 AND user_id = $2', [room.id, uid]);
+  return r.rowCount ? (r.rows[0].super ? SUPER : 1) : 0;
+}
+/** The audit role of a rank. */
+const roleOfRank = (rank) => (rank === OWNER ? 'room_owner' : 'room_admin');
+/** My rank in the room; refused unless I'm room staff. */
+async function staffRank(room, me) {
+  const rank = await rankOf(room, me);
+  if (!rank) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+  return rank;
+}
+/** Refused unless `target` is below my rank (`mine`). */
+async function mustOutrank(room, mine, target, what) {
+  if (target === room.owner) throw new HttpError(403, `Oda sahibine ${what}`);
+  if ((await rankOf(room, target)) >= mine) throw new HttpError(403, `Kendi yetkindeki ya da üstündeki birine ${what}`);
+}
+
+const ROOM_NAME = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+const queueOf = async (roomId) =>
+  (await db.query('SELECT user_id FROM room_mic_queue WHERE room_id = $1 ORDER BY created_at, user_id LIMIT 50', [roomId])).rows.map((x) => x.user_id);
+/**
+ * Writes the room's locked mics, layout, classic mic count and mic queue into the LiveKit room's metadata. LiveKit
+ * hands it to every phone in the room as soon as it changes and to each phone that joins, so all phones draw the
+ * same mics without asking (app lib/live/room-bus parseRoomMeta). False when LiveKit doesn't have the room open
+ * (nobody in it: the next one in gets it from room_started, live.mjs) or can't be reached. Never throws.
+ */
+export async function pushRoomMeta(roomId) {
+  try {
+    const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue FROM rooms WHERE id = $1', [roomId])).rows[0];
+    if (!r) return false;
+    const metadata = JSON.stringify({
+      lockedSeats: (r.locked_seats ?? []).map(Number),
+      layoutId: r.layout_id ?? null,
+      micCount: r.mic_count ?? null,
+      micQueue: !!r.mic_queue,
+      queue: await queueOf(roomId),
+    });
+    const name = liveKitName(roomId);
+    return await roomService('UpdateRoomMetadata', { room: name, metadata }, { roomAdmin: true, room: name });
+  } catch (e) {
+    console.error('livekit UpdateRoomMetadata', roomId, String(e).slice(0, 200));
+    return false;
+  }
+}
+/** Someone left the voice room: off its mic queue. */
+export async function leftVoiceRoom(name, identity) {
+  const m = ROOM_NAME.exec(name);
+  if (!m || !UUID.test(identity)) return;
+  const r = await db.query('DELETE FROM room_mic_queue WHERE room_id = $1 AND user_id = $2', [m[1], identity]);
+  if (r.rowCount) await pushRoomMeta(m[1]);
+}
+/** LiveKit opened the room (someone joined it while empty): nobody waits for a mic yet; it gets the room's mics. */
+export async function voiceRoomStarted(name) {
+  const m = ROOM_NAME.exec(name);
+  if (!m) return;
+  await db.query('DELETE FROM room_mic_queue WHERE room_id = $1', [m[1]]);
+  await pushRoomMeta(m[1]);
+}
 /** A made-up or deleted account gets a 404, not a room_admins / room_bans row. */
 async function mustExist(uid) {
   if (!(await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [uid])).rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
@@ -212,35 +283,43 @@ export const roomRoutes = {
   },
 
   /**
-   * The owner renames the room, changes its bulletin or locks it with a password (null or '' takes the lock off;
-   * people already inside stay, the password is asked at the next join). The owner or a room admin sets the
-   * classic grid's mic count (null = the level's most) and the stage layout (null = classic grid); everyone in
-   * the room's voice connection is told to read the room again, so all phones draw the same mics.
+   * The owner or a Süper Yönetici renames the room or changes its bulletin; only the owner locks it with a password
+   * (null or '' takes the lock off; people already inside stay, the password is asked at the next join). The owner
+   * or any room admin sets the classic grid's mic count (null = the level's most), the stage layout (null = classic
+   * grid) and whether the mic queue is on (off empties it). These go into the LiveKit room's metadata, so every
+   * phone in the room draws the same mics at once; the room packet also tells older apps to read the room again.
    */
   async 'POST /api/rooms/update'(req) {
     const me = await auth(req);
     const b = await readJson(req);
     const room = await roomRow(b.id);
-    const owner = room.owner === me.id;
-    const texts = b.title !== undefined || b.announcement !== undefined || b.password !== undefined;
-    const stage = b.micCount !== undefined || b.layoutId !== undefined;
-    if (!texts && !stage) throw new HttpError(400, 'Değişiklik yok');
-    if (texts && !owner) throw new HttpError(403, 'Odayı yalnızca sahibi düzenleyebilir');
-    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Mikrofonları ve düzeni oda sahibi veya yöneticiler değiştirebilir');
+    const texts = b.title !== undefined || b.announcement !== undefined;
+    const stage = b.micCount !== undefined || b.layoutId !== undefined || b.micQueue !== undefined;
+    if (!texts && !stage && b.password === undefined) throw new HttpError(400, 'Değişiklik yok');
+    const rank = await rankOf(room, me.id);
+    if (b.password !== undefined && rank !== OWNER) throw new HttpError(403, 'Oda kilidini yalnızca oda sahibi değiştirebilir');
+    if (texts && rank < SUPER) throw new HttpError(403, 'Oda adını ve duyurusunu oda sahibi veya Süper Yönetici değiştirebilir');
+    if (!rank) throw new HttpError(403, 'Mikrofonları ve düzeni oda sahibi veya yöneticiler değiştirebilir');
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
     const micCount = b.micCount === undefined ? room.mic_count : b.micCount === null ? null : int(b.micCount, 1, 15);
     if (b.micCount != null && micCount === null) throw new HttpError(400, 'Mikrofon sayısı 1 ile 15 arasında olmalı');
     const layoutId = b.layoutId === undefined ? room.layout_id : b.layoutId;
     if (layoutId !== null && (typeof layoutId !== 'string' || !LAYOUT.test(layoutId))) throw new HttpError(400, 'Geçersiz düzen');
+    if (b.micQueue !== undefined && typeof b.micQueue !== 'boolean') throw new HttpError(400, 'Mikrofon kuyruğu açık ya da kapalı olmalı');
+    const micQueue = b.micQueue ?? room.mic_queue;
     limit(`roomedit:${me.id}`, 30, 'Çok sık değiştirdin, biraz bekle');
     const title = b.title === undefined ? room.title : await publicText(b.title, 3, 40, 'Oda adı', me, 'room.title', 'title');
     const announcement = b.announcement === undefined ? room.announcement : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
     const password = b.password === undefined ? undefined : b.password === null || b.password === '' ? null : text(b.password, 4, 32, 'Şifre');
     if (password) await mayLock(me);
-    await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5 WHERE id = $1', [room.id, title, announcement, micCount, layoutId]);
+    await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5, mic_queue = $6 WHERE id = $1', [room.id, title, announcement, micCount, layoutId, micQueue]);
+    if (!micQueue) await db.query('DELETE FROM room_mic_queue WHERE room_id = $1', [room.id]);
     // The hash includes the room id, as when the room is opened with a password.
     if (password !== undefined) await db.query('UPDATE rooms SET password_hash = $2 WHERE id = $1', [room.id, password && sha(`room:${room.id}:${password}`)]);
-    if (stage) announceRoom(liveKitName(room.id));
+    if (stage) {
+      await pushRoomMeta(room.id);
+      announceRoom(liveKitName(room.id));
+    }
     const [fresh] = await withVoiceCounts([await roomRow(room.id)]);
     return { room: out(fresh) };
   },
@@ -254,23 +333,28 @@ export const roomRoutes = {
     if (target === me.id) throw new HttpError(400, 'Oda sahibi zaten yetkili');
     if (b.admin === false) {
       await db.query('DELETE FROM room_admins WHERE room_id = $1 AND user_id = $2', [room.id, target]);
-      return { admin: false };
+      return { admin: false, super: false };
     }
+    if (b.super !== undefined && typeof b.super !== 'boolean') throw new HttpError(400, 'Süper Yönetici açık ya da kapalı olmalı');
     await mustExist(target);
-    await db.query('INSERT INTO room_admins (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [room.id, target]);
-    return { admin: true };
+    // super left out: an admin keeps the rank they have (a new one starts as Yönetici).
+    const r = await db.query(
+      `INSERT INTO room_admins (room_id, user_id, super) VALUES ($1, $2, coalesce($3::boolean, false))
+       ON CONFLICT (room_id, user_id) DO UPDATE SET super = coalesce($3::boolean, room_admins.super) RETURNING super`,
+      [room.id, target, b.super ?? null],
+    );
+    return { admin: true, super: r.rows[0].super };
   },
 
-  /** Kick for `minutes`, or blacklist with minutes = null. Admins can't remove the owner or another admin. */
+  /** Kick for `minutes`, or blacklist with minutes = null. Only someone below my rank (never the owner). */
   async 'POST /api/rooms/ban'(req) {
     const me = await auth(req);
     const b = await readJson(req);
     const room = await roomRow(b.room);
     const target = userId(b.user);
-    const owner = room.owner === me.id;
-    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    const rank = await staffRank(room, me.id);
     if (target === room.owner || target === me.id) throw new HttpError(400, 'Bu kişi odadan çıkarılamaz');
-    if (!owner && (await isAdmin(room.id, target))) throw new HttpError(403, 'Yöneticiyi yalnızca oda sahibi çıkarabilir');
+    await mustOutrank(room, rank, target, 'çıkarma yapamazsın');
     const minutes = b.minutes === null ? null : int(b.minutes, 1, 60 * 24 * 30);
     if (b.minutes !== null && minutes === null) throw new HttpError(400, 'Süre 1 dakika ile 30 gün arası olmalı');
     await mustExist(target);
@@ -280,7 +364,7 @@ export const roomRoutes = {
       [room.id, target, minutes, me.id],
     );
     await removeFromVoice(liveKitName(room.id), target);
-    await audit(db, { actor: me.id, role: owner ? 'room_owner' : 'room_admin', action: 'room_kick', target, detail: { room: room.id, minutes } });
+    await audit(db, { actor: me.id, role: roleOfRank(rank), action: 'room_kick', target, detail: { room: room.id, minutes } });
     return { until: r.rows[0].until };
   },
 
@@ -301,10 +385,10 @@ export const roomRoutes = {
     const room = await roomRow(b.room);
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
     const target = userId(b.user);
-    const owner = room.owner === me.id;
-    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    const rank = await staffRank(room, me.id);
+    const owner = rank === OWNER;
     if (target === room.owner || target === me.id) throw new HttpError(400, 'Bu kişi susturulamaz');
-    if (!owner && (await isAdmin(room.id, target))) throw new HttpError(403, 'Yöneticiyi yalnızca oda sahibi susturabilir');
+    await mustOutrank(room, rank, target, 'susturma yapamazsın');
     const t = (await db.query('SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL', [target])).rows[0];
     if (!t) throw new HttpError(404, 'Kullanıcı bulunamadı');
     if (t.role === 'admin' || t.role === 'moderator') throw new HttpError(403, 'Platform yetkilileri oda içinden susturulamaz');
@@ -358,9 +442,12 @@ export const roomRoutes = {
   async 'GET /api/rooms/staff'(req, url) {
     const me = await auth(req);
     const room = await roomRow(url.searchParams.get('room'));
-    const admins = await db.query('SELECT u.id, u.name FROM room_admins a JOIN users u ON u.id = a.user_id WHERE a.room_id = $1 AND u.deleted_at IS NULL ORDER BY u.name, u.id', [room.id]);
+    const admins = await db.query(
+      'SELECT u.id, u.name, a.super FROM room_admins a JOIN users u ON u.id = a.user_id WHERE a.room_id = $1 AND u.deleted_at IS NULL ORDER BY a.super DESC, u.name, u.id',
+      [room.id],
+    );
     const staff = room.owner === me.id || admins.rows.some((a) => a.id === me.id);
-    const result = { owner: room.owner, admins: admins.rows.map((a) => ({ id: a.id, name: a.name })) };
+    const result = { owner: room.owner, admins: admins.rows.map((a) => ({ id: a.id, name: a.name, super: a.super })) };
     if (!staff) return result;
     const bans = await db.query(
       'SELECT b.user_id, u.name, b.until FROM room_bans b JOIN users u ON u.id = b.user_id WHERE b.room_id = $1 AND (b.until IS NULL OR b.until > now()) ORDER BY b.created_at DESC LIMIT 200',
@@ -372,38 +459,89 @@ export const roomRoutes = {
   /**
    * Room staff move someone's mic: off it (remove) or to another free one (move), as that person's own `seat`
    * attribute in LiveKit, which their phone then follows. Lock / unlock changes the locked mics in the LiveKit
-   * room's metadata; `locked` is the set the staff phone sees there now. Admins don't touch the owner or admins.
+   * room (and its LiveKit metadata). Staff move only people below their own rank, or themselves.
    */
   async 'POST /api/rooms/seat'(req) {
     const me = await auth(req);
     const b = await readJson(req);
     const room = await roomRow(b.room);
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
-    const owner = room.owner === me.id;
-    if (!owner && !(await isAdmin(room.id, me.id))) throw new HttpError(403, 'Bu işlem için oda yetkisi gerekli');
+    const rank = await staffRank(room, me.id);
     const name = liveKitName(room.id);
     if (b.action === 'remove' || b.action === 'move') {
       const target = userId(b.user);
-      if (!owner && (target === room.owner || (await isAdmin(room.id, target)))) throw new HttpError(403, 'Oda sahibinin ya da yöneticinin koltuğunu yalnızca oda sahibi değiştirebilir');
+      if (target !== me.id) await mustOutrank(room, rank, target, 'koltuk işlemi yapamazsın');
       const seat = b.action === 'move' ? seatNo(b.seat) : null;
       if (b.action === 'move' && seat === null) throw new HttpError(400, 'Geçersiz koltuk');
       limit(`roomseat:${me.id}`, 60, 'Çok sık işlem yaptın, biraz bekle');
       const done = await seatCall('UpdateParticipant', { room: name, identity: target, attributes: { seat: seat === null ? '' : String(seat) } }, name);
       if (!done) throw new HttpError(409, 'Bu kişi şu an sesli odada değil');
-      await audit(db, { actor: me.id, role: owner ? 'room_owner' : 'room_admin', action: b.action === 'move' ? 'room_seat_move' : 'room_seat_remove', target, detail: { room: room.id, seat } });
+      await audit(db, { actor: me.id, role: roleOfRank(rank), action: b.action === 'move' ? 'room_seat_move' : 'room_seat_remove', target, detail: { room: room.id, seat } });
       return { done: true };
     }
     if (b.action === 'lock' || b.action === 'unlock') {
       const seat = seatNo(b.seat);
       if (seat === null) throw new HttpError(400, 'Geçersiz koltuk');
-      const now = new Set((Array.isArray(b.locked) ? b.locked : []).map(seatNo).filter((x) => x !== null));
-      if (b.action === 'lock') now.add(seat);
-      else now.delete(seat);
-      const lockedSeats = [...now].sort((x, y) => x - y);
       limit(`roomseat:${me.id}`, 60, 'Çok sık işlem yaptın, biraz bekle');
-      const done = await seatCall('UpdateRoomMetadata', { room: name, metadata: JSON.stringify({ lockedSeats }) }, name);
-      if (!done) throw new HttpError(409, 'Odanın sesli bağlantısı şu an açık değil');
-      return { lockedSeats };
+      // One statement, so two staff phones locking at once both count. Kept on the room, so an emptied room keeps
+      // its locks; every phone in it sees them through the metadata.
+      const r = await db.query(
+        b.action === 'lock'
+          ? 'UPDATE rooms SET locked_seats = (SELECT array_agg(DISTINCT x ORDER BY x) FROM unnest(array_append(locked_seats, $2::int)) x) WHERE id = $1 RETURNING locked_seats'
+          : 'UPDATE rooms SET locked_seats = array_remove(locked_seats, $2::int) WHERE id = $1 RETURNING locked_seats',
+        [room.id, seat],
+      );
+      await pushRoomMeta(room.id);
+      return { lockedSeats: r.rows[0].locked_seats.map(Number) };
+    }
+    throw new HttpError(400, 'Geçersiz işlem');
+  },
+
+  /**
+   * The mic queue (on in the room's settings): a member asks for a mic (join) or stops asking (leave); the owner or
+   * an admin lets them up on mic `seat` (approve: their `seat` attribute in LiveKit, which their phone follows) or
+   * turns them down (reject). Leaving the voice room takes them off it (live.mjs). Who waits is in the LiveKit
+   * room's metadata, so every staff phone sees a raised hand at once.
+   */
+  async 'POST /api/rooms/queue'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const room = await roomRow(b.room);
+    if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
+    const waiting = async (uid) => (await db.query('SELECT 1 FROM room_mic_queue WHERE room_id = $1 AND user_id = $2', [room.id, uid])).rowCount > 0;
+    const drop = (uid) => db.query('DELETE FROM room_mic_queue WHERE room_id = $1 AND user_id = $2', [room.id, uid]);
+    if (b.action === 'join' || b.action === 'leave') {
+      limit(`roomqueue:${me.id}`, 30, 'Çok sık işlem yaptın, biraz bekle');
+      if (b.action === 'join') {
+        if (!room.mic_queue) throw new HttpError(409, 'Bu odada mikrofon kuyruğu kapalı');
+        if ((await db.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND user_id = $2 AND (until IS NULL OR until > now())', [room.id, me.id])).rowCount)
+          throw new HttpError(403, 'Bu odaya giremezsin');
+        if (!(await waiting(me.id)) && (await queueOf(room.id)).length >= 50) throw new HttpError(409, 'Mikrofon kuyruğu dolu, biraz sonra tekrar dene');
+        await db.query('INSERT INTO room_mic_queue (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [room.id, me.id]);
+      } else await drop(me.id);
+      await pushRoomMeta(room.id);
+      return { queue: await queueOf(room.id) };
+    }
+    if (b.action === 'approve' || b.action === 'reject') {
+      const rank = await staffRank(room, me.id);
+      const target = userId(b.user);
+      if (!(await waiting(target))) throw new HttpError(404, 'Bu kişi kuyrukta değil');
+      limit(`roomseat:${me.id}`, 60, 'Çok sık işlem yaptın, biraz bekle');
+      if (b.action === 'approve') {
+        const seat = seatNo(b.seat);
+        if (seat === null) throw new HttpError(400, 'Geçersiz koltuk');
+        if ((room.locked_seats ?? []).map(Number).includes(seat)) throw new HttpError(409, 'Bu mikrofon kilitli');
+        const name = liveKitName(room.id);
+        const done = await seatCall('UpdateParticipant', { room: name, identity: target, attributes: { seat: String(seat) } }, name);
+        await drop(target);
+        await pushRoomMeta(room.id);
+        if (!done) throw new HttpError(409, 'Bu kişi şu an sesli odada değil');
+        await audit(db, { actor: me.id, role: roleOfRank(rank), action: 'room_seat_move', target, detail: { room: room.id, seat, queue: true } });
+      } else {
+        await drop(target);
+        await pushRoomMeta(room.id);
+      }
+      return { queue: await queueOf(room.id) };
     }
     throw new HttpError(400, 'Geçersiz işlem');
   },

@@ -59,6 +59,8 @@ export type Room = {
   layoutId?: string;
   /** Classic-grid mics the owner (or a room admin) chose on the server; absent = the room level's most. */
   micCount?: number;
+  /** A server room's locked mics, as the server keeps them (the LiveKit metadata says it sooner). */
+  lockedSeats?: number[];
 };
 
 export type Moment = {

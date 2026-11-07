@@ -7,7 +7,7 @@ import { AssetView } from '@/components/fx/anim-player';
 import { Icon3D } from '@/components/Icon3D';
 import { EMOJI_PACKS_ICON, REACTION_TAB_ANIMATED, REACTION_TAB_RECENT, ReactionArt, StickerArt } from '@/components/ReactionArt';
 import { DISPLAY_LABEL } from '@/data/animations';
-import { STANDARD_EMOJI, STICKER_PACKS } from '@/data/catalog';
+import { FREE_PACK_IDS, STANDARD_EMOJI, STICKER_PACKS } from '@/data/catalog';
 import { isLive, useAnimations } from '@/lib/animations';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { showAlert } from '@/lib/alert';
@@ -15,18 +15,19 @@ import { useApp } from '@/store';
 import { makeStyles } from '@/theme';
 
 /**
- * Inline emoji picker. Top row: Hareketli (rooms only), recents, standard emoji, then one tab per
- * sticker pack. Standard Unicode emoji are free for everyone; sticker packs hold the custom-drawn
- * stickers and are bought in the store (locked packs show a preview). Picking a sticker hands the
- * caller its token (lib/stickers), picking an emoji hands the emoji.
- * In rooms (`onAnimate`) the first tab lists animated reactions, effect gifts and mic effects from the
- * central animation catalog, so catalog changes show up without an app update.
+ * Inline emoji picker, in two parts. Ücretsiz (opens first): recents, the standard emoji, the free animated
+ * reactions (rooms only) and the free sticker packs. Ücretli: the paid animated reactions, effect gifts and mic
+ * effects (rooms only) and the sticker packs bought in the store (locked packs show a preview). Picking a
+ * sticker hands the caller its token (lib/stickers), picking an emoji hands the emoji.
+ * In rooms (`onAnimate`) the Hareketli tabs come from the central animation catalog, so catalog changes show
+ * up without an app update.
  */
 export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) => void; hint?: string; onAnimate?: (animationId: string) => void }) {
   const { packUnlocked, recentEmojis, rememberEmoji, buyEmojiPack, ownedAnims, micFx, buyMicFx, setMicFx } = useApp();
   const { catalog } = useAnimations();
   const styles = useStyles();
-  const [tab, setTab] = useState<string>(onAnimate ? 'animated' : recentEmojis.length ? 'recent' : 'emoji');
+  const [kind, setKind] = useState<'free' | 'paid'>('free');
+  const [tab, setTab] = useState<string>('emoji');
   const [group, setGroup] = useState(STANDARD_EMOJI[0].id);
   const pack = STICKER_PACKS.find((p) => p.id === tab);
   const locked = !!pack && !packUnlocked(pack.id);
@@ -42,16 +43,34 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
     onPick(e);
   };
 
-  const tabs: { id: string; name: string; icon?: number; lock?: boolean }[] = [
-    ...(onAnimate ? [{ id: 'animated', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []),
-    { id: 'recent', name: '', icon: REACTION_TAB_RECENT },
-    { id: 'emoji', name: 'Emoji' },
-    ...STICKER_PACKS.map((p) => ({ id: p.id, name: p.name, icon: p.id === STICKER_PACKS[0].id ? EMOJI_PACKS_ICON : undefined, lock: !packUnlocked(p.id) })),
-  ];
+  const packTab = (p: (typeof STICKER_PACKS)[number]) => ({ id: p.id, name: p.name, icon: p.id === STICKER_PACKS[0].id ? EMOJI_PACKS_ICON : undefined, lock: !packUnlocked(p.id) });
+  const tabsOf = (k: 'free' | 'paid'): { id: string; name: string; icon?: number; lock?: boolean }[] =>
+    k === 'free'
+      ? [
+          { id: 'recent', name: '', icon: REACTION_TAB_RECENT },
+          { id: 'emoji', name: 'Emoji' },
+          ...(onAnimate ? [{ id: 'animated-free', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []),
+          ...STICKER_PACKS.filter((p) => FREE_PACK_IDS.includes(p.id)).map(packTab),
+        ]
+      : [...(onAnimate ? [{ id: 'animated', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []), ...STICKER_PACKS.filter((p) => !FREE_PACK_IDS.includes(p.id)).map(packTab)];
+  const tabs = tabsOf(kind);
+  const paidAnim = tab === 'animated';
+  const switchKind = (k: 'free' | 'paid') => {
+    setKind(k);
+    setTab(k === 'free' ? 'emoji' : (tabsOf('paid')[0]?.id ?? 'emoji'));
+  };
+  const micFxList = catalog.filter((a) => a.display_type === 'mic_effect' && isLive(a) && a.is_free === !paidAnim);
 
   return (
     <View style={styles.wrap}>
       {hint && <Text style={styles.hint}>{hint}</Text>}
+      <View style={styles.kinds} accessibilityRole="tablist">
+        {(['free', 'paid'] as const).map((k) => (
+          <Pressable key={k} onPress={() => switchKind(k)} style={[styles.kind2, kind === k && styles.kindOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
+            <Text style={[styles.kindText, kind === k && styles.kindTextOn]}>{k === 'free' ? 'Ücretsiz' : 'Ücretli'}</Text>
+          </Pressable>
+        ))}
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
         {tabs.map((p) => (
           <Pressable
@@ -72,13 +91,11 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
           </Pressable>
         ))}
       </ScrollView>
-      {tab === 'animated' && onAnimate ? (
+      {(tab === 'animated' || tab === 'animated-free') && onAnimate ? (
         <View style={{ paddingHorizontal: 8, gap: 6 }}>
-          <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>
+          {micFxList.length > 0 && <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6 }}>
-            {catalog
-              .filter((a) => a.display_type === 'mic_effect' && isLive(a))
-              .map((a) => {
+            {micFxList.map((a) => {
                 const owned = ownedAnims.has(a.animation_id);
                 const on = micFx === a.animation_id;
                 return (
@@ -101,7 +118,7 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
           </ScrollView>
           <View style={styles.grid}>
             {catalog
-              .filter((a) => isLive(a) && (a.display_type === 'reaction' || a.display_type === 'gift' || a.display_type === 'fullscreen'))
+              .filter((a) => isLive(a) && a.is_free === !paidAnim && (a.display_type === 'reaction' || a.display_type === 'gift' || a.display_type === 'fullscreen'))
               .map((a) => (
                 <Pressable key={a.animation_id} onPress={() => onAnimate(a.animation_id)} style={styles.animCell} accessibilityLabel={`${a.name} gönder`}>
                   <AssetView asset={a.preview_asset} size={30} />
@@ -177,6 +194,11 @@ export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) =>
 
 const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   hint: { color: colors.textDim, fontSize: 12, paddingHorizontal: 12, paddingBottom: 6 },
+  kinds: { flexDirection: 'row', alignSelf: 'center', gap: 4, padding: 3, marginBottom: 8, borderRadius: 999, backgroundColor: colors.cardAlt },
+  kind2: { paddingHorizontal: 18, paddingVertical: 5, borderRadius: 999 },
+  kindOn: { backgroundColor: colors.primary },
+  kindText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  kindTextOn: { color: '#fff' },
   // Light: a hairline and a soft upward shadow so the white panel lifts off the paper behind it.
   wrap: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 10, paddingBottom: 6, ...(dark ? null : { borderWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0, borderColor: 'rgba(11,26,46,0.08)', boxShadow: '0 -4px 16px rgba(16,36,64,0.06)' }) },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },

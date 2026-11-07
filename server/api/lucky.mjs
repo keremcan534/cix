@@ -10,8 +10,8 @@
 // only, as any gift). Each recipient gets SHARE (20 %) of that as diamonds, a gift like any other: diamond locks,
 // gift_events, agency income ('lucky_gift'), PK points, bond and room XP all count the share. The rest of the
 // price is a coin_spend for the finance panel ("Uygulama içi:"). Every gift is one draw (crypto.randomInt over
-// ODDS_TOTAL); a win pays price × multiplier to the sender in game coins, which can only be played in the Oyun
-// Salonu: never gifted, exchanged or withdrawn. So a reward is never money and never reaches a recipient.
+// ODDS_TOTAL); a win pays price × multiplier to the sender in coins, on their own channel ('ugurlu',
+// wallet.mjs): spent like any coin, but what they pay for never counts for Cömertlik (wheel.mjs wealthPoints).
 // Open from Cömertlik Lv.2 and 18 years, checked on every send, like Rüzgâr Gülü. A package takes no new sends
 // while the rewards paid today across the platform plus its top reward would pass the daily limit.
 // The odds a send was drawn with are stored on it; an admin's later edit never changes an old result. Every
@@ -21,14 +21,14 @@ import crypto from 'node:crypto';
 import { recordIncome } from './agency-lib.mjs';
 import { addBondCoins } from './bonds.mjs';
 import { GIFT_COUNTS } from './catalog.mjs';
-import { HttpError, REF, ageOf, auth, blockedBetween, db, limit, move, readJson, selfUser, tx, userId } from './core.mjs';
+import { HttpError, REF, ageOf, auth, blockedBetween, db, limit, readJson, selfUser, tx, userId } from './core.mjs';
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, drawMult, maxMult } from './lucky-rules.mjs';
 import { announceRoom } from './live.mjs';
 import { scorePkGift } from './pk.mjs';
 import { roomLevel } from './rooms.mjs';
 import { audit } from './sanctions.mjs';
-import { giftCoins, spendCoins } from './wallet.mjs';
+import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
 import { NEED_LEVEL, NEED_POINTS, wealthPoints } from './wheel.mjs';
 
 /** People one send can go to (everyone on the mics of the biggest room, with room to spare). */
@@ -171,7 +171,7 @@ export const luckyRoutes = {
 
         const draws = Array.from({ length: count * to.length }, () => drawMult(gift.tiers, crypto.randomInt(0, ODDS_TOTAL)));
         const payout = draws.reduce((n, m) => n + m * gift.price, 0);
-        if (payout) await move(c, me.id, 'game', payout, `Uğurlu ödülü: ${label}${many}`, `${lref}-k`);
+        if (payout) await creditCoins(c, me.id, [{ channel: 'ugurlu', amount: payout }], `Uğurlu ödülü: ${label}${many}`, `${lref}-k`);
         const ins = await c.query(
           `INSERT INTO lucky_sends (user_id, ref, gift_id, room, count, recipients, unit_price, cost, shared, payout, best_mult, draws, config_version, odds)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,

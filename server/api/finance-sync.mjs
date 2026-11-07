@@ -70,6 +70,7 @@ export function eventsOf(r) {
     if (r.channel === 'test') return [{ ...base, type: 'promotion', user_ref: r.user_id, coins: amount, campaign_ref: 'test_yukleme' }];
     if (r.channel === 'cevir') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'elmas_cevirme' }];
     if (r.channel === 'bozdurma') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'elmas_bozdurma' }];
+    if (r.channel === 'ugurlu') return [{ ...base, type: 'bonus_grant', user_ref: r.user_id, coins: amount, campaign_ref: 'ugurlu_odul' }];
     if (r.channel === 'toptan' && d.priceTl !== undefined)
       return [{ ...base, type: 'purchase', user_ref: r.user_id, channel: 'jeton_noktasi', amount: money(d.priceTl), currency: 'TRY', coins: amount, product_ref: 'toptan' }];
     return [];

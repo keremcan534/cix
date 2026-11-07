@@ -48,7 +48,7 @@ export function StageLayout({
   // Six across get a narrower gap.
   const micGap = micCols >= 6 ? space.xs : space.sm;
   const micW = Math.floor(clamp((rowW - (micCols - 1) * micGap) / micCols, 40, 84));
-  const micSlot: ArenaSlot = { width: micW, size: clamp(micW - 24, 32, 56) };
+  const micSlot: ArenaSlot = { width: micW, size: clamp(micW - 28, 30, 48) };
   const paired = new Set(s.pairs.flat());
 
   const videoTile = (x: LayoutSlot, w: number, h: number) => {
@@ -63,7 +63,7 @@ export function StageLayout({
       </View>
     );
   };
-  const mainSeat = (x: LayoutSlot) => renderSeat(x.index, { width: clamp(inner / 3, 84, 120), size: clamp(inner / 4.5, 56, 76) });
+  const mainSeat = (x: LayoutSlot) => renderSeat(x.index, { width: clamp(inner / 3, 84, 120), size: clamp(inner / 5, 50, 66) });
   const heart = (a: number, b: number) => {
     const both = !!seats[a] && !!seats[b];
     return (
@@ -91,7 +91,7 @@ export function StageLayout({
           const linked = paired.has(x.index) && next && s.pairs.some(([a, b]) => a === x.index && b === next.index);
           const beside = x.kind === 'mic' && next?.kind === 'mic' && !x.host && !next.host ? { index: next.index, gap: micGap } : undefined;
           return [
-            <View key={x.index}>{x.kind === 'main' ? mainSeat(x) : renderSeat(x.index, x.host && xs.length === 1 ? { width: Math.max(micW, 96), size: 64 } : micSlot, beside)}</View>,
+            <View key={x.index}>{x.kind === 'main' ? mainSeat(x) : renderSeat(x.index, x.host && xs.length === 1 ? { width: Math.max(micW, 96), size: 56 } : micSlot, beside)}</View>,
             linked ? heart(x.index, next.index) : null,
           ];
         })}

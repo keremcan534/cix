@@ -41,6 +41,10 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   let denoise = true;
   const capture = () => ({ echoCancellation: true, noiseSuppression: denoise, autoGainControl: true });
   let recapturing: Promise<void> | null = null;
+  // "Konuşma sesi" / "Oda sesini kapat": every remote voice plays at this volume (0..1), new ones too.
+  let volume = 1;
+  const applyVolume = (r: Room) =>
+    r.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => (pub.track as { setVolume?: (v: number) => void } | undefined)?.setVolume?.(volume)));
   /** Only for the room still current: a late answer from a room we already left says nothing. */
   const tell = (r: Room, e: EngineEvent) => {
     if (room === r && s.roomId) cfg.onEvent?.(s.roomId, e);
@@ -176,11 +180,16 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     r.on(RoomEvent.DataReceived, (payload, participant) => {
       if (room === r && s.roomId) reportSignal(s.roomId, participant ? participant.identity : null, decodeSignal(payload));
     });
+    // A new voice starts at the volume I chose (the phone build plays it without an element).
+    r.on(RoomEvent.TrackSubscribed, (track) => {
+      if (track.kind === Track.Kind.Audio) (track as { setVolume?: (v: number) => void }).setVolume?.(volume);
+    });
     if (cfg.attachAudio === false) return r;
     // Remote voices play through hidden <audio> elements, removed when the track goes away.
     r.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
       const el = track.attach();
+      (track as { setVolume?: (v: number) => void }).setVolume?.(volume);
       el.style.display = 'none';
       document.body.appendChild(el);
     });
@@ -230,6 +239,10 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (on) s.publishStarts++;
       s.publishing = on;
       if (room) setMic(room, on);
+    },
+    setPlaybackVolume(v) {
+      volume = v;
+      if (room) applyVolume(room);
     },
     setNoiseSuppression(on) {
       if (on === denoise) return;

@@ -86,7 +86,7 @@ describe('Oda yönetimi', () => {
     const [st, mine] = await call('GET', `/api/rooms/staff?room=${room}`, null, owner.session);
     assert.equal(st, 200, mine.error);
     assert.equal(mine.owner, owner.user.id);
-    assert.deepEqual(mine.admins, [{ id: admin.user.id, name: 'Oda Yöneticisi' }]);
+    assert.deepEqual(mine.admins, [{ id: admin.user.id, name: 'Oda Yöneticisi', super: false }]);
     assert.deepEqual(
       mine.bans.map((b) => [b.userId, b.name, !!b.until]),
       [[kicked.user.id, 'Atılan', true]],
@@ -148,27 +148,141 @@ describe('Oda yönetimi', () => {
   test('mikrofon kilidi LiveKit odasının bilgisine yazılır', async () => {
     const from = lkCalls.length;
     const lkName = `oda-${room}`;
-    const [st, j] = await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 5, locked: [2] }, admin.session);
+    assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 2 }, owner.session))[0], 200);
+    // `locked` from an older app is not trusted: the room keeps its own list.
+    const [st, j] = await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 5, locked: [7, 8] }, admin.session);
     assert.equal(st, 200, j.error);
     assert.deepEqual(j.lockedSeats, [2, 5]);
-    const [meta] = callsOf('UpdateRoomMetadata', from);
+    const meta = callsOf('UpdateRoomMetadata', from).at(-1);
     assert.equal(meta.body.room, lkName);
-    assert.deepEqual(JSON.parse(meta.body.metadata), { lockedSeats: [2, 5] });
+    assert.deepEqual(JSON.parse(meta.body.metadata), { lockedSeats: [2, 5], layoutId: null, micCount: null, micQueue: false, queue: [] });
     assert.deepEqual(meta.grant, { roomAdmin: true, room: lkName });
 
-    const [, un] = await call('POST', '/api/rooms/seat', { room, action: 'unlock', seat: 2, locked: [2, 5, 0, 'x', 400] }, owner.session);
-    assert.deepEqual(un.lockedSeats, [5], 'geçersiz koltuklar atılır');
+    const [, un] = await call('POST', '/api/rooms/seat', { room, action: 'unlock', seat: 2 }, owner.session);
+    assert.deepEqual(un.lockedSeats, [5]);
     assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 0 }, owner.session))[0], 400, 'sahibin koltuğu kilitlenmez');
     assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 4 }, member.session))[0], 403);
 
+    // Nobody in the voice room: the lock is kept on the room and reaches the next phones from GET /api/room.
     lkMode.UpdateRoomMetadata = 'gone';
-    assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 4 }, owner.session))[0], 409, 'sesli oda açık değil');
+    assert.deepEqual((await call('POST', '/api/rooms/seat', { room, action: 'lock', seat: 4 }, owner.session))[1].lockedSeats, [4, 5]);
     delete lkMode.UpdateRoomMetadata;
+    assert.deepEqual((await call('GET', `/api/room?id=${room}`, null, member.session))[1].room.lockedSeats, [4, 5]);
+    await call('POST', '/api/rooms/seat', { room, action: 'unlock', seat: 4 }, owner.session);
+    await call('POST', '/api/rooms/seat', { room, action: 'unlock', seat: 5 }, owner.session);
 
     const other = await signUp('Başka Sahip');
     const closed = await openRoom(other);
     await call('POST', '/api/rooms/close', { id: closed }, other.session);
     assert.equal((await call('POST', '/api/rooms/seat', { room: closed, action: 'lock', seat: 4 }, other.session))[0], 410, 'kapanan oda');
+  });
+});
+
+describe('Oda yetki sırası: sahip > Süper Yönetici > Yönetici', () => {
+  let owner;
+  let sup;
+  let adm;
+  let member;
+  let room;
+  before(async () => {
+    owner = await signUp('Sıra Sahibi');
+    sup = await signUp('Süper');
+    adm = await signUp('Sıradan Yönetici');
+    member = await signUp('Sıra Üyesi');
+    room = await openRoom(owner);
+    const [st, j] = await call('POST', '/api/rooms/admin', { room, user: sup.user.id, admin: true, super: true }, owner.session);
+    assert.equal(st, 200, j.error);
+    assert.deepEqual(j, { admin: true, super: true });
+    assert.deepEqual((await call('POST', '/api/rooms/admin', { room, user: adm.user.id }, owner.session))[1], { admin: true, super: false });
+  });
+
+  test('süper yönetici odanın adını ve duyurusunu değiştirir, kilidi değiştiremez; yönetici adı değiştiremez', async () => {
+    const [st, j] = await call('POST', '/api/rooms/update', { id: room, title: 'Süperin Odası', announcement: 'Hoş geldiniz' }, sup.session);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.room.title, 'Süperin Odası');
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, title: 'Yöneticinin' }, adm.session))[0], 403);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, password: '1234' }, sup.session))[0], 403, 'kilit yalnızca sahibin');
+    assert.equal((await call('POST', '/api/rooms/admin', { room, user: member.user.id }, sup.session))[0], 403, 'yönetici yalnızca sahip atar');
+  });
+
+  test('herkes yalnızca kendinden alttakine işlem yapar', async () => {
+    const staff = (await call('GET', `/api/rooms/staff?room=${room}`, null, member.session))[1];
+    assert.deepEqual(staff.admins.map((a) => [a.id, a.super]), [[sup.user.id, true], [adm.user.id, false]], 'süper yönetici önce');
+    // Yönetici: not on the Süper Yönetici nor on another Yönetici's rank.
+    assert.equal((await call('POST', '/api/rooms/ban', { room, user: sup.user.id, minutes: 5 }, adm.session))[0], 403);
+    assert.equal((await call('POST', '/api/rooms/mute', { room, user: sup.user.id, kind: 'text', minutes: 5, reason: 'spam' }, adm.session))[0], 403);
+    assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'remove', user: sup.user.id }, adm.session))[0], 403);
+    assert.equal((await call('POST', '/api/rooms/ban', { room, user: owner.user.id, minutes: 5 }, sup.session))[0], 400, 'sahip çıkarılamaz');
+    // Süper Yönetici: on a Yönetici and on members.
+    assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'remove', user: adm.user.id }, sup.session))[0], 200);
+    const [ms, mj] = await call('POST', '/api/rooms/mute', { room, user: adm.user.id, kind: 'text', minutes: 5, reason: 'spam' }, sup.session);
+    assert.equal(ms, 200, mj.error);
+    assert.equal((await call('POST', '/api/rooms/ban', { room, user: member.user.id, minutes: 5 }, adm.session))[0], 200, 'yönetici üyeye işlem yapar');
+    await call('POST', '/api/rooms/unban', { room, user: member.user.id }, owner.session);
+    // The owner makes the Süper Yönetici a plain Yönetici again; then they can't act on the other Yönetici.
+    assert.deepEqual((await call('POST', '/api/rooms/admin', { room, user: sup.user.id, super: false }, owner.session))[1], { admin: true, super: false });
+    assert.equal((await call('POST', '/api/rooms/seat', { room, action: 'remove', user: adm.user.id }, sup.session))[0], 403);
+    assert.deepEqual((await call('POST', '/api/rooms/admin', { room, user: sup.user.id }, owner.session))[1], { admin: true, super: false }, 'super verilmezse rütbe kalır');
+    await call('POST', '/api/rooms/admin', { room, user: sup.user.id, super: true }, owner.session);
+    assert.equal((await call('POST', '/api/rooms/admin', { room, user: sup.user.id, super: 'evet' }, owner.session))[0], 400);
+  });
+});
+
+describe('Düzen ve mikrofon kuyruğu herkese oda bilgisiyle gider', () => {
+  let owner;
+  let adm;
+  let a;
+  let b;
+  let room;
+  before(async () => {
+    owner = await signUp('Kuyruk Sahibi');
+    adm = await signUp('Kuyruk Yöneticisi');
+    a = await signUp('Elini Kaldıran');
+    b = await signUp('İkinci El');
+    room = await openRoom(owner);
+    await call('POST', '/api/rooms/admin', { room, user: adm.user.id }, owner.session);
+  });
+  const lastMeta = (from) => JSON.parse(callsOf('UpdateRoomMetadata', from).at(-1).body.metadata);
+
+  test('düzen ve mikrofon sayısı değişince odanın bilgisi yazılır', async () => {
+    const from = lkCalls.length;
+    const [st, j] = await call('POST', '/api/rooms/update', { id: room, micCount: 6 }, adm.session);
+    assert.equal(st, 200, j.error);
+    assert.deepEqual(lastMeta(from), { lockedSeats: [], layoutId: null, micCount: 6, micQueue: false, queue: [] });
+    assert.equal(callsOf('SendData', from).length, 1, 'eski uygulamalar için oda paketi de gider');
+    await call('POST', '/api/rooms/update', { id: room, layoutId: 'audio-12-grid' }, owner.session);
+    assert.equal(lastMeta(from).layoutId, 'audio-12-grid');
+  });
+
+  test('kuyruk: açıkken el kaldırılır, yönetici mikrofona alır ya da reddeder', async () => {
+    assert.equal((await call('POST', '/api/rooms/queue', { room, action: 'join' }, a.session))[0], 409, 'kuyruk kapalı');
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, micQueue: 'evet' }, owner.session))[0], 400);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, micQueue: true }, a.session))[0], 403, 'üye açamaz');
+    const [st, j] = await call('POST', '/api/rooms/update', { id: room, micQueue: true }, adm.session);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.room.micQueue, true);
+
+    const from = lkCalls.length;
+    assert.deepEqual((await call('POST', '/api/rooms/queue', { room, action: 'join' }, a.session))[1].queue, [a.user.id]);
+    assert.deepEqual((await call('POST', '/api/rooms/queue', { room, action: 'join' }, a.session))[1].queue, [a.user.id], 'iki kez sıraya girilmez');
+    assert.deepEqual((await call('POST', '/api/rooms/queue', { room, action: 'join' }, b.session))[1].queue, [a.user.id, b.user.id]);
+    assert.deepEqual(lastMeta(from).queue, [a.user.id, b.user.id], 'yöneticiler eli hemen görür');
+
+    assert.equal((await call('POST', '/api/rooms/queue', { room, action: 'approve', user: b.user.id, seat: 3 }, a.session))[0], 403, 'üye onaylayamaz');
+    const [as, aj] = await call('POST', '/api/rooms/queue', { room, action: 'approve', user: a.user.id, seat: 3 }, adm.session);
+    assert.equal(as, 200, aj.error);
+    assert.deepEqual(aj.queue, [b.user.id]);
+    assert.deepEqual(callsOf('UpdateParticipant', from).at(-1).body, { room: `oda-${room}`, identity: a.user.id, attributes: { seat: '3' } });
+    assert.equal((await call('POST', '/api/rooms/queue', { room, action: 'approve', user: a.user.id, seat: 3 }, adm.session))[0], 404, 'kuyrukta değil');
+    assert.deepEqual((await call('POST', '/api/rooms/queue', { room, action: 'reject', user: b.user.id }, owner.session))[1].queue, []);
+
+    // Leaving the voice room or the owner turning the queue off empties the line.
+    await call('POST', '/api/rooms/queue', { room, action: 'join' }, b.session);
+    assert.deepEqual((await call('POST', '/api/rooms/queue', { room, action: 'leave' }, b.session))[1].queue, []);
+    await call('POST', '/api/rooms/queue', { room, action: 'join' }, b.session);
+    await call('POST', '/api/rooms/update', { id: room, micQueue: false }, owner.session);
+    assert.equal((await h.sql.query('SELECT count(*)::int AS n FROM room_mic_queue WHERE room_id = $1', [room])).rows[0].n, 0);
+    assert.equal((await call('POST', '/api/rooms/queue', { room, action: 'wave' }, b.session))[0], 400);
   });
 });
 
