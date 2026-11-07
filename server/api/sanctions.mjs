@@ -299,6 +299,8 @@ const STOPS = {
   room_voice: (s, room) => s.sanction_type === 'mute_all' || s.sanction_type === 'mute_global_voice' || (s.sanction_type === 'mute_room_voice' && s.room_id === room),
   dm: (s) => s.sanction_type === 'mute_all' || (s.sanction_type === 'mute_global_text' && s.include_dm),
   call: (s) => s.sanction_type === 'mute_all' || (s.sanction_type === 'mute_global_voice' && s.include_calls),
+  // Anlar posts and comments (moments.mjs): public text outside rooms.
+  post: (s) => s.sanction_type === 'mute_all' || s.sanction_type === 'mute_global_text',
 };
 export const ACTIONS = Object.keys(STOPS);
 
@@ -311,7 +313,7 @@ export async function muteFor(uid, action, room = null) {
   return (await liveMutes(uid)).find((s) => STOPS[action](s, room)) ?? null;
 }
 
-const ACTION_TEXT = { room_text: 'Bu odada mesaj gönderemezsin', room_voice: 'Mikrofonu şu an kullanamazsın', dm: 'Şu an özel mesaj gönderemezsin', call: 'Şu an sesli görüşme yapamazsın' };
+const ACTION_TEXT = { room_text: 'Bu odada mesaj gönderemezsin', room_voice: 'Mikrofonu şu an kullanamazsın', dm: 'Şu an özel mesaj gönderemezsin', call: 'Şu an sesli görüşme yapamazsın', post: 'Şu an paylaşım ya da yorum yapamazsın' };
 /** 403 with the mute when `action` is stopped. */
 export async function assertMay(u, action, room = null) {
   const s = await muteFor(u.id, action, room);

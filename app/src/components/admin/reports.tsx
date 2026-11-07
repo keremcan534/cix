@@ -1,8 +1,9 @@
 // Yönetim › Şikâyetler: the report queue, oldest open first. A report is closed as handled (optionally banning
 // the reported person for a while) or as "sorun yok". A running ban can be lifted from the same card, and staff
-// with Yaptırımlar open the reported person's full sanction record from it.
+// with Yaptırımlar open the reported person's full sanction record from it. A reported Anlar post or comment shows
+// what it says and who wrote it, and can be taken down from the card (the report closes as handled).
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { Button } from '@/components/ui';
 import { BAN_OPTIONS, REPORT_TARGET_LABEL, ago, banPhrase, fmtDate } from '@/lib/admin-format';
@@ -42,7 +43,7 @@ export function ReportsSection() {
   );
 }
 
-const targetName = (r: admin.Report) => r.target.name ?? (r.target.type === 'message' ? 'Bir mesaj' : r.target.type === 'moment' ? 'Bir paylaşım' : 'Silinmiş kayıt');
+const targetName = (r: admin.Report) => r.target.name ?? (r.target.type === 'message' ? 'Bir mesaj' : r.target.type === 'moment' ? 'Bir an' : r.target.type === 'comment' ? 'Bir yorum' : 'Silinmiş kayıt');
 
 function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
   const ctx = useAdmin();
@@ -52,6 +53,8 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
   const canBan = isUser && !r.target.staff && !!r.target.name;
   const banned = !!r.target.bannedUntil || r.target.bannedForever;
   const [label, tone] = STATUS[r.status];
+  const content = r.target.content;
+  const what = r.target.type === 'comment' ? 'yorum' : 'an';
 
   return (
     <ItemCard title={r.reason} sub={`${REPORT_TARGET_LABEL[r.target.type] ?? 'Kayıt'} · ${name}`} pill={<StatusPill text={label} tone={tone} />}>
@@ -65,10 +68,33 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
         r.target.bannedUntil && <Line label="Askıda" value={`${fmtDate(r.target.bannedUntil)} tarihine kadar`} />
       )}
       {r.target.staff && <Line label="Not" value="Yetkili hesabı; askıya alınamaz" />}
+      {content && <Line label="Yazan" value={content.author.name} onPress={() => ctx.openAccount(content.author.id, content.author.name)} />}
+      {content?.removed && <Line label="Durum" value={`Bu ${what} kaldırıldı`} />}
+      {!!content?.text && <Quote text={content.text} />}
+      {content?.imageUrl && <Image source={{ uri: content.imageUrl }} style={{ width: 120, height: 150, borderRadius: 10 }} accessibilityLabel="Şikâyet edilen fotoğraf" />}
       {!!r.note && <Quote text={r.note} />}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
         {r.status === 'open' && canBan && !banned && (
           <Button title="Askıya al" icon="ban-outline" variant="danger" small disabled={busy} onPress={() => askBan(ctx, r, name, onDone, setBusy)} />
+        )}
+        {r.status === 'open' && content && !content.removed && (
+          <Button
+            title={r.target.type === 'comment' ? 'Yorumu kaldır' : 'Anı kaldır'}
+            icon="trash-outline"
+            variant="danger"
+            small
+            disabled={busy}
+            onPress={() =>
+              confirmThen(
+                ctx,
+                { title: r.target.type === 'comment' ? 'Yorumu kaldır' : 'Anı kaldır', message: `Bu ${what} herkesten kaldırılır ve şikâyet “işlem yapıldı” olarak kapanır.`, confirm: 'Kaldır', destructive: true },
+                () => admin.handleReport(r.id, 'actioned', undefined, true),
+                () => `${what === 'an' ? 'An' : 'Yorum'} kaldırıldı`,
+                onDone,
+                setBusy,
+              )
+            }
+          />
         )}
         {r.status === 'open' && (
           <Button

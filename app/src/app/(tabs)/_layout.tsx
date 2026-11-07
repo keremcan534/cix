@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { EdgeLight, Glass } from '@/components/fx/surface';
-import { liveMode } from '@/lib/live';
 import { unreadTotal } from '@/lib/unread';
 import { useApp } from '@/store';
 import { TAB_BAR_HEIGHT, makeStyles, themes, useTheme } from '@/theme';
@@ -78,9 +77,7 @@ export default function TabLayout() {
         }}
       >
         <Tabs.Screen name="kesfet" options={{ title: 'Benzerler', tabBarIcon: icon('heart-outline', 'heart') }} />
-        {/* Moments have no server feed yet (posts would stay on this phone among sample people), so a live build
-            leaves the tab out; the route itself shows a "yakında" notice there (anlar.tsx). */}
-        <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture'), ...(liveMode() ? { href: null } : {}) }} />
+        <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture') }} />
         <Tabs.Screen
           name="index"
           options={{

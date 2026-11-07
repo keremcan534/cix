@@ -18,7 +18,7 @@ import { looksOf, revokeAllForDelete } from './economy.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
-const REPORT_TYPES = ['user', 'room', 'message', 'moment'];
+const REPORT_TYPES = ['user', 'room', 'message', 'moment', 'comment'];
 const MIN_AGE = 18;
 /**
  * Where the app refuses contact details on its own, named like the server's places ('room.chat', 'moment.post',
@@ -73,6 +73,10 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
+    // Anlar: their posts (with the likes and comments on them), their likes and comments elsewhere.
+    await c.query('DELETE FROM moment_likes WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM moment_comments WHERE author = $1', [id]);
+    await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_admins WHERE user_id = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);

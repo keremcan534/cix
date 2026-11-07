@@ -13,6 +13,8 @@ import { useApp } from '@/store';
 const REASONS: Record<ReportType, string[]> = {
   user: ['Sahte profil', 'Taciz veya hakaret', 'Uygunsuz içerik', 'Dolandırıcılık', 'Spam', '18 yaşından küçük olabilir'],
   room: ['Uygunsuz içerik', 'Taciz veya hakaret', 'Nefret söylemi', 'Spam veya reklam', 'Dolandırıcılık'],
+  moment: ['Uygunsuz içerik', 'Taciz veya hakaret', 'Nefret söylemi', 'Spam veya reklam', 'Dolandırıcılık', 'Başkasının fotoğrafı'],
+  comment: ['Taciz veya hakaret', 'Nefret söylemi', 'Spam veya reklam', 'Uygunsuz içerik'],
 };
 
 /** What is reported. `note` adds context for the moderators (e.g. the message); `onBlock` offers blocking after. */
@@ -52,7 +54,7 @@ export function useReport() {
   const sheet = (
     <ActionSheet
       visible={!!target}
-      title={target?.type === 'room' ? 'Bu odayı neden şikâyet ediyorsun?' : 'Neden şikâyet ediyorsun?'}
+      title={target?.type === 'room' ? 'Bu odayı neden şikâyet ediyorsun?' : target?.type === 'moment' ? 'Bu anı neden şikâyet ediyorsun?' : target?.type === 'comment' ? 'Bu yorumu neden şikâyet ediyorsun?' : 'Neden şikâyet ediyorsun?'}
       onClose={() => setTarget(null)}
       options={(target ? REASONS[target.type] : []).map((r) => ({ label: r, onPress: () => target && void send(target, r) }))}
     />

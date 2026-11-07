@@ -88,7 +88,16 @@ export type Report = {
   id: number;
   reporter: { id: string; name: string };
   /** bannedUntil: when the running timed account ban ends; bannedForever: a lifetime ban runs (bannedUntil may be null then). */
-  target: { type: 'user' | 'room' | 'message' | 'moment'; id: string; name: string | null; staff: boolean; bannedUntil: string | null; bannedForever: boolean };
+  target: {
+    type: 'user' | 'room' | 'message' | 'moment' | 'comment';
+    id: string;
+    name: string | null;
+    staff: boolean;
+    bannedUntil: string | null;
+    bannedForever: boolean;
+    /** An Anlar post or comment: what it says, who wrote it, whether it is already taken down (null otherwise). */
+    content?: { text: string; imageUrl: string | null; removed: boolean; author: { id: string; name: string } } | null;
+  };
   reason: string;
   note: string;
   status: ReportStatus;
@@ -97,10 +106,16 @@ export type Report = {
   handledAt: string | null;
 };
 export const reports = (status: ReportStatus = 'open') => get<{ reports: Report[] }>(`/api/admin/reports${q({ status })}`).then((r) => r.reports);
-/** actioned (with an optional ban of the reported person) or dismissed. 'Süresiz' also sends permanent: true (banBody). */
-export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDays?: number) => {
+/** actioned (with an optional ban of the reported person, or `remove` taking a reported Anlar post or comment down)
+ * or dismissed. 'Süresiz' also sends permanent: true (banBody). */
+export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDays?: number, remove?: boolean) => {
   const b = banDays ? banBody(banDays) : null;
-  return post<{ report: { id: number; status: ReportStatus }; bannedUntil: string | null }>('/api/admin/reports/handle', { id, status, ...(b ? { banDays: b.days, permanent: b.permanent } : {}) });
+  return post<{ report: { id: number; status: ReportStatus }; bannedUntil: string | null }>('/api/admin/reports/handle', {
+    id,
+    status,
+    ...(b ? { banDays: b.days, permanent: b.permanent } : {}),
+    ...(remove ? { remove: true } : {}),
+  });
 };
 /** days = null lifts the ban; 'Süresiz' also sends permanent: true (banBody). */
 export const ban = (user: string, days: number | null) => post<{ bannedUntil: string | null }>('/api/admin/ban', { user, ...(days === null ? { days } : banBody(days)) });

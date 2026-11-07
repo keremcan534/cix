@@ -2,7 +2,7 @@
 // Play's UGC policy expect reports to be acted on; this is the server half, the app's Yönetim panel (components/admin) uses it.
 //
 //   GET  /api/admin/reports?status=open                 → { reports }  (each target with its name and ban state)
-//   POST /api/admin/reports/handle { id, status, banDays?, permanent?, reason? } → { report, bannedUntil, permanent }
+//   POST /api/admin/reports/handle { id, status, banDays?, permanent?, reason?, remove? } → { report, bannedUntil, permanent }
 //   POST /api/admin/ban    { user, days, permanent?, reason? }  (days null = lift)  → { bannedUntil, permanent }
 // Bans are sanctions (sanctions.mjs): days become an account ban of that length (more than 90 days needs the
 // lifetime-ban permission), permanent: true a lifetime one (is_permanent, the same permission), null lifts the
@@ -183,10 +183,15 @@ export const adminRoutes = {
     const r = await db.query(
       `SELECT r.*, u.name AS reporter_name, t.name AS target_name, t.role AS target_role, (SELECT max(s.expires_at) FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS target_banned_until,
               EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND s.is_permanent AND ${LIVE_SANCTION}) AS target_banned_forever, ro.title AS room_title,
-              (SELECT count(*) FROM reports x WHERE x.target_type = r.target_type AND x.target_id = r.target_id) AS reports_on_target
+              (SELECT count(*) FROM reports x WHERE x.target_type = r.target_type AND x.target_id = r.target_id) AS reports_on_target,
+              coalesce(mo.body, mc.body) AS content_text, mo.image_url AS content_image, coalesce(mo.deleted_at, mc.deleted_at) AS content_removed_at,
+              cw.id AS content_author, cw.name AS content_author_name
          FROM reports r JOIN users u ON u.id = r.reporter
          LEFT JOIN users t ON r.target_type = 'user' AND t.id::text = r.target_id
          LEFT JOIN rooms ro ON r.target_type = 'room' AND ro.id::text = r.target_id
+         LEFT JOIN moments mo ON r.target_type = 'moment' AND mo.id::text = r.target_id
+         LEFT JOIN moment_comments mc ON r.target_type = 'comment' AND mc.id::text = r.target_id
+         LEFT JOIN users cw ON cw.id = coalesce(mo.author, mc.author)
         WHERE r.status = $1 ORDER BY r.created_at ${status === 'open' ? 'ASC' : 'DESC'} LIMIT 200`,
       [status],
     );
@@ -203,6 +208,10 @@ export const adminRoutes = {
           staff: x.target_role === 'moderator' || x.target_role === 'admin',
           bannedUntil: x.target_banned_until ?? null,
           bannedForever: !!x.target_banned_forever,
+          // An Anlar post or comment: what it says, who wrote it, whether it is already removed (null otherwise).
+          content: x.content_author
+            ? { text: x.content_text, imageUrl: x.content_image ?? null, removed: !!x.content_removed_at, author: { id: x.content_author, name: x.content_author_name } }
+            : null,
         },
         reason: x.reason,
         note: x.note,
@@ -234,6 +243,15 @@ export const adminRoutes = {
       }
       userId(found.rows[0].target_id);
     }
+    // remove: take the reported Anlar post or comment down (moments.mjs keeps the row for the record).
+    const remove = b.status === 'actioned' && b.remove === true;
+    const kind = found.rows[0].target_type;
+    if (remove && kind !== 'moment' && kind !== 'comment') throw new HttpError(400, 'Kaldırma yalnızca an ve yorum şikâyetinde');
+    if (remove)
+      await db.query(`UPDATE ${kind === 'moment' ? 'moments' : 'moment_comments'} SET deleted_at = now(), removed_by = $2 WHERE id::text = $1 AND deleted_at IS NULL`, [
+        found.rows[0].target_id,
+        me.id,
+      ]);
     const bannedUntil = days || permanent ? await ban(me, found.rows[0].target_id, days, { permanent, reason: banReason(b.reason, found.rows[0].reason), reportId: id }) : null;
     const r = await db.query('UPDATE reports SET status = $2, handled_by = $3, handled_at = now() WHERE id = $1 RETURNING *', [id, b.status, me.id]);
     const rep = r.rows[0];

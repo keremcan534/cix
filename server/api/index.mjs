@@ -44,6 +44,7 @@ import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
 import { messageRoutes } from './messages.mjs';
+import { momentRoutes } from './moments.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
 import { pushRoutes } from './push.mjs';
@@ -209,6 +210,7 @@ const routes = {
   ...liveRoutes,
   ...socialRoutes,
   ...messageRoutes,
+  ...momentRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,

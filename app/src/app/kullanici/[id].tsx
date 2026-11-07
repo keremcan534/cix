@@ -34,6 +34,7 @@ import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
 import { loadFollowList, type FollowSide } from '@/lib/live/follows';
+import { agoText, feed as momentFeed } from '@/lib/live/moments';
 import { followOnServer, loadMe, loadPublicProfile, profilePatch, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
 import { copyText } from '@/lib/clipboard';
 import { goBack } from '@/lib/nav';
@@ -88,6 +89,18 @@ export default function UserProfile() {
   const [reloads, setReloads] = useState(0);
   // Live mode, my own profile: my open room as the server has it (null: none open), never the demo's sample room.
   const [myLiveRoom, setMyLiveRoom] = useState<Room | null>(null);
+  // Live mode: this person's Anlar posts from the server (null until read).
+  const [liveMoments, setLiveMoments] = useState<Moment[] | null>(null);
+  useEffect(() => {
+    if (!serverId) return;
+    let alive = true;
+    momentFeed({ user: serverId })
+      .then((list) => alive && setLiveMoments(list.map((m) => ({ id: m.id, userId: id, text: m.text, image: m.imageUrl ?? undefined, likes: m.likes, comments: m.comments, time: agoText(m.createdAt) }))))
+      .catch(() => alive && setLiveMoments([]));
+    return () => {
+      alive = false;
+    };
+  }, [serverId, id]);
   const counts = social && social.id === serverId ? social.counts : null;
   const user = isMe ? me : userById(id);
   const insets = useSafeAreaInsets();
@@ -132,7 +145,7 @@ export default function UserProfile() {
   // Live mode: the server's follow state once read (a block ends the follow there too).
   const isFollowing = !isBlocked && (counts ? counts.isFollowing : following.has(user.id));
   const extras = profileExtras(user);
-  const moments = MOMENTS.filter((m) => m.userId === user.id);
+  const moments = live ? (liveMoments ?? []) : MOMENTS.filter((m) => m.userId === user.id);
   const photos = moments.filter((m) => m.image).map((m) => m.image!);
   const completion = profileCompletion(user, extras, photos.length);
   // Others: demo values; me: my real Cömertlik (wealth) and Yankı (charm) levels.
