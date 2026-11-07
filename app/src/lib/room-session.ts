@@ -467,12 +467,19 @@ export const engineInfo = () => ({ name: engine.name, capabilities: engine.capab
 export function setEngine(next: AudioEngine) {
   engine = next;
   engine.setNoiseSuppression?.(denoise);
+  engine.setPlaybackVolume?.(volume);
 }
 // "Mikrofon denoise" (settings.micDenoise): kept here so a new engine starts with it.
 let denoise = true;
 export function setNoiseSuppression(on: boolean) {
   denoise = on;
   engine.setNoiseSuppression?.(on);
+}
+// "Oda sesini kapat" and "Konuşma sesi" (settings.roomMuted, voiceVolume): the voices in the room on this phone only.
+let volume = 1;
+export function setPlaybackVolume(v: number) {
+  volume = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1));
+  engine.setPlaybackVolume?.(volume);
 }
 export function resetSession() {
   stopTimers();

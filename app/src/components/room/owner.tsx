@@ -241,6 +241,8 @@ export function RoomInfoSheet({
   onShare,
   onInvite,
   live = false,
+  details = [],
+  actions = [],
 }: {
   visible: boolean;
   onClose: () => void;
@@ -273,6 +275,10 @@ export function RoomInfoSheet({
   onInvite: () => void;
   /** A server room: room membership and Aile aren't on the server yet, so the card doesn't show them. */
   live?: boolean;
+  /** The room at a glance (owner, my rank, listeners, mics, queue, lock…). */
+  details?: { label: string; value: string }[];
+  /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
+  actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
   const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
@@ -305,12 +311,38 @@ export function RoomInfoSheet({
                 🇹🇷 │ {th.emoji} {th.name} │ ID {roomCode(roomId)}
               </Text>
             </View>
-            {(owner || canEditText) && (
-              <Pressable onPress={onSettings} hitSlop={8} accessibilityLabel="Oda ayarlarını aç">
-                <Ionicons name="settings-outline" size={26} color="#fff" />
-              </Pressable>
-            )}
+            <Pressable onPress={onSettings} hitSlop={8} accessibilityLabel="Oda ayarlarını aç">
+              <Ionicons name="settings-outline" size={26} color="#fff" />
+            </Pressable>
           </View>
+
+          {details.length > 0 && (
+            <View style={styles.details}>
+              {details.map((d) => (
+                <View key={d.label} style={styles.detailRow}>
+                  <Text style={styles.dim}>{d.label}</Text>
+                  <Text style={styles.detailValue} numberOfLines={1}>
+                    {d.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {actions.length > 0 && (
+            <View style={styles.actions}>
+              {actions.map((a) => (
+                <Pressable key={a.key} style={styles.action} onPress={a.onPress} accessibilityRole="button" accessibilityLabel={a.label}>
+                  <View style={styles.actionIcon}>
+                    <Ionicons name={a.icon} size={22} color="#fff" />
+                  </View>
+                  <Text style={styles.actionText} numberOfLines={2}>
+                    {a.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Pressable style={{ flex: 1 }} onPress={() => setSub('level')} accessibilityLabel="Oda seviyesi">
@@ -631,6 +663,8 @@ export function RoomSettingsScreen({
   renderLayouts,
   onClassicMics,
   live,
+  standard = true,
+  sections = [],
 }: {
   visible: boolean;
   onClose: () => void;
@@ -651,8 +685,12 @@ export function RoomSettingsScreen({
   renderLayouts: (visible: boolean, onClose: () => void) => ReactNode;
   /** Classic mic count change, validated by lib/room-modes. */
   onClassicMics: (n: number) => Result;
-  /** My room on the server: only the rows the server keeps (lock, level, layout, mic count) are shown. */
+  /** A server room I run: only the rows the server keeps (lock, level, layout, mic count, mic queue) are shown. */
   live?: LiveRoomSettings;
+  /** The room's own settings (owner and staff). Off: only `sections`, everyone's own settings for this room. */
+  standard?: boolean;
+  /** Extra sections after the room's own: room tools for staff, then my own settings (effects, sound…). */
+  sections?: SettingsSection[];
 }) {
   const [picker, setPicker] = useState<Picker>(null);
   const close = () => setPicker(null);
@@ -674,11 +712,16 @@ export function RoomSettingsScreen({
           <Text style={styles.topTitle}>Oda Ayarları</Text>
         </View>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          {!standard && <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Odanın kendi ayarlarını oda sahibi ve yöneticiler yönetir. Buradaki ayarlar yalnızca senin ekranın içindir.</Text>}
+          {standard && (
+            <>
           <Section title="Standart" />
           {!live && <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} />}
           {!live && <Row label="Oda teması" value={roomThemeInfo(room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(room.theme).id]} onPress={() => setPicker('theme')} />}
-          {live ? (
+          {live?.canLock ? (
             <LiveLock live={live} lockOpen={lockOpen} level={level} />
+          ) : live ? (
+            <Row label="Oda kilitli" value={live.locked ? 'Kilitli' : 'Açık'} hint="Oda kilidini ve şifreyi yalnızca oda sahibi değiştirir" />
           ) : (
             <Row
               label="Oda kilitli"
@@ -699,16 +742,23 @@ export function RoomSettingsScreen({
               />
             </View>
           )}
-          {!live && <Row label="Oda Günlüğü" onPress={() => setPicker('log')} />}
+          <Row label="Oda Günlüğü" hint="Susturma, indirme, çıkarma ve ayar değişiklikleri (bu oturum)" onPress={() => setPicker('log')} />
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
           <Section title="Mikrofon pozisyonu" />
           <Row label="Sahne Düzeni" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
           {live ? (
-            <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
-              Şifre, düzen ve mikrofon sayısı sunucuda saklanır; odadaki herkeste aynı görünür. Yeni şifre, odaya bir sonraki girişte sorulur.
-            </Text>
+            <>
+              <Row
+                label="Mikrofon kuyruğu"
+                hint={live.micQueue ? 'Açık: boş mikrofona çıkmak isteyen el kaldırır, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
+                toggle={{ value: live.micQueue, onChange: live.setMicQueue }}
+              />
+              <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
+                Şifre, düzen, mikrofon sayısı ve kuyruk sunucuda saklanır; odadaki herkeste aynı anda değişir. Yeni şifre, odaya bir sonraki girişte sorulur.
+              </Text>
+            </>
           ) : (
             <>
               <Row
@@ -755,6 +805,16 @@ export function RoomSettingsScreen({
               <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
             </>
           )}
+            </>
+          )}
+          {sections.map((s) => (
+            <View key={s.title}>
+              <Section title={s.title} />
+              {s.rows.map(({ key, ...r }) => (
+                <Row key={key} {...r} />
+              ))}
+            </View>
+          ))}
         </ScrollView>
       </SafeAreaView>
 
@@ -903,8 +963,23 @@ export function RoomSettingsScreen({
   );
 }
 
-/** The lock of my room on the server: the password goes to the server when saved and never stays on the phone. */
-export type LiveRoomSettings = { locked: boolean; setPassword: (password: string | null) => Promise<void> };
+/**
+ * A server room I run. The lock (owner only, `canLock`): the password goes to the server when saved and never
+ * stays on the phone. The mic queue (owner and admins): the server keeps it and tells every phone in the room.
+ */
+export type LiveRoomSettings = {
+  locked: boolean;
+  canLock: boolean;
+  setPassword: (password: string | null) => Promise<void>;
+  micQueue: boolean;
+  setMicQueue: (on: boolean) => void;
+};
+
+/** A section of rows the room screen adds to the settings (room tools, my own settings). */
+export type SettingsSection = {
+  title: string;
+  rows: { key: string; label: string; hint?: string; value?: string; onPress?: () => void; toggle?: { value: boolean; onChange: (v: boolean) => void } }[];
+};
 
 function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen: boolean; level: number }) {
   const [on, setOn] = useState(live.locked);
@@ -1030,6 +1105,13 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
   bigBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 13 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
+  details: { borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 14, paddingVertical: 6 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 7 },
+  detailValue: { color: '#fff', fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
+  action: { width: '25%', alignItems: 'center', gap: 6 },
+  actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  actionText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', paddingHorizontal: 2 },
   pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   decor: { width: '47%', borderWidth: 2, borderColor: 'transparent', borderRadius: 10, padding: 3 },

@@ -101,7 +101,7 @@ export function Seat({
   }, [speaking, pulse]);
 
   const user = userId ? userById(userId) : null;
-  const size = avatarSize ?? (host ? 70 : small ? 48 : 56);
+  const size = avatarSize ?? (host ? 60 : small ? 42 : 48);
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
   const label = user
     ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
@@ -129,7 +129,7 @@ export function Seat({
             colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)']}
             style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
           >
-            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 16 : 19} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
+            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 15 : 17} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
           </LinearGradient>
         )}
         {user && similarity !== undefined && !teamColor && <SimilarityRing score={similarity} size={size} />}

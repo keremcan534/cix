@@ -78,6 +78,12 @@ export type Settings = {
   voiceVolume: number;
   giftSounds: boolean;
   bigGiftsOnly: boolean;
+  /** Room effects on this phone (Efekt ayarları), each under `effectsOff`: gift shows and flights, entry
+   *  banners, the mic effect while I talk, emoji reactions over the seats. */
+  giftFx: boolean;
+  entryFx: boolean;
+  micAnim: boolean;
+  seatReactions: boolean;
   micDenoise: boolean;
   invitesFrom: 'everyone' | 'following' | 'nobody';
   dailySpendLimit: number; // coins; 0 = no limit
@@ -490,6 +496,10 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       voiceVolume: 1,
       giftSounds: true,
       bigGiftsOnly: false, micDenoise: true,
+      giftFx: true,
+      entryFx: true,
+      micAnim: true,
+      seatReactions: true,
       invitesFrom: 'everyone',
       dailySpendLimit: 0,
       luckyAnnounce: true,

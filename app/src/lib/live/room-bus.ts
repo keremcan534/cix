@@ -9,8 +9,9 @@
 //    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
 //    fake one; a gift packet from a phone is dropped. The server also says when a PK starts or is cancelled
 //    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does;
-//  - the room's state the server keeps on LiveKit: locked mics (room metadata, server/api/rooms.mjs) and a seat
-//    the owner or an admin set for me (my own `seat` attribute changed by the server).
+//  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
+//    mics, the layout, the mic count, the mic queue and who waits in it), which LiveKit hands every phone on join
+//    and on each change, and a seat the owner or an admin set for me (my own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
 
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
@@ -28,9 +29,15 @@ export type RoomSignal = PeerSignal | GiftSignal | LuckySignal;
 
 /** `send` is false when the voice connection isn't up and nothing went out. */
 type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) => boolean };
-type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; lockedSeats: number[] };
+/**
+ * What the server wrote in the room metadata besides the locks: the layout (null = classic grid), the classic
+ * mic count (null = the level's most), whether the mic queue is on and who waits in it (server user ids, first
+ * asked first). Null when the metadata has none of it (an older server, or nothing written yet).
+ */
+export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[] };
+type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; lockedSeats: number[]; state: RoomState | null };
 
-const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, lockedSeats: [] };
+const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, lockedSeats: [], state: null };
 let snap: Snapshot = EMPTY;
 let link: Link | null = null;
 const listeners = new Set<() => void>();
@@ -59,16 +66,32 @@ export function reportPeers(roomId: string | null, peers: LivePeer[], meSpeaking
     snap.peers.every((p, i) => p.identity === peers[i].identity && p.seat === peers[i].seat && p.speaking === peers[i].speaking && p.micOn === peers[i].micOn && p.name === peers[i].name);
   if (same) return;
   // The locks belong to the room: a new list of people keeps them, another room starts without.
-  snap = roomId ? { roomId, peers, meSpeaking, lockedSeats: snap.roomId === roomId ? snap.lockedSeats : [] } : EMPTY;
+  const sameRoom = snap.roomId === roomId;
+  snap = roomId ? { roomId, peers, meSpeaking, lockedSeats: sameRoom ? snap.lockedSeats : [], state: sameRoom ? snap.state : null } : EMPTY;
   listeners.forEach((l) => l());
 }
 
-/** The room's LiveKit metadata changed (or we just joined): the mics the owner or an admin locked. */
+/** The room's LiveKit metadata changed (or we just joined): locked mics, layout, mic count, mic queue. */
 export function reportRoomMeta(roomId: string, metadata: string | undefined) {
   const lockedSeats = parseRoomMeta(metadata);
-  if (snap.roomId === roomId && snap.lockedSeats.join() === lockedSeats.join()) return;
-  snap = { ...(snap.roomId === roomId ? snap : { ...EMPTY, roomId }), lockedSeats };
+  const state = parseRoomState(metadata);
+  if (snap.roomId === roomId && snap.lockedSeats.join() === lockedSeats.join() && JSON.stringify(snap.state) === JSON.stringify(state)) return;
+  snap = { ...(snap.roomId === roomId ? snap : { ...EMPTY, roomId }), lockedSeats, state };
   listeners.forEach((l) => l());
+}
+
+/** The rest of the metadata (RoomState); null unless `micQueue` is there (the server writes all of it at once). */
+export function parseRoomState(metadata: string | undefined): RoomState | null {
+  try {
+    const m = JSON.parse(metadata || '{}') as Record<string, unknown> | null;
+    if (!m || typeof m !== 'object' || typeof m.micQueue !== 'boolean') return null;
+    const layoutId = typeof m.layoutId === 'string' && m.layoutId.length <= 40 ? m.layoutId : null;
+    const micCount = Number.isInteger(m.micCount) && (m.micCount as number) >= 1 && (m.micCount as number) <= 99 ? (m.micCount as number) : null;
+    const queue = Array.isArray(m.queue) ? [...new Set(m.queue.filter((x): x is string => typeof x === 'string' && !!x && x.length <= 64))].slice(0, 50) : [];
+    return { layoutId, micCount, micQueue: m.micQueue, queue };
+  } catch {
+    return null;
+  }
 }
 
 /** `{"lockedSeats":[2,5]}` → [2, 5]; mic 0 is the owner's and never locked; anything else → none. */

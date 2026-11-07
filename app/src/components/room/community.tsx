@@ -318,28 +318,47 @@ export function QuestionsSheet({ visible, onClose, questions, canManage, onAsk, 
 // --- Personal sound settings ------------------------------------------------------------
 type SetFn = <K extends keyof Settings>(k: K, v: Settings[K]) => void;
 
-function Volume({ settings, set, k, label }: { settings: Settings; set: SetFn; k: 'musicVolume' | 'voiceVolume'; label: string }) {
+function Volume({ settings, set, k, label }: { settings: Settings; set: SetFn; k: 'voiceVolume'; label: string }) {
   return (
     <View style={styles.row}>
       <Text style={{ color: '#fff', flex: 1 }}>{label}</Text>
-      {[0, 0.3, 0.7, 1].map((v) => (
-        <Pressable key={v} onPress={() => set(k, v)} style={[styles.vol, settings[k] === v && { backgroundColor: colors.primary }]}>
-          <Text style={styles.smallText}>{v === 0 ? 'Kapalı' : `%${v * 100}`}</Text>
+      {[0.3, 0.6, 1].map((v) => (
+        <Pressable key={v} onPress={() => set(k, v)} style={[styles.vol, settings[k] === v && { backgroundColor: colors.primary }]} accessibilityLabel={`${label} yüzde ${Math.round(v * 100)}`}>
+          <Text style={styles.smallText}>%{Math.round(v * 100)}</Text>
         </Pressable>
       ))}
     </View>
   );
 }
 
-function SoundToggle({ settings, set, k, label }: { settings: Settings; set: SetFn; k: 'roomMuted' | 'giftSounds' | 'bigGiftsOnly' | 'reduceMotion' | 'effectsOff'; label: string }) {
+type ToggleKey = 'roomMuted' | 'micDenoise' | 'effectsOff' | 'giftFx' | 'bigGiftsOnly' | 'entryFx' | 'micAnim' | 'seatReactions' | 'reduceMotion' | 'lowData';
+function SoundToggle({ settings, set, k, label, hint, off = false }: { settings: Settings; set: SetFn; k: ToggleKey; label: string; hint?: string; off?: boolean }) {
   return (
-    <View style={styles.row}>
-      <Text style={{ color: '#fff', flex: 1 }}>{label}</Text>
-      <Switch value={settings[k]} onValueChange={(v) => set(k, v)} />
+    <View style={[styles.row, off && { opacity: 0.45 }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ color: '#fff' }}>{label}</Text>
+        {hint ? <Text style={styles.dim}>{hint}</Text> : null}
+      </View>
+      <Switch value={settings[k]} disabled={off} onValueChange={(v) => set(k, v)} accessibilityLabel={label} />
     </View>
   );
 }
-export function SoundSheet({
+
+/** Ses ayarları: what I hear in the room and how my mic sounds (this phone only). */
+export function SoundSheet({ visible, onClose, settings, set }: { visible: boolean; onClose: () => void; settings: Settings; set: SetFn }) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Ses ayarları" art={ROOM_ICON_ART.sound}>
+      <Text style={styles.dim}>Yalnızca bu telefonda geçerlidir; odadaki diğer kişilerin duyduğunu değiştirmez.</Text>
+      <SoundToggle settings={settings} set={set} k="roomMuted" label="Oda sesini kapat" hint="Konuşanları duymazsın; mikrofonun açıksa seni duymaya devam ederler." />
+      <Volume settings={settings} set={set} k="voiceVolume" label="Konuşma sesi" />
+      <SoundToggle settings={settings} set={set} k="micDenoise" label="Mikrofon denoise" hint="Arka plan gürültüsünü telefonun kendi filtresiyle azaltır." />
+      <Text style={styles.dim}>Ses çıkışı (hoparlör, kulaklık, Bluetooth) telefonun ayarlarından seçilir.</Text>
+    </Sheet>
+  );
+}
+
+/** Efekt ayarları: which room effects play on this phone; gift payments and records never change. */
+export function EffectsSheet({
   visible,
   onClose,
   settings,
@@ -352,31 +371,32 @@ export function SoundSheet({
   onClose: () => void;
   settings: Settings;
   set: SetFn;
+  /** My own room (prototype): its gift effects can be switched off for everyone. */
   isOwner: boolean;
-  roomFx: { giftEffects: boolean; joinSounds: boolean };
-  setRoomFx: (p: Partial<{ giftEffects: boolean; joinSounds: boolean }>) => void;
+  roomFx: { giftEffects: boolean };
+  setRoomFx: (p: Partial<{ giftEffects: boolean }>) => void;
 }) {
+  const all = settings.effectsOff;
   return (
-    <Sheet visible={visible} onClose={onClose} title="Ses ve efekt ayarları" art={ROOM_ICON_ART.sound}>
-      <Text style={styles.dim}>Bu ayarlar yalnızca senin deneyimini etkiler; hediye işlemlerini ve kayıtlarını değiştirmez.</Text>
-      <SoundToggle settings={settings} set={set} k="roomMuted" label="Oda sesini kapat" />
-      <Volume settings={settings} set={set} k="voiceVolume" label="Konuşma sesi" />
-      <Volume settings={settings} set={set} k="musicVolume" label="Müzik sesi" />
-      <SoundToggle settings={settings} set={set} k="giftSounds" label="Hediye sesleri" />
-      <SoundToggle settings={settings} set={set} k="bigGiftsOnly" label="Sadece büyük hediyelerin efektini göster" />
-      <SoundToggle settings={settings} set={set} k="reduceMotion" label="Animasyonları azalt" />
-      <SoundToggle settings={settings} set={set} k="effectsOff" label="Hediye ve giriş efektlerini kapat" />
-      <Text style={styles.dim}>Ses çıkış cihazı (hoparlör/kulaklık/Bluetooth) işletim sisteminden seçilir.</Text>
+    <Sheet visible={visible} onClose={onClose} title="Efekt ayarları" art={ROOM_ICON_ART.sound}>
+      <Text style={styles.dim}>Yalnızca senin ekranını etkiler. Hediyeler, ödemeler ve kayıtlar aynı kalır.</Text>
+      <SoundToggle settings={settings} set={set} k="effectsOff" label="Tüm efektleri kapat" hint="Aşağıdakilerin hepsini birden kapatır." />
+      <Text style={styles.label}>Hediyeler</Text>
+      <SoundToggle settings={settings} set={set} k="giftFx" off={all} label="Hediye efektleri" hint="Tam ekran gösteri ve koltuğa uçan hediye." />
+      <SoundToggle settings={settings} set={set} k="bigGiftsOnly" off={all || !settings.giftFx} label="Sadece büyük hediyeler" hint="100 jeton altındaki hediyeler sohbette yazıyla görünür." />
+      <Text style={styles.label}>Oda</Text>
+      <SoundToggle settings={settings} set={set} k="entryFx" off={all} label="Giriş efektleri" hint="Odaya girenlerin karşılama gösterisi." />
+      <SoundToggle settings={settings} set={set} k="micAnim" off={all} label="Mikrofon efekti" hint="Konuşurken koltuğundaki efekt." />
+      <SoundToggle settings={settings} set={set} k="seatReactions" label="Koltuk tepkileri" hint="Koltukların üstünde beliren emojiler." />
+      <Text style={styles.label}>Performans</Text>
+      <SoundToggle settings={settings} set={set} k="reduceMotion" label="Animasyonları azalt" hint="Hareketli efektler durağan gösterilir." />
+      <SoundToggle settings={settings} set={set} k="lowData" label="Hafif efektler" hint="Daha az veri ve pil harcayan sade sürüm." />
       {isOwner && (
         <>
           <Text style={styles.label}>Oda geneli (sahip)</Text>
           <View style={styles.row}>
             <Text style={{ color: '#fff', flex: 1 }}>Odada hediye efektleri</Text>
             <Switch value={roomFx.giftEffects} onValueChange={(v) => setRoomFx({ giftEffects: v })} />
-          </View>
-          <View style={styles.row}>
-            <Text style={{ color: '#fff', flex: 1 }}>Giriş/çıkış sesleri</Text>
-            <Switch value={roomFx.joinSounds} onValueChange={(v) => setRoomFx({ joinSounds: v })} />
           </View>
         </>
       )}

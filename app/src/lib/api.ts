@@ -448,7 +448,8 @@ export type ServerMe = ServerUser & ServerProfile & { role?: string };
 export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
- *  the mics and layout the owner or a room admin chose (null = the default). */
+ *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
+ *  `micQueue`: members ask for a mic and the staff let them up. */
 export type ServerRoom = {
   id: string;
   owner: UserCard;
@@ -463,6 +464,8 @@ export type ServerRoom = {
   xp?: number;
   micCount?: number | null;
   layoutId?: string | null;
+  lockedSeats?: number[];
+  micQueue?: boolean;
 };
 export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
@@ -514,9 +517,9 @@ export const createRoom = (title: string, announcement = '', roomType = 'free', 
 export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api/rooms/close', { id });
 /** One room as everyone sees it now (listeners, level, mics, layout). */
 export const serverRoom = (id: string) => call<{ room: ServerRoom }>('GET', `/api/room?id=${encodeURIComponent(id)}`).then((r) => r.room);
-/** What the room screen can change on the server: the name and bulletin (owner only), the mics and the layout
- *  (owner or a room admin; null = back to the default). */
-export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null };
+/** What the room screen can change on the server: the name and bulletin (owner and Süper Yönetici), the lock
+ *  (owner only), the mics, the layout and the mic queue (owner or a room admin; null = back to the default). */
+export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null; micQueue?: boolean };
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
