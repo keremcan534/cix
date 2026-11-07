@@ -3,12 +3,13 @@
 // Every check is here on the server: the app only shows what these return.
 //
 // Streamer:
-//   GET  /api/agency/me                                   → { membership, requests, transfer, agencies, platform }
+//   GET  /api/agency/me                                   → { membership, requests, transfer, agencies, platform, streamer }
 //   GET  /api/agency/lookup?code=                         → { agency }
-//   POST /api/agency/join { code, method?, note? }        → { request } | { membership }
+//   POST /api/agency/join { code, method?, note? }        → { membership } (code, link) | { request } (application)
 //   POST /api/agency/requests/respond { requestId, accept } (an invite to me)
 //   POST /api/agency/requests/cancel  { requestId }        (my join request)
-//   POST /api/agency/transfer { toCode?, reason, ref }    → { transfer }  (move to another agency, or leave)
+//   POST /api/agency/transfer { toCode?, reason, ref }    → { transfer }  (move to another agency; from the centre
+//        when held; leaving only if streamer_policy.can_leave)
 // Agency panel (id = agency; who may see what: permsOn in agency-lib.mjs):
 //   GET  /api/agency/overview?id=      GET /api/agency/streamers?id=&scope=direct|sub
 //   GET  /api/agency/subagencies?id=   GET /api/agency/commissions?id=&from&to&streamer&sub&kind&format=csv
@@ -48,7 +49,24 @@ import {
   usdOf,
   viewerOf,
 } from './agency-lib.mjs';
-import { approveTransfer, checkCanFoundSub, feeRule, linkStreamer, namesFor, openTransfer, payoutStep, rejectTransfer, setStatus, submitAgency, transferView } from './agency-ops.mjs';
+import {
+  HELD_MSG,
+  LEAVE_MSG,
+  approveTransfer,
+  assertEligible,
+  checkCanFoundSub,
+  feeRule,
+  firstAgencyOfPerson,
+  linkStreamer,
+  namesFor,
+  openTransfer,
+  payoutStep,
+  rejectTransfer,
+  setStatus,
+  streamerState,
+  submitAgency,
+  transferView,
+} from './agency-ops.mjs';
 import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
 
 /**
@@ -200,7 +218,11 @@ export const agencyRoutes = {
     const ids = [...x.acc.agency.keys()];
     const ag = ids.length ? await db.query('SELECT * FROM agencies WHERE id = ANY($1::uuid[]) ORDER BY level, name', [ids]) : { rows: [] };
     const names = await namesFor(db, tr.rows);
+    const st = await streamerState(db, x.u.id, x.s);
+    const p = x.s.streamer_policy;
     return {
+      // The streamer rules as they apply to me, so the app shows what is possible (the server checks again).
+      streamer: { eligible: st.eligible, gender: st.gender, held: st.held, pickUntil: st.pickUntil, pickDays: p.pick_days, canLeave: p.can_leave, womenOnly: p.women_only },
       membership: m.rowCount
         ? { agency: { id: m.rows[0].agency_id, name: m.rows[0].name, code: m.rows[0].code, level: m.rows[0].level, parentName: m.rows[0].parent_name }, joinedAt: m.rows[0].joined_at, method: m.rows[0].method }
         : null,
@@ -227,11 +249,18 @@ export const agencyRoutes = {
       const method = b.method ?? 'code';
       if (!['code', 'link', 'application'].includes(method)) bad('Geçersiz katılım yolu');
       if (a.status !== 'approved') throw new HttpError(409, 'Bu ajans şu an yayıncı kabul etmiyor');
-      const open = await c.query('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [x.u.id]);
-      if (open.rowCount) throw new HttpError(409, open.rows[0].agency_id === a.id ? 'Zaten bu ajanstasın' : 'Zaten bir ajansa bağlısın; değiştirmek için transfer talebi oluştur');
-      if (!x.s.join_policy.requires_approval) {
+      const st = await streamerState(c, x.u.id, x.s);
+      if (st.open) throw new HttpError(409, st.open === a.id ? 'Zaten bu ajanstasın' : 'Zaten bir ajansa bağlısın; değiştirmek için transfer talebi oluştur');
+      assertEligible(st);
+      if (st.held) throw new HttpError(409, HELD_MSG);
+      // A code or a link is the agency's own invitation: it joins at once. Only an application waits for the
+      // agency (join_policy). A second account of the same person joins the first one's agency at once.
+      const first = x.s.streamer_policy.one_agency_per_person ? await firstAgencyOfPerson(c, x.u.id) : null;
+      if (method !== 'application' || !x.s.join_policy.requires_approval || (first && first.id !== a.id)) {
         const m = await linkStreamer(c, x.u.id, a, method, x.u.id);
-        return { membership: { agency: { id: a.id, name: a.name, code: a.code }, joinedAt: m.joined_at, method } };
+        const to = m.agency_id === a.id ? a : await agencyRow(c, m.agency_id);
+        if (to.id === a.id) await notice(c, a.id, 'request', `${x.u.name} davet kodunla ajansına katıldı`, '');
+        return { membership: { agency: { id: to.id, name: to.name, code: to.code }, joinedAt: m.joined_at, method }, sameDevice: to.id !== a.id };
       }
       try {
         await c.query('SAVEPOINT j');
@@ -254,7 +283,7 @@ export const agencyRoutes = {
       const r = await c.query("SELECT * FROM agency_requests WHERE id = $1 AND user_id = $2 AND kind = 'invite' AND status = 'pending' FOR UPDATE", [b.requestId, x.u.id]);
       if (!r.rowCount) throw new HttpError(404, 'Davet bulunamadı');
       const a = await agencyRow(c, r.rows[0].agency_id, true);
-      if (b.accept === true) await linkStreamer(c, x.u.id, a, 'invite', x.u.id);
+      if (b.accept === true) await linkStreamer(c, x.u.id, a, 'invite', x.u.id, null, r.rows[0].created_at);
       await c.query('UPDATE agency_requests SET status = $2, decided_by = $3, decided_at = now() WHERE id = $1', [r.rows[0].id, b.accept === true ? 'approved' : 'rejected', x.u.id]);
       return { status: b.accept === true ? 'approved' : 'rejected' };
     });
@@ -274,7 +303,18 @@ export const agencyRoutes = {
       const x = await ctx(c, req);
       const reason = await said(text(b.reason, 3, 500, 'Gerekçe'), x, 'agency.transfer', 'reason');
       const link = await c.query('SELECT * FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [x.u.id]);
-      if (!link.rowCount) throw new HttpError(409, 'Bir ajansa bağlı değilsin');
+      const st = await streamerState(c, x.u.id, x.s);
+      assertEligible(st);
+      if (!link.rowCount) {
+        // Held by the centre (streamer_policy): into an agency only by a move that agency and the centre approve.
+        if (!st.held) throw new HttpError(409, 'Bir ajansa bağlı değilsin; davet koduyla doğrudan katılabilirsin');
+        if (!b.toCode) bad('Geçmek istediğin ajansın kodunu yaz');
+        const to = await agencyByCode(c, b.toCode);
+        if (to.status !== 'approved') throw new HttpError(409, 'Hedef ajans aktif değil');
+        const t = await openTransfer(c, { kind: 'streamer_move', streamerId: x.u.id, toId: to.id, needs: ['to', 'center'], mode: 'free', reason, ref: ref(b.ref), actor: x.u.id });
+        await notice(c, to.id, 'transfer', `${x.u.name} ajansına katılmak istiyor`, 'Merkez hesabından geçiş: senin ve merkezin onayıyla tamamlanır.');
+        return { transfer: transferView(t, await namesFor(c, [t])) };
+      }
       const from = await agencyRow(c, link.rows[0].agency_id);
       const center = x.s.transfer_policy.require_center ? ['center'] : [];
       let t;
@@ -286,6 +326,7 @@ export const agencyRoutes = {
         t = await openTransfer(c, { kind: 'streamer_move', streamerId: x.u.id, fromId: from.id, toId: to.id, needs: ['from', 'to', ...center], mode: fr.fee > 0 ? null : 'free', fee: fr.fee, feeRule: fr, reason, ref: ref(b.ref), actor: x.u.id });
         await notice(c, to.id, 'transfer', `${x.u.name} ajansına geçmek istiyor`, reason);
       } else {
+        if (!x.s.streamer_policy.can_leave) throw new HttpError(409, LEAVE_MSG);
         t = await openTransfer(c, { kind: 'streamer_leave', streamerId: x.u.id, fromId: from.id, needs: ['from', ...center], mode: 'free', reason, ref: ref(b.ref), actor: x.u.id });
       }
       await notice(c, from.id, 'transfer', `${x.u.name} ${b.toCode ? 'başka bir ajansa geçmek' : 'ajanstan ayrılmak'} istiyor`, `${x.s.transfer_policy.decision_days} gün içinde karar verilmezse ayrılış onaylanmış sayılır.`);
@@ -569,9 +610,10 @@ export const agencyRoutes = {
          FROM users u
         WHERE u.deleted_at IS NULL AND u.id <> $1 AND (u.name ILIKE $2 OR u.username ILIKE $2)
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
+          AND ($5::boolean = false OR u.gender = 'Kadın')
         ORDER BY lower(u.username) = lower($3) IS TRUE DESC, lower(u.name) = lower($3) DESC, u.name ILIKE $4 DESC, u.name, u.id
         LIMIT 20`,
-      [x.u.id, `%${esc}%`, q, `${esc}%`],
+      [x.u.id, `%${esc}%`, q, `${esc}%`, x.s.streamer_policy.women_only],
     );
     return {
       users: r.rows.map((u) => ({ id: u.id, name: u.name, username: u.username ?? null, avatarUrl: u.avatar_url ?? null, agency: u.agency_id === a.id ? 'this' : u.agency_id ? 'other' : null })),
@@ -591,6 +633,9 @@ export const agencyRoutes = {
       if (!target.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
       const open = await c.query('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL', [target.rows[0].id]);
       if (open.rowCount) throw new HttpError(409, open.rows[0].agency_id === a.id ? 'Bu yayıncı zaten ajansında' : 'Bu yayıncı başka bir ajansa bağlı; ancak kendi transfer talebiyle geçebilir');
+      const st = await streamerState(c, target.rows[0].id, x.s);
+      if (!st.eligible) throw new HttpError(409, st.gender ? 'Ajanslarda yalnız kadın hesaplar yayıncı olabilir' : 'Bu kişi profilinde cinsiyetini seçmemiş');
+      if (st.held) throw new HttpError(409, 'Bu kişinin ajans seçme süresi doldu; ancak kendi transfer talebiyle katılabilir');
       try {
         await c.query('SAVEPOINT i');
         const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by) VALUES ($1,$2,'invite','invite',$3,$4) RETURNING id", [a.id, target.rows[0].id, await said(opt(b.note, 300, 'Not'), x, 'agency.invite'), x.u.id]);
@@ -614,7 +659,7 @@ export const agencyRoutes = {
       const note = await said(opt(b.note, 300, 'Not'), x, 'agency.request');
       const r = await c.query("SELECT * FROM agency_requests WHERE id = $1 AND agency_id = $2 AND kind = 'join' AND status = 'pending' FOR UPDATE", [b.requestId, a.id]);
       if (!r.rowCount) throw new HttpError(404, 'Başvuru bulunamadı');
-      if (b.approve === true) await linkStreamer(c, r.rows[0].user_id, a, r.rows[0].method, x.u.id);
+      if (b.approve === true) await linkStreamer(c, r.rows[0].user_id, a, r.rows[0].method, x.u.id, null, r.rows[0].created_at);
       await c.query('UPDATE agency_requests SET status = $2, decided_by = $3, decided_at = now() WHERE id = $1', [r.rows[0].id, b.approve === true ? 'approved' : 'rejected', x.u.id]);
       await audit(c, x.u.id, b.approve === true ? 'request.approve' : 'request.reject', 'agency', a.id, { after: { user: r.rows[0].user_id }, reason: note });
       return { status: b.approve === true ? 'approved' : 'rejected' };

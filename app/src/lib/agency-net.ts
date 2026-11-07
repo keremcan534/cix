@@ -221,6 +221,8 @@ export type Me = {
   transfer: Transfer | null;
   agencies: MyAgency[];
   platform: string[];
+  /** The streamer rules for this account (server agency-ops.mjs streamerState); older servers send none. */
+  streamer?: { eligible: boolean; gender: string | null; held: boolean; pickUntil: string | null; pickDays: number; canLeave: boolean; womenOnly: boolean };
 };
 
 // --- Centre (platform) types ----------------------------------------------------------------------------------
@@ -320,7 +322,7 @@ export const agencyNet = {
   // Streamer side
   me: () => get<Me>('/api/agency/me'),
   lookup: (code: string) => get<{ agency: { id: string; name: string; code: string; level: number; parentName: string | null } }>('/api/agency/lookup', { code }).then((r) => r.agency),
-  join: (code: string, method: 'code' | 'link' | 'application', note?: string) => post<{ request?: { id: number; status: string }; membership?: unknown }>('/api/agency/join', { code, method, note }),
+  join: (code: string, method: 'code' | 'link' | 'application', note?: string) => post<{ request?: { id: number; status: string }; membership?: { agency: { id: string; name: string; code: string } }; sameDevice?: boolean }>('/api/agency/join', { code, method, note }),
   respond: (requestId: number, accept: boolean) => post('/api/agency/requests/respond', { requestId, accept }),
   cancelRequest: (requestId: number) => post('/api/agency/requests/cancel', { requestId }),
   transfer: (toCode: string | null, reason: string) => post<{ transfer: Transfer }>('/api/agency/transfer', { ...(toCode ? { toCode } : {}), reason, ref: newRef() }),

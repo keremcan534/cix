@@ -99,6 +99,8 @@ export const socialRoutes = {
     }
     if (b.gender !== undefined) {
       if (!['Kadın', 'Erkek'].includes(b.gender)) throw new HttpError(400, 'Geçersiz cinsiyet');
+      // Set once, like the birth date: who may be an agency streamer depends on it (streamer_policy).
+      if (u.gender && u.gender !== b.gender) throw new HttpError(409, 'Cinsiyet bir kez seçilir; değişiklik için destekle iletişime geç');
       set.gender = b.gender;
     }
     if (b.birthDate !== undefined) {

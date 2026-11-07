@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { Art } from '@/components/Art';
 import { ExchangeSheet } from '@/components/exchange-sheet';
+import { IncomeSources } from '@/components/income-sources';
 import { LoadError } from '@/components/load-error';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
@@ -174,12 +175,10 @@ export default function IncomeScreen() {
             <Pressable style={styles.outlineBtn} onPress={() => router.push('/yayinci/cek')}>
               <Text style={styles.outlineText}>Para Çek</Text>
             </Pressable>
-            {/* Jeton Noktası is still a demo screen: a live build doesn't send money there (Decision A). */}
-            {!live && (
-              <Pressable style={styles.outlineBtn} onPress={instant}>
-                <Text style={styles.outlineText}>Anında bozdur</Text>
-              </Pressable>
-            )}
+            {/* Live: Para Çek's Jeton Noktası way (the server moves the diamonds); the demo keeps its own screen. */}
+            <Pressable style={styles.outlineBtn} onPress={live ? () => router.push({ pathname: '/yayinci/cek', params: { yol: 'jeton' } }) : instant}>
+              <Text style={styles.outlineText}>{live ? 'Jeton Noktası' : 'Anında bozdur'}</Text>
+            </Pressable>
           </View>
           {pendingWithdraw && (
             <Text style={[styles.exchangeSub, { marginTop: 8 }]} onPress={() => router.push('/yayinci/cek')}>
@@ -187,6 +186,8 @@ export default function IncomeScreen() {
             </Text>
           )}
         </LinearGradient>
+
+        {live && <IncomeSources />}
 
         {!live && (
           <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">

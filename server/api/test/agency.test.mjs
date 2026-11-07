@@ -52,6 +52,8 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     );
     [tA, sA, sB, sC, s2A] = await Promise.all(['Yayıncı tA', 'Yayıncı sA', 'Yayıncı sB', 'Yayıncı sC1', 'Yayıncı s2A'].map(account));
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.id]);
+    // Only women's accounts may be streamers (streamer_policy.women_only); the rules themselves: streamer-policy.test.mjs.
+    await q("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [[tA, sA, sB, sC, s2A, outsider].map((x) => x.id)]);
     roles = Object.fromEntries(ok(await admin.get('/api/agency/roles')).roles.map((r) => [r.name, r.id]));
     assert.ok(roles['Yayıncı asistanı'] && roles['BD yöneticisi'] && roles['Finans sorumlusu']);
     // The rules the tests rely on, set through the centre's settings (each change is kept with a reason).
@@ -110,7 +112,7 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     refused(await sOwner.post('/api/agency/sub/create', { parentId: S.id, name: 'Torun Ajans' }), 403, 'üçüncü katman');
   });
 
-  test('[Ş1-4][Ş2-2] alt ajans yayıncı davet eder; kodla başvuru onaylanır; yönetici atar', async () => {
+  test('[Ş1-4][Ş2-2] alt ajans yayıncı davet eder; kodla ve bağlantıyla doğrudan katılınır; yönetici atar', async () => {
     const inv = ok(await sOwner.post('/api/agency/invite', { id: S.id, user: sA.id }));
     const mine = ok(await sA.get('/api/agency/me'));
     assert.equal(mine.requests[0].kind, 'invite');
@@ -119,11 +121,12 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
 
     const code = (await q('SELECT code FROM agencies WHERE id = $1', [S.id]))[0].code;
     assert.equal(ok(await sB.get(`/api/agency/lookup?code=${code}`)).agency.id, S.id);
+    // The agency's code or link is its invitation: joining needs no further approval.
     const jr = ok(await sB.post('/api/agency/join', { code, method: 'code' }));
-    assert.equal(jr.request.status, 'pending');
-    ok(await sOwner.post('/api/agency/requests/decide', { id: S.id, requestId: jr.request.id, approve: true }));
-    const jc = ok(await sC.post('/api/agency/join', { code, method: 'link' }));
-    ok(await sOwner.post('/api/agency/requests/decide', { id: S.id, requestId: jc.request.id, approve: true }));
+    assert.equal(jr.membership.agency.id, S.id);
+    assert.equal(jr.request, undefined);
+    assert.equal(ok(await sB.get('/api/agency/me')).membership.agency.id, S.id);
+    assert.equal(ok(await sC.post('/api/agency/join', { code, method: 'link' })).membership.agency.id, S.id);
 
     ok(await admin.post('/api/admin/agency/assign', { streamer: tA.id, agencyId: T.id, reason: 'Sözleşme imzalandı' }));
     const inv2 = ok(await s2Owner.post('/api/agency/invite', { id: S2.id, user: s2A.id }));
@@ -152,7 +155,7 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     assert.equal(subs.find((x) => x.id === S.id).streamers, 3);
     // Viewing a sub-agency is allowed; acting in it is not.
     ok(await tOwner.get(`/api/agency/streamers?id=${S.id}`));
-    const pendingJoin = ok(await outsider.post('/api/agency/join', { code: (await q('SELECT code FROM agencies WHERE id = $1', [S.id]))[0].code }));
+    const pendingJoin = ok(await outsider.post('/api/agency/join', { code: (await q('SELECT code FROM agencies WHERE id = $1', [S.id]))[0].code, method: 'application' }));
     refused(await tOwner.post('/api/agency/requests/decide', { id: S.id, requestId: pendingJoin.request.id, approve: true }), 403, 'üst ajans alt ajansın başvurusunu onaylayamaz');
     ok(await outsider.post('/api/agency/requests/cancel', { requestId: pendingJoin.request.id }));
   });
@@ -312,7 +315,11 @@ describe('Performans ve dinamik komisyon', () => {
   });
 
   test('[Ş1-12] transferler: yayıncı ayrılır, alt ajanstan üst ajansa geçer; geçmiş kayıtlar eski ajansta kalır', async () => {
+    // Leaving without a move is closed by default (streamer_policy.can_leave); the centre can open it.
+    refused(await sB.post('/api/agency/transfer', { reason: 'Kendi yoluma devam', ref: ref() }), 409, 'transfersiz ayrılma kapalı');
+    await setting('streamer_policy', { can_leave: true });
     const leave = ok(await sB.post('/api/agency/transfer', { reason: 'Kendi yoluma devam', ref: ref() })).transfer;
+    await setting('streamer_policy', { can_leave: false });
     assert.deepEqual(leave.needs, ['from']);
     refused(await tOwner.post('/api/agency/transfers/approve', { id: T.id, transferId: leave.id, approve: true }), 403, 'üst ajans taraf değil');
     assert.equal(ok(await sOwner.post('/api/agency/transfers/approve', { id: S.id, transferId: leave.id, approve: true })).transfer.status, 'completed');

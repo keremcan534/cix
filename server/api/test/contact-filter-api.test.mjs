@@ -41,6 +41,7 @@ describe('iletişim filtresi: uçlar', () => {
   test('hazırlık', async () => {
     [a, b, c, admin] = await Promise.all(['Ayşe', 'Burak', 'Cem', 'Merkez'].map((n) => signUp(n)));
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [admin.user.id]);
+    await q("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [[a.user.id, c.user.id]]);
   });
 
   test('mesaj: iletişim bilgisi reddedilir, sıradan mesaj gider', async () => {
@@ -108,8 +109,8 @@ describe('iletişim filtresi: uçlar', () => {
     const code = (await q('SELECT code FROM agencies WHERE id = $1', [T.id]))[0].code;
     await blocked(call('POST', '/api/agency/apply', { name: 'Deniz Ajans wp 0532 123 45 67' }, c.session), 'phone', 'name');
     await blocked(call('POST', '/api/agency/apply', { name: 'Deniz Ajans', region: 'telegram: denizajans' }, c.session), 'social', 'region');
-    await blocked(call('POST', '/api/agency/join', { code, note: 'mailim ayse@hotmail.com' }, c.session), 'email', 'note');
-    const join = (await ok(call('POST', '/api/agency/join', { code, note: 'Merhaba, hafta içi her akşam yayındayım' }, c.session))).request;
+    await blocked(call('POST', '/api/agency/join', { code, method: 'application', note: 'mailim ayse@hotmail.com' }, c.session), 'email', 'note');
+    const join = (await ok(call('POST', '/api/agency/join', { code, method: 'application', note: 'Merhaba, hafta içi her akşam yayındayım' }, c.session))).request;
     await blocked(call('POST', '/api/agency/requests/decide', { id: T.id, requestId: join.id, approve: true, note: 'şu numaraya yaz 0532 123 45 67' }, b.session), 'phone', 'note');
     await ok(call('POST', '/api/agency/requests/decide', { id: T.id, requestId: join.id, approve: true, note: 'Hoş geldin' }, b.session));
     await blocked(call('POST', '/api/agency/transfer', { reason: 'ödemeyi TR33 0006 1005 1978 6457 8413 26 hesabına yaptılar', toCode: code, ref: ref() }, c.session), 'iban', 'reason');

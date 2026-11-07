@@ -55,9 +55,78 @@ export async function checkCanFoundSub(c, parent, s) {
   }
 }
 
-/** Links a streamer to an agency. The partial unique index makes a second open link impossible. */
-export async function linkStreamer(c, streamerId, agency, method, actor, transferId = null) {
+// --- Streamer rules (streamer_policy) ------------------------------------------------------------------------
+/** The ways a streamer joins by their own choice (a code, a link, an invite, an application); not a transfer or the centre. */
+export const DIRECT_JOIN = new Set(['code', 'link', 'invite', 'application']);
+export const HELD_MSG = 'Ajans seçme süren doldu; bir ajansa geçmek için transfer talebi oluştur';
+export const LEAVE_MSG = 'Ajanstan transfer talebi olmadan ayrılamazsın; başka bir ajansa geçmek için transfer talebi oluştur';
+
+/**
+ * Where a user stands under streamer_policy: may they be a streamer at all (eligible), are they held by the
+ * centre (no open agency and either the pick window is over or they were in one before: they move only by a
+ * transfer the centre approves), and when the window ends. `at` = the moment that counts (an invite's or an
+ * application's time, so an agency deciding late does not lock the streamer out).
+ */
+export async function streamerState(c, userId, s, at = new Date()) {
+  const p = s.streamer_policy;
+  const r = await c.query(
+    `SELECT u.gender, u.created_at,
+        (SELECT agency_id FROM agency_streamers WHERE streamer_id = u.id AND ended_at IS NULL) AS open,
+        EXISTS (SELECT 1 FROM agency_streamers WHERE streamer_id = u.id) AS before
+       FROM users u WHERE u.id = $1`,
+    [userId],
+  );
+  const u = r.rows[0];
+  if (!u) throw new HttpError(404, 'Kullanıcı bulunamadı');
+  const pickUntil = p.pick_days > 0 ? new Date(new Date(u.created_at).getTime() + p.pick_days * 86400e3) : null;
+  return {
+    gender: u.gender,
+    eligible: !p.women_only || u.gender === 'Kadın',
+    open: u.open,
+    held: !u.open && pickUntil !== null && (u.before || new Date(at) >= pickUntil),
+    pickUntil,
+  };
+}
+
+export function assertEligible(st) {
+  if (st.eligible) return;
+  throw new HttpError(403, st.gender ? 'Ajanslarda yalnız kadın hesaplar yayıncı olabilir; erkek hesaplar katkısını Aile üyesi olarak verir' : 'Önce profilinde cinsiyetini seç');
+}
+
+/**
+ * The agency of the same person's first account: other accounts seen on the same device (device_accounts; the
+ * registry already joins a reinstall or a reset to its device) that are in an approved agency, the earliest
+ * joined. Null if there is none.
+ */
+export async function firstAgencyOfPerson(c, userId) {
+  const r = await c.query(
+    `SELECT a.* FROM agency_streamers m JOIN agencies a ON a.id = m.agency_id
+      WHERE m.ended_at IS NULL AND a.status = 'approved' AND m.streamer_id <> $1
+        AND m.streamer_id IN (SELECT o.user_id FROM device_accounts me JOIN device_accounts o ON o.device_id = me.device_id WHERE me.user_id = $1)
+      ORDER BY m.joined_at LIMIT 1`,
+    [userId],
+  );
+  return r.rows[0] ?? null;
+}
+
+/**
+ * Links a streamer to an agency. The partial unique index makes a second open link impossible. A streamer who
+ * joins by their own choice must be eligible and not held; a second account of the same person goes to the
+ * agency of the first (the row returned says where it went).
+ */
+export async function linkStreamer(c, streamerId, agency, method, actor, transferId = null, at = new Date()) {
   if (agency.status !== 'approved') throw new HttpError(409, 'Bu ajans şu an yayıncı kabul etmiyor');
+  const { values: s } = await settingsAt(c);
+  const st = await streamerState(c, streamerId, s, at);
+  assertEligible(st);
+  if (DIRECT_JOIN.has(method)) {
+    if (st.held) throw new HttpError(409, HELD_MSG);
+    const first = s.streamer_policy.one_agency_per_person ? await firstAgencyOfPerson(c, streamerId) : null;
+    if (first && first.id !== agency.id) {
+      await audit(c, actor, 'streamer.multi_account', 'streamer', streamerId, { before: { agency: agency.id }, after: { agency: first.id } });
+      agency = first;
+    }
+  }
   const owner = await c.query("SELECT 1 FROM agencies WHERE owner_id = $1 AND status IN ('draft','pending','approved','suspended')", [streamerId]);
   if (owner.rowCount && agency.owner_id !== streamerId) throw new HttpError(409, 'Ajans yöneticisi başka bir ajansa yayıncı olarak bağlanamaz');
   try {
@@ -219,9 +288,11 @@ async function completeTransfer(c, t, actor) {
       const a = (await c.query('SELECT * FROM agencies WHERE id = $1 FOR UPDATE', [t.agency_id])).rows[0];
       const target = (await c.query('SELECT * FROM agencies WHERE id = $1 FOR UPDATE', [t.to_agency_id])).rows[0];
       const streamers = await c.query('SELECT streamer_id FROM agency_streamers WHERE agency_id = $1 AND ended_at IS NULL', [a.id]);
+      const { values: s } = await settingsAt(c);
       for (const row of streamers.rows) {
         await unlinkStreamer(c, row.streamer_id, 'agency_closed', t.id);
-        await linkStreamer(c, row.streamer_id, target, 'transfer', actor, t.id);
+        // A man's account is not carried over (streamer_policy.women_only): it only leaves.
+        if ((await streamerState(c, row.streamer_id, s)).eligible) await linkStreamer(c, row.streamer_id, target, 'transfer', actor, t.id);
       }
       await c.query('UPDATE agency_parents SET valid_to = now() WHERE agency_id = $1 AND valid_to IS NULL', [a.id]);
       await setStatus(c, a, 'closed', actor, t.reason);

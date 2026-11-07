@@ -359,7 +359,7 @@ const f = StyleSheet.create({
   cargo: { color: 'rgba(230,251,255,0.8)', fontSize: 10, fontWeight: '800', marginTop: -2 },
   cargoLit: { color: '#fff', fontWeight: '900' },
   lamp: { width: 30, height: 30, borderRadius: 15, backgroundColor: LIGHT, alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 12px rgba(255,210,122,0.75)' },
-  lampTag: { position: 'absolute', bottom: 1, color: LIGHT, fontSize: 7, fontWeight: '900', letterSpacing: 0.5 },
+  lampTag: { position: 'absolute', bottom: 1, color: LIGHT, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   meterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 36 },
   meter: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,210,122,0.35)', backgroundColor: 'rgba(255,210,122,0.08)' },
   meterHot: { backgroundColor: 'rgba(255,210,122,0.22)', borderColor: LIGHT },

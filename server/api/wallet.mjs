@@ -231,6 +231,39 @@ export const walletRoutes = {
     };
   },
 
+  /**
+   * Gelir's sources: the diamonds I earned in the period (day, week, month by Turkey's calendar, or all), by where
+   * they came from. Gifts by place (a room, a chat, a moment, a profile; Uğurlu hediye on its own). Paid messages
+   * and calls are not on the server yet: they are listed with 0 so the screen shows every source.
+   */
+  async 'GET /api/wallet/income'(req, url) {
+    const u = await auth(req);
+    const period = url.searchParams.get('period') ?? 'month';
+    if (!['day', 'week', 'month', 'all'].includes(period)) throw new HttpError(400, 'Geçersiz dönem');
+    const r = await db.query(
+      `SELECT CASE WHEN e.source_type = 'lucky_gift' THEN 'lucky' WHEN g.room IS NOT NULL THEN 'room' ELSE coalesce(g.place, 'other') END AS source,
+              sum(g.total) AS diamonds, count(*) AS n
+         FROM gift_events g LEFT JOIN income_events e ON e.source_ref = 'gift:' || g.id
+        WHERE g.recipient = $1 AND ($2 = 'all' OR g.created_at >= date_trunc($2, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')
+        GROUP BY 1`,
+      [u.id, period],
+    );
+    const by = Object.fromEntries(r.rows.map((x) => [x.source, { diamonds: Number(x.diamonds), count: Number(x.n) }]));
+    const row = (key, label, live = true) => ({ key, label, diamonds: by[key]?.diamonds ?? 0, count: by[key]?.count ?? 0, live });
+    const sources = [
+      row('room', 'Oda hediyeleri'),
+      row('lucky', 'Uğurlu hediyeler'),
+      row('chat', 'Mesajdan gelen hediyeler'),
+      row('moment', 'Anlar hediyeleri'),
+      row('profile', 'Profilden gelen hediyeler'),
+      row('other', 'Diğer hediyeler'),
+      row('message_fee', 'Mesaj ücretleri', false),
+      row('voice_call', 'Sesli arama', false),
+      row('video_call', 'Görüntülü arama (birebir)', false),
+    ];
+    return { period, total: sources.reduce((a, x) => a + x.diamonds, 0), sources };
+  },
+
   async 'GET /api/wallet/coins'(req) {
     const u = await auth(req);
     const by = await db.query('SELECT channel, sum(remaining) AS remaining FROM coin_lots WHERE user_id = $1 AND remaining > 0 GROUP BY channel ORDER BY 2 DESC', [u.id]);

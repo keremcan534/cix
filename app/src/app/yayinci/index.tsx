@@ -349,7 +349,7 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 150 },
   barCol: { alignItems: 'center', gap: 4, flex: 1 },
   bar: { width: 18, borderRadius: 6, backgroundColor: colors.primary },
-  barValue: { color: colors.textDim, fontSize: 9 },
+  barValue: { color: colors.textDim, fontSize: 10 },
   barLabel: { color: colors.textDim, fontSize: 11 },
   metric: { flexBasis: '30%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 8, gap: 2 },
   earning: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
