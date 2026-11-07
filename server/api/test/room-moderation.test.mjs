@@ -34,6 +34,15 @@ const h = startApi({ LIVEKIT_API_URL: `http://127.0.0.1:${LK_PORT}` });
 const { call, signUp } = h;
 
 const callsOf = (method, from) => lkCalls.slice(from).filter((c) => c.method === method);
+// Some LiveKit calls are sent without waiting (announcements): they can reach the fake after the answer.
+const until = async (fn, ms = 3000) => {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (fn()) return true;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  return false;
+};
 /** The gift announcements only (a gift can also raise the room's level, which sends `{ type: 'room' }`). */
 const giftsOf = (from) => callsOf('SendData', from).filter((c) => JSON.parse(Buffer.from(c.body.data, 'base64').toString('utf8')).type === 'gift');
 const openRoom = async (owner, title = `Oda ${rnd(2)}`) => {
@@ -249,7 +258,7 @@ describe('Düzen ve mikrofon kuyruğu herkese oda bilgisiyle gider', () => {
     const [st, j] = await call('POST', '/api/rooms/update', { id: room, micCount: 6 }, adm.session);
     assert.equal(st, 200, j.error);
     assert.deepEqual(lastMeta(from), { lockedSeats: [], layoutId: null, micCount: 6, micQueue: false, queue: [] });
-    assert.equal(callsOf('SendData', from).length, 1, 'eski uygulamalar için oda paketi de gider');
+    assert.ok(await until(() => callsOf('SendData', from).length === 1), 'eski uygulamalar için oda paketi de gider');
     await call('POST', '/api/rooms/update', { id: room, layoutId: 'audio-12-grid' }, owner.session);
     assert.equal(lastMeta(from).layoutId, 'audio-12-grid');
   });
@@ -296,14 +305,6 @@ describe('Odada hediye duyurusu', () => {
     room = await openRoom(host);
     assert.equal((await call('POST', '/api/wallet/test-topup', { amount: 5000, ref: rnd(6) }, sender.session))[0], 200);
   });
-  const until = async (fn, ms = 3000) => {
-    const end = Date.now() + ms;
-    while (Date.now() < end) {
-      if (fn()) return true;
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    return false;
-  };
 
   test('ödenen hediye odanın ses bağlantısına sunucudan gider; tekrar ve oda dışı hediye gitmez', async () => {
     const from = lkCalls.length;
