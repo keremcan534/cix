@@ -106,7 +106,7 @@ export function useRoomPkSync(roomId: string, enabled: boolean, pk: PkSession | 
     const offPk = onServerPk(roomId, () => refreshRoomPkSoon(roomId, 0));
     // The server scores a gift in its own transaction, before it announces it: read the new score.
     const offGift = onSignal(roomId, (_from, msg) => {
-      if (msg.t === 'gift' && pkOfRoom(roomId)) refreshRoomPkSoon(roomId);
+      if ((msg.t === 'gift' || msg.t === 'lucky') && pkOfRoom(roomId)) refreshRoomPkSoon(roomId);
     });
     return () => {
       offPk();

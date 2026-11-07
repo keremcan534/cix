@@ -10,7 +10,7 @@
 // Gifts the owner hid in Yönetim › Canlı ayarlar are left off every shelf (lib/live/catalog-live visibleGifts).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +22,7 @@ import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
+import { refreshLucky } from '@/lib/live/lucky';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
@@ -43,7 +44,7 @@ const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMa
 /** One neutral line that explains the shelf; no countdowns, no "spend more" nudges. */
 const SHELF_NOTE: Record<Shelf, string> = {
   hot: 'En çok gönderilen hediyeler.',
-  lucky: `Ödül garanti değildir: gönderdiğin hediyenin katları kadar jeton kazanma ihtimalin var, olasılıklar aşağıda. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
+  lucky: `Ödül garanti değildir: gönderdiğin hediyenin katları kadar oyun jetonu kazanma ihtimalin var, olasılıklar aşağıda. Oyun jetonu yalnızca Oyun Salonu’nda oynanır. Alıcıya ve PK puanına hediye değerinin ${pct(LUCKY_RECIPIENT_SHARE)}’si yazılır.`,
   gameplay: 'Alıcının koltuğuna animasyonla atılır. Fiyat sabit, sürpriz ödül yok.',
   couple: 'İkili hediyeler yakınlık puanını ekstra %2 artırır.',
   privilege: 'İnci üyelerine özel hediyeler.',
@@ -106,9 +107,12 @@ export function GiftSheet({
   const { bottom: navBar } = useSafeAreaInsets();
   const lucky = useLucky();
   const shown = visibleGifts(GIFTS, useLiveCatalog());
-  // Uğurlu is a game of chance: no shelf below the gambling level, and none in a live build (the server has no
-  // Uğurlu draw yet, so nothing may be drawn or paid out on this phone).
-  const luckyShelf = !liveMode() && gamblingLevelOk(wealthLevel);
+  // Uğurlu is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
+  const luckyShelf = gamblingLevelOk(wealthLevel);
+  // Live: the packages, odds and today's limit as the server has them, read each time the sheet opens.
+  useEffect(() => {
+    if (visible && luckyShelf && liveMode()) void refreshLucky().catch(() => {});
+  }, [visible, luckyShelf]);
   const [luckyId, setLuckyId] = useState(lucky.config.gifts[0]?.id ?? '');
   const [luckyView, setLuckyView] = useState<'odds' | 'history'>('odds');
   const [pickedShelf, setShelf] = useState<Shelf>('hot');
@@ -225,7 +229,7 @@ export function GiftSheet({
           ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(total - coins)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
           : overLimit
             ? { tone: 'lock' as const, text: overLimit, cta: 'Günlük limiti aşıyor', disabled: true }
-          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} jeton (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
+          : { tone: 'info' as const, text: `${count * targets.length > 1 ? `Her hediye için ayrı çekiliş yapılır. ` : ''}En yüksek ödül ×${fmt(top)} = ${fmt(lg.price * top)} oyun jetonu (olasılık ${oddsLabel(topOdds)}). Ödül garanti değildir. Sonra sağ alttaki çarka basarak aynı gönderimi tekrarlayabilirsin.`, cta: `Gönder · ${fmt(total)}`, variant: 'money' as const }
     : locked
       ? { tone: 'lock' as const, text: `${gift.name}, İnci ${gift.minSvip} ve üzerine özel. Senin seviyen: İnci ${svipLevel}.`, cta: 'İnci ayrıcalıklarını gör', variant: 'tonal' as const, onPress: goVip }
       : bagShort
@@ -504,11 +508,11 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
             <View key={t.mult} style={[g.oddsRow, t.mult === top && t.mult > 0 && { backgroundColor: 'rgba(251,191,36,0.08)' }]}>
               <Text style={[g.oddsCell, g.oddsMult]}>{t.mult ? `×${fmt(t.mult)}` : 'Ödül yok'}</Text>
               <Text style={[g.oddsCell, { textAlign: 'center' }]}>{oddsLabel(t.weight)}</Text>
-              <Text style={[g.oddsCell, { textAlign: 'right' }]}>{t.mult ? `${fmt(selected.price * t.mult)} jeton` : '—'}</Text>
+              <Text style={[g.oddsCell, { textAlign: 'right' }]}>{t.mult ? `${fmt(selected.price * t.mult)} oyun jetonu` : '—'}</Text>
             </View>
           ))}
           <Text style={[g.dim, { marginTop: 6 }]}>
-            Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir, jeton nakde çevrilmez. Hediyeyi alan kişi normal hediye gelirini alır; senin ödülün ayrıca hesaplanır.
+            Bu oranlar sunucudaki gerçek ayarlardır (sürüm {version}). Ödül garanti değildir. Ödül oyun jetonudur: yalnızca Oyun Salonu’nda oynanır, hediye edilemez, nakde çevrilmez. Hediyeyi alan kişiye fiyatın {pct(LUCKY_RECIPIENT_SHARE)}’si elmas olarak yazılır.
           </Text>
         </View>
       ) : history.length === 0 ? (

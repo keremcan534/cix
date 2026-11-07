@@ -4,22 +4,18 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Text, TextInput } from '@/components/text';
+import { Text } from '@/components/text';
 import { Card, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { resolve } from '@/data/rbac';
 import { pct } from '@/data/rules';
 import {
-  DOC_TEST_TIERS,
-  LUCKY_MULTS,
   LUCKY_RECIPIENT_SHARE,
   ODDS_TOTAL,
-  STANDARD_TIERS,
   getLucky,
   maxMult,
   newGiftDraft,
   oddsLabel,
-  oddsSum,
   saveGift,
   sendLucky,
   setForceNext,
@@ -27,10 +23,10 @@ import {
   unavailable,
   updateConfig,
   useLucky,
-  validate,
   type LuckyGift,
 } from '@/lib/lucky';
 import { showAlert } from '@/lib/alert';
+import { LuckyEditor } from '@/components/admin/lucky-editor';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
@@ -128,7 +124,19 @@ export default function LuckyAdmin() {
           </>
         )}
 
-        {tab === 'packs' && editing && <Editor draft={editing} onChange={setEditing} onDone={() => setEditing(null)} />}
+        {tab === 'packs' && editing && (
+          <LuckyEditor
+            draft={editing}
+            onChange={setEditing}
+            testPreset
+            onSave={(g) => {
+              const err = saveGift(g);
+              if (err) return showAlert('Kaydedilemedi', err);
+              setEditing(null);
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        )}
 
         {tab === 'budget' && (
           <>
@@ -221,85 +229,6 @@ export default function LuckyAdmin() {
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-/** Package editor: odds are typed as percentages; save is refused unless they add up to exactly 100 %. */
-function Editor({ draft, onChange, onDone }: { draft: LuckyGift; onChange: (g: LuckyGift) => void; onDone: () => void }) {
-  const sum = oddsSum(draft.tiers);
-  const bad = validate(draft);
-  const { colors, semantic } = useTheme();
-  const s = useStyles();
-  const pctText = (g: LuckyGift) => Object.fromEntries([0, ...LUCKY_MULTS].map((m) => [m, String((g.tiers.find((t) => t.mult === m)?.weight ?? 0) / 1000).replace('.', ',')]));
-  // Inputs keep what was typed (e.g. "0," mid-entry); the draft always holds the parsed odds.
-  const [texts, setTexts] = useState<Record<number, string>>(() => pctText(draft));
-  const applyPreset = (tiers: LuckyGift['tiers']) => {
-    const next = { ...draft, tiers: tiers.map((t) => ({ ...t })) };
-    onChange(next);
-    setTexts(pctText(next));
-  };
-  const setWeight = (mult: number, pct: string) => {
-    const w = Math.max(0, Math.round((Number(pct.replace(',', '.')) || 0) * 1000));
-    const has = draft.tiers.some((t) => t.mult === mult);
-    const tiers = has ? draft.tiers.map((t) => (t.mult === mult ? { ...t, weight: w } : t)) : [...draft.tiers, { mult, weight: w }];
-    onChange({ ...draft, tiers: tiers.sort((a, b) => a.mult - b.mult) });
-  };
-  return (
-    <Card style={{ gap: 8 }}>
-      <Text style={s.title}>Paket düzenle</Text>
-      <View style={s.row}>
-        <TextInput value={draft.emoji} onChangeText={(t) => onChange({ ...draft, emoji: t })} style={[s.input, { width: 56 }]} accessibilityLabel="Emoji" />
-        <TextInput value={draft.name} onChangeText={(t) => onChange({ ...draft, name: t })} style={[s.input, { flex: 1 }]} accessibilityLabel="Ad" />
-      </View>
-      <View style={s.row}>
-        <Text style={s.label}>Fiyat (jeton)</Text>
-        <TextInput value={String(draft.price)} keyboardType="number-pad" onChangeText={(t) => onChange({ ...draft, price: Math.max(0, Math.floor(Number(t) || 0)) })} style={[s.input, { width: 100 }]} accessibilityLabel="Fiyat" />
-      </View>
-      <Text style={s.label}>Olasılıklar (%). Bir çarpanı kapatmak için 0 yaz.</Text>
-      {[0, ...LUCKY_MULTS].map((m) => (
-        <View key={m} style={s.row}>
-          <Text style={[s.label, { flex: 0, width: 80 }]} numberOfLines={1}>{m ? `×${fmt(m)}` : 'Ödül yok'}</Text>
-          <TextInput
-            value={texts[m]}
-            keyboardType="decimal-pad"
-            onChangeText={(t) => {
-              setTexts((x) => ({ ...x, [m]: t }));
-              setWeight(m, t);
-            }}
-            style={[s.input, { width: 90 }]} accessibilityLabel={`${m ? `×${m}` : 'Ödül yok'} olasılığı`} />
-          <Text style={s.dim}>{m ? `${fmt(draft.price * m)} jeton` : ''}</Text>
-        </View>
-      ))}
-      <Text style={[s.dim, { color: sum === ODDS_TOTAL ? semantic.successText : colors.gold }]}>Toplam {oddsLabel(sum)}{sum === ODDS_TOTAL ? ' ✓' : ' · %100 olmalı'}</Text>
-      <View style={s.row}>
-        <Pressable style={s.small} onPress={() => applyPreset(STANDARD_TIERS)}>
-          <Text style={s.chipText}>Standart oranlar</Text>
-        </Pressable>
-        <Pressable style={s.small} onPress={() => applyPreset(DOC_TEST_TIERS)}>
-          <Text style={s.chipText}>Belgedeki test tablosu</Text>
-        </Pressable>
-      </View>
-      <View style={s.row}>
-        <Text style={s.label}>Paket açık</Text>
-        <Switch value={draft.enabled} onValueChange={(v) => onChange({ ...draft, enabled: v })} />
-      </View>
-      {bad && <Text style={[s.dim, { color: colors.gold }]}>{bad}</Text>}
-      <View style={s.row}>
-        <Pressable
-          style={[s.small, { backgroundColor: semantic.action }]}
-          onPress={() => {
-            const err = saveGift(draft);
-            if (err) return showAlert('Kaydedilemedi', err);
-            onDone();
-          }}
-        >
-          <Text style={[s.chipText, { color: semantic.actionInk }]}>Kaydet</Text>
-        </Pressable>
-        <Pressable style={s.small} onPress={onDone}>
-          <Text style={s.chipText}>Vazgeç</Text>
-        </Pressable>
-      </View>
-    </Card>
   );
 }
 

@@ -80,7 +80,7 @@ import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rul
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
 import { callsAvailable, isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
-import { onServerRoom, sendSignal, useLivePeers, type RoomSignal } from '@/lib/live/room-bus';
+import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
 import { banLeft, roomBan, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type SeatAction } from '@/lib/live/room-staff';
 import { roomUnmute } from '@/lib/api';
@@ -91,6 +91,7 @@ import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteS
 import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
+import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
 import { getPk, markPkSeen, modeLabel, pkPointsFor, recordGift, reportMismatch, teamOf, usePk } from '@/lib/pk';
 import {
   KICK_BAN_MIN,
@@ -683,8 +684,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // Room chat goes phone to phone and the server never reads it, so a line with contact details from an older
       // or modified app is dropped here. Not counted: the refusal would be mine, and I only received it.
       if (msg.t === 'chat') return checkText(msg.text).ok ? addMsg({ userId: from, text: msg.text }) : undefined;
+      const to = msg.to.map((t) => (t === myServerId() ? 'me' : t));
+      if (msg.t === 'lucky') return showLuckyFrom(from, to, msg);
       const gift = GIFTS.find((g) => g.id === msg.giftId);
-      if (gift) showGift(from, msg.to.map((t) => (t === myServerId() ? 'me' : t)), gift, msg.count);
+      if (gift) showGift(from, to, gift, msg.count);
     },
     onServerSeat: (seat) => addMsg({ system: true, text: seat === null ? 'Oda yönetimi seni mikrofondan indirdi' : `Oda yönetimi seni ${seat + 1}. mikrofona taşıdı` }),
   });
@@ -1744,6 +1747,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     bump('giftsSent', count * sent.length);
     if (error) showAlert('Bazı hediyeler gönderilemedi', `${sent.length} kişiye gitti. ${error}`);
   };
+  /** A Lucky send another phone made (the server announced it): the gift lines, the flight and a big win. */
+  const showLuckyFrom = (from: string, toIds: string[], s: LuckySignal) => {
+    const fromName = userById(from).name;
+    const price = luckyGift(s.giftId)?.price ?? 0;
+    toIds.forEach((to) => logGift(from, to, { id: s.giftId, name: s.name, emoji: s.emoji, price }, s.count));
+    if (price) addContrib(from, price * s.count * toIds.length);
+    flyGift(s.emoji, s.count, toIds, { x: 36, y: win.height * 0.72 }, s.giftId);
+    const toText = toIds.length > 1 ? `${toIds.length} kişiye` : toIds[0] === 'me' ? 'sana' : `${userById(toIds[0]).name} kişisine`;
+    addMsg({
+      id: `gift:${s.eventId}`,
+      system: true,
+      text: `🍀 ${fromName}, ${toText} ${s.emoji} ${s.name}${s.count > 1 ? ` x${s.count}` : ''} (Uğurlu) gönderdi`,
+      gift: { fromId: from, toIds, emoji: s.emoji, name: s.name, count: s.count, lucky: true, giftId: s.giftId },
+    });
+    // The sender may hide their name on wins (Ayarlar), and the server doesn't know it: the line names no one.
+    if (s.bigWin > 0) addMsg({ system: true, kind: 'gift', text: `🎉 Uğurlu hediyeden ×${s.best.toLocaleString('tr-TR')} kazanıldı!` });
+  };
   /** A gift line, the seat flight and the big effect (mine or one another phone announced). */
   const showGift = (from: string, toIds: string[], gift: Gift, count: number) => {
     const fromName = from === 'me' ? ME.name : userById(from).name;
@@ -1756,13 +1776,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addMsg({ system: true, text: `🎁 ${fromName}, ${toText} ${gift.emoji} ${gift.name} x${count} gönderdi!`, gift: { fromId: from, toIds, emoji: gift.emoji, name: gift.name, count, giftId: gift.id } });
   };
 
-  // Lucky: `count` gifts to each person picked, one server draw per gift; no send cap beyond the balance.
-  // The room only records the gift for each recipient and shows the stored results; wins go out to every room.
+  // Lucky: `count` gifts to each person picked, one draw per gift; no send cap beyond the balance.
+  // Server room: the server takes the price, gives each recipient their 20 % as diamonds, draws and pays the rewards
+  // in game coins, then tells the room (server/api/lucky.mjs). Offline demo: lib/lucky plays it on this phone.
   const sendLuckyGift = (giftId: string, picked: string[], count = 1) => {
     setGiftOpen(false);
     if (offlineBlocked()) return;
-    // Live mode: Uğurlu gifts aren't on the server yet; nothing is drawn or charged on this phone.
-    if (liveMode()) return showAlert('Uğurlu hediyeler yakında', 'Şimdilik normal hediyeleri gönderebilirsin.');
+    // Live mode: a sample room's people are not real, and real coins never go to them.
+    if (liveMode() && !real) {
+      setCombo(null);
+      return showAlert('Uğurlu hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+    }
     // The combo wheel repeats a stored list: drop anyone who has left the room since (never charge for them).
     const inRoom = new Set([...seatedOthers, ...audience.map((u) => u.id)]);
     const toIds = picked.filter((t) => inRoom.has(t));
@@ -1770,17 +1794,49 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setCombo(null);
       return showAlert('Uğurlu hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
     }
+    if (real) return void deliverLiveLucky(giftId, toIds, count);
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
       { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
-      { spend: spendCoins, credit: addCoins, blocked: spendBlock },
+      { spend: spendCoins, credit: addCoins, reward: app.addGameCoins, blocked: spendBlock },
     );
     if (!records.length) {
       errorHaptic();
+      setCombo(null);
       return showAlert('Uğurlu hediye gönderilemedi', error ?? 'Gönderilemedi.');
     }
+    // PK scores the recipient's 20 % share of the gift value, never the reward (the server does it in a server room).
+    records.forEach((r) => scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r)));
+    const spent = records.reduce((n, r) => n + r.price, 0);
+    if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
+    showLuckySend(records, toIds, count, error);
+  };
+  const deliverLiveLucky = async (giftId: string, toIds: string[], count: number) => {
+    const g = luckyGift(giftId);
+    // The daily limit holds here too (the balance is the server's to check).
+    const limited = g ? spendBlock(g.price * count * toIds.length) : null;
+    if (limited && limited !== 'Yetersiz bakiye.') {
+      errorHaptic();
+      setCombo(null);
+      return showAlert('Uğurlu hediye gönderilemedi', limited);
+    }
+    try {
+      const { records } = await liveLuckySend(giftId, toIds, count, id);
+      if (records.length) showLuckySend(records, toIds, count, null);
+    } catch (e) {
+      errorHaptic();
+      setCombo(null);
+      const text = errorText(e);
+      showAlert('Uğurlu hediye gönderilemedi', text, /Yetersiz/i.test(text) ? [{ text: 'Tamam', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }] : undefined);
+      // A closed package or the day's limit: the sheet shows it from now on.
+      void refreshLucky().catch(() => {});
+    }
+  };
+  /** What a Lucky send I made shows: the gift lines, the flight, the results and the win news. */
+  const showLuckySend = (records: LuckyRecord[], toIds: string[], count: number, error: string | null) => {
     const cfg = getLucky().config;
     const first = records[0];
+    const giftId = first.giftId;
     const spent = records.reduce((n, r) => n + r.price, 0);
     const reward = records.reduce((n, r) => n + r.reward, 0);
     const best = records.reduce((a, b) => (b.mult > a.mult ? b : a), first);
@@ -1789,12 +1845,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     records.forEach((r) => {
       logGift('me', r.toId, { id: r.giftId, name: r.giftName, emoji: r.emoji, price: r.price }, 1);
       app.recordGift(r.toId, r.giftId, 1);
-      // PK scores the recipient's 20 % share of the gift value, never the reward.
-      scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r));
     });
     bump('giftsSent', records.length);
     addContrib('me', spent);
-    if (!isOwn) addFanPoints(hostId, Math.ceil(spent / 10), `Hediye gönderdin (${spent} jeton)`);
     flyGift(first.emoji, count, sentTo, { x: win.width - 60, y: win.height - 48 }, first.giftId);
     // Combo repeats don't add a chat line each time; the wheel shows the count.
     const repeat = combo?.giftId === giftId && combo.to.join() === toIds.join() && combo.each === count;
@@ -1815,7 +1868,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addMsg({
         system: true,
         kind: 'gift',
-        text: settings.luckyAnnounce ? `🎉 ${ME.name} Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
+        text: settings.luckyAnnounce ? `🎉 ${ME.name} Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} oyun jetonu` : `🎉 Bir kullanıcı Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
     // Restarts the combo wheel's timer: the time of this send's last draw.
