@@ -42,6 +42,8 @@ export type Room = {
   seatUserIds: (string | null)[];
   tags: string[];
   level?: number;
+  /** A server room's XP toward the next level (the owner's room XP). */
+  xp?: number;
   agency?: boolean; // agency rooms start with 15 mics
   password?: string; // private room
   adminIds?: string[];

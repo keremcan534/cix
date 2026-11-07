@@ -149,6 +149,23 @@ describe('Oda seviyesi, mikrofonlar ve düzen', () => {
     assert.equal(one.room.micCount, 12, 'reddedilenler bir şey değiştirmedi');
   });
 
+  test('oda şifresini yalnızca sahip koyar ve kaldırır; şifreli odaya şifreyle girilir', async () => {
+    const lk = `oda-${room}`;
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, password: '1234' }, roomAdmin.session))[0], 403, 'yönetici şifre koyamaz');
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, password: '123' }, owner.session))[0], 400, 'çok kısa');
+    let [st, j] = await call('POST', '/api/rooms/update', { id: room, password: '4321' }, owner.session);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.room.hasPassword, true);
+    assert.equal(j.room.micCount, 12, 'şifre mikrofonları değiştirmedi');
+    assert.equal((await call('GET', `/token?room=${lk}`, null, member.session))[0], 403, 'şifresiz');
+    assert.equal((await call('GET', `/token?room=${lk}&password=4321`, null, member.session))[0], 200);
+
+    [st, j] = await call('POST', '/api/rooms/update', { id: room, password: null }, owner.session);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.room.hasPassword, false);
+    assert.equal((await call('GET', `/token?room=${lk}`, null, member.session))[0], 200, 'kilit kalktı');
+  });
+
   test('sesli susturma, kimin odada olduğu bilinmese de ses sunucusundaki odaya ulaşır', async () => {
     assert.equal((await h.sql.query('SELECT count(*)::int AS n FROM room_presence WHERE identity = $1', [member.user.id])).rows[0].n, 0);
     const from = lkCalls.length;

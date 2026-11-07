@@ -6,8 +6,9 @@
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
-//   POST /api/rooms/update { id, title?, announcement?, micCount?, layoutId? } → { room } (title, bulletin: owner;
-//                          mic count and layout: owner or room admin; the room's phones are told to read it again)
+//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId? } → { room } (title, bulletin,
+//                          password (null = no lock): owner; mic count and layout: owner or room admin; the room's
+//                          phones are told to read it again)
 //   POST /api/rooms/admin  { room, user, admin }                            → { admin }   (owner only)
 //   POST /api/rooms/ban    { room, user, minutes }  (null = blacklist)      → { until }   (owner or admin)
 //   POST /api/rooms/unban  { room, user }                                   → { banned: false }
@@ -25,6 +26,8 @@ import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, 
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
+import { vipLevelOf } from './catalog.mjs';
+import { statusOf } from './economy.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -40,6 +43,13 @@ export const roomLevel = (xp) => ROOM_XP_THRESHOLDS.filter((t) => Number(xp) >= 
 /** The public room number the app shows as "ID" (app data/catalog roomCode). */
 export const roomCode = (id) => String(10_000_000 + [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7));
 const LAYOUT = /^[A-Za-z0-9_-]{1,40}$/;
+// A password lock needs a Lv.4 room or any VIP level (app data/catalog LOCK_MIN_LEVEL).
+const LOCK_MIN_LEVEL = 4;
+async function mayLock(me) {
+  if (roomLevel(me.room_xp ?? 0) >= LOCK_MIN_LEVEL) return;
+  if (vipLevelOf(me.svip_xp, (await statusOf(db, me.id)).noble?.tier) >= 1) return;
+  throw new HttpError(403, `Oda kilidi Lv.${LOCK_MIN_LEVEL} odada veya VIP ile açılır`);
+}
 
 const out = (r) => ({
   id: r.id,
@@ -151,6 +161,7 @@ export const roomRoutes = {
     const roomType = b.roomType ?? 'free';
     if (!TYPES.includes(roomType)) throw new HttpError(400, 'Geçersiz oda türü');
     const password = b.password === undefined || b.password === '' ? null : text(b.password, 4, 32, 'Şifre');
+    if (password) await mayLock(me);
     try {
       const r = await db.query('INSERT INTO rooms (owner, title, announcement, room_type) VALUES ($1,$2,$3,$4) RETURNING id', [me.id, title, announcement, roomType]);
       const id = r.rows[0].id;
@@ -201,7 +212,8 @@ export const roomRoutes = {
   },
 
   /**
-   * The owner renames the room or changes its bulletin while it is open. The owner or a room admin sets the
+   * The owner renames the room, changes its bulletin or locks it with a password (null or '' takes the lock off;
+   * people already inside stay, the password is asked at the next join). The owner or a room admin sets the
    * classic grid's mic count (null = the level's most) and the stage layout (null = classic grid); everyone in
    * the room's voice connection is told to read the room again, so all phones draw the same mics.
    */
@@ -210,7 +222,7 @@ export const roomRoutes = {
     const b = await readJson(req);
     const room = await roomRow(b.id);
     const owner = room.owner === me.id;
-    const texts = b.title !== undefined || b.announcement !== undefined;
+    const texts = b.title !== undefined || b.announcement !== undefined || b.password !== undefined;
     const stage = b.micCount !== undefined || b.layoutId !== undefined;
     if (!texts && !stage) throw new HttpError(400, 'Değişiklik yok');
     if (texts && !owner) throw new HttpError(403, 'Odayı yalnızca sahibi düzenleyebilir');
@@ -223,7 +235,11 @@ export const roomRoutes = {
     limit(`roomedit:${me.id}`, 30, 'Çok sık değiştirdin, biraz bekle');
     const title = b.title === undefined ? room.title : await publicText(b.title, 3, 40, 'Oda adı', me, 'room.title', 'title');
     const announcement = b.announcement === undefined ? room.announcement : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
+    const password = b.password === undefined ? undefined : b.password === null || b.password === '' ? null : text(b.password, 4, 32, 'Şifre');
+    if (password) await mayLock(me);
     await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5 WHERE id = $1', [room.id, title, announcement, micCount, layoutId]);
+    // The hash includes the room id, as when the room is opened with a password.
+    if (password !== undefined) await db.query('UPDATE rooms SET password_hash = $2 WHERE id = $1', [room.id, password && sha(`room:${room.id}:${password}`)]);
     if (stage) announceRoom(liveKitName(room.id));
     const [fresh] = await withVoiceCounts([await roomRow(room.id)]);
     return { room: out(fresh) };

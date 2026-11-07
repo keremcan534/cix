@@ -516,7 +516,7 @@ export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api
 export const serverRoom = (id: string) => call<{ room: ServerRoom }>('GET', `/api/room?id=${encodeURIComponent(id)}`).then((r) => r.room);
 /** What the room screen can change on the server: the name and bulletin (owner only), the mics and the layout
  *  (owner or a room admin; null = back to the default). */
-export type RoomPatch = { title?: string; announcement?: string; micCount?: number | null; layoutId?: string | null };
+export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null };
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.

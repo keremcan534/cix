@@ -255,6 +255,7 @@ describe('Boş oda listeden düşer ama kapanmaz (odalar-8)', () => {
 
   test('sahibi çıkıp oda boş kalınca kapanmaz: sahibi aynı odaya döner, kara liste, yönetici ve şifre geçerli', async () => {
     const [owner, admin, troll, stranger] = await Promise.all([signUp('Oda Sahibi'), signUp('Oda Yöneticisi'), signUp('Trol'), signUp('Yabancı')]);
+    await h.sql.query('UPDATE users SET room_xp = 600 WHERE id = $1', [owner.user.id]); // Lv.4: may lock the room
     const id = await openRoom(owner, { title: 'Benim Odam', password: '1234' });
     const name = `oda-${id}`;
     assert.equal((await call('POST', '/api/rooms/admin', { room: id, user: admin.user.id, admin: true }, owner.session))[0], 200);

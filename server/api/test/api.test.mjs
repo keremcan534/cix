@@ -194,6 +194,9 @@ describe('Odalar ve ses token’ı', () => {
     const owner = await signUp('Sahip');
     const admin = await signUp('Yönetici');
     const guest = await signUp('Misafir');
+    // A password lock needs a Lv.4 room or VIP: a new account gets a 403 and no room.
+    assert.equal((await call('POST', '/api/rooms', { title: 'Gece Sohbeti', password: '1234' }, owner.session))[0], 403);
+    await h.sql.query('UPDATE users SET room_xp = 600 WHERE id = $1', [owner.user.id]);
     const [st, j] = await call('POST', '/api/rooms', { title: 'Gece Sohbeti', password: '1234' }, owner.session);
     assert.equal(st, 200, j.error);
     const room = j.room;

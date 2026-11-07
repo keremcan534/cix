@@ -292,6 +292,7 @@ export function roomOf(r: api.ServerRoom): Room {
     seatUserIds: Array(9).fill(null),
     tags: ['Canlı'],
     level: r.level ?? 1,
+    xp: r.xp ?? 0,
     roomType: (['free', 'stage', 'qa', 'music', 'event', 'private'].includes(r.roomType) ? r.roomType : 'free') as Room['roomType'],
     announcement: r.announcement || undefined,
     micCount: r.micCount ?? undefined,

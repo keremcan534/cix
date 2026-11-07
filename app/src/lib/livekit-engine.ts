@@ -37,6 +37,10 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   // My own `seat` writes the server hasn't echoed yet: their echo is not the owner or an admin moving me.
   let pendingSeats: { v: string; at: number }[] = [];
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
+  // "Mikrofon denoise": the mic is captured with these; a change takes a new mic track (recapture).
+  let denoise = true;
+  const capture = () => ({ echoCancellation: true, noiseSuppression: denoise, autoGainControl: true });
+  let recapturing: Promise<void> | null = null;
   /** Only for the room still current: a late answer from a room we already left says nothing. */
   const tell = (r: Room, e: EngineEvent) => {
     if (room === r && s.roomId) cfg.onEvent?.(s.roomId, e);
@@ -49,9 +53,11 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   };
   const setMic = (r: Room, on: boolean) => {
     if (r.state !== ConnectionState.Connected) return;
+    // A new mic track is on its way: the wanted state is put on it when it is ready.
+    if (recapturing) return void recapturing.then(() => room === r && setMic(r, s.publishing));
     // Voice muted by the server: asking LiveKit would only fail (and read as a missing phone permission).
     if (on && !grant(r).canPublish) return;
-    r.localParticipant.setMicrophoneEnabled(on).catch((e) => {
+    r.localParticipant.setMicrophoneEnabled(on, on ? capture() : undefined).catch((e) => {
       // The phone said no to the microphone: the session shows "Mikrofon izni yok" and keeps the room playing.
       const name = e instanceof Error ? e.name : '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || /permission/i.test(String(e))) tell(r, { type: 'mic_denied' });
@@ -137,7 +143,7 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   });
 
   function newRoom() {
-    const r = new Room({ dynacast: true, audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const r = new Room({ dynacast: true, audioCaptureDefaults: capture() });
     const update = () => snapshot(r);
     [RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected, RoomEvent.ParticipantAttributesChanged, RoomEvent.ParticipantNameChanged, RoomEvent.ActiveSpeakersChanged, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.TrackPublished, RoomEvent.TrackUnpublished, RoomEvent.Reconnected].forEach((ev) => r.on(ev, update));
     r.on(RoomEvent.Reconnected, () => {
@@ -224,6 +230,26 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (on) s.publishStarts++;
       s.publishing = on;
       if (room) setMic(room, on);
+    },
+    setNoiseSuppression(on) {
+      if (on === denoise) return;
+      denoise = on;
+      const r = room;
+      if (r) r.options.audioCaptureDefaults = capture();
+      // Constraints can't be changed on a live mic everywhere (the phone's WebRTC): the mic track is dropped and,
+      // when I'm speaking, taken again with the new setting. With no mic track yet, the next one uses it.
+      const track = r?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
+      if (!r || !track || recapturing) return;
+      recapturing = r.localParticipant
+        .unpublishTrack(track, true)
+        .then(
+          () => {},
+          (e) => fail('Mikrofon', e),
+        )
+        .finally(() => {
+          recapturing = null;
+          if (room === r && s.publishing) setMic(r, true);
+        });
     },
     setRoute(route) {
       // The system picks the output device; the route is kept for the session's state only.

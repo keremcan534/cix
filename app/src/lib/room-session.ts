@@ -466,6 +466,13 @@ export const setRecovery = (recovery: State['recovery']) => emit({ recovery });
 export const engineInfo = () => ({ name: engine.name, capabilities: engine.capabilities, stats: engine.stats() });
 export function setEngine(next: AudioEngine) {
   engine = next;
+  engine.setNoiseSuppression?.(denoise);
+}
+// "Mikrofon denoise" (settings.micDenoise): kept here so a new engine starts with it.
+let denoise = true;
+export function setNoiseSuppression(on: boolean) {
+  denoise = on;
+  engine.setNoiseSuppression?.(on);
 }
 export function resetSession() {
   stopTimers();
