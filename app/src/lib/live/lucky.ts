@@ -1,5 +1,5 @@
 // Uğurlu hediyeler in live mode: the server (server/api/lucky.mjs) keeps the packages and odds, takes the price,
-// gives each recipient their 20 % as diamonds, draws and pays the rewards in game coins. This phone reads the
+// gives each recipient their 20 % as diamonds, draws and pays the rewards in coins. This phone reads the
 // packages into lib/lucky (applyServerLucky), sends, and shows what the server answered.
 import * as api from '@/lib/api';
 import { applyServerUser, liveMode, once, rememberUser, toLocal, toServer } from '@/lib/live';
@@ -58,7 +58,11 @@ export async function liveLuckySend(giftId: string, toIds: string[], count: numb
   const ids = to as string[];
   const g = known.get(giftId);
   const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref));
-  applyServerUser(r, `Uğurlu hediye: ${g?.name ?? giftId} ×${count * ids.length}`);
+  // Two rows, the price and the reward, so the whole price counts as spending (store SERVER_TAKES).
+  const won = r.send.payout;
+  const what = `${g?.name ?? giftId} ×${count * ids.length}`;
+  if (won > 0) applyServerUser({ user: { ...r.user, coins: r.user.coins - won } }, `Uğurlu hediye: ${what}`);
+  applyServerUser(r, won > 0 ? `Uğurlu ödülü: ${what}` : `Uğurlu hediye: ${what}`);
   const list = records(r.send, known, Date.now());
   addServerRecords(list);
   return { records: list, replay: r.replay, send: r.send };

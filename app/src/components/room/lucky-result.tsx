@@ -35,7 +35,7 @@ export function LuckyResult({ records, still, onDone }: { records: LuckyRecord[]
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.center]} accessibilityLiveRegion="polite">
       <Animated.View
         style={[s.card, reward ? (big ? s.cardBig : s.cardWin) : s.cardNone, { opacity: v, transform: [{ scale }] }]}
-        accessibilityLabel={reward ? `Uğurlu hediye: en yüksek çarpan ${best.mult}, toplam ${reward} oyun jetonu kazandın` : 'Uğurlu hediye: bu sefer ödül çıkmadı'}
+        accessibilityLabel={reward ? `Uğurlu hediye: en yüksek çarpan ${best.mult}, toplam ${reward} jeton kazandın` : 'Uğurlu hediye: bu sefer ödül çıkmadı'}
       >
         <GiftArt giftId={best.giftId} emoji={best.emoji} size={56} textStyle={s.emoji} />
         {reward ? (
@@ -45,7 +45,7 @@ export function LuckyResult({ records, still, onDone }: { records: LuckyRecord[]
               <Icon3D name="coin" size={22} />
               <Text style={s.reward}>+{fmt(reward)}</Text>
             </View>
-            <Text style={s.note}>{records.length > 1 ? `${records.length} gönderimden ${wins} kazanç · oyun jetonu bakiyene eklendi` : 'Oyun jetonu bakiyene eklendi'}</Text>
+            <Text style={s.note}>{records.length > 1 ? `${records.length} gönderimden ${wins} kazanç · jeton bakiyene eklendi` : 'Jeton bakiyene eklendi'}</Text>
           </>
         ) : (
           <>

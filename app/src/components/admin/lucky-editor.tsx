@@ -55,7 +55,7 @@ export function LuckyEditor({
         <Text style={s.label}>Fiyat (jeton)</Text>
         <TextInput value={String(draft.price)} keyboardType="number-pad" onChangeText={(t) => onChange({ ...draft, price: Math.max(0, Math.floor(Number(t) || 0)) })} style={[s.input, { width: 100 }]} accessibilityLabel="Fiyat" />
       </View>
-      <Text style={s.label}>Olasılıklar (%). Bir çarpanı kapatmak için 0 yaz. Ödül oyun jetonu olarak ödenir.</Text>
+      <Text style={s.label}>Olasılıklar (%). Bir çarpanı kapatmak için 0 yaz. Ödül jeton olarak ödenir.</Text>
       {[0, ...LUCKY_MULTS].map((m) => (
         <View key={m} style={s.row}>
           <Text style={[s.label, { flex: 0, width: 80 }]} numberOfLines={1}>
@@ -71,7 +71,7 @@ export function LuckyEditor({
             style={[s.input, { width: 90 }]}
             accessibilityLabel={`${m ? `×${m}` : 'Ödül yok'} olasılığı`}
           />
-          <Text style={s.dim}>{m ? `${fmt(draft.price * m)} oyun jetonu` : ''}</Text>
+          <Text style={s.dim}>{m ? `${fmt(draft.price * m)} jeton` : ''}</Text>
         </View>
       ))}
       <Text style={[s.dim, { color: sum === ODDS_TOTAL ? semantic.successText : colors.gold }]}>

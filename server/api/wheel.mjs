@@ -32,8 +32,8 @@ const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT T
 /**
  * Spending that counts for Cömertlik (as the app's countsForWealth): not coin games, not coins handed on, not a
  * Jeton Noktası selling coins on (jeton.mjs) and not coins taken back for a refunded purchase ("İade: …"). The
- * part of a spend paid with reward coins ('odul') or with coins of a refunded purchase (coin_lots.refunded_by,
- * read now, so a refund drops the points the moment it lands) never counts either.
+ * part of a spend paid with reward coins ('odul'), Uğurlu hediye rewards ('ugurlu') or coins of a refunded
+ * purchase (coin_lots.refunded_by, read now, so a refund drops the points the moment it lands) never counts either.
  */
 export async function wealthPoints(c, userId) {
   const r = await c.query(
@@ -41,7 +41,7 @@ export async function wealthPoints(c, userId) {
        LEFT JOIN LATERAL (SELECT sum((p->>'amount')::bigint) AS skip
                             FROM jsonb_array_elements(coalesce(l.detail->'lots', '[]'::jsonb)) p
                             LEFT JOIN coin_lots k ON k.id = (p->>'lot')::bigint
-                           WHERE p->>'channel' = 'odul' OR k.refunded_by IS NOT NULL) x ON true
+                           WHERE p->>'channel' IN ('odul', 'ugurlu') OR k.refunded_by IS NOT NULL) x ON true
       WHERE l.user_id = $1 AND l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|transfer|jeton gönder)'
         AND l.reason !~ '^(Jeton Noktası satışı|İade:)'`,
     [userId],

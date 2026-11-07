@@ -1798,7 +1798,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
     const { records, error } = sendLuckyBatch(
       { userId: 'me', userAge: app.me.age, roomId: id, giftId, to: toIds.map((t) => ({ id: t, name: userById(t).name })), count },
-      { spend: spendCoins, credit: addCoins, reward: app.addGameCoins, blocked: spendBlock },
+      { spend: spendCoins, credit: addCoins, blocked: spendBlock },
     );
     if (!records.length) {
       errorHaptic();
@@ -1868,7 +1868,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addMsg({
         system: true,
         kind: 'gift',
-        text: settings.luckyAnnounce ? `🎉 ${ME.name} Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} oyun jetonu` : `🎉 Bir kullanıcı Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
+        text: settings.luckyAnnounce ? `🎉 ${ME.name} Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
     // Restarts the combo wheel's timer: the time of this send's last draw.

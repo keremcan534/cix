@@ -1,5 +1,6 @@
 // Uğurlu hediyeler (lucky.mjs) against a real Postgres: Cömertlik Lv.2 and 18 years, one charge per request,
-// the recipient's 20 % as diamonds and the rest a coin_spend, rewards only as game coins, replays, the daily
+// the recipient's 20 % as diamonds and the rest a coin_spend, rewards as coins that never count for Cömertlik,
+// replays, the daily
 // limit and the admins' settings (checked, versioned, audited).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -82,7 +83,7 @@ describe('Uğurlu hediyeler sunucuda', () => {
     assert.equal((await me(a.session)).coins, 1000);
   });
 
-  test('bir gönderim: alıcıya %20 elmas, kalan uygulama içi harcama, ödül sadece oyun jetonu; tekrar tek sefer', async () => {
+  test('bir gönderim: alıcıya %20 elmas, kalan uygulama içi harcama, ödül jeton; tekrar tek sefer', async () => {
     const a = await player('Gönderen', 1000);
     const b = await signUp('Alıcı');
     const ref = rnd(8);
@@ -93,17 +94,18 @@ describe('Uğurlu hediyeler sunucuda', () => {
     assert.equal(j.send.shared, 100);
     assert.equal(j.send.draws.length, 5);
     assert.equal(j.send.payout, j.send.draws.reduce((n, m) => n + m * 100, 0));
-    assert.equal(j.user.coins, 500);
-    assert.equal(j.user.gameCoins, j.send.payout);
+    assert.equal(j.user.coins, 500 + j.send.payout);
+    assert.equal(j.user.gameCoins, 0);
     assert.equal((await me(b.session)).diamonds, 100);
     const ev = (await h.sql.query('SELECT gift_id, count, unit_price, total FROM gift_events WHERE sender = $1', [a.user.id])).rows;
     assert.deepEqual(ev, [{ gift_id: 'lk2', count: 5, unit_price: '100', total: '100' }]);
-    const spend = (await h.sql.query("SELECT amount, reason FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref LIKE 'lucky:%' ORDER BY id", [a.user.id])).rows;
+    const spend = (await h.sql.query("SELECT amount, reason, channel FROM ledger WHERE user_id = $1 AND currency = 'coin' AND ref LIKE 'lucky:%' ORDER BY id", [a.user.id])).rows;
     assert.deepEqual(
       spend.map((r) => Number(r.amount)),
-      [-100, -400],
+      [-100, -400, ...(j.send.payout ? [j.send.payout] : [])],
     );
     assert.match(spend[1].reason, /^Uygulama içi: Uğurlu hediye/);
+    if (j.send.payout) assert.deepEqual([spend[2].channel, spend[2].reason.startsWith('Uğurlu ödülü')], ['ugurlu', true]);
     const income = (await h.sql.query("SELECT source_type, diamonds FROM income_events WHERE streamer_id = $1", [b.user.id])).rows;
     assert.deepEqual(income, [{ source_type: 'lucky_gift', diamonds: '100' }]);
 
@@ -111,7 +113,7 @@ describe('Uğurlu hediyeler sunucuda', () => {
     assert.equal(st2, 200);
     assert.equal(again.replay, true);
     assert.deepEqual(again.send.draws, j.send.draws);
-    assert.equal((await me(a.session)).coins, 500);
+    assert.equal((await me(a.session)).coins, 500 + j.send.payout);
     assert.equal((await me(b.session)).diamonds, 100);
   });
 
@@ -122,7 +124,8 @@ describe('Uğurlu hediyeler sunucuda', () => {
     let [st, j] = await send(a.session, { giftId: 'lk1', to: [b.user.id, c.user.id], count: 1 });
     assert.equal(st, 200, j.error);
     assert.equal(j.send.draws.length, 2);
-    assert.equal(j.user.coins, 960);
+    const coins = 960 + j.send.payout;
+    assert.equal(j.user.coins, coins);
     assert.equal((await me(b.session)).diamonds, 4);
     assert.equal((await me(c.session)).diamonds, 4);
 
@@ -134,10 +137,12 @@ describe('Uğurlu hediyeler sunucuda', () => {
     [st, j] = await send(a.session, { giftId: 'lk1', to: [c.user.id] });
     assert.equal(st, 403);
     // The recipients' shares fit, the rest doesn't: nothing of it stays.
-    [st, j] = await send(a.session, { giftId: 'lk4', to: [b.user.id] });
+    const poor = await player('Az', 1000);
+    [st, j] = await send(poor.session, { giftId: 'lk4', to: [b.user.id], count: 5 });
     assert.equal(st, 409);
     assert.match(j.error, /Yetersiz/);
-    assert.equal((await me(a.session)).coins, 960);
+    assert.equal((await me(poor.session)).coins, 1000);
+    assert.equal((await me(a.session)).coins, coins);
     assert.equal((await me(b.session)).diamonds, 4);
     assert.equal(Number((await h.sql.query('SELECT count(*) AS n FROM gift_events WHERE sender = $1', [a.user.id])).rows[0].n), 2);
   });
@@ -154,19 +159,19 @@ describe('Uğurlu hediyeler sunucuda', () => {
     [st, j] = await call('POST', '/api/admin/lucky/config', { config: DEFAULT_CONFIG, version: 99 }, adm.session);
     assert.equal(st, 409);
 
-    // Şans Yoncası always pays ×2, Uğur Böceği closed, 100 game coins a day more than the earlier tests paid.
+    // Şans Yoncası always pays ×2, Uğur Böceği closed, 2150 coins of rewards a day more than the earlier tests paid.
     const before = (await call('GET', '/api/admin/lucky', null, adm.session))[1].stats.today.paid;
     [st, j] = await save(adm, (c) => {
       c.gifts[0].tiers = sure2;
       c.gifts[1].enabled = false;
-      c.dailyPayoutLimit = before + 100;
+      c.dailyPayoutLimit = before + 2150;
       return c;
     });
     assert.equal(st, 200, j.error);
     assert.ok(j.version >= 2);
     const log = (await h.sql.query("SELECT actor, detail FROM sanction_audit_logs WHERE action = 'lucky_config' ORDER BY id DESC LIMIT 1")).rows[0];
     assert.equal(log.actor, adm.user.id);
-    assert.equal(log.detail.dailyPayoutLimit, before + 100);
+    assert.equal(log.detail.dailyPayoutLimit, before + 2150);
 
     const a = await player('Şanslı', 1000);
     const b = await signUp('B2');
@@ -177,22 +182,35 @@ describe('Uğurlu hediyeler sunucuda', () => {
     assert.equal(st, 400);
     assert.match(j.error, /kapalı/);
 
+    // A reward spent again: the first send takes every bought coin, the second is paid with its reward and adds
+    // no Cömertlik.
+    const loop = await player('Döngü', 1000);
+    [st, j] = await send(loop.session, { giftId: 'lk1', to: [b.user.id], count: 50 });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.user.coins, 2000);
+    const xp = (await me(loop.session)).wealthXp;
+    assert.ok(xp > 1000);
+    [st, j] = await send(loop.session, { giftId: 'lk1', to: [b.user.id] });
+    assert.equal(st, 200, j.error);
+    assert.equal(j.user.coins, 2020);
+    assert.equal((await me(loop.session)).wealthXp, xp);
+
     [st, j] = await send(a.session, { giftId: 'lk1', to: [b.user.id] });
     assert.equal(st, 200, j.error);
     assert.deepEqual(j.send.draws, [2]);
-    assert.equal(j.user.gameCoins, 40);
+    assert.equal(j.user.coins, 1020);
     [st, j] = await send(a.session, { giftId: 'lk1', to: [b.user.id] });
     assert.equal(st, 200, j.error);
-    // 80 paid today: one more ×2 (40) would pass 100.
+    // 2120 paid today: one more ×2 (40) would pass 2150.
     [st, j] = await send(a.session, { giftId: 'lk1', to: [b.user.id] });
     assert.equal(st, 409);
     assert.match(j.error, /Günlük ödül limiti/);
     const [, after] = await call('GET', '/api/lucky', null, a.session);
     assert.equal(after.gifts.find((g) => g.id === 'lk1').open, false);
-    assert.equal((await me(a.session)).coins, 960);
+    assert.equal((await me(a.session)).coins, 1040);
 
     const [, view] = await call('GET', '/api/admin/lucky', null, adm.session);
-    assert.equal(view.stats.today.paid, before + 80);
+    assert.equal(view.stats.today.paid, before + 2120);
     assert.ok(view.recent.length >= 2);
     assert.equal(view.recent[0].sender.id, a.user.id);
     // Put the built-in packages back for any later test.

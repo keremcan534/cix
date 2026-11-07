@@ -36,6 +36,8 @@ export const CHANNELS = {
   cevir: { label: 'Elmastan çevrildi', lock: 'jeton' },
   // Daily check-in, tasks, İlk adımlar: spent only in the shop (spendCoins `use`), so never gifted.
   odul: { label: 'Ödül jetonu', lock: 'store' },
+  // Uğurlu hediye rewards (lucky.mjs): spent like any coin; what they pay for never counts for Cömertlik.
+  ugurlu: { label: 'Uğurlu ödülü', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */

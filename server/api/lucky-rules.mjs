@@ -15,7 +15,7 @@ const tiers = (w) => {
   const rest = ODDS_TOTAL - list.reduce((n, t) => n + t.weight, 0);
   return list.map((t) => (t.mult === 0 ? { ...t, weight: rest } : t));
 };
-// The app's packages (lib/lucky.ts). Expected return about 0.65× the price, all of it game coins.
+// The app's packages (lib/lucky.ts). Expected return about 0.65× the price, paid as coins.
 const STANDARD = tiers({ 2: 15_000, 5: 3_000, 10: 800, 20: 250, 50: 60, 100: 20, 500: 2, 1000: 1 });
 export const DEFAULT_CONFIG = {
   gifts: [

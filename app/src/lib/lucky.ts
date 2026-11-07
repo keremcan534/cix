@@ -157,7 +157,7 @@ export type Wallet = {
   spend: (n: number, reason: string) => boolean;
   /** Coins back (a gift that could not go out); also the reward when there is no `reward`. */
   credit: (n: number, reason: string) => void;
-  /** Where a reward goes (the store's game coins). */
+  /** Where a reward goes (default: `credit`, the coin balance). */
   reward?: (n: number, reason: string) => void;
   blocked?: (n: number) => string | null;
 };
