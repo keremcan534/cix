@@ -95,6 +95,12 @@ jobs:
           WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
           OTP_REVIEW_EMAIL: ${{ secrets.OTP_REVIEW_EMAIL }}
           OTP_REVIEW_EMAIL_CODE: ${{ secrets.OTP_REVIEW_EMAIL_CODE }}
+          # Photo storage (Cloudflare R2, server/api/media.mjs): all five are secrets, so the log shows none of them.
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          S3_PUBLIC_URL: ${{ secrets.S3_PUBLIC_URL }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
@@ -134,12 +140,12 @@ jobs:
           $SSH "cd /opt/similar && for k in ALLOW_DEV_AUTH ALLOW_TEST_TOPUP; do
               if ! sudo grep -qx \"\$k=$v\" .env; then sudo sed -i \"/^\$k=/d\" .env; echo \"\$k=$v\" | sudo tee -a .env >/dev/null; echo \"set \$k=$v\"; fi; done"
 
-          # Mail and WhatsApp settings (env above). Only the set ones are written; an empty one leaves .env as it
+          # Mail, WhatsApp and photo storage settings (env above). Only the set ones are written; an empty one leaves .env as it
           # is, and "-" empties it on the server (KEY=), which switches that setting off again. The values travel
           # over ssh's stdin into a private temp folder and are merged into .env there: this step never echoes
           # them or puts them on a command line, and only the names of changed keys are printed.
           # Single quotes keep docker from reading $ or # in them, so a value can't hold a quote or a line break.
-          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE; do
+          lines=$(for k in MAIL_PROVIDERS MAIL_FROM BREVO_API_KEY RESEND_API_KEY WHATSAPP_NUMBER WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN OTP_REVIEW_EMAIL OTP_REVIEW_EMAIL_CODE S3_ENDPOINT S3_BUCKET S3_KEY S3_SECRET S3_PUBLIC_URL; do
               v=${!k}
               v=${v#"${v%%[![:space:]]*}"}
               v=${v%"${v##*[![:space:]]}"}
