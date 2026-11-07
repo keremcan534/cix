@@ -164,11 +164,11 @@ export async function liveExchange(diamonds: number) {
   return r.coins;
 }
 
-/** A gift to a real person, at the server's price. `room` = the LiveKit room it was sent in. */
-export async function liveGift(to: string, giftId: string, count: number, room?: string) {
+/** A gift to a real person, at the server's price. `room` = the LiveKit room it was sent in; `place` = where outside one. */
+export async function liveGift(to: string, giftId: string, count: number, room?: string, place?: api.GiftPlace) {
   const id = toServer(to);
   if (!id) throw new Error('Bu kişiye şu an ulaşılamıyor');
-  return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref)), 'Hediye gönderildi');
+  return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? place ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref, place)), 'Hediye gönderildi');
 }
 
 /** Signed out: the next account on this phone starts without this one's id, balance or pending request ids. */

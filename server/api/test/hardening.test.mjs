@@ -110,6 +110,7 @@ describe('yayın sunucusu', () => {
   test('Google Play iadesi kendiliğinden işlenir: jeton, kilitli elmas ve ajans komisyonu geri alınır; tekrar okumak bir şey değiştirmez', async () => {
     const [owner, streamer, buyer2] = await Promise.all([h.account('Ajans Sahibi'), h.account('Ajans Yayıncısı'), h.account('Alıcı 2')]);
     const agency = (await ok(call('POST', '/api/admin/agency/create', { name: 'Deneme Ajans', owner: owner.user.id }, admin.session))).agency;
+    await q("UPDATE users SET gender = 'Kadın' WHERE id = $1", [streamer.user.id]);
     await ok(call('POST', '/api/admin/agency/assign', { streamer: streamer.user.id, agencyId: agency.id, reason: 'Sözleşme imzalandı' }, admin.session));
 
     const token = `void${rnd(12)}`;

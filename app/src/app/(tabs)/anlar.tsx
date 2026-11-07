@@ -557,7 +557,7 @@ function useMomentGift() {
         return false;
       }
       try {
-        await liveGift(to.id, g.id, 1);
+        await liveGift(to.id, g.id, 1, undefined, 'moment');
       } catch (e) {
         showAlert('Hediye gönderilemedi', message(e), [{ text: 'Tamam', style: 'cancel' }, toWallet]);
         return false;
@@ -958,7 +958,7 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   card: { paddingHorizontal: 16, paddingVertical: 14, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   svipTag: { position: 'absolute', bottom: -6, left: 5, right: 5, alignItems: 'center', borderRadius: 6, paddingVertical: 1 },
-  svipText: { color: '#fff', fontSize: 8, fontWeight: '900' },
+  svipText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   name: { color: colors.text, fontWeight: '800', fontSize: 15, maxWidth: 150 },
   genderChip: { flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },

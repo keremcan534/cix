@@ -88,6 +88,25 @@ export async function liveWithdraw(w: WithdrawRequest) {
   return r.withdrawal;
 }
 
+export type JetonBank = { id: string; name: string; avatarUrl: string | null };
+export type DiamondSale = { id: number; coins: number; diamonds: number | null; valueTl: number | null; to: { id: string; name: string | null }; createdAt: string };
+
+/** The active Jeton Noktası accounts (server jeton.mjs GET /api/jeton/banks). */
+export const loadBanks = () => api.apiRequest<{ banks: JetonBank[] }>('GET', '/api/jeton/banks').then((r) => r.banks);
+
+/**
+ * Para çek → Jeton Noktası: the diamonds go to the chosen Jeton Noktası at once (server POST sell-diamonds); it
+ * pays their value in TL outside the app and gets coins for them. Only unlocked diamonds can go.
+ */
+export async function sellToBank(bank: string, diamonds: number) {
+  const r = await once(`sell:${bank}:${diamonds}`, (ref) =>
+    api.apiRequest<{ user: api.ServerUser; replay: boolean; transfer: DiamondSale }>('POST', '/api/jeton/sell-diamonds', { bank, diamonds, ref }),
+  );
+  applyServerUser(r, "Jeton Noktası'na aktarıldı");
+  void loadWithdrawals().catch(() => {});
+  return r.transfer;
+}
+
 /** Cancels a pending request; its diamonds come back. */
 export async function cancelWithdraw(id: number) {
   const r = await api.apiRequest<{ user: api.ServerUser; withdrawal: ServerWithdrawal }>('POST', '/api/wallet/withdrawals/cancel', { id });

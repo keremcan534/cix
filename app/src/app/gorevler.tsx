@@ -199,7 +199,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, dark }) => ({
   day: { width: 64, alignItems: 'center', gap: 4, paddingTop: 12, paddingBottom: 10, borderRadius: 14, backgroundColor: colors.cardAlt, borderWidth: 1.5, borderColor: 'transparent' },
   dayDone: { backgroundColor: dark ? 'rgba(31,48,80,0.5)' : 'rgba(233,239,247,0.5)' },
   daySel: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.14)' },
-  large: { position: 'absolute', top: -7, backgroundColor: semantic.money, color: semantic.moneyInk, fontSize: 8, fontWeight: '800', letterSpacing: 0.4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  large: { position: 'absolute', top: -7, backgroundColor: semantic.money, color: semantic.moneyInk, fontSize: 9, fontWeight: '800', letterSpacing: 0.4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   dayLabel: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   dayCoins: { color: colors.gold, fontSize: 12, fontWeight: '700' },
   tomorrow: { backgroundColor: dark ? 'rgba(19,217,223,0.12)' : 'rgba(0,140,148,0.07)', borderRadius: 16, padding: 14, gap: 12 },

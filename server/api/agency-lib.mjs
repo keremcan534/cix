@@ -57,6 +57,11 @@ export const DEFAULTS = {
   max_levels: 2,
   subagency_policy: { enabled: true, approval: 'center', min_active_streamers: 0 },
   join_policy: { requires_approval: true },
+  // Who may be a streamer and how they move (docs/AJANS_HIYERARSI.md, "Yayıncı kuralları"): only women's accounts
+  // (men take part through Aile); a code or link joins at once in the first pick_days days after sign-up (0 = no
+  // limit), later or once out of an agency only by a transfer the centre approves; no leaving without one; a second
+  // account on the same device goes to the agency of the first.
+  streamer_policy: { women_only: true, pick_days: 3, can_leave: false, one_agency_per_person: true },
   income_types: { gift: true, lucky_gift: true, campaign: false, bonus: false, task_reward: false, refund: true, other: false },
   commission_period: 'month',
   period_close_days: 7,
@@ -107,6 +112,15 @@ export function validateSetting(key, value, cur) {
     }
     case 'join_policy':
       return { requires_approval: bool(obj(value, key).requires_approval ?? cur.join_policy.requires_approval, 'Katılım onayı') };
+    case 'streamer_policy': {
+      const v = { ...cur.streamer_policy, ...obj(value, key) };
+      return {
+        women_only: bool(v.women_only, 'Yalnız kadın yayıncı'),
+        pick_days: whole(v.pick_days, 0, 365, 'Ajans seçme süresi (gün)'),
+        can_leave: bool(v.can_leave, 'Transfersiz ayrılma'),
+        one_agency_per_person: bool(v.one_agency_per_person, 'Aynı cihazdaki hesaplar tek ajansta'),
+      };
+    }
     case 'income_types': {
       const v = { ...cur.income_types, ...obj(value, key) };
       return Object.fromEntries(INCOME_TYPES.map((t) => [t, bool(v[t], t)]));
@@ -459,6 +473,11 @@ export async function calcEvent(c, eventId) {
   const link = await c.query('SELECT agency_id, joined_at FROM agency_streamers WHERE streamer_id = $1 AND joined_at <= $2 AND (ended_at IS NULL OR ended_at > $2) ORDER BY joined_at DESC LIMIT 1', [ev.streamer_id, t]);
   if (!link.rowCount) return (await done('no_agency'), null);
   if (!s.income_types[ev.source_type]) return (await done('excluded'), null);
+  // No agency commission through a man's account (streamer_policy.women_only).
+  if (s.streamer_policy.women_only) {
+    const g = await c.query('SELECT gender FROM users WHERE id = $1', [ev.streamer_id]);
+    if (g.rows[0]?.gender === 'Erkek') return (await done('excluded'), null);
+  }
 
   const chain = await chainAt(c, link.rows[0].agency_id, t);
   const { eff, rows, cap } = await effectiveChain(c, chain, t, s);

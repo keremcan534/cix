@@ -422,9 +422,15 @@ export type CatalogBody = {
 };
 /** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed). */
 export const catalog = () => call<CatalogBody>('GET', '/api/catalog');
-/** A gift at the server's price; `room` = sent on stage (no push to the recipient). */
-export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef()) =>
-  call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', { to, giftId, count, room, ref });
+/** Where a gift outside a room was sent from (Gelir's sources on the server). */
+export type GiftPlace = 'chat' | 'moment' | 'profile';
+/** A gift at the server's price; `room` = sent on stage (no push to the recipient); `place` = where, outside a room. */
+export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef(), place?: GiftPlace) =>
+  call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', { to, giftId, count, room, ref, ...(place && !room ? { place } : {}) });
+/** Gelir's sources: the diamonds earned in the period, by where they came from (server wallet.mjs). */
+export type IncomeSource = { key: string; label: string; diamonds: number; count: number; live: boolean };
+export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
+export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);
 

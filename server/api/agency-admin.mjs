@@ -41,7 +41,20 @@ import {
   usdOf,
   validateSetting,
 } from './agency-lib.mjs';
-import { approveAgency, approveTransfer, checkCanFoundSub, linkStreamer, moveParent, namesFor, payoutStep, rejectTransfer, setStatus, transferView, unlinkStreamer } from './agency-ops.mjs';
+import {
+  approveAgency,
+  approveTransfer,
+  checkCanFoundSub,
+  firstAgencyOfPerson,
+  linkStreamer,
+  moveParent,
+  namesFor,
+  payoutStep,
+  rejectTransfer,
+  setStatus,
+  transferView,
+  unlinkStreamer,
+} from './agency-ops.mjs';
 import { applyTier, calcPending, runPerformance } from './agency-perf.mjs';
 import { PLAY_PAYOUT, insertAgency, playMoneyOn } from './agency.mjs';
 
@@ -136,6 +149,47 @@ export async function runJobs(now = new Date()) {
     });
   }
   out.expired = (await db.query("UPDATE agency_transfers SET status = 'cancelled', decided_at = now(), decision_note = 'Süresi doldu' WHERE status = 'pending' AND created_at < now() - make_interval(days => greatest(30, $1::int + 1))", [s.transfer_policy.decision_days])).rowCount;
+  Object.assign(out, await streamerPolicyJobs(s));
+  return out;
+}
+
+/**
+ * streamer_policy on links made before it (or around it): a man's account leaves its agency (women_only); an
+ * account that joined an agency by its own choice while the same person's earlier account was in another goes
+ * to that first agency (one_agency_per_person). Links made by a transfer or by the centre stay where they are.
+ */
+export async function streamerPolicyJobs(s) {
+  const out = { policyGender: 0, multiAccount: 0 };
+  if (s.streamer_policy.women_only) {
+    const r = await db.query("UPDATE agency_streamers m SET ended_at = now(), end_reason = 'policy_gender' FROM users u WHERE u.id = m.streamer_id AND m.ended_at IS NULL AND u.gender = 'Erkek' RETURNING m.agency_id");
+    out.policyGender = r.rowCount;
+    for (const id of new Set(r.rows.map((x) => x.agency_id))) await notice(db, id, 'status', 'Erkek hesaplar ajanstan çıkarıldı', 'Ajanslarda yalnız kadın hesaplar yayıncı olabilir; erkek hesaplar katkısını Aile üyesi olarak verir.');
+  }
+  if (!s.streamer_policy.one_agency_per_person) return out;
+  const dup = await db.query(
+    `SELECT m.streamer_id FROM agency_streamers m WHERE m.ended_at IS NULL AND m.method IN ('code', 'link', 'invite', 'application')
+        AND EXISTS (SELECT 1 FROM agency_streamers o JOIN agencies a ON a.id = o.agency_id
+                     WHERE o.ended_at IS NULL AND a.status = 'approved' AND o.agency_id <> m.agency_id AND o.joined_at < m.joined_at
+                       AND o.streamer_id IN (SELECT d2.user_id FROM device_accounts d1 JOIN device_accounts d2 ON d2.device_id = d1.device_id
+                                              WHERE d1.user_id = m.streamer_id AND d2.user_id <> m.streamer_id))`,
+  );
+  for (const { streamer_id: id } of dup.rows) {
+    try {
+      await tx(async (c) => {
+        const cur = (await c.query('SELECT agency_id FROM agency_streamers WHERE streamer_id = $1 AND ended_at IS NULL FOR UPDATE', [id])).rows[0];
+        const first = await firstAgencyOfPerson(c, id);
+        if (!cur || !first || first.id === cur.agency_id) return;
+        await unlinkStreamer(c, id, 'multi_account');
+        await linkStreamer(c, id, first, 'transfer', null);
+        await audit(c, null, 'streamer.multi_account', 'streamer', id, { before: { agency: cur.agency_id }, after: { agency: first.id } });
+        await notice(c, cur.agency_id, 'transfer', 'Bir yayıncın ilk ajansına taşındı', 'Aynı kişinin bu cihazdaki ilk hesabı başka bir ajansta; ikinci hesap da oraya bağlanır.');
+        await notice(c, first.id, 'transfer', 'Yayıncının ikinci hesabı ajansına bağlandı', '');
+        out.multiAccount++;
+      });
+    } catch (e) {
+      console.error('agency multi-account', String(e?.message ?? e).slice(0, 200));
+    }
+  }
   return out;
 }
 

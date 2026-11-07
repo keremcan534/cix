@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,8 +9,9 @@ import { Text, TextInput } from '@/components/text';
 import { Button, Card, Header } from '@/components/ui';
 import { RULES, usd } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
+import { diamondValueTl } from '@/lib/coins-bank';
 import { liveMode, message } from '@/lib/live';
-import { cancelWithdraw, liveWithdraw, useServerWithdrawals, type ServerWithdrawal } from '@/lib/live/withdraw';
+import { cancelWithdraw, liveWithdraw, loadBanks, sellToBank, useServerWithdrawals, type JetonBank, type ServerWithdrawal } from '@/lib/live/withdraw';
 import { blockedFeature } from '@/lib/remote-control';
 import { suggestedWithdraw, withdrawPresets } from '@/lib/withdraw-form';
 import { checkWithdraw, formatIban, maskAccount, withdrawUsd, type WithdrawMethod } from '@/lib/withdraw-rules';
@@ -17,10 +19,14 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
-const METHODS: [WithdrawMethod, string][] = [
+/** How the diamonds leave: a payout request (IBAN, other) or straight to a Jeton Noktası, who pays in TL. */
+type Way = WithdrawMethod | 'jeton';
+const METHODS: [Way, string][] = [
   ['iban', 'IBAN'],
+  ['jeton', 'Jeton Noktası'],
   ['other', 'Diğer'],
 ];
+const tl = (v: number) => `${v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
 /** A USD amount as the server sends it ("$10.01"). */
 const money = (v: number) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -42,7 +48,28 @@ export default function Withdraw() {
   const [typed, setTyped] = useState<string | null>(null);
   const amount = typed ?? (suggested ? String(suggested) : '');
   const setAmount = (t: string) => setTyped(t);
-  const [method, setMethod] = useState<WithdrawMethod>('iban');
+  // Gelir → Jeton Noktası opens this screen with the Jeton Noktası way chosen (?yol=jeton).
+  const { yol } = useLocalSearchParams<{ yol?: string }>();
+  const [way, setWay] = useState<Way>(live && yol === 'jeton' ? 'jeton' : 'iban');
+  const jeton = way === 'jeton';
+  const method: WithdrawMethod = jeton ? 'iban' : way;
+  const [banks, setBanks] = useState<JetonBank[] | null>(null);
+  const [bank, setBank] = useState<JetonBank | null>(null);
+  // The list is read the first time the Jeton Noktası way is shown.
+  useEffect(() => {
+    if (!jeton || banks) return;
+    let on = true;
+    loadBanks()
+      .then((b) => on && setBanks(b))
+      .catch((e) => {
+        if (!on) return;
+        setBanks([]);
+        showAlert('Jeton Noktaları yüklenemedi', message(e));
+      });
+    return () => {
+      on = false;
+    };
+  }, [jeton, banks]);
   const [account, setAccount] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -69,8 +96,33 @@ export default function Withdraw() {
   const styles = useStyles();
   // Live mode: one request at a time; a new one waits until the pending one is settled or cancelled.
   const pending = live ? server.list.find((w) => w.status === 'pending') : undefined;
+  // Jeton Noktası: no payout limits (it is a sale), only the exchange minimum and the unlocked balance.
+  const jetonMin = RULES.exchangeMinDiamonds;
+  const jetonOk = n >= jetonMin && n <= diamonds;
+  const jetonPresets = [1_000, 10_000, 100_000].filter((p) => p >= jetonMin && p <= diamonds);
+
+  const sell = () => {
+    if (busy || blockedFeature('withdraw')) return;
+    if (!bank) return showAlert('Jeton Noktası seç', 'Elmaslarını aktaracağın Jeton Noktasını seç.');
+    if (!Number.isSafeInteger(n) || n < jetonMin) return showAlert('Hata', `En az ${fmt(jetonMin)} elmas aktarabilirsin.`);
+    if (n > diamonds) return showAlert('Hata', 'Çekilebilir elmasın yetmiyor. Kilitli elmaslar süresi dolunca eklenir.');
+    showAlert(`${bank.name} Jeton Noktası`, `${fmt(n)} elmas hemen ${bank.name} hesabına geçer. Karşılığı yaklaşık ${tl(diamondValueTl(n))}; ödemeyi Jeton Noktası uygulama dışında yapar. Onaylıyor musun?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Aktar',
+        onPress: () => {
+          setBusy(true);
+          sellToBank(bank.id, n)
+            .then((t) => showAlert('Aktarıldı', `${fmt(t.diamonds ?? n)} elmas ${bank.name} hesabına geçti. Sana ödeyeceği tutar: ${tl(t.valueTl ?? diamondValueTl(n))}. Ödeme için Jeton Noktası ile görüş.`))
+            .catch((e) => showAlert('Aktarılamadı', message(e)))
+            .finally(() => setBusy(false));
+        },
+      },
+    ]);
+  };
 
   const submit = () => {
+    if (jeton) return sell();
     if (live) {
       if (busy || blockedFeature('withdraw')) return;
       if (pending) return showAlert('Bekleyen talebin var', 'Bekleyen talebin sonuçlanınca ya da onu iptal edince yenisini açabilirsin.');
@@ -146,18 +198,20 @@ export default function Withdraw() {
           placeholderTextColor={colors.textDim}
         />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {presets.map((p) => (
+          {(jeton ? jetonPresets : presets).map((p) => (
             <Pressable key={p} style={styles.chip} onPress={() => setAmount(String(p))}>
               <Text style={styles.chipText}>{p.toLocaleString('tr-TR')}</Text>
             </Pressable>
           ))}
-          {cap >= minD && (
-            <Pressable style={styles.chip} onPress={() => setAmount(String(cap))}>
+          {(jeton ? diamonds >= jetonMin : cap >= minD) && (
+            <Pressable style={styles.chip} onPress={() => setAmount(String(jeton ? diamonds : cap))}>
               <Text style={styles.chipText}>Tümü</Text>
             </Pressable>
           )}
         </View>
-        {!enough ? (
+        {jeton ? (
+          jetonOk && <Text style={styles.receive}>Jeton Noktası sana ödeyecek: ≈ {tl(diamondValueTl(n))}</Text>
+        ) : !enough ? (
           <Text style={styles.dim}>
             Para çekmek için en az {fmt(RULES.minWithdrawDiamonds)} çekilebilir elmas gerekli; {fmt(RULES.minWithdrawDiamonds - diamonds)} elmas daha biriktirmelisin.
           </Text>
@@ -168,15 +222,43 @@ export default function Withdraw() {
         {live && (
           <View style={{ flexDirection: 'row', gap: 8 }} accessibilityRole="radiogroup">
             {METHODS.map(([k, l]) => (
-              <Pressable key={k} style={[styles.chip, method === k && styles.chipOn]} onPress={() => setMethod(k)} accessibilityRole="radio" accessibilityState={{ selected: method === k }}>
-                <Text style={[styles.chipText, method === k && styles.chipTextOn]}>{l}</Text>
+              <Pressable key={k} style={[styles.chip, way === k && styles.chipOn]} onPress={() => setWay(k)} accessibilityRole="radio" accessibilityState={{ selected: way === k }}>
+                <Text style={[styles.chipText, way === k && styles.chipTextOn]}>{l}</Text>
               </Pressable>
             ))}
           </View>
         )}
-        <Text style={styles.label}>Hesap sahibi</Text>
-        <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.textDim} style={styles.input} />
-        {method === 'iban' ? (
+        {jeton ? (
+          <>
+            <Text style={styles.label}>Jeton Noktası</Text>
+            {banks === null ? (
+              <Text style={styles.dim}>Jeton Noktaları yükleniyor…</Text>
+            ) : banks.length === 0 ? (
+              <Text style={styles.dim}>Şu an aktif Jeton Noktası yok.</Text>
+            ) : (
+              <Card style={{ gap: 2, paddingVertical: 6 }}>
+                {banks.map((b) => (
+                  <Pressable key={b.id} style={styles.bankRow} onPress={() => setBank(b)} accessibilityRole="radio" accessibilityState={{ selected: bank?.id === b.id }}>
+                    <View style={styles.bankIcon}>
+                      <Ionicons name="storefront-outline" size={18} color={colors.primary} />
+                    </View>
+                    <Text style={{ color: colors.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                      {b.name}
+                    </Text>
+                    <Ionicons name={bank?.id === b.id ? 'radio-button-on' : 'radio-button-off'} size={20} color={bank?.id === b.id ? colors.primary : colors.textDim} />
+                  </Pressable>
+                ))}
+              </Card>
+            )}
+            <Text style={styles.dim}>Elmaslar hemen seçtiğin Jeton Noktasına geçer. Karşılığını Jeton Noktası uygulama dışında sana öder; kayıt iki tarafta da görünür.</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.label}>Hesap sahibi</Text>
+            <TextInput value={name} onChangeText={setName} placeholder="Ad Soyad" placeholderTextColor={colors.textDim} style={styles.input} />
+          </>
+        )}
+        {jeton ? null : method === 'iban' ? (
           <>
             <Text style={styles.label}>IBAN</Text>
             <TextInput value={formatIban(account)} onChangeText={setAccount} autoCapitalize="characters" autoCorrect={false} style={styles.input} placeholder="Ülke kodu ile, ör. GB82 WEST 1234 …" placeholderTextColor={colors.textDim} />
@@ -188,8 +270,13 @@ export default function Withdraw() {
           </>
         )}
 
-        <Button title={busy ? 'Gönderiliyor…' : 'Çekim talebi oluştur'} icon="cash" onPress={submit} disabled={!enough || busy} />
-        {live && <Text style={styles.dim}>Talep açılınca elmaslar bakiyenden düşer. Ödeme yapılınca ya da talep reddedilirse haber verilir; reddedilen veya iptal edilen talebin elmasları geri gelir.</Text>}
+        <Button
+          title={busy ? 'Gönderiliyor…' : jeton ? "Jeton Noktası'na aktar" : 'Çekim talebi oluştur'}
+          icon={jeton ? 'swap-horizontal' : 'cash'}
+          onPress={submit}
+          disabled={busy || (jeton ? !jetonOk || !bank : !enough)}
+        />
+        {live && !jeton && <Text style={styles.dim}>Talep açılınca elmaslar bakiyenden düşer. Ödeme yapılınca ya da talep reddedilirse haber verilir; reddedilen veya iptal edilen talebin elmasları geri gelir.</Text>}
 
         {live
           ? server.list.length > 0 && (
@@ -250,4 +337,6 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   histRow: { gap: 4, paddingVertical: 4 },
   locked: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  bankRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  bankIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
 }));

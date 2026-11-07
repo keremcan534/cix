@@ -22,6 +22,8 @@ describe('Ajans daveti: yayıncıyı adıyla bul', () => {
   test('ad ile bulunur, kimlikle davet edilir; engel, yetki ve ajans durumu', async () => {
     const [admin, owner, deniz, other, outsider] = await Promise.all(['Merkez', 'Ajans Sahibi', 'Davet Deniz', 'Deniz Kaya', 'Yabancı'].map(account));
     await h.sql.query("UPDATE users SET role = 'admin' WHERE id = $1", [admin.id]);
+    // Only women's accounts are offered and may be invited (streamer_policy.women_only).
+    await h.sql.query("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [[deniz.id, other.id]]);
     const A = ok(await admin.post('/api/admin/agency/create', { name: 'Deniz Ajans', owner: owner.id })).agency;
 
     // No username on any of them: the name the app shows finds them, case aside; the exact name comes first.

@@ -279,7 +279,7 @@ export default function UserProfile() {
         return false;
       }
       try {
-        await liveGift(user.id, g.id, 1);
+        await liveGift(user.id, g.id, 1, undefined, 'profile');
       } catch (e) {
         errorHaptic();
         showAlert('Hediye gönderilemedi', message(e), [

@@ -1,7 +1,9 @@
 // The agency entry when the app talks to our server (ajans/index.tsx shows it when apiEnabled()): the agencies I
-// run or work for, the centre's entry for platform staff, my membership as a streamer (move or leave with a
-// reason), invites and my join requests, joining by code, and applying to found an agency. Every decision is the
-// server's (server/api/agency.mjs); without a server connection the labelled example data is shown.
+// run or work for, the centre's entry for platform staff, my membership as a streamer (move with a reason; leave
+// only where the centre allows it), invites and my join requests, joining by code (at once), and applying to found
+// an agency. The streamer rules (server agency-ops.mjs): only women's accounts stream; after the first days a
+// streamer with no agency stays with the centre and joins only by a transfer the centre approves. Every decision
+// is the server's (server/api/agency.mjs); without a server connection the labelled example data is shown.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
@@ -17,6 +19,7 @@ import { Button, Header } from '@/components/ui';
 import { demoMe } from '@/data/agency-net-demo';
 import { LEVEL_TEXT, PARTY_TEXT, STATUS_TEXT, TRANSFER_STATUS, TRANSFER_TEXT, VIEWER_TEXT, agencyNet, errorText, fmtDate, runAction, unavailable, useNet, type Me, type Transfer } from '@/lib/agency-net';
 import { showAlert } from '@/lib/alert';
+import { updateProfile } from '@/lib/api';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
@@ -126,7 +129,7 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
         </ListGroup>
       )}
 
-      {!d.membership && <JoinOrApply demo={demo} reload={reload} hasAgency={d.agencies.length > 0} />}
+      {!d.membership && <JoinOrApply d={d} demo={demo} reload={reload} askFor={askFor} />}
     </View>
   );
 }
@@ -137,6 +140,8 @@ function Membership({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload:
     const r = await askFor({ title: 'Başka ajansa geç', message: 'Yeni ajansın kodunu yaz. Mevcut ajansın, yeni ajans ve gerekirse merkez onaylar; ücret kuralı sunucuda belirlenir. Geçmiş kazançların değişmez.', field: { label: 'Yeni ajans kodu', placeholder: 'Örn. MVD4K2' }, confirm: 'Talep gönder', place: 'agency.transfer' });
     if (r) await runAction(demo, () => agencyNet.transfer(r.field.toUpperCase(), r.reason), 'Transfer talebin gönderildi.', reload);
   };
+  // Older servers send no rules: leaving stays offered there.
+  const canLeave = d.streamer?.canLeave ?? true;
   const leave = async () => {
     const r = await askFor({ title: 'Ajanstan ayrıl', message: 'Ayrılma talebin ajansına ve gerekirse merkeze iletilir. Bu sürede kazandığın komisyon kayıtları silinmez.', confirm: 'Ayrılma talebi', danger: true, place: 'agency.transfer' });
     if (r) await runAction(demo, () => agencyNet.transfer(null, r.reason), 'Ayrılma talebin gönderildi.', reload);
@@ -163,9 +168,10 @@ function Membership({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload:
         ) : (
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Button title="Ajans değiştir" variant="tonal" small icon="swap-horizontal" onPress={move} style={{ flex: 1 }} />
-            <Button title="Ayrıl" variant="danger" small icon="exit-outline" onPress={leave} style={{ flex: 1 }} />
+            {canLeave && <Button title="Ayrıl" variant="danger" small icon="exit-outline" onPress={leave} style={{ flex: 1 }} />}
           </View>
         )}
+        {!canLeave && !d.transfer && <Text style={st.note}>Ajanstan ayrılmak için başka bir ajansa transfer talebi oluşturman gerekir.</Text>}
       </Panel>
     </Section>
   );
@@ -180,7 +186,7 @@ export function TransferCard({ t }: { t: Transfer }) {
       </View>
       {!!(t.streamer?.name ?? t.agency?.name) && <Text style={[ns.title, { fontSize: 14 }]}>{t.streamer?.name ?? t.agency?.name}</Text>}
       <Text style={ns.dim}>
-        {t.from?.name ?? '—'}
+        {t.from?.name ?? (t.kind === 'streamer_move' ? 'Merkez hesabı' : '—')}
         {t.to ? ` → ${t.to.name ?? '—'}` : t.kind === 'independence' ? ' → bağımsız üst ajans' : t.kind === 'streamer_leave' ? ' → ajanssız' : ''}
       </Text>
       <View style={st.pills}>
@@ -195,8 +201,8 @@ export function TransferCard({ t }: { t: Transfer }) {
   );
 }
 
-function JoinOrApply({ demo, reload, hasAgency }: { demo: boolean; reload: () => void; hasAgency: boolean }) {
-  const [mode, setMode] = useState<'join' | 'apply'>(hasAgency ? 'apply' : 'join');
+function JoinOrApply({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: () => void; askFor: ReturnType<typeof useAsk>[1] }) {
+  const [mode, setMode] = useState<'join' | 'apply'>(d.agencies.length > 0 ? 'apply' : 'join');
   return (
     <View style={{ gap: space.md }}>
       <Tabs
@@ -207,14 +213,72 @@ function JoinOrApply({ demo, reload, hasAgency }: { demo: boolean; reload: () =>
           { key: 'apply', label: 'Ajans kur' },
         ]}
       />
-      {mode === 'join' ? <Join demo={demo} reload={reload} /> : <Apply demo={demo} reload={reload} />}
+      {mode === 'apply' ? <Apply demo={demo} reload={reload} /> : <StreamerJoin d={d} demo={demo} reload={reload} askFor={askFor} />}
     </View>
   );
 }
 
-function Join({ demo, reload }: { demo: boolean; reload: () => void }) {
+/** What the join tab offers by the streamer rules: pick a gender, the women-only note, a transfer from the centre, or the code. */
+function StreamerJoin({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: () => void; askFor: ReturnType<typeof useAsk>[1] }) {
+  const s = d.streamer;
+  if (s && !s.eligible && !s.gender) return <PickGender demo={demo} reload={reload} />;
+  if (s && !s.eligible)
+    return (
+      <Panel>
+        <Text style={ns.title}>Ajanslar kadın yayıncılar için</Text>
+        <Text style={ns.dim}>Ajanslarda yalnız kadın hesaplar yayıncı olabilir. Erkek hesaplar katkısını Aile üyesi olarak verir.</Text>
+        <Button title="Aileye git" variant="tonal" icon="people-outline" onPress={() => router.push('/aile' as Href)} />
+      </Panel>
+    );
+  if (s?.held) {
+    if (d.transfer) return <TransferCard t={d.transfer} />;
+    const request = async () => {
+      const r = await askFor({
+        title: 'Ajansa geçiş talebi',
+        message: 'Geçmek istediğin ajansın kodunu yaz. Önce ajans, sonra merkez onaylar; onaylanınca üyeliğin başlar.',
+        field: { label: 'Ajans kodu', placeholder: 'Örn. MVD4K2' },
+        confirm: 'Talep gönder',
+        place: 'agency.transfer',
+      });
+      if (r) await runAction(demo, () => agencyNet.transfer(r.field.toUpperCase(), r.reason), 'Transfer talebin gönderildi.', reload);
+    };
+    return (
+      <Panel>
+        <View style={ns.rowBetween}>
+          <Text style={[ns.title, { flex: 1 }]}>Merkez hesabındasın</Text>
+          <Pill text="Transferle geçiş" tone="money" icon="swap-horizontal" />
+        </View>
+        <Text style={ns.dim}>
+          Kayıttan sonraki {s.pickDays} gün içinde bir ajansa katılmadığın için merkez hesabına bağlısın. Bir ajansa ancak transfer talebiyle geçebilirsin; talebi ajans ve merkez onaylar.
+        </Text>
+        <Button title="Transfer talebi oluştur" icon="swap-horizontal" onPress={request} />
+      </Panel>
+    );
+  }
+  return <Join demo={demo} reload={reload} pickUntil={s?.pickUntil ?? null} />;
+}
+
+/** The gender is chosen once (the server refuses a change); only women's accounts can join an agency. */
+function PickGender({ demo, reload }: { demo: boolean; reload: () => void }) {
+  const pick = (g: 'Kadın' | 'Erkek') =>
+    showAlert('Cinsiyetin: ' + g, 'Cinsiyet bir kez seçilir ve sonradan değiştirilemez. Emin misin?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Onayla', onPress: () => void runAction(demo, () => updateProfile({ gender: g }), undefined, reload) },
+    ]);
+  return (
+    <Panel>
+      <Text style={ns.title}>Önce cinsiyetini seç</Text>
+      <Text style={ns.dim}>Ajanslarda yalnız kadın hesaplar yayıncı olabilir. Cinsiyet bir kez seçilir.</Text>
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <Button title="Kadın" variant="tonal" onPress={() => pick('Kadın')} style={{ flex: 1 }} />
+        <Button title="Erkek" variant="tonal" onPress={() => pick('Erkek')} style={{ flex: 1 }} />
+      </View>
+    </Panel>
+  );
+}
+
+function Join({ demo, reload, pickUntil }: { demo: boolean; reload: () => void; pickUntil: string | null }) {
   const [code, setCode] = useState('');
-  const [note, setNote] = useState('');
   const [found, setFound] = useState<{ id: string; name: string; code: string; level: number; parentName: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const look = async () => {
@@ -232,7 +296,8 @@ function Join({ demo, reload }: { demo: boolean; reload: () => void }) {
   return (
     <Panel>
       <Text style={ns.title}>Davet koduyla katıl</Text>
-      <Text style={ns.dim}>Ajansının verdiği kodu yaz. Ajans onaylayınca üyeliğin başlar; aynı anda tek ajansa bağlı olabilirsin.</Text>
+      <Text style={ns.dim}>Ajansının verdiği kodu yaz; onaylayınca hemen ajansa katılırsın. Aynı anda tek ajansa bağlı olabilirsin, ayrılmak için transfer talebi gerekir.</Text>
+      {!!pickUntil && <Text style={st.note}>{fmtDate(pickUntil)} tarihine kadar kodla doğrudan katılabilirsin; sonra yalnız merkezin onayladığı transferle.</Text>}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <TextInput
           value={code}
@@ -260,16 +325,34 @@ function Join({ demo, reload }: { demo: boolean; reload: () => void }) {
           </View>
         </View>
       )}
-      {found && <TextInput value={note} onChangeText={setNote} placeholder="Ajansa kısa bir not (isteğe bağlı)" placeholderTextColor={colors.textDim} maxLength={300} style={ns.input} />}
       <Button
-        title="Katılma isteği gönder"
+        title="Ajansa katıl"
         disabled={!found}
         onPress={() => {
           if (!found) return;
-          // The agency reads the note: contact details are refused before anything is sent.
-          const refusal = contactRefusal(note.trim(), 'agency.join');
-          if (refusal) return showAlert(CONTACT_TITLE, refusal);
-          void runAction(demo, () => agencyNet.join(found.code, 'code', note || undefined), 'İsteğin ajansa iletildi.', reload);
+          showAlert('Ajansa katıl', `${found.name} ajansına katılacaksın. Sonradan ayrılmak için transfer talebi gerekir.`, [
+            { text: 'Vazgeç', style: 'cancel' },
+            {
+              text: 'Katıl',
+              onPress: () => {
+                let done = `${found.name} ajansına katıldın.`;
+                void runAction(
+                  demo,
+                  async () => {
+                    const r = await agencyNet.join(found.code, 'code');
+                    // A second account on the same phone goes to the first account's agency (server rule).
+                    if (r.sameDevice && r.membership) done = `Bu telefondaki ilk hesabın ${r.membership.agency.name} ajansında; bu hesap da oraya bağlandı.`;
+                    else if (r.request) done = 'İsteğin ajansa iletildi.';
+                  },
+                  undefined,
+                  () => {
+                    showAlert('Tamam', done);
+                    reload();
+                  },
+                );
+              },
+            },
+          ]);
         }}
       />
     </Panel>

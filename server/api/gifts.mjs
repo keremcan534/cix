@@ -1,7 +1,7 @@
 // Gifts at the server's price, and the rankings they feed.
 //
 //   GET  /api/catalog                                             → { gifts, counts, packs, svipXp, purchases, campaign, exchange, v }
-//   POST /api/gifts/send  { to, giftId, count, room?, ref }       → { user, replay, total }
+//   POST /api/gifts/send  { to, giftId, count, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile)
 //   GET  /api/rankings?board=wealth|charm&period=day|week|month   → { rows }
 //
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
@@ -31,6 +31,7 @@ import { roomLevel } from './rooms.mjs';
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
 const PERIODS = ['day', 'week', 'month'];
+export const PLACES = ['chat', 'moment', 'profile'];
 /** A server room's LiveKit name (rooms.mjs liveKitName), from its id or that name; null for anything else. */
 export const liveKitRoom = (room) => {
   const m = /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(room ?? '');
@@ -79,6 +80,8 @@ export const giftRoutes = {
     if (to === u.id) throw new HttpError(400, 'Kendine hediye gönderemezsin');
     const room = b.room === undefined || b.room === null ? null : String(b.room);
     if (room !== null && !ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
+    // Outside a room, where it was sent (Gelir's sources); older apps send none.
+    const place = room === null && PLACES.includes(b.place) ? b.place : null;
     if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} İnci ${gift.minSvip} ve üstü için`);
     if (await blockedBetween(u.id, to)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
     const total = gift.price * count;
@@ -92,7 +95,17 @@ export const giftRoutes = {
       await claimRef(c, u.id, 'coin', b.ref);
       // After the ref check: a retry of a gift that went through before the hide gets its replay, not a 400.
       if (s.giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
-      const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [u.id, to, gift.id, count, gift.price, total, room, b.ref]);
+      const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, place, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id', [
+        u.id,
+        to,
+        gift.id,
+        count,
+        gift.price,
+        total,
+        room,
+        place,
+        b.ref,
+      ]);
       eventId = Number(g.rows[0].id);
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });

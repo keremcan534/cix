@@ -213,7 +213,7 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.cardAlt, borderColor: colors.cardAlt },
   chipText: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  freeNote: { color: colors.textDim, fontSize: 10, textAlign: 'center', paddingBottom: 4 },
+  freeNote: { color: colors.textDim, fontSize: 11, textAlign: 'center', paddingBottom: 4 },
   empty: { color: colors.textDim, padding: 12 },
   sub: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
   fx: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 5 },
@@ -225,6 +225,6 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   free: { color: semantic.successText, fontSize: 10, fontWeight: '800' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   price: { color: colors.gold, fontSize: 10, fontWeight: '800' },
-  kind: { color: colors.textDim, fontSize: 9 },
+  kind: { color: colors.textDim, fontSize: 10 },
   unlock: { alignSelf: 'center', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8, marginBottom: 6 },
 }));

@@ -1,7 +1,7 @@
-// Ajans Merkezi → Genel: the centre's own two moves on the agency network (docs/AJANS_HIYERARSI.md "merkez
-// ataması"): create an agency for a partner (approved at once, server/api/agency-admin.mjs POST create) and link a
-// streamer to an agency or take them out of one (POST assign, with a written reason). The server checks the right
-// (agencies.manage) and every rule; a refusal is shown as it comes. People are found with the Yaptırımlar search
+// Ajans Merkezi → Genel: the centre's own move on the agency network (docs/AJANS_HIYERARSI.md "merkez ataması"):
+// create an agency for a partner (approved at once, server/api/agency-admin.mjs POST create). Assigning streamers
+// by hand is gone from the app: a streamer joins by code in the first days, later only by a transfer the centre
+// approves (Transferler). The server checks the right (agencies.manage) and every rule; a refusal is shown as it comes. People are found with the Yaptırımlar search
 // (name, username, phone, e-mail or account id), which needs sanction.view; an account id can always be pasted.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ReactNode } from 'react';
@@ -20,7 +20,6 @@ import { sanctionSearch } from '@/lib/live/admin';
 import { colors, fonts, radius, semantic, space } from '@/theme';
 
 type Person = { id: string; name: string; sub?: string };
-type Mode = 'create' | 'assign';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROLE_TEXT: Record<string, string> = {
   user: 'Üye',
@@ -30,19 +29,17 @@ const ROLE_TEXT: Record<string, string> = {
 };
 
 export function CenterActions({ nodes, demo, after }: { nodes: TreeNode[]; demo: boolean; after: () => void }) {
-  const [mode, setMode] = useState<Mode | null>(null);
-  const open = (m: Mode) => (demo ? void runAction(true, async () => {}) : setMode(m));
+  const [on, setOn] = useState(false);
+  const open = () => (demo ? void runAction(true, async () => {}) : setOn(true));
   return (
     <View style={{ flexDirection: 'row', gap: space.sm }}>
-      <Button small variant="tonal" icon="add-circle-outline" title="Ajans oluştur" onPress={() => open('create')} style={{ flex: 1 }} />
-      <Button small variant="tonal" icon="person-add-outline" title="Yayıncı ata" onPress={() => open('assign')} style={{ flex: 1 }} />
-      {mode && (
-        <ActionSheet
-          mode={mode}
+      <Button small variant="tonal" icon="add-circle-outline" title="Ajans oluştur" onPress={open} style={{ flex: 1 }} />
+      {on && (
+        <CreateSheet
           nodes={nodes}
-          close={() => setMode(null)}
+          close={() => setOn(false)}
           done={() => {
-            setMode(null);
+            setOn(false);
             after();
           }}
         />
@@ -51,42 +48,27 @@ export function CenterActions({ nodes, demo, after }: { nodes: TreeNode[]; demo:
   );
 }
 
-function ActionSheet({ mode, nodes, close, done }: { mode: Mode; nodes: TreeNode[]; close: () => void; done: () => void }) {
+function CreateSheet({ nodes, close, done }: { nodes: TreeNode[]; close: () => void; done: () => void }) {
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
   const [person, setPerson] = useState<Person | null>(null);
-  const [agencyId, setAgencyId] = useState('');
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const tops = nodes.filter((n) => n.level === 1 && n.status === 'approved');
-  const open = nodes.filter((n) => n.status === 'approved');
-  const create = mode === 'create';
-  const ok = create ? name.trim().length >= 2 : !!person && reason.trim().length >= 5;
+  const ok = name.trim().length >= 2;
 
   const submit = async () => {
     if (!ok || busy) return;
     setBusy(true);
     let made: { name: string; code: string } | null = null;
-    const sent = create
-      ? await runAction(false, async () => {
-          made = (
-            await centerNet.create({
-              name: name.trim(),
-              ...(person ? { owner: person.id } : {}),
-              ...(parentId ? { parentId } : {}),
-            })
-          ).agency;
+    const sent = await runAction(false, async () => {
+      made = (
+        await centerNet.create({
+          name: name.trim(),
+          ...(person ? { owner: person.id } : {}),
+          ...(parentId ? { parentId } : {}),
         })
-      : await runAction(
-          false,
-          () =>
-            centerNet.assign({
-              streamer: person!.id,
-              ...(agencyId ? { agencyId } : {}),
-              reason: reason.trim(),
-            }),
-          agencyId ? `${person!.name} ajansa bağlandı.` : `${person!.name} ajanstan çıkarıldı.`,
-        );
+      ).agency;
+    });
     setBusy(false);
     if (!sent) return;
     const m = made as { name: string; code: string } | null;
@@ -100,14 +82,8 @@ function ActionSheet({ mode, nodes, close, done }: { mode: Mode; nodes: TreeNode
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Kapat" />
         <DepthCard style={st.sheet}>
           <ScrollView contentContainerStyle={{ gap: space.lg }} keyboardShouldPersistTaps="handled">
-            <Text style={st.title}>{create ? 'Ajans oluştur' : 'Yayıncı ata'}</Text>
-            <Text style={ns.dim}>
-              {create
-                ? 'Merkezin oluşturduğu ajans hemen onaylanır. Sahibini şimdi seçebilir ya da sonra atayabilirsin.'
-                : 'Yayıncı seçtiğin ajansa bağlanır; başka bir ajanstaysa oradan çıkarılır. Geçmiş kazançları ve komisyon kayıtları değişmez.'}
-            </Text>
-            {create ? (
-              <>
+            <Text style={st.title}>Ajans oluştur</Text>
+            <Text style={ns.dim}>Merkezin oluşturduğu ajans hemen onaylanır. Sahibini şimdi seçebilir ya da sonra atayabilirsin.</Text>
                 <Field label="Ajans adı">
                   <TextInput value={name} onChangeText={setName} placeholder="Örn. Kuzey Yıldızı Medya" placeholderTextColor={colors.textDim} maxLength={60} style={ns.input} />
                 </Field>
@@ -133,31 +109,9 @@ function ActionSheet({ mode, nodes, close, done }: { mode: Mode; nodes: TreeNode
                 <Field label="Sahibi (isteğe bağlı)">
                   <PersonPick value={person} onChange={setPerson} />
                 </Field>
-              </>
-            ) : (
-              <>
-                <Field label="Yayıncı">
-                  <PersonPick value={person} onChange={setPerson} />
-                </Field>
-                <Field label="Ajans">
-                  <AgencyPick nodes={open} value={agencyId} onChange={setAgencyId} none="Ajanssız bırak" />
-                </Field>
-                <Field label="Gerekçe">
-                  <TextInput
-                    value={reason}
-                    onChangeText={setReason}
-                    placeholder="En az 5 harf; denetim geçmişine yazılır"
-                    placeholderTextColor={colors.textDim}
-                    multiline
-                    maxLength={300}
-                    style={[ns.input, { minHeight: 72, textAlignVertical: 'top' }]}
-                  />
-                </Field>
-              </>
-            )}
             <View style={{ flexDirection: 'row', gap: space.sm }}>
               <Button title="Vazgeç" variant="ghost" onPress={close} style={{ flex: 1 }} />
-              <Button title={busy ? 'Gönderiliyor' : create ? 'Oluştur' : 'Ata'} variant="hero" disabled={!ok || busy} onPress={submit} style={{ flex: 1 }} />
+              <Button title={busy ? 'Gönderiliyor' : 'Oluştur'} variant="hero" disabled={!ok || busy} onPress={submit} style={{ flex: 1 }} />
             </View>
           </ScrollView>
         </DepthCard>
@@ -175,7 +129,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function AgencyPick({ nodes, value, onChange, none }: { nodes: TreeNode[]; value: string; onChange: (id: string) => void; none?: string }) {
+function AgencyPick({ nodes, value, onChange }: { nodes: TreeNode[]; value: string; onChange: (id: string) => void }) {
   const [q, setQ] = useState('');
   const term = q.trim().toLocaleLowerCase('tr-TR');
   const list = nodes.filter((n) => !term || n.name.toLocaleLowerCase('tr-TR').includes(term) || n.code.toLowerCase().includes(term)).slice(0, 8);
@@ -183,7 +137,6 @@ function AgencyPick({ nodes, value, onChange, none }: { nodes: TreeNode[]; value
   return (
     <View style={{ gap: 6 }}>
       {nodes.length > 8 && <TextInput value={q} onChangeText={setQ} placeholder="Ajans adı veya kodu" placeholderTextColor={colors.textDim} autoCapitalize="none" style={ns.input} />}
-      {none && <Choice on={!value} text={none} onPress={() => onChange('')} />}
       {cur && !list.includes(cur) && <Choice on text={`${cur.name} · ${cur.code}`} onPress={() => {}} />}
       {list.map((n) => (
         <Choice key={n.id} on={n.id === value} text={`${n.name} · ${n.code}`} onPress={() => onChange(n.id)} />

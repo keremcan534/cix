@@ -380,7 +380,7 @@ const f = StyleSheet.create({
   cellWild: { backgroundColor: '#3B2A07' },
   sym: { fontSize: 28 },
   symBlur: { opacity: 0.45 },
-  tag: { position: 'absolute', bottom: 1, color: '#FDE68A', fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  tag: { position: 'absolute', bottom: 1, color: '#FDE68A', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   free: { color: '#FDE68A', fontWeight: '900', textAlign: 'center' },
   banner: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(26,18,6,0.85)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   bannerText: { color: '#FDE68A', fontWeight: '900', fontSize: 20, textAlign: 'center', lineHeight: 28 },
