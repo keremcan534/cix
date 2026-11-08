@@ -487,7 +487,9 @@ export const userProfile = (id: string) =>
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first (no distance on the server: city only). */
 export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };
-export const discover = () => call<{ users: DiscoverUser[] }>('GET', '/api/discover').then((r) => r.users);
+/** Keşfet's lists (server/api/social.mjs): most recently active, newest accounts, or who 1v1 lifts. */
+export type DiscoverList = 'home' | 'new' | 'featured';
+export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverUser[] }>('GET', `/api/discover${list === 'home' ? '' : `?list=${list}`}`).then((r) => r.users);
 /** Blocking also ends follows both ways on the server; the other person is not told. */
 export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('POST', '/api/block', { to, block: on }).then((r) => r.blocked);
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);

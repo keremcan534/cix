@@ -202,18 +202,38 @@ export const socialRoutes = {
     return { following: true };
   },
 
-  /** Keşfet: real people, most recently active first; blocks either way and deleted accounts are left out. */
-  async 'GET /api/discover'(req) {
+  /**
+   * Keşfet: real people. Men see women and women see men (anyone, while either of the two hasn't given a gender);
+   * blocks either way and deleted accounts are left out. `list`: 'home' (most recently active first), 'new' (newest
+   * accounts first) or 'featured', who 1v1 lifts in the last 30 days: for a streamer, the people who spent most on
+   * gifts in private chats; for anyone else, the agency streamers who earned most there (all streamers, the earners
+   * first). Paid messages and calls join the score when they are on the server.
+   */
+  async 'GET /api/discover'(req, url) {
     const me = await auth(req);
+    const list = url.searchParams.get('list') ?? 'home';
+    if (!['home', 'new', 'featured'].includes(list)) throw new HttpError(400, 'Geçersiz liste');
+    const live = `EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = $X AND s.ended_at IS NULL AND s.contract = 'approved')`;
+    const streamer = list === 'featured' && (await db.query(`SELECT ${live.replace('$X', '$1')} AS yes`, [me.id])).rows[0].yes;
+    // 1v1 coins in the window: given by them (to me, a streamer) or received by them (anyone else).
+    const score = list !== 'featured' ? '0' : streamer
+      ? `(SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.sender = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')`
+      : `(SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.recipient = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')`;
+    const only = list !== 'featured' ? '' : streamer
+      ? `AND ${score} > 0`
+      : `AND ${live.replace('$X', 'u.id')}`;
+    const order = list === 'new' ? 'u.created_at DESC' : list === 'featured' ? 'score DESC, a.seen DESC NULLS LAST' : 'a.seen DESC NULLS LAST, u.created_at DESC';
     const r = await db.query(
-      `SELECT u.*, a.seen
+      `SELECT u.*, a.seen, ${score} AS score
          FROM users u
          JOIN LATERAL (SELECT max(s.last_seen_at) AS seen FROM sessions s WHERE s.user_id = u.id) a ON true
         WHERE u.id <> $1 AND u.deleted_at IS NULL
+          AND ($2::text IS NULL OR u.gender IS NULL OR u.gender <> $2)
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
-        ORDER BY a.seen DESC NULLS LAST, u.created_at DESC
+          ${only}
+        ORDER BY ${order}
         LIMIT 60`,
-      [me.id],
+      [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
     return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };

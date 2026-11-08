@@ -73,6 +73,15 @@ describe('Canlı sürümde demo ekranları', () => {
     assert.match(readFileSync(join(APP, '../components/family-live.tsx'), 'utf8'), /from '@\/lib\/live\/family'/);
   });
 
+  // Keşfet: five tabs, no gender filter (men see women, women see men), the globe picks the country.
+  test('Keşfet sekmeleri ve dünya filtresi', () => {
+    const src = readFileSync(join(APP, '(tabs)/kesfet.tsx'), 'utf8');
+    assert.match(src, /TABS = \['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'\]/);
+    assert.match(src, /name="globe-outline"/);
+    assert.doesNotMatch(src, /Cinsiyet|onlineOnly|newest/);
+    assert.match(src, /'Öne çıkanlar': 'featured', 'Yeni kullanıcılar': 'new'/);
+  });
+
   // Anlar is on the server (lib/live/moments): a live build shows the tab and the server's feed, never the sample one.
   test('Anlar canlıda sunucudan, sekme görünür', () => {
     const tabs = readFileSync(join(APP, '(tabs)/_layout.tsx'), 'utf8');

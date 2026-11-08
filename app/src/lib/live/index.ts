@@ -178,8 +178,10 @@ export function forgetLiveAccount() {
   returning = 0;
   unsure.clear();
   order.reset();
-  people = null;
-  peopleState = 'loading';
+  for (const k of ['home', 'new', 'featured'] as const) {
+    people[k] = null;
+    peopleState[k] = 'loading';
+  }
   locked.clear();
   forgetRoomPasswords();
   roomsState = 'loading';
@@ -222,19 +224,20 @@ export async function loadProfile(id: string) {
 /** How a server list stands: the first answer still coming, the last answer read, or the last try failed. */
 export type LoadState = 'loading' | 'ready' | 'failed';
 
-let people: User[] | null = null;
-let peopleState: LoadState = 'loading';
+type DiscoverList = api.DiscoverList;
+const people: Record<DiscoverList, User[] | null> = { home: null, new: null, featured: null };
+const peopleState: Record<DiscoverList, LoadState> = { home: 'loading', new: 'loading', featured: 'loading' };
 const peopleListeners = new Set<() => void>();
 const subscribePeople = (l: () => void) => {
   peopleListeners.add(l);
   return () => peopleListeners.delete(l);
 };
 const emitPeople = () => peopleListeners.forEach((l) => l());
-/** Reads Keşfet's people from the server once (the retry button calls it too). */
-export async function reloadDiscoverPeople() {
+/** Reads one of Keşfet's lists from the server once (the retry button calls it too). */
+export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
   try {
-    const rows = await api.discover();
-    people = rows.map((p) =>
+    const rows = await api.discover(list);
+    people[list] = rows.map((p) =>
       putServerUser({
         id: p.id,
         name: p.name,
@@ -248,27 +251,27 @@ export async function reloadDiscoverPeople() {
         ...(p.avatarUrl && { avatar: p.avatarUrl }),
       }),
     );
-    peopleState = 'ready';
+    peopleState[list] = 'ready';
   } catch {
-    peopleState = 'failed';
+    peopleState[list] = 'failed';
   }
   emitPeople();
 }
-/** Keşfet in a live build: real people from the server, re-read every 30 seconds while the screen is in front
- *  (once more when it comes back); null until the first answer. */
-export function useDiscoverPeople(): User[] | null {
-  const list = useSyncExternalStore(subscribePeople, () => people, () => people);
+/** Keşfet in a live build: real people from the server, the list on screen re-read every 30 seconds while the
+ *  screen is in front (once more when it comes back or the tab changes); null until the first answer. */
+export function useDiscoverPeople(list: DiscoverList = 'home'): User[] | null {
+  const rows = useSyncExternalStore(subscribePeople, () => people[list], () => people[list]);
   const focused = useIsFocused();
   useEffect(() => {
     if (!liveMode() || !focused) return;
-    void reloadDiscoverPeople();
-    const t = setInterval(() => void reloadDiscoverPeople(), 30_000);
+    void reloadDiscoverPeople(list);
+    const t = setInterval(() => void reloadDiscoverPeople(list), 30_000);
     return () => clearInterval(t);
-  }, [focused]);
-  return list;
+  }, [focused, list]);
+  return rows;
 }
-/** Whether Keşfet's last read worked ('failed': the screen offers "Tekrar dene"). */
-export const useDiscoverState = () => useSyncExternalStore(subscribePeople, () => peopleState, () => peopleState);
+/** Whether that list's last read worked ('failed': the screen offers "Tekrar dene"). */
+export const useDiscoverState = (list: DiscoverList = 'home') => useSyncExternalStore(subscribePeople, () => peopleState[list], () => peopleState[list]);
 
 // --- Rooms -----------------------------------------------------------------------------------------------
 // Rooms with a password, by id. Kept beside the Room (not as Room.password, which is the demo rooms' own
