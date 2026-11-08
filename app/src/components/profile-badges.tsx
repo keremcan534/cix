@@ -1,4 +1,4 @@
-// Gender chip and agency / kabile pills shared by the Profil tab and the user profile screen.
+// Gender chip and agency / Aile pills shared by the Profil tab and the user profile screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { Pressable, View } from 'react-native';
@@ -9,9 +9,11 @@ import { findKabile, KABILE_ROUTES } from '@/data/kabile';
 import type { User } from '@/data/mock';
 import { familyOf } from '@/data/profile';
 import { shownStaffBadge } from '@/data/rbac';
-import { liveMode } from '@/lib/live';
+import { liveMode, toServer } from '@/lib/live';
 import { useStaffRole } from '@/lib/live/admin';
+import { ROLE_NAME } from '@/lib/live/family';
 import { useMyServerAgency } from '@/lib/live/me-stats';
+import { useTies } from '@/lib/live/profile';
 import { AGENCY_ROLE_TEXT } from '@/lib/me-view';
 import { useApp } from '@/store';
 import { makeStyles, themes, useTheme } from '@/theme';
@@ -22,7 +24,8 @@ export const MALE_FILL = '#0369A1';
 
 /**
  * Profile spec §2-A: a hidden gender shows only the age to others; the owner still sees it, marked as hidden.
- * An age of 0 is an age nobody entered yet (a new live account): it is left out, not shown as "0".
+ * The gender is the symbol on its colour (female red, male blue), never the word. An age of 0 is an age nobody
+ * entered yet (a new live account): it is left out, not shown as "0".
  */
 export function GenderChip({ user, owner }: { user: User; owner?: boolean }) {
   const styles = useStyles();
@@ -43,32 +46,42 @@ export function GenderChip({ user, owner }: { user: User; owner?: boolean }) {
       accessibilityLabel={`${user.gender}${age === null ? '' : `, ${age} yaş`}${hidden ? ', gizli: yalnızca sen görüyorsun' : ''}`}
     >
       <Ionicons name={female ? 'female' : 'male'} size={12} color="#fff" />
-      <Text style={styles.chipText}>
-        {age === null ? user.gender : `${user.gender} · ${age}`}
-      </Text>
+      {age !== null && <Text style={styles.chipText}>{age}</Text>}
       {hidden && <Ionicons name="eye-off" size={12} color="#fff" />}
     </View>
   );
 }
 
-export type Affiliation = { emoji: string; name: string; sub: string; href?: Href };
+export type Affiliation = { emoji?: string; name: string; sub: string; href?: Href };
 
 /**
  * The agency and kabile a user belongs to. Mine come from the store; others' from their public profile.
  * href is set only when the page it opens shows that same agency / kabile (or lets me join it).
  *
- * Live mode: my agency is the server's (lib/live/me-stats, the answer /ajans shows), `known` false until it is
- * in. Kabile (Aile) and other people's agencies exist only in the demo, so live mode shows none of them.
+ * Live mode: my agency is the server's (lib/live/me-stats, the answer /ajans shows), someone else's agency and
+ * anyone's Aile the server's answer for their profile (lib/live/profile useTies); `known` false until they are in.
  */
 export function useAffiliations(user: User): { agency: Affiliation | null; kabile: Affiliation | null; known: boolean } {
   const { agencyId, agencyRole, ownedAgency, familyId } = useApp();
   const isMe = user.id === 'me';
   const live = liveMode();
   const server = useMyServerAgency(isMe && live);
+  const ties = useTies(live ? toServer(user.id) : null);
+  const mineTies = useTies(live && !isMe ? toServer('me') : null);
 
   if (live) {
-    const agency: Affiliation | null = isMe && server ? { emoji: '🏢', name: server.name, sub: AGENCY_ROLE_TEXT[server.role], href: '/ajans' } : null;
-    return { agency, kabile: null, known: !isMe || server !== undefined };
+    const a = ties?.agency;
+    const agency: Affiliation | null = isMe
+      ? server
+        ? { emoji: '🏢', name: server.name, sub: AGENCY_ROLE_TEXT[server.role], href: '/ajans' }
+        : null
+      : a
+        ? { emoji: '🏢', name: a.name, sub: 'Yayıncı' }
+        : null;
+    const f = ties?.family;
+    // /aile shows my own family; someone else's opens as a preview there (with join), unless it is mine too.
+    const kabile: Affiliation | null = f ? { name: f.name, sub: ROLE_NAME[f.role], href: isMe || mineTies?.family?.id === f.id ? '/aile' : `/aile?id=${f.id}` } : null;
+    return { agency, kabile, known: (isMe ? server !== undefined : true) && ties !== undefined };
   }
 
   let agency: Affiliation | null = null;
@@ -116,9 +129,7 @@ export function AffiliationPills({ user }: { user: User }) {
   const styles = useStyles();
   const { agency, kabile, known } = useAffiliations(user);
   const isMe = user.id === 'me';
-  // Live mode has no Aile yet: no pill and no "join" prompt for it.
-  const aile = !liveMode();
-  if (!agency && !kabile && (!isMe || (!known && !aile))) return null;
+  if (!agency && !kabile && (!isMe || !known)) return null;
   return (
     <View style={styles.pills}>
       {agency ? (
@@ -129,7 +140,7 @@ export function AffiliationPills({ user }: { user: User }) {
       {kabile ? (
         <Pill icon="people" label={kabile.name} emoji={kabile.emoji} a11y={`Aile: ${kabile.name}, ${kabile.sub}`} href={kabile.href} />
       ) : (
-        isMe && aile && <Pill icon="people" label="Aile yok · Katıl" empty a11y="Aile: yok. Bir aileye katıl" href={KABILE_ROUTES.profile} />
+        isMe && known && <Pill icon="people" label="Aile yok · Katıl" empty a11y="Aile: yok. Bir aileye katıl" href={KABILE_ROUTES.profile} />
       )}
     </View>
   );

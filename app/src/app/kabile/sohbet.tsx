@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
-import { ComingSoon } from '@/components/coming-soon';
+import { LiveFamilyChat } from '@/components/family-live';
 import { GroupChat, type QuickAction } from '@/components/GroupChat';
 import { GradientButton, StateIcon } from '@/components/ui';
 import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta, payKabileGift } from '@/data/kabile';
@@ -28,10 +28,9 @@ const QUICK: QuickAction[] = [
   { key: 'kasa', label: 'Aile Kasası', emoji: '💰', onPress: () => router.push(KABILE_ROUTES.kasa) },
 ];
 
-// Aile has no server yet (data/kabile tayfaAvailable): in a live build the chat would reach no one and its gifts
-// would take real coins for sample members, so it shows a notice instead.
+// A live build uses the server's family chat (components/family-live); the demo keeps the sample chat below.
 export default function KabileChat() {
-  return liveMode() ? <ComingSoon title="Aile sohbeti" /> : <DemoKabileChat />;
+  return liveMode() ? <LiveFamilyChat /> : <DemoKabileChat />;
 }
 
 function DemoKabileChat() {

@@ -60,10 +60,17 @@ describe('Canlı sürümde demo ekranları', () => {
   });
 
   test('örnek veriyle dolu ekranlar canlıda "yakında" gösterir', () => {
-    for (const route of ['aile', 'kabile/index', 'kabile/sohbet', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
+    for (const route of ['kabile/index', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
       const src = readFileSync(join(APP, `${route}.tsx`), 'utf8');
       assert.match(src, /liveMode\(\)[^\n]*<ComingSoon /, `${route}: canlıda ComingSoon yok`);
     }
+  });
+
+  // Aile is on the server (lib/live/family): its list, my family and the family chat show what the server answers.
+  test('Aile canlıda sunucudan', () => {
+    assert.match(readFileSync(join(APP, 'aile.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilies \/> : <DemoFamilies \/>/);
+    assert.match(readFileSync(join(APP, 'kabile/sohbet.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilyChat \/> : <DemoKabileChat \/>/);
+    assert.match(readFileSync(join(APP, '../components/family-live.tsx'), 'utf8'), /from '@\/lib\/live\/family'/);
   });
 
   // Anlar is on the server (lib/live/moments): a live build shows the tab and the server's feed, never the sample one.

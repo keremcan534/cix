@@ -15,6 +15,7 @@ import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 import { looksOf, revokeAllForDelete } from './economy.mjs';
+import { familyOf, leaveFamily } from './families.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -79,6 +80,10 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_admins WHERE user_id = $1', [id]);
+    // Aile: out of their family (a leader hands it on), their requests and chat lines.
+    await leaveFamily(c, id);
+    await c.query('DELETE FROM family_requests WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
 }
 
@@ -164,9 +169,17 @@ export const socialRoutes = {
       [id, me.id],
     );
     const x = r.rows[0];
+    // A streamer's agency (an approved one they are in now) and anyone's family, shown on the profile.
+    const ag = await db.query(
+      `SELECT a.id, a.name FROM agency_streamers s JOIN agencies a ON a.id = s.agency_id
+        WHERE s.streamer_id = $1 AND s.ended_at IS NULL AND s.contract = 'approved' AND a.status = 'approved' LIMIT 1`,
+      [id],
+    );
     return {
       user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
       looks: (await looksOf([u.id]))[u.id] ?? null,
+      agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
+      family: await familyOf(id),
     };
   },
 

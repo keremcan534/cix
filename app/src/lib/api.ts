@@ -480,7 +480,10 @@ export type ServerEarnings = { diamonds: number; withdrawable: number; locked: n
 
 export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDate?: string; city?: string; bio?: string; interests?: string[]; avatarUrl?: string | null };
 export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
-export const userProfile = (id: string) => call<{ user: PublicUser }>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => r.user);
+/** Someone's agency (an approved one they stream in now) and family, on their profile. */
+export type ProfileTies = { agency: { id: string; name: string } | null; family: { id: string; name: string; role: 'owner' | 'helper' | 'member' } | null };
+export const userProfile = (id: string) =>
+  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first (no distance on the server: city only). */
 export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };

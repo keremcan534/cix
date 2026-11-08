@@ -46,7 +46,7 @@ import { similarity } from '@/lib/similarity';
 import { SimilarityCard } from '@/components/similarity';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
-import { AffiliationPills, GenderChip, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
+import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -394,9 +394,9 @@ export default function UserProfile() {
       ? { title: otherRoom.title, desc: otherRoom.announcement ?? `${otherRoom.listeners} dinleyici`, cover: otherRoom.cover, level: otherRoom.level ?? 1, go: () => router.push(`/oda/${otherRoom.id}`) }
       : null;
   const { agency, kabile, known } = useAffiliations(user);
-  // Live mode: my open room and my agency (once the server answered); nobody else's is on the server yet.
+  // Live mode: my open room; the agency and Aile once the server answered for this profile.
   const showRoom = !live || !!room;
-  const showAgency = !live || (isMe && known);
+  const showAgency = !live || known;
 
   // Live mode: the tabs and blocks with something real behind them (the rest is sample data in the demo).
   const tabs = live ? LIVE_TABS : TABS;
@@ -729,7 +729,7 @@ export default function UserProfile() {
                   )}
                   {showsGender && (
                     <InfoRow icon={user.gender === 'Kadın' ? 'female-outline' : 'male-outline'} label="Cinsiyet" hint={user.showGender === false ? 'Gizli · yalnızca sen görüyorsun, diğerleri sadece yaşını görür' : undefined}>
-                      <Text style={styles.infoValue}>{user.gender}</Text>
+                      <Ionicons name={user.gender === 'Kadın' ? 'female' : 'male'} size={18} color={user.gender === 'Kadın' ? FEMALE_FILL : MALE_FILL} accessibilityLabel={user.gender} />
                     </InfoRow>
                   )}
                   {country && (
@@ -794,11 +794,9 @@ export default function UserProfile() {
             )}
             {showRoom && (showAgency || !live) && <Band />}
 
-            {/* Live mode: only my own agency, as the server has it; someone else's isn't on the server yet. */}
             {showAgency && <AffiliationSection title="Ajans" item={agency} empty={isMe ? 'Katıl' : 'Ajansı yok'} emptyHref={isMe ? '/ajans' : undefined} />}
 
-            {/* Live mode: no Aile on the server yet. */}
-            {!live && (
+            {showAgency && (
               <>
                 <Band />
                 <AffiliationSection title="Aile" item={kabile} empty={isMe ? 'Katıl' : 'Ailesi yok'} emptyHref={isMe ? '/aile' : undefined} />
@@ -1039,7 +1037,7 @@ function AffiliationSection({ title, item, empty, emptyHref }: { title: string; 
       <SectionTitle title={title} onPress={go} />
       <Pressable style={styles.familyCard} onPress={go} disabled={!go} accessibilityLabel={`${title}: ${item.name}, ${item.sub}`}>
         <View style={styles.familyEmoji}>
-          <Text style={{ fontSize: 26 }}>{item.emoji}</Text>
+          {item.emoji ? <Text style={{ fontSize: 26 }}>{item.emoji}</Text> : <Ionicons name="people" size={24} color={colors.primaryText} />}
         </View>
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={styles.roomTitle}>{item.name}</Text>
