@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
@@ -46,6 +46,8 @@ import { GiftSheet } from '@/components/room/gift-sheet';
 import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
+import { PersonCard } from '@/components/room/person-card';
+import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
@@ -460,6 +462,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   if (view.total > peak) setPeak(view.total);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [seatMenu, setSeatMenu] = useState<{ anchor: Rect; title: string; items: SeatMenuItem[] } | null>(null);
+  // The person card (components/room/person-card): someone tapped on a mic, on the balcony list or in the chat.
+  // `manage`: room staff's actions on them (the seat menu), when there are any.
+  const [person, setPerson] = useState<{ uid: string; note?: string; manage?: () => void } | null>(null);
+  const openPerson = useCallback((uid: string) => {
+    if (uid !== 'me') setPerson({ uid });
+  }, [setPerson]);
   const [moving, setMoving] = useState<string | null>(null);
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
@@ -1681,7 +1689,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // Plain members need no role word; the match fits in the menu's one-line title instead.
       const sim = simScores.get(uid);
       const parts = [`${index + 1}. koltuk`, u.name, rankOf(uid) > 0 && rankLabel(uid), sim !== undefined && `%${sim} benzer`].filter(Boolean);
-      return openSeatMenu(index, parts.join(' · '), items);
+      // Everyone gets the person card; what only staff can do stays in the seat menu behind its "Yönet".
+      const manage = items.filter((it) => !['profile', 'gift', 'dm'].includes(it.key)).map((it, i) => (i === 0 ? { ...it, dividerBefore: false } : it));
+      const note = [`${index + 1}. koltuk`, rankOf(uid) > 0 && rankLabel(uid), sim !== undefined && `%${sim} benzer`].filter(Boolean).join(' · ');
+      return setPerson({ uid, note, manage: manage.length ? () => openSeatMenu(index, parts.join(' · '), manage) : undefined });
     }
     if (index === 0) return isOwn ? sitMe(0) : undefined;
     if (canManage) {
@@ -1772,10 +1783,35 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (real && !sendSignal({ t: 'chat', text: msg.text })) return;
     setMessages((list) => mergeFeed(list.filter((m) => m.id !== msg.id), [{ id: msgId(), userId: 'me', text: msg.text, at: Date.now() }]));
   }, [real]);
+  // A line naming me (@bahset) stands out; a tap on someone's photo or name opens their person card.
+  const myName = app.me.name;
   const renderChat = useCallback(
-    ({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null} onRetry={retrySend} />,
-    [equipped.bubble, retrySend, roomBonds],
+    ({ item }: { item: ChatMsg }) => (
+      <ChatLine
+        msg={item}
+        bubbleId={equipped.bubble}
+        bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null}
+        onRetry={retrySend}
+        mentionsMe={!!item.userId && item.userId !== 'me' && mentions(item.text, myName)}
+        onPerson={openPerson}
+      />
+    ),
+    [equipped.bubble, retrySend, roomBonds, myName, openPerson],
   );
+  // @bahset: "@" in the line offers the people on the mics and the balcony; a pick (or the card's Bahset) writes "@Name ".
+  const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const mention = (uid: string) => {
+    editDraft((d) => insertMention(d, userById(uid).name));
+    setTimeout(() => inputRef.current?.focus(), 300);
+  };
+  const mentionQ = typing ? mentionQuery(draft) : null;
+  const mentionPeople =
+    mentionQ === null
+      ? []
+      : mentionPicks(
+          [...new Set([...view.micIds, ...view.balconyIds])].filter((u) => u !== 'me' && !blocked.has(u)).map(userById),
+          mentionQ,
+        );
 
   /** True when at least one recipient got the gift. */
   const deliverGifts = (gift: Gift, toIds: string[], count: number): boolean => {
@@ -2343,7 +2379,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     kick: confirmKick,
     profile: (uid) => {
       setPeopleOpen(false);
-      router.push(`/kullanici/${uid}`);
+      openPerson(uid);
     },
     gift: (uid) => {
       setPeopleOpen(false);
@@ -2381,6 +2417,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setInviteSeat(null);
       setSheet(null);
       setSeatMenu(null);
+      setPerson(null);
       setEmojiOpen(false);
       setPkSetup(false);
       setMoving(null);
@@ -2670,6 +2707,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </View>
           ) : null}
           <ContactNote text={chatRefused} />
+          {mentionPeople.length > 0 && (
+            <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mentionRow}>
+              {mentionPeople.map((u) => (
+                <Pressable key={u.id} style={styles.mentionChip} onPress={() => editDraft((d) => insertMention(d, u.name))} accessibilityRole="button" accessibilityLabel={`${u.name} kişisinden bahset`}>
+                  <Avatar uri={u.avatar} name={u.name} size={22} />
+                  <Text style={styles.mentionName} numberOfLines={1}>
+                    {u.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
           {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
               field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
           <View style={styles.bottom}>
@@ -2679,6 +2728,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
               </Pressable>
               <TextInput
+                ref={inputRef}
                 value={draft}
                 onChangeText={editDraft}
                 onSubmitEditing={() => send()}
@@ -3018,6 +3068,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {full && myInvite && !offline && <MicInvitePrompt key={myInvite.id} invite={myInvite} onAnswer={answerMyInvite} />}
       {session && <SessionTestSheet visible={panel === 'session'} session={session} onClose={closePanel} onKickMe={kickMeTest} />}
       <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
+      {person && (
+        <PersonCard
+          uid={person.uid}
+          note={person.note}
+          onClose={() => setPerson(null)}
+          onGift={(uid) => (setGiftTo(uid), setGiftOpen(true))}
+          onMention={mention}
+          onReport={peopleActions.report}
+          onManage={person.manage}
+        />
+      )}
       {moving && (
         <Pressable style={styles.moveBanner} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">
           <Text style={styles.moveText}>{userById(moving).name} için boş bir koltuğa dokun · iptal için buraya dokun</Text>
@@ -3089,6 +3150,9 @@ const styles = StyleSheet.create({
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },
+  mentionRow: { gap: 6, paddingHorizontal: 10, paddingTop: 4 },
+  mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   micGroup: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },

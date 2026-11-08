@@ -252,7 +252,24 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
   );
 }
 
-export function ChatLine({ msg, bubbleId, bond, onRetry }: { msg: ChatMsg; bubbleId?: string; /** Lv10 bond: the special bubble (a bubble I equipped wins). */ bond?: RoomBond | null; onRetry?: (msg: ChatMsg) => void }) {
+export function ChatLine({
+  msg,
+  bubbleId,
+  bond,
+  onRetry,
+  mentionsMe,
+  onPerson,
+}: {
+  msg: ChatMsg;
+  bubbleId?: string;
+  /** Lv10 bond: the special bubble (a bubble I equipped wins). */
+  bond?: RoomBond | null;
+  onRetry?: (msg: ChatMsg) => void;
+  /** The line names me (@bahset): its bubble gets a gold ring. */
+  mentionsMe?: boolean;
+  /** A tap on the writer's photo or name (their person card). */
+  onPerson?: (uid: string) => void;
+}) {
   if (msg.bot) {
     return (
       <View style={styles.botMsg}>
@@ -317,18 +334,21 @@ export function ChatLine({ msg, bubbleId, bond, onRetry }: { msg: ChatMsg; bubbl
   ) : (
     <View style={[styles.chatBubble, styles.chatGlass]}>{body}</View>
   );
+  const who = msg.userId !== 'me' && onPerson ? () => onPerson(msg.userId!) : undefined;
   const line = (
-    <View style={styles.chatLine} accessibilityLabel={`${u.name}: ${messagePreview(msg.text)}`}>
-      <Avatar uri={u.avatar} size={28} />
+    <View style={styles.chatLine} accessibilityLabel={`${u.name}${mentionsMe ? ', senden bahsetti' : ''}: ${messagePreview(msg.text)}`}>
+      <Pressable onPress={who} disabled={!who} hitSlop={4} accessibilityRole={who ? 'button' : undefined} accessibilityLabel={who ? `${u.name} kişi kartı` : undefined}>
+        <Avatar uri={u.avatar} size={28} />
+      </Pressable>
       <View style={{ flexShrink: 1, gap: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={who} disabled={!who}>
           <Text style={[styles.chatName, { color: nameColor }]} numberOfLines={1}>
             {u.name}
           </Text>
           {u.vip && <Text style={styles.chatVip}>VIP</Text>}
           {bond && <BondChip bond={bond} />}
-        </View>
-        {bubbleView}
+        </Pressable>
+        {mentionsMe ? <View style={styles.chatMention}>{bubbleView}</View> : bubbleView}
       </View>
     </View>
   );
@@ -536,6 +556,7 @@ const styles = StyleSheet.create({
   chatName: { fontSize: 12, fontWeight: '800', maxWidth: 160 },
   chatVip: { color: colors.bg, backgroundColor: colors.gold, fontSize: 9, fontWeight: '900', borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
   chatBubble: { alignSelf: 'flex-start', borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 11, paddingVertical: 7 },
+  chatMention: { alignSelf: 'flex-start', borderRadius: 16, borderTopLeftRadius: 6, borderWidth: 1.5, borderColor: colors.gold, padding: 1 },
   chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
   // Dark glass: keeps white text readable over the stage, with a lit top edge.
   chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },
