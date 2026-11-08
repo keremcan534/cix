@@ -131,7 +131,8 @@ export const agoMinutes = (time: string) => {
 
 export const distanceLabel = (km: number) => (km > 500 ? '500 km+' : `${km.toFixed(1).replace('.', ',')} km`);
 
-export type MomentComment = { id: string; userId: string; text: string; time: string };
+/** likes / liked: live comments only (the server counts them). */
+export type MomentComment = { id: string; userId: string; text: string; time: string; likes?: number; liked?: boolean };
 
 export const SEED_COMMENTS: Record<string, MomentComment[]> = {
   m1: [

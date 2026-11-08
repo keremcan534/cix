@@ -173,7 +173,19 @@ const FEED_TAB: Record<Tab, live.FeedTab> = { Arkadaşlar: 'friends', Önerilen:
 /** The server's page size (moments.mjs): a full page means older posts may follow. */
 const PAGE = 50;
 
-const toSheet = (c: live.LiveComment): MomentComment => ({ id: c.id, userId: toLocal(c.author.id), text: c.text, time: live.agoText(c.createdAt) });
+const toSheet = (c: live.LiveComment): MomentComment => ({ id: c.id, userId: toLocal(c.author.id), text: c.text, time: live.agoText(c.createdAt), likes: c.likes, liked: c.liked });
+
+/** Why the Paylaş button doesn't open the composer below Yankı Lv.5 (the server counts the points). */
+function charmGate(p: live.Posting) {
+  showAlert(
+    `Yankı Lv.${p.needLevel} gerekli`,
+    `Anlar'da paylaşım Yankı Lv.${p.needLevel} ve üstü için. Yankı puanın: ${p.points.toLocaleString('tr-TR')} / ${p.need.toLocaleString('tr-TR')}. Hediye aldıkça Yankı'n yükselir. Bu sırada anları beğenip yorum yapabilirsin.`,
+    [
+      { text: 'Tamam', style: 'cancel' },
+      { text: 'Yankı seviyem', onPress: () => router.push('/seviye?tab=charm') },
+    ],
+  );
+}
 
 // The server's Anlar. A post or comment shows once the server has taken it (and stays in the composer if it
 // didn't); a like shows at once and goes back if the server refuses it.
@@ -189,6 +201,8 @@ function LiveMoments() {
   const [menuFor, setMenuFor] = useState<live.LiveMoment | null>(null);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [thread, setThread] = useState<live.LiveComment[] | null>(null);
+  // Whether I may post (Yankı Lv.5 or staff), from the latest feed; null until the server says.
+  const [posting, setPosting] = useState<live.Posting | null>(null);
   const { hasGreeted, greet } = useGreet();
   const report = useReport();
   const gift = useMomentGift();
@@ -209,11 +223,12 @@ function LiveMoments() {
   useEffect(() => {
     const id = ++loadId.current;
     live
-      .feed({ tab: FEED_TAB[tab], topic })
+      .feedPage({ tab: FEED_TAB[tab], topic })
       .then(
-        (page) => {
+        ({ moments: page, posting: may }) => {
           if (id !== loadId.current) return;
           setItems(page);
+          if (may) setPosting(may);
           setFailed(null);
           setHasMore(tab !== 'Önerilen' && page.length >= PAGE);
         },
@@ -293,10 +308,16 @@ function LiveMoments() {
       if (!topic || m.topic === topic) setItems((cur) => [m, ...(cur ?? []).filter((x) => x.id !== m.id)]);
       return true;
     } catch (e) {
-      showAlert(image ? 'An paylaşılamadı' : 'Paylaşılamadı', message(e));
+      const gate = live.postingRefusal(e);
+      if (gate) {
+        setPosting(gate);
+        setComposing(false);
+        charmGate(gate);
+      } else showAlert(image ? 'An paylaşılamadı' : 'Paylaşılamadı', message(e));
       return false;
     }
   };
+  const startPost = () => (posting && !posting.allowed ? charmGate(posting) : setComposing(true));
 
   const removePost = (m: live.LiveMoment) =>
     showAlert('An silinsin mi?', 'Bu an ve yorumları herkesten kaldırılır.', [
@@ -363,25 +384,44 @@ function LiveMoments() {
   };
 
   const openMoment = items?.find((m) => m.id === commentsFor);
+  // My comments, and every comment under my post (the server also lets staff remove them).
+  const canDelete = (c: MomentComment) => c.userId === 'me' || (!!openMoment && toLocal(openMoment.author.id) === 'me');
+  const removeComment = (c: MomentComment) => {
+    const postId = commentsFor;
+    if (!postId) return;
+    live.removeComment(c.id).then(
+      () => {
+        setThread((cur) => cur && cur.filter((x) => x.id !== c.id));
+        patch(postId, (x) => ({ ...x, comments: Math.max(0, x.comments - 1) }));
+      },
+      (e) => showAlert('Silinemedi', message(e)),
+    );
+  };
+  const deleteComment = (c: MomentComment) =>
+    showAlert('Yorum silinsin mi?', c.text.length > 80 ? `${c.text.slice(0, 80)}…` : c.text, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: () => removeComment(c) },
+    ]);
+  // A like shows at once and goes back if the server refuses it.
+  const likeComment = (c: MomentComment) => {
+    const on = !c.liked;
+    const step = (x: live.LiveComment, up: boolean) => ({ ...x, liked: up, likes: Math.max(0, x.likes + (up ? 1 : -1)) });
+    const patchComment = (f: (x: live.LiveComment) => live.LiveComment) => setThread((cur) => cur && cur.map((x) => (x.id === c.id ? f(x) : x)));
+    patchComment((x) => step(x, on));
+    live.likeComment(c.id, on).then(
+      (r) => patchComment((x) => ({ ...x, liked: r.liked, likes: r.likes })),
+      (e) => {
+        patchComment((x) => (x.liked === on ? step(x, !on) : x));
+        showAlert(on ? 'Beğenilemedi' : 'Beğeni geri alınamadı', message(e));
+      },
+    );
+  };
   const commentMenu = (c: MomentComment) => {
     const lc = thread?.find((x) => x.id === c.id);
-    const postId = commentsFor;
-    if (!lc || !postId) return;
+    if (!lc || !commentsFor) return;
     const mine = c.userId === 'me';
     const buttons: AlertButton[] = [{ text: 'Vazgeç', style: 'cancel' }];
-    if (mine || (openMoment && toLocal(openMoment.author.id) === 'me'))
-      buttons.push({
-        text: 'Sil',
-        style: 'destructive',
-        onPress: () =>
-          live.removeComment(c.id).then(
-            () => {
-              setThread((cur) => cur && cur.filter((x) => x.id !== c.id));
-              patch(postId, (x) => ({ ...x, comments: Math.max(0, x.comments - 1) }));
-            },
-            (e) => showAlert('Silinemedi', message(e)),
-          ),
-      });
+    if (canDelete(c)) buttons.push({ text: 'Sil', style: 'destructive', onPress: () => removeComment(c) });
     if (!mine)
       buttons.push({
         text: 'Şikâyet et',
@@ -406,7 +446,7 @@ function LiveMoments() {
         contentContainerStyle={{ paddingBottom: 100 }}
         ListHeaderComponent={
           <>
-            <ComposeBar me={me} onPress={() => setComposing(true)} />
+            <ComposeBar me={me} onPress={startPost} lockedBelow={posting && !posting.allowed ? posting.needLevel : undefined} />
             <TopicStrip topic={topic} onTopic={pickTopic} showViews={false} />
           </>
         }
@@ -471,8 +511,8 @@ function LiveMoments() {
         }}
       />
 
-      <Pressable style={styles.fab} onPress={() => setComposing(true)} accessibilityRole="button" accessibilityLabel="Yeni an paylaş">
-        <Ionicons name="add" size={22} color="#fff" />
+      <Pressable style={styles.fab} onPress={startPost} accessibilityRole="button" accessibilityLabel="Yeni an paylaş">
+        <Ionicons name={posting && !posting.allowed ? 'lock-closed' : 'add'} size={posting && !posting.allowed ? 18 : 22} color="#fff" />
         <Text style={styles.fabText}>Paylaş</Text>
       </Pressable>
 
@@ -486,6 +526,9 @@ function LiveMoments() {
         onClose={closeComments}
         onSend={sendComment}
         onLongPress={commentMenu}
+        onLike={likeComment}
+        canDelete={canDelete}
+        onDelete={deleteComment}
       />
       <ActionSheet visible={!!menuFor} onClose={() => setMenuFor(null)} options={menuFor ? menuOptions(menuFor) : []} />
       {report.sheet}
@@ -521,16 +564,17 @@ function FeedHeader({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 }
 
 /** The row above the feed that says where a post starts (the Paylaş button does the same). */
-function ComposeBar({ me, onPress }: { me: User; onPress: () => void }) {
+/** `lockedBelow`: posting opens at this Yankı level (the server said I'm below it). */
+function ComposeBar({ me, onPress, lockedBelow }: { me: User; onPress: () => void; lockedBelow?: number }) {
   const { colors } = useTheme();
   const styles = useStyles();
   return (
-    <Pressable style={styles.composeBar} onPress={onPress} accessibilityRole="button" accessibilityLabel="Yeni an paylaş">
+    <Pressable style={styles.composeBar} onPress={onPress} accessibilityRole="button" accessibilityLabel={lockedBelow ? `Paylaşım Yankı Lv.${lockedBelow} ile açılır` : 'Yeni an paylaş'}>
       <FramedAvatar uri={me.avatar} size={38} />
       <Text style={styles.composeHint} numberOfLines={1}>
-        Bugün neler oluyor? Bir an paylaş…
+        {lockedBelow ? `Paylaşım Yankı Lv.${lockedBelow} ile açılır` : 'Bugün neler oluyor? Bir an paylaş…'}
       </Text>
-      <Ionicons name="image-outline" size={22} color={colors.primaryText} />
+      <Ionicons name={lockedBelow ? 'lock-closed-outline' : 'image-outline'} size={22} color={colors.primaryText} />
     </Pressable>
   );
 }
@@ -846,6 +890,9 @@ function CommentsSheet({
   onClose,
   onSend,
   onLongPress,
+  onLike,
+  canDelete,
+  onDelete,
   loading = false,
 }: {
   visible: boolean;
@@ -858,6 +905,10 @@ function CommentsSheet({
   onSend: (text: string) => Sent;
   /** A comment's menu (delete, report). */
   onLongPress?: (c: MomentComment) => void;
+  /** Live only: the heart on each comment, and the bin on those I may remove. */
+  onLike?: (c: MomentComment) => void;
+  canDelete?: (c: MomentComment) => boolean;
+  onDelete?: (c: MomentComment) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [refused, setRefused] = useState<string | null>(null);
@@ -912,7 +963,26 @@ function CommentsSheet({
                       {u.name} · <Text style={{ fontWeight: '400' }}>{c.time}</Text>
                     </Text>
                     <Text style={{ color: colors.text, fontSize: 14 }}>{c.text}</Text>
+                    {onDelete && canDelete?.(c) && (
+                      <Pressable onPress={() => onDelete(c)} hitSlop={8} style={styles.commentDelete} accessibilityRole="button" accessibilityLabel="Yorumu sil">
+                        <Ionicons name="trash-outline" size={13} color={colors.textDim} />
+                        <Text style={styles.commentDeleteText}>Sil</Text>
+                      </Pressable>
+                    )}
                   </View>
+                  {onLike && (
+                    <Pressable
+                      onPress={() => onLike(c)}
+                      hitSlop={10}
+                      style={styles.commentLike}
+                      accessibilityRole="button"
+                      accessibilityLabel={c.liked ? 'Yorum beğenisini geri al' : 'Yorumu beğen'}
+                      accessibilityState={{ selected: !!c.liked }}
+                    >
+                      <Ionicons name={c.liked ? 'heart' : 'heart-outline'} size={17} color={c.liked ? colors.pink : colors.textDim} />
+                      {(c.likes ?? 0) > 0 && <Text style={[styles.commentLikeText, c.liked && { color: colors.pink }]}>{c.likes}</Text>}
+                    </Pressable>
+                  )}
                 </Pressable>
               );
             })}
@@ -1004,6 +1074,10 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   topicChipText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cardAlt },
+  commentLike: { alignItems: 'center', minWidth: 28, paddingTop: 2, gap: 1 },
+  commentLikeText: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
+  commentDelete: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingTop: 2 },
+  commentDeleteText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   // The contact note sits inside the sheet's own padding.
   contactNote: { marginHorizontal: 0, marginBottom: 0 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 999, paddingLeft: 14, paddingRight: 4, paddingVertical: 4 },

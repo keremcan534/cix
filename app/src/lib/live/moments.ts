@@ -18,7 +18,9 @@ export type LiveMoment = {
   liked: boolean;
   createdAt: string;
 };
-export type LiveComment = { id: string; author: MomentAuthor; text: string; createdAt: string };
+export type LiveComment = { id: string; author: MomentAuthor; text: string; likes: number; liked: boolean; createdAt: string };
+/** Whether I may post: Yankı Lv.`needLevel` (`need` points, I have `points`), or staff (server/api/moments.mjs). */
+export type Posting = { allowed: boolean; needLevel: number; need: number; points: number };
 /** Önerilen = popular (the last 7 days by likes and comments), Son = recent, Arkadaşlar = friends (whom I follow, and me). */
 export type FeedTab = 'popular' | 'recent' | 'friends';
 
@@ -27,15 +29,28 @@ function know(a: MomentAuthor) {
   putServerUser({ id: a.id, name: a.name, ...(a.avatarUrl && { avatar: a.avatarUrl }), ...(a.gender && { gender: a.gender }), ...(typeof a.age === 'number' && { age: a.age }) });
 }
 
-export async function feed(q: { tab?: FeedTab; topic?: string | null; user?: string; before?: string }): Promise<LiveMoment[]> {
+type FeedQuery = { tab?: FeedTab; topic?: string | null; user?: string; before?: string };
+
+/** A page of posts, and whether I may post (an older server leaves `posting` out). */
+export async function feedPage(q: FeedQuery): Promise<{ moments: LiveMoment[]; posting: Posting | null }> {
   const p = new URLSearchParams();
   if (q.tab) p.set('tab', q.tab);
   if (q.topic) p.set('topic', q.topic);
   if (q.user) p.set('user', q.user);
   if (q.before) p.set('before', q.before);
-  const r = await api.apiRequest<{ moments: LiveMoment[] }>('GET', `/api/moments?${p}`);
+  const r = await api.apiRequest<{ moments: LiveMoment[]; posting?: Posting }>('GET', `/api/moments?${p}`);
   r.moments.forEach((m) => know(m.author));
-  return r.moments;
+  return { moments: r.moments, posting: r.posting ?? null };
+}
+
+export const feed = async (q: FeedQuery): Promise<LiveMoment[]> => (await feedPage(q)).moments;
+
+/** The server's refusal of a post below Yankı Lv.5 (403 code charm), with where I stand; else null. */
+export function postingRefusal(e: unknown): Posting | null {
+  if (!(e instanceof api.ApiError) || e.data.code !== 'charm') return null;
+  const d = e.data as { needLevel?: unknown; need?: unknown; points?: unknown };
+  const n = (v: unknown, or: number) => (typeof v === 'number' && Number.isFinite(v) ? v : or);
+  return { allowed: false, needLevel: n(d.needLevel, 5), need: n(d.need, 250), points: n(d.points, 0) };
 }
 
 /** A new post; the photo (if any) goes to the storage first. `ref` makes a retry of the same post count once. */
@@ -63,6 +78,8 @@ export async function comment(id: string, text: string, ref = api.newRef()): Pro
 }
 
 export const removeComment = (id: string) => api.apiRequest<{ deleted: true }>('POST', '/api/moments/comment/delete', { id });
+
+export const likeComment = (id: string, on: boolean) => api.apiRequest<{ liked: boolean; likes: number }>('POST', '/api/moments/comment/like', { id, like: on });
 
 /** "5 dakika önce", "3 saat önce", "2 gün önce", or the date for older posts. */
 export function agoText(iso: string, now = Date.now()) {

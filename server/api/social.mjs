@@ -79,6 +79,7 @@ export async function eraseAccount(c, id, phone) {
     await c.query("UPDATE calls SET status = CASE WHEN status = 'live' THEN 'ended' ELSE 'cancelled' END, end_reason = 'deleted', ended_at = now() WHERE (caller = $1 OR callee = $1) AND status IN ('ringing', 'live')", [id]);
     // Anlar: their posts (with the likes and comments on them), their likes and comments elsewhere.
     await c.query('DELETE FROM moment_likes WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM moment_comment_likes WHERE user_id = $1', [id]);
     await c.query('DELETE FROM moment_comments WHERE author = $1', [id]);
     await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);

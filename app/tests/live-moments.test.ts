@@ -6,6 +6,8 @@
 import { register } from 'node:module';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
 register('./api-stub-hooks.mjs', import.meta.url);
 process.env.EXPO_PUBLIC_API_URL = 'http://api.test';
@@ -83,5 +85,37 @@ describe('Anlar sunucudan', () => {
     assert.equal(agoText('2026-11-07T09:00:00.000Z', now), '3 saat önce');
     assert.equal(agoText('2026-11-05T12:00:00.000Z', now), '2 gün önce');
     assert.match(agoText('2026-10-01T12:00:00.000Z', now), /^01\.10\.2026$/);
+  });
+
+  test('paylaşım Yankı Lv.5 ile açılır: telefonun eğrisi sunucunun 250 puanıyla aynı', async () => {
+    const { CHARM_XP } = await import('@/data/charm');
+    assert.equal(CHARM_XP[5], 250);
+    const server = fs.readFileSync(path.join(import.meta.dirname, '../../server/api/moments.mjs'), 'utf8');
+    assert.match(server, /POST_LEVEL = 5;/);
+    assert.match(server, /MOMENT_CHARM \?\? 250\)/);
+  });
+
+  test('akış paylaşım iznini getirir; Yankı yetmeyince ret ne kadar kaldığını söyler', async () => {
+    const { feedPage, post, postingRefusal } = await moments();
+    const posting = { allowed: false, needLevel: 5, need: 250, points: 40 };
+    route = () => ({ body: { moments: [MOMENT], posting } });
+    assert.deepEqual((await feedPage({})).posting, posting);
+    route = () => ({ body: { moments: [] } });
+    assert.equal((await feedPage({})).posting, null, 'eski sunucu: izin bilinmiyor');
+    route = () => ({ status: 403, body: { error: "Anlar'da paylaşım Yankı Lv.5 ve üstü için", code: 'charm', ...posting } });
+    const e = await post('Merhaba', null, null).then(
+      () => null,
+      (x: unknown) => x,
+    );
+    assert.deepEqual(postingRefusal(e), posting);
+    assert.equal(postingRefusal(new Error('başka')), null);
+  });
+
+  test('yorum beğenme sunucuya yorumun kimliğiyle gider', async () => {
+    const { likeComment } = await moments();
+    route = () => ({ body: { liked: true, likes: 3 } });
+    assert.deepEqual(await likeComment('77', true), { liked: true, likes: 3 });
+    assert.deepEqual(seen[0].body, { id: '77', like: true });
+    assert.equal(seen[0].path, '/api/moments/comment/like');
   });
 });

@@ -181,6 +181,19 @@ export async function giftDiamonds(c, { sender, recipient, parts, total, label, 
   return locks;
 }
 
+/**
+ * Yankı points (app/src/data/charm.ts CHARM_XP): the diamonds others gave this person in gifts, less what a refund
+ * took back ("İade: …"). Only giftDiamonds credits diamonds with a counterparty.
+ */
+export async function charmPoints(c, userId) {
+  const r = await c.query(
+    `SELECT coalesce(sum(amount), 0) AS n FROM ledger
+      WHERE user_id = $1 AND currency = 'diamond' AND counterparty IS NOT NULL AND counterparty <> $1 AND (amount > 0 OR reason ~ '^İade:')`,
+    [userId],
+  );
+  return Math.max(0, Number(r.rows[0].n));
+}
+
 /** An account's diamonds: all of them, those still locked, and those that may leave. */
 export async function diamondState(c, userId) {
   const r = await c.query(
