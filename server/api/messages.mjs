@@ -1,15 +1,18 @@
 // Direct messages, stored on the server so they survive reinstalls and reach the other phone.
 //
-//   POST /api/messages       { to, text, ref }      → { message, replay }
+//   POST /api/messages       { to, text, ref }      → { message, replay, price?, coins? }
 //   GET  /api/messages?with=&before=                → { messages }       (newest first, 50 per page)
 //   GET  /api/conversations                         → { conversations }  (last message and unread count)
 //   POST /api/messages/read  { with }               → { read }
 // Messages to or from someone either side has blocked are refused. A new message rings the recipient's
 // phone (push.mjs); an open app polls. At most 30 messages a minute per person, against spam. A message that
 // shares a phone number, IBAN, e-mail, link or social media account is refused (contact-filter.mjs).
-import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, limit, publicText, readJson, userId } from './core.mjs';
+// A message from someone who isn't a streamer to a streamer they don't follow each other with costs dm_price
+// coins (one-on-one.mjs pairOf), paid with the message; the answer then carries the sender's coins.
+import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
+import { pairOf, payOneOnOne } from './one-on-one.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 
@@ -49,15 +52,37 @@ export const messageRoutes = {
     if (!peer.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiye mesaj gönderemezsin');
     await assertNoSplitNumber(me, to, body, b.ref);
-    const r = await db.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, b.ref]);
-    if (r.rowCount) {
-      notify([to], { title: me.name, body, data: { type: 'message', from: me.id } });
-      // Talking back and forth raises a bond; never fails the message.
-      bondTalk(me.id, to, Number(r.rows[0].id)).catch((e) => console.error('bond talk', e.message));
-      return { message: out(r.rows[0]), replay: false };
+    const insert = (c) => c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, b.ref]);
+    const replay = async () => ({ message: out((await db.query('SELECT * FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref])).rows[0]), replay: true });
+    let row;
+    let price = 0;
+    if ((await pairOf(db, me.id, to)).dmPrice > 0) {
+      // A paid message: sent and paid together, or neither (a short balance is a 409, code insufficient).
+      const prev = await db.query('SELECT 1 FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref]);
+      if (prev.rowCount) return replay();
+      row = await tx(async (c) => {
+        await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[me.id, to]]);
+        const pair = await pairOf(c, me.id, to);
+        const r = await insert(c);
+        if (!r.rowCount) return null;
+        price = pair.dmPrice;
+        const id = Number(r.rows[0].id);
+        if (price > 0) await payOneOnOne(c, { kind: 'message', payer: me.id, earner: pair.earner, coins: price, ref: `msg-${id}`, label: 'Mesaj ücreti', income: `msg:${id}`, messageId: id });
+        return r.rows[0];
+      }).catch((e) => {
+        if (e.code === '23505') return null;
+        throw e;
+      });
+    } else {
+      row = (await insert(db)).rows[0];
     }
-    const prev = await db.query('SELECT * FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref]);
-    return { message: out(prev.rows[0]), replay: true };
+    if (!row) return replay();
+    notify([to], { title: me.name, body, data: { type: 'message', from: me.id } });
+    // Talking back and forth raises a bond; never fails the message.
+    bondTalk(me.id, to, Number(row.id)).catch((e) => console.error('bond talk', e.message));
+    if (!price) return { message: out(row), replay: false };
+    const coins = Number((await db.query('SELECT coins FROM users WHERE id = $1', [me.id])).rows[0].coins);
+    return { message: out(row), replay: false, price, coins };
   },
 
   async 'GET /api/messages'(req, url) {

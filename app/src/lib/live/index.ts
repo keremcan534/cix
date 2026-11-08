@@ -20,10 +20,14 @@ import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
 /**
- * One-to-one calls and Hemen Tanış only run on this phone (simulated peer, local per-minute charge): the server
- * has no matching, call signalling or call billing yet. A live build hides them instead of charging for a fake call.
+ * The simulated calls and Hemen Tanış (a demo build: simulated peer, local per-minute charge). A live build has
+ * its own, run by the server (liveCalls, lib/live/one-on-one).
  */
 export const callsAvailable = () => !liveMode();
+/** Real calls and Eşleşme: the server and the LiveKit address (the voice and video go through LiveKit). */
+export const liveCalls = () => liveMode() && !!process.env.EXPO_PUBLIC_LIVEKIT_URL;
+/** Calls and Hemen Tanış can be opened in this build (the demo's or the server's). */
+export const oneOnOneOpen = () => callsAvailable() || liveCalls();
 
 let myId: string | null = null;
 /** My server id once signed in. */

@@ -22,7 +22,7 @@ import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 import { casinoVisible } from '@/lib/games';
-import { callsAvailable, liveMode, myServerId, useServerRooms } from '@/lib/live';
+import { liveMode, myServerId, oneOnOneOpen, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
 import { loadFollowList, type FollowSide } from '@/lib/live/follows';
@@ -40,7 +40,7 @@ const GROWTH: Item[] = [
   { icon: 'git-network-outline', label: 'Üye ağım ve komisyonlar', onPress: () => router.push('/ajans/ag'), agencyOnly: true, localOnly: true },
   { icon: 'add-circle-outline', img: 'briefcase', label: 'Ajansa katıl / ajans başvurusu', onPress: () => router.push('/ajans'), noAgencyOnly: true },
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
-  ...(callsAvailable() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
+  ...(oneOnOneOpen() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true },

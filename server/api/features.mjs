@@ -39,6 +39,9 @@ export const ROUTES = {
   'POST /api/shop/buy': ['shop'],
   'POST /api/wallet/spend': ['shop'],
   'POST /api/messages': ['dm'],
+  // New calls and matches; a live one can still be answered, charged and ended.
+  'POST /api/calls': ['dm'],
+  'POST /api/match/join': ['dm'],
   'POST /api/rooms': ['rooms'],
   // The voice token: without it nobody joins a room.
   'GET /token': ['rooms'],

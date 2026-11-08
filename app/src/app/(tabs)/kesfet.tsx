@@ -21,7 +21,7 @@ import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
-import { callsAvailable, liveMode, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
+import { liveMode, oneOnOneOpen, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
 import type { DiscoverList } from '@/lib/api';
 
 const TABS = ['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'] as const;
@@ -94,7 +94,7 @@ export default function DiscoverScreen() {
           <View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
               {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
-              {DISCOVER_SHORTCUTS.filter((s) => (s.id !== 'call' || callsAvailable()) && (s.id !== 'tribe' || !live)).map((s) => (
+              {DISCOVER_SHORTCUTS.filter((s) => (s.id !== 'call' || oneOnOneOpen()) && (s.id !== 'tribe' || !live)).map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
                   {/* The shortcut's color lights a navy card from the top instead of filling it. */}
                   <LinearGradient colors={[`${s.colors[1]}${dark ? '5C' : '33'}`, dark ? 'rgba(22,37,60,0.94)' : 'rgba(255,255,255,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>

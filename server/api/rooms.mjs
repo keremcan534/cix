@@ -181,7 +181,8 @@ const seatNo = (v) => int(v, 1, 99);
 export async function voiceAccess(name, u, password) {
   const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
   if (!m) {
-    if (PROTOTYPE_ROOMS) return;
+    // A 1v1 call's room (one-on-one.mjs) is only ever joined with the call's own token.
+    if (PROTOTYPE_ROOMS && !name.startsWith('call-')) return;
     throw new HttpError(404, 'Oda bulunamadı');
   }
   const r = await db.query('SELECT * FROM rooms WHERE id = $1', [m[1]]);
@@ -205,6 +206,14 @@ export async function voiceAccess(name, u, password) {
  * from it or from the app, and the owner hasn't blocked them. 'closed' when the room itself should end.
  */
 export async function mayStay(name, identity) {
+  // A 1v1 call (one-on-one.mjs): its two people, while it is live.
+  const call = /^call-(\d{1,18})$/.exec(name);
+  if (call) {
+    const k = await db.query('SELECT caller, callee, status FROM calls WHERE id = $1', [call[1]]);
+    if (!k.rowCount || k.rows[0].status !== 'live') return 'closed';
+    return identity === k.rows[0].caller || identity === k.rows[0].callee ? 'yes' : 'no';
+  }
+  if (name.startsWith('call-')) return 'closed';
   const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
   if (!m) return PROTOTYPE_ROOMS ? 'yes' : 'closed';
   const r = await db.query('SELECT id, owner, closed_at FROM rooms WHERE id = $1', [m[1]]);

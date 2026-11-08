@@ -2,7 +2,7 @@
 // tests can hold them to the server's rules (server/api/live-registry.mjs): the server checks every value again
 // and its dryRun preview is what the admin confirms; these only keep the panel honest before anyone taps.
 // Times are Istanbul time (UTC+3 all year since 2016), whatever the phone's own time zone.
-import type { CatalogCampaign, LiveKey, LiveValue } from '@/lib/api';
+import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey } from '@/lib/api';
 import { RULES } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { campaignCoins } from '@/lib/live/catalog-live';
@@ -80,10 +80,30 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       return typeof after === 'number' && after > 1000;
     case 'min_version':
       return after !== null;
+    case 'dm_price':
+    case 'call_voice_price':
+    case 'call_video_price':
+    case 'match_voice_price':
+    case 'match_video_price':
+      // A price that more than doubles or halves.
+      return typeof after === 'number' && typeof before === 'number' && (after > before * 2 || after * 2 < before);
     default:
       return false;
   }
 }
+
+/** The 1v1 settings in the order the admin card shows them, with each one's unit. */
+export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
+  { key: 'dm_price', unit: ' jeton' },
+  { key: 'call_voice_price', unit: ' jeton' },
+  { key: 'call_video_price', unit: ' jeton' },
+  { key: 'heart_voice_level', unit: '' },
+  { key: 'heart_video_level', unit: '' },
+  { key: 'match_free', unit: '' },
+  { key: 'match_free_seconds', unit: ' saniye' },
+  { key: 'match_voice_price', unit: ' jeton' },
+  { key: 'match_video_price', unit: ' jeton' },
+];
 
 // --- Values as text ------------------------------------------------------------------------------------------
 export const FEATURE_LABEL: Record<string, string> = {
@@ -145,6 +165,19 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} elmas` : String(v);
     case 'otp_global_per_hour':
       return typeof v === 'number' ? (v === 0 ? 'SMS durdu' : `Saatte ${fmtNum(v)}`) : String(v);
+    case 'dm_price':
+    case 'call_voice_price':
+    case 'call_video_price':
+    case 'match_voice_price':
+    case 'match_video_price':
+      return typeof v === 'number' ? (v === 0 ? 'Ücretsiz' : `${fmtNum(v)} jeton`) : String(v);
+    case 'match_free_seconds':
+      return typeof v === 'number' ? `${fmtNum(v)} saniye` : String(v);
+    case 'heart_voice_level':
+    case 'heart_video_level':
+      return typeof v === 'number' ? (v === 0 ? 'Hemen' : `Kalp Lv.${v}`) : String(v);
+    case 'match_free':
+      return typeof v === 'number' ? `24 saatte ${v}` : String(v);
     default:
       return String(v);
   }

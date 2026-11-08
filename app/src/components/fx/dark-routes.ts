@@ -7,7 +7,7 @@
 const ALWAYS_DARK = /^(oda|ajans)(\/|$)/;
 /**
  * A call and Hemen Tanış are full-screen calls, so they are dark too, but only while calls exist: without them
- * (lib/live callsAvailable) the same routes show the "Yakında" placeholder, which follows the app's theme like
+ * (lib/live oneOnOneOpen) the same routes show the "Yakında" placeholder, which follows the app's theme like
  * /eslesme does (gorsel-22 g).
  */
 const CALL_SCREENS = /^(arama|tanis)(\/|$)/;

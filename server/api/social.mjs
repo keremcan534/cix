@@ -74,6 +74,9 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
+    // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
+    await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
+    await c.query("UPDATE calls SET status = CASE WHEN status = 'live' THEN 'ended' ELSE 'cancelled' END, end_reason = 'deleted', ended_at = now() WHERE (caller = $1 OR callee = $1) AND status IN ('ringing', 'live')", [id]);
     // Anlar: their posts (with the likes and comments on them), their likes and comments elsewhere.
     await c.query('DELETE FROM moment_likes WHERE user_id = $1', [id]);
     await c.query('DELETE FROM moment_comments WHERE author = $1', [id]);
@@ -206,8 +209,8 @@ export const socialRoutes = {
    * Keşfet: real people. Men see women and women see men (anyone, while either of the two hasn't given a gender);
    * blocks either way and deleted accounts are left out. `list`: 'home' (most recently active first), 'new' (newest
    * accounts first) or 'featured', who 1v1 lifts in the last 30 days: for a streamer, the people who spent most on
-   * gifts in private chats; for anyone else, the agency streamers who earned most there (all streamers, the earners
-   * first). Paid messages and calls join the score when they are on the server.
+   * them in private (chat gifts, paid messages, paid call and match minutes: paid_events); for anyone else, the agency
+   * streamers who earned most there (all streamers, the earners first).
    */
   async 'GET /api/discover'(req, url) {
     const me = await auth(req);
@@ -217,8 +220,10 @@ export const socialRoutes = {
     const streamer = list === 'featured' && (await db.query(`SELECT ${live.replace('$X', '$1')} AS yes`, [me.id])).rows[0].yes;
     // 1v1 coins in the window: given by them (to me, a streamer) or received by them (anyone else).
     const score = list !== 'featured' ? '0' : streamer
-      ? `(SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.sender = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')`
-      : `(SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.recipient = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')`;
+      ? `((SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.sender = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')
+          + (SELECT coalesce(sum(p.coins), 0) FROM paid_events p WHERE p.payer = u.id AND p.earner = $1 AND p.created_at > now() - interval '30 days'))`
+      : `((SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.recipient = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')
+          + (SELECT coalesce(sum(p.coins), 0) FROM paid_events p WHERE p.earner = u.id AND p.created_at > now() - interval '30 days'))`;
     const only = list !== 'featured' ? '' : streamer
       ? `AND ${score} > 0`
       : `AND ${live.replace('$X', 'u.id')}`;

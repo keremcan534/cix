@@ -648,7 +648,19 @@ export type LiveKey =
   | 'exchange_usd_try'
   | 'withdraw_max_diamonds'
   | 'withdraw_weekly_diamonds'
-  | 'otp_global_per_hour';
+  | 'otp_global_per_hour'
+  | OneOnOneKey;
+/** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
+export type OneOnOneKey =
+  | 'dm_price'
+  | 'call_voice_price'
+  | 'call_video_price'
+  | 'match_voice_price'
+  | 'match_video_price'
+  | 'match_free'
+  | 'match_free_seconds'
+  | 'heart_voice_level'
+  | 'heart_video_level';
 /** A setting's value: a list of ids, text, a number, a campaign, or null for the built-in default. */
 export type LiveValue = string | number | string[] | CatalogCampaign | null;
 export type LiveSetting = {

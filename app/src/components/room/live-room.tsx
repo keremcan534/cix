@@ -81,7 +81,7 @@ import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { callsAvailable, isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
@@ -2176,7 +2176,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items: [
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
         ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
-        ...(callsAvailable() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
+        ...(oneOnOneOpen() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
         // The room envelope isn't on the server: live mode doesn't offer it.
         ...(!liveMode() ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel('envelope') }] : []),
         { key: 'tasks', label: 'Günlük görev', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },

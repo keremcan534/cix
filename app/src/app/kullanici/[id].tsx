@@ -32,7 +32,8 @@ import {
 } from '@/data/profile';
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
-import { callsAvailable, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
+import { callsAvailable, liveCalls, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
+import { callLabel, callPair, usePair } from '@/components/one-on-one-bar';
 import { loadFollowList, type FollowSide } from '@/lib/live/follows';
 import { agoText, feed as momentFeed } from '@/lib/live/moments';
 import { followOnServer, loadMe, loadPublicProfile, profilePatch, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
@@ -207,6 +208,8 @@ export default function UserProfile() {
 
   const [tab, setTab] = useState<Tab>('profil');
   const [sheet, setSheet] = useState<Sheet>('none');
+  // A live build: calls are the server's (1v1): what they cost and which are open between the two of us.
+  const { pair } = usePair(id, liveCalls() && !isMe && !!serverId);
   const [editOpen, setEditOpen] = useState(false);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
   const [tabY, setTabY] = useState(0);
@@ -867,6 +870,7 @@ export default function UserProfile() {
           </Pressable>
           <BarButton icon="chatbubble-ellipses" label="Mesaj" off={!can('message').ok} onPress={() => guard('message', () => router.push(`/sohbet/${user.id}`))} />
           {callsAvailable() && <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />}
+          {!callsAvailable() && pair && !blocked.has(user.id) && <BarButton icon="call" label="Ara" off={!pair.calls.voice.open && !pair.calls.video.open} onPress={() => setSheet('call')} />}
           {giftable && <BarButton icon="gift" label="Hediye" highlight off={!can('gift').ok} onPress={() => guard('gift', () => setSheet('gift'))} />}
         </SafeAreaView>
       )}
@@ -907,10 +911,17 @@ export default function UserProfile() {
         visible={sheet === 'call'}
         title={`${user.name} ile arama`}
         onClose={() => setSheet('none')}
-        options={[
-          { label: `📞 Sesli arama · 🪙 ${Math.round(callPrice(user) / 2)}/dk${can('voice').ok ? '' : ' · kapalı'}`, onPress: () => call('sesli') },
-          { label: `🎥 Görüntülü arama · 🪙 ${callPrice(user)}/dk${can('video').ok ? '' : ' · kapalı'}`, onPress: () => call('goruntulu') },
-        ]}
+        options={
+          pair
+            ? [
+                { label: callLabel(pair, 'voice'), icon: 'call-outline', onPress: () => callPair(user.id, pair, 'voice') },
+                { label: callLabel(pair, 'video'), icon: 'videocam-outline', onPress: () => callPair(user.id, pair, 'video') },
+              ]
+            : [
+                { label: `📞 Sesli arama · 🪙 ${Math.round(callPrice(user) / 2)}/dk${can('voice').ok ? '' : ' · kapalı'}`, onPress: () => call('sesli') },
+                { label: `🎥 Görüntülü arama · 🪙 ${callPrice(user)}/dk${can('video').ok ? '' : ' · kapalı'}`, onPress: () => call('goruntulu') },
+              ]
+        }
       />
       {serverId && (
         <FollowListSheet

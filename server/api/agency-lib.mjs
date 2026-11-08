@@ -11,7 +11,8 @@ import { HttpError, db } from './core.mjs';
 export const DIAMONDS_PER_USD = 5000;
 /** The first release runs two agency levels (top, sub). The data model allows more; settings can't exceed this. */
 export const MAX_LEVELS_V1 = 2;
-export const INCOME_TYPES = ['gift', 'lucky_gift', 'campaign', 'bonus', 'task_reward', 'refund', 'other'];
+// 'message' and 'call': 1v1 paid messages and call or match minutes (one-on-one.mjs).
+export const INCOME_TYPES = ['gift', 'lucky_gift', 'campaign', 'bonus', 'task_reward', 'refund', 'other', 'message', 'call'];
 export const CRITERIA = ['volume', 'active', 'average', 'growth', 'retention', 'acquisition', 'operations', 'reliability'];
 
 // --- Permission catalog (action types the code enforces; roles that bundle them are data) --------------------
@@ -62,7 +63,7 @@ export const DEFAULTS = {
   // limit), later or once out of an agency only by a transfer the centre approves; no leaving without one; a second
   // account on the same device goes to the agency of the first.
   streamer_policy: { women_only: true, pick_days: 3, can_leave: false, one_agency_per_person: true },
-  income_types: { gift: true, lucky_gift: true, campaign: false, bonus: false, task_reward: false, refund: true, other: false },
+  income_types: { gift: true, lucky_gift: true, campaign: false, bonus: false, task_reward: false, refund: true, other: false, message: true, call: true },
   commission_period: 'month',
   period_close_days: 7,
   payout_policy: { min_diamonds: 50000, currencies: ['USD', 'TRY'], two_person: true },
@@ -122,7 +123,7 @@ export function validateSetting(key, value, cur) {
       };
     }
     case 'income_types': {
-      const v = { ...cur.income_types, ...obj(value, key) };
+      const v = { ...DEFAULTS.income_types, ...cur.income_types, ...obj(value, key) };
       return Object.fromEntries(INCOME_TYPES.map((t) => [t, bool(v[t], t)]));
     }
     case 'commission_period':
@@ -472,7 +473,8 @@ export async function calcEvent(c, eventId) {
   const done = (status) => c.query('UPDATE income_events SET calc_status = $2 WHERE id = $1', [ev.id, status]);
   const link = await c.query('SELECT agency_id, joined_at FROM agency_streamers WHERE streamer_id = $1 AND joined_at <= $2 AND (ended_at IS NULL OR ended_at > $2) ORDER BY joined_at DESC LIMIT 1', [ev.streamer_id, t]);
   if (!link.rowCount) return (await done('no_agency'), null);
-  if (!s.income_types[ev.source_type]) return (await done('excluded'), null);
+  // A type added after the settings were stored counts as its default.
+  if (!(s.income_types[ev.source_type] ?? DEFAULTS.income_types[ev.source_type])) return (await done('excluded'), null);
   // No agency commission through a man's account (streamer_policy.women_only).
   if (s.streamer_policy.women_only) {
     const g = await c.query('SELECT gender FROM users WHERE id = $1', [ev.streamer_id]);

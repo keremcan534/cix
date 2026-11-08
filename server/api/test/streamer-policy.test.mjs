@@ -133,7 +133,7 @@ describe('Yayıncı kuralları', () => {
     assert.equal(l.end_reason, 'policy_gender');
   });
 
-  test('Gelir kaynakları: oda, Anlar, profil hediyeleri ayrı; arama ve mesaj ücreti 0', async () => {
+  test('Gelir kaynakları: oda, Anlar, profil hediyeleri ayrı; arama ve mesaj ücreti 0 (birebir yoksa)', async () => {
     const [giver, host] = await Promise.all([account('Veren', null), account('Alan')]);
     await q("INSERT INTO coin_lots (user_id, channel, amount, remaining, lock_hours, ref) VALUES ($1, 'google', 100000, 100000, 0, $2)", [giver.id, ref()]);
     await q('UPDATE users SET coins = coins + 100000 WHERE id = $1', [giver.id]);
@@ -149,7 +149,8 @@ describe('Yayıncı kuralları', () => {
     assert.equal(by.profile.diamonds, gift.price);
     assert.equal(by.other.diamonds, gift.price);
     assert.equal(by.chat.diamonds, 0);
-    assert.equal(by.voice_call.live, false);
+    assert.equal(by.voice_call.diamonds, 0);
+    assert.equal(by.message_fee.diamonds, 0);
     assert.equal(inc.total, gift.price * 4);
     refused(await host.get('/api/wallet/income?period=year'), 400);
   });

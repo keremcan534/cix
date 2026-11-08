@@ -47,6 +47,7 @@ import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } fr
 import { mediaRoutes } from './media.mjs';
 import { messageRoutes } from './messages.mjs';
 import { momentRoutes } from './moments.mjs';
+import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
 import { pushRoutes } from './push.mjs';
@@ -214,6 +215,7 @@ const routes = {
   ...liveRoutes,
   ...socialRoutes,
   ...messageRoutes,
+  ...oneOnOneRoutes,
   ...momentRoutes,
   ...roomRoutes,
   ...adminRoutes,
@@ -304,6 +306,7 @@ function shutdown(signal) {
   stopSanctionSweep();
   stopLiveSync();
   stopOtpSweep();
+  stopCallSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -325,3 +328,4 @@ startBondSweep();
 startSanctionSweep();
 startLiveSync();
 startOtpSweep();
+startCallSweep();

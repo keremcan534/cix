@@ -46,6 +46,15 @@ describe('defaults are today', () => {
       withdraw_max_diamonds: WITHDRAW.maxDiamonds,
       withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
       otp_global_per_hour: 300,
+      dm_price: 240,
+      call_voice_price: 2000,
+      call_video_price: 3200,
+      match_voice_price: 600,
+      match_video_price: 750,
+      match_free: 3,
+      match_free_seconds: 58,
+      heart_voice_level: 2,
+      heart_video_level: 4,
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -72,6 +81,15 @@ describe('defaults are today', () => {
       'withdraw_weekly_diamonds',
       'otp_global_per_hour',
       'min_version',
+      'dm_price',
+      'call_voice_price',
+      'call_video_price',
+      'match_voice_price',
+      'match_video_price',
+      'match_free',
+      'match_free_seconds',
+      'heart_voice_level',
+      'heart_video_level',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);

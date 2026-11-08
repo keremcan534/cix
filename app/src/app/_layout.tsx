@@ -15,6 +15,7 @@ import { Intro } from '@/components/fx/intro';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
+import { IncomingCall } from '@/components/incoming-call';
 import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
 import { SanctionLayer } from '@/components/sanction-screen';
@@ -158,6 +159,7 @@ function RootStack() {
       {loggedIn && <LiveSync />}
       {loggedIn && <RoomHost />}
       {loggedIn && <MatchLayer />}
+      {loggedIn && <IncomingCall />}
       {loggedIn && <GamesBridge />}
       {/* Over everything, signed in or not: a ban refusal can come from the sign-in screen itself. */}
       <SanctionLayer signedIn={loggedIn} />

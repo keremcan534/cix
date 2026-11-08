@@ -31,6 +31,7 @@ import {
   fmtRate,
   istanbulHour,
   MONEY_STOP,
+  ONE_ON_ONE_KEYS,
   parseRate,
   parseWhole,
   PURCHASE_WARNING,
@@ -198,6 +199,7 @@ function Body({
             <PacksCard kit={kit} />
             <RateCard kit={kit} />
             <WithdrawCard kit={kit} />
+            {kit.get('dm_price') && <OneOnOneCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -655,6 +657,61 @@ function WithdrawCard({ kit }: { kit: Kit }) {
           onPress={() => kit.open('Para çekme sınırları değişsin', () => changes)}
           style={{ flex: 1 }}
         />
+      </View>
+    </Card>
+  );
+}
+
+// --- Birebir ve eşleşme --------------------------------------------------------------------------------------
+/**
+ * The 1v1 prices, the heart levels that open calls, and Eşleşme's free matches, saved together. A call keeps the
+ * price it started with; a price that more than doubles or halves asks twice.
+ */
+function OneOnOneCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const rows = ONE_ON_ONE_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
+  const changes: LiveChanges = {};
+  const errors: Record<string, string | null> = {};
+  for (const r of rows) {
+    const v = parseWhole(texts[r.key] ?? '');
+    const changed = v !== r.x.effective;
+    errors[r.key] = changed ? wholeError(v, r.x.bounds as IntBounds, r.x.label, r.unit) : null;
+    if (changed && v !== null) changes[r.key] = v;
+  }
+  const dirty = Object.keys(changes).length > 0;
+  const bad = rows.some((r) => errors[r.key]);
+  const reset: LiveChanges = {};
+  for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
+  const voice = numOf(kit.get('heart_voice_level')?.effective);
+  const video = numOf(kit.get('heart_video_level')?.effective);
+  return (
+    <Card title="Birebir ve eşleşme" footer={lastChange(...rows.map((r) => r.x))} pill={<InvalidPill x={rows.find((r) => r.x.invalid)?.x} />}>
+      <Text style={s.hint}>Yalnız yayıncı ile yayıncı olmayan arasında ücret alınır; ödeyen yayıncı olmayandır, yayıncı aynı sayıda elmas kazanır. Süren aramalar başladıkları fiyatla devam eder.</Text>
+      {rows.map((r) => (
+        <View key={r.key}>
+          <Field
+            label={r.x.label}
+            value={texts[r.key] ?? ''}
+            onChange={(t) => setTexts((m) => ({ ...m, [r.key]: t }))}
+            keyboard="numeric"
+            max={7}
+            hint={`Şu an ${valueText(r.key, r.x.effective)} · ${r.x.help}`}
+          />
+          <Problem text={errors[r.key] ?? null} />
+        </View>
+      ))}
+      {video < voice && <Text style={s.hint}>Görüntülü arama, sesli aramadan önce açılıyor; genelde görüntülü daha yüksek seviyede açılır.</Text>}
+      <View style={s.row}>
+        <Button
+          title="Varsayılana dön"
+          variant="ghost"
+          small
+          disabled={kit.locked || Object.keys(reset).length === 0}
+          onPress={() => kit.open('Birebir ayarları varsayılana dönsün', () => reset, 'Geri dönüş')}
+          style={{ flex: 1 }}
+        />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Birebir ayarları değişsin', () => changes)} style={{ flex: 1 }} />
       </View>
     </Card>
   );

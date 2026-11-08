@@ -8,12 +8,13 @@ import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { useReport } from '@/components/report-sheet';
 import { Text } from '@/components/text';
 import { ChatThread } from '@/components/chat-thread';
+import { CallButtons } from '@/components/one-on-one-bar';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { makeStyles, useTheme } from '@/theme';
 import { goBack } from '@/lib/nav';
-import { callsAvailable, liveMode, loadProfile } from '@/lib/live';
+import { callsAvailable, liveCalls, liveMode, loadProfile } from '@/lib/live';
 import { isLiveUser } from '@/lib/live/messages';
 import { useApp } from '@/store';
 
@@ -93,7 +94,7 @@ export default function ChatScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ChatThread
         user={user}
-        header={(typing) => (
+        header={(typing, pair) => (
           <View style={styles.header}>
             <Pressable onPress={() => goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Geri">
               <Ionicons name="chevron-back" size={26} color={colors.text} />
@@ -114,7 +115,9 @@ export default function ChatScreen() {
                 {!missing && <Text style={styles.status}>{typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : user.city}</Text>}
               </View>
             </Pressable>
-            {callsAvailable() && (
+            {!callsAvailable() ? (
+              liveCalls() && pair && !isBlocked && <CallButtons userId={user.id} pair={pair} />
+            ) : (
               <>
                 <Pressable onPress={() => router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } })} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sesli ara">
                   <Ionicons name="call-outline" size={22} color={colors.text} />

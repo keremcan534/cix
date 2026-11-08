@@ -66,7 +66,8 @@ export const isLiveUser = (id: string) => liveMode() && isServerId(id);
 
 /** What the store offers this file: applying a synced thread (lib/dm-thread applyThread). */
 export type Inbox = { importDms: (userId: string, dms: readonly ServerDm[], sync: ThreadSync, unread: number | null) => void };
-export type SendResult = { ok: true; message: api.DirectMessage } | { ok: false; reason: string; retry: boolean; contact?: boolean };
+/** `coins`: a paid message (1v1, lib/live/one-on-one) the balance couldn't pay. */
+export type SendResult = { ok: true; message: api.DirectMessage } | { ok: false; reason: string; retry: boolean; contact?: boolean; coins?: boolean };
 
 /** A retry can help: no connection, the rate limit, or the server failing. Other refusals stay the same. */
 const retryable = (e: unknown) => !(e instanceof api.ApiError) || e.status === 0 || e.status === 429 || e.status >= 500;
@@ -88,7 +89,8 @@ export function liveDm(to: string, text: string, ref: string, done: (r: SendResu
     .catch((e) => {
       // Muted for DMs (403 muted): the details and the appeal open, besides the note on the bubble.
       noteRefusal(e, true);
-      done({ ok: false, reason: message(e), retry: retryable(e), contact: isContactBlocked(e) });
+      const coins = e instanceof api.ApiError && (e.data.code === 'insufficient' || e.data.code === 'reward_coins_only');
+      done({ ok: false, reason: message(e), retry: retryable(e), contact: isContactBlocked(e), coins });
     });
 }
 

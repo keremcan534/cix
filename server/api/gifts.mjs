@@ -107,6 +107,8 @@ export const giftRoutes = {
         b.ref,
       ]);
       eventId = Number(g.rows[0].id);
+      // A gift from a chat shows in that chat, for both of them (a line of its own; no message price).
+      if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift-${b.ref}`]);
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
       await addBondCoins(c, u.id, to, total);
