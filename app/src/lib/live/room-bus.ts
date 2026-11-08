@@ -8,7 +8,8 @@
 //    later joiner doesn't. The phones send each other chat lines only. A gift is announced by the server after
 //    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
 //    fake one; a gift packet from a phone is dropped. The server also says when a PK starts or is cancelled
-//    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does;
+//    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does; and when a Şanslı çanta is dropped
+//    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
 //    mics, the layout, the mic count, the mic queue and who waits in it), which LiveKit hands every phone on join
 //    and on each change, and a seat the owner or an admin set for me (my own `seat` attribute changed by the server).
@@ -45,6 +46,7 @@ const signalListeners = new Set<(roomId: string, from: string, msg: RoomSignal) 
 const seatListeners = new Set<(roomId: string, seat: number | null) => void>();
 const pkListeners = new Set<(roomId: string) => void>();
 const roomListeners = new Set<(roomId: string) => void>();
+const bagListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 
@@ -118,6 +120,7 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
   if (from === null) {
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
     if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
+    if (isServerBag(raw)) return bagListeners.forEach((l) => l(roomId));
     const g = parseServerGift(raw) ?? parseServerLucky(raw);
     if (!g || seenGifts.includes(g.msg.eventId)) return;
     seenGifts.push(g.msg.eventId);
@@ -169,6 +172,8 @@ export const isServerPk = (raw: unknown) => !!raw && typeof raw === 'object' && 
 /** The server's room packet: the room's level, mics or layout changed (server/api/rooms.mjs, gifts.mjs, admin.mjs);
  *  read the room from the server. */
 export const isServerRoom = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'room';
+/** The server's bag packet: someone dropped a Şanslı çanta in the room (server/api/lucky-bags.mjs); read the bags. */
+export const isServerBag = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'bag';
 
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
@@ -207,6 +212,12 @@ export function onServerRoom(roomId: string, fn: () => void) {
   const l = (r: string) => r === roomId && fn();
   roomListeners.add(l);
   return () => void roomListeners.delete(l);
+}
+/** The server says a bag was dropped in this room; returns the unsubscribe. */
+export function onServerBag(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  bagListeners.add(l);
+  return () => void bagListeners.delete(l);
 }
 /** Shows the other phones which mic I sit on (null = Balkon). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);

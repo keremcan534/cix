@@ -8,6 +8,7 @@ import {
   decodeSignal,
   encodeSignal,
   getLivePeers,
+  onServerBag,
   onServerSeat,
   onSignal,
   parseRoomMeta,
@@ -166,4 +167,15 @@ test('sunucunun Uğurlu paketi: doğru biçim okunur, bozuk olan bırakılır, a
   reportSignal('oda-l', null, ok); // again after a reconnect: shown once
   off();
   assert.deepEqual(got, ['u-a:lk2#7']);
+});
+
+test('Şanslı çanta: yalnızca sunucunun çanta paketi o odanın çantalarını yeniden okutur', () => {
+  let n = 0;
+  const off = onServerBag('oda-c', () => n++);
+  reportSignal('oda-c', 'u-x', { type: 'bag', id: 3, from: 'u-x' }); // from a phone: dropped
+  reportSignal('oda-d', null, { type: 'bag', id: 3, from: 'u-a' }); // another room
+  reportSignal('oda-c', null, { type: 'bag', id: 3, from: 'u-a' });
+  off();
+  reportSignal('oda-c', null, { type: 'bag', id: 4, from: 'u-a' }); // after leaving
+  assert.equal(n, 1);
 });

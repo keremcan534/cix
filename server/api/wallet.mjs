@@ -38,6 +38,8 @@ export const CHANNELS = {
   odul: { label: 'Ödül jetonu', lock: 'store' },
   // Uğurlu hediye rewards (lucky.mjs): spent like any coin; what they pay for never counts for Cömertlik.
   ugurlu: { label: 'Uğurlu ödülü', lock: 'store' },
+  // Coins from someone's Şanslı çanta (lucky-bags.mjs); the store lock, whatever paid for them.
+  canta: { label: 'Şanslı çanta', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */

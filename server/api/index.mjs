@@ -45,6 +45,7 @@ import { familyRoutes } from './families.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
+import { luckyBagRoutes, startBagSweep, stopBagSweep } from './lucky-bags.mjs';
 import { messageRoutes } from './messages.mjs';
 import { momentRoutes } from './moments.mjs';
 import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
@@ -216,6 +217,7 @@ const routes = {
   ...socialRoutes,
   ...messageRoutes,
   ...oneOnOneRoutes,
+  ...luckyBagRoutes,
   ...momentRoutes,
   ...roomRoutes,
   ...adminRoutes,
@@ -307,6 +309,7 @@ function shutdown(signal) {
   stopLiveSync();
   stopOtpSweep();
   stopCallSweep();
+  stopBagSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -329,3 +332,4 @@ startSanctionSweep();
 startLiveSync();
 startOtpSweep();
 startCallSweep();
+startBagSweep();

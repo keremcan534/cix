@@ -45,6 +45,7 @@ import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLog
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
+import { LuckyBagCard, LuckyBagFloat, LuckyBagSheet, bagWhat } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
@@ -85,6 +86,7 @@ import { isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myS
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
+import { useRoomBags, type Bag } from '@/lib/live/lucky-bags';
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
@@ -472,7 +474,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
-  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session'>(null);
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -737,6 +739,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   });
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
+  // Şanslı çanta in a server room (lib/live/lucky-bags): the room's open bags; a new one gets a line in the chat.
+  const bags = useRoomBags(id, real && unlocked, (b) => !b.mine && !blocked.has(b.from.id) && sysNote(`🧧 ${b.from.name} Şanslı çanta attı: ${bagWhat(b)} · ${b.packets} pay`));
+  const [bagOpen, setBagOpen] = useState<Bag | null>(null);
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
@@ -2177,8 +2182,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
         ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
         ...(oneOnOneOpen() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
-        // The room envelope isn't on the server: live mode doesn't offer it.
-        ...(!liveMode() ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel('envelope') }] : []),
+        // Live mode: the server's Şanslı çanta, in a server room only (lib/live/lucky-bags); the demo keeps its envelope.
+        ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
         { key: 'tasks', label: 'Günlük görev', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
         { key: 'events', label: 'Aktivite', emoji: '🎉', art: ROOM_ICON_ART.activity, colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
         ...(canFunctions ? [{ key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') }] : []),
@@ -2782,6 +2787,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </SafeAreaView>
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
+      {real && bags.bags.length > 0 && <LuckyBagFloat bags={bags.bags.filter((b) => !blocked.has(b.from.id))} now={bags.now} onOpen={setBagOpen} />}
 
       <GiftSheet
         key={giftOpen ? `gift-open-${giftTo}` : 'gift-closed'}
@@ -2921,6 +2927,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onReject={(i) => setMusicRequests((l) => l.filter((_, j) => j !== i))}
       />
       <EnvelopeSendModal visible={panel === 'envelope'} onClose={closePanel} onSend={sendEnvelope} coins={coins} />
+      {real && panel === 'bag' && (
+        <LuckyBagSheet
+          visible
+          room={id}
+          rules={bags.rules}
+          coins={coins}
+          svipLevel={svipLevel}
+          onClose={closePanel}
+          onDropped={(b) => {
+            bags.put(b);
+            sysNote(`🧧 Şanslı çanta attın: ${bagWhat(b)} · ${b.packets} pay`);
+          }}
+        />
+      )}
+      {bagOpen && <LuckyBagCard bag={bagOpen} now={bags.now} onClose={() => setBagOpen(null)} onChange={bags.put} />}
       <DiceModal visible={panel === 'dice'} onClose={closePanel} onPlay={playDice} playsLeft={dicePlays} />
       <ContributionModal visible={panel === 'contrib'} onClose={closePanel} data={contrib} locked={isOwn && level < 3} />
       <RequestsModal
