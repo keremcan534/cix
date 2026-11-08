@@ -449,7 +449,7 @@ export const verifyPurchase = (proof: StoreProof) =>
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice' | 'music', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */

@@ -1,24 +1,38 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'notice', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'notice' | 'music', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
 // Settings in the server's .env: S3_ENDPOINT (https://<account>.r2.cloudflarestorage.com), S3_BUCKET,
 // S3_REGION (R2: auto), S3_KEY, S3_SECRET, S3_PUBLIC_URL (the bucket's public https address or CDN domain).
-// Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only.
+// Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
+// 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one.
 import crypto from 'node:crypto';
 
-import { HttpError, auth, env, limit, readJson } from './core.mjs';
+import { HttpError, auth, db, env, limit, readJson } from './core.mjs';
 
 const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4' };
+// What phones call the usual music files (the app names a file's type from its ending when the phone doesn't).
+const AUDIO = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const KINDS = {
   avatar: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 5 * 1024 * 1024 },
   moment: { types: Object.keys(TYPES), max: 50 * 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
+  music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
 };
 const EXPIRES = 10 * 60;
+
+/** Whether `uid` may keep a music library (music.mjs): they have a room, or run one or play in one. */
+export async function mayKeepMusic(uid) {
+  const r = await db.query(
+    `SELECT EXISTS (SELECT 1 FROM rooms WHERE owner = $1) OR EXISTS (SELECT 1 FROM room_admins WHERE user_id = $1)
+            OR EXISTS (SELECT 1 FROM room_djs WHERE user_id = $1) AS ok`,
+    [uid],
+  );
+  return r.rows[0].ok;
+}
 
 const hmac = (key, s) => crypto.createHmac('sha256', key).update(s).digest();
 const hex = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -61,10 +75,11 @@ export const mediaRoutes = {
     const k = typeof kind === 'string' && Object.hasOwn(KINDS, kind) ? KINDS[kind] : null;
     if (!k) throw new HttpError(400, 'Geçersiz yükleme türü');
     if (k.admin && u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    if (k.may && !(await k.may(u.id))) throw new HttpError(403, k.refused);
     if (!k.types.includes(contentType)) throw new HttpError(400, 'Bu dosya türü yüklenemez');
     if (!Number.isSafeInteger(size) || size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
     // Not guessable, and grouped by person so an account's files can be found (and removed) together.
-    const key = `${kind}/${u.id}/${Date.now().toString(36)}-${crypto.randomBytes(9).toString('base64url')}.${TYPES[contentType]}`;
+    const key = `${kind}/${u.id}/${Date.now().toString(36)}-${crypto.randomBytes(9).toString('base64url')}.${TYPES[contentType] ?? AUDIO[contentType]}`;
     const headers = { 'content-type': contentType, 'content-length': String(size) };
     const uploadUrl = presign({
       method: 'PUT',

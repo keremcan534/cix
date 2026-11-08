@@ -16,6 +16,7 @@ import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 import { looksOf, revokeAllForDelete } from './economy.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
+import { dropFromQueues } from './music.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -87,6 +88,10 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_admins WHERE user_id = $1', [id]);
+    // Room music: no longer a DJ; their library goes, and with it what they had queued in rooms.
+    await c.query('DELETE FROM room_djs WHERE user_id = $1', [id]);
+    await c.query('UPDATE music_tracks SET removed_at = now() WHERE owner = $1 AND removed_at IS NULL', [id]);
+    await dropFromQueues(c, 'added_by = $1 OR track_id IN (SELECT id FROM music_tracks WHERE owner = $1)', [id]);
     // Aile: out of their family (a leader hands it on), their requests and chat lines.
     await leaveFamily(c, id);
     await c.query('DELETE FROM family_requests WHERE user_id = $1', [id]);

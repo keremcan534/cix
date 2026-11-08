@@ -11,8 +11,9 @@
 //    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does; and when a Şanslı çanta is dropped
 //    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
-//    mics, the layout, the mic count, the mic queue and who waits in it), which LiveKit hands every phone on join
-//    and on each change, and a seat the owner or an admin set for me (my own `seat` attribute changed by the server).
+//    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs),
+//    which LiveKit hands every phone on join and on each change, and a seat the owner or an admin set for me (my
+//    own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
 
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
@@ -35,7 +36,14 @@ type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) =>
  * mic count (null = the level's most), whether the mic queue is on and who waits in it (server user ids, first
  * asked first). Null when the metadata has none of it (an older server, or nothing written yet).
  */
-export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[] };
+export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[]; music: RoomMusic | null };
+/** A track in the room's music queue: `key` its place in the queue, `by` who added it (server user id). */
+export type QueueTrack = { key: string; title: string; url: string; seconds: number; by: string; byName: string };
+/**
+ * The room's music (server/api/music.mjs): tracks[0] plays from `startedAt` (server ms, pauses taken out), the rest
+ * wait in order; `pausedAt` is when it was paused (null: playing). Both null when the queue is empty.
+ */
+export type RoomMusic = { tracks: QueueTrack[]; startedAt: number | null; pausedAt: number | null };
 type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; lockedSeats: number[]; state: RoomState | null };
 
 const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, lockedSeats: [], state: null };
@@ -90,10 +98,31 @@ export function parseRoomState(metadata: string | undefined): RoomState | null {
     const layoutId = typeof m.layoutId === 'string' && m.layoutId.length <= 40 ? m.layoutId : null;
     const micCount = Number.isInteger(m.micCount) && (m.micCount as number) >= 1 && (m.micCount as number) <= 99 ? (m.micCount as number) : null;
     const queue = Array.isArray(m.queue) ? [...new Set(m.queue.filter((x): x is string => typeof x === 'string' && !!x && x.length <= 64))].slice(0, 50) : [];
-    return { layoutId, micCount, micQueue: m.micQueue, queue };
+    return { layoutId, micCount, micQueue: m.micQueue, queue, music: parseMusic(m.music) };
   } catch {
     return null;
   }
+}
+
+const text = (v: unknown, max: number) => (typeof v === 'string' && v.length <= max ? v : null);
+const stamp = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
+/** The music the server wrote (metadata or an API answer); null when there is none. Odd tracks are left out. */
+export function parseMusic(raw: unknown): RoomMusic | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (!Array.isArray(m.tracks)) return null;
+  const tracks: QueueTrack[] = [];
+  for (const t of m.tracks.slice(0, 20) as Record<string, unknown>[]) {
+    if (!t || typeof t !== 'object') continue;
+    const key = text(t.key, 18);
+    const title = text(t.title, 80);
+    const url = text(t.url, 500);
+    const seconds = Number.isInteger(t.seconds) && (t.seconds as number) >= 5 && (t.seconds as number) <= 1200 ? (t.seconds as number) : null;
+    if (!key || !/^\d+$/.test(key) || !title || !url || !url.startsWith('https://') || !seconds) continue;
+    tracks.push({ key, title, url, seconds, by: text(t.by, 64) ?? '', byName: text(t.byName, 80) ?? '' });
+  }
+  const startedAt = tracks.length ? stamp(m.startedAt) : null;
+  return { tracks, startedAt, pausedAt: startedAt === null ? null : stamp(m.pausedAt) };
 }
 
 /** `{"lockedSeats":[2,5]}` → [2, 5]; mic 0 is the owner's and never locked; anything else → none. */

@@ -86,7 +86,14 @@
       ],
       "./plugins/with-android-release-build",
       "./plugins/with-webrtc-software-ns",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "microphonePermission": "Sesli odalarda, aramalarda ve eşleşmede konuşabilmen için mikrofonuna erişmemiz gerekiyor."
+        }
+      ]
     ],
     "scheme": "similarclub",
     "experiments": {

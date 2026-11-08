@@ -77,7 +77,7 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
@@ -87,7 +87,9 @@ import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
 import { useRoomBags, type Bag } from '@/lib/live/lucky-bags';
-import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
+import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
+import { roomMusicAction, type MusicAction } from '@/lib/live/music';
+import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
@@ -267,6 +269,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Ranks (the server checks them, server/api/rooms.mjs): owner 3 > Süper Yönetici 2 > Yönetici 1 > member 0.
   // Nobody acts on their own rank or higher; the Süper Yönetici also edits the name, bulletin and events.
   const superIds = real ? staff.superAdmins : [];
+  // DJs (server rooms, server/api/music.mjs): the owner names them; they play music in the room and nothing else.
+  const djIds = real ? staff.djs : [];
   const rankOf = (uid: string) => (uid === hostId ? 3 : superIds.includes(uid) ? 2 : adminIds.includes(uid) ? 1 : 0);
   const myRank = rankOf('me');
   const rankLabel = (uid: string) => ['Üye', 'Yönetici', 'Süper Yönetici', 'Oda sahibi'][rankOf(uid)];
@@ -552,7 +556,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [requests, setRequests] = useState<string[]>([]);
   const [envelope, setEnvelope] = useState<{ from: string; amount: number; count: number; seconds: number } | null>(null);
   const [dicePlays, setDicePlays] = useState(DAILY_DICE);
+  // Room music on this phone: on/off and how loud (a server room plays its music here, components/room/room-music).
   const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(0.65);
   const [music, setMusic] = useState<MusicState>(() => {
     const t = MUSIC_CATALOG.find((m) => m.id === base?.track);
     return { queue: t ? [t, ...MUSIC_CATALOG.filter((m) => m.id !== t.id).slice(0, 2)] : [], playing: !!t, position: 0 };
@@ -701,7 +707,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
   const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
-  const canControlMusic = canFunctions;
+  // A server room: the owner, its admins and its DJs play (the server checks it); the demo keeps the functions rule.
+  const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
+  // A server room's music, as the room metadata has it, played on this phone at the room's clock.
+  const liveMusic = real ? (liveState?.music ?? null) : null;
+  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled, musicVolume);
+  const shownMusic: MusicState = real
+    ? {
+        queue: nowMusic && liveMusic ? liveMusic.tracks.slice(nowMusic.index).map((t) => ({ id: t.key, title: t.title, artist: t.byName || 'Oda müziği', seconds: t.seconds })) : [],
+        playing: !!nowMusic && !nowMusic.paused,
+        position: nowMusic?.position ?? 0,
+      }
+    : music;
 
   const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
   // Room events arrive once by id (lib/chat-feed). While the connection is down they wait in a buffer and
@@ -1230,7 +1247,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [envelopeLive]);
 
   // Shared music clock.
-  const musicPlaying = musicEnabled && music.playing && music.queue.length > 0;
+  const musicPlaying = !real && musicEnabled && music.playing && music.queue.length > 0;
   useEffect(() => {
     if (!musicPlaying) return;
     const t = setInterval(
@@ -1482,6 +1499,37 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       })),
     });
   };
+  // Server room, owner only: make someone DJ or take it back. The level's DJ count is checked here and on the server.
+  const setDj = (uid: string, on: boolean) => {
+    const target = toServer(uid);
+    if (!target || offlineBlocked()) return;
+    const name = userById(uid).name;
+    if (on && djIds.length >= djCapacity(level)) return showAlert('DJ kontenjanı dolu', `Lv.${level} odada en fazla ${djCapacity(level)} DJ olabilir. Oda seviyesi yükseldikçe artar.`);
+    staffAction('DJ değişmedi', () => roomSetDj(id, target, on), () => {
+      staff.reload();
+      logMod(on ? 'DJ yaptı' : 'DJ’likten aldı', name);
+      addMsg({ system: true, text: on ? `🎧 ${name} odanın DJ’i oldu` : `${name} artık DJ değil` });
+    });
+  };
+  // Server room, owner: the DJs (take it back), and someone in the room to make DJ.
+  const openDjs = () => {
+    setPanel(null);
+    const max = djCapacity(level);
+    const inRoom = [...new Set([...seatedOthers, ...audience.map((u) => u.id)])].filter((uid) => !!toServer(uid) && uid !== hostId && !adminIds.includes(uid) && !djIds.includes(uid));
+    const pickNew = () => {
+      setPanel(null);
+      menuReturn.current = 'settings';
+      if (!inRoom.length) return showAlert('Odada uygun kimse yok', 'DJ yapmak istediğin kişi odada olmalı. Yöneticiler zaten müzik çalabilir.');
+      setSheet({ title: 'Kimi DJ yapalım?', options: inRoom.slice(0, 30).map((uid) => ({ label: userById(uid).name, icon: 'person-add-outline' as const, onPress: () => setDj(uid, true) })) });
+    };
+    setSheet({
+      title: `DJ’ler · ${djIds.length}/${max}`,
+      options: [
+        ...djIds.map((uid) => ({ label: `${userById(uid).name} · DJ’likten al`, icon: 'remove-circle-outline' as const, onPress: () => setDj(uid, false) })),
+        ...(djIds.length < max ? [{ label: 'DJ ekle (odadakilerden)', icon: 'add-circle-outline' as const, onPress: pickNew }] : []),
+      ],
+    });
+  };
   const sendMicInvite = (uid: string, seat?: number) => {
     if (offlineBlocked()) return false;
     // A mic invite isn't carried to the other phone in a server room yet: say so instead of a pending invite.
@@ -1652,6 +1700,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                       addMsg({ system: true, text: on ? `⭐ ${u.name} Süper Yönetici oldu` : `${u.name} artık Süper Yönetici değil` });
                     });
                   },
+                },
+              ]
+            : []),
+          // DJ (server rooms): plays music in the room, nothing else; an admin already can.
+          ...(real && !isAdmin && target
+            ? [
+                {
+                  key: 'dj',
+                  label: djIds.includes(uid) ? 'DJ’likten al' : 'DJ yap',
+                  icon: 'musical-notes-outline' as const,
+                  onPress: () => setDj(uid, !djIds.includes(uid)),
                 },
               ]
             : []),
@@ -2097,9 +2156,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     return { me, them, opponent };
   };
 
+  const liveMusicAct = (body: MusicAction) => void roomMusicAction(id, body).catch((e) => showAlert('Müzik değişmedi', errorText(e)));
   const music$ = {
-    toggle: () => setMusic((m) => ({ ...m, playing: !m.playing })),
-    next: () => setMusic((m) => ({ queue: m.queue.slice(1), playing: m.queue.length > 1, position: 0 })),
+    toggle: () => (real ? liveMusicAct({ action: nowMusic?.paused ? 'resume' : 'pause' }) : setMusic((m) => ({ ...m, playing: !m.playing }))),
+    next: () => (real ? liveMusicAct({ action: 'skip' }) : setMusic((m) => ({ queue: m.queue.slice(1), playing: m.queue.length > 1, position: 0 }))),
     add: (t: Track) => {
       setMusic((m) => ({ ...m, queue: [...m.queue, t], playing: m.queue.length === 0 ? true : m.playing }));
       addMsg({ system: true, text: `🎵 Sıraya eklendi: ${t.title}` });
@@ -2249,6 +2309,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 ? [
                     { key: 'bans', label: 'Giriş yasakları', value: String(staff.bans?.length ?? 0), hint: 'Odadan atılanlar ve kara liste; yasağı buradan kaldırırsın', onPress: fromSettings(openBans) },
                     { key: 'admins', label: 'Oda yöneticileri', value: `${staff.admins.length}`, hint: 'Süper Yönetici: oda adı, bülten ve etkinlikler', onPress: fromSettings(openAdmins) },
+                    ...(myRole === 'owner'
+                      ? [{ key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) }]
+                      : []),
                   ]
                 : []),
             ],
@@ -2578,7 +2641,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               jumps when a banner comes or goes); scrolls when taller. While typing the mics stay in view: the stage
               keeps its height and only the chat gives way to the keyboard (down to a strip). */}
           <ScrollView style={typing ? { flexGrow: 0, flexShrink: 1 } : { flex: 1, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
-            {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
+            {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
             {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage && !offline} />}
@@ -2906,6 +2969,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         classicLabel={`Klasik düzen · ${classicCapacity} mikrofon`}
         onPick={pickLayout}
       />
+      {real ? (
+        <LiveMusicSheet
+          visible={panel === 'music'}
+          onClose={closePanel}
+          room={id}
+          music={liveMusic}
+          np={nowMusic}
+          canPlay={canControlMusic}
+          enabled={musicEnabled}
+          setEnabled={setMusicEnabled}
+          volume={musicVolume}
+          setVolume={setMusicVolume}
+          onDone={(text) => addMsg({ system: true, text })}
+        />
+      ) : (
       <MusicSheet
         visible={panel === 'music'}
         onClose={closePanel}
@@ -2926,6 +3004,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         }}
         onReject={(i) => setMusicRequests((l) => l.filter((_, j) => j !== i))}
       />
+      )}
       <EnvelopeSendModal visible={panel === 'envelope'} onClose={closePanel} onSend={sendEnvelope} coins={coins} />
       {real && panel === 'bag' && (
         <LuckyBagSheet

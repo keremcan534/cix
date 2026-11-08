@@ -56,6 +56,7 @@ import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
 import { teamRoutes } from './team.mjs';
+import { musicRoutes } from './music.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
@@ -224,6 +225,7 @@ const routes = {
   ...luckyBagRoutes,
   ...momentRoutes,
   ...teamRoutes,
+  ...musicRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,
