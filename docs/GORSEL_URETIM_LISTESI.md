@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`, Temel ücretsiz). Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 536 görsel.** Öncelik: P1 134 (çok görünen, para kazandıran) · P2 183 · P3 158 · P4 61 (küçük arayüz simgeleri).
+**Toplam 543 görsel.** Öncelik: P1 137 (çok görünen, para kazandıran) · P2 187 · P3 158 · P4 61 (küçük arayüz simgeleri).
 
 | Bölüm | Adet |
 |---|---|
@@ -29,6 +29,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 10. Profil, keşfet, sosyal | 63 |
 | 11. Para ve finans | 11 |
 | 12. Arayüz durum ve işlem simgeleri | 57 |
+| 13. Güncelleme 2: Odalar bannerları ve Mesajlar | 7 |
 
 ## ChatGPT ile üretim
 
@@ -672,3 +673,15 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 56 | `ui-isaretsiz-kutu.png` | İşaretsiz kutu | ⬜ | arayüz simgesi: İşaretsiz kutu | P4 | Taslak teslim (parti 04–12) · Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade |
 | 57 | `ui-bilgi.png` | Bilgi | ℹ️ | arayüz simgesi: Bilgi | P4 | Taslak teslim (parti 04–12) · Küçük (16–24 px) kullanılır. 3D yerine düz vektör ikon setiyle (ör. Ionicons) çözülmesi önerilir; yine de üretilecekse aynı stilde, sade |
 
+
+## 13. Güncelleme 2: Odalar bannerları ve Mesajlar (7)
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `banner-zirvedeki-ajanslar.png` | Zirvedeki ajanslar | 3D çanta | Odalar bannerı, sağ köşe: ajans çantası üstünde küçük kupa; koyu mavi-mor zemine oturacak, arka planı şeffaf | P2 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+| 2 | `banner-en-cok-hediye-alan.png` | En çok hediye alanlar | 3D elmas | Odalar bannerı, sağ köşe: parlayan elmas ve etrafında küçük kıvılcımlar; koyu gül-mor zemine oturacak, şeffaf | P2 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+| 3 | `banner-en-cok-hediye-gonderen.png` | En çok hediye gönderenler | 3D hediye | Odalar bannerı, sağ köşe: kapağı açılan altın kurdeleli hediye kutusu; koyu altın-mor zemine oturacak, şeffaf | P2 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+| 4 | `banner-etkinlik-varsayilan.png` | Etkinlik bannerı (görselsiz) | kupa + degrade | Yönetim görsel koymadığında etkinlik bannerının sağ köşesi: kupa ve takvim yaprağı, mavi-mor zemine oturacak, şeffaf | P2 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+| 5 | `mesaj-similar-ekibi.png` | Similar Ekibi | 3D zarf | Mesajlar üst kartı: mühürlü zarf ve küçük megafon (yönetimden gelen duyurular), şeffaf | P1 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+| 6 | `mesaj-cevrimici-hizmet.png` | Çevrim içi hizmet | 3D sohbet | Mesajlar üst kartı: kulaklıklı sohbet balonu (canlı destek), şeffaf | P1 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+| 7 | `mesaj-ajansim.png` | Ajansım | 3D çanta | Mesajlar üst kartı: ajans çantası ve yanında küçük yıldız rozeti, şeffaf | P1 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |

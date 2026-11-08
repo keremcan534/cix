@@ -121,7 +121,7 @@ export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
 
 /** The picked photo put in the app's storage for `kind` (a signed address for its exact type and size, then PUT);
  *  resolves with its public address. Throws when a step fails, e.g. 503 while storage isn't set up. */
-export async function uploadPhoto(kind: 'avatar' | 'moment', img: PickedImage): Promise<string> {
+export async function uploadPhoto(kind: 'avatar' | 'moment' | 'notice', img: PickedImage): Promise<string> {
   let file: Blob;
   try {
     file = await (await fetch(img.uri)).blob();

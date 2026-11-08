@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,12 +15,14 @@ import { ROOMS, USERS, type User } from '@/data/mock';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { periodLabel } from '@/lib/tr';
-import { rankings, type RankingRow } from '@/lib/api';
+import { agencyRankings, rankings, type AgencyRankingRow, type RankingRow } from '@/lib/api';
 import { liveMode, rememberUser, toLocal, useServerRooms } from '@/lib/live';
 import { userById } from '@/data/mock';
 
-/** Boards the server can rank in a live build (gift totals, open rooms); the others are demo-only for now. */
-const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'oda'];
+/** Boards the server can rank in a live build (gift totals, agency income, open rooms); Oda XP is demo-only for now. */
+const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'ajans', 'oda'];
+type Period = 'daily' | 'weekly' | 'monthly';
+const PERIOD_KEYS: Period[] = ['daily', 'weekly', 'monthly'];
 
 type Board = 'zengin' | 'yayinci' | 'oda' | 'ajans' | 'odaxp';
 type Unit = 'coin' | 'diamond' | 'people' | 'xp';
@@ -37,8 +39,10 @@ type Row = { id: string; name: string; avatar: string; score: number; user?: Use
 export default function Leaderboard() {
   const { colors, dark } = useTheme();
   const styles = useStyles();
-  const [board, setBoard] = useState<Board>('zengin');
-  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  // An Odalar banner opens its own board and period (?board=ajans&period=weekly).
+  const params = useLocalSearchParams<{ board?: string; period?: string }>();
+  const [board, setBoard] = useState<Board>(() => BOARDS.find((b) => b.key === params.board)?.key ?? 'zengin');
+  const [period, setPeriod] = useState<Period>(() => PERIOD_KEYS.find((p) => p === params.period) ?? 'daily');
   const live = liveMode();
   const boards = live ? BOARDS.filter((b) => LIVE_BOARDS.includes(b.key)) : BOARDS;
   const info = BOARDS.find((b) => b.key === board)!;
@@ -46,13 +50,14 @@ export default function Leaderboard() {
   const serverRooms = useServerRooms();
   // The answer is kept with the board and period it is for, so a tab change shows "loading" until its own answer.
   const key = `${board}:${period}`;
-  const [answer, setAnswer] = useState<{ key: string; rows: RankingRow[] | null } | null>(null);
+  const [answer, setAnswer] = useState<{ key: string; rows: (RankingRow | AgencyRankingRow)[] | null } | null>(null);
   const serverRows = answer?.key === key ? answer.rows : null;
   const rankError = answer?.key === key && answer.rows === null;
   useEffect(() => {
-    if (!live || (board !== 'zengin' && board !== 'yayinci')) return;
+    if (!live || (board !== 'zengin' && board !== 'yayinci' && board !== 'ajans')) return;
     let alive = true;
-    rankings(board === 'zengin' ? 'wealth' : 'charm', period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month')
+    const p = period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month';
+    (board === 'ajans' ? agencyRankings(p) : rankings(board === 'zengin' ? 'wealth' : 'charm', p))
       .then((rows) => alive && setAnswer({ key: `${board}:${period}`, rows }))
       .catch(() => alive && setAnswer({ key: `${board}:${period}`, rows: null }));
     return () => {
@@ -66,6 +71,7 @@ export default function Leaderboard() {
     board === 'oda'
       ? [...serverRooms].sort((a, b) => b.listeners - a.listeners).map((r) => ({ id: r.id, name: r.title, avatar: r.cover, score: r.listeners, roomId: r.id }))
       : (serverRows ?? []).map((r) => {
+          if ('agency' in r) return { id: r.agency.id, name: r.agency.name, avatar: r.agency.avatarUrl ?? '', score: r.score };
           rememberUser(r.user);
           const id = toLocal(r.user.id);
           const user = userById(id);
@@ -100,7 +106,7 @@ export default function Leaderboard() {
         ))}
       </ScrollView>
       <View style={styles.periods}>
-        {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+        {PERIOD_KEYS.map((p) => (
           <Pressable key={p} onPress={() => setPeriod(p)}>
             <Text style={[styles.period, period === p && styles.periodActive]}>{p === 'daily' ? 'Günlük' : p === 'weekly' ? 'Haftalık' : 'Aylık'}</Text>
           </Pressable>

@@ -1,13 +1,13 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'notice', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
 // Settings in the server's .env: S3_ENDPOINT (https://<account>.r2.cloudflarestorage.com), S3_BUCKET,
 // S3_REGION (R2: auto), S3_KEY, S3_SECRET, S3_PUBLIC_URL (the bucket's public https address or CDN domain).
-// Without them uploads answer 503.
+// Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only.
 import crypto from 'node:crypto';
 
 import { HttpError, auth, env, limit, readJson } from './core.mjs';
@@ -16,6 +16,7 @@ const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', '
 const KINDS = {
   avatar: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 5 * 1024 * 1024 },
   moment: { types: Object.keys(TYPES), max: 50 * 1024 * 1024 },
+  notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
 };
 const EXPIRES = 10 * 60;
 
@@ -57,8 +58,9 @@ export const mediaRoutes = {
     if (!env.S3_ENDPOINT || !env.S3_BUCKET || !env.S3_KEY || !env.S3_SECRET || !env.S3_PUBLIC_URL) throw new HttpError(503, 'Fotoğraf yükleme henüz açık değil');
     limit(`media:${u.id}`, 20, 'Çok fazla yükleme, biraz bekle');
     const { kind, contentType, size } = await readJson(req);
-    const k = KINDS[kind];
+    const k = typeof kind === 'string' && Object.hasOwn(KINDS, kind) ? KINDS[kind] : null;
     if (!k) throw new HttpError(400, 'Geçersiz yükleme türü');
+    if (k.admin && u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
     if (!k.types.includes(contentType)) throw new HttpError(400, 'Bu dosya türü yüklenemez');
     if (!Number.isSafeInteger(size) || size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
     // Not guessable, and grouped by person so an account's files can be found (and removed) together.

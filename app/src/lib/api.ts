@@ -436,6 +436,10 @@ export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
 export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);
+/** Agencies by what their streamers earned this day, week or month (the commission base). */
+export type AgencyRankingRow = { rank: number; agency: { id: string; name: string; avatarUrl: string | null }; score: number };
+export const agencyRankings = (period: 'day' | 'week' | 'month') =>
+  call<{ rows: AgencyRankingRow[] }>('GET', `/api/rankings?board=agency&period=${period}`).then((r) => r.rows);
 
 /** After a store purchase: the server checks it with Google / Apple and credits the coins once. `bonus` is the
  *  first-buy gift, `campaignBonus` a campaign's extra coins (missing from an older server). */
@@ -445,7 +449,7 @@ export const verifyPurchase = (proof: StoreProof) =>
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */

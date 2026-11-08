@@ -55,6 +55,7 @@ import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
+import { teamRoutes } from './team.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
@@ -222,6 +223,7 @@ const routes = {
   ...oneOnOneRoutes,
   ...luckyBagRoutes,
   ...momentRoutes,
+  ...teamRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,

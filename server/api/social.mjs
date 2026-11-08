@@ -80,6 +80,9 @@ export async function eraseAccount(c, id, phone) {
     // Anlar: their posts (with the likes and comments on them), their likes and comments elsewhere.
     await c.query('DELETE FROM moment_likes WHERE user_id = $1', [id]);
     await c.query('DELETE FROM moment_comment_likes WHERE user_id = $1', [id]);
+    // Similar Ekibi: what was written to them alone, and what they had read.
+    await c.query('DELETE FROM team_notices WHERE target = $1', [id]);
+    await c.query('DELETE FROM team_notice_seen WHERE user_id = $1', [id]);
     await c.query('DELETE FROM moment_comments WHERE author = $1', [id]);
     await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);

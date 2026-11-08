@@ -34,6 +34,7 @@ import {
   type RoomTab,
 } from '@/data/rooms-ui';
 import { StarterPath } from '@/components/starter';
+import { RoomBanners } from '@/components/room-banners';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
@@ -177,6 +178,7 @@ export default function RoomsScreen() {
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
               <StarterPath roomHref={starterRoom} />
+              <RoomBanners />
               {closest && <ClosestRoomCard match={closest} />}
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
               {similarPeople.length > 0 && <SimilarPeople people={similarPeople} rooms={visible} />}
