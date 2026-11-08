@@ -121,10 +121,15 @@ export type Streamer = {
   verified: boolean;
   diamonds30: number;
   usd30: number;
+  /** Diamonds this week and this month (Turkey's calendar, since joining this agency). */
+  week: number;
+  month: number;
   onlineHours30: number;
   active: boolean;
   agencyName: string;
 };
+
+export type Periods = { day: number; week: number; month: number };
 
 export type SubAgency = AgencyCard & {
   owner: string | null;
@@ -134,6 +139,9 @@ export type SubAgency = AgencyCard & {
   volume30: number;
   earned30: number | null;
   mine30: number;
+  /** Today, this week and this month: the gifts its streamers received, and the commission that passed to me. */
+  gifts: Periods;
+  mine: Periods;
   rate: number | null;
   parentShare: number | null;
   upcoming: Upcoming | null;
@@ -342,8 +350,6 @@ export const agencyNet = {
   /** Whom to invite: people found by name or username (at most 20; 2 letters at least). */
   inviteSearch: (id: string, q: string) => get<{ users: Invitee[] }>('/api/agency/invite/search', { id, q }).then((r) => r.users),
   decideRequest: (id: string, requestId: number, approve: boolean, note?: string) => post('/api/agency/requests/decide', { id, requestId, approve, note }),
-  createSub: (parentId: string, name: string, owner?: string, region?: string) => post<{ agency: AgencyCard }>('/api/agency/sub/create', { parentId, name, owner, region, submit: true }),
-  submitSub: (id: string) => post('/api/agency/sub/submit', { id }),
   staff: (id: string) => get<{ staff: StaffMember[]; roles: StaffRole[]; catalog: Record<string, string> }>('/api/agency/staff', { id }),
   setStaff: (id: string, user: string, roleId: number | null) => post('/api/agency/staff/set', { id, user, roleId }),
   removeStaff: (id: string, user: string) => post('/api/agency/staff/remove', { id, user }),

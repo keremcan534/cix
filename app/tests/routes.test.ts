@@ -82,6 +82,18 @@ describe('Canlı sürümde demo ekranları', () => {
     assert.match(src, /'Öne çıkanlar': 'featured', 'Yeni kullanıcılar': 'new'/);
   });
 
+  // The agency owner lands on their agency; sub-agencies are "Referans ajanslar", added only by management.
+  test('Ajans paneli: sahibi kendi ajansına iner, Referans ajanslar yalnız görüntülenir', () => {
+    const hub = readFileSync(join(APP, '../components/agency-net-hub.tsx'), 'utf8');
+    assert.match(hub, /router\.replace\(\{ pathname: '\/ajans\/ofis', params: \{ id: ownId, hub: '1' \} \}/);
+    const src = readFileSync(join(APP, 'ajans/ofis.tsx'), 'utf8');
+    assert.match(src, /label: 'Referans ajanslar'/);
+    assert.match(src, /\{ key: 'more', label: 'Diğer', hidden: !hub \}/);
+    assert.doesNotMatch(src, /Alt ajans oluştur|CreateSub|submitSub|'Alt ajanslar'/);
+    assert.match(src, /\['week', 'Haftalık'\]/);
+    assert.match(src, /earningsCsv\(rows\)/);
+  });
+
   // Anlar is on the server (lib/live/moments): a live build shows the tab and the server's feed, never the sample one.
   test('Anlar canlıda sunucudan, sekme görünür', () => {
     const tabs = readFileSync(join(APP, '(tabs)/_layout.tsx'), 'utf8');
