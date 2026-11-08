@@ -213,6 +213,8 @@ export function ChatThread({
           data={[...messages].reverse()}
           inverted
           keyExtractor={(m) => m.id}
+          // A touch on the messages closes the emoji panel (as does the back button).
+          onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
           contentContainerStyle={{ padding: compact ? 12 : 16, gap: 8 }}
           ListFooterComponent={
             <View style={[styles.intro, compact && { paddingVertical: 12 }]}>
@@ -302,7 +304,7 @@ export function ChatThread({
           </View>
         )}
         <ContactNote text={refused} />
-        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} />}
+        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} onClose={() => setEmojiOpen(false)} />}
         <View style={styles.inputRow}>
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />

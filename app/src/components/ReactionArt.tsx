@@ -3,10 +3,11 @@
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
 // (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
-import { Image, View, type StyleProp, type TextStyle } from 'react-native';
+import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { stickerById } from '@/data/catalog';
+import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
 import { stickerIdOf, stickersOf as matchStickers, stickerText } from '@/lib/stickers';
 
 const SRC: Record<string, number> = {
@@ -90,9 +91,31 @@ export function ReactionArt({ emoji, size, textStyle }: { emoji: string; size: n
 }
 
 /** Message body: a stickers-only message shows its stickers large; anything else is text. */
+/** Message text with its emoji drawn larger: one to three emoji alone are drawn large, emoji in text a size up. */
+export function EmojiText({ text, style }: { text: string; style?: StyleProp<TextStyle> }) {
+  const big = bigEmojiSize(emojiOnlyCount(text));
+  if (big) return <Text style={[style, { fontSize: big, lineHeight: Math.round(big * 1.2) }]}>{text.trim()}</Text>;
+  const runs = emojiRuns(text);
+  if (!runs.some((r) => r.emoji)) return <Text style={style}>{text}</Text>;
+  const base = StyleSheet.flatten(style)?.fontSize ?? 15;
+  return (
+    <Text style={style}>
+      {runs.map((r, i) =>
+        r.emoji ? (
+          <Text key={i} style={{ fontSize: base + 5 }}>
+            {r.text}
+          </Text>
+        ) : (
+          r.text
+        ),
+      )}
+    </Text>
+  );
+}
+
 export function MessageText({ text, style, size = 44 }: { text: string; style?: StyleProp<TextStyle>; size?: number }) {
   const stickers = stickersOf(text);
-  if (!stickers) return <Text style={style}>{messagePreview(text)}</Text>;
+  if (!stickers) return <EmojiText text={messagePreview(text)} style={style} />;
   return (
     <View style={{ flexDirection: 'row', gap: 2 }} accessibilityLabel={messagePreview(text)}>
       {stickers.map((id, i) => (

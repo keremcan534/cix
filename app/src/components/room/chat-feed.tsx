@@ -3,14 +3,16 @@
 // replays anything. A reader scrolled up is never pulled down by new events; a pill offers to jump instead.
 // The chat keeps the height the person chose (drag the handle above the tabs, or tap it: lib/room-chat-size);
 // the stage above takes what is left, so banners and mics coming and going never make the chat jump. The tab
-// at the handle's right folds the chat down to its smallest and opens it back to the size it had.
+// at the handle's right is the room's Küçült / Büyüt: Küçült draws the mics smaller and gives the chat the room
+// they free (the largest chat); Büyüt brings the mics back to their size and the chat to the size it had.
+// While typing the chat keeps only a strip above the keyboard and the mics stay in view.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, FlatList, PanResponder, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
 import { Text } from '@/components/text';
 import { filterFeed, type FeedMsg, type FeedTab } from '@/lib/chat-feed';
-import { CHAT_DEFAULT, CHAT_MAX, CHAT_MIN, clampChatShare, getChatShare, setChatShare, toggledChatShare } from '@/lib/room-chat-size';
+import { CHAT_DEFAULT, CHAT_MAX, CHAT_MIN, clampChatShare, getChatShare, isLargeChat, setChatShare, toggledChatShare } from '@/lib/room-chat-size';
 import { colors, semantic } from '@/theme';
 
 const TABS: [FeedTab, string][] = [
@@ -32,6 +34,8 @@ export function ChatFeed({
   renderItem,
   screenHeight,
   fill,
+  onLarge,
+  onTouch,
 }: {
   messages: FeedMsg[];
   /** filter for the Tümü tab only (personal message settings) */
@@ -39,11 +43,24 @@ export function ChatFeed({
   renderItem: ListRenderItem<FeedMsg>;
   /** The window height the chosen share is taken of. */
   screenHeight: number;
-  /** Typing: the stage is folded away and the chat takes all the room there is (no handle). */
+  /** Typing: the chat takes what the mics leave above the keyboard (at least a strip), with no handle. */
   fill: boolean;
+  /** The chat became large (the mics go small) or back to normal. */
+  onLarge?: (large: boolean) => void;
+  /** Any touch on the chat (it is not taken from the list: scrolling still works). */
+  onTouch?: () => void;
 }) {
   const [tab, setTab] = useState<FeedTab>('all');
   const height = useChatHeight(screenHeight);
+  const told = useRef(onLarge);
+  useEffect(() => {
+    told.current = onLarge;
+  });
+  useEffect(() => {
+    const f = () => told.current?.(isLargeChat(height.share));
+    height.listeners.add(f);
+    return () => void height.listeners.delete(f);
+  }, [height]);
   const data = useMemo(
     () => ({
       all: filterFeed(messages, 'all').filter(visible).reverse(),
@@ -53,7 +70,7 @@ export function ChatFeed({
     [messages, visible],
   );
   return (
-    <Animated.View style={[{ marginHorizontal: 12 }, fill ? { flex: 1 } : { height: height.value, flexShrink: 1, minHeight: 96 }]}>
+    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : { height: height.value, flexShrink: 1, minHeight: 96 }]}>
       {!fill && (
         <View>
           <Handle height={height} />
@@ -77,8 +94,8 @@ export function ChatFeed({
 /** The chat's height as an animated value, so dragging moves it without drawing the room again. One per chat. */
 class ChatHeight {
   share = getChatShare();
-  /** The size to open back to from folded (the last one that was not folded). */
-  open = isFolded(this.share) ? CHAT_DEFAULT : this.share;
+  /** The size Büyüt goes back to (the last one that was not large). */
+  normal = isLargeChat(this.share) ? CHAT_DEFAULT : this.share;
   screenHeight: number;
   value: Animated.Value;
   listeners = new Set<() => void>();
@@ -88,7 +105,7 @@ class ChatHeight {
   }
   private saved(x: number) {
     this.share = setChatShare(x);
-    if (!isFolded(this.share)) this.open = this.share;
+    if (!isLargeChat(this.share)) this.normal = this.share;
     this.listeners.forEach((f) => f());
   }
   resize(screenHeight: number) {
@@ -108,7 +125,6 @@ class ChatHeight {
     Animated.spring(this.value, { toValue: this.share * this.screenHeight, useNativeDriver: false, bounciness: 4 }).start();
   }
 }
-const isFolded = (share: number) => share <= CHAT_MIN + 0.01;
 function useChatHeight(screenHeight: number) {
   const [h] = useState(() => new ChatHeight(screenHeight));
   useEffect(() => h.resize(screenHeight), [h, screenHeight]);
@@ -156,24 +172,24 @@ function Handle({ height }: { height: ChatHeight }) {
   );
 }
 
-/** The tab at the handle's right: folds the chat to its smallest, or opens it back to the size it had. */
+/** The tab at the handle's right: Küçült (small mics, the largest chat) or Büyüt (mics and chat as they were). */
 function FoldTab({ height }: { height: ChatHeight }) {
-  const [folded, setFolded] = useState(() => isFolded(height.share));
+  const [large, setLarge] = useState(() => isLargeChat(height.share));
   useEffect(() => {
-    const f = () => setFolded(isFolded(height.share));
+    const f = () => setLarge(isLargeChat(height.share));
     height.listeners.add(f);
     return () => void height.listeners.delete(f);
   }, [height]);
   return (
     <Pressable
-      onPress={() => height.animateTo(folded ? height.open : CHAT_MIN)}
+      onPress={() => height.animateTo(large ? height.normal : CHAT_MAX)}
       hitSlop={8}
       style={s.fold}
       accessibilityRole="button"
-      accessibilityLabel={folded ? 'Sohbeti büyüt' : 'Sohbeti küçült'}
+      accessibilityLabel={large ? 'Mikrofonları büyüt' : 'Mikrofonları küçült, sohbeti genişlet'}
     >
-      <Ionicons name={folded ? 'chevron-up' : 'chevron-down'} size={13} color={colors.text} />
-      <Text style={s.foldText}>{folded ? 'Büyüt' : 'Küçült'}</Text>
+      <Ionicons name={large ? 'expand-outline' : 'contract-outline'} size={13} color={colors.text} />
+      <Text style={s.foldText}>{large ? 'Büyüt' : 'Küçült'}</Text>
     </Pressable>
   );
 }
@@ -237,6 +253,8 @@ const s = StyleSheet.create({
   tabText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   tabTextOn: { color: semantic.actionInk, fontWeight: '900' },
   hidden: { display: 'none' },
+  // Typing: at least a strip of chat; it grows into whatever the mics leave above the keyboard.
+  typing: { flexGrow: 1, flexShrink: 1, flexBasis: 88, minHeight: 88 },
   handle: { height: 22, alignItems: 'center', justifyContent: 'center' },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.38)' },
   fold: { position: 'absolute', right: 0, top: 0, height: 22, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },

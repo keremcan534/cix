@@ -84,6 +84,7 @@
         }
       ],
       "./plugins/with-android-release-build",
+      "./plugins/with-webrtc-software-ns",
       "expo-secure-store"
     ],
     "scheme": "similarclub",

@@ -90,6 +90,8 @@ jobs:
         env:
           EXPO_PUBLIC_API_URL: https://130-61-230-94.sslip.io
           EXPO_PUBLIC_LIVEKIT_URL: wss://130-61-230-94.sslip.io
+          # Ayarlar › Uygulama sürümü: this APK's build number (the preview-N release), checked against the latest.
+          EXPO_PUBLIC_BUILD: ${{ github.run_number }}
           # "Google ile devam et": the web client id from Google Cloud, kept as a repository variable
           # (Settings → Secrets and variables → Actions → Variables). Empty → the APK keeps the device sign-in.
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}

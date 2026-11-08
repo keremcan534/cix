@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { BackHandler, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { AssetView } from '@/components/fx/anim-player';
@@ -21,8 +21,21 @@ import { makeStyles } from '@/theme';
  * sticker hands the caller its token (lib/stickers), picking an emoji hands the emoji.
  * In rooms (`onAnimate`) the Hareketli tabs come from the central animation catalog, so catalog changes show
  * up without an app update.
+ * `onClose`: the phone's back button closes the panel (not the screen); hosts also close it on a touch above it.
  */
-export function EmojiPanel({ onPick, hint, onAnimate }: { onPick: (e: string) => void; hint?: string; onAnimate?: (animationId: string) => void }) {
+export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: string) => void; hint?: string; onAnimate?: (animationId: string) => void; onClose?: () => void }) {
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!close.current) return false;
+      close.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
   const { packUnlocked, recentEmojis, rememberEmoji, buyEmojiPack, ownedAnims, micFx, buyMicFx, setMicFx } = useApp();
   const { catalog } = useAnimations();
   const styles = useStyles();

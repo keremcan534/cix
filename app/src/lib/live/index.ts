@@ -378,7 +378,8 @@ export async function updateServerRoom(id: string, patch: api.RoomPatch) {
 /** Reads one server room again (after the server says it changed: a new level, mics or layout). */
 export async function refreshServerRoom(id: string) {
   const r = roomOf(await api.serverRoom(id));
-  setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
+  // A room that isn't in the list yet (opened from a link or a search) is kept too, so its screen reads it.
+  setRooms(rooms.some((x) => x.id === r.id) ? rooms.map((x) => (x.id === r.id ? r : x)) : [...rooms, r]);
   return r;
 }
 /** Closes my room on the server for everyone (it leaves the lists; a new one can be opened later). */

@@ -155,6 +155,8 @@ export function GroupChat({
             data={[...messages].reverse()}
             inverted
             keyExtractor={(m) => m.id}
+            // A touch on the messages closes the emoji panel (as does the back button).
+            onTouchStart={emoji ? () => setEmoji(false) : undefined}
             contentContainerStyle={{ padding: 16, gap: 8 }}
             renderItem={({ item }) => <Message item={item} />}
           />
@@ -177,6 +179,7 @@ export function GroupChat({
                 onSend(e);
                 setEmoji(false);
               }}
+              onClose={() => setEmoji(false)}
             />
           )}
           <ContactNote text={refused} style={{ marginTop: 6 }} />

@@ -344,20 +344,8 @@ function SoundToggle({ settings, set, k, label, hint, off = false }: { settings:
   );
 }
 
-/** Ses ayarları: what I hear in the room and how my mic sounds (this phone only). */
-export function SoundSheet({ visible, onClose, settings, set }: { visible: boolean; onClose: () => void; settings: Settings; set: SetFn }) {
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Ses ayarları" art={ROOM_ICON_ART.sound}>
-      <Text style={styles.dim}>Yalnızca bu telefonda geçerlidir; odadaki diğer kişilerin duyduğunu değiştirmez.</Text>
-      <SoundToggle settings={settings} set={set} k="roomMuted" label="Oda sesini kapat" hint="Konuşanları duymazsın; mikrofonun açıksa seni duymaya devam ederler." />
-      <Volume settings={settings} set={set} k="voiceVolume" label="Konuşma sesi" />
-      <SoundToggle settings={settings} set={set} k="micDenoise" label="Mikrofon denoise" hint="Arka plan gürültüsünü telefonun kendi filtresiyle azaltır." />
-      <Text style={styles.dim}>Ses çıkışı (hoparlör, kulaklık, Bluetooth) telefonun ayarlarından seçilir.</Text>
-    </Sheet>
-  );
-}
-
-/** Efekt ayarları: which room effects play on this phone; gift payments and records never change. */
+/** Efektler ve ses: what I hear in the room, how my mic sounds, and which room effects play (this phone only;
+ *  gift payments and records never change). */
 export function EffectsSheet({
   visible,
   onClose,
@@ -378,8 +366,13 @@ export function EffectsSheet({
 }) {
   const all = settings.effectsOff;
   return (
-    <Sheet visible={visible} onClose={onClose} title="Efekt ayarları" art={ROOM_ICON_ART.sound}>
-      <Text style={styles.dim}>Yalnızca senin ekranını etkiler. Hediyeler, ödemeler ve kayıtlar aynı kalır.</Text>
+    <Sheet visible={visible} onClose={onClose} title="Efektler ve ses" art={ROOM_ICON_ART.sound}>
+      <Text style={styles.dim}>Yalnızca bu telefonda geçerlidir. Odadakilerin duyduğu, hediyeler ve kayıtlar aynı kalır.</Text>
+      <Text style={styles.label}>Ses</Text>
+      <SoundToggle settings={settings} set={set} k="roomMuted" label="Oda sesini kapat" hint="Konuşanları duymazsın; mikrofonun açıksa seni duymaya devam ederler." />
+      <Volume settings={settings} set={set} k="voiceVolume" label="Konuşma sesi" />
+      <SoundToggle settings={settings} set={set} k="micDenoise" label="Mikrofon denoise" hint="Arka plan gürültüsünü (fan, trafik, klavye) azaltır." />
+      <Text style={styles.label}>Efektler</Text>
       <SoundToggle settings={settings} set={set} k="effectsOff" label="Tüm efektleri kapat" hint="Aşağıdakilerin hepsini birden kapatır." />
       <Text style={styles.label}>Hediyeler</Text>
       <SoundToggle settings={settings} set={set} k="giftFx" off={all} label="Hediye efektleri" hint="Tam ekran gösteri ve koltuğa uçan hediye." />
