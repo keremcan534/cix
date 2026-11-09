@@ -177,3 +177,41 @@ export function labelOf(item) {
   if (item.kind === 'noble') return `Rütbe: ${item.name} (${item.days} gün)`;
   return `Mağaza: ${item.name}${item.days ? ` (${item.days} gün)` : ''}`;
 }
+
+// --- Hareketli in rooms (room-fx.mjs): the paid room animations, in step with the app (app/src/data/animations.ts
+// rows of type reaction, gift and fullscreen with a price); tests/server-catalog.test.ts fails when they drift.
+// Free reactions go phone to phone and never reach the server. A campaign row sells only inside its window
+// (UTC dates, like the app's isLive). Prices change only with a deploy.
+/** [id, name, price in coins, first day (null: always), last day] */
+const ROOM_ANIM_ROWS = [
+  ['an-butterfly', 'Kelebekler', 20, null, null],
+  ['an-bouquet', 'Gül Buketi', 99, null, null],
+  ['an-panda', 'Dans Eden Panda', 150, null, null],
+  ['an-crown', 'Kraliyet Tacı', 500, null, null],
+  ['an-chest', 'Hazine Sandığı', 300, null, null],
+  ['an-heart-rain', 'Kalp Yağmuru', 999, null, null],
+  ['an-coin-rain', 'Altın Yağmuru', 1_999, null, null],
+  ['an-diamond-rain', 'Elmas Yağmuru', 2_999, null, null],
+  ['an-supercar', 'Spor Araba', 4_999, null, null],
+  ['an-jet', 'Özel Jet', 9_999, null, null],
+  ['an-dragon', 'Ejderha', 19_999, null, null],
+  ['an-rocket', 'Roket Fırlatma', 2_499, null, null],
+  ['an-fireworks', 'Havai Fişek', 1_499, null, null],
+  ['an-newyear', 'Yılbaşı Kutlaması', 999, '2026-12-20', '2027-01-07'],
+];
+export const ROOM_ANIMS = new Map(ROOM_ANIM_ROWS.map(([id, name, price, from, until]) => [id, Object.freeze({ id, name, price, from, until })]));
+/** On sale on `now`'s UTC date (the app's lib/animations isLive reads the same date). */
+export const animOnSale = (a, now = new Date()) => {
+  const d = now.toISOString().slice(0, 10);
+  return !(a.from && d < a.from) && !(a.until && d > a.until);
+};
+
+// --- A server room's look (rooms.mjs POST /api/rooms/update), in step with app/src/data/catalog.ts ROOM_BACKGROUNDS
+// and ROOM_THEMES; tests/server-catalog.test.ts fails when they drift. A cover opens at its room level.
+export const ROOM_COVERS = [
+  { id: 'bg1', minLevel: 1 },
+  { id: 'bg2', minLevel: 2 },
+  { id: 'bg3', minLevel: 4 },
+  { id: 'bg4', minLevel: 7 },
+];
+export const ROOM_THEMES = ['chat', 'pk', 'music', 'game', 'party', 'friends'];

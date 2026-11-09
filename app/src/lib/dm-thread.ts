@@ -9,7 +9,7 @@ import type { Conversation } from '@/data/mock';
 
 export type ChatMessage = Conversation['messages'][number];
 /** A message as GET /api/messages returns it (lib/api DirectMessage). */
-export type ServerDm = { id: number; from: string; to: string; text: string; createdAt: string; readAt?: string | null };
+export type ServerDm = { id: number; from: string; to: string; text: string; image?: string | null; createdAt: string; readAt?: string | null };
 export type ThreadSync = { peer: string; after: number; hidden?: readonly number[] };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -53,7 +53,8 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
     // refused (noRetry) was never stored, so it never takes the id.
     let pending = -1;
     if (mine) {
-      const unconfirmed = (m: ChatMessage) => m.fromMe && m.sid === undefined && !m.noRetry && m.text === d.text;
+      // A photo is never sent ahead on this phone (it comes in from the server), so it matches no local message.
+      const unconfirmed = (m: ChatMessage) => !d.image && m.fromMe && m.sid === undefined && !m.noRetry && m.text === d.text;
       pending = out.findIndex((m) => unconfirmed(m) && !m.failed);
       if (pending < 0) pending = out.findIndex(unconfirmed);
     }
@@ -61,7 +62,7 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
     } else {
-      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...seen });
+      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...seen });
       known.set(d.id, out.length - 1);
       if (!mine) incoming++;
     }

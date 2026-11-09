@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase (written by the APK build from a secret, never committed)
+google-services.json

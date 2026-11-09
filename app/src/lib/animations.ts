@@ -187,6 +187,21 @@ export function sendAnimation(animationId: string, roomId: string, fromUserId: s
   return finish({ ok: true, charged: price, replay: false, event });
 }
 
+/**
+ * A server room's animation drawn on this phone (no charge here): a paid one once the server took it (mine) or
+ * announced it (someone else's, server/api/room-fx.mjs), or another phone's free reaction. `eventId` keeps a
+ * repeat of the same event from playing twice. False when it isn't in this phone's catalog or not live now.
+ */
+const played: string[] = [];
+export function playRoomAnim(roomId: string, fromUserId: string, animationId: string, eventId: string) {
+  const a = animById(animationId);
+  if (!a || !isLive(a) || played.includes(eventId)) return false;
+  played.push(eventId);
+  if (played.length > 200) played.shift();
+  broadcast({ eventId, roomId, animationId, fromUserId, startAt: Date.now() + LEAD_MS, requestId: eventId });
+  return true;
+}
+
 /** Other participants' sends arrive through the same bus (prototype: simulated bots). */
 export function simulateRemoteSend(roomId: string, fromUserId: string, animationId: string) {
   const a = animById(animationId);

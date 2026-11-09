@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
+import * as ScreenCapture from 'expo-screen-capture';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
@@ -77,12 +78,13 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import * as api from '@/lib/api';
+import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
@@ -94,7 +96,8 @@ import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
-import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
+import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
+import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
 import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
@@ -142,7 +145,7 @@ import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownF
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
-import { useApp } from '@/store';
+import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
 import { colors, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
@@ -157,6 +160,10 @@ const BOT_TIPS = [
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 const rollDie = () => 1 + Math.floor(Math.random() * 6);
 const msgId = () => String(Date.now() + Math.random());
+const nowMs = () => Date.now();
+const reactionKey = () => Date.now() + Math.random();
+/** A server room's slow mode: one chat line per 10 seconds for everyone but its staff (server/api/room-rules.mjs). */
+const SLOW_MS = 10_000;
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
 const stamp = () => Date.now();
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
@@ -174,6 +181,23 @@ const offlineBlocked = () => {
 const BOT_REACTIONS = [stickerToken('temel-kahkaha'), stickerToken('temel-asik'), stickerToken('oda-alkis'), '🔥', '😎', '🥳', '❤️', stickerToken('temel-begendim'), stickerToken('oda-saskin'), '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
+/** Someone's entry show in a server room, from their shop look (entry effect, ride, noble rank); null: none. */
+function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {
+  if (!look) return null;
+  const entryItem = cosmeticById(look.entry ?? undefined);
+  const ride = cosmeticById(look.ride ?? undefined);
+  const noble = look.noble ? nobleInfo(look.noble) : undefined;
+  if (!entryItem && !ride && !noble) return null;
+  const tier = vipTier(look.vipLevel);
+  return { name, avatar, fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip', ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge: noble?.emoji };
+}
+// What another phone may put over its seat: the emoji panel's own emoji and stickers (no free text, no unknown art).
+const SEAT_EMOJI = new Set(STANDARD_EMOJI.flatMap((g) => g.emojis));
+const STICKER_IDS = new Set(STICKER_PACKS.flatMap((p) => p.stickers.map((x) => x.id)));
+const seatEmojiOk = (e: string) => {
+  const sticker = stickerIdOf(e);
+  return sticker ? STICKER_IDS.has(sticker) : SEAT_EMOJI.has(e);
+};
 /** Lv8 joint entrance banner: both photos, the bond named ("Çift Lv8"); me first when I am one of the two. */
 function jointShowOf(b: RoomBond, myAvatar: string): EntryShow {
   const [x, y] = b.b === 'me' ? [b.b, b.a] : [b.a, b.b];
@@ -234,6 +258,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   const base = isOwn ? null : roomById(id);
   const [, setRoomEdits] = useState(0);
+  // A server room's activities (server/api/room-events.mjs): read on entry and whenever the server says the room
+  // changed; reminders are this phone's own.
+  const [serverEvents, setServerEvents] = useState<api.ServerRoomEvent[] | null>(null);
+  const [reminders, setReminders] = useState<number[]>([]);
   const hostId = isOwn ? 'me' : base!.hostId;
   const title = isOwn ? myRoom.title : base!.title;
   const cover = isOwn ? myRoom.cover : base!.cover;
@@ -256,12 +284,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const micQueue = isOwn ? myRoom.micQueue : real ? (liveState?.micQueue ?? !!base!.micQueue) : (base!.micQueue ?? defaultMicQueue(base!.roomType));
   // Who waits in a server room's mic queue (local ids, first asked first).
   const serverQueue = useMemo(() => (real ? (liveState?.queue ?? []).map(toLocal) : []), [real, liveState]);
-  const functionsBy = isOwn ? myRoom.manageFunctions : 'admins';
+  // A server room's rules (Oda ayarları, Moderasyon), kept on the server and the same on every phone.
+  const liveRules = real ? (base!.rules ?? null) : null;
+  const functionsBy = isOwn ? myRoom.manageFunctions : (liveRules?.manageFunctions ?? 'admins');
+  // What the stage server (lib/room-modes) is told: my room's own choice; a server room's tools are checked here.
+  const stageFunctionsBy = isOwn ? myRoom.manageFunctions : 'admins';
   const adminIds = isOwn ? myRoom.adminIds : real ? staff.admins : (base!.adminIds ?? []);
   // What the stage server knows about the room: level, theme, who manages room functions, the classic mic count.
   const stageInfo: StageInfo = useMemo(
-    () => ({ level, theme, manageFunctions: functionsBy, classicCapacity: Math.min(roomMics ?? maxMics, maxMics), classicMax: maxMics, features: ALL_FEATURES }),
-    [level, theme, functionsBy, roomMics, maxMics],
+    () => ({ level, theme, manageFunctions: stageFunctionsBy, classicCapacity: Math.min(roomMics ?? maxMics, maxMics), classicMax: maxMics, features: ALL_FEATURES }),
+    [level, theme, stageFunctionsBy, roomMics, maxMics],
   );
   const classicCapacity = stageInfo.classicCapacity;
   const myRole: RoomRole = hostId === 'me' ? 'owner' : adminIds.includes('me') ? 'admin' : 'member';
@@ -277,7 +309,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const canManage = myRole !== 'member';
   // "Oda işlevlerini yönet": music, polls, goals, events can be limited to the owner.
   const canFunctions = myRole === 'owner' || (myRole === 'admin' && functionsBy === 'admins');
-  const botOn = real ? false : isOwn ? settings.roomBot : true;
+  const botOn = real ? !!liveRules?.bot : isOwn ? settings.roomBot : true;
   const invisible = settings.invisibleEntry && GATES.invisibleEntry(nobleTier);
   const roomType = isOwn ? myRoom.roomType : (base!.roomType ?? 'free');
   const typeInfo = roomTypeInfo(roomType);
@@ -289,7 +321,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const liveLocks = useMemo(() => (liveState || readLocks === null ? metaLocks : readLocks.split(',').filter(Boolean).map(Number)), [liveState, readLocks, metaLocks]);
   const lockedSeats = isOwn ? myRoom.lockedSeats : real ? liveLocks : localLocks;
   // Personal effect preferences never change the gift transaction itself.
-  const showFx = (price: number) => !settings.effectsOff && settings.giftFx && !settings.reduceMotion && (!isOwn || myRoom.giftEffects) && (!settings.bigGiftsOnly || price >= 100);
+  // The owner can turn gift effects off for the whole room (my room: here; a server room: on the server, for every phone).
+  const roomGiftFx = isOwn ? myRoom.giftEffects : !real || base!.giftEffects !== false;
+  const showFx = (price: number) => !settings.effectsOff && settings.giftFx && !settings.reduceMotion && roomGiftFx && (!settings.bigGiftsOnly || price >= 100);
   // Entry banners (mine, a bond pair's, a joiner's): Efekt ayarları › Giriş efektleri.
   const entryOn = !settings.effectsOff && settings.entryFx;
 
@@ -351,10 +385,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // says they changed (the owner or an admin picked a layout, a gift raised the level), so every phone matches.
   useEffect(() => {
     if (!real) return;
-    const sync = () =>
-      syncServerStage(id)
+    const sync = () => {
+      api.roomEvents(id).then((list) => setServerEvents(list), () => {});
+      return syncServerStage(id)
         .then(() => setRoomEdits((n) => n + 1))
         .catch(() => {});
+    };
     sync();
     // A lost packet can't leave a phone behind for long: read again every minute too.
     const every = setInterval(sync, 60_000);
@@ -485,6 +521,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     roomType === 'event' ? [{ id: 'ev0', title: 'Doğruluk mu Cesaret mi', desc: 'Haftalık oyun gecesi', when: 'Bugün 22:00', type: 'Oyun', by: hostId, going: false, reminder: false, attendees: 37, cancelled: false }] : [],
   );
   const [questions, setQuestions] = useState<Question[]>([]);
+  const loadEvents = () => {
+    if (real) api.roomEvents(id).then((list) => setServerEvents(list), () => {});
+  };
+  const shownEvents: RoomEvent[] = real
+    ? (serverEvents ?? []).map((e) => ({ id: String(e.id), title: e.title, desc: e.desc, when: e.when, type: e.type, by: toLocal(e.by.id), going: e.going, reminder: reminders.includes(e.id), attendees: e.attendees, cancelled: e.cancelled }))
+    : events;
   const [modLog, setModLog] = useState<ModLog[]>([]);
   const [slowMode, setSlowMode] = useState(false);
   const [words, setWords] = useState<string[]>(['spam', 'reklam']);
@@ -503,19 +545,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const lastPk = pkStore.sessions.find((x) => x.roomId === id || x.opponentRoomId === id);
   const [pkSetup, setPkSetup] = useState(false);
   // Something opened from the room menu (a panel, a game, a list) goes back to the menu when it is closed
-  // (back, X or a tap outside), not straight to the room. Armed by the menu, cleared once nothing is open.
-  // The same for a sheet opened from the room settings: it goes back to the settings.
-  const menuReturn = useRef<null | 'menu' | 'settings' | 'info'>(null);
+  // (back, X or a tap outside), not straight to the room. The same for a sheet opened from the room settings or
+  // the room card, at any depth: card → settings → Moderasyon goes back to the settings, then to the card. A stack:
+  // each opener pushes where to return, each close pops one; cleared once nothing is open.
+  const menuReturn = useRef<('menu' | 'settings' | 'info')[]>([]);
   const backToMenu = () => {
-    const to = menuReturn.current;
+    const to = menuReturn.current.pop();
     if (!to) return;
-    menuReturn.current = null;
     setPanel(to);
   };
-  const closePanel = () => (menuReturn.current ? backToMenu() : setPanel(null));
+  const closePanel = () => (menuReturn.current.length ? backToMenu() : setPanel(null));
   useEffect(() => {
-    if (panel === null && !layoutsOpen && !peopleOpen && !pkSetup && !game && !sheet) menuReturn.current = null;
+    if (panel === null && !layoutsOpen && !peopleOpen && !pkSetup && !game && !sheet) menuReturn.current = [];
   }, [panel, layoutsOpen, peopleOpen, pkSetup, game, sheet]);
+  // A menu, card or settings item that opens another screen (Günlük görev, Hemen Tanış, Süsler, a profile): back on
+  // the room, the sheet it was opened from opens again (kept when the room leaves the screen, used when it returns).
+  const [reopenOnReturn, setReopenOnReturn] = useState<null | 'menu' | 'settings' | 'info'>(null);
   const teamPk = pk?.kind === 'room' && pk.mode === 'team' && pk.status !== 'invite' ? pk : null;
   const teamColorOf = (uid: string | null) => (uid && teamPk ? teamOf(teamPk, uid)?.color : undefined);
   /**
@@ -551,6 +596,37 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [bossRemoved, setBossRemoved] = useState<Set<string>>(new Set());
   const [membership, setMembership] = useState<'owner' | 'none' | 'pending' | 'member'>(isOwn ? 'owner' : 'none');
   const [memberApps, setMemberApps] = useState<string[]>(() => (isOwn ? ['u2', 'u9', 'u11'] : []));
+  // A server room's members (server/api/rooms.mjs): read when the room opens and again after each change.
+  const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; canManage: boolean } | null>(null);
+  // The room owner's family (their profile: server/api families.mjs familyOf), read when the room card opens.
+  const [ownerFamily, setOwnerFamily] = useState<{ id: string; name: string } | null>(null);
+  const hostServerId = real ? toServer(hostId) : null;
+  const infoOpen = panel === 'info';
+  useEffect(() => {
+    if (!infoOpen || !hostServerId) return;
+    let on = true;
+    api.userProfile(hostServerId).then(
+      (p) => on && setOwnerFamily(p.family ? { id: p.family.id, name: p.family.name } : null),
+      () => undefined,
+    );
+    return () => {
+      on = false;
+    };
+  }, [infoOpen, hostServerId]);
+  const loadMembers = useCallback(() => {
+    if (!real) return;
+    api.roomMembers(id).then(
+      (r) => {
+        r.members.forEach((m) => rememberUser(m));
+        r.pending.forEach((m) => rememberUser(m));
+        setServerMembers({ ids: r.members.map((m) => toLocal(m.id)), total: r.total, canManage: r.canManage });
+        setMemberApps(r.pending.map((m) => toLocal(m.id)));
+        setMembership(r.mine === 'owner' ? 'owner' : r.mine === 'member' ? 'member' : r.mine === 'pending' ? 'pending' : 'none');
+      },
+      () => {},
+    );
+  }, [real, id]);
+  useEffect(() => loadMembers(), [loadMembers]);
   const [minutes, setMinutes] = useState(0);
   const [giftLog, setGiftLog] = useState<GiftLogRow[]>([]);
   const [requests, setRequests] = useState<string[]>([]);
@@ -568,7 +644,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const allSeats = pad(seats, capacity);
   const ranking = Object.entries(contrib).sort((a, b) => b[1] - a[1]);
   const topGifter = ranking.find(([uid]) => !bossRemoved.has(uid) && !kicked.has(uid));
-  const bossId = bossOn && topGifter && topGifter[1] >= BOSS_SEAT_MIN_COINS ? topGifter[0] : null;
+  // A server room: the server names the holder (its top gifter of the last 24 hours), so every phone shows the same.
+  const bossId = real ? (bossOn && base!.bossId ? toLocal(base!.bossId) : null) : bossOn && topGifter && topGifter[1] >= BOSS_SEAT_MIN_COINS ? topGifter[0] : null;
   // The boss seat is a speaking seat: the presence server counts its holder as on a mic (PK, lists, counts).
   useEffect(() => setBoss(id, bossId), [id, bossId]);
   const mySeat = allSeats.indexOf('me');
@@ -703,6 +780,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   // Balkon: people in the room who are not on a mic (from the presence model, never a separate list).
   const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
+  // A server room: everyone's shop look (frame, bubble, mic effect, entry) from the server, for the people shown.
+  const lookIds = real ? [...seatedOthers, ...audience.map((u) => u.id), ...(bossId && bossId !== 'me' ? [bossId] : [])].map((u) => toServer(u) ?? '').filter(Boolean) : [];
+  const looksVersion = useLooks(lookIds, real);
+  const lookFor = (uid: string): Look | undefined => (real && uid !== 'me' ? lookOf(toServer(uid)) : undefined);
 
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
@@ -720,7 +801,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
     : music;
 
-  const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
+  // The room's forbidden words become *** (a server room's own list, the same on every phone; the server keeps only
+  // letters, digits and spaces in it, so a word is safe in a pattern).
+  // (Kept as plain values: the rules object itself must not travel into the voice hooks below.)
+  const liveWords = real ? (base!.wordsText ?? '') : null;
+  const liveSlow = real && !!liveRules?.slowMode;
+  // The room's staff as plain text, for the voice handlers (slow mode never holds back the owner or admins).
+  const staffIdsKey = [hostId, ...superIds, ...adminIds].join('\n');
+  const mask = (text: string) => (liveWords !== null ? (liveWords ? liveWords.split('\n') : []) : words).reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
   // Room events arrive once by id (lib/chat-feed). While the connection is down they wait in a buffer and
   // are merged, in time order and without duplicates, when it comes back.
   const offlineFeed = useRef<FeedMsg[]>([]);
@@ -739,14 +827,57 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
   // Server room: who switched their own mic off, from the voice connection (drawn like my own mic-off badge).
   const peersMicOff = useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
-    onJoin: (_uid, name) => addMsg({ system: true, text: `${name} odaya girdi` }),
+    onJoin: (uid, name) => {
+      addMsg({ system: true, text: `${name} odaya girdi` });
+      // Their entry effect and ride (their shop look from the server), once it is read.
+      const sid = toServer(uid);
+      if (!entryOn || !sid) return;
+      void loadLooks([sid]).then(() => {
+        const show = entryShowOf(lookOf(sid), name, userById(uid).avatar);
+        if (!show) return;
+        if (entry) setEntryQueue((q) => [...q, show].slice(-3));
+        else setEntry(show);
+      });
+    },
     onLeave: (_uid, name) => addMsg({ system: true, text: `${name} odadan ayrıldı` }),
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
     onSignal: (from, msg: RoomSignal) => {
       if (blocked.has(from)) return;
       // Room chat goes phone to phone and the server never reads it, so a line with contact details from an older
       // or modified app is dropped here. Not counted: the refusal would be mine, and I only received it.
-      if (msg.t === 'chat') return checkText(msg.text).ok ? addMsg({ userId: from, text: msg.text }) : undefined;
+      if (msg.t === 'chat') {
+        if (!checkText(msg.text).ok) return;
+        // Slow mode: a line from someone who isn't staff, sooner than the room allows after their last one, is dropped.
+        if (liveSlow && !staffIdsKey.split('\n').includes(from)) {
+          if (nowMs() - (lastLineFrom.current.get(from) ?? 0) < SLOW_MS - 1_500) return;
+          lastLineFrom.current.set(from, nowMs());
+        }
+        return addMsg({ userId: from, text: mask(msg.text) });
+      }
+      // An emoji over their seat: only one from this phone's own emoji and sticker lists (never free text).
+      if (msg.t === 'react') return seatEmojiOk(msg.emoji) ? react(from, msg.emoji) : undefined;
+      // Another phone's Hareketli: only a free one (a paid one comes from the server as 'fx').
+      if (msg.t === 'anim') {
+        if (animById(msg.animationId)?.is_free && freeAnimOk(from)) playRoomAnim(id, from, msg.animationId, `p:${from}:${msgId()}`);
+        return;
+      }
+      if (msg.t === 'fx') {
+        const a = animById(msg.animationId);
+        if (a && playRoomAnim(id, from, msg.animationId, `fx:${msg.eventId}`)) addMsg({ id: `fx:${msg.eventId}`, system: true, kind: 'gift', text: `✨ ${userById(from).name} ${a.name} efekt hediyesi gönderdi` });
+        return;
+      }
+      // Soru-cevap: anyone's question (never with contact details), a pick only from the room's staff.
+      if (msg.t === 'q') {
+        if (!checkText(msg.text).ok) return;
+        return setQuestions((l) => (l.some((x) => x.id === msg.id) ? l : [...l.slice(-49), { id: msg.id, userId: from, text: msg.text, picked: false }]));
+      }
+      if (msg.t === 'qpick') {
+        if (!staffIdsKey.split('\n').includes(from)) return;
+        const q = questions.find((x) => x.id === msg.id);
+        setQuestions((l) => l.map((x) => (x.id === msg.id ? { ...x, picked: true } : x)));
+        if (q) addMsg({ id: `qpick:${msg.id}`, system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
+        return;
+      }
       const to = msg.to.map((t) => (t === myServerId() ? 'me' : t));
       if (msg.t === 'lucky') return showLuckyFrom(from, to, msg);
       const gift = GIFTS.find((g) => g.id === msg.giftId);
@@ -876,6 +1007,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             (e: unknown) => showAlert(refusalTitle(e, 'Kaydedilemedi'), errorText(e)),
           );
         },
+        ...(myRank === 3 && { theme, setTheme: (t: RoomTheme) => saveLook({ theme: t }, 'Oda temasını değiştirdi') }),
+        owner: myRank === 3,
+        unban: (uid: string) => {
+          const user = toServer(uid);
+          if (!user || offlineBlocked()) return;
+          staffAction('Yasak kaldırılamadı', () => roomUnban(id, user), () => {
+            staff.reload();
+            logMod('Kara listeden çıkardı', userById(uid).name);
+          });
+        },
         setPassword: (password: string | null) =>
           updateServerRoom(id, { password }).then(
             () => {
@@ -891,6 +1032,32 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           ),
       }
     : undefined;
+  // A server room's look (cover, theme, gift effects): saved on the server, which tells every phone in the room.
+  function saveLook(patch: api.RoomPatch, what: string) {
+    if (offlineBlocked()) return;
+    updateServerRoom(id, patch).then(
+      () => {
+        setRoomEdits((n) => n + 1);
+        logMod(what, 'Oda');
+      },
+      (e: unknown) => showAlert(refusalTitle(e, 'Kaydedilemedi'), errorText(e)),
+    );
+  }
+  // Oda ayarları in a server room: the settings screen's changes go to the server as rules (or the room type).
+  function saveRules(p: Partial<MyRoom>) {
+    const rules: Partial<api.RoomRules> = {};
+    if (p.micPermission !== undefined) rules.micPermission = p.micPermission;
+    if (p.bossSeat !== undefined) rules.bossSeat = p.bossSeat;
+    if (p.joinMode !== undefined) rules.joinMode = p.joinMode;
+    if (p.manageMembers !== undefined) rules.manageMembers = p.manageMembers;
+    if (p.manageFunctions !== undefined) rules.manageFunctions = p.manageFunctions;
+    if (p.autoRemoveDays !== undefined) rules.autoRemoveDays = p.autoRemoveDays;
+    if (p.limit !== undefined) rules.limit = p.limit;
+    if (p.profileVisible !== undefined) rules.profileVisible = p.profileVisible;
+    if (p.videoPrivacy !== undefined) rules.videoPrivacy = p.videoPrivacy;
+    const patch: api.RoomPatch = { ...(Object.keys(rules).length > 0 && { rules }), ...(p.roomType !== undefined && { roomType: p.roomType }) };
+    if (Object.keys(patch).length) saveLook(patch, 'Oda ayarını değiştirdi');
+  }
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
   const logGift = (from: string, to: string, gift: Gift, count: number) =>
     setGiftLog((l) => [{ id: msgId(), from, to, emoji: gift.emoji, name: gift.name, count, coins: gift.price * count, time: clock(), giftId: gift.id }, ...l].slice(0, 100));
@@ -958,17 +1125,78 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       v.measureInWindow((x, y, w, h) => resolve(w ? { x: x + w / 2, y: y + h / 2 } : null));
     });
   const sendAnim = (animationId: string) => {
+    if (real) return void sendLiveAnim(animationId);
+    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
+    // Live mode: a sample room's people are not real, and real coins never go to it.
+    if (liveMode() && a && !a.is_free) return showAlert('Gönderilemedi', 'Bu örnek odada ücretli animasyon gönderilemez. Gerçek odalarda gönderebilirsin.');
     // Only the id goes to the "server"; price, licence and activity are read from the catalog there.
     const r = sendAnimation(animationId, id, 'me', newAnimRequestId(), { spend: spendCoins, refund: addCoins });
     if (!r.ok) return showAlert('Gönderilemedi', r.reason);
     tapHaptic();
     setEmojiOpen(false);
-    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
     if (a && r.charged) {
       addMsg({ system: true, kind: 'gift', text: `✨ ${ME.name} ${a.name} efekt hediyesi gönderdi (🪙 ${r.charged.toLocaleString('tr-TR')})` });
       bump('giftsSent', 1);
     }
   };
+  // Server room: a paid one is taken on the server at its price, and the server tells everyone in the room
+  // (server/api/room-fx.mjs); this phone draws it once the server said it was paid. A free one goes from this
+  // phone to the others like a chat line (lib/live/room-bus 'anim').
+  const sendLiveAnim = async (animationId: string) => {
+    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
+    if (!a || !isLive(a)) return showAlert('Gönderilemedi', 'Bu animasyon şu an kullanılamıyor.');
+    if (a.is_free) {
+      const r = sendAnimation(animationId, id, 'me', newAnimRequestId(), { spend: spendCoins, refund: addCoins });
+      if (!r.ok) return showAlert('Gönderilemedi', r.reason);
+      sendSignal({ t: 'anim', animationId });
+      tapHaptic();
+      setEmojiOpen(false);
+      return;
+    }
+    // The daily limit holds here too (the balance is the server's to check).
+    const limited = spendBlock(a.coin_price);
+    if (limited && limited !== 'Yetersiz bakiye.') return showAlert('Gönderilemedi', limited);
+    try {
+      const r = await liveRoomAnimation(id, animationId);
+      playRoomAnim(id, 'me', animationId, `fx:${r.eventId}`);
+      tapHaptic();
+      setEmojiOpen(false);
+      addMsg({ system: true, kind: 'gift', text: `✨ ${ME.name} ${a.name} efekt hediyesi gönderdi (🪙 ${r.price.toLocaleString('tr-TR')})` });
+      bump('giftsSent', 1);
+    } catch (e) {
+      errorHaptic();
+      showAlert('Gönderilemedi', errorText(e), [
+        { text: 'Tamam', style: 'cancel' },
+        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+      ]);
+    }
+  };
+  // Slow mode: when I last wrote, and when each other person's last line came (theirs too fast are dropped).
+  const lastLineAt = useRef(0);
+  const lastLineFrom = useRef(new Map<string, number>());
+  // Another phone's free Hareketli: at most one a second from each person, so nobody can flood the room.
+  const freeAnimAt = useRef(new Map<string, number>());
+  const freeAnimOk = (from: string) => {
+    const now = nowMs();
+    if (now - (freeAnimAt.current.get(from) ?? 0) < 1000) return false;
+    freeAnimAt.current.set(from, now);
+    return true;
+  };
+  // Others' mic effects in a server room: while they talk on a mic, their effect (their shop look) plays at their seat.
+  const othersMicFx = real && !settings.effectsOff && settings.micAnim && !settings.reduceMotion && visible;
+  const talkingKey = real ? [...speaking].filter((u) => u !== 'me' && (seatedOthers.includes(u) || u === bossId)).sort().join(',') : '';
+  useEffect(() => {
+    if (!othersMicFx || !talkingKey) return;
+    const play = () => {
+      for (const uid of talkingKey.split(',')) {
+        const fx = lookOf(toServer(uid))?.micfx;
+        if (fx) playRoomAnim(id, uid, fx, `mic:${uid}:${nowMs()}`);
+      }
+    };
+    play();
+    const t = setInterval(play, 1_800);
+    return () => clearInterval(t);
+  }, [othersMicFx, talkingKey, id]);
   // Mic effect follows actual talking (polled by the layer; never charges, never sends anything).
   const speakingMe = useRef(false);
   useEffect(() => {
@@ -977,7 +1205,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
   const react = (uid: string, emoji: string) => {
-    const key = Date.now() + Math.random();
+    const key = reactionKey();
     setReactions((r) => ({ ...r, [uid]: { emoji, key } }));
     setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), REACTION_MS);
   };
@@ -1306,9 +1534,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addMsg({ system: true, text: `${ME.name} ${index + 1}. koltuğa geçti` });
   };
 
-  // Room membership is the demo's only (a server room has no member list yet: the card doesn't offer it).
+  // Room membership: a server room asks the server (open: at once; apply: the owner or admins answer).
   const joinRoom = () => {
-    if (real || membership !== 'none') return;
+    if (real) {
+      if (membership !== 'none' || offlineBlocked()) return;
+      return staffAction('Üye olunamadı', () => api.joinRoomMembers(id), (r) => {
+        setMembership(r.status);
+        addMsg({ system: true, text: r.status === 'member' ? `✅ ${title} odasının üyesi oldun` : '📝 Oda üyeliği başvurun gönderildi' });
+        loadMembers();
+      });
+    }
+    if (membership !== 'none') return;
     setMembership('pending');
     addMsg({ system: true, text: '📝 Oda üyeliği başvurun gönderildi' });
     setTimeout(() => {
@@ -1362,6 +1598,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       showAlert(failTitle, errorText(e));
     });
   const seatCall = (failTitle: string, body: SeatAction, then: () => void) => staffAction(failTitle, () => roomSeat(id, body), then);
+  // A member change in a server room: then the list is read again (and a line in the chat, if any).
+  const memberCall = <T,>(failTitle: string, run: () => Promise<T>, line?: string, then?: () => void) => {
+    if (offlineBlocked()) return;
+    staffAction(failTitle, run, () => {
+      if (line) addMsg({ system: true, text: line });
+      then?.();
+      loadMembers();
+    });
+  };
   // The mic queue of a server room; the room metadata then shows every phone who waits.
   const queueCall = (failTitle: string, body: QueueAction, then: (queue: string[]) => void) => {
     if (offlineBlocked()) return;
@@ -1468,7 +1713,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           // ActionSheet calls onClose (back to the settings) and then this: the person's sheet replaces the list
           // instead, and closing it goes back to the settings.
           setPanel(null);
-          menuReturn.current = 'settings';
+          menuReturn.current.push('settings');
           setSheet({
             title: label(uid),
             options: [
@@ -1518,7 +1763,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const inRoom = [...new Set([...seatedOthers, ...audience.map((u) => u.id)])].filter((uid) => !!toServer(uid) && uid !== hostId && !adminIds.includes(uid) && !djIds.includes(uid));
     const pickNew = () => {
       setPanel(null);
-      menuReturn.current = 'settings';
+      menuReturn.current.push('settings');
       if (!inRoom.length) return showAlert('Odada uygun kimse yok', 'DJ yapmak istediğin kişi odada olmalı. Yöneticiler zaten müzik çalabilir.');
       setSheet({ title: 'Kimi DJ yapalım?', options: inRoom.slice(0, 30).map((uid) => ({ label: userById(uid).name, icon: 'person-add-outline' as const, onPress: () => setDj(uid, true) })) });
     };
@@ -1783,7 +2028,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       return openSeatMenu(index, `${index + 1}. koltuk · ${locked ? 'kilitli' : 'boş'}`, items);
     }
     if (lockedSeats.includes(index)) return showAlert('Bu mikrofon kilitli', 'Oda yönetimi bu koltuğu kilitledi. Boş başka bir koltuk seçebilir veya el kaldırabilirsin.');
-    if (!real && myRole === 'member' && micPermission === 'members' && membership !== 'member') {
+    if (myRole === 'member' && micPermission === 'members' && membership !== 'member') {
       showAlert('Mikrofon yalnızca oda üyelerine açık', 'Bu odada mikrofon almak için önce oda üyesi olmalısın.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Oda üyesi ol', onPress: joinRoom },
@@ -1828,6 +2073,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const thread = `room:${id}`;
     const refusal = sticker ? null : messageRefusal(thread, text, 'room.chat');
     if (refusal) return setChatRefused(refusal);
+    // A server room in slow mode: one line per 10 seconds for everyone but its staff.
+    if (liveSlow && myRank === 0) {
+      const wait = Math.ceil((lastLineAt.current + SLOW_MS - nowMs()) / 1000);
+      if (wait > 0) return setChatRefused(`Yavaş mod açık: ${wait} saniye sonra yazabilirsin.`);
+      lastLineAt.current = nowMs();
+    }
     if (!sticker) noteSent(thread, text);
     if (!sticker) setDraft('');
     // Server room: the line goes out over the voice connection, which may still be joining or have dropped.
@@ -1849,18 +2100,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [real]);
   // A line naming me (@bahset) stands out; a tap on someone's photo or name opens their person card.
   const myName = app.me.name;
+  // Someone else's chat bubble in a server room: their shop look (it changes when new looks arrive: looksVersion).
+  const bubbleOf = useCallback((uid: string) => (real && looksVersion >= 0 && uid !== 'me' ? (lookOf(toServer(uid))?.bubble ?? undefined) : undefined), [real, looksVersion]);
   const renderChat = useCallback(
     ({ item }: { item: ChatMsg }) => (
       <ChatLine
         msg={item}
         bubbleId={equipped.bubble}
+        bubbleOf={bubbleOf}
         bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null}
         onRetry={retrySend}
         mentionsMe={!!item.userId && item.userId !== 'me' && mentions(item.text, myName)}
         onPerson={openPerson}
       />
     ),
-    [equipped.bubble, retrySend, roomBonds, myName, openPerson],
+    [equipped.bubble, bubbleOf, retrySend, roomBonds, myName, openPerson],
   );
   // @bahset: "@" in the line offers the people on the mics and the balcony; a pick (or the card's Bahset) writes "@Name ".
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -2297,7 +2551,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   ];
   // Oda ayarları (everyone): the room's own settings for staff, then the room tools (Moderasyon, Giriş
   // yasakları, Oda yöneticileri) and my own settings for this room. A sheet opened here comes back here.
-  const fromSettings = (open: () => void) => () => ((menuReturn.current = 'settings'), open());
+  const fromSettings = (open: () => void) => () => (menuReturn.current.push('settings'), open());
   const settingsSections: SettingsSection[] = [
     ...(canManage
       ? [
@@ -2323,7 +2577,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       rows: [
         { key: 'effects', label: 'Efektler ve ses', value: settings.roomMuted ? 'Oda sesi kapalı' : settings.effectsOff ? 'Efektler kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
         { key: 'msg', label: 'Mesaj ayarları', hint: 'Sohbette giriş, hediye ve bot mesajları', onPress: fromSettings(() => setPanel('msgSettings')) },
-        { key: 'decor', label: 'Süsler', hint: 'Çerçeve, giriş efekti ve sohbet balonu (Mağaza)', onPress: () => ((menuReturn.current = null), setPanel(null), router.push('/magaza')) },
+        { key: 'decor', label: 'Süsler', hint: 'Çerçeve, giriş efekti ve sohbet balonu (Mağaza)', onPress: () => (menuReturn.current.push('settings'), router.push('/magaza')) },
       ],
     },
   ];
@@ -2339,7 +2593,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     { label: 'Yöneticiler', value: String(real ? staff.admins.length : adminIds.length) },
     { label: 'Oda kilidi', value: roomLocked ? 'Şifreli' : 'Herkese açık' },
   ];
-  const fromCard = (open: () => void) => () => ((menuReturn.current = 'info'), open());
+  const fromCard = (open: () => void) => () => (menuReturn.current.push('info'), open());
   const cardActions = [
     { key: 'settings', label: 'Oda ayarları', icon: 'settings-outline' as const, onPress: fromCard(() => setPanel('settings')) },
     { key: 'people', label: 'Odadakiler', icon: 'people-outline' as const, onPress: fromCard(() => (setPanel(null), setPeopleOpen(true))) },
@@ -2353,14 +2607,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   // Room card data (members, clan).
   // A server room has no member list on the server yet: none is shown (RoomInfoSheet `live`), never demo people.
-  const roomMembers = isOwn ? ['me', ...myRoom.memberIds] : real ? [] : [...(membership === 'member' ? ['me'] : []), ...USERS.filter((u) => !kicked.has(u.id) && !blocked.has(u.id)).slice(0, 10).map((u) => u.id)];
-  const memberTotal = isOwn ? roomMembers.length : real ? 0 : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
+  const roomMembers = isOwn ? ['me', ...myRoom.memberIds] : real ? (serverMembers?.ids ?? []) : [...(membership === 'member' ? ['me'] : []), ...USERS.filter((u) => !kicked.has(u.id) && !blocked.has(u.id)).slice(0, 10).map((u) => u.id)];
+  const memberTotal = isOwn ? roomMembers.length : real ? (serverMembers?.total ?? 0) : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
   const ownAgencyName = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
-  // Aile isn't on the server yet: a server room's card shows none (never a demo family).
+  // A server room's card shows its owner's family on the server (never a demo family).
   const clan = real
-    ? null
+    ? ownerFamily
+      ? { label: ownerFamily.name, href: `/aile?id=${encodeURIComponent(ownerFamily.id)}` as Href }
+      : null
     : isOwn
       ? familyId
         ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : 'Ailem', href: '/aile' as const, ...(ownFamily ? {} : { art: artSource('oda-ailem') }) }
@@ -2477,7 +2733,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [wasFull, setWasFull] = useState(full);
   if (full !== wasFull) {
     setWasFull(full);
+    if (full && reopenOnReturn) {
+      setPanel(reopenOnReturn);
+      setReopenOnReturn(null);
+    }
     if (!full) {
+      // Left for another screen from a sheet (a menu item, a profile from the card): it opens again on the way back.
+      setReopenOnReturn(panel === 'menu' || panel === 'settings' || panel === 'info' ? panel : null);
       setPanel(null);
       setGiftOpen(false);
       setPeopleOpen(false);
@@ -2498,6 +2760,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (game) setGameMin(true);
     }
   }
+  // Video Odası Gizlilik Koruması: while the room is on screen, this phone blocks screenshots and screen recording.
+  const noCapture = full && (real ? !!liveRules?.videoPrivacy : isOwn && myRoom.videoPrivacy);
+  useEffect(() => {
+    if (!noCapture || Platform.OS === 'web') return;
+    const key = `oda-${id}`;
+    void ScreenCapture.preventScreenCaptureAsync(key).catch(() => {});
+    return () => void ScreenCapture.allowScreenCaptureAsync(key).catch(() => {});
+  }, [noCapture, id]);
   // The chat field may hold the keyboard; it must not stay up over the next screen.
   useEffect(() => {
     if (!full) Keyboard.dismiss();
@@ -2525,8 +2795,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         userId={uid}
         host={extra?.slot ? false : (extra?.host ?? i === 0)}
         small={small}
-        vipLevel={uid === 'me' ? vipLevel : 0}
-        frameId={uid === 'me' ? equipped.frame : undefined}
+        vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
+        frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}
         speaking={!!uid && speaking.has(uid)}
         muted={uid === 'me' ? !sending : !!uid && peersMicOff.has(uid)}
         modMuted={!!uid && mutedUsers.has(uid)}
@@ -2560,7 +2830,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       hidden={gameMin || !full}
       voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
       onSwitch={setGame}
-      onMinimize={() => ((menuReturn.current = null), setGameMin(true))}
+      onMinimize={() => ((menuReturn.current = []), setGameMin(true))}
       onClose={() => (setGame(null), backToMenu())}
       onInvite={(name) => addMsg({ system: true, text: `🎮 ${ME.name} herkesi ${name} masasına davet ediyor! Katılmak için Menü › Oda Oyunları` })}
     />
@@ -2627,7 +2897,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             <Pressable onPress={() => setPanel('contrib')} accessibilityLabel="Katkı sıralaması" hitSlop={6}>
               <Ionicons name="trophy" size={20} color={colors.gold} />
             </Pressable>
-            {isOwn && (
+            {(isOwn || !!liveSettings) && (
               <Pressable onPress={() => setPanel('settings')} accessibilityLabel="Oda ayarları" hitSlop={6}>
                 <Ionicons name="settings-outline" size={20} color="#fff" />
               </Pressable>
@@ -2668,12 +2938,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
               </View>
             )}
-            {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
+            {roomType === 'event' && shownEvents.filter((e) => !e.cancelled)[0] && (
               <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
                 <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
-                  📅 {events.filter((e) => !e.cancelled)[0].title} · {events.filter((e) => !e.cancelled)[0].when}
+                  📅 {shownEvents.filter((e) => !e.cancelled)[0].title} · {shownEvents.filter((e) => !e.cancelled)[0].when}
                 </Text>
-                <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{events.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
+                <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{shownEvents.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
               </Pressable>
             )}
             {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
@@ -2762,6 +3032,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 if (amSeated) {
                   tapHaptic();
                   react('me', e);
+                  // Server room: the others see it over my seat too (lib/live/room-bus 'react').
+                  if (real) sendSignal({ t: 'react', emoji: e });
                   setEmojiOpen(false);
                 } else if (stickerIdOf(e)) send(e);
                 else editDraft((d) => d + e);
@@ -2901,18 +3173,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         members={roomMembers}
         memberTotal={memberTotal}
         applications={memberApps}
-        canManageMembers={isOwn}
-        autoRemoveDays={isOwn ? myRoom.autoRemoveDays : 0}
+        canManageMembers={isOwn || (real && !!serverMembers?.canManage)}
+        autoRemoveDays={isOwn ? myRoom.autoRemoveDays : (liveRules?.autoRemoveDays ?? 0)}
         membership={membership}
         onJoin={joinRoom}
         onApprove={(uid) => {
+          if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
           if (roomMembers.length >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
           setMemberApps((l) => l.filter((x) => x !== uid));
           updateMyRoom({ memberIds: [...myRoom.memberIds, uid] });
           addMsg({ system: true, text: `🏠 ${userById(uid).name} oda üyesi oldu` });
         }}
-        onReject={(uid) => setMemberApps((l) => l.filter((x) => x !== uid))}
+        onReject={(uid) => (real ? memberCall('Reddedilemedi', () => api.answerRoomMember(id, toServer(uid) ?? '', false)) : setMemberApps((l) => l.filter((x) => x !== uid)))}
         onRemoveMember={(uid) => {
+          if (real) return memberCall('Çıkarılamadı', () => api.removeRoomMember(id, toServer(uid) ?? ''), undefined, () => logMod('Oda üyeliğinden çıkardı', userById(uid).name));
           updateMyRoom({ memberIds: myRoom.memberIds.filter((x) => x !== uid) });
           logMod('Oda üyeliğinden çıkardı', userById(uid).name);
         }}
@@ -2921,8 +3195,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         announcement={announcement ?? ''}
         // Server room: the owner and Süper Yönetici edit the name and bulletin (the server checks the rank).
         canEditText={real && myRank >= 2}
+        coverEdit={isOwn || (real && myRank >= 2)}
         onSave={(p) => {
           if (!real) return updateMyRoom(p);
+          if (p.coverId !== undefined) return saveLook({ coverId: p.coverId }, 'Oda kapağını değiştirdi');
           const patch = { ...(p.title !== undefined && { title: p.title }), ...(p.announcement !== undefined && { announcement: p.announcement }) };
           if (!Object.keys(patch).length) return;
           updateServerRoom(id, patch)
@@ -2937,13 +3213,33 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         <RoomSettingsScreen
           visible={panel === 'settings'}
           onClose={closePanel}
-          room={liveSettings ? { ...myRoom, micCount: classicCapacity, xp: base!.xp ?? 0 } : myRoom}
+          room={
+            liveSettings
+              ? {
+                  ...myRoom,
+                  micCount: classicCapacity,
+                  xp: base!.xp ?? 0,
+                  roomType,
+                  micPermission,
+                  bossSeat: !!liveRules?.bossSeat,
+                  joinMode: liveRules?.joinMode ?? 'open',
+                  manageMembers: liveRules?.manageMembers ?? 'admins',
+                  manageFunctions: functionsBy,
+                  autoRemoveDays: liveRules?.autoRemoveDays ?? 0,
+                  limit: liveRules?.limit ?? memberLimit(level),
+                  profileVisible: liveRules?.profileVisible ?? true,
+                  videoPrivacy: !!liveRules?.videoPrivacy,
+                  blacklist: (staff.bans ?? []).filter((b) => b.until === null).map((b) => b.uid),
+                }
+              : myRoom
+          }
           live={liveSettings}
           // The room's own settings for my room and the staff of a server room; everyone gets the sections.
           standard={isOwn || !!liveSettings}
           sections={settingsSections}
           update={(p) => {
-            if (liveSettings || !isOwn) return;
+            if (liveSettings) return saveRules(p);
+            if (!isOwn) return;
             updateMyRoom(p);
             const keys = Object.keys(p).filter((k) => k !== 'password');
             if (keys.length) logMod('Oda ayarını değiştirdi', keys.join(', '));
@@ -2952,9 +3248,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           vipLevel={GATES.roomLock(nobleTier) ? 1 : 0}
           maxMics={maxMics}
           modLog={modLog}
-          bans={bans}
-          botOn={settings.roomBot}
-          setBot={(v) => setSetting('roomBot', v)}
+          bans={real ? (staff.bans ?? []).map((b) => ({ userId: b.uid, until: banLeft(b.until) })) : bans}
+          botOn={real ? botOn : settings.roomBot}
+          setBot={(v) => (real ? saveLook({ rules: { bot: v } }, v ? 'Oda botunu açtı' : 'Oda botunu kapattı') : setSetting('roomBot', v))}
           layoutLabel={layout ? `${modeById(layout.modeId).name} · ${layout.name}` : `Klasik · ${classicCapacity} mikrofon`}
           classicActive={!layout}
           renderLayouts={layoutSheet}
@@ -3070,22 +3366,45 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       <EventsSheet
         visible={panel === 'events'}
         onClose={closePanel}
-        events={events}
+        events={shownEvents}
         // Server room: activities are for the owner and Süper Yönetici.
         canManage={real ? myRank >= 2 : myRole !== 'member'}
         onCreate={(e) => {
+          if (real) {
+            if (offlineBlocked()) return;
+            return staffAction('Etkinlik eklenemedi', () => api.addRoomEvent(id, e), () => {
+              addMsg({ system: true, text: `📅 Yeni etkinlik: ${e.title} · ${e.when}` });
+              loadEvents();
+            });
+          }
           setEvents((l) => [...l, { ...e, id: msgId(), by: isOwn ? 'me' : hostId, going: true, reminder: true, attendees: 0, cancelled: false }]);
           addMsg({ system: true, text: `📅 Yeni etkinlik: ${e.title} · ${e.when}` });
         }}
-        onToggleGoing={(eid) => setEvents((l) => l.map((e) => (e.id === eid ? { ...e, going: !e.going } : e)))}
+        onToggleGoing={(eid) => {
+          if (real) {
+            const e = shownEvents.find((x) => x.id === eid);
+            if (e && !offlineBlocked()) staffAction('Kaydedilemedi', () => api.goRoomEvent(Number(eid), !e.going), loadEvents);
+            return;
+          }
+          setEvents((l) => l.map((e) => (e.id === eid ? { ...e, going: !e.going } : e)));
+        }}
         onToggleReminder={(eid) => {
-          const e = events.find((x) => x.id === eid);
-          setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
+          const e = shownEvents.find((x) => x.id === eid);
+          if (real) setReminders((l) => (l.includes(Number(eid)) ? l.filter((x) => x !== Number(eid)) : [...l, Number(eid)]));
+          else setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
           // One reminder per event (no duplicates); respects the user's notification choices.
           if (e && !e.reminder) notify({ kind: 'social', icon: 'alarm', title: `Hatırlatma kuruldu: ${e.title}`, body: `${e.when} · ${title}`, href: `/oda/${id}` });
         }}
         onCancel={(eid) => {
-          const e = events.find((x) => x.id === eid);
+          const e = shownEvents.find((x) => x.id === eid);
+          if (real) {
+            if (!e || offlineBlocked()) return;
+            return staffAction('İptal edilemedi', () => api.cancelRoomEvent(Number(eid)), () => {
+              addMsg({ system: true, text: `❌ Etkinlik iptal edildi: ${e.title}` });
+              logMod('Etkinliği iptal etti', e.title);
+              loadEvents();
+            });
+          }
           setEvents((l) => l.map((x) => (x.id === eid ? { ...x, cancelled: true } : x)));
           if (e) {
             addMsg({ system: true, text: `❌ Etkinlik iptal edildi: ${e.title} — katılımcılara bildirildi` });
@@ -3098,9 +3417,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onClose={closePanel}
         questions={questions}
         canManage={myRole !== 'member'}
-        onAsk={(text) => setQuestions((q) => [...q, { id: msgId(), userId: 'me', text, picked: false }])}
+        onAsk={(text) => {
+          // A question is public: no contact details (the others check it again when it arrives).
+          const refusal = messageRefusal(`room:${id}`, text, 'room.chat');
+          if (refusal) return showAlert('Soru gönderilemedi', refusal);
+          const qid = `q${msgId().replace('.', '')}`;
+          if (real && !sendSignal({ t: 'q', id: qid, text })) return showAlert('Soru gönderilemedi', 'Oda bağlantısı yok, biraz sonra tekrar dene.');
+          setQuestions((q) => [...q, { id: qid, userId: 'me', text, picked: false }]);
+        }}
         onPick={(qid) => {
           const q = questions.find((x) => x.id === qid);
+          if (real) sendSignal({ t: 'qpick', id: qid });
           setQuestions((l) => l.map((x) => (x.id === qid ? { ...x, picked: true } : x)));
           if (q) addMsg({ system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
         }}
@@ -3110,11 +3437,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onClose={closePanel}
         settings={settings}
         set={setSetting}
-        isOwner={isOwn}
-        roomFx={{ giftEffects: myRoom.giftEffects }}
-        setRoomFx={updateMyRoom}
+        isOwner={isOwn || (real && myRank === 3)}
+        roomFx={{ giftEffects: roomGiftFx }}
+        setRoomFx={real ? (p) => saveLook(p, p.giftEffects ? 'Odada hediye efektlerini açtı' : 'Odada hediye efektlerini kapattı') : updateMyRoom}
       />
-      <ModerationSheet visible={panel === 'mod'} onClose={closePanel} log={modLog} slowMode={slowMode} setSlowMode={(v) => { setSlowMode(v); logMod(v ? 'Yavaş modu açtı' : 'Yavaş modu kapattı', 'Oda'); }} words={words} setWords={setWords} bans={real ? (staff.bans ?? []).map((b) => ({ userId: b.uid, until: banLeft(b.until) })) : bans} />
+      <ModerationSheet visible={panel === 'mod'} onClose={closePanel} log={modLog} slowMode={real ? !!liveRules?.slowMode : slowMode} setSlowMode={(v) => (real ? saveLook({ rules: { slowMode: v } }, v ? 'Yavaş modu açtı' : 'Yavaş modu kapattı') : (setSlowMode(v), logMod(v ? 'Yavaş modu açtı' : 'Yavaş modu kapattı', 'Oda')))} words={real ? (liveRules?.words ?? []) : words} setWords={(w) => (real ? saveLook({ rules: { words: w } }, 'Kelime filtresini değiştirdi') : setWords(w))} bans={real ? (staff.bans ?? []).map((b) => ({ userId: b.uid, until: banLeft(b.until) })) : bans} sample={!liveMode()} />
       <ShareRoomSheet
         visible={panel === 'invite'}
         onClose={closePanel}
@@ -3124,7 +3451,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onExternal={shareExternal}
         followers={canManage ? { count: followerCount(hostId), lastAt: followerInvites[id], onSend: inviteFollowers } : null}
       />
-      <RoomMenuSheet visible={panel === 'menu'} onClose={() => setPanel(null)} sections={menuSections.map((sec) => ({ ...sec, items: sec.items.map((it) => (MENU_TOGGLES.has(it.key) ? it : { ...it, onPress: () => ((menuReturn.current = 'menu'), it.onPress()) })) }))} />
+      <RoomMenuSheet visible={panel === 'menu'} onClose={() => setPanel(null)} sections={menuSections.map((sec) => ({ ...sec, items: sec.items.map((it) => (MENU_TOGGLES.has(it.key) ? it : { ...it, onPress: () => (menuReturn.current.push('menu'), it.onPress()) })) }))} />
       <ActionSheet
         visible={panel === 'msgSettings'}
         title="Mesaj ayarları (sadece senin ekranın)"

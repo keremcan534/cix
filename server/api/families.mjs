@@ -8,7 +8,7 @@
 //   POST /api/family/leave                    → { left: true }
 //   POST /api/family/kick   { userId }        → { members }               (the leader: anyone; a helper: members)
 //   POST /api/family/role   { userId, role }  → { members }               (the leader; role 'owner' hands the family over)
-//   POST /api/family/settings { announcement?, joinMode? } → { family }   (announcement: leader or helper; joinMode: leader)
+//   POST /api/family/settings { announcement?, joinMode?, tag?, theme? } → { family }   (announcement: leader or helper; the rest: leader)
 //   GET  /api/family/chat?after=              → { messages }              (members only, oldest first, at most 100)
 //   POST /api/family/chat   { text }          → { message }
 //
@@ -21,6 +21,7 @@ import { HttpError, auth, db, int, limit, once, publicText, readJson, tx, userId
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { spendCoins } from './wallet.mjs';
+import { FAMILY_THEMES } from './family-rules.mjs';
 
 /** The founding fee (app: data/kabile KABILE_CREATE_COST). */
 export const FAMILY_COST = 500;
@@ -29,7 +30,7 @@ export const FAMILY_XP = [0, 1_000, 3_000, 6_000, 10_000, 16_000, 24_000, 35_000
 export const familyLevel = (power) => FAMILY_XP.reduce((lvl, t, i) => (power >= t ? i + 1 : lvl), 1);
 export const familyCapacity = (level) => 50 + (level - 1) * 25;
 
-const WEEK = `(date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
+export const WEEK = `(date_trunc('week', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;
 const ROLES = ['owner', 'helper', 'member'];
 
 const familyId = (v) => {
@@ -39,7 +40,7 @@ const familyId = (v) => {
 };
 
 /** Members and power (all time, this week) of each family in `ids`. */
-async function statsOf(ids, q = db) {
+export async function statsOf(ids, q = db) {
   const out = Object.fromEntries(ids.map((id) => [id, { members: 0, power: 0, weekly: 0 }]));
   if (!ids.length) return out;
   const m = await q.query('SELECT family_id, count(*)::int AS n FROM family_members WHERE family_id = ANY($1::bigint[]) GROUP BY family_id', [ids]);
@@ -68,12 +69,15 @@ function view(f, s) {
     level,
     capacity: familyCapacity(level),
     createdAt: f.created_at,
+    // What the leader picked (family-more.mjs): a short tag beside the name and a theme (by family level).
+    tag: f.tag ?? '',
+    theme: f.theme ?? 'gece',
   };
 }
 
 const FAMILY = `SELECT f.*, u.name AS leader_name, u.avatar_url AS leader_avatar FROM families f JOIN users u ON u.id = f.leader WHERE f.closed_at IS NULL`;
 
-async function familyView(id, q = db) {
+export async function familyView(id, q = db) {
   const r = await q.query(`${FAMILY} AND f.id = $1`, [id]);
   if (!r.rowCount) throw new HttpError(404, 'Bu aile artık yok');
   return view(r.rows[0], (await statsOf([id], q))[id]);
@@ -81,7 +85,7 @@ async function familyView(id, q = db) {
 
 const person = (x) => ({ id: x.user_id, name: x.name, avatarUrl: x.avatar_url ?? null, gender: x.gender ?? null });
 
-async function membersOf(id, q = db) {
+export async function membersOf(id, q = db) {
   const r = await q.query(
     `SELECT fm.user_id, fm.role, fm.joined_at, u.name, u.avatar_url, u.gender,
             (SELECT COALESCE(sum(g.total), 0) FROM gift_events g WHERE g.sender = fm.user_id AND g.created_at >= GREATEST(fm.joined_at, ${WEEK}))::bigint AS weekly
@@ -102,7 +106,7 @@ async function requestsOf(id, q = db) {
   return r.rows.map((x) => ({ ...person(x), at: x.created_at }));
 }
 
-const myMembership = async (uid, q = db) => (await q.query('SELECT family_id, role, joined_at FROM family_members WHERE user_id = $1', [uid])).rows[0] ?? null;
+export const myMembership = async (uid, q = db) => (await q.query('SELECT family_id, role, joined_at FROM family_members WHERE user_id = $1', [uid])).rows[0] ?? null;
 
 /** The open family `id`, locked for a membership change, or 404. */
 async function lockFamily(c, id) {
@@ -323,11 +327,25 @@ export const familyRoutes = {
     const id = Number(mine.family_id);
     const announcement = b.announcement === undefined ? undefined : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'family.announcement', 'announcement');
     if (b.joinMode !== undefined && !['open', 'approve'].includes(b.joinMode)) throw new HttpError(400, 'Geçersiz katılım');
+    // The leader's look: a short tag (letters and digits, at most 8) and a theme opened by the family's level.
+    const tag = b.tag === undefined ? undefined : await publicText(b.tag, 0, 8, 'Aile etiketi', me, 'family.tag', 'tag');
+    if (tag && !/^[\p{L}\p{N}]+$/u.test(tag)) throw new HttpError(400, 'Aile etiketi yalnızca harf ve rakam olabilir');
+    let theme;
+    if (b.theme !== undefined) {
+      const t = FAMILY_THEMES.find((x) => x.id === b.theme);
+      if (!t) throw new HttpError(400, 'Geçersiz tema');
+      const level = (await familyView(id)).level;
+      if (level < t.minLevel) throw new HttpError(403, `Bu tema Lv.${t.minLevel} ailede açılır`);
+      theme = t.id;
+    }
+    const leaderOnly = b.joinMode !== undefined || tag !== undefined || theme !== undefined;
     await tx(async (c) => {
       await lockFamily(c, id);
-      await roleIn(c, me.id, id, b.joinMode !== undefined ? ['owner'] : ['owner', 'helper']);
+      await roleIn(c, me.id, id, leaderOnly ? ['owner'] : ['owner', 'helper'], leaderOnly ? 'Bunu yalnızca aile lideri yapabilir' : undefined);
       if (announcement !== undefined) await c.query('UPDATE families SET announcement = $2 WHERE id = $1', [id, announcement]);
       if (b.joinMode !== undefined) await c.query('UPDATE families SET join_mode = $2 WHERE id = $1', [id, b.joinMode]);
+      if (tag !== undefined) await c.query('UPDATE families SET tag = $2 WHERE id = $1', [id, tag]);
+      if (theme !== undefined) await c.query('UPDATE families SET theme = $2 WHERE id = $1', [id, theme]);
     });
     return { family: await familyView(id) };
   },

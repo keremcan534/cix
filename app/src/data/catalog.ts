@@ -303,6 +303,11 @@ export const ROOM_BACKGROUNDS = [
   { id: 'bg3', name: 'Deniz', seed: 'sea', minLevel: 4 },
   { id: 'bg4', name: 'Galaksi', seed: 'galaxy', minLevel: 7 },
 ];
+/** A room background's picture ('' for none or an unknown id). A server room keeps only the id (server/api/catalog.mjs ROOM_COVERS). */
+export function roomCoverUrl(id: string | null | undefined) {
+  const b = ROOM_BACKGROUNDS.find((x) => x.id === id);
+  return b ? `https://picsum.photos/seed/${b.seed}/600/400` : '';
+}
 
 // --- Room music (licensed in-app catalog; mock) -------------------------------
 export type Track = { id: string; title: string; artist: string; seconds: number };

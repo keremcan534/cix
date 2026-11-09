@@ -20,7 +20,7 @@ const NAV = {
   },
 };
 
-// Rooms stay the landing tab even though "Benzerler" is first in the bar.
+// Rooms stay the landing tab even though "Ana Sayfa" (people to meet, /kesfet) is first in the bar.
 export const unstable_settings = { anchor: 'index' };
 
 /** Every tab the same: line icon at rest, filled icon on a soft turquoise pill when active. */
@@ -76,13 +76,14 @@ export default function TabLayout() {
           animation: 'shift',
         }}
       >
-        <Tabs.Screen name="kesfet" options={{ title: 'Benzerler', tabBarIcon: icon('heart-outline', 'heart') }} />
+        {/* Güncelleme 2, madde 46: the bar's "Benzerler" is now "Ana Sayfa" (its own tabs start with Ana Sayfa as well). */}
+        <Tabs.Screen name="kesfet" options={{ title: 'Ana Sayfa', tabBarIcon: icon('home-outline', 'home') }} />
         <Tabs.Screen name="anlar" options={{ title: 'Anlar', tabBarIcon: icon('aperture-outline', 'aperture') }} />
         <Tabs.Screen
           name="index"
           options={{
             title: 'Odalar',
-            tabBarIcon: icon('home-outline', 'home'),
+            tabBarIcon: icon('mic-outline', 'mic'),
             // Rooms scroll under the glass bar (the screen pads its list by the bar height).
             tabBarStyle: { ...bar, position: 'absolute' },
           }}

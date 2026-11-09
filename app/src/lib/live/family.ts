@@ -1,5 +1,6 @@
-// Live mode (lib/live): Aile on the server (server/api/families.mjs). Families, members, requests and the family
-// chat are the server's; the screens (app/aile, app/kabile/sohbet) show what it answers.
+// Live mode (lib/live): Aile on the server (server/api/families.mjs, family-more.mjs). Families, members, requests,
+// the family chat, the daily tasks, the weekly chests and the pairs are the server's; the screens (app/aile,
+// app/kabile/*) show what it answers.
 // Only lib/api and data/mock are used, so the unit tests can run this under Node.
 import * as api from '@/lib/api';
 import { putServerUser } from '@/data/mock';
@@ -18,6 +19,9 @@ export type LiveFamily = {
   level: number;
   capacity: number;
   createdAt: string;
+  /** The leader's short tag beside the name ('' none) and the family's theme (data/kabile KABILE_THEMES). */
+  tag: string;
+  theme: string;
 };
 export type FamilyMember = FamilyPerson & { role: FamilyRole; joinedAt: string; weekly: number };
 export type FamilyDetail = { family: LiveFamily | null; members: FamilyMember[]; myRole: FamilyRole | null; requested: boolean; requests: (FamilyPerson & { at: string })[] };
@@ -48,7 +52,35 @@ export const answer = (userId: string, accept: boolean) => api.apiRequest<{ memb
 export const leave = () => api.apiRequest<{ left: true }>('POST', '/api/family/leave', {});
 export const kick = (userId: string) => api.apiRequest<{ members: FamilyMember[] }>('POST', '/api/family/kick', { userId });
 export const setRole = (userId: string, role: FamilyRole) => api.apiRequest<{ members: FamilyMember[] }>('POST', '/api/family/role', { userId, role });
-export const settings = (s: { announcement?: string; joinMode?: 'open' | 'approve' }) => api.apiRequest<{ family: LiveFamily }>('POST', '/api/family/settings', s);
+export const settings = (s: { announcement?: string; joinMode?: 'open' | 'approve'; tag?: string; theme?: string }) => api.apiRequest<{ family: LiveFamily }>('POST', '/api/family/settings', s);
+
+/** A daily task as the server counted it today (Turkey's day) from what I really did. */
+export type FamilyTask = { id: string; progress: number; goal: number; per: number; kind: 'count' | 'rate'; done: boolean; points: number; doneBy: number };
+export type FamilyChest = { id: string; need: number; coins: number; reached: boolean; claimed: boolean };
+type Short = { id: string; name: string; avatarUrl: string | null };
+/** GET /api/family/overview: my family's day and week. */
+export type FamilyOverview = {
+  tasks: FamilyTask[];
+  me: { gifts: number; points: number };
+  chests: FamilyChest[];
+  week: { power: number; start: string };
+  /** An estimate only (level rate × the week): paying it is a management decision. */
+  bonus: { rate: number; pool: number };
+  rank: number;
+  room: { id: string; title: string; listeners: number } | null;
+  highlights: (Short & { contribution: number })[];
+  active: number;
+  pairs: { a: Short; b: Short; kind: string; score: number }[];
+  checkedIn: boolean;
+};
+export async function overview(): Promise<FamilyOverview> {
+  const r = await api.apiRequest<FamilyOverview>('GET', '/api/family/overview');
+  for (const x of [...r.highlights, ...r.pairs.flatMap((p) => [p.a, p.b])]) if (x) know({ ...x, gender: null });
+  return r;
+}
+export const checkIn = () => api.apiRequest<{ checkedIn: true }>('POST', '/api/family/checkin', {});
+/** Opens a weekly chest: reward coins (shop only), once per person and week; `ref` makes a retry safe. */
+export const openChest = (chest: string, ref: string) => api.apiRequest<{ user: api.ServerUser; replay: boolean; coins: number }>('POST', '/api/family/chest', { chest, ref });
 
 export async function chat(after?: string): Promise<FamilyMessage[]> {
   const r = await api.apiRequest<{ messages: FamilyMessage[] }>('GET', `/api/family/chat${after ? `?after=${encodeURIComponent(after)}` : ''}`);

@@ -13,6 +13,7 @@ import { useIsFocused } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
+import { ROOM_THEMES, roomCoverUrl } from '@/data/catalog';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
 import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
@@ -175,6 +176,11 @@ export async function liveGift(to: string, giftId: string, count: number, room?:
   return applied(await once(`gift:${id}:${giftId}:${count}:${room ?? place ?? ''}`, (ref) => api.sendGift(id, giftId, count, room, ref, place)), 'Hediye gönderildi');
 }
 
+/** A paid Hareketli in a server room, at the server's price; the server tells the room (server/api/room-fx.mjs). */
+export async function liveRoomAnimation(room: string, animationId: string) {
+  return applied(await once(`anim:${room}:${animationId}`, (ref) => api.roomAnimation(room, animationId, ref)), 'Animasyon');
+}
+
 /** Signed out: the next account on this phone starts without this one's id, balance or pending request ids. */
 export function forgetLiveAccount() {
   setMyId(null);
@@ -284,7 +290,7 @@ const locked = new Set<string>();
 /** A server room that asks for a password before anyone but its staff gets in. */
 export const isLockedRoom = (id: string) => locked.has(id);
 
-/** A server room as the app's Room (no sample cover, empty mics: who sits where comes from LiveKit). */
+/** A server room as the app's Room (its own cover or none, empty mics: who sits where comes from LiveKit). */
 export function roomOf(r: api.ServerRoom): Room {
   rememberUser(r.owner);
   if (r.hasPassword) locked.add(r.id);
@@ -293,7 +299,7 @@ export function roomOf(r: api.ServerRoom): Room {
     id: r.id,
     title: r.title,
     category: 'Sohbet',
-    cover: '',
+    cover: roomCoverUrl(r.coverId),
     hostId: toLocal(r.owner.id),
     listeners: r.listeners,
     seatUserIds: Array(9).fill(null),
@@ -306,7 +312,12 @@ export function roomOf(r: api.ServerRoom): Room {
     layoutId: r.layoutId ?? undefined,
     lockedSeats: r.lockedSeats ?? [],
     micQueue: !!r.micQueue,
+    theme: ROOM_THEMES.find((t) => t.id === r.theme)?.id ?? 'chat',
+    giftEffects: r.giftEffects !== false,
+    ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
+    bossId: r.boss ? r.boss.id : null,
   };
+  if (r.boss) rememberUser(r.boss);
   putServerRoom(room);
   return room;
 }

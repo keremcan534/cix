@@ -88,6 +88,14 @@
       "./plugins/with-webrtc-software-ns",
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#13D9DF",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-audio",
         {
           "enableBackgroundPlayback": false,

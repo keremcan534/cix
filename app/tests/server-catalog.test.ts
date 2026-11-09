@@ -7,13 +7,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { ANIMATION_SEED } from '@/data/animations';
-import { COSMETICS, STICKER_PACKS } from '@/data/catalog';
+import { COSMETICS, ROOM_BACKGROUNDS, ROOM_THEMES, STICKER_PACKS, roomCoverUrl } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
 import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
+import * as family from '../../server/api/family-rules.mjs';
+import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, KABILE_CHESTS, KABILE_TASKS, KABILE_THEMES } from '@/data/kabile';
 
 type ServerGift = { id: string; name: string; price: number; cat: string; minSvip: number };
 type ServerPack = { id: string; productId: string; coins: number; firstBonus: number };
@@ -23,6 +25,26 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
   test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {
     const app = GIFTS.map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
     assert.deepEqual([...(server.GIFTS as Map<string, ServerGift>).values()], app);
+  });
+
+  test('oda kapakları (seviyeleriyle) ve temalar sunucudakiyle aynı', () => {
+    assert.deepEqual(server.ROOM_COVERS, ROOM_BACKGROUNDS.map((b) => ({ id: b.id, minLevel: b.minLevel })));
+    assert.deepEqual(server.ROOM_THEMES, ROOM_THEMES.map((t) => t.id));
+    assert.equal(roomCoverUrl('bg3'), 'https://picsum.photos/seed/sea/600/400');
+    assert.equal(roomCoverUrl(null), '');
+    assert.equal(roomCoverUrl('yok'), '');
+  });
+
+  test('odada ücretli Hareketli: her animasyonun adı, fiyatı ve kampanya günleri', () => {
+    type ServerAnim = { id: string; name: string; price: number; from: string | null; until: string | null };
+    const app = ANIMATION_SEED.filter((a) => !a.is_free && (a.display_type === 'reaction' || a.display_type === 'gift' || a.display_type === 'fullscreen')).map((a) => ({
+      id: a.animation_id,
+      name: a.name,
+      price: a.coin_price,
+      from: a.starts_at ?? null,
+      until: a.ends_at ?? null,
+    }));
+    assert.deepEqual([...(server.ROOM_ANIMS as Map<string, ServerAnim>).values()], app);
   });
 
   test('mağaza: her ürünün adı, fiyatı, süresi ve VIP sınırı', () => {
@@ -99,5 +121,18 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
 
   test('SVIP eşikleri', () => {
     assert.deepEqual(server.SVIP_XP, SVIP_LEVELS.map((l) => l.xp));
+  });
+
+  test('Aile görevleri, sandıkları, temaları ve bonus oranları sunucudakiyle aynı', () => {
+    const pick = ({ id, source, kind, goal, per, power, treasure }: (typeof KABILE_TASKS)[number]) => ({ id, source, kind, goal, per, power, treasure });
+    assert.deepEqual(family.FAMILY_TASKS, KABILE_TASKS.map(pick));
+    assert.deepEqual(
+      family.FAMILY_CHESTS,
+      KABILE_CHESTS.map((c) => ({ id: c.id, name: c.name, need: c.need, coins: c.reward.coins })),
+    );
+    assert.equal(family.CHEST_MIN_CONTRIBUTION, CHEST_MIN_CONTRIBUTION);
+    assert.deepEqual(family.FAMILY_THEMES, KABILE_THEMES.map((t) => ({ id: t.id, minLevel: t.minLevel })));
+    assert.deepEqual(family.CP_GIFT_IDS, CP_GIFT_IDS);
+    assert.deepEqual(family.FAMILY_RATES, RULES.familyRates);
   });
 });

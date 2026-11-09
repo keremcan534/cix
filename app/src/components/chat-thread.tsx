@@ -7,7 +7,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Platform, Pressable, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { FlatList, Image, Platform, Pressable, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { onWebEnter } from '@/lib/enter-sends';
 
@@ -27,11 +28,12 @@ import { checkInteraction } from '@/lib/interaction';
 import { incomingWarning, scanMessage } from '@/lib/safety';
 import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
-import { newRef } from '@/lib/api';
+import { newRef, sendDm } from '@/lib/api';
 import { HeartBar, paidPair, useChatGift, usePair } from '@/components/one-on-one-bar';
-import { liveMode, message as errorText, refreshWallet } from '@/lib/live';
+import { liveMode, message as errorText, refreshWallet, toServer } from '@/lib/live';
 import type { Pair } from '@/lib/live/one-on-one';
-import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, useLiveThread, type SendResult } from '@/lib/live/messages';
+import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, syncThread, useLiveThread, type SendResult } from '@/lib/live/messages';
+import { uploadPhoto } from '@/lib/live/profile';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -188,6 +190,39 @@ export function ChatThread({
       ]
     : [];
 
+  // A photo (live, a real person): opens with the heart level or a mutual follow (the server's pair.photo). It
+  // goes to the storage, then as a message; the thread then reads it back from the server (no bubble ahead of it).
+  const [sendingPhoto, setSendingPhoto] = useState(false);
+  const photoOpen = !!pair?.photo?.open;
+  const sendPhoto = async () => {
+    if (sendingPhoto || isBlocked || missing) return;
+    if (dmMuted) return showSanction(dmMuted);
+    if (!allowed.ok) return showAlert('Mesaj gönderilemiyor', allowed.reason);
+    if (!photoOpen) return showAlert('Fotoğraf kilitli', pair?.photo?.why ?? 'Bu sohbette fotoğraf henüz açık değil.');
+    if (!mutual && coins < price) {
+      return showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${price} jeton.`, [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+      ]);
+    }
+    const to = toServer(user.id);
+    if (!to) return;
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+    if (picked.canceled || !picked.assets?.[0]) return;
+    setSendingPhoto(true);
+    try {
+      const url = await uploadPhoto('dm', picked.assets[0]);
+      await sendDm(to, '', newRef(), url);
+      await syncThread(user.id, { importDms });
+      reload();
+      void refreshWallet().catch(() => {});
+    } catch (e) {
+      showAlert('Fotoğraf gönderilemedi', errorText(e));
+    } finally {
+      setSendingPhoto(false);
+    }
+  };
+
   // `sticker` (a sticker token) goes out on its own and leaves the typed draft alone.
   const send = (sticker?: string) => {
     const text = sticker ?? draft.trim();
@@ -246,7 +281,8 @@ export function ChatThread({
             item.fromMe ? (
               <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={styles.mine} accessibilityHint="Seçenekler için basılı tut">
                 <LinearGradient colors={gradientDeep} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bubble, styles.mineBubble]}>
-                  <MessageText text={item.text} style={styles.bubbleText} />
+                  {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
+                  {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={styles.bubbleText} />}
                   {item.room && <RoomCard room={item.room} />}
                   <Text style={styles.time}>
                     {messageTime(item)}{' '}
@@ -272,7 +308,8 @@ export function ChatThread({
             ) : (
               <View style={{ gap: 6 }}>
                 <Pressable onLongPress={() => setPicked(item)} delayLongPress={350} style={[styles.bubble, styles.theirs]} accessibilityHint="Seçenekler için basılı tut">
-                  <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />
+                  {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
+                  {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />}
                   {item.room && <RoomCard room={item.room} theirs />}
                   <Text style={[styles.time, styles.theirsTime]}>{messageTime(item)}</Text>
                 </Pressable>
@@ -335,6 +372,17 @@ export function ChatThread({
           {!missing && !isBlocked && (
             <Pressable onPress={gift.open} accessibilityLabel="Hediye gönder" hitSlop={6}>
               <Ionicons name="gift-outline" size={24} color={colors.pink} />
+            </Pressable>
+          )}
+          {real && !isBlocked && (
+            <Pressable
+              onPress={() => void sendPhoto()}
+              disabled={sendingPhoto}
+              style={{ opacity: photoOpen && !sendingPhoto ? 1 : 0.45 }}
+              accessibilityLabel={photoOpen ? 'Fotoğraf gönder' : 'Fotoğraf (kilitli)'}
+              accessibilityState={{ disabled: !photoOpen || sendingPhoto, busy: sendingPhoto }}
+              hitSlop={6}>
+              <Ionicons name="image-outline" size={23} color={colors.textDim} />
             </Pressable>
           )}
           {/* Wraps up to a few lines; the keyboard's send key sends and the keyboard stays open for the next one.
@@ -415,6 +463,7 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   intro: { alignItems: 'center', gap: 6, paddingVertical: 24 },
   introName: { color: colors.text, fontSize: 18, fontWeight: '700' },
   bubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
+  photo: { width: 200, height: 200, borderRadius: 12, marginTop: 2, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.2)' },
   // My bubble sits in a pressable row (long press): the row aligns right and the bubble inside keeps the width limit.
   mine: { alignSelf: 'flex-end', maxWidth: '78%' },
   mineBubble: { maxWidth: '100%', borderBottomRightRadius: 4 },

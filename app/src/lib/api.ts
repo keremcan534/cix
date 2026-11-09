@@ -426,7 +426,7 @@ export type CatalogBody = {
 /** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed). */
 export const catalog = () => call<CatalogBody>('GET', '/api/catalog');
 /** Where a gift outside a room was sent from (Gelir's sources on the server). */
-export type GiftPlace = 'chat' | 'moment' | 'profile';
+export type GiftPlace = 'chat' | 'moment' | 'profile' | 'family';
 /** A gift at the server's price; `room` = sent on stage (no push to the recipient); `place` = where, outside a room. */
 export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef(), place?: GiftPlace) =>
   call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', { to, giftId, count, room, ref, ...(place && !room ? { place } : {}) });
@@ -446,10 +446,17 @@ export const agencyRankings = (period: 'day' | 'week' | 'month') =>
 export const verifyPurchase = (proof: StoreProof) =>
   call<{ user: ServerUser; replay: boolean; coins: number; bonus: number; campaignBonus?: number }>('POST', '/api/wallet/purchase', proof);
 
-export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
+/** A paid Hareketli in a server room (server/api/room-fx.mjs): the server's price, then it tells the room itself. */
+export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; eventId: number; price: number }>('POST', '/api/rooms/animation', { room, animationId, ref });
+
+/** This phone's push token: an Expo one, or Firebase's own (kind 'fcm', lib/push), which the server sends to through Firebase. */
+export const registerPush = (token: string, platform: 'ios' | 'android' | 'web', kind: 'expo' | 'fcm' = 'expo') =>
+  call<{ registered: boolean }>('POST', '/api/push/register', { token, platform, kind });
+export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice' | 'music', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */
@@ -479,8 +486,35 @@ export type ServerRoom = {
   layoutId?: string | null;
   lockedSeats?: number[];
   micQueue?: boolean;
+  /** The owner's choice of look: a room background id (null: none), the theme, gift effects on or off. */
+  coverId?: string | null;
+  theme?: string;
+  giftEffects?: boolean;
+  /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
+  rules?: RoomRules;
+  /** Dümen koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
+  boss?: UserCard | null;
 };
-export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
+/** A server room's rules (server/api/room-rules.mjs). */
+export type RoomRules = {
+  micPermission: 'everyone' | 'members';
+  bossSeat: boolean;
+  joinMode: 'open' | 'apply' | 'closed';
+  manageMembers: 'owner' | 'admins';
+  manageFunctions: 'owner' | 'admins';
+  autoRemoveDays: 0 | 7 | 14 | 30;
+  /** Most people in the room at once; null: the level's most. */
+  limit: number | null;
+  profileVisible: boolean;
+  videoPrivacy: boolean;
+  bot: boolean;
+  slowMode: boolean;
+  words: string[];
+};
+export type RoomMember = UserCard & { since: string };
+export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
+/** `image`: a photo in the chat (its storage address), null for text only. */
+export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; createdAt: string; readAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
 export type ServerLock = { id: number; amount: number; channel: string; channelLabel: string; unlockAt: string; createdAt: string; from: { id: string; name: string } | null; gift: { id: string; count: number } | null };
 export type ServerEarnings = { diamonds: number; withdrawable: number; locked: number; lockDays: { store: number; jeton: number }; locks: ServerLock[] };
@@ -537,8 +571,32 @@ export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api
 export const serverRoom = (id: string) => call<{ room: ServerRoom }>('GET', `/api/room?id=${encodeURIComponent(id)}`).then((r) => r.room);
 /** What the room screen can change on the server: the name and bulletin (owner and Süper Yönetici), the lock
  *  (owner only), the mics, the layout and the mic queue (owner or a room admin; null = back to the default). */
-export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null; micQueue?: boolean };
+export type RoomPatch = {
+  title?: string;
+  announcement?: string;
+  password?: string | null;
+  micCount?: number | null;
+  layoutId?: string | null;
+  micQueue?: boolean;
+  coverId?: string | null;
+  theme?: string;
+  giftEffects?: boolean;
+  roomType?: string;
+  rules?: Partial<RoomRules>;
+};
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
+/** Oda üyeleri (server/api/rooms.mjs): the list, my membership and, for those who answer them, the requests. */
+export const roomMembers = (room: string) => call<RoomMembers>('GET', `/api/rooms/members?room=${encodeURIComponent(room)}`);
+export const joinRoomMembers = (room: string) => call<{ status: 'member' | 'pending' }>('POST', '/api/rooms/members/join', { room });
+export const leaveRoomMembers = (room: string) => call<{ status: null }>('POST', '/api/rooms/members/leave', { room });
+export const answerRoomMember = (room: string, user: string, accept: boolean) => call<{ status: 'member' | null }>('POST', '/api/rooms/members/answer', { room, user, accept });
+export const removeRoomMember = (room: string, user: string) => call<{ status: null }>('POST', '/api/rooms/members/remove', { room, user });
+/** Oda etkinlikleri (server/api/room-events.mjs). */
+export type ServerRoomEvent = { id: number; title: string; desc: string; when: string; type: string; by: { id: string; name: string }; going: boolean; attendees: number; cancelled: boolean; createdAt: string; mine: boolean };
+export const roomEvents = (room: string) => call<{ events: ServerRoomEvent[] }>('GET', `/api/rooms/events?room=${encodeURIComponent(room)}`).then((r) => r.events);
+export const addRoomEvent = (room: string, e: { title: string; desc: string; when: string; type: string }) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events', { room, ...e }).then((r) => r.event);
+export const cancelRoomEvent = (id: number) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events/cancel', { id }).then((r) => r.event);
+export const goRoomEvent = (id: number, going: boolean) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events/going', { id, going }).then((r) => r.event);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
 export type ServerBond = {
@@ -594,7 +652,8 @@ export const luckyAdmin = () => call<ServerLuckyAdmin>('GET', '/api/admin/lucky'
 export const saveLuckyConfig = (config: ServerLuckyConfig, version: number) =>
   call<{ config: ServerLuckyConfig; version: number; updatedAt: string }>('POST', '/api/admin/lucky/config', { config, version });
 
-export const sendDm = (to: string, text: string, ref = newRef()) => call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref }).then((r) => r.message);
+export const sendDm = (to: string, text: string, ref = newRef(), image?: string) =>
+  call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref, ...(image && { image }) }).then((r) => r.message);
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
 export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });

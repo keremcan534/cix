@@ -65,6 +65,7 @@ import {
   type Streamer,
 } from '@/lib/agency-net';
 import { earningsCsv } from '@/lib/agency-export';
+import { shareCsv } from '@/lib/share-file';
 import { NoAccess } from '@/components/no-access';
 import { showAlert } from '@/lib/alert';
 import { liveMode } from '@/lib/live';
@@ -379,12 +380,12 @@ function Streamers({ c }: { c: Ctx }) {
     const r = await c.ask({ title: 'Yayıncı davet et', message: 'Yayıncının profilindeki ID numarasını ya da kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Profil ID’si veya kullanıcı adı', placeholder: 'Örn. 104829301457', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder', place: 'agency.invite' });
     if (r) await runAction(c.demo, () => inviteStreamer(c.id, r.field, r.reason || undefined), 'Davet gönderildi.', q.reload);
   };
-  // The weekly and monthly earnings as a table (opens in Excel), shared or sent by mail.
+  // The weekly and monthly earnings as a table: shared as a .csv file (opens in Excel), or its text by mail.
   const title = `${c.o.agency.name} yayıncı kazançları (${fmtDate(new Date().toISOString())})`;
   const send = async (rows: Streamer[], how: 'share' | 'mail') => {
     if (!rows.length) return showAlert('Gönderilecek kayıt yok', 'Bu listede henüz yayıncı yok.');
     const csv = earningsCsv(rows);
-    if (how === 'share') return void Share.share({ title, message: csv }).catch(() => {});
+    if (how === 'share') return void shareCsv(`yayinci-kazanclari-${new Date().toISOString().slice(0, 10)}.csv`, title, csv);
     const url = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(csv)}`;
     // Very long lists don't fit in a mail link: those go through the share sheet (any mail app is there too).
     if (url.length > 7000) return void Share.share({ title, message: csv }).catch(() => {});

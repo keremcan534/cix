@@ -16,6 +16,7 @@ import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { pollMessages } from '@/lib/live/messages';
 import { settleWithdrawals } from '@/lib/live/withdraw';
+import { startPush } from '@/lib/push';
 import { useApp } from '@/store';
 
 const TICK_MS = 15_000;
@@ -52,6 +53,8 @@ export function LiveSync() {
         if (!signedIn) {
           await liveSignIn(name);
           signedIn = true;
+          // Calls ring and messages arrive while the app is closed (lib/push; off until the build has Firebase).
+          void startPush();
           // A Play purchase whose server answer was lost last time is verified now.
           resumePurchases();
           // Follows and blocks are kept on the server; one failing leaves this phone's list as it is.
@@ -69,7 +72,7 @@ export function LiveSync() {
           if (tick % 4 === 0) await refreshEarnings();
         }
         if (alive) await pollMessages(appRef.current);
-        // No push yet: new followers are noticed here, every minute and on returning to the app.
+        // New followers are noticed here as well, every minute and on returning to the app (push may be off).
         if (alive && (tick % 4 === 0 || resumed)) {
           resumed = false;
           void checkNewFollowers((n) => alive && appRef.current.notify(n)).catch(() => {});

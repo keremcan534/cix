@@ -6,7 +6,7 @@
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
-//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId?, micQueue? } → { room }
+//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId?, micQueue?, coverId?, theme?, giftEffects? } → { room }
 //                          (title, bulletin: owner or Süper Yönetici; password (null = no lock): owner; mic count,
 //                          layout and the mic queue on/off: owner or any room admin; the room's phones see it at once)
 //   POST /api/rooms/admin  { room, user, admin, super? }                    → { admin, super } (owner only)
@@ -32,8 +32,9 @@
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
-import { applySanction, audit, liftSanction } from './sanctions.mjs';
-import { vipLevelOf } from './catalog.mjs';
+import { applySanction, audit, liftSanction, refreshVoice } from './sanctions.mjs';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, applyRules, memberCap, rulesOf } from './room-rules.mjs';
+import { ROOM_COVERS, ROOM_THEMES, vipLevelOf } from './catalog.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { clearRoomMusic, roomMusic } from './music.mjs';
@@ -77,11 +78,19 @@ const out = (r) => ({
   layoutId: r.layout_id ?? null,
   lockedSeats: (r.locked_seats ?? []).map(Number),
   micQueue: !!r.mic_queue,
+  // The look the owner chose: a cover (an app background id; null = none), the theme, gift effects on or off.
+  coverId: r.cover_id ?? null,
+  theme: r.theme ?? 'chat',
+  giftEffects: r.gift_effects !== false,
+  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Dümen koltuğu holder, if any.
+  rules: rulesOf(r.rules),
+  boss: r.boss_id && rulesOf(r.rules).bossSeat ? { id: r.boss_id, name: r.boss_name ?? 'Üye', avatarUrl: r.boss_avatar ?? null } : null,
 });
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
 const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
+                       b.name AS boss_name, b.avatar_url AS boss_avatar,
                        (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners
-                  FROM rooms r JOIN users u ON u.id = r.owner`;
+                  FROM rooms r JOIN users u ON u.id = r.owner LEFT JOIN users b ON b.id = r.boss_id`;
 
 /** Puts LiveKit's people count on the rows of rooms it has open now (rooms it doesn't have keep room_presence's). */
 async function withVoiceCounts(rows) {
@@ -90,7 +99,7 @@ async function withVoiceCounts(rows) {
   return rows.map((r) => (n.has(liveKitName(r.id)) ? { ...r, listeners: n.get(liveKitName(r.id)) } : r));
 }
 
-async function roomRow(id) {
+export async function roomRow(id) {
   if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(400, 'Geçersiz oda');
   const r = await db.query(`${SELECT} WHERE r.id = $1`, [id]);
   if (!r.rowCount) throw new HttpError(404, 'Oda bulunamadı');
@@ -100,7 +109,7 @@ const isAdmin = async (roomId, uid) => (await db.query('SELECT 1 FROM room_admin
 /** Owner 3, Süper Yönetici 2, Yönetici 1, anyone else 0. */
 const OWNER = 3;
 const SUPER = 2;
-async function rankOf(room, uid) {
+export async function rankOf(room, uid) {
   if (room.owner === uid) return OWNER;
   const r = await db.query('SELECT super FROM room_admins WHERE room_id = $1 AND user_id = $2', [room.id, uid]);
   return r.rowCount ? (r.rows[0].super ? SUPER : 1) : 0;
@@ -201,11 +210,78 @@ export async function voiceAccess(name, u, password) {
   if (ban.rowCount) throw new HttpError(403, ban.rows[0].until ? 'Bu odadan geçici olarak çıkarıldın' : 'Bu odaya giremezsin');
   if (await blockedBetween(room.owner, u.id)) throw new HttpError(403, 'Bu odaya giremezsin');
   const staff = room.owner === u.id || (await isAdmin(room.id, u.id));
-  if (room.password_hash && !staff) {
+  const member = !staff && (await db.query("SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2 AND status = 'member'", [room.id, u.id])).rowCount > 0;
+  // A private room (Özel oda): its staff and members come in; anyone else only with its password, if it has one.
+  const privateRoom = room.room_type === 'private';
+  if (privateRoom && !staff && !member && !room.password_hash) throw new HttpError(403, 'Bu oda özel: yalnızca oda üyeleri girebilir');
+  if (room.password_hash && !staff && !(privateRoom && member)) {
     // A short password can't be guessed by trying them all: 10 tries a minute per person and room.
     limit(`roompw:${room.id}:${u.id}`, 10, 'Çok fazla şifre denemesi, bir dakika sonra tekrar dene');
     if (sha(`room:${room.id}:${password ?? ''}`) !== room.password_hash) throw new HttpError(403, 'Oda şifresi yanlış');
   }
+  // The people limit (Oda ayarları › Katılımcı limiti, else the level's most): staff always get in.
+  const already = (await db.query('SELECT 1 FROM room_presence WHERE room = $1 AND identity = $2', [name, u.id])).rowCount > 0;
+  if (!staff && !already) {
+    const level = roomLevel((await db.query('SELECT room_xp FROM users WHERE id = $1', [room.owner])).rows[0]?.room_xp ?? 0);
+    const cap = rulesOf(room.rules).limit ?? memberCap(level);
+    const counts = await voiceCounts();
+    const here = counts?.has(name)
+      ? counts.get(name)
+      : Number((await db.query('SELECT count(*) AS n FROM room_presence WHERE room = $1 AND identity <> $2', [name, u.id])).rows[0].n);
+    if (here >= cap) throw new HttpError(403, `Oda dolu (en fazla ${cap.toLocaleString('tr-TR')} kişi)`);
+  }
+  if (member) await db.query('UPDATE room_members SET seen_at = now() WHERE room_id = $1 AND user_id = $2', [room.id, u.id]);
+}
+
+/**
+ * Dümen koltuğu: the room's top gifter of the last 24 hours (once past BOSS_SEAT_MIN_COINS) sits on it while the
+ * owner keeps it on and the room is Lv.3 or more; anyone banned from the room is left out. When the holder changes,
+ * the room's phones are told to read the room again. Never throws.
+ */
+export async function refreshBoss(roomId) {
+  try {
+    const r = (await db.query('SELECT r.id, r.rules, r.boss_id, r.closed_at, u.room_xp FROM rooms r JOIN users u ON u.id = r.owner WHERE r.id = $1', [roomId])).rows[0];
+    if (!r || r.closed_at) return;
+    let boss = null;
+    if (rulesOf(r.rules).bossSeat && roomLevel(r.room_xp ?? 0) >= BOSS_SEAT_MIN_LEVEL) {
+      const top = await db.query(
+        `SELECT g.sender, sum(g.total) AS coins FROM gift_events g
+          WHERE g.room = ANY($1::text[]) AND g.created_at > now() - interval '24 hours'
+            AND NOT EXISTS (SELECT 1 FROM room_bans b WHERE b.room_id = $2 AND b.user_id = g.sender AND (b.until IS NULL OR b.until > now()))
+          GROUP BY g.sender ORDER BY coins DESC, min(g.created_at) LIMIT 1`,
+        [[roomId, liveKitName(roomId)], roomId],
+      );
+      if (top.rowCount && Number(top.rows[0].coins) >= BOSS_SEAT_MIN_COINS) boss = top.rows[0].sender;
+    }
+    if (boss === (r.boss_id ?? null)) return;
+    await db.query('UPDATE rooms SET boss_id = $2 WHERE id = $1', [roomId, boss]);
+    announceRoom(liveKitName(roomId));
+  } catch (e) {
+    console.error('boss seat', roomId, String(e).slice(0, 200));
+  }
+}
+
+/** Members who stayed away longer than the room allows (rules.autoRemoveDays) are no longer members; staff stay. */
+async function purgeMembers(room) {
+  const days = rulesOf(room.rules).autoRemoveDays;
+  if (!days) return;
+  await db.query(
+    `DELETE FROM room_members m WHERE m.room_id = $1 AND m.status = 'member' AND m.seen_at < now() - make_interval(days => $2)
+       AND NOT EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = m.room_id AND a.user_id = m.user_id)`,
+    [room.id, days],
+  );
+}
+/** Whether `rank` may answer and remove the room's members (rules.manageMembers). */
+const mayManageMembers = (rules, rank) => rank === OWNER || (rules.manageMembers === 'admins' && rank >= 1);
+/** Everyone in the room's voice gets their mic right again (the mic permission or their membership changed). */
+async function refreshRoomVoices(roomId, only = null) {
+  const name = liveKitName(roomId);
+  const ids = new Set((await db.query('SELECT identity FROM room_presence WHERE room = $1', [name])).rows.map((x) => x.identity));
+  if (!only) {
+    const live = await roomService('ListParticipants', { room: name }, { roomAdmin: true, room: name }).catch(() => null);
+    for (const p of live?.participants ?? []) ids.add(p.identity);
+  }
+  for (const id of only ? [only] : ids) if (UUID.test(id)) await refreshVoice(id).catch(() => {});
 }
 
 /**
@@ -285,7 +361,10 @@ export const roomRoutes = {
 
   async 'GET /api/room'(req, url) {
     await auth(req);
-    const [room] = await withVoiceCounts([await roomRow(url.searchParams.get('id'))]);
+    // The Dümen koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
+    const id = url.searchParams.get('id');
+    if (typeof id === 'string' && UUID.test(id)) await refreshBoss(id);
+    const [room] = await withVoiceCounts([await roomRow(id)]);
     return { room: out(room) };
   },
 
@@ -312,10 +391,17 @@ export const roomRoutes = {
     const room = await roomRow(b.id);
     const texts = b.title !== undefined || b.announcement !== undefined;
     const stage = b.micCount !== undefined || b.layoutId !== undefined || b.micQueue !== undefined;
-    if (!texts && !stage && b.password === undefined) throw new HttpError(400, 'Değişiklik yok');
+    const look = b.coverId !== undefined || b.theme !== undefined || b.giftEffects !== undefined || b.roomType !== undefined;
+    if (!texts && !stage && !look && b.password === undefined && b.rules === undefined) throw new HttpError(400, 'Değişiklik yok');
     const rank = await rankOf(room, me.id);
     if (b.password !== undefined && rank !== OWNER) throw new HttpError(403, 'Oda kilidini yalnızca oda sahibi değiştirebilir');
-    if (texts && rank < SUPER) throw new HttpError(403, 'Oda adını ve duyurusunu oda sahibi veya Süper Yönetici değiştirebilir');
+    if ((texts || b.coverId !== undefined) && rank < SUPER) throw new HttpError(403, 'Oda adını, duyurusunu ve kapağını oda sahibi veya Süper Yönetici değiştirebilir');
+    if ((b.theme !== undefined || b.giftEffects !== undefined || b.roomType !== undefined) && rank !== OWNER) throw new HttpError(403, 'Oda tipini, temasını ve hediye efektlerini yalnızca oda sahibi değiştirebilir');
+    if (b.roomType !== undefined && !TYPES.includes(b.roomType)) throw new HttpError(400, 'Geçersiz oda türü');
+    const roomType = b.roomType ?? room.room_type;
+    // Oda ayarları and Moderasyon (room-rules.mjs): each rule checks who may change it and the room's level.
+    const rulesBefore = rulesOf(room.rules);
+    const rules = b.rules === undefined ? rulesBefore : applyRules(rulesBefore, b.rules, { rank, level: roomLevel(room.owner_room_xp ?? 0) });
     if (!rank) throw new HttpError(403, 'Mikrofonları ve düzeni oda sahibi veya yöneticiler değiştirebilir');
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
     const micCount = b.micCount === undefined ? room.mic_count : b.micCount === null ? null : int(b.micCount, 1, 15);
@@ -323,20 +409,40 @@ export const roomRoutes = {
     const layoutId = b.layoutId === undefined ? room.layout_id : b.layoutId;
     if (layoutId !== null && (typeof layoutId !== 'string' || !LAYOUT.test(layoutId))) throw new HttpError(400, 'Geçersiz düzen');
     if (b.micQueue !== undefined && typeof b.micQueue !== 'boolean') throw new HttpError(400, 'Mikrofon kuyruğu açık ya da kapalı olmalı');
-    const micQueue = b.micQueue ?? room.mic_queue;
+    // A Sahne room's speakers always ask first: its mic queue stays on.
+    if (b.micQueue === false && (b.roomType ?? room.room_type) === 'stage') throw new HttpError(400, 'Sahne odasında mikrofon kuyruğu hep açıktır');
+    const micQueue = (b.roomType ?? room.room_type) === 'stage' ? true : (b.micQueue ?? room.mic_queue);
+    // A cover opens at its room level (the app greys out the others); null takes the cover off.
+    let coverId = room.cover_id ?? null;
+    if (b.coverId !== undefined) {
+      const c = b.coverId === null ? null : ROOM_COVERS.find((x) => x.id === b.coverId);
+      if (c === undefined) throw new HttpError(400, 'Geçersiz kapak');
+      if (c && roomLevel(room.owner_room_xp ?? 0) < c.minLevel) throw new HttpError(403, `Bu kapak Lv.${c.minLevel} odada açılır`);
+      coverId = c ? c.id : null;
+    }
+    if (b.theme !== undefined && !ROOM_THEMES.includes(b.theme)) throw new HttpError(400, 'Geçersiz tema');
+    if (b.giftEffects !== undefined && typeof b.giftEffects !== 'boolean') throw new HttpError(400, 'Hediye efektleri açık ya da kapalı olmalı');
+    const theme = b.theme ?? room.theme ?? 'chat';
+    const giftEffects = b.giftEffects ?? room.gift_effects !== false;
     limit(`roomedit:${me.id}`, 30, 'Çok sık değiştirdin, biraz bekle');
     const title = b.title === undefined ? room.title : await publicText(b.title, 3, 40, 'Oda adı', me, 'room.title', 'title');
     const announcement = b.announcement === undefined ? room.announcement : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
     const password = b.password === undefined ? undefined : b.password === null || b.password === '' ? null : text(b.password, 4, 32, 'Şifre');
     if (password) await mayLock(me);
-    await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5, mic_queue = $6 WHERE id = $1', [room.id, title, announcement, micCount, layoutId, micQueue]);
+    await db.query(
+      'UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5, mic_queue = $6, cover_id = $7, theme = $8, gift_effects = $9, room_type = $10, rules = $11 WHERE id = $1',
+      [room.id, title, announcement, micCount, layoutId, micQueue, coverId, theme, giftEffects, roomType, JSON.stringify(rules)],
+    );
     if (!micQueue) await db.query('DELETE FROM room_mic_queue WHERE room_id = $1', [room.id]);
     // The hash includes the room id, as when the room is opened with a password.
     if (password !== undefined) await db.query('UPDATE rooms SET password_hash = $2 WHERE id = $1', [room.id, password && sha(`room:${room.id}:${password}`)]);
-    if (stage) {
-      await pushRoomMeta(room.id);
-      announceRoom(liveKitName(room.id));
-    }
+    const queueChanged = micQueue !== !!room.mic_queue;
+    if (stage || queueChanged) await pushRoomMeta(room.id);
+    // The phones in the room read it again: new mics or layout, a new cover, theme, type, gift effects or rules.
+    if (stage || look || b.rules !== undefined) announceRoom(liveKitName(room.id));
+    if (rules.bossSeat !== rulesBefore.bossSeat) await refreshBoss(room.id);
+    // Who may speak changed: everyone in the room gets their mic right again.
+    if (rules.micPermission !== rulesBefore.micPermission) await refreshRoomVoices(room.id);
     const [fresh] = await withVoiceCounts([await roomRow(room.id)]);
     return { room: out(fresh) };
   },
@@ -474,6 +580,109 @@ export const roomRoutes = {
       [room.id],
     );
     return { ...result, bans: bans.rows.map((x) => ({ userId: x.user_id, name: x.name, until: x.until })) };
+  },
+
+  /**
+   * The room's members (Oda üyeleri), how many it may have, my own membership ('owner' | 'member' | 'pending' |
+   * null) and, for whoever answers members (rules.manageMembers), who asked to join.
+   */
+  async 'GET /api/rooms/members'(req, url) {
+    const me = await auth(req);
+    const room = await roomRow(url.searchParams.get('room'));
+    await purgeMembers(room);
+    const rules = rulesOf(room.rules);
+    const canManage = mayManageMembers(rules, await rankOf(room, me.id));
+    const r = await db.query(
+      `SELECT m.user_id, m.status, m.created_at, u.name, u.avatar_url FROM room_members m JOIN users u ON u.id = m.user_id
+        WHERE m.room_id = $1 AND u.deleted_at IS NULL ORDER BY m.created_at, m.user_id LIMIT 1000`,
+      [room.id],
+    );
+    const person = (x) => ({ id: x.user_id, name: x.name, avatarUrl: x.avatar_url ?? null, since: x.created_at });
+    const members = r.rows.filter((x) => x.status === 'member');
+    return {
+      members: members.map(person),
+      total: members.length,
+      cap: memberCap(roomLevel(room.owner_room_xp ?? 0)),
+      mine: room.owner === me.id ? 'owner' : (r.rows.find((x) => x.user_id === me.id)?.status ?? null),
+      joinMode: rules.joinMode,
+      canManage,
+      pending: canManage ? r.rows.filter((x) => x.status === 'pending').map(person) : [],
+    };
+  },
+
+  /** Become a member: at once in an open room, as a request in an 'apply' room; a closed room takes nobody. */
+  async 'POST /api/rooms/members/join'(req) {
+    const me = await auth(req);
+    const room = await roomRow((await readJson(req)).room);
+    if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
+    if (room.owner === me.id) throw new HttpError(400, 'Zaten oda sahibisin');
+    limit(`roommember:${me.id}`, 20);
+    const ban = await db.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND user_id = $2 AND (until IS NULL OR until > now())', [room.id, me.id]);
+    if (ban.rowCount || (await blockedBetween(room.owner, me.id))) throw new HttpError(403, 'Bu odaya üye olamazsın');
+    const rules = rulesOf(room.rules);
+    const had = (await db.query('SELECT status FROM room_members WHERE room_id = $1 AND user_id = $2', [room.id, me.id])).rows[0]?.status ?? null;
+    if (had === 'member') return { status: 'member' };
+    if (rules.joinMode === 'closed') throw new HttpError(403, 'Bu oda şu an üye almıyor');
+    await purgeMembers(room);
+    if (rules.joinMode === 'open') {
+      const n = Number((await db.query("SELECT count(*) AS n FROM room_members WHERE room_id = $1 AND status = 'member'", [room.id])).rows[0].n);
+      const cap = memberCap(roomLevel(room.owner_room_xp ?? 0));
+      if (n >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
+    }
+    const status = rules.joinMode === 'open' ? 'member' : 'pending';
+    await db.query(
+      `INSERT INTO room_members (room_id, user_id, status) VALUES ($1, $2, $3)
+       ON CONFLICT (room_id, user_id) DO UPDATE SET status = EXCLUDED.status, seen_at = now()`,
+      [room.id, me.id, status],
+    );
+    if (status === 'member') await refreshRoomVoices(room.id, me.id);
+    return { status };
+  },
+
+  /** Leave the room's members (or take a request back). */
+  async 'POST /api/rooms/members/leave'(req) {
+    const me = await auth(req);
+    const room = await roomRow((await readJson(req)).room);
+    const r = await db.query('DELETE FROM room_members WHERE room_id = $1 AND user_id = $2', [room.id, me.id]);
+    if (r.rowCount) await refreshRoomVoices(room.id, me.id);
+    return { status: null };
+  },
+
+  /** Accept or refuse a request to join (whoever answers members: rules.manageMembers). */
+  async 'POST /api/rooms/members/answer'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const room = await roomRow(b.room);
+    const target = userId(b.user);
+    if (typeof b.accept !== 'boolean') throw new HttpError(400, 'Kabul ya da ret seç');
+    if (!mayManageMembers(rulesOf(room.rules), await rankOf(room, me.id))) throw new HttpError(403, 'Üyeleri yönetme yetkin yok');
+    const had = (await db.query('SELECT status FROM room_members WHERE room_id = $1 AND user_id = $2', [room.id, target])).rows[0]?.status;
+    if (had !== 'pending') throw new HttpError(404, 'Bekleyen başvuru yok');
+    if (!b.accept) {
+      await db.query('DELETE FROM room_members WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+      return { status: null };
+    }
+    const n = Number((await db.query("SELECT count(*) AS n FROM room_members WHERE room_id = $1 AND status = 'member'", [room.id])).rows[0].n);
+    const cap = memberCap(roomLevel(room.owner_room_xp ?? 0));
+    if (n >= cap) throw new HttpError(403, `Üye kapasitesi dolu (${cap.toLocaleString('tr-TR')})`);
+    await db.query("UPDATE room_members SET status = 'member', created_at = now(), seen_at = now() WHERE room_id = $1 AND user_id = $2", [room.id, target]);
+    await refreshRoomVoices(room.id, target);
+    return { status: 'member' };
+  },
+
+  /** Take someone off the room's members (never the room's staff). */
+  async 'POST /api/rooms/members/remove'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const room = await roomRow(b.room);
+    const target = userId(b.user);
+    if (!mayManageMembers(rulesOf(room.rules), await rankOf(room, me.id))) throw new HttpError(403, 'Üyeleri yönetme yetkin yok');
+    if (target === room.owner || (await isAdmin(room.id, target))) throw new HttpError(403, 'Oda yetkilileri üyelikten çıkarılamaz');
+    const r = await db.query('DELETE FROM room_members WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+    if (!r.rowCount) throw new HttpError(404, 'Bu kişi oda üyesi değil');
+    await audit(db, { actor: me.id, role: roleOfRank(await rankOf(room, me.id)), action: 'room_member_remove', target, detail: { room: room.id } });
+    await refreshRoomVoices(room.id, target);
+    return { status: null };
   },
 
   /**

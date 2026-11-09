@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { Art } from '@/components/Art';
-import { ComingSoon } from '@/components/coming-soon';
+import { LiveFamilyPairs } from '@/components/family-center-live';
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
 import { CP_GIFT_IDS, KABILE_COUPLES, KABILE_FRIENDS, KABILE_ROUTES, findKabile, fmtK, kabile, kabileMemberIds, payKabileGift, type Pair } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
@@ -20,10 +20,9 @@ import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
 const CP_GIFTS = CP_GIFT_IDS.map((id) => GIFTS.find((g) => g.id === id)).filter((g): g is Gift => !!g);
 
-// Aile has no server yet (data/kabile tayfaAvailable): the pairs are sample people and an İkili gift would take
-// real coins for no one, so a live build shows a notice instead.
+// A live build shows the family's real bonds and sends İkili gifts to members (components/family-center-live).
 export default function IliskiMeydani() {
-  return liveMode() ? <ComingSoon title="Uyum Köşesi" /> : <DemoIliski />;
+  return liveMode() ? <LiveFamilyPairs /> : <DemoIliski />;
 }
 
 function DemoIliski() {

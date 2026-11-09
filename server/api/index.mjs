@@ -42,6 +42,7 @@ import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
 import { economyRoutes } from './economy.mjs';
 import { familyRoutes } from './families.mjs';
+import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
@@ -57,6 +58,8 @@ import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctio
 import { socialRoutes } from './social.mjs';
 import { teamRoutes } from './team.mjs';
 import { musicRoutes } from './music.mjs';
+import { roomFxRoutes } from './room-fx.mjs';
+import { roomEventRoutes } from './room-events.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
@@ -216,6 +219,7 @@ const routes = {
   ...wheelRoutes,
   ...luckyRoutes,
   ...familyRoutes,
+  ...familyMoreRoutes,
   ...purchaseRoutes,
   ...mediaRoutes,
   ...liveRoutes,
@@ -226,6 +230,8 @@ const routes = {
   ...momentRoutes,
   ...teamRoutes,
   ...musicRoutes,
+  ...roomFxRoutes,
+  ...roomEventRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,

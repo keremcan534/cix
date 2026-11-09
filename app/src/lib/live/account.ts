@@ -7,6 +7,7 @@ import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { googleAvailable, googleIdToken, googleSignOut } from '@/lib/google-sign-in';
 import { applyServerUser, liveMode, liveSignIn, message, toServer } from '@/lib/live';
+import { stopPush } from '@/lib/push';
 import { retrySeconds, reusableCode, type SentCode } from '@/lib/verify-code';
 import { isServerId } from '@/data/mock';
 
@@ -100,6 +101,8 @@ export async function verifyLinkCode(kind: CodeKind, target: string, code: strin
 export async function liveSignOut() {
   if (!(await api.signedInWithAccount())) return;
   const google = await api.signedInWithGoogle();
+  // This phone stops getting the account's notifications (while the session can still say so).
+  await stopPush();
   await api.logout();
   if (google) await googleSignOut();
 }

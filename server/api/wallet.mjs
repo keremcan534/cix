@@ -248,7 +248,7 @@ export const walletRoutes = {
 
   /**
    * Gelir's sources: the diamonds I earned in the period (day, week, month by Turkey's calendar, or all), by where
-   * they came from. Gifts by place (a room, a chat, a moment, a profile; Uğurlu hediye on its own), then paid
+   * they came from. Gifts by place (a room, a chat, a moment, a profile, the family chat; Uğurlu hediye on its own), then paid
    * messages and paid call or match minutes (one-on-one.mjs, paid_events).
    */
   async 'GET /api/wallet/income'(req, url) {
@@ -282,6 +282,7 @@ export const walletRoutes = {
       row('chat', 'Mesajdan gelen hediyeler'),
       row('moment', 'Anlar hediyeleri'),
       row('profile', 'Profilden gelen hediyeler'),
+      row('family', 'Aile sohbetinden gelen hediyeler'),
       row('other', 'Diğer hediyeler'),
       row('message_fee', 'Mesaj ücretleri'),
       row('voice_call', 'Sesli arama ve eşleşme'),

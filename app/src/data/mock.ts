@@ -32,6 +32,21 @@ export type User = {
 
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
 
+/** A server room's rules as data/mock keeps them (lib/api RoomRules has the same shape). */
+export type RoomRulesLike = {
+  micPermission: 'everyone' | 'members';
+  bossSeat: boolean;
+  joinMode: 'open' | 'apply' | 'closed';
+  manageMembers: 'owner' | 'admins';
+  manageFunctions: 'owner' | 'admins';
+  autoRemoveDays: 0 | 7 | 14 | 30;
+  limit: number | null;
+  profileVisible: boolean;
+  videoPrivacy: boolean;
+  bot: boolean;
+  slowMode: boolean;
+  words: string[];
+};
 export type Room = {
   id: string;
   title: string;
@@ -52,6 +67,13 @@ export type Room = {
   roomType?: RoomType;
   theme?: RoomTheme;
   bossSeat?: boolean;
+  /** A server room: the owner turned gift effects off for everyone in it (undefined/true: on). */
+  giftEffects?: boolean;
+  /** A server room: its rules (Oda ayarları, Moderasyon) and its Dümen koltuğu holder (server id). */
+  rules?: RoomRulesLike;
+  bossId?: string | null;
+  /** The rules' forbidden words, one per line (plain text, so the room screen can hand it to the voice handlers). */
+  wordsText?: string;
   micPermission?: 'everyone' | 'members';
   /** "Mikrofon kuyruğu"; absent = on for every room type except "Serbest sohbet" (lib/room-invites). */
   micQueue?: boolean;
@@ -105,6 +127,8 @@ export type Conversation = {
     /** Live mode: the server's message id, so the same message is never imported twice. */
     sid?: number;
     room?: RoomInviteCard;
+    /** Live mode: a photo in the chat (its storage address); its text is the caption ('Fotoğraf' when there is none). */
+    image?: string;
     /** Live mode: the request id sent with it (a retry reuses it, so the server keeps one copy). */
     ref?: string;
     /** Live mode: the server didn't take it; the bubble shows why and offers "tekrar dene". */

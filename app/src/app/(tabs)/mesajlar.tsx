@@ -238,10 +238,10 @@ export default function MessagesScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           ListEmptyComponent={
             filter === 'all' ? (
-              // The Benzerler tab (/kesfet) lists people to greet.
-              <Pressable onPress={() => router.push('/kesfet')} accessibilityRole="link" accessibilityLabel="Benzerler sekmesini aç">
+              // The Ana Sayfa tab (/kesfet) lists people to greet.
+              <Pressable onPress={() => router.push('/kesfet')} accessibilityRole="link" accessibilityLabel="Ana Sayfa sekmesini aç">
                 <Text style={styles.empty}>
-                  Henüz mesaj yok. <Text style={[styles.empty, styles.emptyLink]}>Benzerler</Text>&apos;den birine selam ver!
+                  Henüz mesaj yok. <Text style={[styles.empty, styles.emptyLink]}>Ana Sayfa</Text>&apos;dan birine selam ver!
                 </Text>
               </Pressable>
             ) : (

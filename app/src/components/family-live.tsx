@@ -1,26 +1,42 @@
-// Aile in a live build (lib/live/family → server/api/families.mjs): the family list, founding one, joining or
-// asking to join, my family (members, requests, roles, announcement, join mode) and the family chat. Everything
-// shown is the server's answer; nothing is kept on the phone. The demo build keeps app/aile's sample families.
+// Aile in a live build (lib/live/family → server/api/families.mjs, family-more.mjs): the family list, founding one,
+// joining or asking to join, my family (members, requests, roles, announcement, join mode, the leader's tag and
+// theme, this week, the family room, highlights, level perks, rules) and the family chat (with gifts to members).
+// Görevler and Uyum Köşesi are in family-center-live. Everything shown is the server's answer; nothing is kept on
+// the phone. The demo build keeps app/aile's sample families.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
+import { MemberPicker, useFamilyGift } from '@/components/family-center-live';
 import { EmojiText } from '@/components/ReactionArt';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Avatar, Card, GradientButton, Header } from '@/components/ui';
-import { KABILE_CREATE_COST, KABILE_ROUTES } from '@/data/kabile';
+import { CHAT_GIFT_IDS, KABILE_CREATE_COST, KABILE_ROUTES, KABILE_THEMES } from '@/data/kabile';
+import { GIFTS } from '@/data/mock';
+import { FAMILY_PERKS } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { applyServerUser, message, myServerId, once } from '@/lib/live';
 import * as fam from '@/lib/live/family';
 import { makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
+const themeOf = (id: string) => KABILE_THEMES.find((t) => t.id === id) ?? KABILE_THEMES[0];
+const CHAT_GIFTS = GIFTS.filter((g) => CHAT_GIFT_IDS.includes(g.id));
+const RULES = [
+  'Bir kişi aynı anda yalnızca bir ailede olabilir.',
+  'Ailenin gücü üyelerin gönderdiği hediyelerden gelir; satın alınamaz.',
+  'Günlük görevler katkı puanı verir, jeton vermez.',
+  'Haftalık sandıklar ödül jetonu verir; her sandık kişi başı haftada bir açılır.',
+  'Aile sohbetinde telefon, adres ya da sosyal medya hesabı paylaşılmaz.',
+  'Hafta Pazartesi 00:00’da (Türkiye saati) yenilenir.',
+];
 const openProfile = (id: string) => (id === myServerId() ? router.push('/(tabs)/profil') : router.push(`/kullanici/${id}`));
 
 /** Aileler: my family when I have one, else the list (with founding and a family's preview). */
@@ -193,17 +209,22 @@ function Summary({ f }: { f: fam.LiveFamily }) {
   const { colors } = useTheme();
   const full = f.members / Math.max(1, f.capacity);
   return (
-    <Card style={{ gap: 10 }}>
-      <View style={styles.row}>
+    <Card style={{ gap: 10, padding: 0, overflow: 'hidden' }}>
+      {/* The family's theme (the leader picks it, by family level): a dark band in both schemes, white text. */}
+      <LinearGradient colors={themeOf(f.theme).colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
         <Avatar uri={f.leader.avatarUrl ?? undefined} name={f.name} size={56} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.big} numberOfLines={1}>
-            {f.name}
-          </Text>
-          <Text style={styles.dim}>Lider: {f.leader.name}</Text>
+          <View style={[styles.row, { gap: 6, paddingVertical: 0 }]}>
+            <Text style={[styles.big, styles.onBand, { flexShrink: 1 }]} numberOfLines={1}>
+              {f.name}
+            </Text>
+            {!!f.tag && <Text style={styles.tag}>{f.tag}</Text>}
+          </View>
+          <Text style={styles.bandDim}>Lider: {f.leader.name}</Text>
         </View>
         <Text style={[styles.lv, { color: colors.gold }]}>Lv.{f.level}</Text>
-      </View>
+      </LinearGradient>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
       <View style={styles.stats}>
         <Stat label="Üye" value={`${f.members}/${f.capacity}`} />
         <Stat label="Bu hafta" value={fmt(f.weekly)} />
@@ -213,6 +234,7 @@ function Summary({ f }: { f: fam.LiveFamily }) {
         <View style={[styles.barFill, { width: `${Math.round(Math.min(1, full) * 100)}%` }]} />
       </View>
       <Text style={styles.dim}>{f.joinMode === 'open' ? 'Herkes katılabilir' : 'Katılmak için onay gerekir'}</Text>
+      </View>
     </Card>
   );
 }
@@ -224,6 +246,22 @@ function Stat({ label, value }: { label: string; value: string }) {
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.dim}>{label}</Text>
     </View>
+  );
+}
+
+function Tile({ icon, title, sub, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; onPress: () => void }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={onPress} style={styles.tile} accessibilityRole="button" accessibilityLabel={sub ? `${title}, ${sub}` : title}>
+      <Ionicons name={icon} size={22} color={colors.primary} />
+      <Text style={styles.name} numberOfLines={1}>
+        {title}
+      </Text>
+      <Text style={styles.dim} numberOfLines={1}>
+        {sub}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -267,6 +305,18 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
   const [menu, setMenu] = useState<fam.FamilyMember | null>(null);
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState(f.announcement);
+  // An older server sends no tag: an empty one then.
+  const [tag, setTag] = useState(f.tag ?? '');
+  // This week, the family room, highlights (family-more.mjs), read again whenever the screen comes back.
+  const [ov, setOv] = useState<fam.FamilyOverview | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      fam.overview().then(
+        (o) => setOv(o),
+        () => undefined,
+      );
+    }, []),
+  );
 
   const run = async (what: string, p: Promise<{ members: fam.FamilyMember[] }>) => {
     try {
@@ -298,6 +348,25 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
       showAlert('Değiştirilemedi', message(e));
     }
   };
+  const saveLook = async (s: { tag?: string; theme?: string }, what: string) => {
+    try {
+      const r = await fam.settings(s);
+      onChange({ ...detail, family: r.family });
+      setTag(r.family.tag ?? '');
+    } catch (e) {
+      showAlert(what, message(e));
+    }
+  };
+  const pickTheme = (t: (typeof KABILE_THEMES)[number]) =>
+    f.level < t.minLevel ? showAlert(t.name, `Bu tema Lv.${t.minLevel} ailede açılır.`) : void saveLook({ theme: t.id }, 'Tema değiştirilemedi');
+  const openRoom = () =>
+    ov?.room
+      ? router.push(`/oda/${ov.room.id}`)
+      : showAlert(
+          'Aile odası kapalı',
+          role === 'owner' ? 'Bir oda açtığında o oda aile odası olur; üyeler buradan girer.' : 'Aile odası, aile liderinin açık odasıdır. Lider odasını açınca buradan girebilirsin.',
+        );
+  const doneToday = ov ? ov.tasks.filter((t) => t.points > 0).length : 0;
   const leave = () =>
     showAlert('Aileden ayrıl', role === 'owner' ? 'Ayrılırsan liderlik bir yardımcıya (yoksa en eski üyeye) geçer.' : `${f.name} ailesinden ayrılmak istiyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
@@ -345,6 +414,42 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
           <Summary f={f} />
           <GradientButton title="Aile sohbeti" icon="chatbubbles" onPress={() => router.push(KABILE_ROUTES.sohbet)} />
+          <View style={styles.tiles}>
+            <Tile icon="checkbox-outline" title="Görevler" sub={ov ? `Bugün ${doneToday}/${ov.tasks.length}` : ''} onPress={() => router.push(KABILE_ROUTES.merkez)} />
+            <Tile icon="mic-outline" title="Aile odası" sub={ov ? (ov.room ? `${ov.room.listeners} kişi içeride` : 'Kapalı') : ''} onPress={openRoom} />
+            <Tile icon="heart-outline" title="Uyum Köşesi" sub={ov ? `${ov.pairs.length} ikili` : ''} onPress={() => router.push(KABILE_ROUTES.iliski)} />
+          </View>
+          {ov && (
+            <Card style={{ gap: 10 }}>
+              <View style={styles.row}>
+                <Text style={[styles.title, { flex: 1 }]}>Bu hafta</Text>
+                <Text style={styles.rankChip}>Sıra #{ov.rank}</Text>
+              </View>
+              <View style={styles.stats}>
+                <Stat label="Haftalık güç" value={fmt(ov.week.power)} />
+                <Stat label="Aktif üye" value={`${ov.active}/${f.members}`} />
+                <Stat label="Katkım" value={fmt(ov.me.gifts + ov.me.points)} />
+              </View>
+              <Text style={styles.dim}>
+                Tahmini haftalık aile bonusu: {fmt(ov.bonus.pool)} elmas. Bu bir tahmindir; bonus ödemesi yönetim kararıyla yapılır.
+              </Text>
+              {ov.highlights.length > 0 && (
+                <>
+                  <Text style={styles.label}>Öne çıkanlar</Text>
+                  {ov.highlights.map((h, i) => (
+                    <Pressable key={h.id} style={styles.row} onPress={() => openProfile(h.id)} accessibilityLabel={`${i + 1}. ${h.name}, ${fmt(h.contribution)} katkı`}>
+                      <Text style={styles.rank}>{i + 1}</Text>
+                      <Avatar uri={h.avatarUrl ?? undefined} name={h.name} size={32} />
+                      <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
+                        {h.name}
+                      </Text>
+                      <Text style={styles.dim}>{fmt(h.contribution)} katkı</Text>
+                    </Pressable>
+                  ))}
+                </>
+              )}
+            </Card>
+          )}
           <Card style={{ gap: 8 }}>
             <View style={styles.row}>
               <Text style={[styles.label, { flex: 1 }]}>Duyuru</Text>
@@ -382,6 +487,41 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
               </Card>
             </Pressable>
           )}
+          {role === 'owner' && (
+            <Card style={{ gap: 10 }}>
+              <Text style={styles.title}>Aile görünümü</Text>
+              <Text style={styles.label}>Etiket</Text>
+              <View style={styles.row}>
+                <TextInput value={tag} onChangeText={setTag} maxLength={8} autoCapitalize="characters" placeholder="Örn. YILDIZ" placeholderTextColor={colors.textDim} style={[styles.input, { flex: 1 }]} />
+                <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => void saveLook({ tag: tag.trim() }, 'Etiket kaydedilemedi')} accessibilityLabel="Etiketi kaydet">
+                  <Text style={styles.pillText}>Kaydet</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.dim}>Adının yanında görünür. En fazla 8 harf ya da rakam.</Text>
+              <Text style={styles.label}>Tema</Text>
+              <View style={styles.themes}>
+                {KABILE_THEMES.map((t) => {
+                  const locked = f.level < t.minLevel;
+                  return (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => pickTheme(t)}
+                      style={[styles.theme, f.theme === t.id && { borderColor: colors.primary }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: f.theme === t.id, disabled: locked }}
+                      accessibilityLabel={`${t.name}${locked ? `, Lv.${t.minLevel} ailede açılır` : ''}`}>
+                      <LinearGradient colors={t.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.swatch}>
+                        {locked && <Ionicons name="lock-closed" size={14} color="#fff" />}
+                      </LinearGradient>
+                      <Text style={styles.themeName} numberOfLines={1}>
+                        {t.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Card>
+          )}
           {manager && detail.requests.length > 0 && (
             <Card style={{ gap: 4 }}>
               <Text style={styles.title}>Katılma istekleri · {detail.requests.length}</Text>
@@ -404,6 +544,29 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
             </Card>
           )}
           <Members members={detail.members} myRole={role} onMenu={manager ? setMenu : undefined} />
+          <Card style={{ gap: 6 }}>
+            <Text style={styles.title}>Seviye ayrıcalıkları</Text>
+            {FAMILY_PERKS.map((p) => {
+              const here = f.level >= p.from && f.level <= p.to;
+              return (
+                <View key={p.from} style={[styles.perk, here && { borderColor: colors.primary }]}>
+                  <Text style={[styles.perkLv, here && { color: colors.primary }]}>
+                    Lv.{p.from}–{p.to}
+                  </Text>
+                  <Text style={[styles.dim, { flex: 1 }, here && { color: colors.text }]}>{p.text}</Text>
+                </View>
+              );
+            })}
+          </Card>
+          <Card style={{ gap: 6 }}>
+            <Text style={styles.title}>Aile kuralları</Text>
+            {RULES.map((r) => (
+              <View key={r} style={[styles.row, { alignItems: 'flex-start', paddingVertical: 2, gap: 8 }]}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={colors.textDim} style={{ marginTop: 1 }} />
+                <Text style={[styles.dim, { flex: 1 }]}>{r}</Text>
+              </View>
+            ))}
+          </Card>
           <Pressable onPress={leave} style={styles.leave} accessibilityRole="button">
             <Text style={styles.leaveText}>Aileden ayrıl</Text>
           </Pressable>
@@ -414,7 +577,7 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
   );
 }
 
-/** Aile sohbeti: the family's chat, read again every few seconds while open. */
+/** Aile sohbeti: the family's chat, read again every few seconds while open, with gifts to members (the chat shows them). */
 export function LiveFamilyChat() {
   const styles = useStyles();
   const { colors } = useTheme();
@@ -422,9 +585,20 @@ export function LiveFamilyChat() {
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [members, setMembers] = useState<fam.FamilyMember[]>([]);
+  const [picking, setPicking] = useState(false);
+  // Bumped after a gift: the chat is read again at once (the server wrote the gift's line).
+  const [nudge, setNudge] = useState(0);
   const list = useRef<FlatList<fam.FamilyMessage>>(null);
   const last = useRef<string | undefined>(undefined);
   const me = myServerId();
+  const gift = useFamilyGift(CHAT_GIFTS, 'family', () => setNudge((n) => n + 1));
+  useEffect(() => {
+    fam.family().then(
+      (d) => setMembers(d.members),
+      () => undefined,
+    );
+  }, []);
 
   useEffect(() => {
     let on = true;
@@ -443,7 +617,7 @@ export function LiveFamilyChat() {
       on = false;
       clearInterval(t);
     };
-  }, []);
+  }, [nudge]);
 
   const send = async () => {
     const t = draft.trim();
@@ -495,6 +669,9 @@ export function LiveFamilyChat() {
             }}
           />
           <View style={styles.composer}>
+            <Pressable onPress={() => setPicking(true)} style={[styles.send, { backgroundColor: colors.cardAlt }]} accessibilityLabel="Aileden birine hediye gönder">
+              <Ionicons name="gift-outline" size={20} color={colors.text} />
+            </Pressable>
             <TextInput value={draft} onChangeText={setDraft} placeholder="Ailene yaz" placeholderTextColor={colors.textDim} style={[styles.input, { flex: 1 }]} maxLength={500} onSubmitEditing={send} returnKeyType="send" />
             <Pressable onPress={send} style={[styles.send, { backgroundColor: draft.trim() ? colors.primary : colors.cardAlt }]} accessibilityLabel="Gönder">
               <Ionicons name="send" size={18} color="#fff" />
@@ -502,6 +679,8 @@ export function LiveFamilyChat() {
           </View>
         </KeyboardAvoid>
       )}
+      <MemberPicker visible={picking} title="Kime hediye göndereceksin?" members={members} onPick={(m) => gift.giftTo(m)} onClose={() => setPicking(false)} />
+      {gift.sheet}
     </SafeAreaView>
   );
 }
@@ -535,4 +714,17 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   msgText: { color: colors.text, fontSize: 15, lineHeight: 20 },
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  onBand: { color: '#fff' },
+  bandDim: { color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 18 },
+  tag: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  tiles: { flexDirection: 'row', gap: 8 },
+  tile: { flex: 1, backgroundColor: colors.card, borderRadius: 16, padding: 12, gap: 4 },
+  rankChip: { color: colors.gold, fontWeight: '800', fontSize: 13 },
+  themes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  theme: { width: '31%', borderRadius: 12, borderWidth: 2, borderColor: 'transparent', padding: 4, gap: 4 },
+  swatch: { height: 44, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  themeName: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  perk: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
+  perkLv: { color: colors.textDim, fontWeight: '800', fontSize: 12, width: 52 },
 }));

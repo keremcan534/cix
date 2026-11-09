@@ -178,3 +178,47 @@ describe('Oda seviyesi, mikrofonlar ve düzen', () => {
     assert.equal(sent.body.permission.canPublish, false);
   });
 });
+
+describe('Odanın görünümü: kapak, tema, hediye efektleri', () => {
+  test('kapağı sahip ya da Süper Yönetici, temayı ve hediye efektlerini yalnızca sahip değiştirir; herkese haber gider', async () => {
+    const owner = await signUp('Görünüm Sahibi');
+    const superAdmin = await signUp('Süper');
+    const plainAdmin = await signUp('Yönetici');
+    const member = await signUp('Dinleyici');
+    const [st0, j0] = await call('POST', '/api/rooms', { title: `Görünüm ${rnd(2)}` }, owner.session);
+    assert.equal(st0, 200, j0.error);
+    const room = j0.room.id;
+    assert.deepEqual([j0.room.coverId, j0.room.theme, j0.room.giftEffects], [null, 'chat', true]);
+    assert.equal((await call('POST', '/api/rooms/admin', { room, user: superAdmin.user.id, super: true }, owner.session))[0], 200);
+    assert.equal((await call('POST', '/api/rooms/admin', { room, user: plainAdmin.user.id }, owner.session))[0], 200);
+
+    let from = lkCalls.length;
+    let [st, j] = await call('POST', '/api/rooms/update', { id: room, coverId: 'bg1' }, superAdmin.session);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.room.coverId, 'bg1');
+    assert.ok(await until(() => packets(from, 'room').length === 1), 'odadaki telefonlara haber gitti');
+    // A level-1 room: the Galaksi cover opens at Lv.7.
+    [st, j] = await call('POST', '/api/rooms/update', { id: room, coverId: 'bg4' }, owner.session);
+    assert.equal(st, 403);
+    assert.match(j.error, /Lv\.7/);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, coverId: 'yok' }, owner.session))[0], 400);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, coverId: 'bg1' }, plainAdmin.session))[0], 403, 'yönetici kapağı değiştiremez');
+
+    from = lkCalls.length;
+    [st, j] = await call('POST', '/api/rooms/update', { id: room, theme: 'party', giftEffects: false }, owner.session);
+    assert.equal(st, 200, j.error);
+    assert.deepEqual([j.room.theme, j.room.giftEffects, j.room.coverId], ['party', false, 'bg1']);
+    assert.ok(await until(() => packets(from, 'room').length === 1));
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, theme: 'chat' }, superAdmin.session))[0], 403, 'temayı yalnızca sahip değiştirir');
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, giftEffects: true }, plainAdmin.session))[0], 403);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, theme: 'disko' }, owner.session))[0], 400);
+    assert.equal((await call('POST', '/api/rooms/update', { id: room, giftEffects: 'evet' }, owner.session))[0], 400);
+
+    // What every phone reads; null takes the cover off.
+    const seen = (await call('GET', `/api/room?id=${room}`, null, member.session))[1].room;
+    assert.deepEqual([seen.coverId, seen.theme, seen.giftEffects], ['bg1', 'party', false]);
+    [st, j] = await call('POST', '/api/rooms/update', { id: room, coverId: null }, owner.session);
+    assert.equal(st, 200, j.error);
+    assert.equal(j.room.coverId, null);
+  });
+});

@@ -36,6 +36,8 @@ import { giftDiamonds, paidCoins, spendCoins } from './wallet.mjs';
 /** Heart points (coins the two spent on each other: gifts, paid messages, paid minutes) needed for each level. */
 export const HEART_LEVELS = [0, 300, 1500, 5000, 15_000, 40_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000];
 export const heartLevel = (points) => HEART_LEVELS.findLastIndex((p) => points >= p);
+/** A photo in a chat between a streamer and someone who isn't opens at this heart level (messages.mjs). */
+export const PHOTO_HEART_LEVEL = 3;
 const MODES = ['voice', 'video'];
 const MODE_TEXT = { voice: 'Sesli', video: 'Görüntülü' };
 /** A call nobody answers stops ringing; a call nobody hears from ends. Seconds. */
@@ -87,8 +89,12 @@ export async function pairOf(c, me, other) {
     earner: paid ? (x.me_s ? me : other) : null,
     iPay: payer === me,
     dmPrice: payer === me && !mutual ? s.dmPrice : 0,
-    heart: { points, level, next: HEART_LEVELS[level + 1] ?? null, floor: HEART_LEVELS[level], voiceAt: s.heartVoice, videoAt: s.heartVideo },
+    heart: { points, level, next: HEART_LEVELS[level + 1] ?? null, floor: HEART_LEVELS[level], voiceAt: s.heartVoice, videoAt: s.heartVideo, photoAt: PHOTO_HEART_LEVEL },
     calls: { voice: call('voice'), video: call('video') },
+    // A photo in the chat: with a streamer from the heart level, otherwise between people who follow each other.
+    photo: paid
+      ? { open: level >= PHOTO_HEART_LEVEL, why: level >= PHOTO_HEART_LEVEL ? null : `Mesajda fotoğraf kalp seviyesi ${PHOTO_HEART_LEVEL} olunca açılır` }
+      : { open: mutual, why: mutual ? null : 'Fotoğraf göndermek için karşılıklı takip gerekli' },
   };
 }
 
