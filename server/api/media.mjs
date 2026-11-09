@@ -76,11 +76,21 @@ export function presign({ method, url, region, accessKey, secretKey, expires, he
 }
 
 const storageOn = () => !!(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_KEY && env.S3_SECRET && env.S3_PUBLIC_URL);
+/**
+ * The storage's API address: S3_ENDPOINT without a trailing slash, and without the bucket's name when it was left
+ * at the end (Cloudflare's "S3 API" line shows it there). Kept, it would put every file one folder too deep, where
+ * the public address can't find it.
+ */
+export function endpointOf(e = env) {
+  const base = String(e.S3_ENDPOINT ?? '').trim().replace(/\/+$/, '');
+  const bucket = String(e.S3_BUCKET ?? '').trim();
+  return bucket && base.endsWith(`/${bucket}`) ? base.slice(0, -(bucket.length + 1)) : base;
+}
 /** A signed request to the bucket: `key` '' is the bucket itself (listing). */
 const signed = (method, key, query = {}) =>
   presign({
     method,
-    url: `${env.S3_ENDPOINT.replace(/\/$/, '')}/${env.S3_BUCKET}${key ? `/${key}` : ''}`,
+    url: `${endpointOf()}/${env.S3_BUCKET}${key ? `/${key}` : ''}`,
     region: env.S3_REGION ?? 'auto',
     accessKey: env.S3_KEY,
     secretKey: env.S3_SECRET,
@@ -154,9 +164,9 @@ export function storageNotes(e = env) {
   const notes = [];
   let host;
   try {
-    const u = new URL(e.S3_ENDPOINT);
+    const u = new URL(endpointOf(e));
     host = u.hostname;
-    if (u.pathname.replace(/\/$/, '') !== '') notes.push('S3_ENDPOINT sonunda fazladan yol var (kova adı silinmeli)');
+    if (u.pathname.replace(/\/$/, '') !== '') notes.push('S3_ENDPOINT sonunda fazladan yol var (yalnızca https://….r2.cloudflarestorage.com olmalı)');
   } catch {
     return ['S3_ENDPOINT bir adres değil'];
   }
@@ -192,7 +202,7 @@ export async function storageCheck() {
   const out = [];
   let put;
   try {
-    const url = presign({ method: 'PUT', url: `${env.S3_ENDPOINT.replace(/\/$/, '')}/${env.S3_BUCKET}/${key}`, region: env.S3_REGION ?? 'auto', accessKey: env.S3_KEY, secretKey: env.S3_SECRET, expires: 60, headers });
+    const url = presign({ method: 'PUT', url: `${endpointOf()}/${env.S3_BUCKET}/${key}`, region: env.S3_REGION ?? 'auto', accessKey: env.S3_KEY, secretKey: env.S3_SECRET, expires: 60, headers });
     put = await fetch(url, { method: 'PUT', headers, body, signal: signal() });
     out.push(`yükleme ${await codeOf(put)}`);
   } catch (e) {
@@ -230,7 +240,7 @@ export const mediaRoutes = {
     const headers = { 'content-type': contentType, 'content-length': String(size) };
     const uploadUrl = presign({
       method: 'PUT',
-      url: `${env.S3_ENDPOINT.replace(/\/$/, '')}/${env.S3_BUCKET}/${key}`,
+      url: `${endpointOf()}/${env.S3_BUCKET}/${key}`,
       region: env.S3_REGION ?? 'auto',
       accessKey: env.S3_KEY,
       secretKey: env.S3_SECRET,
