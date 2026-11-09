@@ -587,6 +587,12 @@ export const joinRoomMembers = (room: string) => call<{ status: 'member' | 'pend
 export const leaveRoomMembers = (room: string) => call<{ status: null }>('POST', '/api/rooms/members/leave', { room });
 export const answerRoomMember = (room: string, user: string, accept: boolean) => call<{ status: 'member' | null }>('POST', '/api/rooms/members/answer', { room, user, accept });
 export const removeRoomMember = (room: string, user: string) => call<{ status: null }>('POST', '/api/rooms/members/remove', { room, user });
+/** Oda etkinlikleri (server/api/room-events.mjs). */
+export type ServerRoomEvent = { id: number; title: string; desc: string; when: string; type: string; by: { id: string; name: string }; going: boolean; attendees: number; cancelled: boolean; createdAt: string; mine: boolean };
+export const roomEvents = (room: string) => call<{ events: ServerRoomEvent[] }>('GET', `/api/rooms/events?room=${encodeURIComponent(room)}`).then((r) => r.events);
+export const addRoomEvent = (room: string, e: { title: string; desc: string; when: string; type: string }) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events', { room, ...e }).then((r) => r.event);
+export const cancelRoomEvent = (id: number) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events/cancel', { id }).then((r) => r.event);
+export const goRoomEvent = (id: number, going: boolean) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events/going', { id, going }).then((r) => r.event);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
 export type ServerBond = {

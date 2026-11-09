@@ -20,7 +20,13 @@ import { useSyncExternalStore } from 'react';
 
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
 /** What one phone may send the others: a chat line, an emoji or sticker over its own seat, a free Hareketli. */
-export type PeerSignal = { t: 'chat'; text: string } | { t: 'react'; emoji: string } | { t: 'anim'; animationId: string };
+export type PeerSignal =
+  | { t: 'chat'; text: string }
+  | { t: 'react'; emoji: string }
+  | { t: 'anim'; animationId: string }
+  /** Soru-cevap: a listener's question, and the staff's pick (the room screen takes a pick only from its staff). */
+  | { t: 'q'; id: string; text: string }
+  | { t: 'qpick'; id: string };
 /** A paid Hareketli the server announced (server/api/room-fx.mjs): `eventId` its room_animations row. */
 export type FxSignal = { t: 'fx'; animationId: string; eventId: number };
 /** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
@@ -186,6 +192,9 @@ export function parseSignal(raw: unknown): PeerSignal | null {
   if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) return { t: 'chat', text: m.text.slice(0, 300) };
   if (m.t === 'react' && typeof m.emoji === 'string' && m.emoji.trim() && m.emoji.length <= 40) return { t: 'react', emoji: m.emoji };
   if (m.t === 'anim' && typeof m.animationId === 'string' && /^[a-z0-9-]{1,40}$/.test(m.animationId)) return { t: 'anim', animationId: m.animationId };
+  const qid = typeof m.id === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(m.id) ? m.id : null;
+  if (m.t === 'q' && qid && typeof m.text === 'string' && m.text.trim()) return { t: 'q', id: qid, text: m.text.slice(0, 200) };
+  if (m.t === 'qpick' && qid) return { t: 'qpick', id: qid };
   return null;
 }
 

@@ -99,7 +99,7 @@ async function withVoiceCounts(rows) {
   return rows.map((r) => (n.has(liveKitName(r.id)) ? { ...r, listeners: n.get(liveKitName(r.id)) } : r));
 }
 
-async function roomRow(id) {
+export async function roomRow(id) {
   if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(400, 'Geçersiz oda');
   const r = await db.query(`${SELECT} WHERE r.id = $1`, [id]);
   if (!r.rowCount) throw new HttpError(404, 'Oda bulunamadı');
@@ -109,7 +109,7 @@ const isAdmin = async (roomId, uid) => (await db.query('SELECT 1 FROM room_admin
 /** Owner 3, Süper Yönetici 2, Yönetici 1, anyone else 0. */
 const OWNER = 3;
 const SUPER = 2;
-async function rankOf(room, uid) {
+export async function rankOf(room, uid) {
   if (room.owner === uid) return OWNER;
   const r = await db.query('SELECT super FROM room_admins WHERE room_id = $1 AND user_id = $2', [room.id, uid]);
   return r.rowCount ? (r.rows[0].super ? SUPER : 1) : 0;

@@ -247,6 +247,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   const base = isOwn ? null : roomById(id);
   const [, setRoomEdits] = useState(0);
+  // A server room's activities (server/api/room-events.mjs): read on entry and whenever the server says the room
+  // changed; reminders are this phone's own.
+  const [serverEvents, setServerEvents] = useState<api.ServerRoomEvent[] | null>(null);
+  const [reminders, setReminders] = useState<number[]>([]);
   const hostId = isOwn ? 'me' : base!.hostId;
   const title = isOwn ? myRoom.title : base!.title;
   const cover = isOwn ? myRoom.cover : base!.cover;
@@ -370,10 +374,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // says they changed (the owner or an admin picked a layout, a gift raised the level), so every phone matches.
   useEffect(() => {
     if (!real) return;
-    const sync = () =>
-      syncServerStage(id)
+    const sync = () => {
+      api.roomEvents(id).then((list) => setServerEvents(list), () => {});
+      return syncServerStage(id)
         .then(() => setRoomEdits((n) => n + 1))
         .catch(() => {});
+    };
     sync();
     // A lost packet can't leave a phone behind for long: read again every minute too.
     const every = setInterval(sync, 60_000);
@@ -504,6 +510,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     roomType === 'event' ? [{ id: 'ev0', title: 'Doğruluk mu Cesaret mi', desc: 'Haftalık oyun gecesi', when: 'Bugün 22:00', type: 'Oyun', by: hostId, going: false, reminder: false, attendees: 37, cancelled: false }] : [],
   );
   const [questions, setQuestions] = useState<Question[]>([]);
+  const loadEvents = () => {
+    if (real) api.roomEvents(id).then((list) => setServerEvents(list), () => {});
+  };
+  const shownEvents: RoomEvent[] = real
+    ? (serverEvents ?? []).map((e) => ({ id: String(e.id), title: e.title, desc: e.desc, when: e.when, type: e.type, by: toLocal(e.by.id), going: e.going, reminder: reminders.includes(e.id), attendees: e.attendees, cancelled: e.cancelled }))
+    : events;
   const [modLog, setModLog] = useState<ModLog[]>([]);
   const [slowMode, setSlowMode] = useState(false);
   const [words, setWords] = useState<string[]>(['spam', 'reklam']);
@@ -811,6 +823,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (msg.t === 'fx') {
         const a = animById(msg.animationId);
         if (a && playRoomAnim(id, from, msg.animationId, `fx:${msg.eventId}`)) addMsg({ id: `fx:${msg.eventId}`, system: true, kind: 'gift', text: `✨ ${userById(from).name} ${a.name} efekt hediyesi gönderdi` });
+        return;
+      }
+      // Soru-cevap: anyone's question (never with contact details), a pick only from the room's staff.
+      if (msg.t === 'q') {
+        if (!checkText(msg.text).ok) return;
+        return setQuestions((l) => (l.some((x) => x.id === msg.id) ? l : [...l.slice(-49), { id: msg.id, userId: from, text: msg.text, picked: false }]));
+      }
+      if (msg.t === 'qpick') {
+        if (!staffIdsKey.split('\n').includes(from)) return;
+        const q = questions.find((x) => x.id === msg.id);
+        setQuestions((l) => l.map((x) => (x.id === msg.id ? { ...x, picked: true } : x)));
+        if (q) addMsg({ id: `qpick:${msg.id}`, system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
         return;
       }
       const to = msg.to.map((t) => (t === myServerId() ? 'me' : t));
@@ -2853,12 +2877,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
               </View>
             )}
-            {roomType === 'event' && events.filter((e) => !e.cancelled)[0] && (
+            {roomType === 'event' && shownEvents.filter((e) => !e.cancelled)[0] && (
               <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
                 <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
-                  📅 {events.filter((e) => !e.cancelled)[0].title} · {events.filter((e) => !e.cancelled)[0].when}
+                  📅 {shownEvents.filter((e) => !e.cancelled)[0].title} · {shownEvents.filter((e) => !e.cancelled)[0].when}
                 </Text>
-                <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{events.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
+                <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{shownEvents.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
               </Pressable>
             )}
             {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
@@ -3281,22 +3305,45 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       <EventsSheet
         visible={panel === 'events'}
         onClose={closePanel}
-        events={events}
+        events={shownEvents}
         // Server room: activities are for the owner and Süper Yönetici.
         canManage={real ? myRank >= 2 : myRole !== 'member'}
         onCreate={(e) => {
+          if (real) {
+            if (offlineBlocked()) return;
+            return staffAction('Etkinlik eklenemedi', () => api.addRoomEvent(id, e), () => {
+              addMsg({ system: true, text: `📅 Yeni etkinlik: ${e.title} · ${e.when}` });
+              loadEvents();
+            });
+          }
           setEvents((l) => [...l, { ...e, id: msgId(), by: isOwn ? 'me' : hostId, going: true, reminder: true, attendees: 0, cancelled: false }]);
           addMsg({ system: true, text: `📅 Yeni etkinlik: ${e.title} · ${e.when}` });
         }}
-        onToggleGoing={(eid) => setEvents((l) => l.map((e) => (e.id === eid ? { ...e, going: !e.going } : e)))}
+        onToggleGoing={(eid) => {
+          if (real) {
+            const e = shownEvents.find((x) => x.id === eid);
+            if (e && !offlineBlocked()) staffAction('Kaydedilemedi', () => api.goRoomEvent(Number(eid), !e.going), loadEvents);
+            return;
+          }
+          setEvents((l) => l.map((e) => (e.id === eid ? { ...e, going: !e.going } : e)));
+        }}
         onToggleReminder={(eid) => {
-          const e = events.find((x) => x.id === eid);
-          setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
+          const e = shownEvents.find((x) => x.id === eid);
+          if (real) setReminders((l) => (l.includes(Number(eid)) ? l.filter((x) => x !== Number(eid)) : [...l, Number(eid)]));
+          else setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
           // One reminder per event (no duplicates); respects the user's notification choices.
           if (e && !e.reminder) notify({ kind: 'social', icon: 'alarm', title: `Hatırlatma kuruldu: ${e.title}`, body: `${e.when} · ${title}`, href: `/oda/${id}` });
         }}
         onCancel={(eid) => {
-          const e = events.find((x) => x.id === eid);
+          const e = shownEvents.find((x) => x.id === eid);
+          if (real) {
+            if (!e || offlineBlocked()) return;
+            return staffAction('İptal edilemedi', () => api.cancelRoomEvent(Number(eid)), () => {
+              addMsg({ system: true, text: `❌ Etkinlik iptal edildi: ${e.title}` });
+              logMod('Etkinliği iptal etti', e.title);
+              loadEvents();
+            });
+          }
           setEvents((l) => l.map((x) => (x.id === eid ? { ...x, cancelled: true } : x)));
           if (e) {
             addMsg({ system: true, text: `❌ Etkinlik iptal edildi: ${e.title} — katılımcılara bildirildi` });
@@ -3309,9 +3356,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onClose={closePanel}
         questions={questions}
         canManage={myRole !== 'member'}
-        onAsk={(text) => setQuestions((q) => [...q, { id: msgId(), userId: 'me', text, picked: false }])}
+        onAsk={(text) => {
+          // A question is public: no contact details (the others check it again when it arrives).
+          const refusal = messageRefusal(`room:${id}`, text, 'room.chat');
+          if (refusal) return showAlert('Soru gönderilemedi', refusal);
+          const qid = `q${msgId().replace('.', '')}`;
+          if (real && !sendSignal({ t: 'q', id: qid, text })) return showAlert('Soru gönderilemedi', 'Oda bağlantısı yok, biraz sonra tekrar dene.');
+          setQuestions((q) => [...q, { id: qid, userId: 'me', text, picked: false }]);
+        }}
         onPick={(qid) => {
           const q = questions.find((x) => x.id === qid);
+          if (real) sendSignal({ t: 'qpick', id: qid });
           setQuestions((l) => l.map((x) => (x.id === qid ? { ...x, picked: true } : x)));
           if (q) addMsg({ system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
         }}

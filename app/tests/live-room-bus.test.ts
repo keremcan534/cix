@@ -213,3 +213,14 @@ test('sunucunun ücretli Hareketli paketi: doğru biçim okunur, telefondan gele
   off();
   assert.deepEqual(got, ['u-a:an-coin-rain#12', 'gift']);
 });
+
+test('soru-cevap: soru ve seçim telefondan gelir; biçimi bozuk olan atılır', () => {
+  assert.deepEqual(parseSignal({ t: 'q', id: 'q123', text: 'Yarın oda açık mı?' }), { t: 'q', id: 'q123', text: 'Yarın oda açık mı?' });
+  assert.equal(parseSignal({ t: 'q', id: 'q123', text: '   ' }), null);
+  assert.equal(parseSignal({ t: 'q', id: '../x', text: 'soru' }), null);
+  assert.equal(parseSignal({ t: 'q', text: 'kimliksiz' }), null);
+  assert.equal(parseSignal({ t: 'q', id: 'q1', text: 'a'.repeat(500) })?.t, 'q');
+  assert.equal((parseSignal({ t: 'q', id: 'q1', text: 'a'.repeat(500) }) as { text: string }).text.length, 200);
+  assert.deepEqual(parseSignal({ t: 'qpick', id: 'q123' }), { t: 'qpick', id: 'q123' });
+  assert.equal(parseSignal({ t: 'qpick' }), null);
+});
