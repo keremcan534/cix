@@ -255,6 +255,7 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
 export function ChatLine({
   msg,
   bubbleId,
+  bubbleOf,
   bond,
   onRetry,
   mentionsMe,
@@ -262,6 +263,8 @@ export function ChatLine({
 }: {
   msg: ChatMsg;
   bubbleId?: string;
+  /** Someone else's bubble (a server room: their shop look), by their user id. */
+  bubbleOf?: (userId: string) => string | undefined;
   /** Lv10 bond: the special bubble (a bubble I equipped wins). */
   bond?: RoomBond | null;
   onRetry?: (msg: ChatMsg) => void;
@@ -310,7 +313,7 @@ export function ChatLine({
     );
   }
   const u = userById(msg.userId!);
-  const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : undefined;
+  const bubble = msg.userId === 'me' ? cosmeticById(bubbleId) : msg.userId && !msg.system && !msg.bot && bubbleOf ? cosmeticById(bubbleOf(msg.userId)) : undefined;
   const nameColor = msg.userId === 'me' ? colors.gold : '#A5F3F5';
   const stickers = stickersOf(msg.text);
   // Avatar, name above, text in its own bubble: who said what reads at a glance, like a group chat.

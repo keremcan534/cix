@@ -97,6 +97,7 @@ import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
+import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
 import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
@@ -180,6 +181,16 @@ const offlineBlocked = () => {
 const BOT_REACTIONS = [stickerToken('temel-kahkaha'), stickerToken('temel-asik'), stickerToken('oda-alkis'), '🔥', '😎', '🥳', '❤️', stickerToken('temel-begendim'), stickerToken('oda-saskin'), '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
+/** Someone's entry show in a server room, from their shop look (entry effect, ride, noble rank); null: none. */
+function entryShowOf(look: Look | undefined, name: string, avatar: string): EntryShow | null {
+  if (!look) return null;
+  const entryItem = cosmeticById(look.entry ?? undefined);
+  const ride = cosmeticById(look.ride ?? undefined);
+  const noble = look.noble ? nobleInfo(look.noble) : undefined;
+  if (!entryItem && !ride && !noble) return null;
+  const tier = vipTier(look.vipLevel);
+  return { name, avatar, fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip', ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge: noble?.emoji };
+}
 // What another phone may put over its seat: the emoji panel's own emoji and stickers (no free text, no unknown art).
 const SEAT_EMOJI = new Set(STANDARD_EMOJI.flatMap((g) => g.emojis));
 const STICKER_IDS = new Set(STICKER_PACKS.flatMap((p) => p.stickers.map((x) => x.id)));
@@ -754,6 +765,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const seatedKey = [...seatedOthers, bossId && bossId !== 'me' ? bossId : ''].join(',');
   // Balkon: people in the room who are not on a mic (from the presence model, never a separate list).
   const audience = useMemo(() => view.balconyIds.filter((u) => u !== 'me' && !blocked.has(u)).map(userById), [view.balconyIds, blocked]);
+  // A server room: everyone's shop look (frame, bubble, mic effect, entry) from the server, for the people shown.
+  const lookIds = real ? [...seatedOthers, ...audience.map((u) => u.id), ...(bossId && bossId !== 'me' ? [bossId] : [])].map((u) => toServer(u) ?? '').filter(Boolean) : [];
+  const looksVersion = useLooks(lookIds, real);
+  const lookFor = (uid: string): Look | undefined => (real && uid !== 'me' ? lookOf(toServer(uid)) : undefined);
 
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
@@ -797,7 +812,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Server room: people, mics, talking rings, chat lines and gifts come from the other phones (lib/live/room).
   // Server room: who switched their own mic off, from the voice connection (drawn like my own mic-off badge).
   const peersMicOff = useLiveRoomSync(id, real && unlocked, mySeat >= 0 ? mySeat : null, {
-    onJoin: (_uid, name) => addMsg({ system: true, text: `${name} odaya girdi` }),
+    onJoin: (uid, name) => {
+      addMsg({ system: true, text: `${name} odaya girdi` });
+      // Their entry effect and ride (their shop look from the server), once it is read.
+      const sid = toServer(uid);
+      if (!entryOn || !sid) return;
+      void loadLooks([sid]).then(() => {
+        const show = entryShowOf(lookOf(sid), name, userById(uid).avatar);
+        if (!show) return;
+        if (entry) setEntryQueue((q) => [...q, show].slice(-3));
+        else setEntry(show);
+      });
+    },
     onLeave: (_uid, name) => addMsg({ system: true, text: `${name} odadan ayrıldı` }),
     setSpeaking: (ids) => setSpeaking((prev) => (prev.size === ids.size && [...ids].every((u) => prev.has(u)) ? prev : ids)),
     onSignal: (from, msg: RoomSignal) => {
@@ -1141,6 +1167,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     freeAnimAt.current.set(from, now);
     return true;
   };
+  // Others' mic effects in a server room: while they talk on a mic, their effect (their shop look) plays at their seat.
+  const othersMicFx = real && !settings.effectsOff && settings.micAnim && !settings.reduceMotion && visible;
+  const talkingKey = real ? [...speaking].filter((u) => u !== 'me' && (seatedOthers.includes(u) || u === bossId)).sort().join(',') : '';
+  useEffect(() => {
+    if (!othersMicFx || !talkingKey) return;
+    const play = () => {
+      for (const uid of talkingKey.split(',')) {
+        const fx = lookOf(toServer(uid))?.micfx;
+        if (fx) playRoomAnim(id, uid, fx, `mic:${uid}:${nowMs()}`);
+      }
+    };
+    play();
+    const t = setInterval(play, 1_800);
+    return () => clearInterval(t);
+  }, [othersMicFx, talkingKey, id]);
   // Mic effect follows actual talking (polled by the layer; never charges, never sends anything).
   const speakingMe = useRef(false);
   useEffect(() => {
@@ -2044,18 +2085,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [real]);
   // A line naming me (@bahset) stands out; a tap on someone's photo or name opens their person card.
   const myName = app.me.name;
+  // Someone else's chat bubble in a server room: their shop look (it changes when new looks arrive: looksVersion).
+  const bubbleOf = useCallback((uid: string) => (real && looksVersion >= 0 && uid !== 'me' ? (lookOf(toServer(uid))?.bubble ?? undefined) : undefined), [real, looksVersion]);
   const renderChat = useCallback(
     ({ item }: { item: ChatMsg }) => (
       <ChatLine
         msg={item}
         bubbleId={equipped.bubble}
+        bubbleOf={bubbleOf}
         bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null}
         onRetry={retrySend}
         mentionsMe={!!item.userId && item.userId !== 'me' && mentions(item.text, myName)}
         onPerson={openPerson}
       />
     ),
-    [equipped.bubble, retrySend, roomBonds, myName, openPerson],
+    [equipped.bubble, bubbleOf, retrySend, roomBonds, myName, openPerson],
   );
   // @bahset: "@" in the line offers the people on the mics and the balcony; a pick (or the card's Bahset) writes "@Name ".
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -2734,8 +2778,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         userId={uid}
         host={extra?.slot ? false : (extra?.host ?? i === 0)}
         small={small}
-        vipLevel={uid === 'me' ? vipLevel : 0}
-        frameId={uid === 'me' ? equipped.frame : undefined}
+        vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
+        frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}
         speaking={!!uid && speaking.has(uid)}
         muted={uid === 'me' ? !sending : !!uid && peersMicOff.has(uid)}
         modMuted={!!uid && mutedUsers.has(uid)}
