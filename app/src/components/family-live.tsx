@@ -305,7 +305,8 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
   const [menu, setMenu] = useState<fam.FamilyMember | null>(null);
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState(f.announcement);
-  const [tag, setTag] = useState(f.tag);
+  // An older server sends no tag: an empty one then.
+  const [tag, setTag] = useState(f.tag ?? '');
   // This week, the family room, highlights (family-more.mjs), read again whenever the screen comes back.
   const [ov, setOv] = useState<fam.FamilyOverview | null>(null);
   useFocusEffect(
@@ -351,7 +352,7 @@ function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onCh
     try {
       const r = await fam.settings(s);
       onChange({ ...detail, family: r.family });
-      setTag(r.family.tag);
+      setTag(r.family.tag ?? '');
     } catch (e) {
       showAlert(what, message(e));
     }
