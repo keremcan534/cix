@@ -11,7 +11,7 @@ Durumlar:
 - **Yalnız telefonda**: sadece kullanan kişinin telefonunda çalışıyor, odadaki diğerleri görmüyor. Ya sunucuya taşınacak ya da gizlenecek.
 - **Telefonda denenmeli**: kodda doğru, gerçek telefonda henüz denenmedi.
 
-Son güncelleme: Paket 1–5 (acil düzeltmeler, hepsi bitti).
+Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzeltmesi).
 
 ---
 
@@ -117,13 +117,13 @@ Son güncelleme: Paket 1–5 (acil düzeltmeler, hepsi bitti).
 | 20 | Ayarlar'da sürüm ve güncelleme | Çalışıyor | |
 | 21 | Oda sesi kapat düğmesi | Çalışıyor | |
 | 22–33 | ⋯ menüsü düzenlemesi | Çalışıyor | Çıkanlar odanın adına/resmine dokununca açılan oda kartında |
-| 34 | Şanslı çanta | Çalışıyor | |
+| 34 | Şanslı çanta | Telefonda denenmeli | preview-96: atılınca üstte kart iner, ekran kararır, yukarıdan çanta yağar |
 | 35 | Emoji paneli geri tuşuyla kapansın | Çalışıyor | |
-| 36 | Küçült/Büyüt | Çalışıyor | |
+| 36 | Küçült/Büyüt | Telefonda denenmeli | preview-96: Küçült'te mikrofonlar numaralı küçük bir şerit, sohbet kalan yeri alır |
 | 37 | Mesajda büyük emoji | Çalışıyor | |
 | 38 | Mikrofon sayısına göre boyut | Çalışıyor | |
 | 39 | Yazarken mikrofonlar kapanmasın | Telefonda denenmeli | |
-| 40 | @bahset | Çalışıyor | |
+| 40 | @bahset | Yarım | Bahsetmeli mesaj iletişim filtresine takılıyordu. Düzeltmesi PR #87'de, sonraki APK'da gelir |
 | 41–42 | Kişi kartı | Çalışıyor | |
 | 43–44 | DJ yetkisi | Çalışıyor | |
 | 45 | Telefondan müzik çalma | Kurulum bekliyor | Depo (R2) anahtarları girilmeden şarkı yüklenmez |
@@ -143,16 +143,31 @@ Son güncelleme: Paket 1–5 (acil düzeltmeler, hepsi bitti).
 
 ---
 
-## Kurulum bekleyenler (senin yapacakların)
+## Kalanlar: tam liste
 
-- **Bildirimler (Firebase):** Arama çalması, mesaj ve hediye bildirimleri için. GitHub Secrets'a iki dosya:
+**Yarım kalan işler (benim):**
+- Simetri (Belge 1, madde 1): her ekran tek tek açılıp kontrol edilmedi.
+- @bahset düzeltmesi: hazır, PR #87'de birleştirme bekliyor.
+- Aile sandığındaki çerçeve ve sohbet balonu: mağazaya eklenince sandıktan verilir.
+- Gezinme sadeleştirme planı: sana gösterilecek.
+
+**Kurulum bekleyenler (senin):**
+- **Bildirimler (Firebase):** Arama çalması, mesaj, hediye ve duyuru bildirimleri için. GitHub Secrets'a iki dosya:
   - `GOOGLE_SERVICES_JSON`: Firebase'in Android dosyası (paket adı com.similarclub.app).
   - `FCM_SERVICE_ACCOUNT`: Firebase hizmet hesabı anahtarı.
-- **Depo (R2) anahtarları:** Fotoğraf (Anlar ve mesaj), şarkı ve duyuru resimleri için. GitHub Secrets'a girilir.
+- **Depo (R2) anahtarları:** Anlar ve mesajda fotoğraf, şarkı yükleme, duyuru ve banner resimleri için. GitHub Secrets'a girilir.
 - **Haftalık aile bonusu:** Şu an sadece tahmin gösteriliyor. Ödenecekse kuralını sen belirle.
 - **Resim denetimi:** Anlar'daki resimleri otomatik denetlemek için bir hizmet seçilmeli.
 
-## Sıradaki
+**Telefonda denenecekler:** Bu listede "Telefonda denenmeli" yazan maddeler.
 
-- Mağazaya aile çerçevesi ve aile sohbet balonu eklenince sandıktan verilebilir.
-- "Telefonda denenmeli" yazan maddeler gerçek telefonda denenmeli.
+**Güvenlik ve yayın öncesi:**
+- Finans paneli şifresini değiştir, iki adımlı doğrulamayı aç, WhatsApp'ta sabitlenmiş giriş mesajını sil. Sonra eski giriş bilgisi panelden silinir.
+- Yayından önce test modu kapatılmalı: test jeton yükleme ve deneme girişi kapanır.
+- Odada müzik için müzik lisansı (PRS/PPL).
+- Play Store için mağaza paketi (AAB).
+
+**Çalışıyor ama sınırlı:**
+- Çevrim içi hizmette canlı destek yok, sık sorulanlar ve e-posta var.
+- Odalar bannerları sadece "Sana yakın" sekmesinde.
+- Kulüp (PR #36) senin isteğinle bekletiliyor.
