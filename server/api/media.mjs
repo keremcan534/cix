@@ -149,6 +149,51 @@ export function removeUserFiles(uid) {
   });
 }
 
+/**
+ * The storage settings checked end to end (run after a deploy, server.yml): a small file put exactly the way the
+ * phone puts a photo, read back through the public address, then deleted. The answer holds only status codes and
+ * the storage's error code (SignatureDoesNotMatch, NoSuchBucket…), never a setting's value, so it can go in a log.
+ */
+export async function storageCheck() {
+  const missing = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_KEY', 'S3_SECRET', 'S3_PUBLIC_URL'].filter((k) => !env[k]);
+  if (missing.length) return `kapalı: ${missing.join(', ')} yok`;
+  const notes = [];
+  try {
+    if (new URL(env.S3_ENDPOINT).pathname.replace(/\/$/, '') !== '') notes.push('S3_ENDPOINT sonunda fazladan yol var (kova adı silinmeli)');
+  } catch {
+    return 'S3_ENDPOINT bir adres değil';
+  }
+  if (!/^https:\/\/[^/]+/.test(env.S3_PUBLIC_URL)) notes.push('S3_PUBLIC_URL https:// ile başlamıyor');
+  const key = `check/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.txt`;
+  const body = 'similar storage check';
+  const headers = { 'content-type': 'text/plain', 'content-length': String(Buffer.byteLength(body)) };
+  const signal = () => AbortSignal.timeout(10_000);
+  const codeOf = async (res) => `${res.status}${/<Code>([^<]{1,60})<\/Code>/.exec(await res.text().catch(() => ''))?.[1]?.replace(/^/, ' ') ?? ''}`;
+  const failed = (step, e) => `${step} bağlanamadı (${e?.cause?.code ?? e?.name ?? 'hata'})`;
+  const out = [];
+  let put;
+  try {
+    const url = presign({ method: 'PUT', url: `${env.S3_ENDPOINT.replace(/\/$/, '')}/${env.S3_BUCKET}/${key}`, region: env.S3_REGION ?? 'auto', accessKey: env.S3_KEY, secretKey: env.S3_SECRET, expires: 60, headers });
+    put = await fetch(url, { method: 'PUT', headers, body, signal: signal() });
+    out.push(`yükleme ${await codeOf(put)}`);
+  } catch (e) {
+    out.push(failed('yükleme', e));
+  }
+  if (put?.ok) {
+    try {
+      out.push(`açık adres ${(await fetch(`${env.S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`, { signal: signal() })).status}`);
+    } catch (e) {
+      out.push(failed('açık adres', e));
+    }
+    try {
+      out.push(`silme ${await codeOf(await fetch(signed('DELETE', key), { method: 'DELETE', signal: signal() }))}`);
+    } catch (e) {
+      out.push(failed('silme', e));
+    }
+  }
+  return [...out, ...notes].join(', ');
+}
+
 export const mediaRoutes = {
   async 'POST /api/media/upload-url'(req) {
     const u = await auth(req);

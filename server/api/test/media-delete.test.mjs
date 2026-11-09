@@ -21,6 +21,11 @@ const bucket = http.createServer((req, res) => {
     stored.delete(decodeURIComponent(u.pathname.replace(/^\/media\//, '')));
     return res.writeHead(204).end();
   }
+  if (req.method === 'PUT') {
+    if (!u.pathname.startsWith('/media/')) return res.writeHead(404).end('<?xml version="1.0"?><Error><Code>NoSuchBucket</Code></Error>');
+    stored.add(decodeURIComponent(u.pathname.slice('/media/'.length)));
+    return res.writeHead(200).end();
+  }
   if (req.method === 'GET' && u.pathname === '/media' && u.searchParams.get('list-type') === '2') {
     const prefix = u.searchParams.get('prefix') ?? '';
     const keys = [...stored].filter((k) => k.startsWith(prefix));
@@ -28,6 +33,10 @@ const bucket = http.createServer((req, res) => {
   }
   res.writeHead(400).end();
 });
+// The bucket's public address (S3_PUBLIC_URL) for the storage check; it is not signed.
+const pub = http.createServer((req, res) => res.writeHead(stored.has(decodeURIComponent(req.url.slice(1))) ? 200 : 404).end());
+pub.listen(S3_PORT + 1, '127.0.0.1');
+after(() => pub.close());
 bucket.listen(S3_PORT, '127.0.0.1');
 after(() => bucket.close());
 
@@ -116,6 +125,31 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     assert.equal(stored.has(evidence.key), true, 'kanıt dosyası kalır');
     assert.equal(stored.has(theirs.key), true, 'başkasının dosyası duruyor');
     assert.ok(asked.some((x) => x.startsWith('GET /media')), 'kişinin klasörleri listelendi');
+  });
+
+  test('depo ayarları baştan sona denenir; yalnızca durum ve hata kodları yazılır', async () => {
+    const { storageCheck } = await import('../media.mjs');
+    const saved = { ...process.env };
+    Object.assign(process.env, { S3_ENDPOINT: `http://127.0.0.1:${S3_PORT}`, S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: `http://127.0.0.1:${S3_PORT + 1}` });
+    try {
+      assert.match(await storageCheck(), /^yükleme 200, açık adres 200, silme 204/);
+      assert.ok(![...stored].some((k) => k.startsWith('check/')), 'deneme dosyası silindi');
+      process.env.S3_BUCKET = 'yanlis';
+      assert.match(await storageCheck(), /^yükleme 404 NoSuchBucket/);
+      process.env.S3_BUCKET = 'media';
+      process.env.S3_ENDPOINT = `http://127.0.0.1:${S3_PORT}/media`;
+      const extra = await storageCheck();
+      assert.match(extra, /açık adres 404/);
+      assert.match(extra, /S3_ENDPOINT sonunda fazladan yol var/);
+      delete process.env.S3_KEY;
+      assert.equal(await storageCheck(), 'kapalı: S3_KEY yok');
+      assert.doesNotMatch(extra, /testkey|testsecret/);
+    } finally {
+      for (const k of ['S3_ENDPOINT', 'S3_BUCKET', 'S3_KEY', 'S3_SECRET', 'S3_PUBLIC_URL']) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k];
+      }
+    }
   });
 
   test('Anlar ve sohbet için video ya da çok büyük dosya istenmez', async () => {
