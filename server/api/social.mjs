@@ -20,7 +20,7 @@ import { dropFromQueues } from './music.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
-const REPORT_TYPES = ['user', 'room', 'message', 'moment', 'comment'];
+const REPORT_TYPES = ['user', 'room', 'message', 'moment', 'comment', 'family'];
 const MIN_AGE = 18;
 /**
  * Where the app refuses contact details on its own, named like the server's places ('room.chat', 'moment.post',
@@ -95,6 +95,7 @@ export async function eraseAccount(c, id, phone) {
     // Aile: out of their family (a leader hands it on), their requests and chat lines.
     await leaveFamily(c, id);
     await c.query('DELETE FROM family_requests WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM family_invites WHERE user_id = $1', [id]);
     await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
 }

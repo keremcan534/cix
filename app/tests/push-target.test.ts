@@ -12,6 +12,7 @@ describe('Bildirime dokununca açılan ekran', () => {
     assert.equal(pushTarget({ type: 'gift', from: 'u9' }), '/kullanici/u9');
     assert.equal(pushTarget({ type: 'follow', from: 'u9' }), '/kullanici/u9');
     assert.equal(pushTarget({ type: 'family_request', family: '4' }), '/aile');
+    assert.equal(pushTarget({ type: 'family_invite', family: '4' }), '/aile');
     assert.equal(pushTarget({ type: 'withdrawal', id: '1' }), '/cuzdan');
     assert.equal(pushTarget({ type: 'call', from: 'u2', call: '7' }), null, 'çalan arama: uygulama açılır, kart cevaplar');
     assert.equal(pushTarget({ type: 'call', call: '7', missed: 'true' }), '/bildirimler');

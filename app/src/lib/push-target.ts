@@ -13,6 +13,7 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
       return s('from') ? (`/kullanici/${s('from')}` as Href) : '/bildirimler';
     case 'family_joined':
     case 'family_request':
+    case 'family_invite':
       return '/aile';
     case 'withdrawal':
       return '/cuzdan';

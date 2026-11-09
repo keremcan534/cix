@@ -142,4 +142,33 @@ describe('Aile görevleri ve sandıklar', () => {
     assert.deepEqual([view.tag, view.theme], ['SC1', 'ates']);
     await ok(call('POST', '/api/family/settings', { tag: '' }, lead.session), 'etiketi kaldır');
   });
+
+  test('davet: lider ya da yardımcı davet eder, davetli kabul edince katılır; çevrim içi üyeler; aile şikâyeti', async () => {
+    const { family, lead, member } = await familyOf('Davet');
+    const guest = await signUp('Davetli');
+    const other = await signUp('Öteki');
+    assert.equal((await call('POST', '/api/family/invite', { userId: guest.user.id }, member.session))[0], 403, 'üye davet edemez');
+    await ok(call('POST', '/api/family/invite', { userId: guest.user.id }, lead.session), 'davet');
+    await ok(call('POST', '/api/family/invite', { userId: guest.user.id }, lead.session), 'tekrar davet');
+    assert.equal((await call('POST', '/api/family/invite', { userId: member.user.id }, lead.session))[0], 409, 'ailesi olan davet edilmez');
+    const inv = await ok(call('GET', '/api/family/invites', null, guest.session), 'davetler');
+    assert.deepEqual(inv.invites.map((x) => [x.family.id, x.by.id]), [[family.id, lead.user.id]]);
+    assert.equal((await call('POST', '/api/family/invite/answer', { id: family.id, accept: true }, other.session))[0], 404, 'davetsiz katılınmaz');
+    assert.deepEqual(await ok(call('POST', '/api/family/invite/answer', { id: family.id, accept: true }, guest.session), 'kabul'), { joined: true });
+    assert.equal((await ok(call('GET', '/api/family', null, guest.session), 'aile')).family.id, family.id);
+    assert.equal((await ok(call('GET', '/api/family/invites', null, guest.session), 'davetler')).invites.length, 0, 'katılınca davetler düşer');
+
+    await ok(call('POST', '/api/family/invite', { userId: other.user.id }, lead.session), 'ikinci davet');
+    assert.deepEqual(await ok(call('POST', '/api/family/invite/answer', { id: family.id, accept: false }, other.session), 'ret'), { joined: false });
+    assert.equal((await ok(call('GET', '/api/family/invites', null, other.session), 'davetler')).invites.length, 0);
+
+    // The members signed in a moment ago are online (Birlikte oynuyor), myself not listed.
+    const o = await overview(lead.session);
+    assert.ok(o.online.some((x) => x.id === member.user.id && x.room === null));
+    assert.ok(!o.online.some((x) => x.id === lead.user.id));
+
+    const [st] = await call('POST', '/api/report', { type: 'family', id: String(family.id), reason: 'Uygunsuz ad' }, other.session);
+    assert.equal(st, 200, 'aile şikâyet edilebilir');
+  });
 });
+

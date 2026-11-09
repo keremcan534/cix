@@ -89,7 +89,7 @@ export type Report = {
   reporter: { id: string; name: string };
   /** bannedUntil: when the running timed account ban ends; bannedForever: a lifetime ban runs (bannedUntil may be null then). */
   target: {
-    type: 'user' | 'room' | 'message' | 'moment' | 'comment';
+    type: 'user' | 'room' | 'message' | 'moment' | 'comment' | 'family';
     id: string;
     name: string | null;
     staff: boolean;

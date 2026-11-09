@@ -66,7 +66,7 @@ export const banPhrase = (days: number, future = false) => `${isPermanentBan(day
  */
 export const banBody = (days: number): { days: number; permanent?: true } => (isPermanentBan(days) ? { days: PERMANENT_BAN_DAYS, permanent: true } : { days });
 
-export const REPORT_TARGET_LABEL: Record<string, string> = { user: 'Kişi', room: 'Oda', message: 'Mesaj', moment: 'An', comment: 'Yorum' };
+export const REPORT_TARGET_LABEL: Record<string, string> = { user: 'Kişi', room: 'Oda', message: 'Mesaj', moment: 'An', comment: 'Yorum', family: 'Aile' };
 
 export const PLATFORM_LABEL: Record<string, string> = { android: 'Google Play', ios: 'App Store', test: 'Test' };
 
