@@ -108,7 +108,44 @@ export function imageType(uri: string, picked?: string | null, file?: string) {
 }
 
 /** A photo the picker returned (expo-image-picker asset). */
-export type PickedImage = { uri: string; mimeType?: string | null };
+export type PickedImage = { uri: string; mimeType?: string | null; width?: number; height?: number };
+
+type PhotoKind = 'avatar' | 'moment' | 'dm' | 'notice';
+/**
+ * How big a photo is kept, by use: its longest side in pixels and the JPEG quality. A phone photo (about 4000 px,
+ * 3–8 MB) becomes 150–300 KB at 1280 px and looks the same on a phone screen, so the storage holds 10–20 times
+ * more photos. Saving it again also drops the file's hidden details (where and on which phone it was taken).
+ */
+export const PHOTO_KEEP: Record<PhotoKind, { side: number; quality: number }> = {
+  avatar: { side: 640, quality: 0.8 },
+  moment: { side: 1280, quality: 0.75 },
+  dm: { side: 1280, quality: 0.75 },
+  notice: { side: 1600, quality: 0.8 },
+};
+
+/** The resize that brings a `width`×`height` photo down to `side` on its longest side, or null when it fits. */
+export function shrinkSize(width: number, height: number, side: number): { width: number } | { height: number } | null {
+  if (!(width > 0 && height > 0) || Math.max(width, height) <= side) return null;
+  return width >= height ? { width: side } : { height: side };
+}
+
+/** The picked photo made smaller (a JPEG within PHOTO_KEEP[kind]); the photo as picked when this phone can't
+ *  (the upload then still goes, within the server's size cap). */
+async function shrinkPhoto(kind: PhotoKind, img: PickedImage): Promise<PickedImage> {
+  const keep = PHOTO_KEEP[kind];
+  try {
+    const { ImageManipulator, SaveFormat } = await import('expo-image-manipulator');
+    // The picker's size saves reading a big photo twice; without it the photo is read once to learn its size.
+    const known = shrinkSize(img.width ?? 0, img.height ?? 0, keep.side);
+    let ref = await (known ? ImageManipulator.manipulate(img.uri).resize(known) : ImageManipulator.manipulate(img.uri)).renderAsync();
+    const size = known ? null : shrinkSize(ref.width, ref.height, keep.side);
+    if (size) ref = await ImageManipulator.manipulate(img.uri).resize(size).renderAsync();
+    const out = await ref.saveAsync({ compress: keep.quality, format: SaveFormat.JPEG });
+    return { uri: out.uri, mimeType: 'image/jpeg', width: out.width, height: out.height };
+  } catch {
+    return img;
+  }
+}
 
 /**
  * A new profile photo: a signed upload address for its exact type and size, the file PUT there, then its public
@@ -119,9 +156,11 @@ export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
   return meFromServer(await api.updateProfile({ avatarUrl: await uploadPhoto('avatar', img) }));
 }
 
-/** The picked photo put in the app's storage for `kind` (a signed address for its exact type and size, then PUT);
- *  resolves with its public address. Throws when a step fails, e.g. 503 while storage isn't set up. */
-export async function uploadPhoto(kind: 'avatar' | 'moment' | 'dm' | 'notice', img: PickedImage): Promise<string> {
+/** The picked photo, made smaller first (shrinkPhoto), put in the app's storage for `kind` (a signed address for
+ *  its exact type and size, then PUT); resolves with its public address. Throws when a step fails, e.g. 503 while
+ *  storage isn't set up. */
+export async function uploadPhoto(kind: PhotoKind, picked: PickedImage): Promise<string> {
+  const img = await shrinkPhoto(kind, picked);
   let file: Blob;
   try {
     file = await (await fetch(img.uri)).blob();

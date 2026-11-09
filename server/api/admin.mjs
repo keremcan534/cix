@@ -19,6 +19,7 @@
 import { HttpError, LIVE_SANCTION, SANCTION_SELECT, auth, db, int, readJson, tx, userId } from './core.mjs';
 import { applySanction, audit, liftSanction, mayLift, permsOf } from './sanctions.mjs';
 import { eraseAccount } from './social.mjs';
+import { removeUserFiles } from './media.mjs';
 import { announceRoom } from './live.mjs';
 import { ROOM_MAX_LEVEL, ROOM_XP_THRESHOLDS, liveKitName, roomCode, roomLevel } from './rooms.mjs';
 
@@ -42,6 +43,7 @@ async function deleteAccount(me, id) {
     await eraseAccount(c, t.id, t.phone);
     await audit(c, { actor: me.id, role: me.role, action: 'account_delete', target: t.id });
   });
+  removeUserFiles(id);
 }
 
 async function staff(req) {

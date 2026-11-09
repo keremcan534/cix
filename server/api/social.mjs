@@ -17,6 +17,7 @@ import { autoFromReports } from './sanctions.mjs';
 import { looksOf, revokeAllForDelete } from './economy.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
+import { removeFiles, removeUserFiles } from './media.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -144,6 +145,8 @@ export const socialRoutes = {
     if (!keys.length) return { user: await withSignIn(u) };
     try {
       const r = await db.query(`UPDATE users SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`, [u.id, ...keys.map((k) => set[k])]);
+      // The photo it replaced leaves the storage (only one this person uploaded).
+      if (set.avatar_url !== undefined && u.avatar_url && u.avatar_url !== set.avatar_url) removeFiles([u.avatar_url], u.id);
       return { user: await withSignIn(r.rows[0]) };
     } catch (e) {
       if (e.code === '23505') throw new HttpError(409, 'Bu kullanıcı adı alınmış');
@@ -164,6 +167,8 @@ export const socialRoutes = {
   async 'DELETE /api/me'(req) {
     const u = await auth(req);
     await tx((c) => eraseAccount(c, u.id, u.phone));
+    // Their photos and music leave the storage too, once the account is gone.
+    removeUserFiles(u.id);
     return { deleted: true };
   },
 

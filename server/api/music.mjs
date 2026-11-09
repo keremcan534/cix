@@ -21,7 +21,7 @@
 // mayKeepMusic before it hands out an upload address). Playing music to a room is a public performance: see
 // docs (PRS/PPL licence) before launch.
 import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
-import { mayKeepMusic } from './media.mjs';
+import { mayKeepMusic, removeFiles } from './media.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { ROOM_MAX_LEVEL, pushRoomMeta, roomLevel } from './rooms.mjs';
 
@@ -155,12 +155,16 @@ export const musicRoutes = {
     const b = await readJson(req);
     const id = typeof b.id === 'string' && /^\d{1,18}$/.test(b.id) ? b.id : null;
     if (!id) throw new HttpError(400, 'Geçersiz parça');
+    let url = null;
     const rooms = await tx(async (c) => {
-      const r = await c.query('UPDATE music_tracks SET removed_at = now() WHERE id = $1 AND owner = $2 AND removed_at IS NULL', [id, me.id]);
+      const r = await c.query('UPDATE music_tracks SET removed_at = now() WHERE id = $1 AND owner = $2 AND removed_at IS NULL RETURNING url', [id, me.id]);
       if (!r.rowCount) throw new HttpError(404, 'Parça bulunamadı');
+      url = r.rows[0].url;
       return dropFromQueues(c, 'track_id = $1', [id]);
     });
     for (const roomId of rooms) await pushRoomMeta(roomId);
+    // The file leaves the storage unless another track of the library still plays it.
+    if (!(await db.query('SELECT 1 FROM music_tracks WHERE url = $1 AND removed_at IS NULL LIMIT 1', [url])).rowCount) removeFiles([url], me.id);
     return { removed: true };
   },
 

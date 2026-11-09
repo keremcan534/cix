@@ -26,6 +26,7 @@ import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { SPAM_MESSAGES, checkSpam } from './spam-filter.mjs';
 import { charmPoints } from './wallet.mjs';
+import { removeFiles } from './media.mjs';
 
 const PAGE = 50;
 /** The topics the app offers (app/src/data/social-ui.ts MOMENT_TOPICS). */
@@ -179,10 +180,16 @@ export const momentRoutes = {
   async 'POST /api/moments/delete'(req) {
     const me = await auth(req);
     const id = momentId((await readJson(req)).id);
-    const r = await db.query('SELECT author FROM moments WHERE id = $1 AND deleted_at IS NULL', [id]);
+    const r = await db.query('SELECT author, image_url FROM moments WHERE id = $1 AND deleted_at IS NULL', [id]);
     if (!r.rowCount) throw new HttpError(404, 'Bu an artık yok');
     if (r.rows[0].author !== me.id && !isStaff(me)) throw new HttpError(403, 'Yalnızca kendi anını silebilirsin');
     await db.query('UPDATE moments SET deleted_at = now(), removed_by = $2 WHERE id = $1', [id, me.id]);
+    // Its author deleting it takes the photo out of the storage too. One staff took down, or one with an open
+    // report, keeps it: that is what the report or an appeal is decided on.
+    if (r.rows[0].author === me.id && r.rows[0].image_url) {
+      const open = await db.query("SELECT 1 FROM reports WHERE target_type = 'moment' AND target_id = $1 AND status = 'open' LIMIT 1", [String(id)]);
+      if (!open.rowCount) removeFiles([r.rows[0].image_url], me.id);
+    }
     return { deleted: true };
   },
 

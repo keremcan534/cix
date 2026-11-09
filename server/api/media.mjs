@@ -7,6 +7,10 @@
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
 // Settings in the server's .env: S3_ENDPOINT (https://<account>.r2.cloudflarestorage.com), S3_BUCKET,
 // S3_REGION (R2: auto), S3_KEY, S3_SECRET, S3_PUBLIC_URL (the bucket's public https address or CDN domain).
+//
+// Files no longer used are deleted (removeFiles, removeUserFiles): an avatar replaced, a moment its author
+// deletes, a track taken out of a library, a removed notice, and every file of a deleted account (UK GDPR
+// erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
 // Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
 // 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one.
 import crypto from 'node:crypto';
@@ -18,9 +22,11 @@ const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', '
 const AUDIO = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const KINDS = {
   avatar: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 5 * 1024 * 1024 },
-  moment: { types: Object.keys(TYPES), max: 50 * 1024 * 1024 },
+  // Photos only (the app posts no video). The app shrinks a photo before it uploads (lib/live/profile
+  // uploadPhoto), so these caps only stop a file sent around the app.
+  moment: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   // A photo in a chat (messages.mjs; who may send one is checked when the message is sent).
-  dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 10 * 1024 * 1024 },
+  dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
   music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
 };
@@ -45,7 +51,7 @@ const enc = (s) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCo
  * An AWS Signature V4 presigned URL (query-string auth, unsigned payload). `headers` are signed too and must
  * be sent as given; `host` always is.
  */
-export function presign({ method, url, region, accessKey, secretKey, expires, headers = {}, now = new Date() }) {
+export function presign({ method, url, region, accessKey, secretKey, expires, headers = {}, query: extra = {}, now = new Date() }) {
   const u = new URL(url);
   const date = now.toISOString().replace(/[-:]|\.\d{3}/g, '');
   const day = date.slice(0, 8);
@@ -53,6 +59,7 @@ export function presign({ method, url, region, accessKey, secretKey, expires, he
   const all = Object.fromEntries(Object.entries({ host: u.host, ...headers }).map(([k, v]) => [k.toLowerCase(), String(v).trim()]));
   const names = Object.keys(all).sort();
   const query = {
+    ...extra,
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': `${accessKey}/${scope}`,
     'X-Amz-Date': date,
@@ -66,6 +73,80 @@ export function presign({ method, url, region, accessKey, secretKey, expires, he
   const key = hmac(hmac(hmac(hmac(`AWS4${secretKey}`, day), region), 's3'), 'aws4_request');
   const signature = crypto.createHmac('sha256', key).update(toSign).digest('hex');
   return `${u.origin}${path}?${qs}&X-Amz-Signature=${signature}`;
+}
+
+const storageOn = () => !!(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_KEY && env.S3_SECRET && env.S3_PUBLIC_URL);
+/** A signed request to the bucket: `key` '' is the bucket itself (listing). */
+const signed = (method, key, query = {}) =>
+  presign({
+    method,
+    url: `${env.S3_ENDPOINT.replace(/\/$/, '')}/${env.S3_BUCKET}${key ? `/${key}` : ''}`,
+    region: env.S3_REGION ?? 'auto',
+    accessKey: env.S3_KEY,
+    secretKey: env.S3_SECRET,
+    expires: 60,
+    query,
+  });
+const FILE_KEY = /^(avatar|moment|dm|notice|music)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+
+/** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
+ *  `owner`, only a file that person uploaded. */
+export function keyOf(url, owner) {
+  const base = (env.S3_PUBLIC_URL ?? '').replace(/\/$/, '');
+  if (!base || typeof url !== 'string' || !url.startsWith(`${base}/`)) return null;
+  const key = url.slice(base.length + 1);
+  if (!FILE_KEY.test(key)) return null;
+  return owner && key.split('/')[1] !== owner ? null : key;
+}
+
+async function deleteKeys(keys) {
+  for (const key of keys) {
+    // A file a moderation decision points at stays: an appeal is decided on it.
+    if ((await db.query('SELECT 1 FROM moderation_evidence WHERE position($1 in content) > 0 LIMIT 1', [key])).rowCount) continue;
+    const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
+    // 404: already gone, which is what was wanted.
+    if (!res.ok && res.status !== 404) console.error('storage delete', res.status);
+  }
+}
+
+/** Every key under `prefix` (ListObjectsV2, a page of up to 1000 at a time). */
+async function listKeys(prefix) {
+  const keys = [];
+  let token = null;
+  do {
+    const res = await fetch(signed('GET', '', { 'list-type': '2', prefix, ...(token ? { 'continuation-token': token } : {}) }), { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`storage list ${res.status}`);
+    const xml = await res.text();
+    const unxml = (v) => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    for (const m of xml.matchAll(/<Key>([^<]*)<\/Key>/g)) keys.push(unxml(m[1]));
+    token = /<IsTruncated>true<\/IsTruncated>/.test(xml) ? unxml(xml.match(/<NextContinuationToken>([^<]*)<\/NextContinuationToken>/)?.[1] ?? '') || null : null;
+  } while (token);
+  return keys;
+}
+
+/** Done after the request that caused it, never failing it: storage being slow or down only leaves files. */
+const later = (what, fn) => {
+  const p = fn().catch((e) => console.error(what, String(e).slice(0, 200)));
+  pending.add(p);
+  p.finally(() => pending.delete(p));
+};
+const pending = new Set();
+/** Waits for the deletions started so far (tests). */
+export const storageSettled = () => Promise.all([...pending]);
+
+/** Deletes the files at these public addresses that are ours (with `owner`, only that person's). */
+export function removeFiles(urls, owner) {
+  const keys = [...new Set(urls.map((u) => keyOf(u, owner)).filter(Boolean))];
+  if (keys.length && storageOn()) later('storage delete failed', () => deleteKeys(keys));
+}
+
+/** Deletes every file a deleted account uploaded (its avatars, moment and chat photos, music). A notice's
+ *  picture stays: it is the company's, whoever put it up. */
+export function removeUserFiles(uid) {
+  if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
+  later('storage erase failed', async () => {
+    for (const kind of ['avatar', 'moment', 'dm', 'music']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+  });
 }
 
 export const mediaRoutes = {

@@ -331,7 +331,9 @@ describe('Fotoğraf yükleme', () => {
     assert.equal((await call('PATCH', '/api/me', { avatarUrl: j.publicUrl }, a.session))[1].user.avatarUrl, j.publicUrl);
     assert.equal((await call('POST', '/api/media/upload-url', { kind: 'avatar', contentType: 'video/mp4', size: 1000 }, a.session))[0], 400);
     assert.equal((await call('POST', '/api/media/upload-url', { kind: 'avatar', contentType: 'image/png', size: 6 * 1024 * 1024 }, a.session))[0], 400);
-    assert.equal((await call('POST', '/api/media/upload-url', { kind: 'moment', contentType: 'video/mp4', size: 20 * 1024 * 1024 }, a.session))[0], 200);
+    // Anlar takes photos only (the app posts no video).
+    assert.equal((await call('POST', '/api/media/upload-url', { kind: 'moment', contentType: 'video/mp4', size: 20 * 1024 * 1024 }, a.session))[0], 400);
+    assert.equal((await call('POST', '/api/media/upload-url', { kind: 'moment', contentType: 'image/jpeg', size: 5 * 1024 * 1024 }, a.session))[0], 200);
   });
 });
 
