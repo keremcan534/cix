@@ -456,7 +456,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice' | 'music', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */
@@ -513,7 +513,8 @@ export type RoomRules = {
 };
 export type RoomMember = UserCard & { since: string };
 export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
-export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
+/** `image`: a photo in the chat (its storage address), null for text only. */
+export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; createdAt: string; readAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
 export type ServerLock = { id: number; amount: number; channel: string; channelLabel: string; unlockAt: string; createdAt: string; from: { id: string; name: string } | null; gift: { id: string; count: number } | null };
 export type ServerEarnings = { diamonds: number; withdrawable: number; locked: number; lockDays: { store: number; jeton: number }; locks: ServerLock[] };
@@ -651,7 +652,8 @@ export const luckyAdmin = () => call<ServerLuckyAdmin>('GET', '/api/admin/lucky'
 export const saveLuckyConfig = (config: ServerLuckyConfig, version: number) =>
   call<{ config: ServerLuckyConfig; version: number; updatedAt: string }>('POST', '/api/admin/lucky/config', { config, version });
 
-export const sendDm = (to: string, text: string, ref = newRef()) => call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref }).then((r) => r.message);
+export const sendDm = (to: string, text: string, ref = newRef(), image?: string) =>
+  call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref, ...(image && { image }) }).then((r) => r.message);
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
 export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });

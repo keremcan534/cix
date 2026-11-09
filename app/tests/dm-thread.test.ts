@@ -22,6 +22,17 @@ const dm = (id: number, from: string, text: string, extra: Partial<ServerDm> = {
 });
 
 describe('Sohbet eşitleme (mergeThread)', () => {
+  test('fotoğraf adresiyle gelir; benim fotoğrafım yazılı bekleyen mesajın yerini almaz', () => {
+    const url = 'https://cdn.example.com/dm/me1/a.jpg';
+    const local: ChatMessage[] = [{ id: 'l1', fromMe: true, text: 'Fotoğraf', time: '10:00', ref: 'r1' }];
+    const r = mergeThread(local, [dm(4, ME, 'Fotoğraf', { image: url }), dm(5, PEER, 'Fotoğraf', { image: url })], { peer: PEER, after: 0 });
+    assert.deepEqual(r.messages.map((m) => [m.id, m.sid, m.image]), [
+      ['l1', undefined, undefined],
+      ['s4', 4, url],
+      ['s5', 5, url],
+    ]);
+  });
+
   test('iki yöndeki mesajlar sunucu sırasıyla ve sunucu saatiyle eklenir', () => {
     const r = mergeThread([], [dm(3, PEER, 'naber'), dm(2, ME, 'selam')], { peer: PEER, after: 0 });
     assert.deepEqual(r.messages.map((m) => [m.text, m.fromMe, m.sid]), [

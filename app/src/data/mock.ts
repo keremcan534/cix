@@ -127,6 +127,8 @@ export type Conversation = {
     /** Live mode: the server's message id, so the same message is never imported twice. */
     sid?: number;
     room?: RoomInviteCard;
+    /** Live mode: a photo in the chat (its storage address); its text is the caption ('Fotoğraf' when there is none). */
+    image?: string;
     /** Live mode: the request id sent with it (a retry reuses it, so the server keeps one copy). */
     ref?: string;
     /** Live mode: the server didn't take it; the bubble shows why and offers "tekrar dene". */

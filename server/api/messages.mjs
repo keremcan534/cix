@@ -1,6 +1,6 @@
 // Direct messages, stored on the server so they survive reinstalls and reach the other phone.
 //
-//   POST /api/messages       { to, text, ref }      → { message, replay, price?, coins? }
+//   POST /api/messages       { to, text, image?, ref } → { message, replay, price?, coins? }
 //   GET  /api/messages?with=&before=                → { messages }       (newest first, 50 per page)
 //   GET  /api/conversations                         → { conversations }  (last message and unread count)
 //   POST /api/messages/read  { with }               → { read }
@@ -9,7 +9,10 @@
 // shares a phone number, IBAN, e-mail, link or social media account is refused (contact-filter.mjs).
 // A message from someone who isn't a streamer to a streamer they don't follow each other with costs dm_price
 // coins (one-on-one.mjs pairOf), paid with the message; the answer then carries the sender's coins.
-import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, limit, publicText, readJson, tx, userId } from './core.mjs';
+// A photo (image: a photo this person put in the storage for a chat, media.mjs dm/<their id>/…) goes with a
+// streamer from the heart level, otherwise between people who follow each other (pairOf photo); its text is
+// optional.
+import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, env, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
 import { pairOf, payOneOnOne } from './one-on-one.mjs';
@@ -17,7 +20,19 @@ import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 
 const PAGE = 50;
-const out = (m) => ({ id: Number(m.id), from: m.sender, to: m.recipient, text: m.body, createdAt: m.created_at, readAt: m.read_at });
+const out = (m) => ({ id: Number(m.id), from: m.sender, to: m.recipient, text: m.body, image: m.image_url ?? null, createdAt: m.created_at, readAt: m.read_at });
+/** The text a photo without words carries (the conversation list and the notification show it). */
+export const PHOTO_TEXT = 'Fotoğraf';
+
+/** Only a photo this person put in the storage for a chat (media.mjs: dm/<their id>/...), or null for none. */
+function photoOf(v, me) {
+  if (v === undefined || v === null || v === '') return null;
+  const base = (env.S3_PUBLIC_URL ?? '').replace(/\/$/, '');
+  const mine = `${base}/dm/${me.id}/`;
+  if (!base || typeof v !== 'string' || v.length > 500 || !v.startsWith(mine) || !/^[A-Za-z0-9._-]+$/.test(v.slice(mine.length)))
+    throw new HttpError(400, 'Geçersiz fotoğraf');
+  return v;
+}
 
 /**
  * A number typed a few digits at a time ("0532", "123", "45", "67"): a number-only message is read together
@@ -46,13 +61,19 @@ export const messageRoutes = {
     const b = await readJson(req);
     const to = userId(b.to, 'alıcı');
     if (to === me.id) throw new HttpError(400, 'Kendine mesaj gönderemezsin');
-    const body = await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
+    const image = photoOf(b.image, me);
+    const body = image && (b.text === undefined || b.text === null || String(b.text).trim() === '') ? PHOTO_TEXT : await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);
     if (!peer.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiye mesaj gönderemezsin');
-    await assertNoSplitNumber(me, to, body, b.ref);
-    const insert = (c) => c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, b.ref]);
+    if (!(image && body === PHOTO_TEXT)) await assertNoSplitNumber(me, to, body, b.ref);
+    if (image) {
+      const gate = (await pairOf(db, me.id, to)).photo;
+      if (!gate.open) throw new HttpError(403, gate.why);
+    }
+    const insert = (c) =>
+      c.query('INSERT INTO messages (sender, recipient, body, image_url, ref) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, image, b.ref]);
     const replay = async () => ({ message: out((await db.query('SELECT * FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref])).rows[0]), replay: true });
     let row;
     let price = 0;
@@ -77,7 +98,7 @@ export const messageRoutes = {
       row = (await insert(db)).rows[0];
     }
     if (!row) return replay();
-    notify([to], { title: me.name, body, data: { type: 'message', from: me.id } });
+    notify([to], { title: me.name, body: image ? `${PHOTO_TEXT} gönderdi` : body, data: { type: 'message', from: me.id } });
     // Talking back and forth raises a bond; never fails the message.
     bondTalk(me.id, to, Number(row.id)).catch((e) => console.error('bond talk', e.message));
     if (!price) return { message: out(row), replay: false };

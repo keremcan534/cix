@@ -40,12 +40,21 @@ export function usePair(peer: string, on: boolean) {
 /** A paid pair (a streamer and someone who isn't): the heart level matters, it opens the calls. */
 export const paidPair = (p: Pair | null): p is Pair => !!p && p.streamer !== p.meStreamer;
 
+/** "Lv.2’de", "Lv.3’te", "Lv.6’da": a heart level with the locative suffix its number takes. */
+const SUFFIX = ['’da', '’de', '’de', '’te', '’te', '’te', '’da', '’de', '’de', '’da'];
+const lvAt = (n: number) => `Lv.${n}${SUFFIX[n % 10]}`;
+
 /** The next thing the heart opens, in a few words. */
-function nextUnlock(p: Pair) {
-  const { level, voiceAt, videoAt } = p.heart;
-  if (level < voiceAt) return `Sesli arama Lv.${voiceAt}'te açılır`;
-  if (level < videoAt) return `Görüntülü arama Lv.${videoAt}'te açılır`;
-  return 'Sesli ve görüntülü arama açık';
+export function nextUnlock(p: Pair) {
+  const { level, voiceAt, videoAt, photoAt } = p.heart;
+  const next = [
+    { at: voiceAt, what: 'Sesli arama' },
+    ...(photoAt === undefined ? [] : [{ at: photoAt, what: 'Mesajda fotoğraf' }]),
+    { at: videoAt, what: 'Görüntülü arama' },
+  ]
+    .filter((x) => level < x.at)
+    .sort((a, b) => a.at - b.at)[0];
+  return next ? `${next.what} ${lvAt(next.at)} açılır` : photoAt === undefined ? 'Sesli ve görüntülü arama açık' : 'Aramalar ve fotoğraf açık';
 }
 
 /** Under the chat's header: the heart level between the two of us, and what it opens next. */
