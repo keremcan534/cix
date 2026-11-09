@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { Image, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
@@ -217,7 +217,8 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   levelChipText: { fontSize: 12, fontWeight: '800' },
   textLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   textLinkCenter: { alignSelf: 'center' },
-  headerTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center' },
+  headerTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.displayBold, letterSpacing: -0.2, flexShrink: 1, maxWidth: '60%', textAlign: 'center', marginHorizontal: 6 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
   headerSide: { flex: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center' },
   headerBack: { width: 40, height: 40, justifyContent: 'center' },
 }));
@@ -242,18 +243,27 @@ export function TextLink({ title, onPress, color: own, center }: {
 export function Header({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
+  // Both sides are at least as wide as what sits on the right (a coin pill, a text action), so the title stays on
+  // the screen's centre line and gives way (smaller, then "…") instead of running into a wide right side.
+  const [rightW, setRightW] = useState(0);
+  const side = rightW > 40 ? { minWidth: rightW } : null;
   return (
-    // Equal flexible sides keep the title on the screen's centre line whatever sits on the right.
     <View style={styles.header}>
-      <View style={styles.headerSide}>
+      <View style={[styles.headerSide, side]}>
         <Pressable onPress={() => (onBack ? onBack() : goBack())} hitSlop={8} style={styles.headerBack} accessibilityRole="button" accessibilityLabel="Geri">
           <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
       </View>
-      <Text style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
+      <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} accessibilityRole="header">
         {title}
       </Text>
-      <View style={[styles.headerSide, { justifyContent: 'flex-end' }]}>{right}</View>
+      <View style={[styles.headerSide, { justifyContent: 'flex-end' }, side]}>
+        {right != null && (
+          <View style={styles.headerRight} onLayout={(e) => setRightW(Math.ceil(e.nativeEvent.layout.width))}>
+            {right}
+          </View>
+        )}
+      </View>
     </View>
   );
 }

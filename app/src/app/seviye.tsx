@@ -83,9 +83,12 @@ export default function LevelsScreen() {
         </Pressable>
         <View style={s.seg}>
           {(['wealth', 'charm'] as const).map((k) => (
-            <Pressable key={k} onPress={() => setTab(k)} style={[s.segItem, tab === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === k }}>
+            <Pressable key={k} onPress={() => setTab(k)} style={[s.segItem, tab === k && s.segOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} accessibilityLabel={`${SYSTEMS[k].title} Seviyesi`}>
               <Art name={SYSTEMS[k].art} size={18} />
-              <Text style={[s.segText, tab === k && { color: semantic.actionInk }]}>{SYSTEMS[k].title} Seviyesi</Text>
+              {/* One line on every phone: the screen is the level screen, so the system's name alone says it. */}
+              <Text style={[s.segText, tab === k && { color: semantic.actionInk }]} numberOfLines={1}>
+                {SYSTEMS[k].title}
+              </Text>
             </Pressable>
           ))}
         </View>

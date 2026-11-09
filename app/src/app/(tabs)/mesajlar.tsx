@@ -316,26 +316,30 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 /** One of the three big doors at the top of Mesajlar. */
 function HubTile({ title, sub, icon, tint, badge = 0, onPress }: { title: string; sub: string; icon: Icon3DName; tint: readonly [string, string]; badge?: number; onPress: () => void }) {
   const styles = useStyles();
+  // The outer View takes the third of the row: PressableScale puts its style on the inner view, so a flex there
+  // would leave each tile as wide as its text and push the last one off a narrow screen.
   return (
-    <PressableScale style={{ flex: 1 }} onPress={onPress} accessibilityRole="button" accessibilityLabel={badge > 0 ? `${title}, ${badge} yeni` : title}>
-      <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hub}>
-        <Gloss radius={16} strength={0.18} />
-        <Icon3D name={icon} size={38} />
-        <View style={{ gap: 1 }}>
-          <Text style={styles.hubTitle} numberOfLines={2}>
-            {title}
-          </Text>
-          <Text style={styles.hubSub} numberOfLines={1}>
-            {sub}
-          </Text>
-        </View>
-        {badge > 0 && (
-          <View style={[styles.badge, styles.hubBadge]}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+    <View style={{ flex: 1 }}>
+      <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={badge > 0 ? `${title}, ${badge} yeni` : title}>
+        <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hub}>
+          <Gloss radius={16} strength={0.18} />
+          <Icon3D name={icon} size={38} />
+          <View style={{ gap: 1 }}>
+            <Text style={styles.hubTitle} numberOfLines={2}>
+              {title}
+            </Text>
+            <Text style={styles.hubSub} numberOfLines={2}>
+              {sub}
+            </Text>
           </View>
-        )}
-      </LinearGradient>
-    </PressableScale>
+          {badge > 0 && (
+            <View style={[styles.badge, styles.hubBadge]}>
+              <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+            </View>
+          )}
+        </LinearGradient>
+      </PressableScale>
+    </View>
   );
 }
 
@@ -557,9 +561,10 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     paddingHorizontal: 16,
     paddingTop: 6,
   },
-  tabs: { flexDirection: 'row', gap: 18, alignItems: 'flex-end' },
+  // Tight enough that three tabs and the menu fit a 360-wide phone without touching.
+  tabs: { flexDirection: 'row', gap: 14, alignItems: 'flex-end' },
   tabBtn: { alignItems: 'center', gap: 5 },
-  tabText: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
+  tabText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
   tabTextActive: { color: colors.text, fontSize: 20, fontWeight: '800' },
   tabLine: {
     width: 18,
@@ -579,9 +584,10 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     paddingHorizontal: 4,
   },
   hubs: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
-  hub: { height: 118, borderRadius: 16, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
+  // Tall enough for a two-line title and a two-line note, so a third of a narrow phone cuts no word.
+  hub: { height: 132, borderRadius: 16, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
   hubTitle: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '800' },
-  hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11 },
+  hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: 14 },
   hubBadge: { position: 'absolute', top: 8, right: 8 },
   chips: {
     flexDirection: 'row',

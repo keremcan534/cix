@@ -49,7 +49,7 @@ import { LuckyResult } from '@/components/room/lucky-result';
 import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
-import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
+import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
@@ -164,6 +164,8 @@ const nowMs = () => Date.now();
 const reactionKey = () => Date.now() + Math.random();
 /** A server room's slow mode: one chat line per 10 seconds for everyone but its staff (server/api/room-rules.mjs). */
 const SLOW_MS = 10_000;
+/** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
+const WHEEL_ROOM = 62;
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
 const stamp = () => Date.now();
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
@@ -511,6 +513,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (uid !== 'me') setPerson({ uid });
   }, [setPerson]);
   const [moving, setMoving] = useState<string | null>(null);
+  // The Rüzgâr Gülü shortcut floats over the chat's right side; while it shows, the chat keeps that side free.
+  const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && gamblingLevelOk(app.wealthLevel);
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
@@ -808,6 +812,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const liveSlow = real && !!liveRules?.slowMode;
   // The room's staff as plain text, for the voice handlers (slow mode never holds back the owner or admins).
   const staffIdsKey = [hostId, ...superIds, ...adminIds].join('\n');
+  // @bahset: the names of the people in the room and mine, so a mention of one of them is no @handle to the contact
+  // filter (lib/room-mention stripMentions), on the way out and on the way in. Any other "@word" is still refused.
+  const roomNamesKey = [...new Set([...view.micIds, ...view.balconyIds])]
+    .filter((u) => u !== 'me')
+    .map((u) => userById(u).name)
+    .concat(app.me.name)
+    .join('\n');
   const mask = (text: string) => (liveWords !== null ? (liveWords ? liveWords.split('\n') : []) : words).reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
   // Room events arrive once by id (lib/chat-feed). While the connection is down they wait in a buffer and
   // are merged, in time order and without duplicates, when it comes back.
@@ -846,7 +857,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // Room chat goes phone to phone and the server never reads it, so a line with contact details from an older
       // or modified app is dropped here. Not counted: the refusal would be mine, and I only received it.
       if (msg.t === 'chat') {
-        if (!checkText(msg.text).ok) return;
+        if (!checkText(stripMentions(msg.text, roomNamesKey.split('\n'))).ok) return;
         // Slow mode: a line from someone who isn't staff, sooner than the room allows after their last one, is dropped.
         if (liveSlow && !staffIdsKey.split('\n').includes(from)) {
           if (nowMs() - (lastLineFrom.current.get(from) ?? 0) < SLOW_MS - 1_500) return;
@@ -868,7 +879,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
       // Soru-cevap: anyone's question (never with contact details), a pick only from the room's staff.
       if (msg.t === 'q') {
-        if (!checkText(msg.text).ok) return;
+        if (!checkText(stripMentions(msg.text, roomNamesKey.split('\n'))).ok) return;
         return setQuestions((l) => (l.some((x) => x.id === msg.id) ? l : [...l.slice(-49), { id: msg.id, userId: from, text: msg.text, picked: false }]));
       }
       if (msg.t === 'qpick') {
@@ -2077,7 +2088,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // No phone numbers, IBANs, e-mails, links or social media accounts (lib/contact-filter). The server never
     // sees room chat, so this is the check on the way out: refused, and the line stays in the input.
     const thread = `room:${id}`;
-    const refusal = sticker ? null : messageRefusal(thread, text, 'room.chat');
+    // A mention of someone in the room ("@Ayşe") is no social media handle: checked as the plain name.
+    const checked = sticker ? text : stripMentions(text, roomNamesKey.split('\n'));
+    const refusal = sticker ? null : messageRefusal(thread, checked, 'room.chat');
     if (refusal) return setChatRefused(refusal);
     // A server room in slow mode: one line per 10 seconds for everyone but its staff.
     if (liveSlow && myRank === 0) {
@@ -2085,7 +2098,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (wait > 0) return setChatRefused(`Yavaş mod açık: ${wait} saniye sonra yazabilirsin.`);
       lastLineAt.current = nowMs();
     }
-    if (!sticker) noteSent(thread, text);
+    if (!sticker) noteSent(thread, checked);
     if (!sticker) setDraft('');
     // Server room: the line goes out over the voice connection, which may still be joining or have dropped.
     if (!isOnline() || (real && !sendSignal({ t: 'chat', text: mask(text) }))) {
@@ -3039,7 +3052,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           )}
 
           {/* A touch on the stage or the chat closes the emoji panel (as does the back button). */}
-          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} />
+          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
 
           {emojiOpen && (
             <EmojiPanel
@@ -3452,7 +3465,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         canManage={myRole !== 'member'}
         onAsk={(text) => {
           // A question is public: no contact details (the others check it again when it arrives).
-          const refusal = messageRefusal(`room:${id}`, text, 'room.chat');
+          const refusal = messageRefusal(`room:${id}`, stripMentions(text, roomNamesKey.split('\n')), 'room.chat');
           if (refusal) return showAlert('Soru gönderilemedi', refusal);
           const qid = `q${msgId().replace('.', '')}`;
           if (real && !sendSignal({ t: 'q', id: qid, text })) return showAlert('Soru gönderilemedi', 'Oda bağlantısı yok, biraz sonra tekrar dene.');
@@ -3551,8 +3564,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>
         </Pressable>
       )}
-      {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). */}
-      {full && !game && !combo && !moving && gamblingLevelOk(app.wealthLevel) && (
+      {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). It steps
+          aside while the emoji panel, the keyboard or a refusal note is up, so it never covers their text. */}
+      {wheelShown && (
         <Pressable style={styles.wheelBtn} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
           <View style={styles.wheelDisc}>
             <Ionicons name="compass" size={26} color="#3A2A08" />

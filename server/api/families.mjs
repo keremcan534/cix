@@ -5,6 +5,9 @@
 //   POST /api/families      { name, ref }     → { family, user, replay }  (founding fee FAMILY_COST coins)
 //   POST /api/family/join   { id, join? }     → { joined } | { requested } (join: false takes my request back)
 //   POST /api/family/request { userId, accept } → { members }             (the leader or a helper)
+//   POST /api/family/invite { userId }        → { invited }               (the leader or a helper: someone with no family)
+//   GET  /api/family/invites                  → { invites }               (mine, open families only, newest first)
+//   POST /api/family/invite/answer { id, accept } → { joined }            (accept joins; decline drops the invite)
 //   POST /api/family/leave                    → { left: true }
 //   POST /api/family/kick   { userId }        → { members }               (the leader: anyone; a helper: members)
 //   POST /api/family/role   { userId, role }  → { members }               (the leader; role 'owner' hands the family over)
@@ -17,7 +20,7 @@
 // that (FAMILY_XP, the same table as the app's data/rules). When the leader leaves, the earliest helper (else the
 // earliest member) leads; the last one out closes the family. Names, announcements and chat pass the contact
 // filter, and a mute on public text (sanctions 'post') stops chatting.
-import { HttpError, auth, db, int, limit, once, publicText, readJson, tx, userId } from './core.mjs';
+import { HttpError, auth, blockedBetween, db, int, limit, once, publicText, readJson, tx, userId } from './core.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { spendCoins } from './wallet.mjs';
@@ -131,6 +134,7 @@ async function assertRoom(c, id) {
 async function addMember(c, id, uid, role = 'member') {
   await c.query('INSERT INTO family_members (user_id, family_id, role) VALUES ($1, $2, $3)', [uid, id, role]);
   await c.query('DELETE FROM family_requests WHERE user_id = $1', [uid]);
+  await c.query('DELETE FROM family_invites WHERE user_id = $1', [uid]);
 }
 
 /**
@@ -269,6 +273,74 @@ export const familyRoutes = {
     });
     if (name) notify([who], { title: name, body: 'Aile isteğin kabul edildi', data: { type: 'family_joined', family: String(id) } });
     return { members: await membersOf(id) };
+  },
+
+  /** Invites someone with no family to mine (the leader or a helper); they see it in Aileler and join with one tap. */
+  async 'POST /api/family/invite'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const who = userId(b.userId);
+    if (who === me.id) throw new HttpError(400, 'Kendini davet edemezsin');
+    limit(`family-invite:${me.id}`, 30, 'Çok hızlı, biraz bekle');
+    const mine = await myMembership(me.id);
+    if (!mine) throw new HttpError(403, 'Bir ailede değilsin');
+    const id = Number(mine.family_id);
+    if (await blockedBetween(me.id, who)) throw new HttpError(403, 'Bu kişiyi davet edemezsin');
+    const out = await tx(async (c) => {
+      const f = await lockFamily(c, id);
+      await roleIn(c, me.id, id, ['owner', 'helper']);
+      if (!(await c.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [who])).rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
+      if (await myMembership(who, c)) throw new HttpError(409, 'Bu kişi zaten bir ailede');
+      await assertRoom(c, id);
+      const r = await c.query(
+        `INSERT INTO family_invites (family_id, user_id, invited_by) VALUES ($1, $2, $3)
+         ON CONFLICT (family_id, user_id) DO UPDATE SET invited_by = EXCLUDED.invited_by RETURNING (xmax::text = '0') AS fresh`,
+        [id, who, me.id],
+      );
+      return { name: f.name, fresh: r.rows[0].fresh };
+    });
+    if (out.fresh) notify([who], { title: out.name, body: `${me.name} seni ailesine davet etti`, data: { type: 'family_invite', family: String(id) } });
+    return { invited: true };
+  },
+
+  /** My invites from open families, newest first. */
+  async 'GET /api/family/invites'(req) {
+    const me = await auth(req);
+    const r = await db.query(
+      `SELECT i.family_id, i.created_at, u.id AS by_id, u.name AS by_name, u.avatar_url AS by_avatar
+         FROM family_invites i JOIN families f ON f.id = i.family_id AND f.closed_at IS NULL JOIN users u ON u.id = i.invited_by
+        WHERE i.user_id = $1 ORDER BY i.created_at DESC LIMIT 20`,
+      [me.id],
+    );
+    const invites = [];
+    for (const x of r.rows) {
+      const family = await familyView(Number(x.family_id)).catch(() => null);
+      if (family) invites.push({ family, by: { id: x.by_id, name: x.by_name, avatarUrl: x.by_avatar ?? null }, at: x.created_at });
+    }
+    return { invites };
+  },
+
+  /** Answers an invite: accept joins (one family per person, within the family's size); decline drops it. */
+  async 'POST /api/family/invite/answer'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    const id = familyId(b.id);
+    if (b.accept !== true) {
+      await db.query('DELETE FROM family_invites WHERE family_id = $1 AND user_id = $2', [id, me.id]);
+      return { joined: false };
+    }
+    limit(`family-join:${me.id}`, 10, 'Çok hızlı, biraz bekle');
+    const name = await tx(async (c) => {
+      const f = await lockFamily(c, id);
+      const inv = await c.query('DELETE FROM family_invites WHERE family_id = $1 AND user_id = $2', [id, me.id]);
+      if (!inv.rowCount) throw new HttpError(404, 'Bu davet artık yok');
+      if (await myMembership(me.id, c)) throw new HttpError(409, 'Zaten bir ailedesin');
+      await assertRoom(c, id);
+      await addMember(c, id, me.id);
+      return f.name;
+    });
+    notify(await managers(id), { title: name, body: `${me.name} davetini kabul etti, aileye katıldı`, data: { type: 'family_joined', family: String(id) } });
+    return { joined: true };
   },
 
   async 'POST /api/family/leave'(req) {

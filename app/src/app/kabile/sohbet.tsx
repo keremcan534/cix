@@ -8,7 +8,7 @@ import { Text } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
 import { LiveFamilyChat } from '@/components/family-live';
 import { GroupChat, type QuickAction } from '@/components/GroupChat';
-import { GradientButton, StateIcon } from '@/components/ui';
+import { GradientButton, Header, StateIcon } from '@/components/ui';
 import { CHAT_GIFT_IDS, KABILE_ROUTES, findKabile, kabile, kabileMemberIds, kabileMeta, payKabileGift } from '@/data/kabile';
 import { GIFTS, userById, type Gift } from '@/data/mock';
 import { presenceOf } from '@/data/presence';
@@ -47,6 +47,8 @@ function DemoKabileChat() {
   if (!family)
     return (
       <SafeAreaView style={styles.safe}>
+        {/* The same header as the other locked family screens, so there is always a way back. */}
+        <Header title="Aile Sohbeti" />
         <View style={styles.locked}>
           <StateIcon name="lock-closed" />
           <Text style={styles.title}>Aile sohbetine yalnızca aile üyeleri girebilir</Text>

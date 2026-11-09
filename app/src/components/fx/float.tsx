@@ -99,12 +99,12 @@ export function BreakoutCard({
         locations={[0, 0.45, 1]}
         start={{ x: featured ? 1 : 0, y: 0 }}
         end={{ x: featured ? 0.1 : 0.7, y: 1 }}
-        style={[s.card, { borderColor: `${hue}40`, boxShadow: `${dark ? '0 10px 24px rgba(0,0,0,0.4)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 18px ${hue}22` }, featured ? { paddingRight: iconSize * 0.8, minHeight: iconSize * 0.95 } : { paddingTop: iconSize - lift + 2 }]}
+        style={[s.card, { borderColor: `${hue}40`, boxShadow: `${dark ? '0 10px 24px rgba(0,0,0,0.4)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 18px ${hue}22` }, featured ? { paddingRight: iconSize, minHeight: iconSize * 0.95 } : { paddingTop: iconSize - lift + 2 }]}
       >
         <EdgeLight inset={18} strength={0.4} />
         {children}
       </LinearGradient>
-      <View style={[s.icon, featured ? { right: 4, top: -lift } : { left: 8, top: -lift }]}>
+      <View style={[s.icon, featured ? { right: -2, top: -lift } : { left: 8, top: -lift }]}>
         <FloatIcon {...icon} size={iconSize} hue={hue} bob delay={delay} />
       </View>
     </PressableScale>

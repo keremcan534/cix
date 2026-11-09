@@ -143,8 +143,8 @@ export function confirmDeleteLiveAccount(clearPhone: () => void) {
   );
 }
 
-/** 'moment' / 'comment': an Anlar post or comment (its server id). */
-export type ReportType = 'user' | 'room' | 'moment' | 'comment';
+/** 'moment' / 'comment': an Anlar post or comment (its server id); 'family': an Aile (its server id). */
+export type ReportType = 'user' | 'room' | 'moment' | 'comment' | 'family';
 /** True when the report goes to the server: a real person (not me), a real room or an Anlar post in a live build. */
 export const reportsToServer = (type: ReportType, id: string) =>
   liveMode() && (type === 'user' ? id !== 'me' && !!toServer(id) : type === 'room' ? isServerId(id) : /^\d{1,18}$/.test(id));

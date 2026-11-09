@@ -249,7 +249,8 @@ export function StackedColumns({ rows }: { rows: { label: string; a: number; b: 
 /** Horizontal tabs (glass pills); a locked tab shows a lock and stays selectable to explain why. */
 export function Tabs<T extends string>({ value, options, onChange }: { value: T; options: { key: T; label: string; badge?: number; locked?: boolean }[]; onChange: (v: T) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.tabs}>
+    // Never shrinks: on a short screen the content below scrolls, the tabs keep their full height.
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={s.tabs}>
       {options.map((o) => {
         const on = o.key === value;
         return (

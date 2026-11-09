@@ -100,7 +100,7 @@ export default function GameCenter() {
                         <BreakoutCard
                           icon={{ source: gameArtOf(g.id), emoji: g.emoji }}
                           hue={gameHueOf(g.id)}
-                          iconSize={featured ? 112 : 76}
+                          iconSize={featured ? 100 : 76}
                           featured={featured}
                           delay={i * 300}
                           label={`${g.name} aç`}
@@ -225,7 +225,7 @@ const useStyles = makeStyles((t) => ({
   half: { width: '48.5%' },
   full: { width: '100%' },
   name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
-  heroName: { color: t.colors.text, fontFamily: fonts.display, fontSize: 26, lineHeight: 32 },
+  heroName: { color: t.colors.text, fontFamily: fonts.display, fontSize: 24, lineHeight: 30 },
   section: { color: t.colors.text, fontFamily: fonts.display, fontSize: 18, lineHeight: 24, marginTop: 4 },
   dim: { color: t.colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },

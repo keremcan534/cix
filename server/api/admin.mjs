@@ -181,7 +181,7 @@ export const adminRoutes = {
     const status = url.searchParams.get('status') ?? 'open';
     if (!['open', 'actioned', 'dismissed'].includes(status)) throw new HttpError(400, 'Geçersiz durum');
     const r = await db.query(
-      `SELECT r.*, u.name AS reporter_name, t.name AS target_name, t.role AS target_role, (SELECT max(s.expires_at) FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS target_banned_until,
+      `SELECT r.*, u.name AS reporter_name, t.name AS target_name, fa.name AS family_name, t.role AS target_role, (SELECT max(s.expires_at) FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}) AS target_banned_until,
               EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = t.id AND s.sanction_type = 'account_ban' AND s.is_permanent AND ${LIVE_SANCTION}) AS target_banned_forever, ro.title AS room_title,
               (SELECT count(*) FROM reports x WHERE x.target_type = r.target_type AND x.target_id = r.target_id) AS reports_on_target,
               coalesce(mo.body, mc.body) AS content_text, mo.image_url AS content_image, coalesce(mo.deleted_at, mc.deleted_at) AS content_removed_at,
@@ -191,6 +191,7 @@ export const adminRoutes = {
          LEFT JOIN rooms ro ON r.target_type = 'room' AND ro.id::text = r.target_id
          LEFT JOIN moments mo ON r.target_type = 'moment' AND mo.id::text = r.target_id
          LEFT JOIN moment_comments mc ON r.target_type = 'comment' AND mc.id::text = r.target_id
+         LEFT JOIN families fa ON r.target_type = 'family' AND fa.id::text = r.target_id
          LEFT JOIN users cw ON cw.id = coalesce(mo.author, mc.author)
         WHERE r.status = $1 ORDER BY r.created_at ${status === 'open' ? 'ASC' : 'DESC'} LIMIT 200`,
       [status],
@@ -204,7 +205,7 @@ export const adminRoutes = {
         target: {
           type: x.target_type,
           id: x.target_id,
-          name: x.target_name ?? x.room_title ?? null,
+          name: x.target_name ?? x.room_title ?? x.family_name ?? null,
           staff: x.target_role === 'moderator' || x.target_role === 'admin',
           bannedUntil: x.target_banned_until ?? null,
           bannedForever: !!x.target_banned_forever,

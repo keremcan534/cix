@@ -72,6 +72,8 @@ export type FamilyOverview = {
   active: number;
   pairs: { a: Short; b: Short; kind: string; score: number }[];
   checkedIn: boolean;
+  /** Birlikte oynuyor: the other members online now, and the open room each one is in (null: none). Older server: missing. */
+  online?: (Short & { room: { id: string; title: string } | null })[];
 };
 export async function overview(): Promise<FamilyOverview> {
   const r = await api.apiRequest<FamilyOverview>('GET', '/api/family/overview');
@@ -79,6 +81,17 @@ export async function overview(): Promise<FamilyOverview> {
   return r;
 }
 export const checkIn = () => api.apiRequest<{ checkedIn: true }>('POST', '/api/family/checkin', {});
+
+/** An invite to a family (the leader or a helper sent it); accepting joins. */
+export type FamilyInvite = { family: LiveFamily; by: Short; at: string };
+/** Invites someone with no family to mine (the leader or a helper). */
+export const invite = (userId: string) => api.apiRequest<{ invited: true }>('POST', '/api/family/invite', { userId });
+export async function invites(): Promise<FamilyInvite[]> {
+  const r = await api.apiRequest<{ invites: FamilyInvite[] }>('GET', '/api/family/invites');
+  r.invites.forEach((i) => know({ ...i.by, gender: null }));
+  return r.invites;
+}
+export const answerInvite = (id: string, accept: boolean) => api.apiRequest<{ joined: boolean }>('POST', '/api/family/invite/answer', { id, accept });
 /** Opens a weekly chest: reward coins (shop only), once per person and week; `ref` makes a retry safe. */
 export const openChest = (chest: string, ref: string) => api.apiRequest<{ user: api.ServerUser; replay: boolean; coins: number }>('POST', '/api/family/chest', { chest, ref });
 

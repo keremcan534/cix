@@ -4,7 +4,7 @@
 // the weekly milestone chests, the family room, the week's ranking and highlights, active members, the Uyum Köşesi
 // pairs and the weekly bonus estimate.
 //
-//   GET  /api/family/overview                → { tasks, me, chests, week, bonus, rank, room, highlights, active, pairs, checkedIn }
+//   GET  /api/family/overview                → { tasks, me, chests, week, bonus, rank, room, highlights, active, pairs, checkedIn, online }
 //   POST /api/family/checkin                 → { checkedIn: true }
 //   POST /api/family/chest   { chest, ref }  → { user, replay, coins }
 //
@@ -120,6 +120,22 @@ async function overviewOf(uid) {
   );
   const nameOf = Object.fromEntries(members.map((m) => [m.id, { id: m.id, name: m.name, avatarUrl: m.avatarUrl }]));
   const checkedIn = (await db.query(`SELECT 1 FROM family_checkins WHERE user_id = $1 AND day = ${TODAY}`, [uid])).rowCount > 0;
+  // Birlikte oynuyor: the other members online now (a session seen in the last 5 minutes) or in an open room.
+  const seen = await db.query(
+    `SELECT fm.user_id AS id, u.name, u.avatar_url, rm.id AS room_id, rm.title AS room_title,
+            (SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = fm.user_id) AS seen
+       FROM family_members fm JOIN users u ON u.id = fm.user_id
+       LEFT JOIN LATERAL (SELECT r.id, r.title FROM room_presence p JOIN rooms r ON p.room = 'oda-' || r.id::text AND r.closed_at IS NULL
+                           WHERE p.identity = fm.user_id::text ORDER BY p.joined_at DESC LIMIT 1) rm ON true
+      WHERE fm.family_id = $1 AND fm.user_id <> $2`,
+    [id, uid],
+  );
+  const fresh = Date.now() - 5 * 60_000;
+  const online = seen.rows
+    .filter((x) => x.room_id || (x.seen && new Date(x.seen).getTime() > fresh))
+    .sort((a, b) => Number(!!b.room_id) - Number(!!a.room_id))
+    .slice(0, 20)
+    .map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null, room: x.room_id ? { id: x.room_id, title: x.room_title } : null }));
 
   return {
     tasks,
@@ -137,6 +153,7 @@ async function overviewOf(uid) {
     active: members.filter((m) => contribution(m) > 0).length,
     pairs: pairs.rows.map((x) => ({ a: nameOf[x.a], b: nameOf[x.b], kind: x.kind, score: x.score })),
     checkedIn,
+    online,
   };
 }
 
