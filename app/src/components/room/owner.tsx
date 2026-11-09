@@ -28,6 +28,7 @@ import {
   adminCapacity,
   memberLimit,
   roomCode,
+  roomCoverUrl,
   roomThemeInfo,
   type RoomTheme,
 } from '@/data/catalog';
@@ -236,6 +237,7 @@ export function RoomInfoSheet({
   giftLog,
   announcement,
   canEditText = false,
+  coverEdit,
   onSave,
   onSettings,
   onShare,
@@ -267,9 +269,11 @@ export function RoomInfoSheet({
   stats: { coins: number; peak: number; minutes: number };
   giftLog: GiftLogRow[];
   announcement: string;
+  /** May change the cover (default: the owner). A server room: its owner and Süper Yöneticiler. */
+  coverEdit?: boolean;
   /** Name and bulletin can be edited without the other owner tools (my live-mode server room). */
   canEditText?: boolean;
-  onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement' | 'cover'>>) => void;
+  onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement' | 'cover'>> & { coverId?: string }) => void;
   onSettings: () => void;
   onShare: () => void;
   onInvite: () => void;
@@ -284,6 +288,7 @@ export function RoomInfoSheet({
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
   const textEditor = owner || canEditText;
+  const coverEditor = coverEdit ?? owner;
   const paddingBottom = useSheetBottom();
   const editText = (which: 'title' | 'bulletin') => {
     setDraft(which === 'title' ? title : announcement);
@@ -296,9 +301,9 @@ export function RoomInfoSheet({
       <View style={[styles.sheet, { maxHeight: '82%', paddingTop: 18, paddingBottom }]}>
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <Pressable onPress={() => owner && setSub('decor')} accessibilityLabel="Kapak seç">
+            <Pressable onPress={() => coverEditor && setSub('decor')} accessibilityLabel="Kapak seç">
               <Photo uri={cover} kind="cover" style={styles.cover} />
-              {owner && <Text style={styles.coverLabel}>Kapak Seç</Text>}
+              {coverEditor && <Text style={styles.coverLabel}>Kapak Seç</Text>}
             </Pressable>
             <View style={{ flex: 1, gap: 6 }}>
               <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => textEditor && editText('title')} accessibilityLabel="Oda adını düzenle">
@@ -434,7 +439,7 @@ export function RoomInfoSheet({
             </View>
           )}
 
-          {owner && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Photo uri={cover} kind="cover" style={{ width: 34, height: 44, borderRadius: 6 }} />} />}
+          {coverEditor && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Photo uri={cover} kind="cover" style={{ width: 34, height: 44, borderRadius: 6 }} />} />}
           <Line label="Oda hediye kaydı" onPress={() => setSub('gifts')} />
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -533,9 +538,9 @@ export function RoomInfoSheet({
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {ROOM_BACKGROUNDS.map((b) => {
             const open = level >= b.minLevel;
-            const uri = `https://picsum.photos/seed/${b.seed}/600/400`;
+            const uri = roomCoverUrl(b.id);
             return (
-              <Pressable key={b.id} disabled={!open} onPress={() => onSave({ cover: uri })} style={[styles.decor, cover === uri && { borderColor: colors.primaryText }, !open && { opacity: 0.4 }]}>
+              <Pressable key={b.id} disabled={!open} onPress={() => onSave({ cover: uri, coverId: b.id })} style={[styles.decor, cover === uri && { borderColor: colors.primaryText }, !open && { opacity: 0.4 }]}>
                 <Image source={{ uri }} style={{ width: '100%', height: 70, borderRadius: 8 }} />
                 <Text style={styles.tiny}>
                   {open ? '' : '🔒 '}
@@ -717,7 +722,7 @@ export function RoomSettingsScreen({
             <>
           <Section title="Standart" />
           {!live && <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} />}
-          {!live && <Row label="Oda teması" value={roomThemeInfo(room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(room.theme).id]} onPress={() => setPicker('theme')} />}
+          {(!live || live.setTheme) && <Row label="Oda teması" value={roomThemeInfo(live?.theme ?? room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(live?.theme ?? room.theme).id]} onPress={() => setPicker('theme')} />}
           {live?.canLock ? (
             <LiveLock live={live} lockOpen={lockOpen} level={level} />
           ) : live ? (
@@ -826,7 +831,7 @@ export function RoomSettingsScreen({
         onPick={(v) => update({ roomType: v, micQueue: defaultMicQueue(v) })}
         onClose={close}
       />
-      <ChoiceSheet visible={picker === 'theme'} title="Oda teması" options={ROOM_THEMES.map((t) => ({ value: t.id, label: t.name, art: ROOM_THEME_ART[t.id] }))} value={room.theme} onPick={(v) => update({ theme: v })} onClose={close} />
+      <ChoiceSheet visible={picker === 'theme'} title="Oda teması" options={ROOM_THEMES.map((t) => ({ value: t.id, label: t.name, art: ROOM_THEME_ART[t.id] }))} value={live?.theme ?? room.theme} onPick={(v) => (live?.setTheme ? live.setTheme(v) : update({ theme: v }))} onClose={close} />
       <ChoiceSheet
         visible={picker === 'mics'}
         title="Klasik düzen mikrofon sayısı"
@@ -973,6 +978,9 @@ export type LiveRoomSettings = {
   setPassword: (password: string | null) => Promise<void>;
   micQueue: boolean;
   setMicQueue: (on: boolean) => void;
+  /** The owner only: the room's theme, kept on the server so every phone draws it. */
+  theme?: RoomTheme;
+  setTheme?: (t: RoomTheme) => void;
 };
 
 /** A section of rows the room screen adds to the settings (room tools, my own settings). */

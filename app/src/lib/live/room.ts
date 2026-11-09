@@ -76,7 +76,8 @@ export function useLiveRoomSync(roomId: string, enabled: boolean, mySeat: number
     return onSignal(roomId, (from, msg) => {
       const sender = toLocal(from);
       const gift = msg.t === 'gift' || msg.t === 'lucky';
-      if (gift && sender === 'me') return;
+      // My own gifts and paid Hareketli were drawn when the server said they were paid (no second time).
+      if ((gift || msg.t === 'fx') && sender === 'me') return;
       if (gift && msg.to.some((t) => toLocal(t) === 'me')) void refreshWallet().catch(() => {});
       hooksRef.current.onSignal(sender, msg);
     });

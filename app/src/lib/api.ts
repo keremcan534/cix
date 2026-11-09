@@ -446,6 +446,10 @@ export const agencyRankings = (period: 'day' | 'week' | 'month') =>
 export const verifyPurchase = (proof: StoreProof) =>
   call<{ user: ServerUser; replay: boolean; coins: number; bonus: number; campaignBonus?: number }>('POST', '/api/wallet/purchase', proof);
 
+/** A paid Hareketli in a server room (server/api/room-fx.mjs): the server's price, then it tells the room itself. */
+export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; eventId: number; price: number }>('POST', '/api/rooms/animation', { room, animationId, ref });
+
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
@@ -479,6 +483,10 @@ export type ServerRoom = {
   layoutId?: string | null;
   lockedSeats?: number[];
   micQueue?: boolean;
+  /** The owner's choice of look: a room background id (null: none), the theme, gift effects on or off. */
+  coverId?: string | null;
+  theme?: string;
+  giftEffects?: boolean;
 };
 export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
@@ -537,7 +545,7 @@ export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api
 export const serverRoom = (id: string) => call<{ room: ServerRoom }>('GET', `/api/room?id=${encodeURIComponent(id)}`).then((r) => r.room);
 /** What the room screen can change on the server: the name and bulletin (owner and Süper Yönetici), the lock
  *  (owner only), the mics, the layout and the mic queue (owner or a room admin; null = back to the default). */
-export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null; micQueue?: boolean };
+export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null; micQueue?: boolean; coverId?: string | null; theme?: string; giftEffects?: boolean };
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.

@@ -14,6 +14,7 @@ import {
   parseRoomMeta,
   parseRoomState,
   parseSeat,
+  parseServerFx,
   parseServerGift,
   parseServerLucky,
   parseSignal,
@@ -179,4 +180,36 @@ test('Şanslı çanta: yalnızca sunucunun çanta paketi o odanın çantaların�
   off();
   reportSignal('oda-c', null, { type: 'bag', id: 4, from: 'u-a' }); // after leaving
   assert.equal(n, 1);
+});
+
+test('koltuk emojisi ve ücretsiz Hareketli telefondan gelir; biçimi bozuk olan atılır', () => {
+  assert.deepEqual(parseSignal({ t: 'react', emoji: '🔥' }), { t: 'react', emoji: '🔥' });
+  assert.deepEqual(parseSignal({ t: 'react', emoji: '⟦temel-kahkaha⟧' }), { t: 'react', emoji: '⟦temel-kahkaha⟧' });
+  assert.equal(parseSignal({ t: 'react', emoji: '  ' }), null);
+  assert.equal(parseSignal({ t: 'react', emoji: 'x'.repeat(41) }), null);
+  assert.equal(parseSignal({ t: 'react', emoji: 7 }), null);
+  assert.deepEqual(parseSignal({ t: 'anim', animationId: 'an-hearts' }), { t: 'anim', animationId: 'an-hearts' });
+  assert.equal(parseSignal({ t: 'anim', animationId: 'AN HEARTS' }), null);
+  assert.equal(parseSignal({ t: 'anim' }), null);
+  // A paid one ("fx") from a phone is never taken: only the server announces it.
+  assert.equal(parseSignal({ t: 'fx', animationId: 'an-dragon', eventId: 1 }), null);
+});
+
+test('sunucunun ücretli Hareketli paketi: doğru biçim okunur, telefondan gelen atılır, aynı olay bir kez', () => {
+  const ok = { type: 'anim', animationId: 'an-coin-rain', from: 'u-a', eventId: 12 };
+  assert.deepEqual(parseServerFx(ok), { from: 'u-a', msg: { t: 'fx', animationId: 'an-coin-rain', eventId: 12 } });
+  assert.equal(parseServerFx({ ...ok, eventId: 0 }), null);
+  assert.equal(parseServerFx({ ...ok, from: '' }), null);
+  assert.equal(parseServerFx({ ...ok, animationId: '../x' }), null);
+  assert.equal(parseServerFx({ ...ok, type: 'gift' }), null);
+
+  const got: string[] = [];
+  const off = onSignal('oda-fx', (from, msg) => got.push(msg.t === 'fx' ? `${from}:${msg.animationId}#${msg.eventId}` : msg.t));
+  reportSignal('oda-fx', 'u-x', ok); // from a phone: dropped
+  reportSignal('oda-fx', null, ok);
+  reportSignal('oda-fx', null, ok); // again after a reconnect: shown once
+  // A gift with the same number is another table's row: still shown.
+  reportSignal('oda-fx', null, { type: 'gift', giftId: 'g1', count: 1, from: 'u-a', to: 'u-b', eventId: 12 });
+  off();
+  assert.deepEqual(got, ['u-a:an-coin-rain#12', 'gift']);
 });

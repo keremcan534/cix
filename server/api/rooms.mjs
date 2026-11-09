@@ -6,7 +6,7 @@
 //   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
-//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId?, micQueue? } → { room }
+//   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId?, micQueue?, coverId?, theme?, giftEffects? } → { room }
 //                          (title, bulletin: owner or Süper Yönetici; password (null = no lock): owner; mic count,
 //                          layout and the mic queue on/off: owner or any room admin; the room's phones see it at once)
 //   POST /api/rooms/admin  { room, user, admin, super? }                    → { admin, super } (owner only)
@@ -33,7 +33,7 @@ import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, 
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
-import { vipLevelOf } from './catalog.mjs';
+import { ROOM_COVERS, ROOM_THEMES, vipLevelOf } from './catalog.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { clearRoomMusic, roomMusic } from './music.mjs';
@@ -77,6 +77,10 @@ const out = (r) => ({
   layoutId: r.layout_id ?? null,
   lockedSeats: (r.locked_seats ?? []).map(Number),
   micQueue: !!r.mic_queue,
+  // The look the owner chose: a cover (an app background id; null = none), the theme, gift effects on or off.
+  coverId: r.cover_id ?? null,
+  theme: r.theme ?? 'chat',
+  giftEffects: r.gift_effects !== false,
 });
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
 const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
@@ -312,10 +316,12 @@ export const roomRoutes = {
     const room = await roomRow(b.id);
     const texts = b.title !== undefined || b.announcement !== undefined;
     const stage = b.micCount !== undefined || b.layoutId !== undefined || b.micQueue !== undefined;
-    if (!texts && !stage && b.password === undefined) throw new HttpError(400, 'Değişiklik yok');
+    const look = b.coverId !== undefined || b.theme !== undefined || b.giftEffects !== undefined;
+    if (!texts && !stage && !look && b.password === undefined) throw new HttpError(400, 'Değişiklik yok');
     const rank = await rankOf(room, me.id);
     if (b.password !== undefined && rank !== OWNER) throw new HttpError(403, 'Oda kilidini yalnızca oda sahibi değiştirebilir');
-    if (texts && rank < SUPER) throw new HttpError(403, 'Oda adını ve duyurusunu oda sahibi veya Süper Yönetici değiştirebilir');
+    if ((texts || b.coverId !== undefined) && rank < SUPER) throw new HttpError(403, 'Oda adını, duyurusunu ve kapağını oda sahibi veya Süper Yönetici değiştirebilir');
+    if ((b.theme !== undefined || b.giftEffects !== undefined) && rank !== OWNER) throw new HttpError(403, 'Oda temasını ve hediye efektlerini yalnızca oda sahibi değiştirebilir');
     if (!rank) throw new HttpError(403, 'Mikrofonları ve düzeni oda sahibi veya yöneticiler değiştirebilir');
     if (room.closed_at) throw new HttpError(410, 'Oda kapandı');
     const micCount = b.micCount === undefined ? room.mic_count : b.micCount === null ? null : int(b.micCount, 1, 15);
@@ -324,19 +330,40 @@ export const roomRoutes = {
     if (layoutId !== null && (typeof layoutId !== 'string' || !LAYOUT.test(layoutId))) throw new HttpError(400, 'Geçersiz düzen');
     if (b.micQueue !== undefined && typeof b.micQueue !== 'boolean') throw new HttpError(400, 'Mikrofon kuyruğu açık ya da kapalı olmalı');
     const micQueue = b.micQueue ?? room.mic_queue;
+    // A cover opens at its room level (the app greys out the others); null takes the cover off.
+    let coverId = room.cover_id ?? null;
+    if (b.coverId !== undefined) {
+      const c = b.coverId === null ? null : ROOM_COVERS.find((x) => x.id === b.coverId);
+      if (c === undefined) throw new HttpError(400, 'Geçersiz kapak');
+      if (c && roomLevel(room.owner_room_xp ?? 0) < c.minLevel) throw new HttpError(403, `Bu kapak Lv.${c.minLevel} odada açılır`);
+      coverId = c ? c.id : null;
+    }
+    if (b.theme !== undefined && !ROOM_THEMES.includes(b.theme)) throw new HttpError(400, 'Geçersiz tema');
+    if (b.giftEffects !== undefined && typeof b.giftEffects !== 'boolean') throw new HttpError(400, 'Hediye efektleri açık ya da kapalı olmalı');
+    const theme = b.theme ?? room.theme ?? 'chat';
+    const giftEffects = b.giftEffects ?? room.gift_effects !== false;
     limit(`roomedit:${me.id}`, 30, 'Çok sık değiştirdin, biraz bekle');
     const title = b.title === undefined ? room.title : await publicText(b.title, 3, 40, 'Oda adı', me, 'room.title', 'title');
     const announcement = b.announcement === undefined ? room.announcement : await publicText(b.announcement, 0, 200, 'Duyuru', me, 'room.announcement', 'announcement');
     const password = b.password === undefined ? undefined : b.password === null || b.password === '' ? null : text(b.password, 4, 32, 'Şifre');
     if (password) await mayLock(me);
-    await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5, mic_queue = $6 WHERE id = $1', [room.id, title, announcement, micCount, layoutId, micQueue]);
+    await db.query('UPDATE rooms SET title = $2, announcement = $3, mic_count = $4, layout_id = $5, mic_queue = $6, cover_id = $7, theme = $8, gift_effects = $9 WHERE id = $1', [
+      room.id,
+      title,
+      announcement,
+      micCount,
+      layoutId,
+      micQueue,
+      coverId,
+      theme,
+      giftEffects,
+    ]);
     if (!micQueue) await db.query('DELETE FROM room_mic_queue WHERE room_id = $1', [room.id]);
     // The hash includes the room id, as when the room is opened with a password.
     if (password !== undefined) await db.query('UPDATE rooms SET password_hash = $2 WHERE id = $1', [room.id, password && sha(`room:${room.id}:${password}`)]);
-    if (stage) {
-      await pushRoomMeta(room.id);
-      announceRoom(liveKitName(room.id));
-    }
+    if (stage) await pushRoomMeta(room.id);
+    // The phones in the room read it again: new mics or layout, a new cover, theme or gift effects.
+    if (stage || look) announceRoom(liveKitName(room.id));
     const [fresh] = await withVoiceCounts([await roomRow(room.id)]);
     return { room: out(fresh) };
   },

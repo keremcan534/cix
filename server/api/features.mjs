@@ -45,6 +45,8 @@ export const ROUTES = {
   'POST /api/rooms': ['rooms'],
   // New bags only: a bag already dropped can still be opened, and returns what is left.
   'POST /api/lucky-bags': ['gifts'],
+  // A paid room animation (room-fx.mjs) is a gift to the room.
+  'POST /api/rooms/animation': ['gifts'],
   // The voice token: without it nobody joins a room.
   'GET /token': ['rooms'],
 };

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { ANIMATION_SEED } from '@/data/animations';
-import { COSMETICS, STICKER_PACKS } from '@/data/catalog';
+import { COSMETICS, ROOM_BACKGROUNDS, ROOM_THEMES, STICKER_PACKS, roomCoverUrl } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
 import { RULES } from '@/data/rules';
 import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate, wholesaleQuote } from '@/lib/coins-bank';
@@ -23,6 +23,26 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
   test('her hediyenin adı, fiyatı, kategorisi ve SVIP sınırı', () => {
     const app = GIFTS.map((g) => ({ id: g.id, name: g.name, price: g.price, cat: g.cat, minSvip: g.minSvip ?? 0 }));
     assert.deepEqual([...(server.GIFTS as Map<string, ServerGift>).values()], app);
+  });
+
+  test('oda kapakları (seviyeleriyle) ve temalar sunucudakiyle aynı', () => {
+    assert.deepEqual(server.ROOM_COVERS, ROOM_BACKGROUNDS.map((b) => ({ id: b.id, minLevel: b.minLevel })));
+    assert.deepEqual(server.ROOM_THEMES, ROOM_THEMES.map((t) => t.id));
+    assert.equal(roomCoverUrl('bg3'), 'https://picsum.photos/seed/sea/600/400');
+    assert.equal(roomCoverUrl(null), '');
+    assert.equal(roomCoverUrl('yok'), '');
+  });
+
+  test('odada ücretli Hareketli: her animasyonun adı, fiyatı ve kampanya günleri', () => {
+    type ServerAnim = { id: string; name: string; price: number; from: string | null; until: string | null };
+    const app = ANIMATION_SEED.filter((a) => !a.is_free && (a.display_type === 'reaction' || a.display_type === 'gift' || a.display_type === 'fullscreen')).map((a) => ({
+      id: a.animation_id,
+      name: a.name,
+      price: a.coin_price,
+      from: a.starts_at ?? null,
+      until: a.ends_at ?? null,
+    }));
+    assert.deepEqual([...(server.ROOM_ANIMS as Map<string, ServerAnim>).values()], app);
   });
 
   test('mağaza: her ürünün adı, fiyatı, süresi ve VIP sınırı', () => {

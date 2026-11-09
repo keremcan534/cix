@@ -77,12 +77,12 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
@@ -94,7 +94,7 @@ import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
-import { getAnimations, isLive, newAnimRequestId, sendAnimation, simulateRemoteSend } from '@/lib/animations';
+import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
@@ -174,6 +174,13 @@ const offlineBlocked = () => {
 const BOT_REACTIONS = [stickerToken('temel-kahkaha'), stickerToken('temel-asik'), stickerToken('oda-alkis'), '🔥', '😎', '🥳', '❤️', stickerToken('temel-begendim'), stickerToken('oda-saskin'), '🤣'];
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
+// What another phone may put over its seat: the emoji panel's own emoji and stickers (no free text, no unknown art).
+const SEAT_EMOJI = new Set(STANDARD_EMOJI.flatMap((g) => g.emojis));
+const STICKER_IDS = new Set(STICKER_PACKS.flatMap((p) => p.stickers.map((x) => x.id)));
+const seatEmojiOk = (e: string) => {
+  const sticker = stickerIdOf(e);
+  return sticker ? STICKER_IDS.has(sticker) : SEAT_EMOJI.has(e);
+};
 /** Lv8 joint entrance banner: both photos, the bond named ("Çift Lv8"); me first when I am one of the two. */
 function jointShowOf(b: RoomBond, myAvatar: string): EntryShow {
   const [x, y] = b.b === 'me' ? [b.b, b.a] : [b.a, b.b];
@@ -289,7 +296,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const liveLocks = useMemo(() => (liveState || readLocks === null ? metaLocks : readLocks.split(',').filter(Boolean).map(Number)), [liveState, readLocks, metaLocks]);
   const lockedSeats = isOwn ? myRoom.lockedSeats : real ? liveLocks : localLocks;
   // Personal effect preferences never change the gift transaction itself.
-  const showFx = (price: number) => !settings.effectsOff && settings.giftFx && !settings.reduceMotion && (!isOwn || myRoom.giftEffects) && (!settings.bigGiftsOnly || price >= 100);
+  // The owner can turn gift effects off for the whole room (my room: here; a server room: on the server, for every phone).
+  const roomGiftFx = isOwn ? myRoom.giftEffects : !real || base!.giftEffects !== false;
+  const showFx = (price: number) => !settings.effectsOff && settings.giftFx && !settings.reduceMotion && roomGiftFx && (!settings.bigGiftsOnly || price >= 100);
   // Entry banners (mine, a bond pair's, a joiner's): Efekt ayarları › Giriş efektleri.
   const entryOn = !settings.effectsOff && settings.entryFx;
 
@@ -747,6 +756,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // Room chat goes phone to phone and the server never reads it, so a line with contact details from an older
       // or modified app is dropped here. Not counted: the refusal would be mine, and I only received it.
       if (msg.t === 'chat') return checkText(msg.text).ok ? addMsg({ userId: from, text: msg.text }) : undefined;
+      // An emoji over their seat: only one from this phone's own emoji and sticker lists (never free text).
+      if (msg.t === 'react') return seatEmojiOk(msg.emoji) ? react(from, msg.emoji) : undefined;
+      // Another phone's Hareketli: only a free one (a paid one comes from the server as 'fx').
+      if (msg.t === 'anim') {
+        if (animById(msg.animationId)?.is_free && freeAnimOk(from)) playRoomAnim(id, from, msg.animationId, `p:${from}:${msgId()}`);
+        return;
+      }
+      if (msg.t === 'fx') {
+        const a = animById(msg.animationId);
+        if (a && playRoomAnim(id, from, msg.animationId, `fx:${msg.eventId}`)) addMsg({ id: `fx:${msg.eventId}`, system: true, kind: 'gift', text: `✨ ${userById(from).name} ${a.name} efekt hediyesi gönderdi` });
+        return;
+      }
       const to = msg.to.map((t) => (t === myServerId() ? 'me' : t));
       if (msg.t === 'lucky') return showLuckyFrom(from, to, msg);
       const gift = GIFTS.find((g) => g.id === msg.giftId);
@@ -876,6 +897,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             (e: unknown) => showAlert(refusalTitle(e, 'Kaydedilemedi'), errorText(e)),
           );
         },
+        ...(myRank === 3 && { theme, setTheme: (t: RoomTheme) => saveLook({ theme: t }, 'Oda temasını değiştirdi') }),
         setPassword: (password: string | null) =>
           updateServerRoom(id, { password }).then(
             () => {
@@ -891,6 +913,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           ),
       }
     : undefined;
+  // A server room's look (cover, theme, gift effects): saved on the server, which tells every phone in the room.
+  function saveLook(patch: { coverId?: string; theme?: RoomTheme; giftEffects?: boolean }, what: string) {
+    if (offlineBlocked()) return;
+    updateServerRoom(id, patch).then(
+      () => {
+        setRoomEdits((n) => n + 1);
+        logMod(what, 'Oda');
+      },
+      (e: unknown) => showAlert(refusalTitle(e, 'Kaydedilemedi'), errorText(e)),
+    );
+  }
   const addContrib = (uid: string, n: number) => setContrib((c) => ({ ...c, [uid]: (c[uid] ?? 0) + n }));
   const logGift = (from: string, to: string, gift: Gift, count: number) =>
     setGiftLog((l) => [{ id: msgId(), from, to, emoji: gift.emoji, name: gift.name, count, coins: gift.price * count, time: clock(), giftId: gift.id }, ...l].slice(0, 100));
@@ -958,16 +991,59 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       v.measureInWindow((x, y, w, h) => resolve(w ? { x: x + w / 2, y: y + h / 2 } : null));
     });
   const sendAnim = (animationId: string) => {
+    if (real) return void sendLiveAnim(animationId);
+    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
+    // Live mode: a sample room's people are not real, and real coins never go to it.
+    if (liveMode() && a && !a.is_free) return showAlert('Gönderilemedi', 'Bu örnek odada ücretli animasyon gönderilemez. Gerçek odalarda gönderebilirsin.');
     // Only the id goes to the "server"; price, licence and activity are read from the catalog there.
     const r = sendAnimation(animationId, id, 'me', newAnimRequestId(), { spend: spendCoins, refund: addCoins });
     if (!r.ok) return showAlert('Gönderilemedi', r.reason);
     tapHaptic();
     setEmojiOpen(false);
-    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
     if (a && r.charged) {
       addMsg({ system: true, kind: 'gift', text: `✨ ${ME.name} ${a.name} efekt hediyesi gönderdi (🪙 ${r.charged.toLocaleString('tr-TR')})` });
       bump('giftsSent', 1);
     }
+  };
+  // Server room: a paid one is taken on the server at its price, and the server tells everyone in the room
+  // (server/api/room-fx.mjs); this phone draws it once the server said it was paid. A free one goes from this
+  // phone to the others like a chat line (lib/live/room-bus 'anim').
+  const sendLiveAnim = async (animationId: string) => {
+    const a = getAnimations().catalog.find((x) => x.animation_id === animationId);
+    if (!a || !isLive(a)) return showAlert('Gönderilemedi', 'Bu animasyon şu an kullanılamıyor.');
+    if (a.is_free) {
+      const r = sendAnimation(animationId, id, 'me', newAnimRequestId(), { spend: spendCoins, refund: addCoins });
+      if (!r.ok) return showAlert('Gönderilemedi', r.reason);
+      sendSignal({ t: 'anim', animationId });
+      tapHaptic();
+      setEmojiOpen(false);
+      return;
+    }
+    // The daily limit holds here too (the balance is the server's to check).
+    const limited = spendBlock(a.coin_price);
+    if (limited && limited !== 'Yetersiz bakiye.') return showAlert('Gönderilemedi', limited);
+    try {
+      const r = await liveRoomAnimation(id, animationId);
+      playRoomAnim(id, 'me', animationId, `fx:${r.eventId}`);
+      tapHaptic();
+      setEmojiOpen(false);
+      addMsg({ system: true, kind: 'gift', text: `✨ ${ME.name} ${a.name} efekt hediyesi gönderdi (🪙 ${r.price.toLocaleString('tr-TR')})` });
+      bump('giftsSent', 1);
+    } catch (e) {
+      errorHaptic();
+      showAlert('Gönderilemedi', errorText(e), [
+        { text: 'Tamam', style: 'cancel' },
+        { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
+      ]);
+    }
+  };
+  // Another phone's free Hareketli: at most one a second from each person, so nobody can flood the room.
+  const freeAnimAt = useRef(new Map<string, number>());
+  const freeAnimOk = (from: string) => {
+    const now = Date.now();
+    if (now - (freeAnimAt.current.get(from) ?? 0) < 1000) return false;
+    freeAnimAt.current.set(from, now);
+    return true;
   };
   // Mic effect follows actual talking (polled by the layer; never charges, never sends anything).
   const speakingMe = useRef(false);
@@ -2627,7 +2703,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             <Pressable onPress={() => setPanel('contrib')} accessibilityLabel="Katkı sıralaması" hitSlop={6}>
               <Ionicons name="trophy" size={20} color={colors.gold} />
             </Pressable>
-            {isOwn && (
+            {(isOwn || !!liveSettings) && (
               <Pressable onPress={() => setPanel('settings')} accessibilityLabel="Oda ayarları" hitSlop={6}>
                 <Ionicons name="settings-outline" size={20} color="#fff" />
               </Pressable>
@@ -2762,6 +2838,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 if (amSeated) {
                   tapHaptic();
                   react('me', e);
+                  // Server room: the others see it over my seat too (lib/live/room-bus 'react').
+                  if (real) sendSignal({ t: 'react', emoji: e });
                   setEmojiOpen(false);
                 } else if (stickerIdOf(e)) send(e);
                 else editDraft((d) => d + e);
@@ -2921,8 +2999,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         announcement={announcement ?? ''}
         // Server room: the owner and Süper Yönetici edit the name and bulletin (the server checks the rank).
         canEditText={real && myRank >= 2}
+        coverEdit={isOwn || (real && myRank >= 2)}
         onSave={(p) => {
           if (!real) return updateMyRoom(p);
+          if (p.coverId !== undefined) return saveLook({ coverId: p.coverId }, 'Oda kapağını değiştirdi');
           const patch = { ...(p.title !== undefined && { title: p.title }), ...(p.announcement !== undefined && { announcement: p.announcement }) };
           if (!Object.keys(patch).length) return;
           updateServerRoom(id, patch)
@@ -3110,11 +3190,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         onClose={closePanel}
         settings={settings}
         set={setSetting}
-        isOwner={isOwn}
-        roomFx={{ giftEffects: myRoom.giftEffects }}
-        setRoomFx={updateMyRoom}
+        isOwner={isOwn || (real && myRank === 3)}
+        roomFx={{ giftEffects: roomGiftFx }}
+        setRoomFx={real ? (p) => saveLook(p, p.giftEffects ? 'Odada hediye efektlerini açtı' : 'Odada hediye efektlerini kapattı') : updateMyRoom}
       />
-      <ModerationSheet visible={panel === 'mod'} onClose={closePanel} log={modLog} slowMode={slowMode} setSlowMode={(v) => { setSlowMode(v); logMod(v ? 'Yavaş modu açtı' : 'Yavaş modu kapattı', 'Oda'); }} words={words} setWords={setWords} bans={real ? (staff.bans ?? []).map((b) => ({ userId: b.uid, until: banLeft(b.until) })) : bans} />
+      <ModerationSheet visible={panel === 'mod'} onClose={closePanel} log={modLog} slowMode={slowMode} setSlowMode={(v) => { setSlowMode(v); logMod(v ? 'Yavaş modu açtı' : 'Yavaş modu kapattı', 'Oda'); }} words={words} setWords={setWords} bans={real ? (staff.bans ?? []).map((b) => ({ userId: b.uid, until: banLeft(b.until) })) : bans} sample={!liveMode()} />
       <ShareRoomSheet
         visible={panel === 'invite'}
         onClose={closePanel}

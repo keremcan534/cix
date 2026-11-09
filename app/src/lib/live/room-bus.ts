@@ -5,9 +5,11 @@
 //    attribute: set by their phone, or by the server when the owner or an admin moves them), whether their mic
 //    is on (their LiveKit microphone track, muted when they switch it off) and whether they are talking right now;
 //  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
-//    later joiner doesn't. The phones send each other chat lines only. A gift is announced by the server after
-//    it is paid (server/api/gifts.mjs, LiveKit SendData: a packet with no sending participant), so no phone can
-//    fake one; a gift packet from a phone is dropped. The server also says when a PK starts or is cancelled
+//    later joiner doesn't. The phones send each other chat lines, the emoji over their own seat and the free
+//    Hareketli reactions. A gift is announced by the server after it is paid (server/api/gifts.mjs, LiveKit
+//    SendData: a packet with no sending participant), so no phone can fake one; a gift packet from a phone is
+//    dropped. A paid Hareketli is announced the same way (server/api/room-fx.mjs: 'fx'); the room screen plays a
+//    phone's own 'anim' only when its catalog says that animation is free. The server also says when a PK starts or is cancelled
 //    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does; and when a Şanslı çanta is dropped
 //    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
@@ -17,8 +19,10 @@
 import { useSyncExternalStore } from 'react';
 
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
-/** What one phone may send the others. */
-export type PeerSignal = { t: 'chat'; text: string };
+/** What one phone may send the others: a chat line, an emoji or sticker over its own seat, a free Hareketli. */
+export type PeerSignal = { t: 'chat'; text: string } | { t: 'react'; emoji: string } | { t: 'anim'; animationId: string };
+/** A paid Hareketli the server announced (server/api/room-fx.mjs): `eventId` its room_animations row. */
+export type FxSignal = { t: 'fx'; animationId: string; eventId: number };
 /** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
 export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number };
 /**
@@ -27,7 +31,7 @@ export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[
  * emoji come along, so a phone that never opened the Uğurlu shelf still draws it.
  */
 export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number };
-export type RoomSignal = PeerSignal | GiftSignal | LuckySignal;
+export type RoomSignal = PeerSignal | GiftSignal | LuckySignal | FxSignal;
 
 /** `send` is false when the voice connection isn't up and nothing went out. */
 type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) => boolean };
@@ -57,6 +61,8 @@ const roomListeners = new Set<(roomId: string) => void>();
 const bagListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
+// The same for paid Hareketli (their own ids: a room_animations row, not a gift_events one).
+const seenFx: number[] = [];
 
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -150,6 +156,14 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
     if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
     if (isServerBag(raw)) return bagListeners.forEach((l) => l(roomId));
+    const fx = parseServerFx(raw);
+    if (fx) {
+      if (seenFx.includes(fx.msg.eventId)) return;
+      seenFx.push(fx.msg.eventId);
+      if (seenFx.length > 200) seenFx.shift();
+      signalListeners.forEach((l) => l(roomId, fx.from, fx.msg));
+      return;
+    }
     const g = parseServerGift(raw) ?? parseServerLucky(raw);
     if (!g || seenGifts.includes(g.msg.eventId)) return;
     seenGifts.push(g.msg.eventId);
@@ -161,12 +175,27 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
   if (msg) signalListeners.forEach((l) => l(roomId, from, msg));
 }
 
-/** What a phone may send: a chat line. A "gift" from a phone is never shown (only the server announces one). */
+/**
+ * What a phone may send: a chat line, a seat emoji, a Hareketli id. A "gift" or a paid "fx" from a phone is never
+ * shown (only the server announces those). Only the shape is checked here; the room screen shows a seat emoji only
+ * from its own emoji and sticker lists, and an 'anim' only when its catalog says it is free.
+ */
 export function parseSignal(raw: unknown): PeerSignal | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
   if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) return { t: 'chat', text: m.text.slice(0, 300) };
+  if (m.t === 'react' && typeof m.emoji === 'string' && m.emoji.trim() && m.emoji.length <= 40) return { t: 'react', emoji: m.emoji };
+  if (m.t === 'anim' && typeof m.animationId === 'string' && /^[a-z0-9-]{1,40}$/.test(m.animationId)) return { t: 'anim', animationId: m.animationId };
   return null;
+}
+
+/** The server's paid Hareketli packet: `{ type: 'anim', animationId, from, eventId }` (server/api/room-fx.mjs). */
+export function parseServerFx(raw: unknown): { from: string; msg: FxSignal } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (m.type !== 'anim' || typeof m.animationId !== 'string' || !/^[a-z0-9-]{1,40}$/.test(m.animationId)) return null;
+  if (typeof m.from !== 'string' || !m.from || !Number.isSafeInteger(m.eventId) || (m.eventId as number) <= 0) return null;
+  return { from: m.from, msg: { t: 'fx', animationId: m.animationId, eventId: m.eventId as number } };
 }
 
 /** The server's gift packet: `{ type: 'gift', giftId, count, from, to, eventId }` (server/api/gifts.mjs). */

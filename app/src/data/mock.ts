@@ -52,6 +52,8 @@ export type Room = {
   roomType?: RoomType;
   theme?: RoomTheme;
   bossSeat?: boolean;
+  /** A server room: the owner turned gift effects off for everyone in it (undefined/true: on). */
+  giftEffects?: boolean;
   micPermission?: 'everyone' | 'members';
   /** "Mikrofon kuyruğu"; absent = on for every room type except "Serbest sohbet" (lib/room-invites). */
   micQueue?: boolean;

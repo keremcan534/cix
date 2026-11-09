@@ -407,6 +407,7 @@ export function ModerationSheet({
   words,
   setWords,
   bans,
+  sample,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -416,6 +417,8 @@ export function ModerationSheet({
   words: string[];
   setWords: (w: string[]) => void;
   bans: { userId: string; until: string }[];
+  /** The demo build: shows its sample report line. A live build has no room reports to show (they go to Yönetim). */
+  sample: boolean;
 }) {
   const [word, setWord] = useState('');
   return (
@@ -456,8 +459,12 @@ export function ModerationSheet({
           </Text>
         ))
       )}
-      <Text style={styles.label}>Raporlar</Text>
-      <Text style={styles.dim}>• 2 açık rapor: spam (Onur), hakaret (anonim) — platform moderasyonuna iletildi</Text>
+      {sample && (
+        <>
+          <Text style={styles.label}>Raporlar</Text>
+          <Text style={styles.dim}>• 2 açık rapor: spam (Onur), hakaret (anonim) — platform moderasyonuna iletildi</Text>
+        </>
+      )}
       <Text style={styles.label}>Moderasyon geçmişi (denetim kaydı)</Text>
       {log.length === 0 && <Text style={styles.dim}>Kayıt yok.</Text>}
       {log.map((l) => (
