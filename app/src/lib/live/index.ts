@@ -314,7 +314,10 @@ export function roomOf(r: api.ServerRoom): Room {
     micQueue: !!r.micQueue,
     theme: ROOM_THEMES.find((t) => t.id === r.theme)?.id ?? 'chat',
     giftEffects: r.giftEffects !== false,
+    ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
+    bossId: r.boss ? r.boss.id : null,
   };
+  if (r.boss) rememberUser(r.boss);
   putServerRoom(room);
   return room;
 }

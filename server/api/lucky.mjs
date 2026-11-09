@@ -26,7 +26,7 @@ import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, drawMult, maxMult } from './lucky-rules.mjs';
 import { announceRoom } from './live.mjs';
 import { scorePkGift } from './pk.mjs';
-import { roomLevel } from './rooms.mjs';
+import { refreshBoss, roomLevel } from './rooms.mjs';
 import { audit } from './sanctions.mjs';
 import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
 import { NEED_LEVEL, NEED_POINTS, wealthPoints } from './wheel.mjs';
@@ -204,6 +204,8 @@ export const luckyRoutes = {
         bigWin: best >= announceFrom ? best * Number(row.unit_price) : 0,
       });
       if (levelUp) announceRoom(lkRoom);
+      // Dümen koltuğu: Uğurlu gifts count like any gift in the room.
+      await refreshBoss(lkRoom.slice(4));
     }
     return answer(row, false);
   },

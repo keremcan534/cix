@@ -32,6 +32,21 @@ export type User = {
 
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
 
+/** A server room's rules as data/mock keeps them (lib/api RoomRules has the same shape). */
+export type RoomRulesLike = {
+  micPermission: 'everyone' | 'members';
+  bossSeat: boolean;
+  joinMode: 'open' | 'apply' | 'closed';
+  manageMembers: 'owner' | 'admins';
+  manageFunctions: 'owner' | 'admins';
+  autoRemoveDays: 0 | 7 | 14 | 30;
+  limit: number | null;
+  profileVisible: boolean;
+  videoPrivacy: boolean;
+  bot: boolean;
+  slowMode: boolean;
+  words: string[];
+};
 export type Room = {
   id: string;
   title: string;
@@ -54,6 +69,11 @@ export type Room = {
   bossSeat?: boolean;
   /** A server room: the owner turned gift effects off for everyone in it (undefined/true: on). */
   giftEffects?: boolean;
+  /** A server room: its rules (Oda ayarları, Moderasyon) and its Dümen koltuğu holder (server id). */
+  rules?: RoomRulesLike;
+  bossId?: string | null;
+  /** The rules' forbidden words, one per line (plain text, so the room screen can hand it to the voice handlers). */
+  wordsText?: string;
   micPermission?: 'everyone' | 'members';
   /** "Mikrofon kuyruğu"; absent = on for every room type except "Serbest sohbet" (lib/room-invites). */
   micQueue?: boolean;

@@ -487,7 +487,29 @@ export type ServerRoom = {
   coverId?: string | null;
   theme?: string;
   giftEffects?: boolean;
+  /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
+  rules?: RoomRules;
+  /** Dümen koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
+  boss?: UserCard | null;
 };
+/** A server room's rules (server/api/room-rules.mjs). */
+export type RoomRules = {
+  micPermission: 'everyone' | 'members';
+  bossSeat: boolean;
+  joinMode: 'open' | 'apply' | 'closed';
+  manageMembers: 'owner' | 'admins';
+  manageFunctions: 'owner' | 'admins';
+  autoRemoveDays: 0 | 7 | 14 | 30;
+  /** Most people in the room at once; null: the level's most. */
+  limit: number | null;
+  profileVisible: boolean;
+  videoPrivacy: boolean;
+  bot: boolean;
+  slowMode: boolean;
+  words: string[];
+};
+export type RoomMember = UserCard & { since: string };
+export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 export type DirectMessage = { id: number; from: string; to: string; text: string; createdAt: string; readAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
 export type ServerLock = { id: number; amount: number; channel: string; channelLabel: string; unlockAt: string; createdAt: string; from: { id: string; name: string } | null; gift: { id: string; count: number } | null };
@@ -545,8 +567,26 @@ export const closeRoom = (id: string) => call<{ closed: boolean }>('POST', '/api
 export const serverRoom = (id: string) => call<{ room: ServerRoom }>('GET', `/api/room?id=${encodeURIComponent(id)}`).then((r) => r.room);
 /** What the room screen can change on the server: the name and bulletin (owner and Süper Yönetici), the lock
  *  (owner only), the mics, the layout and the mic queue (owner or a room admin; null = back to the default). */
-export type RoomPatch = { title?: string; announcement?: string; password?: string | null; micCount?: number | null; layoutId?: string | null; micQueue?: boolean; coverId?: string | null; theme?: string; giftEffects?: boolean };
+export type RoomPatch = {
+  title?: string;
+  announcement?: string;
+  password?: string | null;
+  micCount?: number | null;
+  layoutId?: string | null;
+  micQueue?: boolean;
+  coverId?: string | null;
+  theme?: string;
+  giftEffects?: boolean;
+  roomType?: string;
+  rules?: Partial<RoomRules>;
+};
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
+/** Oda üyeleri (server/api/rooms.mjs): the list, my membership and, for those who answer them, the requests. */
+export const roomMembers = (room: string) => call<RoomMembers>('GET', `/api/rooms/members?room=${encodeURIComponent(room)}`);
+export const joinRoomMembers = (room: string) => call<{ status: 'member' | 'pending' }>('POST', '/api/rooms/members/join', { room });
+export const leaveRoomMembers = (room: string) => call<{ status: null }>('POST', '/api/rooms/members/leave', { room });
+export const answerRoomMember = (room: string, user: string, accept: boolean) => call<{ status: 'member' | null }>('POST', '/api/rooms/members/answer', { room, user, accept });
+export const removeRoomMember = (room: string, user: string) => call<{ status: null }>('POST', '/api/rooms/members/remove', { room, user });
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
 export type ServerBond = {

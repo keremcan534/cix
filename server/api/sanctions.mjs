@@ -323,11 +323,26 @@ export async function assertMay(u, action, room = null) {
 /** The room uuid of a LiveKit room name (oda-<uuid>), or null. */
 const roomUuid = (name) => /^oda-([0-9a-f-]{36})$/.exec(name)?.[1] ?? null;
 
-/** What the voice token for `room` may do for this person: no mic while voice muted, no chat while text muted. */
+/**
+ * What the voice token for `room` may do for this person: no mic while voice muted, no chat while text muted, and
+ * in a room whose mics are for its members (room-rules.mjs micPermission) no mic for anyone but its staff and members.
+ */
 export async function voiceGrant(uid, roomName) {
   const room = roomUuid(roomName);
   const mutes = await liveMutes(uid);
-  return { canPublish: !mutes.some((s) => STOPS.room_voice(s, room)), canPublishData: !mutes.some((s) => STOPS.room_text(s, room)) };
+  const mic = room && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(room) ? await micAllowed(room, uid) : true;
+  return { canPublish: mic && !mutes.some((s) => STOPS.room_voice(s, room)), canPublishData: !mutes.some((s) => STOPS.room_text(s, room)) };
+}
+async function micAllowed(roomId, uid) {
+  const r = await db.query(
+    `SELECT r.owner, r.rules->>'micPermission' AS perm,
+            EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = r.id AND a.user_id::text = $2) AS admin,
+            EXISTS (SELECT 1 FROM room_members m WHERE m.room_id = r.id AND m.user_id::text = $2 AND m.status = 'member') AS member
+       FROM rooms r WHERE r.id = $1`,
+    [roomId, uid],
+  );
+  const x = r.rows[0];
+  return !x || x.perm !== 'members' || x.owner === uid || x.admin || x.member;
 }
 
 /**

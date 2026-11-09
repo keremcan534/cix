@@ -132,10 +132,11 @@ export default function UserProfile() {
       loadMe()
         .then((p) => alive && updateMe(p))
         .catch(() => {});
-      loadRooms()
-        .then((list) => alive && setMyLiveRoom(list.find((r) => r.hostId === 'me') ?? null))
-        .catch(() => {});
     }
+    // Their open room: mine always; someone else's only when its owner shows it on the profile (Oda ayarları).
+    loadRooms()
+      .then((list) => alive && setMyLiveRoom(list.find((r) => (isMe ? r.hostId === 'me' : r.hostId === id && r.rules?.profileVisible !== false)) ?? null))
+      .catch(() => {});
     return () => {
       alive = false;
       clearTimeout(retry);
@@ -383,7 +384,7 @@ export default function UserProfile() {
   // Room & family
   // Live mode: no sample room for anyone; mine is my open server room (it has no level there, so none is shown).
   const otherRoom = live ? undefined : ROOMS.find((r) => r.hostId === user.id);
-  const room: { title: string; desc: string; cover: string; level: number | null; go: () => void } | null = isMe
+  const room: { title: string; desc: string; cover: string; level: number | null; go: () => void } | null = isMe || live
     ? live
       ? myLiveRoom && {
           title: myLiveRoom.title || 'Odam',

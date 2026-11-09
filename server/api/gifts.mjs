@@ -26,7 +26,7 @@ import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
-import { roomLevel } from './rooms.mjs';
+import { refreshBoss, roomLevel } from './rooms.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -158,6 +158,8 @@ export const giftRoutes = {
     if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
     // A new room level: the room's phones read the room again (more mics from Lv.8 on).
     if (!out.replay && levelUp && lkRoom) announceRoom(lkRoom);
+    // Dümen koltuğu: a new top gifter of the room takes it.
+    if (!out.replay && lkRoom) await refreshBoss(lkRoom.slice(4));
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     if (!out.replay) return { ...out, total };
     // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).

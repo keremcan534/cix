@@ -376,7 +376,7 @@ export function RoomInfoSheet({
             )}
           </View>
 
-          {!live && (
+          {(
             <>
               <Pressable onPress={() => setSub('members')} accessibilityLabel="Oda üyeleri">
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -706,6 +706,8 @@ export function RoomSettingsScreen({
   const blacklist = [...new Set([...room.blacklist, ...bans.map((b) => b.userId)])];
   const who = { owner: 'Sadece oda sahibi', admins: 'Oda sahibi ve yöneticiler' } as const;
   const joinLabel = { open: 'Başvuru gerekmiyor', apply: 'Katılma başvurusu', closed: 'Başvuruya izin verilmiyor' } as const;
+  // A server room: the owner's rows are locked for an admin (the server keeps them and checks who changes them).
+  const ownerLock = live && !live.owner ? 'Bu ayarı yalnızca oda sahibi değiştirir.' : undefined;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -721,7 +723,7 @@ export function RoomSettingsScreen({
           {standard && (
             <>
           <Section title="Standart" />
-          {!live && <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} />}
+          <Row label="Oda tipi" value={typeInfo.name} valueArt={ROOM_TYPE_ART[typeInfo.id]} onPress={() => setPicker('type')} locked={ownerLock} />
           {(!live || live.setTheme) && <Row label="Oda teması" value={roomThemeInfo(live?.theme ?? room.theme).name} valueArt={ROOM_THEME_ART[roomThemeInfo(live?.theme ?? room.theme).id]} onPress={() => setPicker('theme')} />}
           {live?.canLock ? (
             <LiveLock live={live} lockOpen={lockOpen} level={level} />
@@ -753,63 +755,59 @@ export function RoomSettingsScreen({
           <Section title="Mikrofon pozisyonu" />
           <Row label="Sahne Düzeni" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
-          {live ? (
-            <>
-              <Row
-                label="Mikrofon kuyruğu"
-                hint={live.micQueue ? 'Açık: boş mikrofona çıkmak isteyen el kaldırır, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
-                toggle={{ value: live.micQueue, onChange: live.setMicQueue }}
-              />
-              <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
-                Şifre, düzen, mikrofon sayısı ve kuyruk sunucuda saklanır; odadaki herkeste aynı anda değişir. Yeni şifre, odaya bir sonraki girişte sorulur.
-              </Text>
-            </>
-          ) : (
-            <>
-              <Row
-                label="Mikrofon kuyruğu"
-                hint={room.micQueue ? 'Açık: boş mikrofona çıkmak isteyenler kuyruğa girer, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
-                toggle={{ value: room.micQueue, onChange: (v) => update({ micQueue: v }) }}
-              />
-              <Row
-                label="Mikrofon izni"
-                hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
-                value={room.micPermission === 'members' ? 'Oda üyeleri' : 'Herkes'}
-                onPress={() => setPicker('micPerm')}
-                locked={micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`}
-              />
-              <Row
-                label="Dümen Koltuğu"
-                hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · oturumun en çok hediye gönderen kişisi oturur`}
-                toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
-                locked={bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`}
-              />
+          <Row
+            label="Mikrofon kuyruğu"
+            hint={(live ? live.micQueue : room.micQueue) ? 'Açık: boş mikrofona çıkmak isteyen el kaldırır, sahip veya yönetici onaylar' : 'Kapalı: herkes boş mikrofona onay beklemeden çıkar'}
+            toggle={{ value: live ? live.micQueue : room.micQueue, onChange: (v) => (live ? live.setMicQueue(v) : update({ micQueue: v })) }}
+          />
+          <Row
+            label="Mikrofon izni"
+            hint={`Oda seviyesi >= ${MIC_PERMISSION_MIN_LEVEL} açılır`}
+            value={room.micPermission === 'members' ? 'Oda üyeleri' : 'Herkes'}
+            onPress={() => setPicker('micPerm')}
+            locked={ownerLock ?? (micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`)}
+          />
+          <Row
+            label="Dümen Koltuğu"
+            hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · ${live ? 'son 24 saatte odada en çok hediye gönderen kişi oturur' : 'oturumun en çok hediye gönderen kişisi oturur'}`}
+            toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
+            locked={ownerLock ?? (bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
+          />
 
-              <Section title="Oda üyeleri" />
-              <Row label="Oda üyesi başvurusu" value={joinLabel[room.joinMode]} onPress={() => setPicker('join')} />
-              <Row label="Oda üyelerini yönet" value={who[room.manageMembers]} onPress={() => setPicker('manageMembers')} />
-              <Row
-                label="Otomatik eleme"
-                hint="Oda üyeleri standartlara uymadığında otomatik olarak odadan çıkarılır (yöneticiler hariç)"
-                value={room.autoRemoveDays ? 'Etkinleştirildi' : 'Açılmadı'}
-                onPress={() => setPicker('autoRemove')}
-              />
-              <Row label="Oda işlevlerini yönet" value={who[room.manageFunctions]} onPress={() => setPicker('manageFunctions')} />
-              <Row label={`Oda yöneticileri`} value={`${room.adminIds.length}/${adminCapacity(level)}`} onPress={() => setPicker('admins')} />
-              <Row label="Katılımcı limiti" value={`${room.limit.toLocaleString('tr-TR')} kişi`} onPress={() => setPicker('limit')} />
+          <Section title="Oda üyeleri" />
+          <Row label="Oda üyesi başvurusu" value={joinLabel[room.joinMode]} onPress={() => setPicker('join')} locked={ownerLock} />
+          <Row label="Oda üyelerini yönet" value={who[room.manageMembers]} onPress={() => setPicker('manageMembers')} locked={ownerLock} />
+          <Row
+            label="Otomatik eleme"
+            hint="Oda üyeleri standartlara uymadığında otomatik olarak odadan çıkarılır (yöneticiler hariç)"
+            value={room.autoRemoveDays ? `${room.autoRemoveDays} gün gelmeyen` : 'Açılmadı'}
+            onPress={() => setPicker('autoRemove')}
+            locked={ownerLock}
+          />
+          <Row label="Oda işlevlerini yönet" value={who[room.manageFunctions]} onPress={() => setPicker('manageFunctions')} locked={ownerLock} />
+          {!live && <Row label={`Oda yöneticileri`} value={`${room.adminIds.length}/${adminCapacity(level)}`} onPress={() => setPicker('admins')} />}
+          <Row label="Katılımcı limiti" value={`${room.limit.toLocaleString('tr-TR')} kişi`} onPress={() => setPicker('limit')} locked={ownerLock} />
 
-              <Section title="Gizlilik & Güvenlik" />
-              <Row label="Oda kara listesi" value={String(blacklist.length)} onPress={() => setPicker('blacklist')} />
-              <Row label="Profil Sayfasında Oda Görünürlüğü" hint="Etkinleştirildiğinde odanız profil sayfanızda görüntülenecektir" toggle={{ value: room.profileVisible, onChange: (v) => update({ profileVisible: v }) }} />
-              <Row
-                label="Video Odası Gizlilik Koruması"
-                hint="Etkinleştirildiğinde video odası ekran görüntüsü alma veya kaydetmeye karşı korunur"
-                toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
-              />
-              <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} />
-              <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.</Text>
-            </>
-          )}
+          <Section title="Gizlilik & Güvenlik" />
+          <Row label="Oda kara listesi" value={String(blacklist.length)} onPress={() => setPicker('blacklist')} />
+          <Row
+            label="Profil Sayfasında Oda Görünürlüğü"
+            hint="Etkinleştirildiğinde odanız profil sayfanızda görüntülenecektir"
+            toggle={{ value: room.profileVisible, onChange: (v) => update({ profileVisible: v }) }}
+            locked={ownerLock}
+          />
+          <Row
+            label="Video Odası Gizlilik Koruması"
+            hint="Etkinleştirildiğinde odada ekran görüntüsü alma ve ekran kaydı engellenir"
+            toggle={{ value: room.videoPrivacy, onChange: (v) => update({ videoPrivacy: v }) }}
+            locked={ownerLock}
+          />
+          <Row label="Oda botu (karşılama ve kurallar)" labelArt="oda-oda-botu" toggle={{ value: botOn, onChange: setBot }} locked={ownerLock} />
+          <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
+            {live
+              ? 'Bu ayarlar sunucuda saklanır ve odadaki herkeste aynı anda geçerli olur. Yeni şifre, odaya bir sonraki girişte sorulur.'
+              : 'Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.'}
+          </Text>
             </>
           )}
           {sections.map((s) => (
@@ -927,7 +925,7 @@ export function RoomSettingsScreen({
                 <Text style={styles.dim}>{room.blacklist.includes(id) ? 'Kalıcı · odaya giremez' : `Geçici yasak · ${ban?.until}`}</Text>
               </View>
               {room.blacklist.includes(id) && (
-                <Pressable onPress={() => update({ blacklist: room.blacklist.filter((x) => x !== id) })} hitSlop={6}>
+                <Pressable onPress={() => (live ? live.unban(id) : update({ blacklist: room.blacklist.filter((x) => x !== id) }))} hitSlop={6}>
                   <Text style={{ color: colors.green, fontWeight: '700' }}>Kaldır</Text>
                 </Pressable>
               )}
@@ -981,6 +979,10 @@ export type LiveRoomSettings = {
   /** The owner only: the room's theme, kept on the server so every phone draws it. */
   theme?: RoomTheme;
   setTheme?: (t: RoomTheme) => void;
+  /** I own the room: the owner's rows can be changed (an admin sees them locked). */
+  owner: boolean;
+  /** Takes someone off the room's blacklist (a permanent ban kept on the server). */
+  unban: (userId: string) => void;
 };
 
 /** A section of rows the room screen adds to the settings (room tools, my own settings). */
