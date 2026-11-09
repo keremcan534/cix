@@ -152,6 +152,20 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     }
   });
 
+  test('depo ayarlarının biçimi denetlenir; değerleri hiç yazılmaz', async () => {
+    const { storageNotes } = await import('../media.mjs');
+    const good = { S3_ENDPOINT: `https://${'0'.repeat(32)}.r2.cloudflarestorage.com`, S3_BUCKET: 'similarclub-media', S3_KEY: 'a'.repeat(32), S3_SECRET: 'b'.repeat(64), S3_PUBLIC_URL: 'https://pub-0123.r2.dev' };
+    assert.deepEqual(storageNotes(good), []);
+    const notes = storageNotes({ ...good, S3_ENDPOINT: 'https://pub-0123.r2.dev', S3_KEY: 'X'.repeat(40), S3_SECRET: 'kisaGizli' }).join(' | ');
+    assert.match(notes, /S3_ENDPOINT açık adres \(r2\.dev\) olmuş/);
+    assert.match(notes, /S3_KEY .*\(32 karakter olmalı, 40\)/);
+    assert.match(notes, /S3_SECRET .*\(64 karakter olmalı, 9\)/);
+    assert.doesNotMatch(notes, /XXXX|kisaGizli/, 'değerler yazılmaz');
+    assert.match(storageNotes({ ...good, S3_ENDPOINT: `${good.S3_ENDPOINT}/similarclub-media` }).join(), /fazladan yol/);
+    assert.match(storageNotes({ ...good, S3_PUBLIC_URL: good.S3_ENDPOINT }).join(), /S3_PUBLIC_URL depo adresi olmuş/);
+    assert.match(storageNotes({ ...good, S3_BUCKET: 'Similar Club' }).join(), /S3_BUCKET bir kova adı değil/);
+  });
+
   test('Anlar ve sohbet için video ya da çok büyük dosya istenmez', async () => {
     const a = await signUp('Sınır');
     assert.equal((await call('POST', '/api/media/upload-url', { kind: 'moment', contentType: 'video/mp4', size: 1000 }, a.session))[0], 400);

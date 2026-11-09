@@ -149,21 +149,40 @@ export function removeUserFiles(uid) {
   });
 }
 
+/** What looks wrong in the storage settings `e`, by shape only (length and form, never a value). */
+export function storageNotes(e = env) {
+  const notes = [];
+  let host;
+  try {
+    const u = new URL(e.S3_ENDPOINT);
+    host = u.hostname;
+    if (u.pathname.replace(/\/$/, '') !== '') notes.push('S3_ENDPOINT sonunda fazladan yol var (kova adı silinmeli)');
+  } catch {
+    return ['S3_ENDPOINT bir adres değil'];
+  }
+  if (!/^https:\/\/[^/]+/.test(e.S3_PUBLIC_URL)) notes.push('S3_PUBLIC_URL https:// ile başlamıyor');
+  if (/r2\.cloudflarestorage/.test(e.S3_PUBLIC_URL)) notes.push('S3_PUBLIC_URL depo adresi olmuş: açık adres (https://pub-….r2.dev) olmalı');
+  // The shapes Cloudflare's R2 token page gives.
+  const r2 = /\.r2\.dev$/.test(host) || /\.r2\.cloudflarestorage\.com$/.test(host) || /r2\.dev|cloudflare/.test(e.S3_PUBLIC_URL);
+  if (/\.r2\.dev$/.test(host)) notes.push('S3_ENDPOINT açık adres (r2.dev) olmuş: ….r2.cloudflarestorage.com olmalı');
+  else if (r2 && !/\.r2\.cloudflarestorage\.com$/.test(host)) notes.push('S3_ENDPOINT bir R2 adresi değil: ….r2.cloudflarestorage.com olmalı');
+  if (r2 && !/^[0-9a-f]{32}$/.test(e.S3_KEY)) notes.push(`S3_KEY bir Access Key ID'ye benzemiyor (32 karakter olmalı, ${e.S3_KEY.length})`);
+  if (r2 && !/^[0-9a-f]{64}$/.test(e.S3_SECRET)) notes.push(`S3_SECRET bir Secret Access Key'e benzemiyor (64 karakter olmalı, ${e.S3_SECRET.length})`);
+  if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(e.S3_BUCKET)) notes.push('S3_BUCKET bir kova adı değil (küçük harf, rakam ve - olmalı)');
+  return notes;
+}
+
 /**
  * The storage settings checked end to end (run after a deploy, server.yml): a small file put exactly the way the
- * phone puts a photo, read back through the public address, then deleted. The answer holds only status codes and
- * the storage's error code (SignatureDoesNotMatch, NoSuchBucket…), never a setting's value, so it can go in a log.
+ * phone puts a photo, read back through the public address, then deleted. The answer holds only status codes, the
+ * storage's error code (SignatureDoesNotMatch, NoSuchBucket…) and storageNotes, never a setting's value, so it can
+ * go in a log.
  */
 export async function storageCheck() {
   const missing = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_KEY', 'S3_SECRET', 'S3_PUBLIC_URL'].filter((k) => !env[k]);
   if (missing.length) return `kapalı: ${missing.join(', ')} yok`;
-  const notes = [];
-  try {
-    if (new URL(env.S3_ENDPOINT).pathname.replace(/\/$/, '') !== '') notes.push('S3_ENDPOINT sonunda fazladan yol var (kova adı silinmeli)');
-  } catch {
-    return 'S3_ENDPOINT bir adres değil';
-  }
-  if (!/^https:\/\/[^/]+/.test(env.S3_PUBLIC_URL)) notes.push('S3_PUBLIC_URL https:// ile başlamıyor');
+  const notes = storageNotes();
+  if (notes[0] === 'S3_ENDPOINT bir adres değil') return notes[0];
   const key = `check/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.txt`;
   const body = 'similar storage check';
   const headers = { 'content-type': 'text/plain', 'content-length': String(Buffer.byteLength(body)) };
