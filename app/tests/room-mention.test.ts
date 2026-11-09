@@ -3,7 +3,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
+import { checkText } from '@/lib/contact-filter';
+import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
 
 describe('@bahset', () => {
   test('yazılan "@…" bulunur; e-posta gibi bitişik "@" sayılmaz', () => {
@@ -34,5 +35,19 @@ describe('@bahset', () => {
     assert.equal(mentions('@Ayşe Nurcan selam', 'Ayşe Nur'), false);
     assert.equal(mentions('Ayşe Nur selam', 'Ayşe Nur'), false);
     assert.equal(mentions('@', ''), false);
+  });
+
+  test('odadaki birinden bahsetmek iletişim filtresine takılmaz; dışarıdan bir @hesap takılır', () => {
+    const room = ['Ayşe', 'Ayşe Yılmaz', 'Kral (Ali)', 'Deniz'];
+    const ok = (t: string) => checkText(stripMentions(t, room)).ok;
+    assert.equal(checkText('@Ayşe selam').ok, false, 'filtre tek başına @isim görünce reddeder');
+    assert.equal(ok('@Ayşe selam'), true);
+    assert.equal(ok('selam @ayşe nasılsın'), true, 'büyük küçük harf');
+    assert.equal(ok('@Ayşe Yılmaz hoş geldin'), true, 'boşluklu ad bütün olarak');
+    assert.equal(ok('@Kral (Ali) ve @Deniz gelin'), true, 'özel işaretli ad, iki bahsetme');
+    assert.equal(stripMentions('@Ayşe Yılmaz hey', room), 'Ayşe Yılmaz hey');
+    assert.equal(ok('@ayse.insta takip et'), false, 'odada olmayan bir @hesap');
+    assert.equal(ok('@Ayşeinsta'), false, 'adın devamı başka bir hesap');
+    assert.equal(ok('@Ayşe beni 0532 123 45 67 ara'), false, 'bahsetme telefonu geçirmez');
   });
 });
