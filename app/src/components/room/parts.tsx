@@ -49,6 +49,7 @@ export function Seat({
   invitee,
   similarity,
   bondLink,
+  mini,
   onPress,
 }: {
   index: number;
@@ -86,6 +87,8 @@ export function Seat({
   similarity?: number;
   /** Lv4 bond with the person on the next seat of the row: a line to their avatar (`gap`: the row's gap). */
   bondLink?: { bond: RoomBond; gap: number } | null;
+  /** Küçült: a small avatar (no frame) over the mic's number, in the room's mic strip; nothing else under it. */
+  mini?: boolean;
   onPress: () => void;
 }) {
   const [pulse] = useState(() => new Animated.Value(0));
@@ -119,7 +122,7 @@ export function Seat({
             ]}
           />
         )}
-        {user && (vipLevel > 0 || frameId) ? (
+        {user && !mini && (vipLevel > 0 || frameId) ? (
           <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
         ) : user ? (
           <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
@@ -129,10 +132,10 @@ export function Seat({
             colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)']}
             style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
           >
-            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={small ? 15 : 17} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
+            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : small ? 15 : 17} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
           </LinearGradient>
         )}
-        {user && similarity !== undefined && !teamColor && <SimilarityRing score={similarity} size={size} />}
+        {user && similarity !== undefined && !teamColor && !mini && <SimilarityRing score={similarity} size={size} />}
         {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
         {camera && user && (
           <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
@@ -151,15 +154,20 @@ export function Seat({
         )}
         {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-        {host && <Icon3D name="crown" size={14} />}
-        <Text style={[styles.seatName, small && { fontSize: 12 }, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
-          {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
-        </Text>
-        {user?.verified && !small && <VerifiedBadge size={11} />}
-      </View>
-      {user && pkPoints !== undefined && <PkPoints value={pkPoints} still={still} />}
-      {user && bondLink && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
+      {mini ? (
+        // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
+        <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          {host && <Icon3D name="crown" size={14} />}
+          <Text style={[styles.seatName, small && { fontSize: 12 }, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
+            {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
+          </Text>
+          {user?.verified && !small && <VerifiedBadge size={11} />}
+        </View>
+      )}
+      {user && pkPoints !== undefined && !mini && <PkPoints value={pkPoints} still={still} />}
+      {user && bondLink && !mini && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
     </Pressable>
   );
 }
@@ -549,6 +557,8 @@ const styles = StyleSheet.create({
   giftName: { color: '#fff', fontWeight: '800' },
   failed: { color: '#FF9AA1', fontSize: 12, fontWeight: '700' },
   seatName: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 64 },
+  miniLabel: { height: 14, alignItems: 'center', justifyContent: 'center' },
+  miniNum: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '700' },
   // Room events stay in the background of the conversation: no box shouting over people's messages.
   systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, maxWidth: '92%' },
   systemText: { color: '#B9C7DE', fontSize: 12 },

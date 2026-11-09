@@ -3,8 +3,8 @@
 // replays anything. A reader scrolled up is never pulled down by new events; a pill offers to jump instead.
 // The chat keeps the height the person chose (drag the handle above the tabs, or tap it: lib/room-chat-size);
 // the stage above takes what is left, so banners and mics coming and going never make the chat jump. The tab
-// at the handle's right is the room's Küçült / Büyüt: Küçült draws the mics smaller and gives the chat the room
-// they free (the largest chat); Büyüt brings the mics back to their size and the chat to the size it had.
+// at the handle's right is the room's Küçült / Büyüt: Küçült turns the mics into a short strip and the chat takes
+// all the room below it; Büyüt brings the mics back to their size and the chat to the size it had.
 // While typing the chat keeps only a strip above the keyboard and the mics stay in view.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,12 +52,18 @@ export function ChatFeed({
 }) {
   const [tab, setTab] = useState<FeedTab>('all');
   const height = useChatHeight(screenHeight);
+  // Large (Küçült): the chat grows into whatever the mic strip leaves; otherwise it keeps its chosen height.
+  const [large, setLarge] = useState(() => isLargeChat(height.share));
   const told = useRef(onLarge);
   useEffect(() => {
     told.current = onLarge;
   });
   useEffect(() => {
-    const f = () => told.current?.(isLargeChat(height.share));
+    const f = () => {
+      const l = isLargeChat(height.share);
+      setLarge(l);
+      told.current?.(l);
+    };
     height.listeners.add(f);
     return () => void height.listeners.delete(f);
   }, [height]);
@@ -70,7 +76,7 @@ export function ChatFeed({
     [messages, visible],
   );
   return (
-    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : { height: height.value, flexShrink: 1, minHeight: 96 }]}>
+    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { height: height.value, flexShrink: 1, minHeight: 96 }]}>
       {!fill && (
         <View>
           <Handle height={height} />
@@ -255,6 +261,8 @@ const s = StyleSheet.create({
   hidden: { display: 'none' },
   // Typing: at least a strip of chat; it grows into whatever the mics leave above the keyboard.
   typing: { flexGrow: 1, flexShrink: 1, flexBasis: 88, minHeight: 88 },
+  // Küçült: everything the mic strip leaves.
+  grow: { flexGrow: 1, flexShrink: 1, flexBasis: 160, minHeight: 120 },
   handle: { height: 22, alignItems: 'center', justifyContent: 'center' },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.38)' },
   fold: { position: 'absolute', right: 0, top: 0, height: 22, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },

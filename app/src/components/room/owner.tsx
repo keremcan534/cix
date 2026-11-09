@@ -1051,8 +1051,25 @@ function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen:
 }
 
 // --- Boss seat ("Dümen Koltuğu") ---------------------------------------------------------
-export function BossSeat({ userId, speaking, onPress }: { userId: string | null; speaking: boolean; onPress: () => void }) {
+export function BossSeat({ userId, speaking, onPress, mini }: { userId: string | null; speaking: boolean; onPress: () => void; /** Küçült: a small gold ring in the mic strip (`size` its avatar, `width` its slot). */ mini?: { size: number; width: number } }) {
   const u = userId ? userById(userId) : null;
+  if (mini) {
+    const ring = mini.size + 6;
+    return (
+      <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: mini.width }} accessibilityLabel={u ? `Dümen koltuğu: ${userId === 'me' ? 'sen' : u.name}` : 'Dümen koltuğu, boş'}>
+        <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={{ width: ring, height: ring, borderRadius: ring / 2, alignItems: 'center', justifyContent: 'center' }}>
+          {u ? (
+            <Photo uri={u.avatar} kind="face" style={{ width: mini.size, height: mini.size, borderRadius: mini.size / 2 }} />
+          ) : (
+            <View style={[styles.bossEmpty, { width: mini.size, height: mini.size, borderRadius: mini.size / 2 }]}>
+              <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
+            </View>
+          )}
+        </LinearGradient>
+        <Text style={[styles.bossTag, { fontSize: 9 }]}>DÜMEN</Text>
+      </Pressable>
+    );
+  }
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Dümen koltuğu">
       <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>

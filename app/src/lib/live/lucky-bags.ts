@@ -86,7 +86,8 @@ const POLL_MS = 15_000;
  * then while any is open. Bags past their time drop off here. `onNew` hears of each bag the first time a read
  * brings it (a bag `put` here never comes to it).
  */
-export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag) => void) {
+/** `onNew(bag, fresh)`: a bag seen for the first time; `fresh` when it came after the room's first answer (just dropped). */
+export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag, fresh: boolean) => void) {
   const [state, setState] = useState<{ room: string; bags: Bag[]; rules: BagRules }>({ room, bags: [], rules: BAG_DEFAULTS });
   const [n, setN] = useState(0);
   const [now, setNow] = useState(() => serverNow());
@@ -95,6 +96,8 @@ export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag) => void)
     heard.current = onNew;
   });
   const seen = useRef(new Set<number>());
+  // The bags already there when the room opened are no news: only later ones are "fresh".
+  const loaded = useRef(false);
   useEffect(() => {
     if (!on) return;
     let alive = true;
@@ -104,8 +107,9 @@ export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag) => void)
         for (const b of r.bags) {
           if (seen.current.has(b.id)) continue;
           seen.current.add(b.id);
-          heard.current?.(b);
+          heard.current?.(b, loaded.current);
         }
+        loaded.current = true;
         setState({ room, bags: r.bags, rules: r.rules });
       })
       .catch(() => {});

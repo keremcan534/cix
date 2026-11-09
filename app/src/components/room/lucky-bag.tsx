@@ -1,10 +1,12 @@
 // Şanslı çanta in a server room (lib/live/lucky-bags): the sheet that drops one (coins or gifts, how many shares,
-// when it opens, followers only), the bag floating over the room while one is open, and the card that opens it and
-// shows who took what. The server takes the coins, draws the shares and pays; this only shows its answers.
+// when it opens, followers only), the show when one is dropped (it comes down at the top, the room dims and bags
+// fall), the bag floating over the room while one is open, and the card that opens it and shows who took what.
+// The server takes the coins, draws the shares and pays; this only shows its answers.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GiftArt } from '@/components/GiftArt';
 import { Icon3D } from '@/components/Icon3D';
@@ -178,6 +180,104 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
         </Pressable>
       </View>
     </Modal>
+  );
+}
+
+/** One falling bag: where it starts across the screen, when it falls, how long it takes, how far it sways, its size. */
+type Drop = { x: number; delay: number; duration: number; sway: number; size: number };
+/** A new set of falling bags across `width`, spread so they don't bunch up (impure: once per show). */
+function makeDrops(count: number, width: number): Drop[] {
+  return Array.from({ length: count }, (_, i) => ({
+    x: Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 56)),
+    delay: Math.round(Math.random() * 1500),
+    duration: 1700 + Math.round(Math.random() * 1000),
+    sway: Math.round((Math.random() - 0.5) * 40),
+    size: 38 + Math.round(Math.random() * 16),
+  }));
+}
+const RAIN_DROPS = 14;
+
+/**
+ * A bag was just dropped in the room: it comes down at the top with who dropped it and what is in it, then the room
+ * dims a little and bags fall from the top to the bottom. A tap on a falling bag or on the top card opens the bag;
+ * the show ends by itself after about five seconds and never blocks the room (only the bags take touches).
+ * Reduce motion: the top card alone, a little longer.
+ */
+export function LuckyBagRain({ bag, width, height, still, onOpen, onDone }: { bag: Bag; width: number; height: number; still?: boolean; onOpen: (b: Bag) => void; onDone: () => void }) {
+  const { top } = useSafeAreaInsets();
+  const [intro] = useState(() => new Animated.Value(0));
+  const [dim] = useState(() => new Animated.Value(0));
+  const [drops] = useState(() => makeDrops(still ? 0 : RAIN_DROPS, width));
+  const [falls] = useState(() => drops.map(() => new Animated.Value(0)));
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  useEffect(() => {
+    const show = Animated.sequence([
+      Animated.spring(intro, { toValue: 1, useNativeDriver: true, bounciness: 10, speed: 9 }),
+      Animated.delay(still ? 2600 : 450),
+      Animated.parallel([
+        Animated.timing(dim, { toValue: 1, duration: 380, useNativeDriver: true }),
+        ...falls.map((v, i) =>
+          Animated.sequence([Animated.delay(drops[i].delay), Animated.timing(v, { toValue: 1, duration: drops[i].duration, easing: Easing.in(Easing.quad), useNativeDriver: true })]),
+        ),
+      ]),
+      Animated.parallel([
+        Animated.timing(dim, { toValue: 0, duration: 420, useNativeDriver: true }),
+        Animated.timing(intro, { toValue: 0, duration: 320, useNativeDriver: true }),
+      ]),
+    ]);
+    show.start(({ finished }) => finished && done.current());
+    return () => show.stop();
+  }, [intro, dim, falls, drops, still]);
+
+  const open = () => onOpen(bag);
+  return (
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.rainDim, { opacity: dim }]} />
+      {drops.map((d, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            s.drop,
+            {
+              left: d.x,
+              transform: [
+                { translateY: falls[i].interpolate({ inputRange: [0, 1], outputRange: [0, height + 160] }) },
+                { translateX: falls[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, d.sway, 0] }) },
+                { rotate: falls[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-14deg', '12deg', '-8deg'] }) },
+              ],
+            },
+          ]}
+        >
+          <Pressable onPress={open} hitSlop={10} accessibilityRole="button" accessibilityLabel="Şanslı çantayı aç">
+            <Image source={ROOM_ICON_ART.envelope} style={{ width: d.size, height: d.size }} />
+          </Pressable>
+        </Animated.View>
+      ))}
+      <Animated.View
+        style={[
+          s.rainCard,
+          { top: top + 64, opacity: intro, transform: [{ translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [-140, 0] }) }, { scale: intro.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) }] },
+        ]}
+      >
+        <Pressable onPress={open} style={s.rainInner} accessibilityRole="button" accessibilityLabel={`${bag.mine ? 'Şanslı çanta attın' : `${bag.from.name} Şanslı çanta attı`}: ${bagWhat(bag)}, ${bag.packets} pay. Açmak için dokun`}>
+          <Image source={ROOM_ICON_ART.envelope} style={{ width: 56, height: 56 }} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={s.rainTitle} numberOfLines={1}>
+              {bag.mine ? 'Şanslı çanta attın' : `${bag.from.name} Şanslı çanta attı`}
+            </Text>
+            <Text style={s.rainSub} numberOfLines={1}>
+              {bagWhat(bag)} · {bag.packets} pay
+            </Text>
+          </View>
+          <View style={s.rainGo}>
+            <Text style={s.rainGoText}>Aç</Text>
+          </View>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -360,6 +460,15 @@ const s = StyleSheet.create({
   floatLine: { color: GOLD, fontSize: 12, fontWeight: '900', marginTop: 1 },
   badge: { position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: '#E5484D', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#140C04' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  // The drop show: a warm dark veil, bags falling from above the screen, and the card at the top.
+  rainDim: { backgroundColor: 'rgba(6,4,14,0.46)' },
+  drop: { position: 'absolute', top: -80 },
+  rainCard: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  rainInner: { width: '88%', maxWidth: 380, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#1A1208', borderWidth: 1.5, borderColor: GOLD, boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 22px rgba(246,189,96,0.35)' },
+  rainTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  rainSub: { color: GOLD, fontSize: 13, fontWeight: '700' },
+  rainGo: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: GOLD },
+  rainGoText: { color: '#1B1300', fontSize: 13, fontWeight: '900' },
   card: { width: '100%', maxWidth: 360, borderRadius: 26, padding: 18, backgroundColor: '#1A1208', borderWidth: 1, borderColor: 'rgba(246,189,96,0.4)', boxShadow: '0 20px 50px rgba(0,0,0,0.55)' },
   cardClose: { position: 'absolute', top: 14, right: 14, zIndex: 2 },
   from: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 26 },
