@@ -3560,8 +3560,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           <Text style={styles.gameChipText}>🎮 Oyun devam ediyor · aç</Text>
         </Pressable>
       )}
-      {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). */}
-      {full && !game && !combo && !moving && gamblingLevelOk(app.wealthLevel) && (
+      {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). It steps
+          aside while the emoji panel, the keyboard or a refusal note is up, so it never covers their text. */}
+      {full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && gamblingLevelOk(app.wealthLevel) && (
         <Pressable style={styles.wheelBtn} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
           <View style={styles.wheelDisc}>
             <Ionicons name="compass" size={26} color="#3A2A08" />
