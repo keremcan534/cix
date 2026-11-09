@@ -52,6 +52,12 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
   - liderin seçtiği etiket ve tema
 - **Uyum Köşesi:** Ailedeki gerçek ikililer ve İkili hediyesi.
 - **Diğer:** Keşfet'teki Aile kısayolu açıldı. Oda kartında oda sahibinin ailesi görünüyor.
+- **PR #87 ile eklenenler:**
+  - üye davet (lider ve yardımcı; davet edilen bildirim alır, Aile ekranında Katıl/Reddet)
+  - çevrim içi üyeler, odadaysa "Git"
+  - aile sıralaması (kendi ailen işaretli)
+  - aileyi şikâyet
+  - aile sohbetinde Görevler, Uyum Köşesi ve Ailem kısayolları
 
 ## Paket 4'te gelenler (bildirimler)
 
@@ -74,7 +80,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 
 | No | Madde | Durum | Not |
 |---|---|---|---|
-| 1 | Her yer simetrik ve okunur | Yarım | Kodda tarandı, her ekrana tek tek bakılmadı |
+| 1 | Her yer simetrik ve okunur | Telefonda denenmeli | 38 ekranın ilk görünümüne telefon boyunda (360 genişlik) bakıldı, bulunan çakışmalar düzeltildi (PR #87). Kaydırınca görünen kısımlara ve sadece canlı sürümde açılan ekranlara telefonda bakılmalı |
 | 2 | Para Çek'te Jeton Noktası | Çalışıyor | Aktif Jeton Noktası yoksa "Şu an aktif Jeton Noktası yok" yazar |
 | 3 | "Yayıncı ata" kalksın | Çalışıyor | |
 | 4 | Ajans koduyla katılma, 3 gün kuralı | Çalışıyor | 3 günü geçen kişi ajanssız kalır, sadece transferle bir ajansa girer |
@@ -103,7 +109,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 |---|---|---|---|
 | 1 | Yayına katılma modu herkeste aynı | Telefonda denenmeli | |
 | 2 | Mikrofon gürültü engelleme | Telefonda denenmeli | preview-94'ten beri APK'da |
-| 3 | Aile | Yarım | Hepsi sunucuda (Paket 3). İki eksik: haftalık aile bonusu sadece tahmin olarak görünüyor, ödemesi senin kararın. Sandıktaki çerçeve ve sohbet balonu henüz verilmiyor, sadece jeton |
+| 3 | Aile | Yarım | Hepsi sunucuda (Paket 3). PR #87: üye davet, çevrim içi üyeler, sıralama, şikâyet, sohbet kısayolları. İki eksik: haftalık aile bonusu sadece tahmin olarak görünüyor, ödemesi senin kararın. Sandıktaki çerçeve ve sohbet balonu henüz verilmiyor, sadece jeton |
 | 4 | Yayıncı profilinde ajans ve aile | Çalışıyor | |
 | 5 | Profilde kırmızı/mavi cinsiyet simgesi | Çalışıyor | |
 | 6 | Ajans sahibinin ana ekranı | Çalışıyor | |
@@ -146,8 +152,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 ## Kalanlar: tam liste
 
 **Yarım kalan işler (benim):**
-- Simetri (Belge 1, madde 1): her ekran tek tek açılıp kontrol edilmedi.
-- @bahset düzeltmesi: hazır, PR #87'de birleştirme bekliyor.
+- PR #87 birleştirme bekliyor: @bahset düzeltmesi, Aile eksikleri, simetri düzeltmeleri.
 - Aile sandığındaki çerçeve ve sohbet balonu: mağazaya eklenince sandıktan verilir.
 - Gezinme sadeleştirme planı: sana gösterilecek.
 

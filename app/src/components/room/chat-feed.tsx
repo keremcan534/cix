@@ -36,6 +36,7 @@ export function ChatFeed({
   fill,
   onLarge,
   onTouch,
+  sideRoom = 0,
 }: {
   messages: FeedMsg[];
   /** filter for the Tümü tab only (personal message settings) */
@@ -49,6 +50,8 @@ export function ChatFeed({
   onLarge?: (large: boolean) => void;
   /** Any touch on the chat (it is not taken from the list: scrolling still works). */
   onTouch?: () => void;
+  /** Room kept free on the right for a floating button over the chat, so no message runs under it. */
+  sideRoom?: number;
 }) {
   const [tab, setTab] = useState<FeedTab>('all');
   const height = useChatHeight(screenHeight);
@@ -91,7 +94,7 @@ export function ChatFeed({
         ))}
       </View>
       {TABS.map(([k]) => (
-        <FeedList key={k} data={data[k]} active={tab === k} empty={EMPTY[k]} renderItem={renderItem} />
+        <FeedList key={k} data={data[k]} active={tab === k} empty={EMPTY[k]} renderItem={renderItem} sideRoom={sideRoom} />
       ))}
     </Animated.View>
   );
@@ -200,7 +203,7 @@ function FoldTab({ height }: { height: ChatHeight }) {
   );
 }
 
-function FeedList({ data, active, empty, renderItem }: { data: FeedMsg[]; active: boolean; empty: string; renderItem: ListRenderItem<FeedMsg> }) {
+function FeedList({ data, active, empty, renderItem, sideRoom }: { data: FeedMsg[]; active: boolean; empty: string; renderItem: ListRenderItem<FeedMsg>; sideRoom: number }) {
   const ref = useRef<FlatList<FeedMsg>>(null);
   const [away, setAway] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -222,7 +225,7 @@ function FeedList({ data, active, empty, renderItem }: { data: FeedMsg[]; active
           inverted
           keyExtractor={(m) => m.id}
           renderItem={renderItem}
-          contentContainerStyle={{ gap: 6, paddingVertical: 8 }}
+          contentContainerStyle={{ gap: 6, paddingVertical: 8, paddingRight: sideRoom }}
           initialNumToRender={16}
           windowSize={9}
           scrollEventThrottle={100}

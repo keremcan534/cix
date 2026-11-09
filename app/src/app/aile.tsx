@@ -118,17 +118,22 @@ function DemoFamilies() {
                 <Text style={styles.rank}>{i + 1}</Text>
                 <Text style={{ fontSize: 32 }}>{f.emoji}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.title}>{f.name}</Text>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {f.name}
+                  </Text>
                   <Text style={styles.dim} numberOfLines={1}>
                     Lv.{lvl} · {f.members}/{familyCapacity(lvl)} üye
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                    {f.memberIds.slice(0, 5).map((id, j) => (
+                    {/* Three faces leave the bonus room on one line on a narrow phone. */}
+                    {f.memberIds.slice(0, 3).map((id, j) => (
                       <View key={id} style={{ marginLeft: j ? -8 : 0 }}>
                         <Avatar uri={userById(id).avatar} size={22} />
                       </View>
                     ))}
-                    <Text style={[styles.dim, { marginLeft: 8 }]}>Bonus {pct(RULES.familyRates[lvl - 1])}</Text>
+                    <Text style={[styles.dim, { marginLeft: 8, flexShrink: 1 }]} numberOfLines={1}>
+                      Bonus {pct(RULES.familyRates[lvl - 1])}
+                    </Text>
                   </View>
                 </View>
                 <Pressable

@@ -164,6 +164,8 @@ const nowMs = () => Date.now();
 const reactionKey = () => Date.now() + Math.random();
 /** A server room's slow mode: one chat line per 10 seconds for everyone but its staff (server/api/room-rules.mjs). */
 const SLOW_MS = 10_000;
+/** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
+const WHEEL_ROOM = 62;
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
 const stamp = () => Date.now();
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
@@ -511,6 +513,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (uid !== 'me') setPerson({ uid });
   }, [setPerson]);
   const [moving, setMoving] = useState<string | null>(null);
+  // The Rüzgâr Gülü shortcut floats over the chat's right side; while it shows, the chat keeps that side free.
+  const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && gamblingLevelOk(app.wealthLevel);
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
@@ -3048,7 +3052,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           )}
 
           {/* A touch on the stage or the chat closes the emoji panel (as does the back button). */}
-          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} />
+          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
 
           {emojiOpen && (
             <EmojiPanel
@@ -3562,7 +3566,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       )}
       {/* Rüzgâr Gülü shortcut: one tap from the room, only where the Oyun Salonu exists (Cömertlik Lv.2+). It steps
           aside while the emoji panel, the keyboard or a refusal note is up, so it never covers their text. */}
-      {full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && gamblingLevelOk(app.wealthLevel) && (
+      {wheelShown && (
         <Pressable style={styles.wheelBtn} onPress={() => (setGame({ kind: 'wheel' }), setGameMin(false))} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü">
           <View style={styles.wheelDisc}>
             <Ionicons name="compass" size={26} color="#3A2A08" />
