@@ -215,4 +215,17 @@ describe('Profil fotoğrafı sunucuya yüklenir', () => {
     assert.equal(imageType('file:///a.PNG?x=1', null, ''), 'image/png');
     assert.equal(imageType('file:///a', undefined, ''), 'image/jpeg');
   });
+
+  test('fotoğraf yüklenmeden önce küçülür: uzun kenarı sınıra iner, küçükse boyutu değişmez', async () => {
+    const { shrinkSize, PHOTO_KEEP } = await profile();
+    assert.deepEqual(shrinkSize(4000, 3000, 1280), { width: 1280 });
+    assert.deepEqual(shrinkSize(3000, 4000, 1280), { height: 1280 });
+    assert.equal(shrinkSize(1280, 960, 1280), null);
+    assert.equal(shrinkSize(0, 0, 1280), null, 'boyutu bilinmiyorsa önce okunur');
+    // Small enough to look the same on a phone, well inside the server's caps (media.mjs: 5 MB, 8 MB).
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(PHOTO_KEEP).map(([k, v]) => [k, v.side])),
+      { avatar: 640, moment: 1280, dm: 1280, notice: 1600 },
+    );
+  });
 });

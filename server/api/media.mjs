@@ -7,6 +7,10 @@
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
 // Settings in the server's .env: S3_ENDPOINT (https://<account>.r2.cloudflarestorage.com), S3_BUCKET,
 // S3_REGION (R2: auto), S3_KEY, S3_SECRET, S3_PUBLIC_URL (the bucket's public https address or CDN domain).
+//
+// Files no longer used are deleted (removeFiles, removeUserFiles): an avatar replaced, a moment its author
+// deletes, a track taken out of a library, a removed notice, and every file of a deleted account (UK GDPR
+// erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
 // Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
 // 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one.
 import crypto from 'node:crypto';
@@ -18,9 +22,11 @@ const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', '
 const AUDIO = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const KINDS = {
   avatar: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 5 * 1024 * 1024 },
-  moment: { types: Object.keys(TYPES), max: 50 * 1024 * 1024 },
+  // Photos only (the app posts no video). The app shrinks a photo before it uploads (lib/live/profile
+  // uploadPhoto), so these caps only stop a file sent around the app.
+  moment: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   // A photo in a chat (messages.mjs; who may send one is checked when the message is sent).
-  dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 10 * 1024 * 1024 },
+  dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
   music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
 };
@@ -45,7 +51,7 @@ const enc = (s) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCo
  * An AWS Signature V4 presigned URL (query-string auth, unsigned payload). `headers` are signed too and must
  * be sent as given; `host` always is.
  */
-export function presign({ method, url, region, accessKey, secretKey, expires, headers = {}, now = new Date() }) {
+export function presign({ method, url, region, accessKey, secretKey, expires, headers = {}, query: extra = {}, now = new Date() }) {
   const u = new URL(url);
   const date = now.toISOString().replace(/[-:]|\.\d{3}/g, '');
   const day = date.slice(0, 8);
@@ -53,6 +59,7 @@ export function presign({ method, url, region, accessKey, secretKey, expires, he
   const all = Object.fromEntries(Object.entries({ host: u.host, ...headers }).map(([k, v]) => [k.toLowerCase(), String(v).trim()]));
   const names = Object.keys(all).sort();
   const query = {
+    ...extra,
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': `${accessKey}/${scope}`,
     'X-Amz-Date': date,
@@ -66,6 +73,154 @@ export function presign({ method, url, region, accessKey, secretKey, expires, he
   const key = hmac(hmac(hmac(hmac(`AWS4${secretKey}`, day), region), 's3'), 'aws4_request');
   const signature = crypto.createHmac('sha256', key).update(toSign).digest('hex');
   return `${u.origin}${path}?${qs}&X-Amz-Signature=${signature}`;
+}
+
+const storageOn = () => !!(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_KEY && env.S3_SECRET && env.S3_PUBLIC_URL);
+/**
+ * The storage's API address: S3_ENDPOINT without a trailing slash, and without the bucket's name when it was left
+ * at the end (Cloudflare's "S3 API" line shows it there). Kept, it would put every file one folder too deep, where
+ * the public address can't find it.
+ */
+export function endpointOf(e = env) {
+  const base = String(e.S3_ENDPOINT ?? '').trim().replace(/\/+$/, '');
+  const bucket = String(e.S3_BUCKET ?? '').trim();
+  return bucket && base.endsWith(`/${bucket}`) ? base.slice(0, -(bucket.length + 1)) : base;
+}
+/** A signed request to the bucket: `key` '' is the bucket itself (listing). */
+const signed = (method, key, query = {}) =>
+  presign({
+    method,
+    url: `${endpointOf()}/${env.S3_BUCKET}${key ? `/${key}` : ''}`,
+    region: env.S3_REGION ?? 'auto',
+    accessKey: env.S3_KEY,
+    secretKey: env.S3_SECRET,
+    expires: 60,
+    query,
+  });
+const FILE_KEY = /^(avatar|moment|dm|notice|music)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+
+/** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
+ *  `owner`, only a file that person uploaded. */
+export function keyOf(url, owner) {
+  const base = (env.S3_PUBLIC_URL ?? '').replace(/\/$/, '');
+  if (!base || typeof url !== 'string' || !url.startsWith(`${base}/`)) return null;
+  const key = url.slice(base.length + 1);
+  if (!FILE_KEY.test(key)) return null;
+  return owner && key.split('/')[1] !== owner ? null : key;
+}
+
+async function deleteKeys(keys) {
+  for (const key of keys) {
+    // A file a moderation decision points at stays: an appeal is decided on it.
+    if ((await db.query('SELECT 1 FROM moderation_evidence WHERE position($1 in content) > 0 LIMIT 1', [key])).rowCount) continue;
+    const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
+    // 404: already gone, which is what was wanted.
+    if (!res.ok && res.status !== 404) console.error('storage delete', res.status);
+  }
+}
+
+/** Every key under `prefix` (ListObjectsV2, a page of up to 1000 at a time). */
+async function listKeys(prefix) {
+  const keys = [];
+  let token = null;
+  do {
+    const res = await fetch(signed('GET', '', { 'list-type': '2', prefix, ...(token ? { 'continuation-token': token } : {}) }), { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`storage list ${res.status}`);
+    const xml = await res.text();
+    const unxml = (v) => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    for (const m of xml.matchAll(/<Key>([^<]*)<\/Key>/g)) keys.push(unxml(m[1]));
+    token = /<IsTruncated>true<\/IsTruncated>/.test(xml) ? unxml(xml.match(/<NextContinuationToken>([^<]*)<\/NextContinuationToken>/)?.[1] ?? '') || null : null;
+  } while (token);
+  return keys;
+}
+
+/** Done after the request that caused it, never failing it: storage being slow or down only leaves files. */
+const later = (what, fn) => {
+  const p = fn().catch((e) => console.error(what, String(e).slice(0, 200)));
+  pending.add(p);
+  p.finally(() => pending.delete(p));
+};
+const pending = new Set();
+/** Waits for the deletions started so far (tests). */
+export const storageSettled = () => Promise.all([...pending]);
+
+/** Deletes the files at these public addresses that are ours (with `owner`, only that person's). */
+export function removeFiles(urls, owner) {
+  const keys = [...new Set(urls.map((u) => keyOf(u, owner)).filter(Boolean))];
+  if (keys.length && storageOn()) later('storage delete failed', () => deleteKeys(keys));
+}
+
+/** Deletes every file a deleted account uploaded (its avatars, moment and chat photos, music). A notice's
+ *  picture stays: it is the company's, whoever put it up. */
+export function removeUserFiles(uid) {
+  if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
+  later('storage erase failed', async () => {
+    for (const kind of ['avatar', 'moment', 'dm', 'music']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+  });
+}
+
+/** What looks wrong in the storage settings `e`, by shape only (length and form, never a value). */
+export function storageNotes(e = env) {
+  const notes = [];
+  let host;
+  try {
+    const u = new URL(endpointOf(e));
+    host = u.hostname;
+    if (u.pathname.replace(/\/$/, '') !== '') notes.push('S3_ENDPOINT sonunda fazladan yol var (yalnızca https://….r2.cloudflarestorage.com olmalı)');
+  } catch {
+    return ['S3_ENDPOINT bir adres değil'];
+  }
+  if (!/^https:\/\/[^/]+/.test(e.S3_PUBLIC_URL)) notes.push('S3_PUBLIC_URL https:// ile başlamıyor');
+  if (/r2\.cloudflarestorage/.test(e.S3_PUBLIC_URL)) notes.push('S3_PUBLIC_URL depo adresi olmuş: açık adres (https://pub-….r2.dev) olmalı');
+  // The shapes Cloudflare's R2 token page gives.
+  const r2 = /\.r2\.dev$/.test(host) || /\.r2\.cloudflarestorage\.com$/.test(host) || /r2\.dev|cloudflare/.test(e.S3_PUBLIC_URL);
+  if (/\.r2\.dev$/.test(host)) notes.push('S3_ENDPOINT açık adres (r2.dev) olmuş: ….r2.cloudflarestorage.com olmalı');
+  else if (r2 && !/\.r2\.cloudflarestorage\.com$/.test(host)) notes.push('S3_ENDPOINT bir R2 adresi değil: ….r2.cloudflarestorage.com olmalı');
+  if (r2 && !/^[0-9a-f]{32}$/.test(e.S3_KEY)) notes.push(`S3_KEY bir Access Key ID'ye benzemiyor (32 karakter olmalı, ${e.S3_KEY.length})`);
+  if (r2 && !/^[0-9a-f]{64}$/.test(e.S3_SECRET)) notes.push(`S3_SECRET bir Secret Access Key'e benzemiyor (64 karakter olmalı, ${e.S3_SECRET.length})`);
+  if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(e.S3_BUCKET)) notes.push('S3_BUCKET bir kova adı değil (küçük harf, rakam ve - olmalı)');
+  return notes;
+}
+
+/**
+ * The storage settings checked end to end (run after a deploy, server.yml): a small file put exactly the way the
+ * phone puts a photo, read back through the public address, then deleted. The answer holds only status codes, the
+ * storage's error code (SignatureDoesNotMatch, NoSuchBucket…) and storageNotes, never a setting's value, so it can
+ * go in a log.
+ */
+export async function storageCheck() {
+  const missing = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_KEY', 'S3_SECRET', 'S3_PUBLIC_URL'].filter((k) => !env[k]);
+  if (missing.length) return `kapalı: ${missing.join(', ')} yok`;
+  const notes = storageNotes();
+  if (notes[0] === 'S3_ENDPOINT bir adres değil') return notes[0];
+  const key = `check/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.txt`;
+  const body = 'similar storage check';
+  const headers = { 'content-type': 'text/plain', 'content-length': String(Buffer.byteLength(body)) };
+  const signal = () => AbortSignal.timeout(10_000);
+  const codeOf = async (res) => `${res.status}${/<Code>([^<]{1,60})<\/Code>/.exec(await res.text().catch(() => ''))?.[1]?.replace(/^/, ' ') ?? ''}`;
+  const failed = (step, e) => `${step} bağlanamadı (${e?.cause?.code ?? e?.name ?? 'hata'})`;
+  const out = [];
+  let put;
+  try {
+    const url = presign({ method: 'PUT', url: `${endpointOf()}/${env.S3_BUCKET}/${key}`, region: env.S3_REGION ?? 'auto', accessKey: env.S3_KEY, secretKey: env.S3_SECRET, expires: 60, headers });
+    put = await fetch(url, { method: 'PUT', headers, body, signal: signal() });
+    out.push(`yükleme ${await codeOf(put)}`);
+  } catch (e) {
+    out.push(failed('yükleme', e));
+  }
+  if (put?.ok) {
+    try {
+      out.push(`açık adres ${(await fetch(`${env.S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`, { signal: signal() })).status}`);
+    } catch (e) {
+      out.push(failed('açık adres', e));
+    }
+    try {
+      out.push(`silme ${await codeOf(await fetch(signed('DELETE', key), { method: 'DELETE', signal: signal() }))}`);
+    } catch (e) {
+      out.push(failed('silme', e));
+    }
+  }
+  return [...out, ...notes].join(', ');
 }
 
 export const mediaRoutes = {
@@ -85,7 +240,7 @@ export const mediaRoutes = {
     const headers = { 'content-type': contentType, 'content-length': String(size) };
     const uploadUrl = presign({
       method: 'PUT',
-      url: `${env.S3_ENDPOINT.replace(/\/$/, '')}/${env.S3_BUCKET}/${key}`,
+      url: `${endpointOf()}/${env.S3_BUCKET}/${key}`,
       region: env.S3_REGION ?? 'auto',
       accessKey: env.S3_KEY,
       secretKey: env.S3_SECRET,

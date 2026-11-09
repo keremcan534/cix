@@ -15,6 +15,7 @@
 import { HttpError, auth, db, env, int, limit, readJson, text, userId } from './core.mjs';
 import { PERIODS, topBoard } from './gifts.mjs';
 import { notify } from './push.mjs';
+import { removeFiles } from './media.mjs';
 
 export const KINDS = ['event', 'update', 'reward', 'rule', 'notice'];
 const PAGE = 30;
@@ -159,8 +160,11 @@ export const teamRoutes = {
     const me = await admin(req);
     const b = await readJson(req);
     if (typeof b.id !== 'string' || !/^\d{1,18}$/.test(b.id)) throw new HttpError(400, 'Geçersiz istek');
-    const r = await db.query('UPDATE team_notices SET removed_at = now(), removed_by = $2 WHERE id = $1 AND removed_at IS NULL RETURNING id', [b.id, me.id]);
+    const r = await db.query('UPDATE team_notices SET removed_at = now(), removed_by = $2 WHERE id = $1 AND removed_at IS NULL RETURNING id, image_url', [b.id, me.id]);
     if (!r.rowCount) throw new HttpError(404, 'Duyuru bulunamadı');
+    // Its picture leaves the storage unless another notice still shows it.
+    const image = r.rows[0].image_url;
+    if (image && !(await db.query('SELECT 1 FROM team_notices WHERE image_url = $1 AND removed_at IS NULL LIMIT 1', [image])).rowCount) removeFiles([image]);
     return { removed: true };
   },
 };

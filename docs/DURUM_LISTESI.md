@@ -71,8 +71,23 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Mesajda fotoğraf:**
   - Yayıncıyla kalp seviyesi 3'te açılıyor.
   - Diğer kişilerle karşılıklı takipte açılıyor.
-  - Depo (R2) anahtarları girilince çalışır.
+  - Depo (R2) 9 Kasım'da kuruldu.
 - **Alt menü:** "Benzerler" artık "Ana Sayfa". Odalar'ın simgesi mikrofon oldu.
+
+## Depo (R2): kuruldu, az yer kaplıyor
+
+- **Kurulum:** Anahtarlar 9 Kasım'da girildi, sunucuya yazıldı. Fotoğraf ve şarkı yükleme açık.
+- **Fotoğraflar küçülüyor:** Telefon fotoğrafı yüklenmeden önce küçülüyor.
+  - Profil: 640 piksel. Anlar ve sohbet: 1280 piksel. Duyuru: 1600 piksel.
+  - Bir fotoğraf 3–8 MB yerine yaklaşık 150–300 KB tutuyor.
+  - Fotoğrafın içindeki gizli bilgiler (çekildiği yer, telefon) da siliniyor.
+- **Kullanılmayan dosyalar siliniyor:**
+  - değişen profil fotoğrafı
+  - sahibinin sildiği An (şikâyeti açıksa kanıt olarak kalır)
+  - kütüphaneden çıkan şarkı
+  - kaldırılan duyuru
+  - silinen hesabın bütün dosyaları (UK GDPR)
+- **Sınırlar:** Anlar sadece fotoğraf alıyor (video yok), Anlar ve sohbet fotoğrafı en fazla 8 MB.
 
 ---
 
@@ -88,7 +103,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 6 | Erkek yayıncı olamaz, erkekten komisyon yok | Çalışıyor | |
 | 7 | Gelir'de tüm kazanç ayrıntısı | Çalışıyor | |
 | 8–11 | Balkon, Aile, yeni rütbe adları | Çalışıyor | |
-| 12 | Anlar'da paylaşım ve hediye | Seviyeyle açılır | Paylaşım Yankı Lv.5'te açılır. Fotoğraf için depo (R2) gerekir. Hediye çalışıyor |
+| 12 | Anlar'da paylaşım ve hediye | Seviyeyle açılır | Paylaşım Yankı Lv.5'te açılır. Fotoğraf yükleme açık (R2 kuruldu). Hediye çalışıyor |
 | 13 | Oda menüsünde geri tuşu | Telefonda denenmeli | İki adım geri ve menüye dönüş Paket 2'de geldi |
 | 14 | Oda kartında tüm ayrıntılar | Çalışıyor | Kapak, oda üyeleri ve oda sahibinin ailesi var |
 | 15 | Oda ayarlarında her şey | Çalışıyor | Hepsi sunucuda. Mikrofon izni Lv.4, Dümen koltuğu Lv.3 odada açılır |
@@ -118,7 +133,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 9–12 | Eşleşme (3 hak, 58 saniye, ücretler) | Çalışıyor | İki karşı cinsten hesap aynı anda aramada olmalı |
 | 13 | Birebir: mesaj, sesli/görüntülü arama | Kurulum bekliyor | Uygulama kapalıyken arama çalması Firebase dosyaları girilince açılır |
 | 14, 16–18 | Ücretler, karşılıklı takipte mesaj ücretsiz | Çalışıyor | Ücretler sadece onaylı ajans yayıncısıyla konuşunca görünür. Yönetim panelinden değişir |
-| 15 | Kalp seviyesiyle arama açılması | Kurulum bekliyor | Arama kilitleri çalışıyor. Mesajda fotoğraf hazır (yayıncıyla kalp Lv.3), depo (R2) girilince çalışır |
+| 15 | Kalp seviyesiyle arama açılması | Telefonda denenmeli | Arama kilitleri çalışıyor. Mesajda fotoğraf (yayıncıyla kalp Lv.3) depo kurulunca açıldı |
 | 19 | Mesajda hediye | Çalışıyor | |
 | 20 | Ayarlar'da sürüm ve güncelleme | Çalışıyor | |
 | 21 | Oda sesi kapat düğmesi | Çalışıyor | |
@@ -132,7 +147,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 40 | @bahset | Yarım | Bahsetmeli mesaj iletişim filtresine takılıyordu. Düzeltmesi PR #87'de, sonraki APK'da gelir |
 | 41–42 | Kişi kartı | Çalışıyor | |
 | 43–44 | DJ yetkisi | Çalışıyor | |
-| 45 | Telefondan müzik çalma | Kurulum bekliyor | Depo (R2) anahtarları girilmeden şarkı yüklenmez |
+| 45 | Telefondan müzik çalma | Telefonda denenmeli | Depo (R2) kuruldu, şarkı yükleme açık |
 | 46 | "Benzer" yerine "Ana Sayfa" | Çalışıyor | Alt menüde de "Ana Sayfa" |
 | 47 | Cinsiyet filtresi kalksın | Çalışıyor | |
 | 48 | Öne çıkanlar | Çalışıyor | Onaylı yayıncı ya da harcama yapan biri olunca dolar |
@@ -142,7 +157,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 53 | Anlar'da spam ve görüntü filtresi | Yarım | Yazı filtreleniyor. Resimleri otomatik denetlemek için bir hizmet seçilmeli |
 | 54 | Anlar'da yorum, silme, beğeni | Çalışıyor | |
 | 55 | Odalar bannerları | Çalışıyor | Sadece "Sana yakın" sekmesinde |
-| 56 | Yönetimin etkinlik bannerı | Çalışıyor | Resim için depo (R2) gerekir |
+| 56 | Yönetimin etkinlik bannerı | Çalışıyor | Resim yükleme açık (R2 kuruldu) |
 | 57–58 | Mesajlar üst bölümleri | Çalışıyor | |
 | 59 | Similar Ekibi duyuruları | Çalışıyor | Telefona bildirimi Firebase girilince gelir |
 | 60 | Çevrim içi hizmet | Çalışıyor | Sık sorulanlar ve e-posta var, canlı destek yok |
@@ -160,7 +175,6 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Bildirimler (Firebase):** Arama çalması, mesaj, hediye ve duyuru bildirimleri için. GitHub Secrets'a iki dosya:
   - `GOOGLE_SERVICES_JSON`: Firebase'in Android dosyası (paket adı com.similarclub.app).
   - `FCM_SERVICE_ACCOUNT`: Firebase hizmet hesabı anahtarı.
-- **Depo (R2) anahtarları:** Anlar ve mesajda fotoğraf, şarkı yükleme, duyuru ve banner resimleri için. GitHub Secrets'a girilir.
 - **Haftalık aile bonusu:** Şu an sadece tahmin gösteriliyor. Ödenecekse kuralını sen belirle.
 - **Resim denetimi:** Anlar'daki resimleri otomatik denetlemek için bir hizmet seçilmeli.
 
