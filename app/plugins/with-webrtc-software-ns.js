@@ -10,12 +10,23 @@ const path = require('path');
 const FROM = '.setUseHardwareNoiseSuppressor(useHardwareAudioProcessing)';
 const TO = '.setUseHardwareNoiseSuppressor(false) // with-webrtc-software-ns';
 
+// The package's folder. Its "exports" do not list package.json, so resolve its entry and walk up to it.
+function livekitDir(root) {
+  let dir = path.dirname(require.resolve('@livekit/react-native', { paths: [root] }));
+  for (;;) {
+    const pkg = path.join(dir, 'package.json');
+    if (fs.existsSync(pkg) && JSON.parse(fs.readFileSync(pkg, 'utf8')).name === '@livekit/react-native') return dir;
+    const up = path.dirname(dir);
+    if (up === dir) throw new Error('with-webrtc-software-ns: @livekit/react-native not found');
+    dir = up;
+  }
+}
+
 module.exports = function withWebrtcSoftwareNs(config) {
   return withDangerousMod(config, [
     'android',
     async (cfg) => {
-      const pkg = require.resolve('@livekit/react-native/package.json', { paths: [cfg.modRequest.projectRoot] });
-      const file = path.join(path.dirname(pkg), 'android/src/main/java/com/livekit/reactnative/LiveKitReactNative.kt');
+      const file = path.join(livekitDir(cfg.modRequest.projectRoot), 'android/src/main/java/com/livekit/reactnative/LiveKitReactNative.kt');
       const src = fs.readFileSync(file, 'utf8');
       if (src.includes(TO)) return cfg;
       // A LiveKit update moved this line: stop the build rather than ship a denoise switch that does nothing.
