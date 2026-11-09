@@ -137,6 +137,20 @@ describe('Başkasının profili: gerçek sayılar', () => {
     assert.deepEqual(await loadPublicProfile(id), { followers: 0, following: 0, isFollowing: false, blockedByMe: true });
   });
 
+  test('ajansı ve ailesi profilin cevabından (cevapta yoksa yok)', async () => {
+    const { loadPublicProfile, tiesOf } = await profile();
+    const id = 'bbbbbbbb-0000-4000-8000-000000000004';
+    const user = { id, name: 'Ece', username: null, gender: null, age: null, city: null, bio: '', interests: [], avatarUrl: null, followers: 0, following: 0, isFollowing: false, blockedByMe: false };
+    const shown = () => tiesOf(id);
+    assert.equal(shown(), undefined, 'okunmadan bilinmez');
+    route = (s) => (s.path === `/api/user?id=${id}` ? { body: { user, agency: { id: '7', name: 'Mavi' }, family: { id: '3', name: 'Martılar', role: 'helper' } } } : { status: 404 });
+    await loadPublicProfile(id);
+    assert.deepEqual(shown(), { agency: { id: '7', name: 'Mavi' }, family: { id: '3', name: 'Martılar', role: 'helper' } });
+    route = (s) => (s.path === `/api/user?id=${id}` ? { body: { user } } : { status: 404 });
+    await loadPublicProfile(id);
+    assert.deepEqual(shown(), { agency: null, family: null });
+  });
+
   test('takip sunucuya gider ve cevap sunucunun takip durumudur', async () => {
     const { followOnServer } = await profile();
     route = (s) => (s.path === '/api/follow' ? { body: { following: false } } : { status: 404 });

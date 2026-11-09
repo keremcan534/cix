@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useKeyboardOpen } from '@/lib/keyboard-open';
@@ -33,7 +33,6 @@ import {
   PollCreate,
   QuestionsSheet,
   ShareRoomSheet,
-  SoundSheet,
   EffectsSheet,
   type Goal,
   type ModLog,
@@ -46,7 +45,10 @@ import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLog
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
+import { LuckyBagCard, LuckyBagFloat, LuckyBagSheet, bagWhat } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
+import { PersonCard } from '@/components/room/person-card';
+import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
 import { EntryEffect, type EntryFx, type EntryShow } from '@/components/fx/entry';
 import { storeArtOf } from '@/components/StoreArt';
 import { ArtText, ROOM_ICON_ART } from '@/components/RoomArt';
@@ -59,12 +61,13 @@ import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
 import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
-import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
 import { SessionBanner, SessionTestSheet, closeRoomScreen } from '@/components/room/session-ui';
 import { ChatFeed } from '@/components/room/chat-feed';
+import { getChatShare, isLargeChat } from '@/lib/room-chat-size';
 import { InboxSheet, useInboxUnread } from '@/components/room/inbox-sheet';
 import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
@@ -74,16 +77,19 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
-import { callsAvailable, isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, liveGift, liveMode, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
-import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
+import { useRoomBags, type Bag } from '@/lib/live/lucky-bags';
+import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
+import { roomMusicAction, type MusicAction } from '@/lib/live/music';
+import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
@@ -139,7 +145,6 @@ import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp } from '@/store';
 import { similarity } from '@/lib/similarity';
 import { colors, gradient, semantic } from '@/theme';
-import { IS_DEMO } from '@/lib/build';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 
@@ -211,7 +216,7 @@ const syncServerStage = (id: string) =>
  * no sheet stays open and no visual-only loop runs. Connection, mic and leaving belong to lib/room-session.
  */
 /** Room menu items that only switch something on or off (or leave the room): nothing to come back from. */
-const MENU_TOGGLES = new Set(['denoise', 'queue']);
+const MENU_TOGGLES = new Set(['queue']);
 
 export function LiveRoom({ id, via, full }: { id: string; via?: string; full: boolean }) {
   const isOwn = id === 'yeni';
@@ -235,8 +240,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const announcement = isOwn ? myRoom.announcement : base!.announcement;
   const password = isOwn ? '' : (base!.password ?? '');
   // The classic grid's mic count (room settings; a server room: as the server keeps it, none = the level's most);
-  // a selected layout (lib/room-modes) replaces it.
-  const roomMics = isOwn ? myRoom.micCount : base!.micCount;
+  // a selected layout (lib/room-modes) replaces it. A server room takes it from the voice room's metadata first:
+  // it reaches every phone the moment it changes, while the room read can be older.
+  const roomMics = isOwn ? myRoom.micCount : real && liveState ? liveState.micCount : base!.micCount;
   const level = isOwn ? roomLevel(myRoom.xp) : (base!.level ?? 1);
   const agencyRoom = isOwn ? !!agencyId : !!base!.agency;
   const maxMics = micCapacity(agencyRoom, level);
@@ -263,6 +269,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Ranks (the server checks them, server/api/rooms.mjs): owner 3 > Süper Yönetici 2 > Yönetici 1 > member 0.
   // Nobody acts on their own rank or higher; the Süper Yönetici also edits the name, bulletin and events.
   const superIds = real ? staff.superAdmins : [];
+  // DJs (server rooms, server/api/music.mjs): the owner names them; they play music in the room and nothing else.
+  const djIds = real ? staff.djs : [];
   const rankOf = (uid: string) => (uid === hostId ? 3 : superIds.includes(uid) ? 2 : adminIds.includes(uid) ? 1 : 0);
   const myRank = rankOf('me');
   const rankLabel = (uid: string) => ['Üye', 'Yönetici', 'Süper Yönetici', 'Oda sahibi'][rankOf(uid)];
@@ -348,7 +356,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         .then(() => setRoomEdits((n) => n + 1))
         .catch(() => {});
     sync();
-    return onServerRoom(id, sync);
+    // A lost packet can't leave a phone behind for long: read again every minute too.
+    const every = setInterval(sync, 60_000);
+    const off = onServerRoom(id, sync);
+    return () => (clearInterval(every), off());
   }, [id, real]);
   // The voice room's metadata (the server writes it on every change; it arrives the moment it changes and on
   // joining) also carries the layout and mic count: every phone switches at once, without reading the room.
@@ -457,11 +468,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   if (view.total > peak) setPeak(view.total);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [seatMenu, setSeatMenu] = useState<{ anchor: Rect; title: string; items: SeatMenuItem[] } | null>(null);
+  // The person card (components/room/person-card): someone tapped on a mic, on the balcony list or in the chat.
+  // `manage`: room staff's actions on them (the seat menu), when there are any.
+  const [person, setPerson] = useState<{ uid: string; note?: string; manage?: () => void } | null>(null);
+  const openPerson = useCallback((uid: string) => {
+    if (uid !== 'me') setPerson({ uid });
+  }, [setPerson]);
   const [moving, setMoving] = useState<string | null>(null);
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
-  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'sound' | 'effects' | 'mod' | 'invite' | 'results' | 'session'>(null);
+  const [panel, setPanel] = useState<null | 'menu' | 'msgSettings' | 'info' | 'settings' | 'music' | 'envelope' | 'bag' | 'dice' | 'contrib' | 'requests' | 'poll' | 'goal' | 'events' | 'qa' | 'effects' | 'mod' | 'invite' | 'results' | 'session'>(null);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<RoomEvent[]>(() =>
@@ -539,7 +556,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [requests, setRequests] = useState<string[]>([]);
   const [envelope, setEnvelope] = useState<{ from: string; amount: number; count: number; seconds: number } | null>(null);
   const [dicePlays, setDicePlays] = useState(DAILY_DICE);
+  // Room music on this phone: on/off and how loud (a server room plays its music here, components/room/room-music).
   const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(0.65);
   const [music, setMusic] = useState<MusicState>(() => {
     const t = MUSIC_CATALOG.find((m) => m.id === base?.track);
     return { queue: t ? [t, ...MUSIC_CATALOG.filter((m) => m.id !== t.id).slice(0, 2)] : [], playing: !!t, position: 0 };
@@ -688,7 +707,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const gameEntry = { from: 'room' as const, roomId: id, roomTitle: title };
   // Table seats: me, people on the mics, then listeners (the game's own lobby, separate from room seats).
   const gamePlayers = [{ id: 'me', name: ME.name, avatar: app.me.avatar }, ...[...seatedOthers.map(userById), ...audience].slice(0, 5)];
-  const canControlMusic = canFunctions;
+  // A server room: the owner, its admins and its DJs play (the server checks it); the demo keeps the functions rule.
+  const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
+  // A server room's music, as the room metadata has it, played on this phone at the room's clock.
+  const liveMusic = real ? (liveState?.music ?? null) : null;
+  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled, musicVolume);
+  const shownMusic: MusicState = real
+    ? {
+        queue: nowMusic && liveMusic ? liveMusic.tracks.slice(nowMusic.index).map((t) => ({ id: t.key, title: t.title, artist: t.byName || 'Oda müziği', seconds: t.seconds })) : [],
+        playing: !!nowMusic && !nowMusic.paused,
+        position: nowMusic?.position ?? 0,
+      }
+    : music;
 
   const mask = (text: string) => words.reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
   // Room events arrive once by id (lib/chat-feed). While the connection is down they wait in a buffer and
@@ -726,6 +756,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   });
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
+  // Şanslı çanta in a server room (lib/live/lucky-bags): the room's open bags; a new one gets a line in the chat.
+  const bags = useRoomBags(id, real && unlocked, (b) => !b.mine && !blocked.has(b.from.id) && sysNote(`🧧 ${b.from.name} Şanslı çanta attı: ${bagWhat(b)} · ${b.packets} pay`));
+  const [bagOpen, setBagOpen] = useState<Bag | null>(null);
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
@@ -1214,7 +1247,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [envelopeLive]);
 
   // Shared music clock.
-  const musicPlaying = musicEnabled && music.playing && music.queue.length > 0;
+  const musicPlaying = !real && musicEnabled && music.playing && music.queue.length > 0;
   useEffect(() => {
     if (!musicPlaying) return;
     const t = setInterval(
@@ -1466,6 +1499,37 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       })),
     });
   };
+  // Server room, owner only: make someone DJ or take it back. The level's DJ count is checked here and on the server.
+  const setDj = (uid: string, on: boolean) => {
+    const target = toServer(uid);
+    if (!target || offlineBlocked()) return;
+    const name = userById(uid).name;
+    if (on && djIds.length >= djCapacity(level)) return showAlert('DJ kontenjanı dolu', `Lv.${level} odada en fazla ${djCapacity(level)} DJ olabilir. Oda seviyesi yükseldikçe artar.`);
+    staffAction('DJ değişmedi', () => roomSetDj(id, target, on), () => {
+      staff.reload();
+      logMod(on ? 'DJ yaptı' : 'DJ’likten aldı', name);
+      addMsg({ system: true, text: on ? `🎧 ${name} odanın DJ’i oldu` : `${name} artık DJ değil` });
+    });
+  };
+  // Server room, owner: the DJs (take it back), and someone in the room to make DJ.
+  const openDjs = () => {
+    setPanel(null);
+    const max = djCapacity(level);
+    const inRoom = [...new Set([...seatedOthers, ...audience.map((u) => u.id)])].filter((uid) => !!toServer(uid) && uid !== hostId && !adminIds.includes(uid) && !djIds.includes(uid));
+    const pickNew = () => {
+      setPanel(null);
+      menuReturn.current = 'settings';
+      if (!inRoom.length) return showAlert('Odada uygun kimse yok', 'DJ yapmak istediğin kişi odada olmalı. Yöneticiler zaten müzik çalabilir.');
+      setSheet({ title: 'Kimi DJ yapalım?', options: inRoom.slice(0, 30).map((uid) => ({ label: userById(uid).name, icon: 'person-add-outline' as const, onPress: () => setDj(uid, true) })) });
+    };
+    setSheet({
+      title: `DJ’ler · ${djIds.length}/${max}`,
+      options: [
+        ...djIds.map((uid) => ({ label: `${userById(uid).name} · DJ’likten al`, icon: 'remove-circle-outline' as const, onPress: () => setDj(uid, false) })),
+        ...(djIds.length < max ? [{ label: 'DJ ekle (odadakilerden)', icon: 'add-circle-outline' as const, onPress: pickNew }] : []),
+      ],
+    });
+  };
   const sendMicInvite = (uid: string, seat?: number) => {
     if (offlineBlocked()) return false;
     // A mic invite isn't carried to the other phone in a server room yet: say so instead of a pending invite.
@@ -1639,6 +1703,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 },
               ]
             : []),
+          // DJ (server rooms): plays music in the room, nothing else; an admin already can.
+          ...(real && !isAdmin && target
+            ? [
+                {
+                  key: 'dj',
+                  label: djIds.includes(uid) ? 'DJ’likten al' : 'DJ yap',
+                  icon: 'musical-notes-outline' as const,
+                  onPress: () => setDj(uid, !djIds.includes(uid)),
+                },
+              ]
+            : []),
           {
             key: 'black',
             label: 'Kara listeye ekle',
@@ -1678,7 +1753,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       // Plain members need no role word; the match fits in the menu's one-line title instead.
       const sim = simScores.get(uid);
       const parts = [`${index + 1}. koltuk`, u.name, rankOf(uid) > 0 && rankLabel(uid), sim !== undefined && `%${sim} benzer`].filter(Boolean);
-      return openSeatMenu(index, parts.join(' · '), items);
+      // Everyone gets the person card; what only staff can do stays in the seat menu behind its "Yönet".
+      const manage = items.filter((it) => !['profile', 'gift', 'dm'].includes(it.key)).map((it, i) => (i === 0 ? { ...it, dividerBefore: false } : it));
+      const note = [`${index + 1}. koltuk`, rankOf(uid) > 0 && rankLabel(uid), sim !== undefined && `%${sim} benzer`].filter(Boolean).join(' · ');
+      return setPerson({ uid, note, manage: manage.length ? () => openSeatMenu(index, parts.join(' · '), manage) : undefined });
     }
     if (index === 0) return isOwn ? sitMe(0) : undefined;
     if (canManage) {
@@ -1769,10 +1847,35 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (real && !sendSignal({ t: 'chat', text: msg.text })) return;
     setMessages((list) => mergeFeed(list.filter((m) => m.id !== msg.id), [{ id: msgId(), userId: 'me', text: msg.text, at: Date.now() }]));
   }, [real]);
+  // A line naming me (@bahset) stands out; a tap on someone's photo or name opens their person card.
+  const myName = app.me.name;
   const renderChat = useCallback(
-    ({ item }: { item: ChatMsg }) => <ChatLine msg={item} bubbleId={equipped.bubble} bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null} onRetry={retrySend} />,
-    [equipped.bubble, retrySend, roomBonds],
+    ({ item }: { item: ChatMsg }) => (
+      <ChatLine
+        msg={item}
+        bubbleId={equipped.bubble}
+        bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null}
+        onRetry={retrySend}
+        mentionsMe={!!item.userId && item.userId !== 'me' && mentions(item.text, myName)}
+        onPerson={openPerson}
+      />
+    ),
+    [equipped.bubble, retrySend, roomBonds, myName, openPerson],
   );
+  // @bahset: "@" in the line offers the people on the mics and the balcony; a pick (or the card's Bahset) writes "@Name ".
+  const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const mention = (uid: string) => {
+    editDraft((d) => insertMention(d, userById(uid).name));
+    setTimeout(() => inputRef.current?.focus(), 300);
+  };
+  const mentionQ = typing ? mentionQuery(draft) : null;
+  const mentionPeople =
+    mentionQ === null
+      ? []
+      : mentionPicks(
+          [...new Set([...view.micIds, ...view.balconyIds])].filter((u) => u !== 'me' && !blocked.has(u)).map(userById),
+          mentionQ,
+        );
 
   /** True when at least one recipient got the gift. */
   const deliverGifts = (gift: Gift, toIds: string[], count: number): boolean => {
@@ -2053,9 +2156,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     return { me, them, opponent };
   };
 
+  const liveMusicAct = (body: MusicAction) => void roomMusicAction(id, body).catch((e) => showAlert('Müzik değişmedi', errorText(e)));
   const music$ = {
-    toggle: () => setMusic((m) => ({ ...m, playing: !m.playing })),
-    next: () => setMusic((m) => ({ queue: m.queue.slice(1), playing: m.queue.length > 1, position: 0 })),
+    toggle: () => (real ? liveMusicAct({ action: nowMusic?.paused ? 'resume' : 'pause' }) : setMusic((m) => ({ ...m, playing: !m.playing }))),
+    next: () => (real ? liveMusicAct({ action: 'skip' }) : setMusic((m) => ({ queue: m.queue.slice(1), playing: m.queue.length > 1, position: 0 }))),
     add: (t: Track) => {
       setMusic((m) => ({ ...m, queue: [...m.queue, t], playing: m.queue.length === 0 ? true : m.playing }));
       addMsg({ system: true, text: `🎵 Sıraya eklendi: ${t.title}` });
@@ -2137,29 +2241,29 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items: [
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
         ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
-        ...(callsAvailable() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
-        // The room envelope isn't on the server: live mode doesn't offer it.
-        ...(!liveMode() ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel('envelope') }] : []),
-        { key: 'tasks', label: 'Merkez görevi', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
+        ...(oneOnOneOpen() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
+        // Live mode: the server's Şanslı çanta, in a server room only (lib/live/lucky-bags); the demo keeps its envelope.
+        ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
+        { key: 'tasks', label: 'Günlük görev', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
         { key: 'events', label: 'Aktivite', emoji: '🎉', art: ROOM_ICON_ART.activity, colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
-        ...(canFunctions
-          ? [
-              { key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') },
-              { key: 'goal', label: 'Topluluk hedefi', emoji: '🎯', art: ROOM_ICON_ART.goal, colors: ['#16A34A', '#0D9488'] as [string, string], onPress: () => setPanel('goal') },
-            ]
-          : []),
+        ...(canFunctions ? [{ key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') }] : []),
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
         { key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
       ],
     },
-    {
-      title: 'Oda Oyunları · ücretsiz',
-      variant: 'tile',
-      note: 'Herkes oynayabilir · oyun açıkken mikrofonun ve koltuğun aynen kalır',
-      items: gameCatalog.roomGames
-        .filter((g) => g.active)
-        .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('SOON' as const), onPress: () => openRoomGame(g.id) })),
-    },
+    // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
+    ...(canManage
+      ? [
+          {
+            title: 'Oda Oyunları · ücretsiz',
+            variant: 'tile',
+            note: 'Masayı sen açarsın, herkes katılır · oyun açıkken mikrofonun ve koltuğun aynen kalır',
+            items: gameCatalog.roomGames
+              .filter((g) => g.active)
+              .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('SOON' as const), onPress: () => openRoomGame(g.id) })),
+          } satisfies MenuSection,
+        ]
+      : []),
     // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it.
     // The section is gated on the level alone (the server-run wheel); casinoVisible gates the phone-decided games.
     ...(gamblingLevelOk(app.wealthLevel)
@@ -2179,29 +2283,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           } satisfies MenuSection,
         ]
       : []),
+    // Oda kartı, Oda ayarları, Yayına Katılma Modu, Odadakiler and Katkı sıralaması open from the room's top bar
+    // and its card, so the menu doesn't repeat them. Ses and Mikrofon denoise live in Efektler.
     {
-      title: 'Oda Araçları',
-      variant: 'tool',
-      items: [
-        { key: 'card', label: 'Oda kartı', icon: 'home-outline', onPress: () => setPanel('info') },
-        { key: 'settings', label: 'Oda ayarları', icon: 'settings-outline', onPress: () => setPanel('settings') },
-        ...(canStage ? [{ key: 'layout', label: 'Yayına Katılma Modu', icon: 'grid-outline' as const, onPress: () => (setPanel(null), setLayoutsOpen(true)) }] : []),
-        { key: 'invite', label: 'Arkadaş davet et', icon: 'person-add-outline', onPress: () => setPanel('invite') },
-        { key: 'listeners', label: 'Odadakiler', icon: 'people-outline', onPress: () => setPeopleOpen(true) },
-        { key: 'contrib', label: 'Katkı sıralaması', icon: 'trophy-outline', onPress: () => setPanel('contrib') },
-        ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: leaveQueue }] : []),
-        // Test: plays phone and server events (background, network, call, Bluetooth, permission, kick) on the session.
-        ...(IS_DEMO ? [{ key: 'session', label: 'Ses ve bağlantı testi', icon: 'pulse-outline' as const, onPress: () => setPanel('session') }] : []),
-      ],
-    },
-    {
-      title: 'Oda Ayarları',
+      title: 'Oda',
       variant: 'tool',
       items: [
         { key: 'share', label: 'Paylaş', icon: 'arrow-redo-outline', onPress: shareRoom },
-        { key: 'fx', label: 'Efektler', icon: 'sparkles-outline', badge: settings.effectsOff ? 'off' : 'on', onPress: () => setPanel('effects') },
-        { key: 'sound', label: 'Ses', icon: 'volume-high-outline', badge: settings.roomMuted ? 'off' : undefined, onPress: () => setPanel('sound') },
-        { key: 'denoise', label: 'Mikrofon denoise', icon: 'mic-circle-outline', badge: settings.micDenoise ? 'on' : 'off', onPress: () => setSetting('micDenoise', !settings.micDenoise) },
+        { key: 'fx', label: 'Efektler ve ses', icon: 'sparkles-outline', badge: settings.effectsOff ? 'off' : 'on', onPress: () => setPanel('effects') },
+        ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: leaveQueue }] : []),
       ],
     },
   ];
@@ -2219,6 +2309,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 ? [
                     { key: 'bans', label: 'Giriş yasakları', value: String(staff.bans?.length ?? 0), hint: 'Odadan atılanlar ve kara liste; yasağı buradan kaldırırsın', onPress: fromSettings(openBans) },
                     { key: 'admins', label: 'Oda yöneticileri', value: `${staff.admins.length}`, hint: 'Süper Yönetici: oda adı, bülten ve etkinlikler', onPress: fromSettings(openAdmins) },
+                    ...(myRole === 'owner'
+                      ? [{ key: 'djs', label: 'DJ’ler', value: `${djIds.length}/${djCapacity(level)}`, hint: 'Odada yalnızca müzik çalarlar; başka yetkileri yok', onPress: fromSettings(openDjs) }]
+                      : []),
                   ]
                 : []),
             ],
@@ -2228,8 +2321,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     {
       title: 'Benim ayarlarım',
       rows: [
-        { key: 'effects', label: 'Efekt ayarları', value: settings.effectsOff ? 'Kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
-        { key: 'sound', label: 'Ses ayarları', value: settings.roomMuted ? 'Oda sesi kapalı' : `%${Math.round(settings.voiceVolume * 100)}`, onPress: fromSettings(() => setPanel('sound')) },
+        { key: 'effects', label: 'Efektler ve ses', value: settings.roomMuted ? 'Oda sesi kapalı' : settings.effectsOff ? 'Efektler kapalı' : 'Açık', onPress: fromSettings(() => setPanel('effects')) },
         { key: 'msg', label: 'Mesaj ayarları', hint: 'Sohbette giriş, hediye ve bot mesajları', onPress: fromSettings(() => setPanel('msgSettings')) },
         { key: 'decor', label: 'Süsler', hint: 'Çerçeve, giriş efekti ve sohbet balonu (Mağaza)', onPress: () => ((menuReturn.current = null), setPanel(null), router.push('/magaza')) },
       ],
@@ -2355,7 +2447,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     kick: confirmKick,
     profile: (uid) => {
       setPeopleOpen(false);
-      router.push(`/kullanici/${uid}`);
+      openPerson(uid);
     },
     gift: (uid) => {
       setPeopleOpen(false);
@@ -2393,6 +2485,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       setInviteSeat(null);
       setSheet(null);
       setSeatMenu(null);
+      setPerson(null);
       setEmojiOpen(false);
       setPkSetup(false);
       setMoving(null);
@@ -2412,10 +2505,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** Mic-on-but-not-sending, for the mic button and screen readers. */
   const heldHint = block ? `Mikrofonun açık ama şu an ses gitmiyor: ${MIC_BLOCK_LABEL[block]}. Kapatmak için dokun` : undefined;
 
-  const small = capacity > 10;
+  // "Küçült" (the chat's fold tab, or a large chat): the mics are drawn smaller and the chat takes the room.
+  const [seatsSmall, setSeatsSmall] = useState(() => isLargeChat(getChatShare()));
+  // Classic mics are sized by how many there are: up to 8 guest mics go four to a row, more go five; Küçült
+  // fits one more per row. Each mic takes an equal share of the row and its avatar fills it (sharper faces).
+  const seatCols = Math.min(6, (allSeats.length - 1 <= 8 ? 4 : 5) + (seatsSmall ? 1 : 0));
+  const seatW = Math.floor((Math.min(win.width, 640) - 16) / seatCols);
+  const gridSlot: ArenaSlot = { width: seatW, size: Math.max(34, Math.min(64, seatW - (seatsSmall ? 24 : 20))) };
+  const small = gridSlot.size < 46;
   // Empty / locked / invite pending / mic on / mic off / muted by the room, per numbered mic.
   const slots = useMemo(() => slotStates(live, (uid) => uid === 'me' && !sending), [live, sending]);
-  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; next?: { index: number; gap: number } }) => {
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number } }) => {
     const uid = allSeats[i];
     const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
     return (
@@ -2441,8 +2541,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         camera={uid === 'me' && camOn}
         teamColor={teamColorOf(uid)}
         pkPoints={pkPointsOf(uid)}
-        avatarSize={extra?.slot?.size}
-        slotWidth={extra?.slot?.width}
+        avatarSize={extra?.slot?.size ?? extra?.grid?.size}
+        slotWidth={extra?.slot?.width ?? extra?.grid?.width}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
         onPress={() => onSeatPress(i)}
       />
@@ -2538,10 +2638,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           </View>
 
           {/* Stage: boards and mics, in what the chat leaves (the chat keeps the height the person chose, so it never
-              jumps when a banner comes or goes); scrolls when taller. Folded away (still mounted) while typing, so the
-              chat keeps its lines above the keyboard. */}
-          <ScrollView style={{ flex: 1, minHeight: 120, display: typing ? 'none' : 'flex' }} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
-            {musicEnabled && <MusicBar music={music} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
+              jumps when a banner comes or goes); scrolls when taller. While typing the mics stay in view: the stage
+              keeps its height and only the chat gives way to the keyboard (down to a strip). */}
+          <ScrollView style={typing ? { flexGrow: 0, flexShrink: 1 } : { flex: 1, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+            {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
             {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage && !offline} />}
@@ -2618,7 +2718,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
                   </View>
                 )}
-                <StageLayout layout={layout} width={win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
+                <StageLayout layout={layout} width={seatsSmall ? Math.round(win.width * 0.8) : win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
               </>
             ) : (
               <View style={styles.seatGrid}>
@@ -2628,8 +2728,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
                   </View>
                 )}
-                {/* Seat 0 has its own row; the others wrap five to a row (20 % each, no gap). */}
-                {allSeats.map((_, i) => (bossOn && i === 0 ? null : renderSeat(i, i >= 1 && i + 1 < allSeats.length && (i - 1) % 5 !== 4 ? { next: { index: i + 1, gap: 0 } } : undefined)))}
+                {/* Seat 0 has its own row; the others wrap `seatCols` to a row (equal widths, no gap). */}
+                {allSeats.map((_, i) =>
+                  bossOn && i === 0
+                    ? null
+                    : i === 0
+                      ? renderSeat(0, seatsSmall ? { grid: { width: 0 /* keeps its own row */, size: 48 } } : undefined)
+                      : renderSeat(i, { grid: gridSlot, next: i + 1 < allSeats.length && (i - 1) % seatCols !== seatCols - 1 ? { index: i + 1, gap: 0 } : undefined }),
+                )}
               </View>
             )}
           </ScrollView>
@@ -2644,10 +2750,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             />
           )}
 
-          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} />
+          {/* A touch on the stage or the chat closes the emoji panel (as does the back button). */}
+          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} />
 
           {emojiOpen && (
             <EmojiPanel
+              onClose={() => setEmojiOpen(false)}
               onAnimate={sendAnim}
               hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
               onPick={(e) => {
@@ -2667,6 +2775,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </View>
           ) : null}
           <ContactNote text={chatRefused} />
+          {mentionPeople.length > 0 && (
+            <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mentionRow}>
+              {mentionPeople.map((u) => (
+                <Pressable key={u.id} style={styles.mentionChip} onPress={() => editDraft((d) => insertMention(d, u.name))} accessibilityRole="button" accessibilityLabel={`${u.name} kişisinden bahset`}>
+                  <Avatar uri={u.avatar} name={u.name} size={22} />
+                  <Text style={styles.mentionName} numberOfLines={1}>
+                    {u.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
           {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
               field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
           <View style={styles.bottom}>
@@ -2676,6 +2796,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />
               </Pressable>
               <TextInput
+                ref={inputRef}
                 value={draft}
                 onChangeText={editDraft}
                 onSubmitEditing={() => send()}
@@ -2697,16 +2818,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             )}
             {!typing && roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
             {!typing && <RoundBtn label="Mesajlar" icon="chatbubble-ellipses" onPress={() => setInboxOpen(true)} badge={inboxUnread} />}
-            {/* A speaker keeps the mic while typing; the raise-hand button waits. */}
-            {typing && !amSeated ? null : amSeated ? (
-              <MicBtn
-                state={!micOn ? 'off' : sending ? 'on' : 'held'}
-                caption={block ? HELD_CAPTION[block] : undefined}
-                hint={heldHint}
-                onPress={() => (voiceMuted && !micOn ? showSanction(voiceMuted) : !devicesBusy() && setMicOn((m) => !m))}
-              />
-            ) : (
-              <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
+            {/* The mic and "Oda sesi" side by side, small. A speaker keeps the mic while typing; the raise-hand button waits. */}
+            {typing && !amSeated ? null : (
+              <View style={styles.micGroup}>
+                {amSeated ? (
+                  <MicBtn
+                    state={!micOn ? 'off' : sending ? 'on' : 'held'}
+                    caption={block ? HELD_CAPTION[block] : undefined}
+                    hint={heldHint}
+                    onPress={() => (voiceMuted && !micOn ? showSanction(voiceMuted) : !devicesBusy() && setMicOn((m) => !m))}
+                  />
+                ) : (
+                  <MicBtn state={myQueuePos !== null ? 'queued' : 'hand'} queuePos={myQueuePos ?? undefined} onPress={raiseHand} />
+                )}
+                {!typing && <RoomSoundBtn muted={settings.roomMuted} onPress={() => setSetting('roomMuted', !settings.roomMuted)} />}
+              </View>
             )}
             {!typing && (
               <RoundBtn
@@ -2724,6 +2850,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </SafeAreaView>
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
+      {real && bags.bags.length > 0 && <LuckyBagFloat bags={bags.bags.filter((b) => !blocked.has(b.from.id))} now={bags.now} onOpen={setBagOpen} />}
 
       <GiftSheet
         key={giftOpen ? `gift-open-${giftTo}` : 'gift-closed'}
@@ -2842,6 +2969,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         classicLabel={`Klasik düzen · ${classicCapacity} mikrofon`}
         onPick={pickLayout}
       />
+      {real ? (
+        <LiveMusicSheet
+          visible={panel === 'music'}
+          onClose={closePanel}
+          room={id}
+          music={liveMusic}
+          np={nowMusic}
+          canPlay={canControlMusic}
+          enabled={musicEnabled}
+          setEnabled={setMusicEnabled}
+          volume={musicVolume}
+          setVolume={setMusicVolume}
+          onDone={(text) => addMsg({ system: true, text })}
+        />
+      ) : (
       <MusicSheet
         visible={panel === 'music'}
         onClose={closePanel}
@@ -2862,7 +3004,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         }}
         onReject={(i) => setMusicRequests((l) => l.filter((_, j) => j !== i))}
       />
+      )}
       <EnvelopeSendModal visible={panel === 'envelope'} onClose={closePanel} onSend={sendEnvelope} coins={coins} />
+      {real && panel === 'bag' && (
+        <LuckyBagSheet
+          visible
+          room={id}
+          rules={bags.rules}
+          coins={coins}
+          svipLevel={svipLevel}
+          onClose={closePanel}
+          onDropped={(b) => {
+            bags.put(b);
+            sysNote(`🧧 Şanslı çanta attın: ${bagWhat(b)} · ${b.packets} pay`);
+          }}
+        />
+      )}
+      {bagOpen && <LuckyBagCard bag={bagOpen} now={bags.now} onClose={() => setBagOpen(null)} onChange={bags.put} />}
       <DiceModal visible={panel === 'dice'} onClose={closePanel} onPlay={playDice} playsLeft={dicePlays} />
       <ContributionModal visible={panel === 'contrib'} onClose={closePanel} data={contrib} locked={isOwn && level < 3} />
       <RequestsModal
@@ -2947,12 +3105,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           if (q) addMsg({ system: true, text: `🎤 Seçilen soru (${userById(q.userId).name}): ${q.text}` });
         }}
       />
-      <SoundSheet
-        visible={panel === 'sound'}
-        onClose={closePanel}
-        settings={settings}
-        set={setSetting}
-      />
       <EffectsSheet
         visible={panel === 'effects'}
         onClose={closePanel}
@@ -3016,6 +3168,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       {full && myInvite && !offline && <MicInvitePrompt key={myInvite.id} invite={myInvite} onAnswer={answerMyInvite} />}
       {session && <SessionTestSheet visible={panel === 'session'} session={session} onClose={closePanel} onKickMe={kickMeTest} />}
       <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
+      {person && (
+        <PersonCard
+          uid={person.uid}
+          note={person.note}
+          onClose={() => setPerson(null)}
+          onGift={(uid) => (setGiftTo(uid), setGiftOpen(true))}
+          onMention={mention}
+          onReport={peopleActions.report}
+          onManage={person.manage}
+        />
+      )}
       {moving && (
         <Pressable style={styles.moveBanner} onPress={() => setMoving(null)} accessibilityLabel="Koltuk değiştirmeyi iptal et">
           <Text style={styles.moveText}>{userById(moving).name} için boş bir koltuğa dokun · iptal için buraya dokun</Text>
@@ -3087,6 +3250,10 @@ const styles = StyleSheet.create({
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },
+  mentionRow: { gap: 6, paddingHorizontal: 10, paddingTop: 4 },
+  mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  micGroup: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },

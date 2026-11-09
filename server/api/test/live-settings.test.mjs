@@ -100,7 +100,10 @@ describe('nothing saved', () => {
     assert.deepEqual(j.env, { featuresOff: ['dm'], notice: null, minVersion: null });
     assert.deepEqual(
       j.settings.map((x) => x.key),
-      ['features_off', 'notice', 'campaign', 'gifts_hidden', 'shop_hidden', 'packs_hidden', 'exchange_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
+      [
+        ...['features_off', 'notice', 'campaign', 'gifts_hidden', 'shop_hidden', 'packs_hidden', 'exchange_usd_try', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds', 'otp_global_per_hour', 'min_version'],
+        ...['dm_price', 'call_voice_price', 'call_video_price', 'match_voice_price', 'match_video_price', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'],
+      ],
     );
     const by = Object.fromEntries(j.settings.map((x) => [x.key, x]));
     for (const x of j.settings) {

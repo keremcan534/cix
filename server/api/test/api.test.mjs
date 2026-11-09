@@ -157,6 +157,28 @@ describe('Keşfet', () => {
     assert.ok(!j.users.some((u) => u.id === b.user.id), 'beni engelleyen görünmez');
     assert.equal((await call('GET', '/api/discover'))[0], 401);
   });
+
+  test('karşı cinsiyet; yeni üyeler; öne çıkanlar: erkeğe 1v1 kazanan yayıncılar, yayıncıya 1v1 harcayanlar', async () => {
+    const q = (s, p) => h.sql.query(s, p);
+    const [man, rich, newbie, star, quiet, woman] = await Promise.all(['Levent', 'Mert', 'Nuri', 'Oya', 'Pelin', 'Rana'].map((n) => signUp(n)));
+    await q("UPDATE users SET gender = 'Erkek' WHERE id = ANY($1::uuid[])", [[man, rich, newbie].map((x) => x.user.id)]);
+    await q("UPDATE users SET gender = 'Kadın' WHERE id = ANY($1::uuid[])", [[star, quiet, woman].map((x) => x.user.id)]);
+    await q("UPDATE users SET created_at = now() + interval '1 minute' WHERE id = $1", [newbie.user.id]);
+    const ids = async (s, list = '') => (await call('GET', `/api/discover${list && `?list=${list}`}`, null, s))[1].users.map((u) => u.id);
+    const home = await ids(man.session);
+    assert.ok(home.includes(star.user.id) && !home.includes(rich.user.id), 'erkek kadınları görür');
+    assert.ok((await ids(star.session)).includes(rich.user.id) && !(await ids(star.session)).includes(quiet.user.id), 'kadın erkekleri görür');
+    assert.equal((await ids(star.session, 'new'))[0], newbie.user.id, 'en yeni üye önce');
+    // Oya and Pelin are agency streamers; Mert sent Oya a gift in a private chat.
+    const [ag] = (await q("INSERT INTO agencies (code, name, level, status) VALUES ($1, 'Kıyı', 1, 'approved') RETURNING id", [`K${rnd(3).toUpperCase()}`])).rows;
+    await q("INSERT INTO agency_streamers (streamer_id, agency_id, method) VALUES ($1, $3, 'admin'), ($2, $3, 'admin')", [star.user.id, quiet.user.id, ag.id]);
+    await q("INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, place, ref) VALUES ($1, $2, 'gul', 1, 500, 500, 'chat', $3)", [rich.user.id, star.user.id, rnd(6)]);
+    const featured = await ids(man.session, 'featured');
+    assert.deepEqual(featured.slice(0, 2), [star.user.id, quiet.user.id], 'kazanan yayıncı önce, sonra öteki yayıncı');
+    assert.ok(!featured.includes(woman.user.id), 'yayıncı olmayan öne çıkmaz');
+    assert.deepEqual(await ids(star.session, 'featured'), [rich.user.id], 'yayıncıya 1v1 harcayan');
+    assert.equal((await call('GET', '/api/discover?list=hepsi', null, man.session))[0], 400);
+  });
 });
 
 describe('Mesajlar', () => {

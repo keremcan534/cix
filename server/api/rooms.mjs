@@ -15,11 +15,12 @@
 //   POST /api/rooms/mute   { room, user, kind: text|voice, minutes|null, reason, description? } → { sanction }
 //   POST /api/rooms/unmute { sanction, reason? }                            → { lifted }
 //   GET  /api/rooms/mutes?room=                                             → { mutes }    (owner or admin)
-//   GET  /api/rooms/staff?room=                                             → { owner, admins, bans? } (bans: staff only)
+//   GET  /api/rooms/staff?room=                                             → { owner, admins, djs, bans? } (bans: staff only)
 //   POST /api/rooms/seat   { room, action: remove|move, user, seat? }       → { done }     (owner or admin)
 //   POST /api/rooms/seat   { room, action: lock|unlock, seat }              → { lockedSeats }
 //   POST /api/rooms/queue  { room, action: join|leave }                     → { queue }    (the mic queue, when on)
 //   POST /api/rooms/queue  { room, action: approve|reject, user, seat? }    → { queue }    (owner or admin)
+// DJs and the room's music: music.mjs (a DJ plays music and is not staff: none of the above).
 // Ranks (migration 025): owner > Süper Yönetici > Yönetici > everyone else. Staff act only on people below their
 // own rank: a Yönetici on members, a Süper Yönetici also on Yöneticiler, the owner on everyone.
 // Room mutes are sanctions (sanctions.mjs): their own row, server time, audited. A room admin mutes for up to
@@ -34,6 +35,8 @@ import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomSe
 import { applySanction, audit, liftSanction } from './sanctions.mjs';
 import { vipLevelOf } from './catalog.mjs';
 import { statusOf } from './economy.mjs';
+// music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { clearRoomMusic, roomMusic } from './music.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -135,6 +138,7 @@ export async function pushRoomMeta(roomId) {
       micCount: r.mic_count ?? null,
       micQueue: !!r.mic_queue,
       queue: await queueOf(roomId),
+      music: await roomMusic(roomId),
     });
     const name = liveKitName(roomId);
     return await roomService('UpdateRoomMetadata', { room: name, metadata }, { roomAdmin: true, room: name });
@@ -150,11 +154,15 @@ export async function leftVoiceRoom(name, identity) {
   const r = await db.query('DELETE FROM room_mic_queue WHERE room_id = $1 AND user_id = $2', [m[1], identity]);
   if (r.rowCount) await pushRoomMeta(m[1]);
 }
-/** LiveKit opened the room (someone joined it while empty): nobody waits for a mic yet; it gets the room's mics. */
+/**
+ * LiveKit opened the room (someone joined it while empty): nobody waits for a mic yet and no music plays; it gets
+ * the room's mics.
+ */
 export async function voiceRoomStarted(name) {
   const m = ROOM_NAME.exec(name);
   if (!m) return;
   await db.query('DELETE FROM room_mic_queue WHERE room_id = $1', [m[1]]);
+  await clearRoomMusic(m[1]);
   await pushRoomMeta(m[1]);
 }
 /** A made-up or deleted account gets a 404, not a room_admins / room_bans row. */
@@ -181,7 +189,8 @@ const seatNo = (v) => int(v, 1, 99);
 export async function voiceAccess(name, u, password) {
   const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
   if (!m) {
-    if (PROTOTYPE_ROOMS) return;
+    // A 1v1 call's room (one-on-one.mjs) is only ever joined with the call's own token.
+    if (PROTOTYPE_ROOMS && !name.startsWith('call-')) return;
     throw new HttpError(404, 'Oda bulunamadı');
   }
   const r = await db.query('SELECT * FROM rooms WHERE id = $1', [m[1]]);
@@ -205,6 +214,14 @@ export async function voiceAccess(name, u, password) {
  * from it or from the app, and the owner hasn't blocked them. 'closed' when the room itself should end.
  */
 export async function mayStay(name, identity) {
+  // A 1v1 call (one-on-one.mjs): its two people, while it is live.
+  const call = /^call-(\d{1,18})$/.exec(name);
+  if (call) {
+    const k = await db.query('SELECT caller, callee, status FROM calls WHERE id = $1', [call[1]]);
+    if (!k.rowCount || k.rows[0].status !== 'live') return 'closed';
+    return identity === k.rows[0].caller || identity === k.rows[0].callee ? 'yes' : 'no';
+  }
+  if (name.startsWith('call-')) return 'closed';
   const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
   if (!m) return PROTOTYPE_ROOMS ? 'yes' : 'closed';
   const r = await db.query('SELECT id, owner, closed_at FROM rooms WHERE id = $1', [m[1]]);
@@ -343,6 +360,8 @@ export const roomRoutes = {
        ON CONFLICT (room_id, user_id) DO UPDATE SET super = coalesce($3::boolean, room_admins.super) RETURNING super`,
       [room.id, target, b.super ?? null],
     );
+    // An admin plays music anyway: no DJ seat kept for them.
+    await db.query('DELETE FROM room_djs WHERE room_id = $1 AND user_id = $2', [room.id, target]);
     return { admin: true, super: r.rows[0].super };
   },
 
@@ -446,8 +465,9 @@ export const roomRoutes = {
       'SELECT u.id, u.name, a.super FROM room_admins a JOIN users u ON u.id = a.user_id WHERE a.room_id = $1 AND u.deleted_at IS NULL ORDER BY a.super DESC, u.name, u.id',
       [room.id],
     );
+    const djs = await db.query('SELECT u.id, u.name FROM room_djs d JOIN users u ON u.id = d.user_id WHERE d.room_id = $1 AND u.deleted_at IS NULL ORDER BY d.created_at, u.id', [room.id]);
     const staff = room.owner === me.id || admins.rows.some((a) => a.id === me.id);
-    const result = { owner: room.owner, admins: admins.rows.map((a) => ({ id: a.id, name: a.name, super: a.super })) };
+    const result = { owner: room.owner, admins: admins.rows.map((a) => ({ id: a.id, name: a.name, super: a.super })), djs: djs.rows.map((d) => ({ id: d.id, name: d.name })) };
     if (!staff) return result;
     const bans = await db.query(
       'SELECT b.user_id, u.name, b.until FROM room_bans b JOIN users u ON u.id = b.user_id WHERE b.room_id = $1 AND (b.until IS NULL OR b.until > now()) ORDER BY b.created_at DESC LIMIT 200',

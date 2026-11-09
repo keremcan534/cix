@@ -81,8 +81,11 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     assert.equal(me.agencies[0].viewer, 'owner');
   });
 
-  test('[Ş1-2][Ş2-1] üst ajans alt ajans başvurusu oluşturur; onaydan önce yayıncı eklenemez, komisyon yok', async () => {
-    S = ok(await tOwner.post('/api/agency/sub/create', { parentId: T.id, name: 'Ay Ajans', owner: sOwner.id, region: 'İzmir', submit: true })).agency;
+  test('[Ş1-2][Ş2-1] alt ajansı yalnız yönetim ekler; onaydan önce yayıncı eklenemez, komisyon yok', async () => {
+    // A top agency sees its sub-agencies (Referans ajanslar) and never adds or approves one.
+    refused(await tOwner.post('/api/agency/sub/create', { parentId: T.id, name: 'Kendi Alt Ajansım', owner: sOwner.id, submit: true }), 403, 'üst ajans alt ajans ekleyemez');
+    assert.equal((await q("SELECT count(*)::int AS n FROM agency_audit WHERE actor_id = $1 AND result = 'denied' AND action = 'agencies.manage'", [tOwner.id]))[0].n, 1);
+    S = ok(await admin.post('/api/agency/sub/create', { parentId: T.id, name: 'Ay Ajans', owner: sOwner.id, region: 'İzmir', submit: true })).agency;
     assert.equal(S.status, 'pending');
     assert.equal(S.level, 2);
     assert.equal(S.parentId, T.id);
@@ -105,11 +108,23 @@ describe('Ajans ağı: kurulum ve hiyerarşi', () => {
     assert.deepEqual(hist.map((x) => x.to_status), ['draft', 'pending', 'approved']);
 
     await setting('subagency_policy', { approval: 'auto' });
-    S2 = ok(await tOwner.post('/api/agency/sub/create', { parentId: T.id, name: 'Güneş Ajans', owner: s2Owner.id, submit: true })).agency;
+    S2 = ok(await admin.post('/api/agency/sub/create', { parentId: T.id, name: 'Güneş Ajans', owner: s2Owner.id, submit: true })).agency;
     assert.equal(S2.status, 'approved', 'otomatik onay');
     await setting('subagency_policy', { approval: 'center' });
     // Two levels in this release: a sub-agency can't found its own.
     refused(await sOwner.post('/api/agency/sub/create', { parentId: S.id, name: 'Torun Ajans' }), 403, 'üçüncü katman');
+  });
+
+  test('üst ajansın koduyla başvuru da yönetimin onayını bekler; üst ajansa bilgi gider', async () => {
+    const codeT = (await q('SELECT code FROM agencies WHERE id = $1', [T.id]))[0].code;
+    const applicant = await account('Başvuran');
+    const r = ok(await applicant.post('/api/agency/apply', { name: 'Kod Ajans', parentCode: codeT }));
+    assert.equal(r.pendingWith, 'center');
+    assert.equal(r.agency.status, 'pending');
+    const nt = ok(await tOwner.get(`/api/agency/notices?id=${T.id}`)).notices;
+    assert.ok(nt.some((n) => n.kind === 'sub' && /Kod Ajans/.test(n.title)));
+    refused(await tOwner.post('/api/agency/sub/decide', { id: r.agency.id, approve: true }), 409, 'üst ajans karar veremez');
+    ok(await admin.post('/api/admin/agency/decide', { id: r.agency.id, approve: false, note: 'Test başvurusu' }));
   });
 
   test('[Ş1-4][Ş2-2] alt ajans yayıncı davet eder; kodla ve bağlantıyla doğrudan katılınır; yönetici atar', async () => {
@@ -207,6 +222,14 @@ describe('Komisyon motoru', () => {
     const [kt] = await commissionsOf(tA);
     assert.equal(num(kt.agency_amount), 4000, 'üst ajansın doğrudan yayıncısı: tam %40');
     assert.equal(kt.parent_agency_id, null);
+
+    // The top agency's panel: today / this week / this month per sub-agency, and per streamer.
+    const subS = ok(await tOwner.get(`/api/agency/subagencies?id=${T.id}`)).subagencies.find((x) => x.id === S.id);
+    assert.deepEqual(subS.gifts, { day: 45000, week: 45000, month: 45000 });
+    assert.deepEqual(subS.mine, { day: 6750, week: 6750, month: 6750 }, 'üst ajansa geçen fark: 45000 × %15');
+    const rowA = ok(await tOwner.get(`/api/agency/streamers?id=${T.id}&scope=sub`)).streamers.find((x) => x.id === sA.id);
+    assert.equal(rowA.week, 5000);
+    assert.equal(rowA.month, 5000);
   });
 
   test('[Ş1-9][Ş2-7] havuz sınırı: hiçbir kayıt %40ı aşmaz; aşan oran ve ayar reddedilir', async () => {

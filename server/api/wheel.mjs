@@ -42,7 +42,7 @@ export async function wealthPoints(c, userId) {
                             FROM jsonb_array_elements(coalesce(l.detail->'lots', '[]'::jsonb)) p
                             LEFT JOIN coin_lots k ON k.id = (p->>'lot')::bigint
                            WHERE p->>'channel' IN ('odul', 'ugurlu') OR k.refunded_by IS NOT NULL) x ON true
-      WHERE l.user_id = $1 AND l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|transfer|jeton gönder)'
+      WHERE l.user_id = $1 AND l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|çantası|transfer|jeton gönder)'
         AND l.reason !~ '^(Jeton Noktası satışı|İade:)'`,
     [userId],
   );

@@ -6,7 +6,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -30,7 +30,7 @@ import {
   useAsk,
   type Ask,
 } from '@/components/agency-net';
-import { Field, TransferCard, openOffice } from '@/components/agency-net-hub';
+import { HubSections, TransferCard, openOffice } from '@/components/agency-net-hub';
 import { InviteSheet } from '@/components/agency-invite-sheet';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
@@ -62,23 +62,26 @@ import {
   usdOf,
   type LedgerRow,
   type Overview,
+  type Streamer,
 } from '@/lib/agency-net';
+import { earningsCsv } from '@/lib/agency-export';
 import { NoAccess } from '@/components/no-access';
 import { showAlert } from '@/lib/alert';
-import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
-type Tab = 'summary' | 'streamers' | 'subs' | 'performance' | 'earnings' | 'requests' | 'team';
+type Tab = 'summary' | 'streamers' | 'subs' | 'performance' | 'earnings' | 'requests' | 'team' | 'more';
 type AskFn = (a: Ask) => Promise<{ reason: string; field: string } | null>;
 type Ctx = { o: Overview; id: string; name: string; demo: boolean; reload: () => void; ask: AskFn; can: (p: string) => boolean; acting: boolean };
 
 const METHOD_TEXT: Record<string, string> = { code: 'Kod', link: 'Bağlantı', invite: 'Davet', application: 'Başvuru', admin: 'Merkez' };
 
 export default function AgencyOffice() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  // hub=1: opened as the owner's agency entry (components/agency-net-hub), so the entry's other sections are a tab.
+  const params = useLocalSearchParams<{ id?: string; hub?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
+  const hub = params.hub === '1';
   const live = liveMode();
   const { me } = useApp();
   const q = useNet(me.name, () => agencyNet.overview(id), () => demoOverview(id || 'demo-top'), [id]);
@@ -89,11 +92,12 @@ export default function AgencyOffice() {
   const tabs: { key: Tab; label: string; perm?: string; badge?: number; hidden?: boolean }[] = [
     { key: 'summary', label: 'Özet' },
     { key: 'streamers', label: 'Yayıncılar', perm: 'streamers.view' },
-    { key: 'subs', label: 'Alt ajanslar', perm: 'subagencies.view', hidden: !!o && o.agency.level > 1, badge: o?.counts.pending_subs },
+    { key: 'subs', label: 'Referans ajanslar', perm: 'subagencies.view', hidden: !!o && o.agency.level > 1, badge: o?.counts.pending_subs },
     { key: 'performance', label: 'Performans', perm: 'reports.performance' },
     { key: 'earnings', label: 'Kazanç', perm: 'reports.commission' },
     { key: 'requests', label: 'Talepler', perm: 'streamers.view', badge: o ? o.counts.pending_requests + o.counts.pending_transfers : 0 },
     { key: 'team', label: 'Ekip', perm: 'staff.manage', hidden: !!o && !['owner', 'staff'].includes(o.viewer) },
+    { key: 'more', label: 'Diğer', hidden: !hub },
   ];
   const shown = tabs.filter((t) => !t.hidden);
   const cur = shown.find((t) => t.key === tab) ?? shown[0];
@@ -128,6 +132,8 @@ export default function AgencyOffice() {
                 <Earnings c={ctx} />
               ) : cur.key === 'requests' ? (
                 <Requests c={ctx} />
+              ) : cur.key === 'more' ? (
+                <HubSections />
               ) : (
                 <Team c={ctx} />
               )
@@ -326,18 +332,18 @@ function Actions({ c }: { c: Ctx }) {
     const r = await ask({ title: 'İtiraz', message: 'İtirazın merkeze iletilir ve sonuç bildirim olarak gelir.', reasonLabel: 'Açıklama', min: 10, confirm: 'İtirazı gönder' });
     if (r) await runAction(demo, () => agencyNet.appeal(id, subject, r.reason), 'İtirazın merkeze iletildi.', reload);
   };
-  const isParent = o.viewer === 'parent';
-  if (!c.acting && !(sub && isParent)) return null;
+  // The parent agency only views a sub-agency (Referans ajans): no actions here.
+  if (!c.acting) return null;
   return (
     <Section title="İşlemler">
       <Panel>
-        {sub && c.acting && c.can('transfers.manage') && !o.request && a.status === 'approved' && (
+        {sub && c.can('transfers.manage') && !o.request && a.status === 'approved' && (
           <>
             <Button title="Bağımsızlık talebi" variant="tonal" icon="flag-outline" onPress={independence} />
             <Button title="Üst ajans değiştir" variant="tonal" icon="swap-horizontal" onPress={changeParent} />
           </>
         )}
-        {sub && (isParent || (c.acting && c.can('transfers.manage'))) && ['approved', 'suspended'].includes(a.status) && <Button title="Alt ajansı kapat" variant="danger" icon="close-circle-outline" onPress={close} />}
+        {sub && c.can('transfers.manage') && ['approved', 'suspended'].includes(a.status) && <Button title="Alt ajansı kapat" variant="danger" icon="close-circle-outline" onPress={close} />}
         {c.acting && (
           <View style={{ gap: space.sm }}>
             <Text style={st.label}>İtiraz konusu</Text>
@@ -363,6 +369,7 @@ function Actions({ c }: { c: Ctx }) {
 function Streamers({ c }: { c: Ctx }) {
   const subsAllowed = c.o.agency.level === 1 && c.can('subagencies.view');
   const [scope, setScope] = useState<'direct' | 'sub'>('direct');
+  const [period, setPeriod] = useState<'week' | 'month'>('week');
   const q = useNet(c.name, () => agencyNet.streamers(c.id, scope), () => demoStreamers(c.id, scope), [c.id, scope]);
   const [inviting, setInviting] = useState(false);
   const invite = async () => {
@@ -372,6 +379,17 @@ function Streamers({ c }: { c: Ctx }) {
     const r = await c.ask({ title: 'Yayıncı davet et', message: 'Yayıncının profilindeki ID numarasını ya da kullanıcı adını yaz. Davet kabul edilince yayıncı ajansına bağlanır; başka bir ajansa bağlıysa transfer kuralları uygulanır.', field: { label: 'Profil ID’si veya kullanıcı adı', placeholder: 'Örn. 104829301457', caps: false }, reasonLabel: 'Davet notu', min: 0, confirm: 'Davet gönder', place: 'agency.invite' });
     if (r) await runAction(c.demo, () => inviteStreamer(c.id, r.field, r.reason || undefined), 'Davet gönderildi.', q.reload);
   };
+  // The weekly and monthly earnings as a table (opens in Excel), shared or sent by mail.
+  const title = `${c.o.agency.name} yayıncı kazançları (${fmtDate(new Date().toISOString())})`;
+  const send = async (rows: Streamer[], how: 'share' | 'mail') => {
+    if (!rows.length) return showAlert('Gönderilecek kayıt yok', 'Bu listede henüz yayıncı yok.');
+    const csv = earningsCsv(rows);
+    if (how === 'share') return void Share.share({ title, message: csv }).catch(() => {});
+    const url = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(csv)}`;
+    // Very long lists don't fit in a mail link: those go through the share sheet (any mail app is there too).
+    if (url.length > 7000) return void Share.share({ title, message: csv }).catch(() => {});
+    Linking.openURL(url).catch(() => showAlert('E-posta açılamadı', 'Telefonunda bir e-posta uygulaması bulunamadı. Paylaş ile gönderebilirsin.'));
+  };
   return (
     <View style={{ gap: space.lg }}>
       {subsAllowed && (
@@ -380,7 +398,7 @@ function Streamers({ c }: { c: Ctx }) {
           onChange={setScope}
           options={[
             ['direct', 'Doğrudan yayıncılar'],
-            ['sub', 'Alt ajans yayıncıları'],
+            ['sub', 'Referans ajans yayıncıları'],
           ]}
         />
       )}
@@ -388,27 +406,43 @@ function Streamers({ c }: { c: Ctx }) {
       {inviting && <InviteSheet agencyId={c.id} onClose={() => setInviting(false)} onSent={q.reload} />}
       <NetState q={q}>
         {(rows) => {
-          const total = rows.reduce((x, r) => x + r.diamonds30, 0);
+          const total = rows.reduce((x, r) => x + r[period], 0);
+          const sorted = [...rows].sort((x, y) => y[period] - x[period]);
           return (
             <View style={{ gap: space.lg }}>
+              <ChoiceChips
+                value={period}
+                onChange={setPeriod}
+                options={[
+                  ['week', 'Haftalık'],
+                  ['month', 'Aylık'],
+                ]}
+              />
               <KpiGrid>
                 <Kpi label="Yayıncı" icon="people-outline" value={String(rows.length)} sub={`${rows.filter((r) => r.active).length} aktif`} />
-                <Kpi label="30 gün hediye elması" icon="diamond-outline" tone="money" {...diamondsKpi(total)} />
+                <Kpi label={period === 'week' ? 'Bu hafta kazanç' : 'Bu ay kazanç'} icon="diamond-outline" tone="money" {...diamondsKpi(total)} />
               </KpiGrid>
+              {c.can('reports.export') && (
+                <View style={{ flexDirection: 'row', gap: space.sm }}>
+                  <Button title="CSV / Excel" variant="tonal" small icon="document-text-outline" onPress={() => void send(rows, 'share')} style={{ flex: 1 }} />
+                  <Button title="E-postayla gönder" variant="tonal" small icon="mail-outline" onPress={() => void send(rows, 'mail')} style={{ flex: 1 }} />
+                </View>
+              )}
               {rows.length === 0 ? (
                 <Empty icon="people-outline" text="Henüz yayıncı yok. Davet kodunu paylaşarak başlayabilirsin." />
               ) : (
-                <ListGroup footer="Yayıncı kazancı, yayıncının aldığı hediye elmaslarıdır; ajans komisyonu bu elmaslardan kesilmez.">
-                  {rows.map((r) => (
+                <ListGroup footer="Kazanç, yayıncının aldığı hediye elmaslarıdır; ajans komisyonu bu elmaslardan kesilmez. Hafta pazartesi, ay ayın 1’inde başlar (Türkiye saati).">
+                  {sorted.map((r) => (
                     <ListRow
                       key={r.id}
                       leading={<Mono name={r.name} active={r.active} />}
                       title={r.name}
                       subtitle={[r.username ? `@${r.username}` : null, scope === 'sub' ? r.agencyName : null, `${fmtDate(r.joinedAt)} · ${METHOD_TEXT[r.method] ?? r.method}`, `${Math.round(r.onlineHours30)} saat yayın`].filter(Boolean).join(' · ')}
                       right={
-                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                          <Text style={st.amount}>{fmtD(r.diamonds30)}</Text>
-                          <Text style={st.small}>{fmtUsd(r.usd30)}</Text>
+                        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                          <Text style={st.amount}>{fmtD(r[period])}</Text>
+                          <Text style={st.small}>{fmtUsd(usdOf(r[period]))}</Text>
+                          <Text style={st.small}>{period === 'week' ? `Bu ay ${fmtD(r.month)}` : `Bu hafta ${fmtD(r.week)}`}</Text>
                         </View>
                       }
                     />
@@ -432,22 +466,41 @@ function Mono({ name, active }: { name: string; active?: boolean }) {
   );
 }
 
-// --- Sub-agencies -------------------------------------------------------------------------------------------
+// --- Referans ajanslar (sub-agencies) ----------------------------------------------------------------------
+// Only the centre adds an agency under this one and approves it; this agency sees each one's figures and the
+// commission that passes to it, and never manages it (server/api/agency.mjs byCentre).
+const PERIODS = [
+  ['day', 'Bugün'],
+  ['week', 'Bu hafta'],
+  ['month', 'Bu ay'],
+] as const;
+
 function Subs({ c }: { c: Ctx }) {
   const q = useNet(c.name, () => agencyNet.subagencies(c.id), () => demoSubs(c.id), [c.id]);
-  const [open, setOpen] = useState(false);
   return (
     <View style={{ gap: space.lg }}>
-      <Text style={st.foot}>Alt ajans oranı performansa göre otomatik belirlenir: yüksek performans alt ajansın oranını artırır, üst ajans farkını azaltır (en az {fmtPct(0.01)}). Toplam havuz {fmtPct(c.o.poolCap)} ile sınırlıdır.</Text>
-      {c.acting && c.can('subagencies.manage') && c.o.agency.status === 'approved' && (open ? <CreateSub c={c} done={() => (setOpen(false), q.reload())} /> : <Button title="Alt ajans oluştur" icon="add-circle-outline" onPress={() => setOpen(true)} />)}
+      <Panel>
+        <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
+          <Ionicons name="shield-checkmark-outline" size={20} color={semantic.action} />
+          <Text style={[st.foot, { flex: 1 }]}>Referans ajansları yalnız yönetim ekler ve onaylar; onaylanan ajans burada görünür. Bu ajansları yönetemezsin: bilgilerini ve sana geçen komisyonu görürsün.</Text>
+        </View>
+      </Panel>
       <NetState q={q}>
-        {(d) =>
-          d.subagencies.length === 0 ? (
-            <Empty icon="git-branch-outline" text="Henüz alt ajans yok." />
+        {(d) => {
+          const open = d.subagencies.filter((s) => s.status === 'approved');
+          const sum = (p: 'day' | 'week' | 'month') => open.reduce((x, s) => x + s.mine[p], 0);
+          return d.subagencies.length === 0 ? (
+            <Empty icon="git-branch-outline" text="Henüz referans ajans yok. Yönetim bir ajansı altına eklediğinde burada görünür." />
           ) : (
             <View style={{ gap: space.md }}>
+              <KpiGrid>
+                <Kpi label="Bugün sana geçen" icon="today-outline" tone="money" {...diamondsKpi(sum('day'))} />
+                <Kpi label="Bu hafta" icon="calendar-outline" tone="money" {...diamondsKpi(sum('week'))} />
+                <Kpi label="Bu ay" icon="calendar-number-outline" tone="money" {...diamondsKpi(sum('month'))} />
+                <Kpi label="Referans ajans" icon="git-branch-outline" value={`${open.length} / ${d.subagencies.length}`} sub={`${open.reduce((x, s) => x + s.streamers, 0)} yayıncı`} />
+              </KpiGrid>
               {d.subagencies.map((s) => (
-                <Pressable key={s.id} onPress={() => openOffice(s.id)} accessibilityRole="button" accessibilityLabel={`${s.name} panelini aç`}>
+                <Pressable key={s.id} onPress={() => openOffice(s.id)} accessibilityRole="button" accessibilityLabel={`${s.name} bilgilerini aç`}>
                   <DepthCard style={st.sub}>
                     <View style={ns.rowBetween}>
                       <View style={{ flex: 1, gap: 4 }}>
@@ -463,63 +516,58 @@ function Subs({ c }: { c: Ctx }) {
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textDim} />
                     </View>
+                    <View style={st.table}>
+                      <View style={st.tRow}>
+                        <Text style={[st.tHead, st.tFirst]} />
+                        {PERIODS.map(([k, label]) => (
+                          <Text key={k} style={st.tHead}>
+                            {label}
+                          </Text>
+                        ))}
+                      </View>
+                      <View style={st.tRow}>
+                        <Text style={[st.tLabel, st.tFirst]}>Toplam hediye</Text>
+                        {PERIODS.map(([k]) => (
+                          <Text key={k} style={st.tCell}>
+                            {fmtD(s.gifts[k])}
+                          </Text>
+                        ))}
+                      </View>
+                      <View style={st.tRow}>
+                        <Text style={[st.tLabel, st.tFirst]}>Sana geçen</Text>
+                        {PERIODS.map(([k]) => (
+                          <Text key={k} style={[st.tCell, st.tMoney]}>
+                            {fmtD(s.mine[k])}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
                     {s.rate !== null && s.parentShare !== null && (
-                      <RateSplit rate={s.rate} parentShare={s.parentShare} poolCap={c.o.poolCap} ownLabel="Alt ajans" parentLabel="Sizin farkınız" note={false} />
+                      <RateSplit rate={s.rate} parentShare={s.parentShare} poolCap={c.o.poolCap} ownLabel="Referans ajans" parentLabel="Senin payın" note={false} />
                     )}
                     <View style={st.grid2}>
                       <Line label="Yayıncı" value={`${s.active} / ${s.streamers}`} />
                       <Line label="Puan" value={s.score === null ? '—' : `${fmtScore(s.score)}${s.rank ? ` · ${s.rank}.` : ''}`} />
-                      <Line label="30 gün hacim" value={`${fmtD(s.volume30)} elmas`} />
-                      <Line label="Sizin farkınız" value={`${fmtD(s.mine30)} elmas`} strong />
-                      {s.earned30 !== null && <Line label="Alt ajans kazancı" value={`${fmtD(s.earned30)} elmas`} />}
+                      {s.earned30 !== null && <Line label="Ajansın kazancı (30 gün)" value={`${fmtD(s.earned30)} elmas`} />}
                       {!!s.owner && <Line label="Yönetici" value={s.owner} />}
                     </View>
                     {s.upcoming && (
                       <Text style={st.foot}>
-                        {fmtDate(s.upcoming.effectiveFrom)} itibarıyla alt ajans oranı {fmtPct(s.upcoming.rate)} olacak.
+                        {fmtDate(s.upcoming.effectiveFrom)} itibarıyla referans ajansın oranı {fmtPct(s.upcoming.rate)} olacak.
                       </Text>
                     )}
-                    {s.status === 'draft' && c.acting && <Button title="Onaya gönder" variant="tonal" small onPress={() => runAction(c.demo, () => agencyNet.submitSub(s.id), 'Onaya gönderildi.', q.reload)} />}
-                    {s.pendingWith && <Text style={st.foot}>Onay bekleniyor: {s.pendingWith === 'center' ? 'Merkez' : 'Üst ajans'}</Text>}
+                    {s.pendingWith && <Text style={st.foot}>Yönetimin onayını bekliyor.</Text>}
                   </DepthCard>
                 </Pressable>
               ))}
+              <Text style={st.foot}>
+                Elmas sayıları; gün, hafta (pazartesiden) ve ay Türkiye saatine göre. Referans ajansın oranı performansa göre belirlenir: yüksek performans onun oranını artırır, senin payını azaltır (en az {fmtPct(0.01)}). Toplam havuz {fmtPct(c.o.poolCap)} ile sınırlıdır.
+              </Text>
             </View>
-          )
-        }
+          );
+        }}
       </NetState>
     </View>
-  );
-}
-
-function CreateSub({ c, done }: { c: Ctx; done: () => void }) {
-  const [name, setName] = useState('');
-  const [region, setRegion] = useState('');
-  const [owner, setOwner] = useState<string>('');
-  const people = useNet(c.name, () => agencyNet.streamers(c.id, 'direct'), () => demoStreamers(c.id, 'direct'), [c.id]);
-  return (
-    <Panel>
-      <Text style={ns.title}>Yeni alt ajans</Text>
-      <Field label="Alt ajans adı" value={name} onChange={setName} placeholder="En az 2 karakter" />
-      <Field label="Bölge" value={region} onChange={setRegion} placeholder="Şehir" />
-      <Text style={st.label}>Yönetici (isteğe bağlı)</Text>
-      {people.data && people.data.length > 0 ? <ChoiceChips value={owner} onChange={setOwner} options={[['', 'Ben yöneteceğim'], ...people.data.slice(0, 8).map((p) => [p.id, p.name] as [string, string])]} /> : <Text style={ns.dim}>Yönetici sonradan atanabilir.</Text>}
-      <Text style={st.foot}>Merkezin onay politikasına göre onaya gider. Başlangıç seviyesi ve oranı merkez kurallarından gelir.</Text>
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <Button title="Vazgeç" variant="ghost" onPress={done} style={{ flex: 1 }} />
-        <Button
-          title="Oluştur"
-          disabled={name.trim().length < 2}
-          onPress={() => {
-            // Others see the name and region: contact details are refused and the form keeps what was typed.
-            const refusal = contactRefusal(name.trim(), 'agency.name') ?? contactRefusal(region.trim(), 'agency.region');
-            if (refusal) return showAlert(CONTACT_TITLE, refusal);
-            void runAction(c.demo, () => agencyNet.createSub(c.id, name.trim(), owner || undefined, region.trim() || undefined), 'Alt ajans oluşturuldu ve onaya gönderildi.', done);
-          }}
-          style={{ flex: 1 }}
-        />
-      </View>
-    </Panel>
   );
 }
 
@@ -949,6 +997,13 @@ const st = StyleSheet.create({
   dot: { position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: colors.card },
   sub: { padding: space.lg, gap: space.md },
   grid2: { gap: 4 },
+  table: { gap: 6, padding: space.md, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)' },
+  tRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tFirst: { flex: 1.3, textAlign: 'left' },
+  tHead: { flex: 1, textAlign: 'right', color: colors.textDim, fontSize: 11.5, fontWeight: '700' },
+  tLabel: { color: colors.textDim, fontSize: 12.5 },
+  tCell: { flex: 1, textAlign: 'right', color: '#fff', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  tMoney: { color: semantic.money },
   track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 3, backgroundColor: SERIES.own },
   rank: { width: 28, textAlign: 'center', color: semantic.action, fontSize: 16, fontFamily: fonts.display },

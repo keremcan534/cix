@@ -19,14 +19,15 @@ import { useApp } from '@/store';
 import { colors } from '@/theme';
 import { Photo } from '@/components/photo';
 import { CallsUnavailable } from '@/components/calls-unavailable';
-import { callsAvailable } from '@/lib/live';
+import { LiveCall } from '@/components/live-call';
+import { callsAvailable, liveCalls } from '@/lib/live';
 
 type Phase = 'ringing' | 'connected' | 'ended';
 
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 export default function CallScreenRoute() {
-  return callsAvailable() ? <CallScreen /> : <CallsUnavailable title="Arama" />;
+  return callsAvailable() ? <CallScreen /> : liveCalls() ? <LiveCall /> : <CallsUnavailable title="Arama" />;
 }
 
 function CallScreen() {

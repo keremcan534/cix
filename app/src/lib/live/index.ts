@@ -20,10 +20,14 @@ import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
 /**
- * One-to-one calls and Hemen Tanış only run on this phone (simulated peer, local per-minute charge): the server
- * has no matching, call signalling or call billing yet. A live build hides them instead of charging for a fake call.
+ * The simulated calls and Hemen Tanış (a demo build: simulated peer, local per-minute charge). A live build has
+ * its own, run by the server (liveCalls, lib/live/one-on-one).
  */
 export const callsAvailable = () => !liveMode();
+/** Real calls and Eşleşme: the server and the LiveKit address (the voice and video go through LiveKit). */
+export const liveCalls = () => liveMode() && !!process.env.EXPO_PUBLIC_LIVEKIT_URL;
+/** Calls and Hemen Tanış can be opened in this build (the demo's or the server's). */
+export const oneOnOneOpen = () => callsAvailable() || liveCalls();
 
 let myId: string | null = null;
 /** My server id once signed in. */
@@ -178,8 +182,10 @@ export function forgetLiveAccount() {
   returning = 0;
   unsure.clear();
   order.reset();
-  people = null;
-  peopleState = 'loading';
+  for (const k of ['home', 'new', 'featured'] as const) {
+    people[k] = null;
+    peopleState[k] = 'loading';
+  }
   locked.clear();
   forgetRoomPasswords();
   roomsState = 'loading';
@@ -222,19 +228,20 @@ export async function loadProfile(id: string) {
 /** How a server list stands: the first answer still coming, the last answer read, or the last try failed. */
 export type LoadState = 'loading' | 'ready' | 'failed';
 
-let people: User[] | null = null;
-let peopleState: LoadState = 'loading';
+type DiscoverList = api.DiscoverList;
+const people: Record<DiscoverList, User[] | null> = { home: null, new: null, featured: null };
+const peopleState: Record<DiscoverList, LoadState> = { home: 'loading', new: 'loading', featured: 'loading' };
 const peopleListeners = new Set<() => void>();
 const subscribePeople = (l: () => void) => {
   peopleListeners.add(l);
   return () => peopleListeners.delete(l);
 };
 const emitPeople = () => peopleListeners.forEach((l) => l());
-/** Reads Keşfet's people from the server once (the retry button calls it too). */
-export async function reloadDiscoverPeople() {
+/** Reads one of Keşfet's lists from the server once (the retry button calls it too). */
+export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
   try {
-    const rows = await api.discover();
-    people = rows.map((p) =>
+    const rows = await api.discover(list);
+    people[list] = rows.map((p) =>
       putServerUser({
         id: p.id,
         name: p.name,
@@ -248,27 +255,27 @@ export async function reloadDiscoverPeople() {
         ...(p.avatarUrl && { avatar: p.avatarUrl }),
       }),
     );
-    peopleState = 'ready';
+    peopleState[list] = 'ready';
   } catch {
-    peopleState = 'failed';
+    peopleState[list] = 'failed';
   }
   emitPeople();
 }
-/** Keşfet in a live build: real people from the server, re-read every 30 seconds while the screen is in front
- *  (once more when it comes back); null until the first answer. */
-export function useDiscoverPeople(): User[] | null {
-  const list = useSyncExternalStore(subscribePeople, () => people, () => people);
+/** Keşfet in a live build: real people from the server, the list on screen re-read every 30 seconds while the
+ *  screen is in front (once more when it comes back or the tab changes); null until the first answer. */
+export function useDiscoverPeople(list: DiscoverList = 'home'): User[] | null {
+  const rows = useSyncExternalStore(subscribePeople, () => people[list], () => people[list]);
   const focused = useIsFocused();
   useEffect(() => {
     if (!liveMode() || !focused) return;
-    void reloadDiscoverPeople();
-    const t = setInterval(() => void reloadDiscoverPeople(), 30_000);
+    void reloadDiscoverPeople(list);
+    const t = setInterval(() => void reloadDiscoverPeople(list), 30_000);
     return () => clearInterval(t);
-  }, [focused]);
-  return list;
+  }, [focused, list]);
+  return rows;
 }
-/** Whether Keşfet's last read worked ('failed': the screen offers "Tekrar dene"). */
-export const useDiscoverState = () => useSyncExternalStore(subscribePeople, () => peopleState, () => peopleState);
+/** Whether that list's last read worked ('failed': the screen offers "Tekrar dene"). */
+export const useDiscoverState = (list: DiscoverList = 'home') => useSyncExternalStore(subscribePeople, () => peopleState[list], () => peopleState[list]);
 
 // --- Rooms -----------------------------------------------------------------------------------------------
 // Rooms with a password, by id. Kept beside the Room (not as Room.password, which is the demo rooms' own
@@ -378,7 +385,8 @@ export async function updateServerRoom(id: string, patch: api.RoomPatch) {
 /** Reads one server room again (after the server says it changed: a new level, mics or layout). */
 export async function refreshServerRoom(id: string) {
   const r = roomOf(await api.serverRoom(id));
-  setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
+  // A room that isn't in the list yet (opened from a link or a search) is kept too, so its screen reads it.
+  setRooms(rooms.some((x) => x.id === r.id) ? rooms.map((x) => (x.id === r.id ? r : x)) : [...rooms, r]);
   return r;
 }
 /** Closes my room on the server for everyone (it leaves the lists; a new one can be opened later). */

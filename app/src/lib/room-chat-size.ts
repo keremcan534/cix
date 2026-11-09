@@ -11,6 +11,9 @@ export const CHAT_MAX = 0.56;
 /** Any number → a share the chat may take (NaN and junk → the default). */
 export const clampChatShare = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.min(CHAT_MAX, Math.max(CHAT_MIN, x)) : CHAT_DEFAULT);
 
+/** A large chat goes with small mics (the room's "Küçült"); below this share the mics have their normal size. */
+export const isLargeChat = (share: number) => share >= (CHAT_DEFAULT + CHAT_MAX) / 2;
+
 /** A tap on the handle: a small or normal chat grows to the largest, the largest goes back to normal. */
 export const toggledChatShare = (share: number) => (share < (CHAT_DEFAULT + CHAT_MAX) / 2 ? CHAT_MAX : CHAT_DEFAULT);
 

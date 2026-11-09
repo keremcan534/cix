@@ -114,6 +114,13 @@ async function agencyFor(c, x, id, perm = null) {
   return a;
 }
 
+/** Refuses (403) unless the centre is acting (agencies.manage): adding and approving agencies is the centre's. */
+async function byCentre(x, a) {
+  if (x.acc.admin || x.acc.platform.has('agencies.manage')) return;
+  await audit(db, x.u.id, 'agencies.manage', 'agency', a.id, { result: 'denied' });
+  throw new HttpError(403, 'Alt ajansları yalnız yönetim ekler ve onaylar');
+}
+
 /** Acting in an agency (never through the parent's view rights): own permissions only. */
 async function actIn(c, x, a, perm) {
   if (x.acc.agency.get(a.id)?.has(perm)) return;
@@ -178,8 +185,12 @@ async function perfOf(c, a, s) {
   return out;
 }
 
+/** The start of this day, week or month on Turkey's calendar (the periods the panel's totals use). */
+const since = (p) => `date_trunc('${p}', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul'`;
 const STREAMER_ROW = `SELECT m.streamer_id, m.agency_id, m.joined_at, m.method, m.contract, u.name, u.username, u.avatar_url, u.phone IS NOT NULL AS verified,
     (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, now() - interval '30 days')) AS d30,
+    (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, ${since('week')})) AS d_week,
+    (SELECT coalesce(sum(e.diamonds), 0) FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.occurred_at >= greatest(m.joined_at, ${since('month')})) AS d_month,
     (SELECT coalesce(sum(l.seconds), 0) FROM presence_log l WHERE l.user_id = m.streamer_id AND l.left_at > now() - interval '30 days') AS online30,
     EXISTS (SELECT 1 FROM income_events e WHERE e.streamer_id = m.streamer_id AND e.diamonds > 0 AND e.occurred_at > now() - make_interval(days => $2::int))
       OR EXISTS (SELECT 1 FROM presence_log l WHERE l.user_id = m.streamer_id AND l.left_at > now() - make_interval(days => $2::int)) AS active
@@ -196,6 +207,9 @@ const streamerView = (r) => ({
   verified: r.verified,
   diamonds30: n(r.d30),
   usd30: usdOf(r.d30),
+  // This week's and this month's earnings (Turkey's calendar, since they joined this agency).
+  week: n(r.d_week),
+  month: n(r.d_month),
   onlineHours30: Math.round(n(r.online30) / 360) / 10,
   active: r.active,
 });
@@ -422,6 +436,12 @@ export const agencyRoutes = {
          (SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.agency_id = s.id AND k.occurred_at > now() - interval '30 days') AS volume30,
          (SELECT coalesce(sum(l.amount), 0) FROM agency_ledger l WHERE l.agency_id = s.id AND l.created_at > now() - interval '30 days') AS earned30,
          (SELECT coalesce(sum(l.amount), 0) FROM agency_ledger l JOIN agency_commissions k ON k.id = l.commission_id WHERE l.agency_id = $1 AND l.kind = 'difference' AND k.agency_id = s.id AND l.created_at > now() - interval '30 days') AS mine30,
+         ${['day', 'week', 'month']
+           .map(
+             (p) => `(SELECT coalesce(sum(k.base_diamonds), 0) FROM agency_commissions k WHERE k.agency_id = s.id AND k.occurred_at >= ${since(p)}) AS gifts_${p},
+         (SELECT coalesce(sum(l.amount), 0) FROM agency_ledger l JOIN agency_commissions k ON k.id = l.commission_id WHERE l.agency_id = $1 AND l.kind = 'difference' AND k.agency_id = s.id AND k.occurred_at >= ${since(p)}) AS mine_${p},`,
+           )
+           .join('\n         ')}
          (SELECT p.status FROM agency_payouts p WHERE p.agency_id = s.id ORDER BY p.id DESC LIMIT 1) AS payout_status
        FROM agencies s LEFT JOIN users u ON u.id = s.owner_id
       WHERE s.parent_id = $1 AND s.status <> 'rejected' ORDER BY s.status = 'approved' DESC, s.name`,
@@ -441,6 +461,9 @@ export const agencyRoutes = {
         volume30: n(s.volume30),
         earned30: perms.has('reports.commission') ? d4(s.earned30) : null,
         mine30: d4(s.mine30),
+        // Today, this week and this month (Turkey's calendar): the gifts its streamers received, and my commission.
+        gifts: { day: n(s.gifts_day), week: n(s.gifts_week), month: n(s.gifts_month) },
+        mine: { day: d4(s.mine_day), week: d4(s.mine_week), month: d4(s.mine_month) },
         rate: rv?.rate ?? null,
         parentShare: rv?.parentShare ?? null,
         upcoming: rv?.upcoming ?? null,
@@ -667,12 +690,14 @@ export const agencyRoutes = {
   },
 
   // --- Sub-agencies and applications ---
+  // Only the centre adds sub-agencies under a top agency (Referans ajanslar) and only it approves an agency: a
+  // top agency sees its sub-agencies and the commission from them, and never manages them.
   async 'POST /api/agency/sub/create'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await ctx(c, req);
       const parent = await agencyRow(c, uuid(b.parentId, 'üst ajans'), true);
-      await actIn(c, x, parent, 'subagencies.manage');
+      await byCentre(x, parent);
       await checkCanFoundSub(c, parent, x.s);
       const a = await insertAgency(c, b, { parent, owner: b.owner ? uuid(b.owner, 'yönetici') : null, actor: x.u.id, status: 'draft', pendingWith: null, screen: x.u });
       if (b.submit === true) await submitAgency(c, a, x.u.id);
@@ -687,7 +712,7 @@ export const agencyRoutes = {
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       if (a.status !== 'draft' || !a.parent_id) throw new HttpError(409, 'Yalnızca taslak alt ajans başvurusu gönderilebilir');
       const parent = await agencyRow(c, a.parent_id, true);
-      await actIn(c, x, parent, 'subagencies.manage');
+      await byCentre(x, parent);
       await checkCanFoundSub(c, parent, x.s);
       await submitAgency(c, a, x.u.id);
       return { agency: card(await agencyRow(c, a.id), x.s) };
@@ -706,13 +731,14 @@ export const agencyRoutes = {
         parent = await agencyByCode(c, b.parentCode);
         await checkCanFoundSub(c, parent, x.s);
       }
-      const a = await insertAgency(c, b, { parent, owner, actor: x.u.id, status: 'pending', pendingWith: parent ? 'parent' : 'center', bd: bd ? x.u.id : null, screen: bd ? null : x.u });
-      if (parent) await notice(c, parent.id, 'sub', `Yeni alt ajans başvurusu: ${a.name}`, '');
+      // The centre decides every application, one under a top agency's code too.
+      const a = await insertAgency(c, b, { parent, owner, actor: x.u.id, status: 'pending', pendingWith: 'center', bd: bd ? x.u.id : null, screen: bd ? null : x.u });
+      if (parent) await notice(c, parent.id, 'sub', `Yeni alt ajans başvurusu: ${a.name}`, 'Başvuruyu yönetim değerlendirir; onaylanırsa Referans ajanslar bölümünde görünür.');
       return { agency: card(a, x.s), pendingWith: a.pending_with };
     });
   },
 
-  /** The parent's decision on a sub-agency application from outside; approved ones go on to the centre. */
+  /** An older application still waiting for its parent agency: only the centre decides it now. */
   async 'POST /api/agency/sub/decide'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
@@ -720,7 +746,7 @@ export const agencyRoutes = {
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       if (a.status !== 'pending' || a.pending_with !== 'parent') throw new HttpError(409, 'Bu başvuru üst ajans kararı beklemiyor');
       const parent = await agencyRow(c, a.parent_id, true);
-      await actIn(c, x, parent, 'subagencies.manage');
+      await byCentre(x, parent);
       if (b.approve === true) await submitAgency(c, a, x.u.id);
       else {
         const note = await said(opt(b.note, 300, 'Not'), x, 'agency.sub_decide');
@@ -936,16 +962,14 @@ export const agencyRoutes = {
     });
   },
 
-  /** Closing a sub-agency (by itself or its parent): its streamers move to the parent once the centre approves. */
+  /** Closing a sub-agency (asked by itself; its parent only views it): its streamers move to the parent once the centre approves. */
   async 'POST /api/agency/sub/close'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await ctx(c, req);
       const a = await agencyRow(c, uuid(b.id, 'ajans'), true);
       if (!a.parent_id || !['approved', 'suspended'].includes(a.status)) throw new HttpError(409, 'Yalnızca açık bir alt ajans kapatılabilir');
-      const own = x.acc.agency.get(a.id)?.has('transfers.manage');
-      const parent = x.acc.agency.get(a.parent_id)?.has('subagencies.manage');
-      if (!own && !parent) {
+      if (!x.acc.agency.get(a.id)?.has('transfers.manage')) {
         await audit(db, x.u.id, 'sub.close', 'agency', a.id, { result: 'denied' });
         throw new HttpError(403, 'Bu işlem için yetkin yok');
       }

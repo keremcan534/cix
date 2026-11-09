@@ -15,6 +15,8 @@ import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
 import { looksOf, revokeAllForDelete } from './economy.mjs';
+import { familyOf, leaveFamily } from './families.mjs';
+import { dropFromQueues } from './music.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -73,12 +75,27 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
+    // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
+    await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
+    await c.query("UPDATE calls SET status = CASE WHEN status = 'live' THEN 'ended' ELSE 'cancelled' END, end_reason = 'deleted', ended_at = now() WHERE (caller = $1 OR callee = $1) AND status IN ('ringing', 'live')", [id]);
     // Anlar: their posts (with the likes and comments on them), their likes and comments elsewhere.
     await c.query('DELETE FROM moment_likes WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM moment_comment_likes WHERE user_id = $1', [id]);
+    // Similar Ekibi: what was written to them alone, and what they had read.
+    await c.query('DELETE FROM team_notices WHERE target = $1', [id]);
+    await c.query('DELETE FROM team_notice_seen WHERE user_id = $1', [id]);
     await c.query('DELETE FROM moment_comments WHERE author = $1', [id]);
     await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_admins WHERE user_id = $1', [id]);
+    // Room music: no longer a DJ; their library goes, and with it what they had queued in rooms.
+    await c.query('DELETE FROM room_djs WHERE user_id = $1', [id]);
+    await c.query('UPDATE music_tracks SET removed_at = now() WHERE owner = $1 AND removed_at IS NULL', [id]);
+    await dropFromQueues(c, 'added_by = $1 OR track_id IN (SELECT id FROM music_tracks WHERE owner = $1)', [id]);
+    // Aile: out of their family (a leader hands it on), their requests and chat lines.
+    await leaveFamily(c, id);
+    await c.query('DELETE FROM family_requests WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
 }
 
@@ -164,9 +181,17 @@ export const socialRoutes = {
       [id, me.id],
     );
     const x = r.rows[0];
+    // A streamer's agency (an approved one they are in now) and anyone's family, shown on the profile.
+    const ag = await db.query(
+      `SELECT a.id, a.name FROM agency_streamers s JOIN agencies a ON a.id = s.agency_id
+        WHERE s.streamer_id = $1 AND s.ended_at IS NULL AND s.contract = 'approved' AND a.status = 'approved' LIMIT 1`,
+      [id],
+    );
     return {
       user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
       looks: (await looksOf([u.id]))[u.id] ?? null,
+      agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
+      family: await familyOf(id),
     };
   },
 
@@ -189,18 +214,40 @@ export const socialRoutes = {
     return { following: true };
   },
 
-  /** Keşfet: real people, most recently active first; blocks either way and deleted accounts are left out. */
-  async 'GET /api/discover'(req) {
+  /**
+   * Keşfet: real people. Men see women and women see men (anyone, while either of the two hasn't given a gender);
+   * blocks either way and deleted accounts are left out. `list`: 'home' (most recently active first), 'new' (newest
+   * accounts first) or 'featured', who 1v1 lifts in the last 30 days: for a streamer, the people who spent most on
+   * them in private (chat gifts, paid messages, paid call and match minutes: paid_events); for anyone else, the agency
+   * streamers who earned most there (all streamers, the earners first).
+   */
+  async 'GET /api/discover'(req, url) {
     const me = await auth(req);
+    const list = url.searchParams.get('list') ?? 'home';
+    if (!['home', 'new', 'featured'].includes(list)) throw new HttpError(400, 'Geçersiz liste');
+    const live = `EXISTS (SELECT 1 FROM agency_streamers s WHERE s.streamer_id = $X AND s.ended_at IS NULL AND s.contract = 'approved')`;
+    const streamer = list === 'featured' && (await db.query(`SELECT ${live.replace('$X', '$1')} AS yes`, [me.id])).rows[0].yes;
+    // 1v1 coins in the window: given by them (to me, a streamer) or received by them (anyone else).
+    const score = list !== 'featured' ? '0' : streamer
+      ? `((SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.sender = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')
+          + (SELECT coalesce(sum(p.coins), 0) FROM paid_events p WHERE p.payer = u.id AND p.earner = $1 AND p.created_at > now() - interval '30 days'))`
+      : `((SELECT coalesce(sum(g.total), 0) FROM gift_events g WHERE g.recipient = u.id AND g.place = 'chat' AND g.created_at > now() - interval '30 days')
+          + (SELECT coalesce(sum(p.coins), 0) FROM paid_events p WHERE p.earner = u.id AND p.created_at > now() - interval '30 days'))`;
+    const only = list !== 'featured' ? '' : streamer
+      ? `AND ${score} > 0`
+      : `AND ${live.replace('$X', 'u.id')}`;
+    const order = list === 'new' ? 'u.created_at DESC' : list === 'featured' ? 'score DESC, a.seen DESC NULLS LAST' : 'a.seen DESC NULLS LAST, u.created_at DESC';
     const r = await db.query(
-      `SELECT u.*, a.seen
+      `SELECT u.*, a.seen, ${score} AS score
          FROM users u
          JOIN LATERAL (SELECT max(s.last_seen_at) AS seen FROM sessions s WHERE s.user_id = u.id) a ON true
         WHERE u.id <> $1 AND u.deleted_at IS NULL
+          AND ($2::text IS NULL OR u.gender IS NULL OR u.gender <> $2)
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
-        ORDER BY a.seen DESC NULLS LAST, u.created_at DESC
+          ${only}
+        ORDER BY ${order}
         LIMIT 60`,
-      [me.id],
+      [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
     return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };

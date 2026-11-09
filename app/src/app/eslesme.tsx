@@ -19,7 +19,8 @@ import { makeStyles, useTheme } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { Photo } from '@/components/photo';
 import { CallsUnavailable } from '@/components/calls-unavailable';
-import { callsAvailable } from '@/lib/live';
+import { LiveMatch } from '@/components/live-match';
+import { callsAvailable, liveCalls } from '@/lib/live';
 
 const FILTERS: MatchFilter[] = ['Herkes', 'Kadın', 'Erkek'];
 const SCENARIOS: [Scenario, string][] = [
@@ -30,7 +31,7 @@ const SCENARIOS: [Scenario, string][] = [
 ];
 
 export default function HemenTanisRoute() {
-  return callsAvailable() ? <HemenTanis /> : <CallsUnavailable title="Hemen Tanış" />;
+  return callsAvailable() ? <HemenTanis /> : liveCalls() ? <LiveMatch /> : <CallsUnavailable title="Hemen Tanış" />;
 }
 
 function HemenTanis() {

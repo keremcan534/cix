@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
-import { ReactionArt, StickerArt, messagePreview, stickersOf } from '@/components/ReactionArt';
+import { EmojiText, ReactionArt, StickerArt, messagePreview, stickersOf } from '@/components/ReactionArt';
 import { cosmeticById } from '@/data/catalog';
 import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
@@ -252,7 +252,24 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
   );
 }
 
-export function ChatLine({ msg, bubbleId, bond, onRetry }: { msg: ChatMsg; bubbleId?: string; /** Lv10 bond: the special bubble (a bubble I equipped wins). */ bond?: RoomBond | null; onRetry?: (msg: ChatMsg) => void }) {
+export function ChatLine({
+  msg,
+  bubbleId,
+  bond,
+  onRetry,
+  mentionsMe,
+  onPerson,
+}: {
+  msg: ChatMsg;
+  bubbleId?: string;
+  /** Lv10 bond: the special bubble (a bubble I equipped wins). */
+  bond?: RoomBond | null;
+  onRetry?: (msg: ChatMsg) => void;
+  /** The line names me (@bahset): its bubble gets a gold ring. */
+  mentionsMe?: boolean;
+  /** A tap on the writer's photo or name (their person card). */
+  onPerson?: (uid: string) => void;
+}) {
   if (msg.bot) {
     return (
       <View style={styles.botMsg}>
@@ -304,7 +321,7 @@ export function ChatLine({ msg, bubbleId, bond, onRetry }: { msg: ChatMsg; bubbl
       ))}
     </View>
   ) : (
-    <Text style={styles.chatText}>{messagePreview(msg.text)}</Text>
+    <EmojiText text={messagePreview(msg.text)} style={styles.chatText} />
   );
   const bubbleView = stickers ? (
     body
@@ -317,18 +334,21 @@ export function ChatLine({ msg, bubbleId, bond, onRetry }: { msg: ChatMsg; bubbl
   ) : (
     <View style={[styles.chatBubble, styles.chatGlass]}>{body}</View>
   );
+  const who = msg.userId !== 'me' && onPerson ? () => onPerson(msg.userId!) : undefined;
   const line = (
-    <View style={styles.chatLine} accessibilityLabel={`${u.name}: ${messagePreview(msg.text)}`}>
-      <Avatar uri={u.avatar} size={28} />
+    <View style={styles.chatLine} accessibilityLabel={`${u.name}${mentionsMe ? ', senden bahsetti' : ''}: ${messagePreview(msg.text)}`}>
+      <Pressable onPress={who} disabled={!who} hitSlop={4} accessibilityRole={who ? 'button' : undefined} accessibilityLabel={who ? `${u.name} kişi kartı` : undefined}>
+        <Avatar uri={u.avatar} size={28} />
+      </Pressable>
       <View style={{ flexShrink: 1, gap: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={who} disabled={!who}>
           <Text style={[styles.chatName, { color: nameColor }]} numberOfLines={1}>
             {u.name}
           </Text>
           {u.vip && <Text style={styles.chatVip}>VIP</Text>}
           {bond && <BondChip bond={bond} />}
-        </View>
-        {bubbleView}
+        </Pressable>
+        {mentionsMe ? <View style={styles.chatMention}>{bubbleView}</View> : bubbleView}
       </View>
     </View>
   );
@@ -416,15 +436,38 @@ export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPres
     >
       {({ pressed }) => (
         <>
-          <View style={{ borderRadius: 28, backgroundColor: look.edge, paddingBottom: pressed ? 0 : 4, marginTop: pressed ? 4 : 0 }}>
+          <View style={{ borderRadius: 23, backgroundColor: look.edge, paddingBottom: pressed ? 0 : 3, marginTop: pressed ? 3 : 0 }}>
             <View style={[styles.micRound, { backgroundColor: look.bg }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
               <Gloss strength={0.32} />
-              <Ionicons name={look.icon} size={26} color={look.fg} />
+              <Ionicons name={look.icon} size={22} color={look.fg} />
             </View>
           </View>
           <Text style={[styles.micCaption, state === 'on' && { color: semantic.live }, state === 'held' && { color: colors.gold }]}>{caption}</Text>
         </>
       )}
+    </Pressable>
+  );
+}
+
+/** "Oda sesi", next to the mic: the room goes quiet on this phone only; my own mic keeps going out. */
+export function RoomSoundBtn({ muted, onPress }: { muted: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={() => {
+        tapHaptic();
+        onPress();
+      }}
+      accessibilityRole="switch"
+      accessibilityLabel={muted ? 'Oda sesi kapalı, açmak için dokun' : 'Oda sesi açık, kapatmak için dokun'}
+      accessibilityState={{ checked: !muted }}
+      aria-checked={!muted}
+      hitSlop={6}
+      style={({ pressed }) => ({ alignItems: 'center', gap: 2, transform: [{ scale: pressed ? 0.92 : 1 }] })}
+    >
+      <View style={[styles.soundRound, muted && styles.soundRoundOff]}>
+        <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color={muted ? '#FCA5A5' : '#fff'} />
+      </View>
+      <Text style={[styles.micCaption, muted && { color: '#FCA5A5' }]}>{muted ? 'SESSİZ' : 'SES'}</Text>
     </Pressable>
   );
 }
@@ -513,16 +556,19 @@ const styles = StyleSheet.create({
   chatName: { fontSize: 12, fontWeight: '800', maxWidth: 160 },
   chatVip: { color: colors.bg, backgroundColor: colors.gold, fontSize: 9, fontWeight: '900', borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
   chatBubble: { alignSelf: 'flex-start', borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 11, paddingVertical: 7 },
+  chatMention: { alignSelf: 'flex-start', borderRadius: 16, borderTopLeftRadius: 6, borderWidth: 1.5, borderColor: colors.gold, padding: 1 },
   chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
   // Dark glass: keeps white text readable over the stage, with a lit top edge.
   chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },
   round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   giftRound: { backgroundColor: 'rgba(246,189,96,0.16)', borderWidth: 2, borderColor: semantic.money, overflow: 'hidden', boxShadow: '0 0 16px rgba(246,189,96,0.45)' },
   glassRound: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
-  micRound: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  micRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  soundRound: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
+  soundRoundOff: { backgroundColor: 'rgba(252,165,165,0.14)', borderColor: 'rgba(252,165,165,0.45)' },
   micGlowOn: { boxShadow: '0 4px 16px rgba(19,217,223,0.6)' },
   micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
-  micCaption: { color: colors.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  micCaption: { color: colors.textDim, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   pk: { marginHorizontal: 12, marginTop: 4, gap: 6 },

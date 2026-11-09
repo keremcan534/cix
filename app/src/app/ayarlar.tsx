@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -23,6 +23,8 @@ import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useStaffRole } from '@/lib/live/admin';
 import { type CodeKind } from '@/lib/live/account';
 import { useRemoteConfig } from '@/lib/remote-control';
+import { useAppUpdate, versionLabel } from '@/lib/app-update';
+import { APP_VERSION } from '@/lib/reporting';
 import { formatPhone } from '@/lib/verify-code';
 import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
 import { useLiveSessions } from '@/lib/live/sessions';
@@ -137,6 +139,7 @@ export default function SettingsScreen() {
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
   const { signIn, verify } = useRemoteConfig();
+  const update = useAppUpdate();
   const [verifyKind, setVerifyKind] = useState<CodeKind | null>(null);
   const canAddEmail = liveMode() && !!signIn?.email;
   const canCheckPhone = liveMode() && (verify.sms || verify.whatsapp);
@@ -412,6 +415,18 @@ export default function SettingsScreen() {
           <ListRow icon="document-text-outline" title="Kullanım Koşulları" onPress={() => openLegal('terms')} />
           <ListRow icon="shield-checkmark-outline" title="Gizlilik Politikası" onPress={() => openLegal('privacy')} />
           <ListRow icon="code-slash-outline" tone="neutral" title="Açık kaynak lisansları" subtitle="Uygulamada kullanılan kütüphaneler ve yazı tipi" onPress={() => setLicenses(true)} />
+          {/* The version, and a newer build when one is out (lib/app-update): a tap downloads it. */}
+          {update ? (
+            <ListRow
+              icon="cloud-download-outline"
+              tone="success"
+              title="Güncelleme mevcut"
+              subtitle={`Yeni sürüm hazır (yapı ${update.build}) · indirmek için dokun · Bu cihazda ${versionLabel(APP_VERSION)}`}
+              onPress={() => Linking.openURL(update.url).catch(() => {})}
+            />
+          ) : (
+            <ListRow icon="information-circle-outline" tone="neutral" title="Uygulama sürümü" value={versionLabel(APP_VERSION)} />
+          )}
         </ListGroup>
 
         <ListGroup

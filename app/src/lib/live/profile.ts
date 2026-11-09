@@ -5,8 +5,25 @@
 //   PATCH /api/me, so other phones see it.
 // Ids here are server ids (lib/live toServer). Only lib/api is used, so the unit tests can run this under Node
 // (tests/live-profile.test.ts). Without a server address the screen never calls it.
+import { useSyncExternalStore } from 'react';
+
 import * as api from '@/lib/api';
 import { putServerUser, type User } from '@/data/mock';
+
+// Someone's agency and family as their profile last answered, by server id (the profile pills and sections).
+const ties = new Map<string, api.ProfileTies>();
+const tieListeners = new Set<() => void>();
+export function putTies(serverId: string, t: api.ProfileTies) {
+  ties.set(serverId, { agency: t.agency, family: t.family });
+  tieListeners.forEach((l) => l());
+}
+const subscribeTies = (l: () => void) => {
+  tieListeners.add(l);
+  return () => void tieListeners.delete(l);
+};
+/** Their agency and family; undefined until their profile was read. */
+export const tiesOf = (serverId: string | null) => (serverId ? ties.get(serverId) : undefined);
+export const useTies = (serverId: string | null) => useSyncExternalStore(subscribeTies, () => tiesOf(serverId), () => tiesOf(serverId));
 
 /** `blockedByMe`: whether the server already has my block, so a read sent right after a block can be told apart. */
 export type SocialCounts = { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
@@ -38,6 +55,7 @@ export async function loadMe(): Promise<Partial<User>> {
  */
 export async function loadPublicProfile(serverId: string, mine = false): Promise<SocialCounts> {
   const p = await api.userProfile(serverId);
+  putTies(serverId, p);
   if (!mine) {
     putServerUser({
       id: p.id,
@@ -103,7 +121,7 @@ export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
 
 /** The picked photo put in the app's storage for `kind` (a signed address for its exact type and size, then PUT);
  *  resolves with its public address. Throws when a step fails, e.g. 503 while storage isn't set up. */
-export async function uploadPhoto(kind: 'avatar' | 'moment', img: PickedImage): Promise<string> {
+export async function uploadPhoto(kind: 'avatar' | 'moment' | 'notice', img: PickedImage): Promise<string> {
   let file: Blob;
   try {
     file = await (await fetch(img.uri)).blob();

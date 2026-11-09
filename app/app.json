@@ -66,7 +66,8 @@
       [
         "@config-plugins/react-native-webrtc",
         {
-          "microphonePermission": "Sesli odalarda konuşabilmen için mikrofonuna erişmemiz gerekiyor."
+          "cameraPermission": "Görüntülü arama ve eşleşmede kendini gösterebilmen için kameranı kullanmamız gerekiyor.",
+          "microphonePermission": "Sesli odalarda, aramalarda ve eşleşmede konuşabilmen için mikrofonuna erişmemiz gerekiyor."
         }
       ],
       [
@@ -84,7 +85,15 @@
         }
       ],
       "./plugins/with-android-release-build",
-      "expo-secure-store"
+      "./plugins/with-webrtc-software-ns",
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "microphonePermission": "Sesli odalarda, aramalarda ve eşleşmede konuşabilmen için mikrofonuna erişmemiz gerekiyor."
+        }
+      ]
     ],
     "scheme": "similarclub",
     "experiments": {

@@ -8,6 +8,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import * as api from '@/lib/api';
 import { agencyNet } from '@/lib/agency-net';
 import { liveMode, myServerId } from '@/lib/live';
+import { putTies } from '@/lib/live/profile';
 import { agencyLinkOf, type AgencyLink } from '@/lib/me-view';
 
 export type MeStats = { serverId: string; followers: number; following: number };
@@ -36,6 +37,7 @@ export function refreshMeStats(): Promise<void> {
     if (snap.owner !== id) put({ ...EMPTY, owner: id });
     const [profile, agency] = await Promise.allSettled([api.userProfile(id), agencyNet.me()]);
     if (snap.owner !== id) return;
+    if (profile.status === 'fulfilled') putTies(id, profile.value);
     put({
       ...(profile.status === 'fulfilled' && { stats: { serverId: id, followers: profile.value.followers, following: profile.value.following } }),
       ...(agency.status === 'fulfilled' && { agency: agencyLinkOf(agency.value) }),

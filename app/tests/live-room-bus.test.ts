@@ -8,6 +8,7 @@ import {
   decodeSignal,
   encodeSignal,
   getLivePeers,
+  onServerBag,
   onServerSeat,
   onSignal,
   parseRoomMeta,
@@ -102,12 +103,13 @@ test('oda durumu (düzen, mikrofon sayısı, kuyruk) oda bilgisinden gelir; bozu
     micCount: 12,
     micQueue: true,
     queue: ['u1', 'u2'],
+    music: null,
   });
-  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"]}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'] });
-  assert.deepEqual(parseRoomState(`{"layoutId":"${'x'.repeat(41)}","micCount":2.5,"micQueue":false,"queue":"u1"}`), { layoutId: null, micCount: null, micQueue: false, queue: [] });
+  assert.deepEqual(parseRoomState('{"layoutId":5,"micCount":0,"micQueue":false,"queue":[1,"",null,"u3"]}'), { layoutId: null, micCount: null, micQueue: false, queue: ['u3'], music: null });
+  assert.deepEqual(parseRoomState(`{"layoutId":"${'x'.repeat(41)}","micCount":2.5,"micQueue":false,"queue":"u1"}`), { layoutId: null, micCount: null, micQueue: false, queue: [], music: null });
 
   reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":true,"queue":["u9"]}');
-  assert.deepEqual(getLivePeers('oda-d').state, { layoutId: null, micCount: 8, micQueue: true, queue: ['u9'] });
+  assert.deepEqual(getLivePeers('oda-d').state, { layoutId: null, micCount: 8, micQueue: true, queue: ['u9'], music: null });
   assert.deepEqual(getLivePeers('oda-d').lockedSeats, [1]);
   reportRoomMeta('oda-d', '{"lockedSeats":[1],"layoutId":null,"micCount":8,"micQueue":false,"queue":[]}');
   assert.equal(getLivePeers('oda-d').state?.micQueue, false);
@@ -166,4 +168,15 @@ test('sunucunun Uğurlu paketi: doğru biçim okunur, bozuk olan bırakılır, a
   reportSignal('oda-l', null, ok); // again after a reconnect: shown once
   off();
   assert.deepEqual(got, ['u-a:lk2#7']);
+});
+
+test('Şanslı çanta: yalnızca sunucunun çanta paketi o odanın çantalarını yeniden okutur', () => {
+  let n = 0;
+  const off = onServerBag('oda-c', () => n++);
+  reportSignal('oda-c', 'u-x', { type: 'bag', id: 3, from: 'u-x' }); // from a phone: dropped
+  reportSignal('oda-d', null, { type: 'bag', id: 3, from: 'u-a' }); // another room
+  reportSignal('oda-c', null, { type: 'bag', id: 3, from: 'u-a' });
+  off();
+  reportSignal('oda-c', null, { type: 'bag', id: 4, from: 'u-a' }); // after leaving
+  assert.equal(n, 1);
 });

@@ -1,13 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState, type ReactNode } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
-import { Backdrop } from '@/components/fx/surface';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
 import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime, type CallLog } from '@/data/messages-ui';
@@ -15,7 +14,10 @@ import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/dat
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
-import { Icon3D } from '@/components/Icon3D';
+import { Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { Backdrop, Gloss, PressableScale } from '@/components/fx/surface';
+import { TeamInbox } from '@/components/team-inbox';
+import { teamUnread } from '@/lib/live/team';
 import { messagePreview } from '@/components/ReactionArt';
 import { callsAvailable, liveMode } from '@/lib/live';
 
@@ -58,6 +60,21 @@ export default function MessagesScreen() {
   const [visitorsOpen, setVisitorsOpen] = useState(false);
   const [visitorsSeen, setVisitorsSeen] = useState(false);
   const [clearedCalls, setClearedCalls] = useState(false);
+  // Similar Ekibi: what is new since I last opened it (the demo starts with two of its sample notices new).
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [teamNew, setTeamNew] = useState(liveMode() ? 0 : 2);
+  useFocusEffect(
+    useCallback(() => {
+      if (!liveMode()) return;
+      let alive = true;
+      teamUnread()
+        .then((n) => alive && setTeamNew(n))
+        .catch(() => {});
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
 
@@ -141,6 +158,11 @@ export default function MessagesScreen() {
 
   const messagesHeader = (
     <View>
+      <View style={styles.hubs}>
+        <HubTile title="Similar Ekibi" sub="Duyuru, etkinlik, ödül" icon="envelope" tint={['#2B4FD8', '#5B21B6']} badge={teamNew} onPress={() => setTeamOpen(true)} />
+        <HubTile title="Çevrim içi hizmet" sub="Destek ekibine yaz" icon="chat" tint={['#0B7A86', '#14532D']} onPress={() => router.push('/destek')} />
+        <HubTile title="Ajansım" sub="Ajans ve kazanç" icon="briefcase" tint={['#9A4A12', '#6B1F3A']} onPress={() => router.push('/ajans')} />
+      </View>
       <View style={styles.chips}>
         {FILTERS.map((f) => (
           <Chip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
@@ -259,6 +281,7 @@ export default function MessagesScreen() {
 
       <ActionSheet visible={menuOpen} options={menuOptions} onClose={() => setMenuOpen(false)} />
       <VisitorsSheet visible={visitorsOpen} visitors={visitors} onClose={() => setVisitorsOpen(false)} />
+      <TeamInbox visible={teamOpen} onClose={() => setTeamOpen(false)} onUnread={setTeamNew} />
     </SafeAreaView>
   );
 }
@@ -287,6 +310,32 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
     <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
     </Pressable>
+  );
+}
+
+/** One of the three big doors at the top of Mesajlar. */
+function HubTile({ title, sub, icon, tint, badge = 0, onPress }: { title: string; sub: string; icon: Icon3DName; tint: readonly [string, string]; badge?: number; onPress: () => void }) {
+  const styles = useStyles();
+  return (
+    <PressableScale style={{ flex: 1 }} onPress={onPress} accessibilityRole="button" accessibilityLabel={badge > 0 ? `${title}, ${badge} yeni` : title}>
+      <LinearGradient colors={tint} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hub}>
+        <Gloss radius={16} strength={0.18} />
+        <Icon3D name={icon} size={38} />
+        <View style={{ gap: 1 }}>
+          <Text style={styles.hubTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={styles.hubSub} numberOfLines={1}>
+            {sub}
+          </Text>
+        </View>
+        {badge > 0 && (
+          <View style={[styles.badge, styles.hubBadge]}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
+      </LinearGradient>
+    </PressableScale>
   );
 }
 
@@ -529,6 +578,11 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
+  hubs: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
+  hub: { height: 118, borderRadius: 16, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
+  hubTitle: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '800' },
+  hubSub: { color: 'rgba(255,255,255,0.78)', fontSize: 11 },
+  hubBadge: { position: 'absolute', top: 8, right: 8 },
   chips: {
     flexDirection: 'row',
     gap: 8,

@@ -1,6 +1,8 @@
 // One-to-one chat: the message list, the notices (blocked, not allowed, coin price) and the composer
 // with all sending rules. Used by the full chat screen and by the in-room messages sheet, so a reply
 // sent from inside a room follows exactly the same rules as one sent from the Mesajlar tab.
+// With a real person the server prices each message (1v1, components/one-on-one-bar): free on a mutual follow
+// or between two people who aren't streamers; the heart bar and the gift button come from there too.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -26,7 +28,9 @@ import { incomingWarning, scanMessage } from '@/lib/safety';
 import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { newRef } from '@/lib/api';
-import { liveMode, message as errorText } from '@/lib/live';
+import { HeartBar, paidPair, useChatGift, usePair } from '@/components/one-on-one-bar';
+import { liveMode, message as errorText, refreshWallet } from '@/lib/live';
+import type { Pair } from '@/lib/live/one-on-one';
 import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, useLiveThread, type SendResult } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
@@ -45,14 +49,14 @@ export function ChatThread({
   avoidKeyboard = true,
 }: {
   user: User;
-  /** Rendered above the thread; gets the "typing…" state. */
-  header: (typing: boolean) => ReactNode;
+  /** Rendered above the thread; gets the "typing…" state and, with a real person, the 1v1 pair (null until read). */
+  header: (typing: boolean, pair: Pair | null) => ReactNode;
   /** Smaller intro, for sheets. */
   compact?: boolean;
   /** Off when the screen around it already keeps the composer above the keyboard (a bottom sheet rises as a whole). */
   avoidKeyboard?: boolean;
 }) {
-  const { conversations, sendMessage, setMessageFailed, markMessageSent, importDms, deleteMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me } = useApp();
+  const { conversations, sendMessage, setMessageFailed, markMessageSent, importDms, deleteMessage, markRead, following, toggleFollow, blocked, toggleBlock, spendCoins, createTicket, logSafety, me, coins } = useApp();
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
   const allowed = checkInteraction('message', user, { blocked, following, myAge: me.age });
@@ -68,7 +72,11 @@ export function ChatThread({
   // Muted for DMs by the server (lib/sanctions): the composer stays closed until it ends.
   const dmStopped = useStopped('dm');
   const dmMuted = real ? dmStopped : null;
-  const mutual = real || (following.has(user.id) && FOLLOWS_ME.has(user.id));
+  // A real person: what a message costs is the server's (0 while it is still being read; the server charges anyway).
+  const { pair, reload } = usePair(user.id, real);
+  const price = real ? (pair?.dmPrice ?? 0) : DM_PRICE;
+  const mutual = real ? price === 0 : following.has(user.id) && FOLLOWS_ME.has(user.id);
+  const gift = useChatGift(user, reload);
   const isBlocked = blocked.has(user.id);
   const report = useReport();
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -103,8 +111,17 @@ export function ChatThread({
   const thread = `dm:${user.id}`;
   const deliver = (text: string, ref: string) =>
     liveDm(user.id, text, ref, (r: SendResult) => {
-      if (r.ok) return markMessageSent(user.id, ref, r.message);
+      if (r.ok) {
+        markMessageSent(user.id, ref, r.message);
+        // A paid message: the balance and the heart moved.
+        if (price > 0) {
+          void refreshWallet().catch(() => {});
+          reload();
+        }
+        return;
+      }
       setMessageFailed(user.id, ref, r.reason, r.retry);
+      if (r.coins) showAlert('Yetersiz jeton', `Bu sohbette mesaj başı ${price} jeton.`, [{ text: 'Vazgeç', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }]);
       // The server refused contact details the app let through (an older rule on this phone): the bubble says
       // why, and the text comes back into an empty input to be changed.
       if (!r.contact) return;
@@ -183,9 +200,10 @@ export function ChatThread({
     // coin is spent or a bubble is added, and the text stays in the input. Stickers are catalogue tokens.
     const refusal = sticker ? null : messageRefusal(thread, text, 'dm');
     if (refusal) return setRefused(refusal);
-    // Mutual follow chats are free; otherwise each message costs coins (price shown before sending).
-    if (!mutual && !spendCoins(DM_PRICE, `Mesaj: ${user.name}`)) {
-      showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${DM_PRICE} jeton.`, [
+    // Mutual follow chats are free; otherwise each message costs coins (price shown before sending). A real
+    // person's message is paid on the server with the message; a balance that clearly can't pay is told here.
+    if (!mutual && (real ? coins < price : !spendCoins(DM_PRICE, `Mesaj: ${user.name}`))) {
+      showAlert('Yetersiz jeton', `Karşılıklı takip olmadan mesaj başı ${price} jeton.`, [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
       ]);
@@ -207,12 +225,15 @@ export function ChatThread({
 
   return (
     <>
-      {header(typing)}
+      {header(typing, pair)}
+      {paidPair(pair) && <HeartBar pair={pair} />}
       <Body style={{ flex: 1 }}>
         <FlatList
           data={[...messages].reverse()}
           inverted
           keyExtractor={(m) => m.id}
+          // A touch on the messages closes the emoji panel (as does the back button).
+          onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
           contentContainerStyle={{ padding: compact ? 12 : 16, gap: 8 }}
           ListFooterComponent={
             <View style={[styles.intro, compact && { paddingVertical: 12 }]}>
@@ -284,14 +305,18 @@ export function ChatThread({
             // Tapping follows; once you follow, it only explains (tapping again must not unfollow).
             <Pressable
               style={styles.paywall}
-              onPress={() => toggleFollow(user.id)}
+              onPress={() => {
+                toggleFollow(user.id);
+                // The server's follow lands first; then the price is read again (free once it is mutual).
+                if (real) setTimeout(reload, 1500);
+              }}
               disabled={following.has(user.id)}
               accessibilityRole="button"
               accessibilityLabel={following.has(user.id) ? undefined : `${user.name} kişisini takip et`}
             >
               <Icon3D name="coin" size={16} />
               <Text style={styles.paywallText}>
-                Mesaj başı {DM_PRICE} jeton · {following.has(user.id) ? `${user.name} seni takip etmiyor` : 'Takip et, karşılıklıysa ücretsiz'}
+                Mesaj başı {price} jeton · {following.has(user.id) ? `${user.name} seni takip etmiyor` : 'Takip et, karşılıklıysa ücretsiz'}
               </Text>
             </Pressable>
           )
@@ -302,11 +327,16 @@ export function ChatThread({
           </View>
         )}
         <ContactNote text={refused} />
-        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} />}
+        {emojiOpen && <EmojiPanel onPick={(e) => (stickerIdOf(e) ? send(e) : edit((d) => d + e))} onClose={() => setEmojiOpen(false)} />}
         <View style={styles.inputRow}>
           <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel="Emoji" hitSlop={6}>
             <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={26} color={colors.textDim} />
           </Pressable>
+          {!missing && !isBlocked && (
+            <Pressable onPress={gift.open} accessibilityLabel="Hediye gönder" hitSlop={6}>
+              <Ionicons name="gift-outline" size={24} color={colors.pink} />
+            </Pressable>
+          )}
           {/* Wraps up to a few lines; the keyboard's send key sends and the keyboard stays open for the next one.
               Web: Enter sends, Shift+Enter is a new line (lib/enter-sends). */}
           <TextInput
@@ -331,6 +361,7 @@ export function ChatThread({
         </View>
       </Body>
       {report.sheet}
+      {gift.sheet}
       <ActionSheet visible={!!picked} options={messageOptions} onClose={() => setPicked(null)} />
       <ActionSheet
         visible={!!reporting}

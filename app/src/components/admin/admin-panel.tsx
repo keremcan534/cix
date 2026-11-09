@@ -27,6 +27,7 @@ import { RefundsSection } from './refunds';
 import { ReportsSection } from './reports';
 import { SanctionUserScreen } from './sanction-user';
 import { SanctionsSection } from './sanctions';
+import { TeamSection } from './team-notices';
 import { UsersSection } from './users';
 import { WithdrawalsSection } from './withdrawals';
 
@@ -35,6 +36,7 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'kullanici', label: 'Kullanıcılar' },
   { key: 'ayarlar', label: 'Canlı ayarlar' },
   { key: 'ugurlu', label: 'Uğurlu hediyeler' },
+  { key: 'duyuru', label: 'Duyurular' },
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
   { key: 'sikayet', label: 'Şikâyetler', count: 'reports' },
@@ -149,7 +151,7 @@ function PanelBody({
   const showLive = isAdmin && !moderator && (!!live.data?.view || !!live.error);
   const tabs = moderator
     ? TABS.filter((t) => t.key === 'yaptirim')
-    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin));
+    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin) && (t.key !== 'duyuru' || isAdmin));
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
@@ -209,6 +211,7 @@ function PanelBody({
           <View style={{ flex: 1 }}>
             {tab === 'ayarlar' && <LiveSettingsSection load={live} />}
             {tab === 'ugurlu' && <LuckySection />}
+            {tab === 'duyuru' && <TeamSection />}
             {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
             {tab === 'kullanici' && <UsersSection />}
             {tab === 'sikayet' && <ReportsSection />}

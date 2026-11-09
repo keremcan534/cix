@@ -218,22 +218,22 @@ export const STANDARD_MICS = 10;
 export const AGENCY_MICS = 15;
 export const ROOM_XP_THRESHOLDS = [0, 100, 300, 600, 1_000, 1_600, 2_400, 3_400, 4_800, 6_500, 8_500, 11_000, 14_000, 18_000, 23_000];
 // Per-level limits and rewards (update doc §1.1–1.2). All values are admin-configurable defaults.
-export const ROOM_LIMITS: { rooms: number; members: number; admins: number }[] = [
-  { rooms: 50, members: 50, admins: 5 },
-  { rooms: 100, members: 100, admins: 5 },
-  { rooms: 200, members: 200, admins: 5 },
-  { rooms: 200, members: 300, admins: 5 },
-  { rooms: 200, members: 500, admins: 5 },
-  { rooms: 400, members: 600, admins: 7 },
-  { rooms: 600, members: 800, admins: 9 },
-  { rooms: 1_000, members: 1_200, admins: 12 },
-  { rooms: 1_000, members: 1_350, admins: 13 },
-  { rooms: 1_000, members: 1_500, admins: 15 },
-  { rooms: 1_250, members: 1_750, admins: 17 },
-  { rooms: 1_500, members: 2_000, admins: 20 },
-  { rooms: 1_750, members: 2_500, admins: 23 },
-  { rooms: 2_000, members: 3_000, admins: 27 },
-  { rooms: 2_500, members: 5_000, admins: 30 },
+export const ROOM_LIMITS: { rooms: number; members: number; admins: number; djs: number }[] = [
+  { rooms: 50, members: 50, admins: 5, djs: 3 },
+  { rooms: 100, members: 100, admins: 5, djs: 3 },
+  { rooms: 200, members: 200, admins: 5, djs: 3 },
+  { rooms: 200, members: 300, admins: 5, djs: 3 },
+  { rooms: 200, members: 500, admins: 5, djs: 3 },
+  { rooms: 400, members: 600, admins: 7, djs: 4 },
+  { rooms: 600, members: 800, admins: 9, djs: 5 },
+  { rooms: 1_000, members: 1_200, admins: 12, djs: 7 },
+  { rooms: 1_000, members: 1_350, admins: 13, djs: 8 },
+  { rooms: 1_000, members: 1_500, admins: 15, djs: 9 },
+  { rooms: 1_250, members: 1_750, admins: 17, djs: 10 },
+  { rooms: 1_500, members: 2_000, admins: 20, djs: 12 },
+  { rooms: 1_750, members: 2_500, admins: 23, djs: 14 },
+  { rooms: 2_000, members: 3_000, admins: 27, djs: 16 },
+  { rooms: 2_500, members: 5_000, admins: 30, djs: 18 },
 ];
 export const ROOM_LEVEL_REWARDS = [
   'Temel seviye simgesi, standart oda, 5 yöneticiye kadar',
@@ -275,6 +275,8 @@ export const roomLevel = (xp: number) => {
 export const micCapacity = (agencyRoom: boolean, level: number) =>
   agencyRoom ? AGENCY_MICS : Math.min(15, STANDARD_MICS + (level >= 8 ? 2 : 0) + (level >= 15 ? 3 : 0));
 export const adminCapacity = (level: number) => ROOM_LIMITS[level - 1].admins;
+/** DJs (only the room's music, nothing else): 3, rising at the admins' rate (server/api/music.mjs DJ_LIMITS). */
+export const djCapacity = (level: number) => ROOM_LIMITS[level - 1].djs;
 // Room settings gates ("Oda Ayarları").
 export const ROOM_THEMES = [
   { id: 'chat', name: 'Sohbet', emoji: '💬' },

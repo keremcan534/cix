@@ -18,9 +18,12 @@ import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
 
-/** wealthXp: Cömertlik points, only in GET /api/me (the server's count, server/api/wheel.mjs wealthPoints). */
+/**
+ * wealthXp: Cömertlik points, charmXp: Yankı points, only in GET /api/me (the server's counts, server/api/wheel.mjs
+ * wealthPoints and wallet.mjs charmPoints).
+ */
 export type ServerUser = {
-  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number;
+  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number;
   // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
   email?: string | null; identities?: string[]; phoneVerified?: boolean;
 };
@@ -433,6 +436,10 @@ export type IncomePeriod = 'day' | 'week' | 'month' | 'all';
 export const incomeSources = (period: IncomePeriod) => call<{ period: IncomePeriod; total: number; sources: IncomeSource[] }>('GET', `/api/wallet/income?period=${period}`);
 export const rankings = (board: 'wealth' | 'charm', period: 'day' | 'week' | 'month') =>
   call<{ rows: RankingRow[] }>('GET', `/api/rankings?board=${board}&period=${period}`).then((r) => r.rows);
+/** Agencies by what their streamers earned this day, week or month (the commission base). */
+export type AgencyRankingRow = { rank: number; agency: { id: string; name: string; avatarUrl: string | null }; score: number };
+export const agencyRankings = (period: 'day' | 'week' | 'month') =>
+  call<{ rows: AgencyRankingRow[] }>('GET', `/api/rankings?board=agency&period=${period}`).then((r) => r.rows);
 
 /** After a store purchase: the server checks it with Google / Apple and credits the coins once. `bonus` is the
  *  first-buy gift, `campaignBonus` a campaign's extra coins (missing from an older server). */
@@ -442,7 +449,7 @@ export const verifyPurchase = (proof: StoreProof) =>
 export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice' | 'music', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */
@@ -480,11 +487,16 @@ export type ServerEarnings = { diamonds: number; withdrawable: number; locked: n
 
 export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDate?: string; city?: string; bio?: string; interests?: string[]; avatarUrl?: string | null };
 export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
-export const userProfile = (id: string) => call<{ user: PublicUser }>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => r.user);
+/** Someone's agency (an approved one they stream in now) and family, on their profile. */
+export type ProfileTies = { agency: { id: string; name: string } | null; family: { id: string; name: string; role: 'owner' | 'helper' | 'member' } | null };
+export const userProfile = (id: string) =>
+  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first (no distance on the server: city only). */
 export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };
-export const discover = () => call<{ users: DiscoverUser[] }>('GET', '/api/discover').then((r) => r.users);
+/** Keşfet's lists (server/api/social.mjs): most recently active, newest accounts, or who 1v1 lifts. */
+export type DiscoverList = 'home' | 'new' | 'featured';
+export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverUser[] }>('GET', `/api/discover${list === 'home' ? '' : `?list=${list}`}`).then((r) => r.users);
 /** Blocking also ends follows both ways on the server; the other person is not told. */
 export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('POST', '/api/block', { to, block: on }).then((r) => r.blocked);
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
@@ -643,7 +655,19 @@ export type LiveKey =
   | 'exchange_usd_try'
   | 'withdraw_max_diamonds'
   | 'withdraw_weekly_diamonds'
-  | 'otp_global_per_hour';
+  | 'otp_global_per_hour'
+  | OneOnOneKey;
+/** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
+export type OneOnOneKey =
+  | 'dm_price'
+  | 'call_voice_price'
+  | 'call_video_price'
+  | 'match_voice_price'
+  | 'match_video_price'
+  | 'match_free'
+  | 'match_free_seconds'
+  | 'heart_voice_level'
+  | 'heart_video_level';
 /** A setting's value: a list of ids, text, a number, a campaign, or null for the built-in default. */
 export type LiveValue = string | number | string[] | CatalogCampaign | null;
 export type LiveSetting = {

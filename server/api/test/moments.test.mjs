@@ -1,5 +1,6 @@
 // Anlar on the server (moments.mjs): posting, the feed tabs, likes, comments, blocks, removal by the writer and
-// by staff from a report, mutes, and account deletion.
+// by staff from a report, mutes, and account deletion; comment likes and the spam filter. Yankı Lv.5 for posting is
+// switched off here (MOMENT_CHARM 0) and tested in moments-charm.test.mjs.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,7 +9,7 @@ import path from 'node:path';
 import { rnd, startApi } from './harness.mjs';
 
 const CDN = 'https://cdn.example.test';
-const h = startApi({ S3_PUBLIC_URL: CDN, AUTO_MUTE_REFUSALS: '0' });
+const h = startApi({ S3_PUBLIC_URL: CDN, AUTO_MUTE_REFUSALS: '0', MOMENT_CHARM: '0' });
 const { call, signUp } = h;
 const ok = async (p, what) => {
   const [st, j] = await p;
@@ -76,16 +77,44 @@ describe('Anlar', () => {
     await ok(call('POST', '/api/moments/comment', { id, text: 'Katılıyorum', ref: rnd(10) }, c.session), 'yorum 2');
     const list = (await ok(call('GET', `/api/moments/comments?id=${id}`, null, a.session))).comments;
     assert.deepEqual(list.map((x) => x.text), ['Çok güzel!', 'Katılıyorum'], 'eskisi üstte');
+    assert.deepEqual([list[0].likes, list[0].liked], [0, false]);
+
+    // Comment likes: once per person, seen by everyone, taken back.
+    assert.deepEqual(await ok(call('POST', '/api/moments/comment/like', { id: list[0].id, like: true }, a.session), 'yorum beğen'), { liked: true, likes: 1 });
+    assert.equal((await ok(call('POST', '/api/moments/comment/like', { id: list[0].id, like: true }, a.session))).likes, 1, 'bir kişi bir kez');
+    await ok(call('POST', '/api/moments/comment/like', { id: list[0].id, like: true }, c.session), 'yorum beğen 2');
+    const seen = (await ok(call('GET', `/api/moments/comments?id=${id}`, null, b.session))).comments[0];
+    assert.deepEqual([seen.likes, seen.liked], [2, false]);
+    assert.equal((await ok(call('POST', '/api/moments/comment/like', { id: list[0].id, like: false }, c.session))).likes, 1);
+    assert.equal((await call('POST', '/api/moments/comment/like', { id: list[0].id, like: 'evet' }, c.session))[0], 400);
     assert.equal((await ok(call('GET', '/api/moments?tab=recent', null, a.session))).moments.find((m) => m.id === id).comments, 2);
 
     assert.equal((await call('POST', '/api/moments/comment/delete', { id: list[1].id }, b.session))[0], 403, 'başkasının yorumu');
     await ok(call('POST', '/api/moments/comment/delete', { id: list[1].id }, a.session), 'an sahibi yorumu siler');
     assert.equal((await ok(call('GET', `/api/moments/comments?id=${id}`, null, a.session))).comments.length, 1);
+    assert.equal((await call('POST', '/api/moments/comment/like', { id: list[1].id, like: true }, b.session))[0], 404, 'silinen yorum beğenilmez');
 
     assert.equal((await call('POST', '/api/moments/delete', { id }, b.session))[0], 403, 'başkasının anı');
     await ok(call('POST', '/api/moments/delete', { id: photo.moment.id }, a.session), 'kendi anını siler');
     assert.deepEqual((await ok(call('GET', '/api/moments?tab=recent', null, b.session))).moments.map((m) => m.id), [id]);
     assert.equal((await call('POST', '/api/moments/like', { id: photo.moment.id, like: true }, b.session))[0], 404, 'silinen an beğenilmez');
+  });
+
+  test('küfür, cinsel içerik ve reklam paylaşılamaz; günlük yazı geçer', async () => {
+    const a = await signUp('Filtreli');
+    const refused = async (path, body, category) => {
+      const [st, j] = await call('POST', path, { ref: rnd(10), ...body }, a.session);
+      assert.equal(st, 400, `${body.text}: reddedilmeli`);
+      assert.equal(j.code, 'text_blocked');
+      assert.equal(j.category, category, body.text);
+    };
+    await refused('/api/moments', { text: 'a.m.k ne biçim gün' }, 'swear');
+    await refused('/api/moments', { text: 'p0rn0 izleyelim' }, 'sexual');
+    await refused('/api/moments', { text: 'Ucuz jeton burada, takipçi satılır' }, 'ad');
+    await refused('/api/moments', { text: 'Bu uygulamayı bırakın, şu uygulamayı indirin' }, 'ad');
+    const p = await ok(call('POST', '/api/moments', { text: 'Bugün çok sıkıcı geçti, sıkıntı yok; dedem seksen yaşında!', ref: rnd(10) }, a.session), 'günlük yazı');
+    await refused('/api/moments/comment', { id: p.moment.id, text: 'siktir git' }, 'swear');
+    await ok(call('POST', '/api/moments/comment', { id: p.moment.id, text: 'Ankara’da analiz yaptım', ref: rnd(10) }, a.session), 'günlük yorum');
   });
 
   test('engellenen kişinin anları ve yorumları görünmez', async () => {

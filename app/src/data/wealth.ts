@@ -35,7 +35,7 @@ export const levelFromTable = (table: number[], xp: number) => {
 export const wealthLevelOf = (xp: number) => levelFromTable(WEALTH_XP, xp);
 
 /** Spending that does not count: coin games and coin hand-outs. */
-const NOT_COUNTED = [/· tur /, /Zar Düellosu/i, /zarf/i, /transfer/i, /jeton gönder/i];
+const NOT_COUNTED = [/· tur /, /Zar Düellosu/i, /zarf/i, /çantası/i, /transfer/i, /jeton gönder/i];
 export const countsForWealth = (reason: string) => !NOT_COUNTED.some((r) => r.test(reason));
 
 /** Level groups share an emblem; each has its own colors and symbol. */

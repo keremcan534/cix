@@ -85,8 +85,45 @@ export function defaultsOf(e = process.env) {
     withdraw_max_diamonds: WITHDRAW.maxDiamonds,
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
+    ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [k, x.default])),
   };
 }
+/**
+ * 1v1 (one-on-one.mjs): the prices in coins (the earner gets as many diamonds), the free matches and the heart
+ * levels that open calls. key → [field, label, default, bounds, unit, sentence].
+ */
+const ONE = 'Birebir ve eşleşme';
+const price = (max) => ({ min: 0, max, step: 10, money: true });
+const ONE_ON_ONE = {
+  dm_price: { field: 'dmPrice', label: 'Mesaj ücreti', default: 240, bounds: price(10_000), unit: ' jeton', help: 'Yayıncıya karşılıklı takip olmadan gönderilen her mesaj. 0: ücretsiz.', text: (a, b) => `Mesaj başı ${a} → ${b} jeton.` },
+  call_voice_price: { field: 'callVoice', label: 'Sesli arama (dakika)', default: 2000, bounds: price(100_000), unit: ' jeton', help: 'Yayıncıyla sesli aramanın dakikası.', text: (a, b) => `Sesli arama dakikası ${a} → ${b} jeton. Süren aramalar başladıkları fiyatla devam eder.` },
+  call_video_price: { field: 'callVideo', label: 'Görüntülü arama (dakika)', default: 3200, bounds: price(100_000), unit: ' jeton', help: 'Yayıncıyla görüntülü aramanın dakikası.', text: (a, b) => `Görüntülü arama dakikası ${a} → ${b} jeton. Süren aramalar başladıkları fiyatla devam eder.` },
+  match_voice_price: { field: 'matchVoice', label: 'Sesli eşleşme (dakika)', default: 600, bounds: price(100_000), unit: ' jeton', help: 'Ücretsiz eşleşme hakkı bitince sesli eşleşmenin dakikası.', text: (a, b) => `Sesli eşleşme dakikası ${a} → ${b} jeton.` },
+  match_video_price: { field: 'matchVideo', label: 'Görüntülü eşleşme (dakika)', default: 750, bounds: price(100_000), unit: ' jeton', help: 'Ücretsiz eşleşme hakkı bitince görüntülü eşleşmenin dakikası.', text: (a, b) => `Görüntülü eşleşme dakikası ${a} → ${b} jeton.` },
+  match_free: { field: 'matchFree', label: 'Ücretsiz eşleşme (24 saatte)', default: 3, bounds: { min: 0, max: 20, step: 1 }, unit: '', help: 'Yayıncı olmayan herkesin 24 saatte kullanabileceği ücretsiz eşleşme.', text: (a, b) => `24 saatte ${a} → ${b} ücretsiz eşleşme.` },
+  match_free_seconds: { field: 'matchSeconds', label: 'Ücretsiz eşleşme süresi (saniye)', default: 58, bounds: { min: 15, max: 600, step: 1 }, unit: ' saniye', help: 'Ücretsiz bir eşleşme en çok bu kadar sürer.', text: (a, b) => `Ücretsiz eşleşme en çok ${a} → ${b} saniye sürer.` },
+  heart_voice_level: { field: 'heartVoice', label: 'Sesli arama kalp seviyesi', default: 2, bounds: { min: 0, max: 10, step: 1 }, unit: '', help: 'Yayıncıyla sesli arama bu kalp seviyesinde açılır. 0: hemen.', text: (a, b) => `Sesli arama kalp seviyesi ${a} → ${b}.` },
+  heart_video_level: { field: 'heartVideo', label: 'Görüntülü arama kalp seviyesi', default: 4, bounds: { min: 0, max: 10, step: 1 }, unit: '', help: 'Yayıncıyla görüntülü arama bu kalp seviyesinde açılır. 0: hemen.', text: (a, b) => `Görüntülü arama kalp seviyesi ${a} → ${b}.` },
+};
+/** The 1v1 keys as registry entries; a price that more than doubles or halves needs the second confirmation. */
+const oneOnOneEntries = () =>
+  Object.fromEntries(
+    Object.entries(ONE_ON_ONE).map(([k, x]) => [
+      k,
+      {
+        field: x.field,
+        group: ONE,
+        label: x.label,
+        help: x.help,
+        type: 'int',
+        bounds: x.bounds,
+        parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+        big: (before, after) => after !== null && !!x.bounds.money && (after > before * 2 || after * 2 < before),
+        impact: (before, after) => x.text(fmt(before), fmt(after)),
+      },
+    ]),
+  );
+
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
 
@@ -409,6 +446,7 @@ export const REGISTRY = {
       return ctx.raw === null ? `Sunucu ayarındaki zorunlu sürüm (${after}) geçerli olur.` : `${after} sürümünden eski uygulamalar "Güncelleme gerekli" ekranında kalır.`;
     },
   },
+  ...oneOnOneEntries(),
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -457,7 +495,8 @@ const readOnlySet = (xs) => {
  * unknown keys are ignored; the first are listed in `invalid`. FEATURES_OFF is always added to the live list,
  * and the live notice and minimum version replace .env's ('' = no notice, null = .env's).
  *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
- *     withdrawWeekly, otpPerHour, invalid }
+ *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
+ *     heartVideo, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -490,6 +529,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     withdrawMax: val('withdraw_max_diamonds'),
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),
+    ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [x.field, val(k)])),
     invalid: Object.freeze([...invalid]),
   });
 }

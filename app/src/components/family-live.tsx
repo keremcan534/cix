@@ -1,0 +1,538 @@
+// Aile in a live build (lib/live/family → server/api/families.mjs): the family list, founding one, joining or
+// asking to join, my family (members, requests, roles, announcement, join mode) and the family chat. Everything
+// shown is the server's answer; nothing is kept on the phone. The demo build keeps app/aile's sample families.
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, Pressable, ScrollView, Share, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
+import { EmojiText } from '@/components/ReactionArt';
+import { SCENES } from '@/components/fx/scenes';
+import { Backdrop } from '@/components/fx/surface';
+import { KeyboardAvoid } from '@/components/keyboard-avoid';
+import { Text, TextInput } from '@/components/text';
+import { Avatar, Card, GradientButton, Header } from '@/components/ui';
+import { KABILE_CREATE_COST, KABILE_ROUTES } from '@/data/kabile';
+import { showAlert } from '@/lib/alert';
+import { applyServerUser, message, myServerId, once } from '@/lib/live';
+import * as fam from '@/lib/live/family';
+import { makeStyles, useTheme } from '@/theme';
+
+const fmt = (n: number) => n.toLocaleString('tr-TR');
+const openProfile = (id: string) => (id === myServerId() ? router.push('/(tabs)/profil') : router.push(`/kullanici/${id}`));
+
+/** Aileler: my family when I have one, else the list (with founding and a family's preview). */
+export function LiveFamilies() {
+  const [detail, setDetail] = useState<fam.FamilyDetail | null>(null);
+  const [failed, setFailed] = useState(false);
+  // /aile?id=… (someone's family from their profile) opens that family's preview, unless it is mine.
+  const { id: asked } = useLocalSearchParams<{ id?: string }>();
+  const [preview, setPreview] = useState<string | null>(asked ?? null);
+  const load = useCallback(
+    () =>
+      fam.family().then(
+        (d) => (setFailed(false), setDetail(d)),
+        () => setFailed(true),
+      ),
+    [],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const back = useCallback(() => setPreview(null), []);
+  const retry = () => (setFailed(false), void load());
+
+  if (preview && preview !== detail?.family?.id) return <FamilyView id={preview} onBack={back} onJoined={() => (setPreview(null), void load())} />;
+  if (detail?.family) return <MyFamily detail={detail} onChange={setDetail} reload={() => (setPreview(null), void load())} />;
+  return <FamilyList loading={!detail && !failed} failed={failed} onRetry={retry} onOpen={setPreview} onCreated={load} />;
+}
+
+function FamilyList({ loading, failed, onRetry, onOpen, onCreated }: { loading: boolean; failed: boolean; onRetry: () => void; onOpen: (id: string) => void; onCreated: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const [q, setQ] = useState('');
+  const [list, setList] = useState<fam.LiveFamily[] | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    const t = setTimeout(() => fam.families(q).then((r) => on && setList(r.families), () => on && setList([])), q ? 350 : 0);
+    return () => {
+      on = false;
+      clearTimeout(t);
+    };
+  }, [q]);
+
+  const found = async () => {
+    const n = name.trim();
+    if (n.length < 2) return showAlert('Aile adı en az 2 karakter olmalı');
+    setBusy(true);
+    try {
+      const r = await once(`family:create:${n}`, (ref) => fam.create(n, ref));
+      applyServerUser(r, `Aile kurma: ${n}`);
+      onCreated();
+    } catch (e) {
+      showAlert('Aile kurulamadı', message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <Backdrop scene={SCENES.family} />
+      <Header title="Aileler" />
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
+          {creating ? (
+            <Card style={{ gap: 10 }}>
+              <Text style={styles.title}>Aile kur · {fmt(KABILE_CREATE_COST)} jeton</Text>
+              <TextInput value={name} onChangeText={setName} placeholder="Aile adı" placeholderTextColor={colors.textDim} style={styles.input} maxLength={24} />
+              <Text style={styles.dim}>Kuran kişi aile lideri olur: yardımcı atar, istekleri onaylar ve duyuruyu yazar.</Text>
+              <GradientButton title={busy ? 'Kuruluyor…' : 'Kur'} onPress={busy ? undefined : found} />
+            </Card>
+          ) : (
+            <GradientButton title="Kendi aileni kur" icon="add" onPress={() => setCreating(true)} />
+          )}
+          {failed && (
+            <Pressable onPress={onRetry} style={styles.notice}>
+              <Text style={styles.dim}>Ailen yüklenemedi. Tekrar denemek için dokun.</Text>
+            </Pressable>
+          )}
+          <TextInput value={q} onChangeText={setQ} placeholder="Aile ara" placeholderTextColor={colors.textDim} style={styles.input} maxLength={24} />
+          <Text style={[styles.title, { marginTop: 4 }]}>Bu haftanın aileleri</Text>
+          {loading || list === null ? (
+            <Text style={styles.dim}>Yükleniyor…</Text>
+          ) : list.length === 0 ? (
+            <Text style={styles.dim}>{q ? 'Bu isimde aile yok.' : 'Henüz aile yok. İlkini sen kur.'}</Text>
+          ) : (
+            list.map((f, i) => (
+              <Pressable key={f.id} onPress={() => onOpen(f.id)} accessibilityRole="button" accessibilityLabel={`${f.name} ailesi`}>
+                <Card style={styles.row}>
+                  <Text style={styles.rank}>{i + 1}</Text>
+                  <Avatar uri={f.leader.avatarUrl ?? undefined} name={f.name} size={44} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.title} numberOfLines={1}>
+                      {f.name}
+                    </Text>
+                    <Text style={styles.dim} numberOfLines={1}>
+                      Lv.{f.level} · {f.members}/{f.capacity} üye · bu hafta {fmt(f.weekly)} güç
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+                </Card>
+              </Pressable>
+            ))
+          )}
+          <Text style={[styles.dim, { textAlign: 'center' }]}>Bir kişi aynı anda yalnızca bir ailede olabilir. Güç, üyelerin gönderdiği hediyelerden gelir.</Text>
+        </ScrollView>
+      </KeyboardAvoid>
+    </SafeAreaView>
+  );
+}
+
+/** Another family: who is in it, and join (open) / ask to join (approve) / take my request back. */
+function FamilyView({ id, onBack, onJoined }: { id: string; onBack: () => void; onJoined: () => void }) {
+  const styles = useStyles();
+  const [d, setD] = useState<fam.FamilyDetail | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fam.family(id).then(setD, (e) => (showAlert('Aile açılamadı', message(e)), onBack()));
+  }, [id, onBack]);
+  const f = d?.family;
+
+  const act = async () => {
+    if (!f || !d) return;
+    setBusy(true);
+    try {
+      const r = await fam.join(f.id, !d.requested);
+      if (r.joined) return onJoined();
+      setD({ ...d, requested: !!r.requested });
+      if (r.requested) showAlert('İstek gönderildi', 'Aile lideri ya da yardımcısı onaylayınca aileye katılırsın.');
+    } catch (e) {
+      showAlert('Olmadı', message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <Backdrop scene={SCENES.family} />
+      <Header title={f?.name ?? 'Aile'} onBack={onBack} />
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+        {!f || !d ? (
+          <Text style={styles.dim}>Yükleniyor…</Text>
+        ) : (
+          <>
+            <Summary f={f} />
+            {!!f.announcement && (
+              <Card>
+                <Text style={styles.label}>Duyuru</Text>
+                <Text style={styles.body}>{f.announcement}</Text>
+              </Card>
+            )}
+            <GradientButton
+              title={busy ? 'Bekle…' : d.requested ? 'İsteği geri al' : f.joinMode === 'open' ? 'Aileye katıl' : 'Katılma isteği gönder'}
+              onPress={busy ? undefined : act}
+            />
+            <Members members={d.members} />
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Summary({ f }: { f: fam.LiveFamily }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const full = f.members / Math.max(1, f.capacity);
+  return (
+    <Card style={{ gap: 10 }}>
+      <View style={styles.row}>
+        <Avatar uri={f.leader.avatarUrl ?? undefined} name={f.name} size={56} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.big} numberOfLines={1}>
+            {f.name}
+          </Text>
+          <Text style={styles.dim}>Lider: {f.leader.name}</Text>
+        </View>
+        <Text style={[styles.lv, { color: colors.gold }]}>Lv.{f.level}</Text>
+      </View>
+      <View style={styles.stats}>
+        <Stat label="Üye" value={`${f.members}/${f.capacity}`} />
+        <Stat label="Bu hafta" value={fmt(f.weekly)} />
+        <Stat label="Toplam güç" value={fmt(f.power)} />
+      </View>
+      <View style={styles.bar}>
+        <View style={[styles.barFill, { width: `${Math.round(Math.min(1, full) * 100)}%` }]} />
+      </View>
+      <Text style={styles.dim}>{f.joinMode === 'open' ? 'Herkes katılabilir' : 'Katılmak için onay gerekir'}</Text>
+    </Card>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.dim}>{label}</Text>
+    </View>
+  );
+}
+
+function Members({ members, myRole, onMenu }: { members: fam.FamilyMember[]; myRole?: fam.FamilyRole | null; onMenu?: (m: fam.FamilyMember) => void }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const me = myServerId();
+  return (
+    <Card style={{ gap: 4 }}>
+      <Text style={styles.title}>Üyeler · {members.length}</Text>
+      {members.map((m) => {
+        const manage = !!onMenu && m.id !== me && (myRole === 'owner' || fam.mayKick(myRole ?? null, m.role));
+        return (
+          <Pressable key={m.id} style={styles.row} onPress={() => openProfile(m.id)} onLongPress={manage ? () => onMenu?.(m) : undefined} accessibilityLabel={`${m.name}, ${fam.ROLE_NAME[m.role]}`}>
+            <Avatar uri={m.avatarUrl ?? undefined} name={m.name} size={40} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name} numberOfLines={1}>
+                {m.id === me ? `${m.name} (sen)` : m.name}
+              </Text>
+              <Text style={styles.dim}>Bu hafta {fmt(m.weekly)} güç</Text>
+            </View>
+            {m.role !== 'member' && <Text style={styles.role}>{fam.ROLE_NAME[m.role]}</Text>}
+            {manage && (
+              <Pressable hitSlop={10} onPress={() => onMenu?.(m)} accessibilityLabel={`${m.name} için seçenekler`}>
+                <Ionicons name="ellipsis-horizontal" size={18} color={colors.textDim} />
+              </Pressable>
+            )}
+          </Pressable>
+        );
+      })}
+    </Card>
+  );
+}
+
+function MyFamily({ detail, onChange, reload }: { detail: fam.FamilyDetail; onChange: (d: fam.FamilyDetail) => void; reload: () => void }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const f = detail.family!;
+  const role = detail.myRole;
+  const manager = role === 'owner' || role === 'helper';
+  const [menu, setMenu] = useState<fam.FamilyMember | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [note, setNote] = useState(f.announcement);
+
+  const run = async (what: string, p: Promise<{ members: fam.FamilyMember[] }>) => {
+    try {
+      const r = await p;
+      onChange({ ...detail, members: r.members, family: { ...f, members: r.members.length } });
+      reload();
+    } catch (e) {
+      showAlert(what, message(e));
+    }
+  };
+  const answer = async (id: string, accept: boolean) => {
+    onChange({ ...detail, requests: detail.requests.filter((r) => r.id !== id) });
+    await run(accept ? 'Kabul edilemedi' : 'Reddedilemedi', fam.answer(id, accept));
+  };
+  const saveNote = async () => {
+    try {
+      const r = await fam.settings({ announcement: note });
+      onChange({ ...detail, family: r.family });
+      setEditing(false);
+    } catch (e) {
+      showAlert('Duyuru kaydedilemedi', message(e));
+    }
+  };
+  const toggleMode = async () => {
+    try {
+      const r = await fam.settings({ joinMode: f.joinMode === 'open' ? 'approve' : 'open' });
+      onChange({ ...detail, family: r.family });
+    } catch (e) {
+      showAlert('Değiştirilemedi', message(e));
+    }
+  };
+  const leave = () =>
+    showAlert('Aileden ayrıl', role === 'owner' ? 'Ayrılırsan liderlik bir yardımcıya (yoksa en eski üyeye) geçer.' : `${f.name} ailesinden ayrılmak istiyor musun?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Ayrıl',
+        style: 'destructive',
+        onPress: () => void fam.leave().then(reload, (e) => showAlert('Ayrılamadın', message(e))),
+      },
+    ]);
+
+  const options: SheetOption[] = menu
+    ? [
+        { label: 'Profili gör', icon: 'person-outline', onPress: () => openProfile(menu.id) },
+        ...(role === 'owner' && menu.role === 'member' ? [{ label: 'Yardımcı yap', icon: 'shield-outline' as const, onPress: () => run('Olmadı', fam.setRole(menu.id, 'helper')) }] : []),
+        ...(role === 'owner' && menu.role === 'helper' ? [{ label: 'Üye yap', icon: 'person-remove-outline' as const, onPress: () => run('Olmadı', fam.setRole(menu.id, 'member')) }] : []),
+        ...(role === 'owner'
+          ? [
+              {
+                label: 'Liderliği devret',
+                icon: 'ribbon-outline' as const,
+                onPress: () =>
+                  showAlert('Liderliği devret', `${menu.name} aile lideri olur, sen yardımcı olursun.`, [
+                    { text: 'Vazgeç', style: 'cancel' },
+                    { text: 'Devret', onPress: () => void run('Devredilemedi', fam.setRole(menu.id, 'owner')) },
+                  ]),
+              },
+            ]
+          : []),
+        ...(fam.mayKick(role, menu.role) ? [{ label: 'Aileden çıkar', icon: 'close-circle-outline' as const, destructive: true, onPress: () => run('Çıkarılamadı', fam.kick(menu.id)) }] : []),
+      ]
+    : [];
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <Backdrop scene={SCENES.family} />
+      <Header
+        title="Ailem"
+        right={
+          <Pressable hitSlop={10} onPress={() => void Share.share({ message: `${f.name} ailesine katıl! Similar Club'da Aileler bölümünde "${f.name}" ara.` })} accessibilityLabel="Paylaş">
+            <Ionicons name="share-social-outline" size={22} color={colors.text} />
+          </Pressable>
+        }
+      />
+      <KeyboardAvoid style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
+          <Summary f={f} />
+          <GradientButton title="Aile sohbeti" icon="chatbubbles" onPress={() => router.push(KABILE_ROUTES.sohbet)} />
+          <Card style={{ gap: 8 }}>
+            <View style={styles.row}>
+              <Text style={[styles.label, { flex: 1 }]}>Duyuru</Text>
+              {manager && !editing && (
+                <Pressable hitSlop={10} onPress={() => (setNote(f.announcement), setEditing(true))} accessibilityLabel="Duyuruyu düzenle">
+                  <Ionicons name="create-outline" size={18} color={colors.textDim} />
+                </Pressable>
+              )}
+            </View>
+            {editing ? (
+              <>
+                <TextInput value={note} onChangeText={setNote} multiline maxLength={200} style={[styles.input, { minHeight: 80 }]} placeholder="Ailene bir not yaz" placeholderTextColor={colors.textDim} />
+                <View style={styles.row}>
+                  <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => setEditing(false)}>
+                    <Text style={styles.name}>Vazgeç</Text>
+                  </Pressable>
+                  <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={saveNote}>
+                    <Text style={styles.pillText}>Kaydet</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.body}>{f.announcement || (manager ? 'Henüz duyuru yok. Ailene bir not yaz.' : 'Henüz duyuru yok.')}</Text>
+            )}
+          </Card>
+          {role === 'owner' && (
+            <Pressable onPress={toggleMode} accessibilityRole="switch" accessibilityState={{ checked: f.joinMode === 'approve' }}>
+              <Card style={styles.row}>
+                <Ionicons name={f.joinMode === 'approve' ? 'lock-closed-outline' : 'lock-open-outline'} size={20} color={colors.text} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>Katılım</Text>
+                  <Text style={styles.dim}>{f.joinMode === 'approve' ? 'Onayla katılım: istekleri sen onaylarsın' : 'Açık: herkes hemen katılır'}</Text>
+                </View>
+                <Text style={[styles.dim, { color: colors.primary }]}>Değiştir</Text>
+              </Card>
+            </Pressable>
+          )}
+          {manager && detail.requests.length > 0 && (
+            <Card style={{ gap: 4 }}>
+              <Text style={styles.title}>Katılma istekleri · {detail.requests.length}</Text>
+              {detail.requests.map((r) => (
+                <View key={r.id} style={styles.row}>
+                  <Pressable onPress={() => openProfile(r.id)} style={[styles.row, { flex: 1 }]}>
+                    <Avatar uri={r.avatarUrl ?? undefined} name={r.name} size={36} />
+                    <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
+                      {r.name}
+                    </Text>
+                  </Pressable>
+                  <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => answer(r.id, false)} accessibilityLabel={`${r.name} isteğini reddet`}>
+                    <Text style={styles.name}>Reddet</Text>
+                  </Pressable>
+                  <Pressable style={[styles.pill, { backgroundColor: colors.primary }]} onPress={() => answer(r.id, true)} accessibilityLabel={`${r.name} isteğini kabul et`}>
+                    <Text style={styles.pillText}>Kabul</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </Card>
+          )}
+          <Members members={detail.members} myRole={role} onMenu={manager ? setMenu : undefined} />
+          <Pressable onPress={leave} style={styles.leave} accessibilityRole="button">
+            <Text style={styles.leaveText}>Aileden ayrıl</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoid>
+      <ActionSheet visible={!!menu} title={menu?.name} options={options} onClose={() => setMenu(null)} />
+    </SafeAreaView>
+  );
+}
+
+/** Aile sohbeti: the family's chat, read again every few seconds while open. */
+export function LiveFamilyChat() {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const [msgs, setMsgs] = useState<fam.FamilyMessage[] | null>(null);
+  const [closed, setClosed] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const list = useRef<FlatList<fam.FamilyMessage>>(null);
+  const last = useRef<string | undefined>(undefined);
+  const me = myServerId();
+
+  useEffect(() => {
+    let on = true;
+    const pull = () =>
+      fam.chat(last.current).then(
+        (m) => {
+          if (!on) return;
+          if (m.length) last.current = m[m.length - 1].id;
+          setMsgs((cur) => [...(cur ?? []), ...m.filter((x) => !(cur ?? []).some((c) => c.id === x.id))]);
+        },
+        (e) => on && e?.status === 403 && setClosed(true),
+      );
+    void pull();
+    const t = setInterval(pull, 4000);
+    return () => {
+      on = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  const send = async () => {
+    const t = draft.trim();
+    if (!t || sending) return;
+    setSending(true);
+    try {
+      const m = await fam.say(t);
+      setDraft('');
+      setMsgs((cur) => (cur?.some((c) => c.id === m.id) ? cur : [...(cur ?? []), m]));
+    } catch (e) {
+      showAlert('Gönderilemedi', message(e));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <Header title="Aile sohbeti" />
+      {closed ? (
+        <View style={{ padding: 24, gap: 12 }}>
+          <Text style={styles.dim}>Aile sohbetini okumak için bir ailede olmalısın.</Text>
+          <GradientButton title="Ailelere git" onPress={() => router.replace(KABILE_ROUTES.profile)} />
+        </View>
+      ) : (
+        <KeyboardAvoid style={{ flex: 1 }}>
+          <FlatList
+            ref={list}
+            data={msgs ?? []}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={{ padding: 12, gap: 8, flexGrow: 1 }}
+            onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+            ListEmptyComponent={<Text style={[styles.dim, { textAlign: 'center', marginTop: 24 }]}>{msgs ? 'Henüz mesaj yok. İlk merhabayı sen yaz.' : 'Yükleniyor…'}</Text>}
+            renderItem={({ item: m }) => {
+              const mine = m.author.id === me;
+              return (
+                <View style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
+                  {!mine && (
+                    <Pressable onPress={() => openProfile(m.author.id)}>
+                      <Avatar uri={m.author.avatarUrl ?? undefined} name={m.author.name} size={32} />
+                    </Pressable>
+                  )}
+                  <View style={[styles.bubble, { backgroundColor: mine ? colors.primary : colors.card }]}>
+                    {!mine && <Text style={styles.author}>{m.author.name}</Text>}
+                    <EmojiText text={m.text} style={[styles.msgText, mine && { color: '#fff' }]} />
+                  </View>
+                </View>
+              );
+            }}
+          />
+          <View style={styles.composer}>
+            <TextInput value={draft} onChangeText={setDraft} placeholder="Ailene yaz" placeholderTextColor={colors.textDim} style={[styles.input, { flex: 1 }]} maxLength={500} onSubmitEditing={send} returnKeyType="send" />
+            <Pressable onPress={send} style={[styles.send, { backgroundColor: draft.trim() ? colors.primary : colors.cardAlt }]} accessibilityLabel="Gönder">
+              <Ionicons name="send" size={18} color="#fff" />
+            </Pressable>
+          </View>
+        </KeyboardAvoid>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const useStyles = makeStyles(({ colors, semantic }) => ({
+  safe: { flex: 1, backgroundColor: colors.bg },
+  title: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  big: { color: colors.text, fontWeight: '800', fontSize: 20 },
+  name: { color: colors.text, fontWeight: '600', fontSize: 14 },
+  label: { color: colors.textDim, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+  body: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  rank: { color: colors.textDim, fontWeight: '800', width: 18 },
+  lv: { fontWeight: '900', fontSize: 16 },
+  role: { color: colors.gold, fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(246,189,96,0.18)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
+  input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 16, paddingVertical: 12 },
+  notice: { backgroundColor: colors.card, borderRadius: 14, padding: 12 },
+  stats: { flexDirection: 'row', gap: 8 },
+  stat: { flex: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10, gap: 2 },
+  statValue: { color: colors.text, fontWeight: '800', fontSize: 16 },
+  bar: { width: '100%', height: 6, backgroundColor: colors.cardAlt, borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: 6, backgroundColor: semantic.money },
+  pill: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  pillText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  leave: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 20 },
+  leaveText: { color: semantic.danger, fontWeight: '700' },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  bubble: { maxWidth: '78%', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
+  author: { color: colors.textDim, fontSize: 11, fontWeight: '700', marginBottom: 2 },
+  msgText: { color: colors.text, fontSize: 15, lineHeight: 20 },
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+}));

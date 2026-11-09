@@ -5,13 +5,19 @@
 // answers and what LiveKit then shows every phone (the room metadata, lib/live/room-bus).
 //
 // Ranks (the server checks them): Oda sahibi > Süper Yönetici > Yönetici > everyone else; nobody acts on their
-// own rank or higher. The Süper Yönetici also changes the room's name and bulletin.
+// own rank or higher. The Süper Yönetici also changes the room's name and bulletin. A DJ (server/api/music.mjs)
+// is no rank: the owner names them, and they only play music in the room (lib/live/music).
 import { useCallback, useEffect, useState } from 'react';
 
 import { apiRequest, roomMutes } from '@/lib/api';
 import { rememberUser, toLocal } from '@/lib/live';
 
-type StaffAnswer = { owner: string; admins: { id: string; name: string; super?: boolean }[]; bans?: { userId: string; name: string; until: string | null }[] };
+type StaffAnswer = {
+  owner: string;
+  admins: { id: string; name: string; super?: boolean }[];
+  djs?: { id: string; name: string }[];
+  bans?: { userId: string; name: string; until: string | null }[];
+};
 /** Someone kept out of the room: `until` in ms, null = the room's blacklist. */
 export type StaffBan = { uid: string; name: string; until: number | null };
 export type SeatAction = { action: 'remove'; user: string } | { action: 'move'; user: string; seat: number } | { action: 'lock' | 'unlock'; seat: number };
@@ -24,6 +30,8 @@ export const roomUnban = (room: string, user: string) => apiRequest<{ banned: fa
 /** Owner only. `superAdmin` true/false makes them Süper Yönetici or a plain Yönetici; left out keeps it. */
 export const roomSetAdmin = (room: string, user: string, admin: boolean, superAdmin?: boolean) =>
   apiRequest<{ admin: boolean; super: boolean }>('POST', '/api/rooms/admin', { room, user, admin, ...(superAdmin === undefined ? {} : { super: superAdmin }) });
+/** Owner only: make someone the room's DJ or take it back (not an admin; as many as the room's level allows). */
+export const roomSetDj = (room: string, user: string, dj: boolean) => apiRequest<{ dj: boolean }>('POST', '/api/rooms/dj', { room, user, dj });
 export const roomSeat = (room: string, body: SeatAction) => apiRequest<{ done?: boolean; lockedSeats?: number[] }>('POST', '/api/rooms/seat', { room, ...body });
 /**
  * The mic queue: `join` / `leave` my own hand (join only while the room has the queue on); `approve` puts a
@@ -37,12 +45,14 @@ export type RoomStaff = {
   admins: string[];
   /** The admins who are Süper Yönetici (local ids). */
   superAdmins: string[];
+  /** The room's DJs (local ids): they play music and nothing else. */
+  djs: string[];
   /** Only for the owner and admins; null for everyone else (the server doesn't tell them). */
   bans: StaffBan[] | null;
   /** Local id → the room voice mute's sanction id, for lifting it (owner and admins only). */
   voiceMutes: Map<string, number>;
 };
-const NONE: RoomStaff = { admins: [], superAdmins: [], bans: null, voiceMutes: new Map() };
+const NONE: RoomStaff = { admins: [], superAdmins: [], djs: [], bans: null, voiceMutes: new Map() };
 
 export function staffFrom(s: StaffAnswer, mutes: { id: number; type: string; userId: string }[]): RoomStaff {
   const voiceMutes = new Map<string, number>();
@@ -50,6 +60,7 @@ export function staffFrom(s: StaffAnswer, mutes: { id: number; type: string; use
   return {
     admins: s.admins.map((a) => toLocal(a.id)),
     superAdmins: s.admins.filter((a) => a.super).map((a) => toLocal(a.id)),
+    djs: (s.djs ?? []).map((d) => toLocal(d.id)),
     bans: s.bans ? s.bans.map((b) => ({ uid: toLocal(b.userId), name: b.name, until: b.until === null ? null : Date.parse(b.until) })) : null,
     voiceMutes,
   };
@@ -67,6 +78,7 @@ export function useRoomStaff(roomId: string, enabled: boolean) {
       try {
         const s = await roomStaff(roomId);
         s.admins.forEach((a) => rememberUser(a));
+        s.djs?.forEach((d) => rememberUser(d));
         s.bans?.forEach((b) => rememberUser({ id: b.userId, name: b.name }));
         // Mutes are for staff only, like the bans.
         const mutes = s.bans ? await roomMutes(roomId).catch(() => []) : [];

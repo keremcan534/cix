@@ -754,6 +754,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       wealthRef.current = u.wealthXp;
       setWealthXp(u.wealthXp);
     }
+    // Yankı as the server counts it (diamonds received in gifts): posting in Anlar opens on the same value.
+    if (isFiniteNumber(u.charmXp)) {
+      charmRef.current = u.charmXp;
+      setCharmXp(u.charmXp);
+    }
     const prev = serverBalRef.current;
     serverBalRef.current = { coins: u.coins, diamonds: u.diamonds, gameCoins: u.gameCoins ?? 0 };
     // Game coins: only server games (Rüzgâr Gülü) move them there, the other games here, so the server's change
@@ -795,8 +800,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     setWeekly((w) => [...w.slice(0, 6), w[6] + dd]);
     setEarnings((e) => [{ id: uid(), amount: dd, source: 'Hediye' as const, time: now(), day: today() }, ...e].slice(0, 100));
     log('diamond', dd, 'Hediye');
-    charmRef.current += dd;
-    setCharmXp(charmRef.current);
+    // Yankı: GET /api/me carries the server's count (taken above, this gift included); other answers don't.
+    if (!isFiniteNumber(u.charmXp)) {
+      charmRef.current += dd;
+      setCharmXp(charmRef.current);
+    }
     notify({ kind: 'finance', icon: 'gift', title: 'Hediye aldın', body: `${dd.toLocaleString('tr-TR')} elmas kazandın. Kilidi açılınca çekebilir ya da jetona çevirebilirsin.`, href: '/gelir' });
   };
   const applyLocks = (e: ServerEarnings) => {

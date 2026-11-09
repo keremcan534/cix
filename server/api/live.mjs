@@ -258,7 +258,8 @@ export const liveRoutes = {
 
   async 'GET /api/rooms/live'(req) {
     await auth(req);
-    const r = await db.query('SELECT room, count(*)::int AS n FROM room_presence GROUP BY room ORDER BY n DESC LIMIT 200');
+    // 1v1 calls (call-<id>) are private: not in the list.
+    const r = await db.query("SELECT room, count(*)::int AS n FROM room_presence WHERE room NOT LIKE 'call-%' GROUP BY room ORDER BY n DESC LIMIT 200");
     return { rooms: r.rows.map((x) => ({ room: x.room, listeners: x.n })) };
   },
 };

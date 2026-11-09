@@ -4,9 +4,10 @@
 // an agency. The streamer rules (server agency-ops.mjs): only women's accounts stream; after the first days a
 // streamer with no agency stays with the centre and joins only by a transfer the centre approves. Every decision
 // is the server's (server/api/agency.mjs); without a server connection the labelled example data is shown.
+// An agency owner lands on their own agency's panel (ajans/ofis); everything else here is its "Diğer" tab.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,6 +32,12 @@ export function NetworkHub() {
   const { me } = useApp();
   const q = useNet<Me>(me.name, agencyNet.me, demoMe);
   const ask = useAsk();
+  // The agency I own opens first: its panel, with this screen's other sections as a tab there.
+  const ownId = q.data?.agencies.find((a) => a.viewer === 'owner')?.id;
+  useEffect(() => {
+    if (ownId) router.replace({ pathname: '/ajans/ofis', params: { id: ownId, hub: '1' } } as unknown as Href);
+  }, [ownId]);
+  if (ownId) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <Backdrop scene={SCENES.family} />
@@ -40,6 +47,19 @@ export function NetworkHub() {
       </ScrollView>
       {ask[0]}
     </SafeAreaView>
+  );
+}
+
+/** This screen's sections (Ajans Merkezi, my agencies, membership, invites, joining) as the owner's "Diğer" tab. */
+export function HubSections() {
+  const { me } = useApp();
+  const q = useNet<Me>(me.name, agencyNet.me, demoMe);
+  const ask = useAsk();
+  return (
+    <>
+      <NetState q={q}>{(d) => <HubBody d={d} demo={q.demo} reload={q.reload} askFor={ask[1]} />}</NetState>
+      {ask[0]}
+    </>
   );
 }
 

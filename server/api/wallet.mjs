@@ -38,6 +38,8 @@ export const CHANNELS = {
   odul: { label: 'Ödül jetonu', lock: 'store' },
   // Uğurlu hediye rewards (lucky.mjs): spent like any coin; what they pay for never counts for Cömertlik.
   ugurlu: { label: 'Uğurlu ödülü', lock: 'store' },
+  // Coins from someone's Şanslı çanta (lucky-bags.mjs); the store lock, whatever paid for them.
+  canta: { label: 'Şanslı çanta', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */
@@ -164,7 +166,7 @@ export async function giftCoins(c, { sender, recipient, total, label, ref, giftE
  * each portion locked by its channel. A bond gift (bonds.mjs) takes the coins when it is asked and pays them
  * here when it is accepted. The recipient's row must be locked.
  */
-export async function giftDiamonds(c, { sender, recipient, parts, total, label, ref, giftEvent = null }) {
+export async function giftDiamonds(c, { sender, recipient, parts, total, label, ref, giftEvent = null, reason = null }) {
   const what = label ? `: ${label}` : '';
   const locks = [];
   for (const p of parts) {
@@ -175,8 +177,21 @@ export async function giftDiamonds(c, { sender, recipient, parts, total, label, 
     );
     locks.push({ lock: Number(r.rows[0].id), channel: p.channel, amount: p.amount, unlockAt: r.rows[0].unlock_at });
   }
-  await move(c, recipient, 'diamond', total, `Hediye alındı${what}`, `${ref}-in`, sender, { channel: channelOf(parts), detail: { ...(giftEvent && { gift: giftEvent }), locks } });
+  await move(c, recipient, 'diamond', total, reason ?? `Hediye alındı${what}`, `${ref}-in`, sender, { channel: channelOf(parts), detail: { ...(giftEvent && { gift: giftEvent }), locks } });
   return locks;
+}
+
+/**
+ * Yankı points (app/src/data/charm.ts CHARM_XP): the diamonds others gave this person in gifts, less what a refund
+ * took back ("İade: …"). Only giftDiamonds credits diamonds with a counterparty.
+ */
+export async function charmPoints(c, userId) {
+  const r = await c.query(
+    `SELECT coalesce(sum(amount), 0) AS n FROM ledger
+      WHERE user_id = $1 AND currency = 'diamond' AND counterparty IS NOT NULL AND counterparty <> $1 AND (amount > 0 OR reason ~ '^İade:')`,
+    [userId],
+  );
+  return Math.max(0, Number(r.rows[0].n));
 }
 
 /** An account's diamonds: all of them, those still locked, and those that may leave. */
@@ -233,8 +248,8 @@ export const walletRoutes = {
 
   /**
    * Gelir's sources: the diamonds I earned in the period (day, week, month by Turkey's calendar, or all), by where
-   * they came from. Gifts by place (a room, a chat, a moment, a profile; Uğurlu hediye on its own). Paid messages
-   * and calls are not on the server yet: they are listed with 0 so the screen shows every source.
+   * they came from. Gifts by place (a room, a chat, a moment, a profile; Uğurlu hediye on its own), then paid
+   * messages and paid call or match minutes (one-on-one.mjs, paid_events).
    */
   async 'GET /api/wallet/income'(req, url) {
     const u = await auth(req);
@@ -245,11 +260,22 @@ export const walletRoutes = {
               sum(g.total) AS diamonds, count(*) AS n
          FROM gift_events g LEFT JOIN income_events e ON e.source_ref = 'gift:' || g.id
         WHERE g.recipient = $1 AND ($2 = 'all' OR g.created_at >= date_trunc($2, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')
+        GROUP BY 1
+       UNION ALL
+       SELECT CASE WHEN p.kind = 'message' THEN 'message_fee' WHEN p.kind IN ('voice_call', 'match_voice') THEN 'voice_call' ELSE 'video_call' END,
+              sum(p.coins), count(*)
+         FROM paid_events p
+        WHERE p.earner = $1 AND ($2 = 'all' OR p.created_at >= date_trunc($2, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')
         GROUP BY 1`,
       [u.id, period],
     );
-    const by = Object.fromEntries(r.rows.map((x) => [x.source, { diamonds: Number(x.diamonds), count: Number(x.n) }]));
-    const row = (key, label, live = true) => ({ key, label, diamonds: by[key]?.diamonds ?? 0, count: by[key]?.count ?? 0, live });
+    const by = {};
+    for (const x of r.rows) {
+      const o = (by[x.source] ??= { diamonds: 0, count: 0 });
+      o.diamonds += Number(x.diamonds);
+      o.count += Number(x.n);
+    }
+    const row = (key, label) => ({ key, label, diamonds: by[key]?.diamonds ?? 0, count: by[key]?.count ?? 0, live: true });
     const sources = [
       row('room', 'Oda hediyeleri'),
       row('lucky', 'Uğurlu hediyeler'),
@@ -257,9 +283,9 @@ export const walletRoutes = {
       row('moment', 'Anlar hediyeleri'),
       row('profile', 'Profilden gelen hediyeler'),
       row('other', 'Diğer hediyeler'),
-      row('message_fee', 'Mesaj ücretleri', false),
-      row('voice_call', 'Sesli arama', false),
-      row('video_call', 'Görüntülü arama (birebir)', false),
+      row('message_fee', 'Mesaj ücretleri'),
+      row('voice_call', 'Sesli arama ve eşleşme'),
+      row('video_call', 'Görüntülü arama ve eşleşme'),
     ];
     return { period, total: sources.reduce((a, x) => a + x.diamonds, 0), sources };
   },

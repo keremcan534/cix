@@ -1,0 +1,38 @@
+/// <reference types="node" />
+// Room chat @mentions (lib/room-mention): "@" offers the room's people, a pick writes "@Name ", a line naming me stands out.
+import { describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
+
+describe('@bahset', () => {
+  test('yazılan "@…" bulunur; e-posta gibi bitişik "@" sayılmaz', () => {
+    assert.equal(mentionQuery('@'), '');
+    assert.equal(mentionQuery('selam @Ay'), 'Ay');
+    assert.equal(mentionQuery('selam @Ayşe '), null);
+    assert.equal(mentionQuery('selam'), null);
+    assert.equal(mentionQuery('ali@ver'), null);
+  });
+
+  test('seçilen kişi satırın sonuna yazılır', () => {
+    assert.equal(insertMention('selam @Ay', 'Ayşe Nur'), 'selam @Ayşe Nur ');
+    assert.equal(insertMention('@', 'Can'), '@Can ');
+    assert.equal(insertMention('', 'Can'), '@Can ');
+    assert.equal(insertMention('selam  ', 'Can'), 'selam @Can ');
+  });
+
+  test('önce adı yazılanla başlayanlar, sonra içerenler', () => {
+    const people = [{ name: 'Mehmet' }, { name: 'Ahmet' }, { name: 'Melis' }, { name: 'İlker' }];
+    assert.deepEqual(mentionPicks(people, 'me').map((p) => p.name), ['Mehmet', 'Melis', 'Ahmet']);
+    assert.deepEqual(mentionPicks(people, 'il').map((p) => p.name), ['İlker']);
+    assert.equal(mentionPicks(people, '', 2).length, 2);
+  });
+
+  test('beni anan satır: ad tam yazılmalı', () => {
+    assert.equal(mentions('@Ayşe Nur geldin mi', 'Ayşe Nur'), true);
+    assert.equal(mentions('hey @ayşe nur!', 'Ayşe Nur'), true);
+    assert.equal(mentions('@Ayşe Nurcan selam', 'Ayşe Nur'), false);
+    assert.equal(mentions('Ayşe Nur selam', 'Ayşe Nur'), false);
+    assert.equal(mentions('@', ''), false);
+  });
+});

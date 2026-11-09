@@ -41,18 +41,23 @@ import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
 import { economyRoutes } from './economy.mjs';
+import { familyRoutes } from './families.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
+import { luckyBagRoutes, startBagSweep, stopBagSweep } from './lucky-bags.mjs';
 import { messageRoutes } from './messages.mjs';
 import { momentRoutes } from './moments.mjs';
+import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
-import { TEST_DAILY, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
+import { teamRoutes } from './team.mjs';
+import { musicRoutes } from './music.mjs';
+import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
@@ -104,10 +109,13 @@ const walletRoutes = {
     return { ok, db: ok, version: VERSION, uptime: Math.round((Date.now() - STARTED) / 1000), warnings: await warningCodes() };
   },
 
-  /** wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same value. */
+  /**
+   * wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same
+   * value; charmXp: the Yankı points (wallet.mjs charmPoints), which open posting in Anlar.
+   */
   async 'GET /api/me'(req) {
     const u = await auth(req);
-    return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id) } };
+    return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id), charmXp: await charmPoints(db, u.id) } };
   },
 
   async 'GET /api/ledger'(req) {
@@ -207,12 +215,17 @@ const routes = {
   ...bondRoutes,
   ...wheelRoutes,
   ...luckyRoutes,
+  ...familyRoutes,
   ...purchaseRoutes,
   ...mediaRoutes,
   ...liveRoutes,
   ...socialRoutes,
   ...messageRoutes,
+  ...oneOnOneRoutes,
+  ...luckyBagRoutes,
   ...momentRoutes,
+  ...teamRoutes,
+  ...musicRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,
@@ -302,6 +315,8 @@ function shutdown(signal) {
   stopSanctionSweep();
   stopLiveSync();
   stopOtpSweep();
+  stopCallSweep();
+  stopBagSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -323,3 +338,5 @@ startBondSweep();
 startSanctionSweep();
 startLiveSync();
 startOtpSweep();
+startCallSweep();
+startBagSweep();

@@ -34,10 +34,11 @@ import {
   type RoomTab,
 } from '@/data/rooms-ui';
 import { StarterPath } from '@/components/starter';
+import { RoomBanners } from '@/components/room-banners';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { callsAvailable, isLockedRoom, liveMode, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
+import { isLockedRoom, liveMode, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -177,6 +178,7 @@ export default function RoomsScreen() {
           main === 'rec' ? (
             <View style={{ gap: 14, paddingBottom: 4 }}>
               <StarterPath roomHref={starterRoom} />
+              <RoomBanners />
               {closest && <ClosestRoomCard match={closest} />}
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
               {similarPeople.length > 0 && <SimilarPeople people={similarPeople} rooms={visible} />}
@@ -317,7 +319,7 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
   const styles = useStyles();
   const items: { key: string; source: number | undefined; hue: string; label: string; a11y?: string; onPress: () => void; dot?: boolean }[] = [
     { key: 'coins', source: icon3dSource('coin'), hue: '#F6BD60', label: coins.toLocaleString('tr-TR'), a11y: 'Cüzdan', onPress: () => router.push('/cuzdan') },
-    ...(callsAvailable() ? [{ key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
+    ...(oneOnOneOpen() ? [{ key: 'match', source: icon3dSource('bolt'), hue: '#13D9DF', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') }] : []),
     { key: 'games', source: artSource('ana-oyun-merkezi'), hue: '#FF6576', label: 'Oyun merkezi', onPress: () => router.push('/oyunlar') },
     { key: 'tasks', source: artSource('ana-gorevler'), hue: '#A78BFA', label: 'Görevler', onPress: () => router.push('/gorevler'), dot: !checkedInToday },
   ];

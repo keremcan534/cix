@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -21,49 +21,62 @@ import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
-import { callsAvailable, liveMode, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
+import { liveMode, oneOnOneOpen, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
+import type { DiscoverList } from '@/lib/api';
 
-const TABS = ['Benzer', 'Yakındaki'] as const;
+const TABS = ['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'] as const;
 type Tab = (typeof TABS)[number];
-type Gender = 'Hepsi' | 'Kadın' | 'Erkek';
-type Filters = { country: string; gender: Gender; onlineOnly: boolean; newest: boolean };
+/** The server list each tab reads in a live build (Yakındakiler and Çevrim içi narrow Ana Sayfa's). */
+const LIST_OF: Record<Tab, DiscoverList> = { 'Ana Sayfa': 'home', Yakındakiler: 'home', 'Çevrim içi': 'home', 'Öne çıkanlar': 'featured', 'Yeni kullanıcılar': 'new' };
+type Filters = { country: string };
 type Row = { kind: 'user'; user: User } | { kind: 'promo' };
 
-const DEFAULT_FILTERS: Filters = { country: 'ALL', gender: 'Hepsi', onlineOnly: false, newest: false };
-const isDefault = (f: Filters) => f.country === 'ALL' && f.gender === 'Hepsi' && !f.onlineOnly && !f.newest;
+const DEFAULT_FILTERS: Filters = { country: 'ALL' };
+const isDefault = (f: Filters) => f.country === 'ALL';
+/** Men see women and women see men; anyone, while either of the two hasn't given a gender. */
+const matches = (me: User, u: User) => !me.gender || !u.gender || me.gender !== u.gender;
+const byOnlineThenCharm = (a: User, b: User) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm);
 
 export default function DiscoverScreen() {
-  const [tab, setTab] = useState<Tab>('Benzer');
+  const [tab, setTab] = useState<Tab>('Ana Sayfa');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const { hasGreeted, greet } = useGreet();
   const { blocked, settings, setSetting, following, toggleFollow, me } = useApp();
   // A live build lists real people from the server (no sample profiles, no distances: the server knows cities only).
   const live = liveMode();
-  const serverPeople = useDiscoverPeople();
-  const peopleState = useDiscoverState();
+  const list = LIST_OF[tab];
+  const serverPeople = useDiscoverPeople(list);
+  const peopleState = useDiscoverState(list);
   const pool = live ? (serverPeople ?? []) : USERS;
   const { colors, dark } = useTheme();
   const styles = useStyles();
   // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
-  const needsOptIn = tab === 'Yakındaki' && !settings.cityDiscovery;
-  const showDistance = !live && (tab === 'Yakındaki' || settings.cityDiscovery);
+  const needsOptIn = tab === 'Yakındakiler' && !settings.cityDiscovery;
+  const showDistance = !live && (tab === 'Yakındakiler' || settings.cityDiscovery);
 
-  let users =
-    tab === 'Yakındaki'
+  const base = pool.filter((u) => !blocked.has(u.id) && matches(me, u) && (filters.country === 'ALL' || countryOf(u) === filters.country));
+  // The server orders its lists (new accounts, who 1v1 lifts); the demo orders its sample people the same way here.
+  const users =
+    tab === 'Yakındakiler'
       ? live
-        ? pool.filter((u) => !!me.city && u.city.toLocaleLowerCase('tr-TR') === me.city.toLocaleLowerCase('tr-TR'))
-        : pool.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
-      : // Online first, then Yankı level: charm is what lifts a profile in discovery.
-        [...pool].sort((a, b) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm));
-  if (filters.newest) users = [...users].reverse();
-  users = users.filter(
-    (u) =>
-      !blocked.has(u.id) &&
-      (filters.gender === 'Hepsi' || u.gender === filters.gender) &&
-      (!filters.onlineOnly || u.online) &&
-      (filters.country === 'ALL' || countryOf(u) === filters.country),
-  );
+        ? base.filter((u) => !!me.city && u.city.toLocaleLowerCase('tr-TR') === me.city.toLocaleLowerCase('tr-TR'))
+        : base.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
+      : tab === 'Çevrim içi'
+        ? base.filter((u) => u.online)
+        : tab === 'Yeni kullanıcılar'
+          ? live
+            ? base
+            : [...base].sort((a, b) => (b.joinedAt ?? '').localeCompare(a.joinedAt ?? ''))
+          : tab === 'Öne çıkanlar'
+            ? live
+              ? base
+              : // A woman sees the men who spend most, a man the women who earn most (Yankı stands in for 1v1 here).
+                [...base].sort((a, b) => (me.gender === 'Kadın' ? wealthCharmOf(b.id).wealth - wealthCharmOf(a.id).wealth : wealthCharmOf(b.id).charm - wealthCharmOf(a.id).charm))
+            : // Online first, then Yankı level: charm is what lifts a profile in discovery.
+              live
+              ? base
+              : [...base].sort(byOnlineThenCharm);
 
   const rows: Row[] = needsOptIn ? [] : users.map((user) => ({ kind: 'user', user }));
   if (rows.length > 0 && !live) rows.splice(Math.min(DISCOVER_PROMO.afterIndex, rows.length), 0, { kind: 'promo' });
@@ -81,7 +94,7 @@ export default function DiscoverScreen() {
           <View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
               {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
-              {DISCOVER_SHORTCUTS.filter((s) => (s.id !== 'call' || callsAvailable()) && (s.id !== 'tribe' || !live)).map((s) => (
+              {DISCOVER_SHORTCUTS.filter((s) => (s.id !== 'call' || oneOnOneOpen()) && (s.id !== 'tribe' || !live)).map((s) => (
                 <Pressable key={s.id} onPress={() => router.push(s.href)}>
                   {/* The shortcut's color lights a navy card from the top instead of filling it. */}
                   <LinearGradient colors={[`${s.colors[1]}${dark ? '5C' : '33'}`, dark ? 'rgba(22,37,60,0.94)' : 'rgba(255,255,255,0.94)']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[styles.shortcut, s.wide && styles.shortcutWide]}>
@@ -96,18 +109,19 @@ export default function DiscoverScreen() {
             </ScrollView>
 
             <View style={styles.tabsRow}>
-              {TABS.map((t) => (
-                <Pressable key={t} onPress={() => setTab(t)} style={{ alignItems: 'center' }}>
-                  <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
-                  {t === tab && <View style={styles.underline} />}
-                </Pressable>
-              ))}
-              <View style={{ flex: 1 }} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabs}>
+                {TABS.map((t) => (
+                  <Pressable key={t} onPress={() => setTab(t)} style={{ alignItems: 'center' }} accessibilityRole="tab" accessibilityState={{ selected: t === tab }}>
+                    <Text style={[styles.tab, t === tab && styles.tabActive]}>{t}</Text>
+                    {t === tab && <View style={styles.underline} />}
+                  </Pressable>
+                ))}
+              </ScrollView>
               <Pressable style={styles.iconBtn} onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
                 <Ionicons name="trophy-outline" size={24} color={colors.text} />
               </Pressable>
-              <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Filtreler">
-                <Ionicons name="options-outline" size={24} color={colors.text} />
+              <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} hitSlop={6} accessibilityLabel="Ülke seç">
+                <Ionicons name="globe-outline" size={24} color={colors.text} />
                 {!isDefault(filters) && <View style={styles.filterDot} />}
               </Pressable>
             </View>
@@ -116,9 +130,6 @@ export default function DiscoverScreen() {
               <View style={styles.activeFilters}>
                 <Text style={styles.activeText} numberOfLines={1}>
                   {country.flag} {country.name}
-                  {filters.gender !== 'Hepsi' ? ` · ${filters.gender}` : ''}
-                  {filters.onlineOnly ? ' · Çevrimiçi' : ''}
-                  {filters.newest ? ' · Yeni üyeler' : ''}
                 </Text>
                 <Pressable onPress={() => setFilters(DEFAULT_FILTERS)} hitSlop={8}>
                   <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 12 }}>Temizle</Text>
@@ -126,7 +137,7 @@ export default function DiscoverScreen() {
               </View>
             )}
 
-            {tab === 'Yakındaki' && settings.cityDiscovery && (
+            {tab === 'Yakındakiler' && settings.cityDiscovery && (
               <View style={styles.cityRow}>
                 <Ionicons name="location" size={13} color={colors.green} />
                 <Text style={styles.cityText}>Şehir bazlı keşif açık · kesin konumun paylaşılmaz</Text>
@@ -148,7 +159,7 @@ export default function DiscoverScreen() {
               <Pressable style={styles.optInBtn} onPress={() => setSetting('cityDiscovery', true)}>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>Şehir bazlı keşfi aç</Text>
               </Pressable>
-              <Pressable onPress={() => setTab('Benzer')}>
+              <Pressable onPress={() => setTab('Ana Sayfa')}>
                 <Text style={{ color: colors.textDim }}>Şimdilik herkesi göster</Text>
               </Pressable>
             </View>
@@ -157,7 +168,7 @@ export default function DiscoverScreen() {
               <StateIcon name="cloud-offline-outline" size={56} />
               <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16, textAlign: 'center' }}>Bağlantı kurulamadı</Text>
               <Text style={{ color: colors.textDim, textAlign: 'center', fontSize: 13 }}>Kişiler şu an yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>
-              <Button title="Tekrar dene" icon="refresh" small variant="tonal" onPress={() => void reloadDiscoverPeople()} />
+              <Button title="Tekrar dene" icon="refresh" small variant="tonal" onPress={() => void reloadDiscoverPeople(list)} />
             </View>
           ) : (
             <View style={styles.optIn}>
@@ -165,9 +176,15 @@ export default function DiscoverScreen() {
               <Text style={{ color: colors.textDim, textAlign: 'center' }}>
                 {live && serverPeople === null
                   ? 'Kişiler yükleniyor…'
-                  : live && tab === 'Yakındaki' && !me.city
+                  : live && tab === 'Yakındakiler' && !me.city
                     ? 'Yakındakileri görmek için profiline şehrini ekle.'
-                    : 'Bu filtrelerle şu an kimse yok. Filtreleri değiştirmeyi dene.'}
+                    : tab === 'Çevrim içi'
+                      ? 'Şu an çevrim içi kimse yok. Biraz sonra tekrar bak.'
+                      : tab === 'Öne çıkanlar'
+                        ? 'Şu an öne çıkan kimse yok. Birebir sohbetler arttıkça burası dolacak.'
+                        : isDefault(filters)
+                          ? 'Şu an burada kimse yok. Biraz sonra tekrar bak.'
+                          : 'Bu ülkede şu an kimse yok. Başka bir ülke seçmeyi dene.'}
               </Text>
             </View>
           )
@@ -347,19 +364,17 @@ function FilterSheet({
   onClose: () => void;
 }) {
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => onChange({ ...filters, [k]: v });
-  const { colors, dark } = useTheme();
+  const { colors } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  // The off track is a step darker than the sheet in the light scheme, where cardAlt would vanish on white.
-  const off = dark ? colors.cardAlt : colors.border;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       {/* Above the system navigation bar too (edge-to-edge Android draws the sheet under it). */}
       <View style={[styles.sheet, { paddingBottom: Math.max(34, insets.bottom + 8) }]}>
-        <Text style={styles.sheetTitle}>Filtreler</Text>
+        <Text style={styles.sheetTitle}>Dünya</Text>
 
-        <Text style={styles.sheetLabel}>Ülke</Text>
+        <Text style={styles.sheetLabel}>Hangi ülkeden kişiler görünsün?</Text>
         <View style={styles.optionWrap}>
           {COUNTRIES.map((c) => (
             <Pressable key={c.code} onPress={() => set('country', c.code)} style={[styles.option, filters.country === c.code && styles.optionActive]}>
@@ -368,24 +383,6 @@ function FilterSheet({
               </Text>
             </Pressable>
           ))}
-        </View>
-
-        <Text style={styles.sheetLabel}>Cinsiyet</Text>
-        <View style={styles.optionWrap}>
-          {(['Hepsi', 'Kadın', 'Erkek'] as const).map((g) => (
-            <Pressable key={g} onPress={() => set('gender', g)} style={[styles.option, filters.gender === g && styles.optionActive]}>
-              <Text style={[styles.optionText, filters.gender === g && { color: colors.text }]}>{g}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchText}>Sadece çevrimiçi</Text>
-          <Switch value={filters.onlineOnly} onValueChange={(v) => set('onlineOnly', v)} trackColor={{ true: colors.primary, false: off }} />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchText}>Yeni üyeler önce</Text>
-          <Switch value={filters.newest} onValueChange={(v) => set('newest', v)} trackColor={{ true: colors.primary, false: off }} />
         </View>
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
@@ -414,7 +411,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   partyAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff', backgroundColor: colors.cardAlt, ...(dark ? {} : { boxShadow: '0 1px 3px rgba(16,36,64,0.18)' }) },
   partyAvatarMid: { width: 34, height: 34, borderRadius: 17, zIndex: 1 },
   starCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
+  tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 12, paddingTop: 14, paddingBottom: 6 },
+  tabs: { gap: 18, paddingHorizontal: 16, alignItems: 'center' },
   tab: { color: colors.textDim, fontSize: 16, fontWeight: '600' },
   tabActive: { color: colors.text, fontSize: 19, fontWeight: '800' },
   underline: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4, width: 20 },
@@ -457,7 +455,5 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   option: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
   optionActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
   optionText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchText: { color: colors.text, fontSize: 14 },
   sheetBtn: { flex: 1, alignItems: 'center', borderRadius: 999, paddingVertical: 12 },
 }));

@@ -6,7 +6,7 @@ import { Modal, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { ComingSoon } from '@/components/coming-soon';
+import { LiveFamilies } from '@/components/family-live';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
@@ -65,10 +65,9 @@ const WEEK_SHARE = [0.1, 0.12, 0.15, 0.13, 0.18, 0.17, 0.15];
 const activity = (id: string, i: number) => ({ days: id === 'me' ? 4 : (i * 3 + 2) % 8, contribution: id === 'me' ? 2_500 : Math.max(0, (9 - i) * 2_600 - (i % 3) * 900) });
 const isActive = (a: { days: number; contribution: number }) => a.days >= 3 && a.contribution >= 1_000;
 
-// Aile has no server yet (data/kabile tayfaAvailable): a live build shows a notice instead of sample families and
-// a "Aile kur" that would take real coins for a aile that exists only on this phone.
+// A live build uses the server's families (components/family-live); the demo keeps the sample families below.
 export default function FamilyScreen() {
-  return liveMode() ? <ComingSoon title="Aileler" /> : <DemoFamilies />;
+  return liveMode() ? <LiveFamilies /> : <DemoFamilies />;
 }
 
 function DemoFamilies() {

@@ -60,10 +60,38 @@ describe('Canlı sürümde demo ekranları', () => {
   });
 
   test('örnek veriyle dolu ekranlar canlıda "yakında" gösterir', () => {
-    for (const route of ['aile', 'kabile/index', 'kabile/sohbet', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
+    for (const route of ['kabile/index', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
       const src = readFileSync(join(APP, `${route}.tsx`), 'utf8');
       assert.match(src, /liveMode\(\)[^\n]*<ComingSoon /, `${route}: canlıda ComingSoon yok`);
     }
+  });
+
+  // Aile is on the server (lib/live/family): its list, my family and the family chat show what the server answers.
+  test('Aile canlıda sunucudan', () => {
+    assert.match(readFileSync(join(APP, 'aile.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilies \/> : <DemoFamilies \/>/);
+    assert.match(readFileSync(join(APP, 'kabile/sohbet.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilyChat \/> : <DemoKabileChat \/>/);
+    assert.match(readFileSync(join(APP, '../components/family-live.tsx'), 'utf8'), /from '@\/lib\/live\/family'/);
+  });
+
+  // Keşfet: five tabs, no gender filter (men see women, women see men), the globe picks the country.
+  test('Keşfet sekmeleri ve dünya filtresi', () => {
+    const src = readFileSync(join(APP, '(tabs)/kesfet.tsx'), 'utf8');
+    assert.match(src, /TABS = \['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'\]/);
+    assert.match(src, /name="globe-outline"/);
+    assert.doesNotMatch(src, /Cinsiyet|onlineOnly|newest/);
+    assert.match(src, /'Öne çıkanlar': 'featured', 'Yeni kullanıcılar': 'new'/);
+  });
+
+  // The agency owner lands on their agency; sub-agencies are "Referans ajanslar", added only by management.
+  test('Ajans paneli: sahibi kendi ajansına iner, Referans ajanslar yalnız görüntülenir', () => {
+    const hub = readFileSync(join(APP, '../components/agency-net-hub.tsx'), 'utf8');
+    assert.match(hub, /router\.replace\(\{ pathname: '\/ajans\/ofis', params: \{ id: ownId, hub: '1' \} \}/);
+    const src = readFileSync(join(APP, 'ajans/ofis.tsx'), 'utf8');
+    assert.match(src, /label: 'Referans ajanslar'/);
+    assert.match(src, /\{ key: 'more', label: 'Diğer', hidden: !hub \}/);
+    assert.doesNotMatch(src, /Alt ajans oluştur|CreateSub|submitSub|'Alt ajanslar'/);
+    assert.match(src, /\['week', 'Haftalık'\]/);
+    assert.match(src, /earningsCsv\(rows\)/);
   });
 
   // Anlar is on the server (lib/live/moments): a live build shows the tab and the server's feed, never the sample one.

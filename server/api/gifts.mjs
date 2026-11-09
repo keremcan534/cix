@@ -2,7 +2,7 @@
 //
 //   GET  /api/catalog                                             → { gifts, counts, packs, svipXp, purchases, campaign, exchange, v }
 //   POST /api/gifts/send  { to, giftId, count, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile)
-//   GET  /api/rankings?board=wealth|charm&period=day|week|month   → { rows }
+//   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
 // the app only says which gift and how many, never the price. The recipient's diamonds are also the base of
@@ -30,7 +30,34 @@ import { roomLevel } from './rooms.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
-const PERIODS = ['day', 'week', 'month'];
+export const PERIODS = ['day', 'week', 'month'];
+const SINCE = `date_trunc($1, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul'`;
+
+/**
+ * The top `n` of a board this day, week or month (Turkey's calendar): wealth = coins given in gifts, charm =
+ * diamonds received, agency = the diamonds its streamers earned (the commission base, refunds taken off).
+ */
+export async function topBoard(board, period, n = 50) {
+  if (board === 'agency') {
+    const r = await db.query(
+      `SELECT a.id, a.name, o.avatar_url, sum(c.base_diamonds) AS score
+         FROM agency_commissions c JOIN agencies a ON a.id = c.agency_id LEFT JOIN users o ON o.id = a.owner_id
+        WHERE c.occurred_at >= ${SINCE} AND a.status = 'approved'
+        GROUP BY a.id, a.name, o.avatar_url HAVING sum(c.base_diamonds) > 0 ORDER BY score DESC, a.id LIMIT $2`,
+      [period, n],
+    );
+    return r.rows.map((x, i) => ({ rank: i + 1, agency: { id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null }, score: Number(x.score) }));
+  }
+  const side = BOARDS[board];
+  const r = await db.query(
+    `SELECT u.id, u.name, u.avatar_url, sum(g.total) AS score
+       FROM gift_events g JOIN users u ON u.id = g.${side}
+      WHERE g.created_at >= ${SINCE} AND u.deleted_at IS NULL
+      GROUP BY u.id ORDER BY score DESC, u.id LIMIT $2`,
+    [period, n],
+  );
+  return r.rows.map((x, i) => ({ rank: i + 1, user: { id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null }, score: Number(x.score) }));
+}
 export const PLACES = ['chat', 'moment', 'profile'];
 /** A server room's LiveKit name (rooms.mjs liveKitName), from its id or that name; null for anything else. */
 export const liveKitRoom = (room) => {
@@ -107,6 +134,8 @@ export const giftRoutes = {
         b.ref,
       ]);
       eventId = Number(g.rows[0].id);
+      // A gift from a chat shows in that chat, for both of them (a line of its own; no message price).
+      if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift-${b.ref}`]);
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
       await addBondCoins(c, u.id, to, total);
@@ -140,16 +169,9 @@ export const giftRoutes = {
     await auth(req);
     const board = url.searchParams.get('board') ?? 'wealth';
     // Own keys only: 'constructor' or '__proto__' would otherwise reach the SQL as a column name.
-    const side = Object.hasOwn(BOARDS, board) ? BOARDS[board] : null;
+    const known = board === 'agency' || Object.hasOwn(BOARDS, board);
     const period = url.searchParams.get('period') ?? 'week';
-    if (!side || !PERIODS.includes(period)) throw new HttpError(400, 'Geçersiz sıralama');
-    const r = await db.query(
-      `SELECT u.id, u.name, u.avatar_url, sum(g.total) AS score
-         FROM gift_events g JOIN users u ON u.id = g.${side}
-        WHERE g.created_at >= date_trunc($1, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul' AND u.deleted_at IS NULL
-        GROUP BY u.id ORDER BY score DESC, u.id LIMIT 50`,
-      [period],
-    );
-    return { rows: r.rows.map((x, i) => ({ rank: i + 1, user: { id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null }, score: Number(x.score) })) };
+    if (!known || !PERIODS.includes(period)) throw new HttpError(400, 'Geçersiz sıralama');
+    return { rows: await topBoard(board, period) };
   },
 };
