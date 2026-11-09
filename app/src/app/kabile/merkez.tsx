@@ -6,7 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { ComingSoon } from '@/components/coming-soon';
+import { LiveFamilyTasks } from '@/components/family-center-live';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import {
   CHEST_MIN_CONTRIBUTION,
@@ -38,10 +38,9 @@ import { makeStyles, useTheme } from '@/theme';
 type Counters = { roomMinutes: number; giftsSent: number; spentTotal: number };
 const CHECKIN = KABILE_TASKS.find((t) => t.source === 'checkIn') ?? KABILE_TASKS[0];
 
-// Aile has no server yet (data/kabile tayfaAvailable): chest coins credited here would exist only on this phone,
-// so a live build shows a notice instead of the tasks and chests.
+// A live build shows the server's tasks and chests (components/family-center-live); the demo keeps its sample family.
 export default function KabileMerkez() {
-  return liveMode() ? <ComingSoon title="Görevler" /> : <DemoKabileMerkez />;
+  return liveMode() ? <LiveFamilyTasks /> : <DemoKabileMerkez />;
 }
 
 function DemoKabileMerkez() {

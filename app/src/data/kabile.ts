@@ -27,10 +27,10 @@ export const findKabile = (id: string | null): KabileFamily | null => (id ? (FAM
 
 // --- Live builds ---------------------------------------------------------------
 /**
- * Aile has no server yet: no tribe tables, members, chat, chests or treasury, so all of it lives on this phone
- * among sample people. A live build (server address set, like lib/live liveMode) hides the Aile screens
- * (components/coming-soon), and the money paths below refuse there: no real coin is taken for a aile nobody else
- * can see or for a gift no one receives, and no chest coins are credited that the server never gave.
+ * The demo's Aile lives on this phone among sample people. A live build (server address set, like lib/live
+ * liveMode) shows the server's instead (components/family-live, family-center-live → server/api families.mjs,
+ * family-more.mjs), and the demo's money paths below refuse there: no real coin is taken for a sample aile or a
+ * gift no one receives, and no chest coins are credited that the server never gave.
  */
 export const tayfaAvailable = (live: boolean = !!process.env.EXPO_PUBLIC_API_URL) => !live;
 

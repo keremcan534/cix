@@ -1,7 +1,7 @@
 // Room info card ("oda kartı"), full-screen "Oda Ayarları" and the boss seat.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -255,7 +255,7 @@ export function RoomInfoSheet({
   level: number;
   xp: number | null;
   owner: boolean;
-  clan: { label: string; href: '/aile' | '/ajans'; art?: number } | null;
+  clan: { label: string; href: Href; art?: number } | null;
   members: string[];
   memberTotal: number;
   applications: string[];
@@ -358,22 +358,21 @@ export function RoomInfoSheet({
                 </ArtText>
               </LinearGradient>
             </Pressable>
-            {!live && (
-              <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Aile">
-                <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
-                  <Text style={styles.cardLabel}>Aile</Text>
-                  {clan?.art ? (
-                    <ArtText art={clan.art} size={26} style={styles.cardValue}>
-                      {clan.label}
-                    </ArtText>
-                  ) : (
-                    <Text style={styles.cardValue} numberOfLines={1}>
-                      {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
-                    </Text>
-                  )}
-                </LinearGradient>
-              </Pressable>
-            )}
+            {/* The owner's family: the server's in a live build (their profile), else the demo's. */}
+            <Pressable style={{ flex: 1 }} onPress={() => (clan ? (onClose(), router.push(clan.href)) : owner && (onClose(), router.push('/aile')))} accessibilityLabel="Aile">
+              <LinearGradient colors={['#15803D', '#166534']} style={styles.card}>
+                <Text style={styles.cardLabel}>Aile</Text>
+                {clan?.art ? (
+                  <ArtText art={clan.art} size={26} style={styles.cardValue}>
+                    {clan.label}
+                  </ArtText>
+                ) : (
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {clan ? clan.label : owner ? '+ Aile kur / katıl' : 'Yok'}
+                  </Text>
+                )}
+              </LinearGradient>
+            </Pressable>
           </View>
 
           {(

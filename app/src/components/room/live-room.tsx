@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
@@ -598,6 +598,21 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [memberApps, setMemberApps] = useState<string[]>(() => (isOwn ? ['u2', 'u9', 'u11'] : []));
   // A server room's members (server/api/rooms.mjs): read when the room opens and again after each change.
   const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; canManage: boolean } | null>(null);
+  // The room owner's family (their profile: server/api families.mjs familyOf), read when the room card opens.
+  const [ownerFamily, setOwnerFamily] = useState<{ id: string; name: string } | null>(null);
+  const hostServerId = real ? toServer(hostId) : null;
+  const infoOpen = panel === 'info';
+  useEffect(() => {
+    if (!infoOpen || !hostServerId) return;
+    let on = true;
+    api.userProfile(hostServerId).then(
+      (p) => on && setOwnerFamily(p.family ? { id: p.family.id, name: p.family.name } : null),
+      () => undefined,
+    );
+    return () => {
+      on = false;
+    };
+  }, [infoOpen, hostServerId]);
   const loadMembers = useCallback(() => {
     if (!real) return;
     api.roomMembers(id).then(
@@ -2597,9 +2612,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
   const ownAgencyName = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
   const otherFamily = FAMILIES[(Number(id.replace(/\D/g, '')) || 0) % FAMILIES.length];
-  // Aile isn't on the server yet: a server room's card shows none (never a demo family).
+  // A server room's card shows its owner's family on the server (never a demo family).
   const clan = real
-    ? null
+    ? ownerFamily
+      ? { label: ownerFamily.name, href: `/aile?id=${encodeURIComponent(ownerFamily.id)}` as Href }
+      : null
     : isOwn
       ? familyId
         ? { label: ownFamily ? `${ownFamily.emoji} ${ownFamily.name}` : 'Ailem', href: '/aile' as const, ...(ownFamily ? {} : { art: artSource('oda-ailem') }) }

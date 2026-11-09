@@ -14,6 +14,8 @@ import { convertDiamonds, diamondValueTl, exchangeOwnDiamonds, selfExchangeRate,
 import { NOBLE_DAYS, NOBLE_TIERS, RECHARGE_PACKS, SVIP_LEVELS } from '@/data/status';
 // Plain JavaScript module of the server; TypeScript reads it through allowJs.
 import * as server from '../../server/api/catalog.mjs';
+import * as family from '../../server/api/family-rules.mjs';
+import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, KABILE_CHESTS, KABILE_TASKS, KABILE_THEMES } from '@/data/kabile';
 
 type ServerGift = { id: string; name: string; price: number; cat: string; minSvip: number };
 type ServerPack = { id: string; productId: string; coins: number; firstBonus: number };
@@ -119,5 +121,18 @@ describe('Sunucu kataloğu uygulamayla aynı', () => {
 
   test('SVIP eşikleri', () => {
     assert.deepEqual(server.SVIP_XP, SVIP_LEVELS.map((l) => l.xp));
+  });
+
+  test('Aile görevleri, sandıkları, temaları ve bonus oranları sunucudakiyle aynı', () => {
+    const pick = ({ id, source, kind, goal, per, power, treasure }: (typeof KABILE_TASKS)[number]) => ({ id, source, kind, goal, per, power, treasure });
+    assert.deepEqual(family.FAMILY_TASKS, KABILE_TASKS.map(pick));
+    assert.deepEqual(
+      family.FAMILY_CHESTS,
+      KABILE_CHESTS.map((c) => ({ id: c.id, name: c.name, need: c.need, coins: c.reward.coins })),
+    );
+    assert.equal(family.CHEST_MIN_CONTRIBUTION, CHEST_MIN_CONTRIBUTION);
+    assert.deepEqual(family.FAMILY_THEMES, KABILE_THEMES.map((t) => ({ id: t.id, minLevel: t.minLevel })));
+    assert.deepEqual(family.CP_GIFT_IDS, CP_GIFT_IDS);
+    assert.deepEqual(family.FAMILY_RATES, RULES.familyRates);
   });
 });

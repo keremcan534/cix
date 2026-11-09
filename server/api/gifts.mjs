@@ -1,7 +1,7 @@
 // Gifts at the server's price, and the rankings they feed.
 //
 //   GET  /api/catalog                                             → { gifts, counts, packs, svipXp, purchases, campaign, exchange, v }
-//   POST /api/gifts/send  { to, giftId, count, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile)
+//   POST /api/gifts/send  { to, giftId, count, room?, place?, ref } → { user, replay, total }  (place: chat|moment|profile|family)
 //   GET  /api/rankings?board=wealth|charm|agency&period=day|week|month → { rows }  (agency: rows carry agency, not user)
 //
 // The sender's coins become the recipient's diamonds 1 to 1 (app/src/data/rules.ts creatorDiamondsPerCoin);
@@ -58,7 +58,7 @@ export async function topBoard(board, period, n = 50) {
   );
   return r.rows.map((x, i) => ({ rank: i + 1, user: { id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null }, score: Number(x.score) }));
 }
-export const PLACES = ['chat', 'moment', 'profile'];
+export const PLACES = ['chat', 'moment', 'profile', 'family'];
 /** A server room's LiveKit name (rooms.mjs liveKitName), from its id or that name; null for anything else. */
 export const liveKitRoom = (room) => {
   const m = /^(?:oda-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(room ?? '');
@@ -136,6 +136,16 @@ export const giftRoutes = {
       eventId = Number(g.rows[0].id);
       // A gift from a chat shows in that chat, for both of them (a line of its own; no message price).
       if (place === 'chat') await c.query('INSERT INTO messages (sender, recipient, body, ref) VALUES ($1,$2,$3,$4) ON CONFLICT (sender, ref) DO NOTHING', [u.id, to, `Hediye gönderdi: ${label}`, `gift-${b.ref}`]);
+      // A gift from the family chat: only to someone of my family, and the family chat shows it (family-more.mjs task).
+      if (place === 'family') {
+        const fam = await c.query(
+          `SELECT a.family_id, u.name FROM family_members a JOIN family_members b ON b.family_id = a.family_id AND b.user_id = $2 JOIN users u ON u.id = $2
+            WHERE a.user_id = $1`,
+          [u.id, to],
+        );
+        if (!fam.rowCount) throw new HttpError(403, 'Aile sohbetinden yalnızca ailendeki birine hediye gönderebilirsin');
+        await c.query('INSERT INTO family_messages (family_id, author, body) VALUES ($1, $2, $3)', [fam.rows[0].family_id, u.id, `Hediye gönderdi: ${label} → ${fam.rows[0].name}`.slice(0, 500)]);
+      }
       // The diamonds stay locked by where the coins came from (wallet.mjs): store 7 days, Jeton Noktası 1 day.
       await giftCoins(c, { sender: u.id, recipient: to, total, label, ref: b.ref, giftEvent: Number(g.rows[0].id) });
       await addBondCoins(c, u.id, to, total);

@@ -42,6 +42,7 @@ import { liveRoutes } from './live.mjs';
 import { luckyRoutes } from './lucky.mjs';
 import { economyRoutes } from './economy.mjs';
 import { familyRoutes } from './families.mjs';
+import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
 import { mediaRoutes } from './media.mjs';
@@ -218,6 +219,7 @@ const routes = {
   ...wheelRoutes,
   ...luckyRoutes,
   ...familyRoutes,
+  ...familyMoreRoutes,
   ...purchaseRoutes,
   ...mediaRoutes,
   ...liveRoutes,

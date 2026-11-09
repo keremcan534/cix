@@ -1,12 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { ComingSoon } from '@/components/coming-soon';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
 import { KABILE_ROUTES, KASA_GOAL, KASA_HISTORY_MOCK, ensureFresh, findKabile, fmt, kabileMemberIds, kabileMeta, memberPower, useKabileProgress } from '@/data/kabile';
 import { userById } from '@/data/mock';
@@ -16,10 +15,9 @@ import { youLabel } from '@/lib/tr';
 import { useApp } from '@/store';
 import { ThemeScope, makeStyles, useTheme } from '@/theme';
 
-// Aile has no server yet (data/kabile tayfaAvailable): the treasury and its history are sample data, so a live
-// build shows a notice instead.
+// The demo's treasury and its history are sample data; a live build's chests are in Görevler (the server's).
 export default function KabileKasa() {
-  return liveMode() ? <ComingSoon title="Aile Kasası" /> : <DemoKabileKasa />;
+  return liveMode() ? <Redirect href={KABILE_ROUTES.merkez} /> : <DemoKabileKasa />;
 }
 
 function DemoKabileKasa() {

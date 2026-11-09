@@ -60,17 +60,21 @@ describe('Canlı sürümde demo ekranları', () => {
   });
 
   test('örnek veriyle dolu ekranlar canlıda "yakında" gösterir', () => {
-    for (const route of ['kabile/index', 'kabile/merkez', 'kabile/iliski', 'kabile/kasa', 'davet', 'coins-bank']) {
+    for (const route of ['davet', 'coins-bank']) {
       const src = readFileSync(join(APP, `${route}.tsx`), 'utf8');
       assert.match(src, /liveMode\(\)[^\n]*<ComingSoon /, `${route}: canlıda ComingSoon yok`);
     }
   });
 
-  // Aile is on the server (lib/live/family): its list, my family and the family chat show what the server answers.
+  // Aile is on the server (lib/live/family): its list, my family, the family chat, Görevler and Uyum Köşesi show
+  // what the server answers; the demo's treasury screen sends a live build to Görevler (the chests are there).
   test('Aile canlıda sunucudan', () => {
     assert.match(readFileSync(join(APP, 'aile.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilies \/> : <DemoFamilies \/>/);
     assert.match(readFileSync(join(APP, 'kabile/sohbet.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilyChat \/> : <DemoKabileChat \/>/);
-    assert.match(readFileSync(join(APP, '../components/family-live.tsx'), 'utf8'), /from '@\/lib\/live\/family'/);
+    assert.match(readFileSync(join(APP, 'kabile/merkez.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilyTasks \/> : <DemoKabileMerkez \/>/);
+    assert.match(readFileSync(join(APP, 'kabile/iliski.tsx'), 'utf8'), /liveMode\(\) \? <LiveFamilyPairs \/> : <DemoIliski \/>/);
+    assert.match(readFileSync(join(APP, 'kabile/kasa.tsx'), 'utf8'), /liveMode\(\) \? <Redirect href=\{KABILE_ROUTES\.merkez\} \/> : <DemoKabileKasa \/>/);
+    for (const f of ['family-live', 'family-center-live']) assert.match(readFileSync(join(APP, `../components/${f}.tsx`), 'utf8'), /from '@\/lib\/live\/family'/);
   });
 
   // Keşfet: five tabs, no gender filter (men see women, women see men), the globe picks the country.

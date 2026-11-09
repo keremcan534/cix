@@ -1,6 +1,6 @@
 // Gelir → Gelir kaynakları (live mode): the diamonds earned in a period by where they came from, as the server
 // counts them (server/api wallet.mjs GET /api/wallet/income). Room gifts, Uğurlu hediyeler, gifts from a chat, a
-// moment or a profile each on their own line; paid messages and calls are listed as "Yakında" until the server
+// moment, a profile or the family chat each on their own line; paid messages and calls are listed as "Yakında" until the server
 // has them, so the screen already shows every source.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
@@ -25,6 +25,7 @@ const ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   chat: 'chatbubble-outline',
   moment: 'images-outline',
   profile: 'person-outline',
+  family: 'people-outline',
   other: 'gift-outline',
   message_fee: 'mail-outline',
   voice_call: 'call-outline',

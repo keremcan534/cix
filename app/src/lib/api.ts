@@ -426,7 +426,7 @@ export type CatalogBody = {
 /** Gift prices, counts, coin packs and SVIP thresholds as the server charges them (no sign-in needed). */
 export const catalog = () => call<CatalogBody>('GET', '/api/catalog');
 /** Where a gift outside a room was sent from (Gelir's sources on the server). */
-export type GiftPlace = 'chat' | 'moment' | 'profile';
+export type GiftPlace = 'chat' | 'moment' | 'profile' | 'family';
 /** A gift at the server's price; `room` = sent on stage (no push to the recipient); `place` = where, outside a room. */
 export const sendGift = (to: string, giftId: string, count: number, room?: string, ref = newRef(), place?: GiftPlace) =>
   call<{ user: ServerUser; replay: boolean; total: number }>('POST', '/api/gifts/send', { to, giftId, count, room, ref, ...(place && !room ? { place } : {}) });
