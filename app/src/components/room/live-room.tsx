@@ -46,7 +46,7 @@ import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLog
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
-import { LuckyBagCard, LuckyBagFloat, LuckyBagSheet, bagWhat } from '@/components/room/lucky-bag';
+import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions } from '@/lib/room-mention';
@@ -888,7 +888,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
   // Şanslı çanta in a server room (lib/live/lucky-bags): the room's open bags; a new one gets a line in the chat.
-  const bags = useRoomBags(id, real && unlocked, (b) => !b.mine && !blocked.has(b.from.id) && sysNote(`🧧 ${b.from.name} Şanslı çanta attı: ${bagWhat(b)} · ${b.packets} pay`));
+  // A bag dropped while I'm in the room (not one that was already there) also gets its show (LuckyBagRain).
+  const [bagRain, setBagRain] = useState<Bag | null>(null);
+  const bags = useRoomBags(id, real && unlocked, (b, fresh) => {
+    if (b.mine || blocked.has(b.from.id)) return;
+    sysNote(`🧧 ${b.from.name} Şanslı çanta attı: ${bagWhat(b)} · ${b.packets} pay`);
+    if (fresh) setBagRain(b);
+  });
   const [bagOpen, setBagOpen] = useState<Bag | null>(null);
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
@@ -2775,17 +2781,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   /** Mic-on-but-not-sending, for the mic button and screen readers. */
   const heldHint = block ? `Mikrofonun açık ama şu an ses gitmiyor: ${MIC_BLOCK_LABEL[block]}. Kapatmak için dokun` : undefined;
 
-  // "Küçült" (the chat's fold tab, or a large chat): the mics are drawn smaller and the chat takes the room.
+  // "Küçült" (the chat's fold tab, or a large chat): every mic becomes a small numbered circle in a strip at the
+  // top (ten to a row) and the chat takes all the room below it; "Büyüt" brings the mics and the chat back.
+  // A team PK keeps its arena (the teams need their sides).
   const [seatsSmall, setSeatsSmall] = useState(() => isLargeChat(getChatShare()));
-  // Classic mics are sized by how many there are: up to 8 guest mics go four to a row, more go five; Küçült
-  // fits one more per row. Each mic takes an equal share of the row and its avatar fills it (sharper faces).
-  const seatCols = Math.min(6, (allSeats.length - 1 <= 8 ? 4 : 5) + (seatsSmall ? 1 : 0));
+  const strip = seatsSmall && !teamPk;
+  // Classic mics are sized by how many there are: up to 8 guest mics go four to a row, more go five. Each mic
+  // takes an equal share of the row and its avatar fills it (sharper faces).
+  const seatCols = Math.min(6, allSeats.length - 1 <= 8 ? 4 : 5);
   const seatW = Math.floor((Math.min(win.width, 640) - 16) / seatCols);
-  const gridSlot: ArenaSlot = { width: seatW, size: Math.max(34, Math.min(64, seatW - (seatsSmall ? 24 : 20))) };
+  const gridSlot: ArenaSlot = { width: seatW, size: Math.max(34, Math.min(64, seatW - 20)) };
   const small = gridSlot.size < 46;
+  // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
+  const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
+  const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
   // Empty / locked / invite pending / mic on / mic off / muted by the room, per numbered mic.
   const slots = useMemo(() => slotStates(live, (uid) => uid === 'me' && !sending), [live, sending]);
-  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number } }) => {
+  const renderSeat = (i: number, extra?: { host?: boolean; compact?: boolean; slot?: ArenaSlot; grid?: ArenaSlot; next?: { index: number; gap: number }; mini?: boolean }) => {
     const uid = allSeats[i];
     const link = extra?.next ? micLinkOf(roomBonds, uid, allSeats[extra.next.index]) : null;
     return (
@@ -2814,6 +2826,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         avatarSize={extra?.slot?.size ?? extra?.grid?.size}
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
+        mini={extra?.mini}
         onPress={() => onSeatPress(i)}
       />
     );
@@ -2910,7 +2923,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           {/* Stage: boards and mics, in what the chat leaves (the chat keeps the height the person chose, so it never
               jumps when a banner comes or goes); scrolls when taller. While typing the mics stay in view: the stage
               keeps its height and only the chat gives way to the keyboard (down to a strip). */}
-          <ScrollView style={typing ? { flexGrow: 0, flexShrink: 1 } : { flex: 1, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={typing || strip ? { flexGrow: 0, flexShrink: 1 } : { flex: 1, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
@@ -2981,6 +2994,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 )}
                 <TeamArena pk={teamPk} seats={allSeats} boss={bossId} width={win.width} canManage={canManage && !offline} renderSeat={(i, slot) => renderSeat(i, { slot })} />
               </>
+            ) : strip ? (
+              <View style={styles.micStrip}>
+                {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} />}
+                {allSeats.map((_, i) => renderSeat(i, { host: i === 0, grid: stripSlot, mini: true }))}
+              </View>
             ) : layout ? (
               <>
                 {bossOn && (
@@ -2988,7 +3006,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
                   </View>
                 )}
-                <StageLayout layout={layout} width={seatsSmall ? Math.round(win.width * 0.8) : win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
+                <StageLayout layout={layout} width={win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
               </>
             ) : (
               <View style={styles.seatGrid}>
@@ -3003,7 +3021,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   bossOn && i === 0
                     ? null
                     : i === 0
-                      ? renderSeat(0, seatsSmall ? { grid: { width: 0 /* keeps its own row */, size: 48 } } : undefined)
+                      ? renderSeat(0)
                       : renderSeat(i, { grid: gridSlot, next: i + 1 < allSeats.length && (i - 1) % seatCols !== seatCols - 1 ? { index: i + 1, gap: 0 } : undefined }),
                 )}
               </View>
@@ -3123,6 +3141,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
       {real && bags.bags.length > 0 && <LuckyBagFloat bags={bags.bags.filter((b) => !blocked.has(b.from.id))} now={bags.now} onOpen={setBagOpen} />}
+      {real && bagRain && (
+        <LuckyBagRain
+          key={bagRain.id}
+          bag={bagRain}
+          width={win.width}
+          height={win.height}
+          still={settings.reduceMotion}
+          onOpen={(b) => {
+            setBagRain(null);
+            setBagOpen(b);
+          }}
+          onDone={() => setBagRain(null)}
+        />
+      )}
 
       <GiftSheet
         key={giftOpen ? `gift-open-${giftTo}` : 'gift-closed'}
@@ -3313,6 +3345,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           onDropped={(b) => {
             bags.put(b);
             sysNote(`🧧 Şanslı çanta attın: ${bagWhat(b)} · ${b.packets} pay`);
+            setBagRain(b);
           }}
         />
       )}
@@ -3576,6 +3609,8 @@ const styles = StyleSheet.create({
   topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
+  // Küçült: the mics as one short strip (ten to a row, from the left), the chat takes the rest.
+  micStrip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2, rowGap: 6 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },
   mentionRow: { gap: 6, paddingHorizontal: 10, paddingTop: 4 },
   mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
