@@ -374,6 +374,17 @@ Değer boşsa ilgili parça kapalı kalır; `.env`'deki satırı kurulum silmez.
 
 `WHATSAPP_NUMBER` ve `WHATSAPP_APP_SECRET` ikisi birden dolu değilse kapalıdır (503). Yalnız `OTP_COUNTRIES` (+90) numaraları doğrulanır. SMS ile doğrulama `SMS_PROVIDER` doluysa açılır; şimdilik gerekmiyor.
 
+## Fotoğraf depolama (Cloudflare R2)
+Anlar'daki ve profildeki fotoğraflar için. Telefon fotoğrafı doğrudan R2'ye yükler, API yalnız imzalı adres verir. Ayar yoksa yükleme "Fotoğraf yükleme henüz açık değil" der (503). R2'de 10 GB'a kadar ücretsiz, indirme ücreti yok; açmak için Cloudflare bir kart ya da PayPal ister. Bir kez yapılır:
+
+1. **Kova:** [dash.cloudflare.com](https://dash.cloudflare.com) → ücretsiz hesap → **R2 Object Storage** → **Create bucket**: ad `similar-media`, konum **Automatic** ya da **Western Europe (WEUR)**.
+2. **Herkese açık adres:** kova → **Settings → Public access → R2.dev subdomain → Allow Access**. Gösterilen `https://pub-….r2.dev` adresi `S3_PUBLIC_URL`. (r2.dev denemelik ve hız sınırlı; alan adı gelince kovaya **Custom domain** bağlanır, `S3_PUBLIC_URL` o olur.)
+3. **Anahtar:** R2 ana sayfası → **API Tokens → Manage → Create API token** (Account API token): izin **Object Read & Write**, yalnız `similar-media` kovası. **Create**'ten sonra çıkan **Access Key ID** → `S3_KEY`, **Secret Access Key** → `S3_SECRET` (bir kez gösterilir), **S3 endpoint** (`https://<hesap>.r2.cloudflarestorage.com`, sonundaki kova adı olmadan) → `S3_ENDPOINT`.
+4. **GitHub:** depo → **Settings → Secrets and variables → Actions → Secrets**: `S3_ENDPOINT`, `S3_BUCKET` (`similar-media`), `S3_KEY`, `S3_SECRET`, `S3_PUBLIC_URL`. Beşi de sır; anahtarları sohbete yapıştırmayın.
+5. **Kurulum:** Actions → **Server** → Run workflow. Kurulum dolu olanları `/opt/similar/.env`'e yazar (yalnız adları yazdırır). Uygulamada fotoğraflı bir an paylaşıp deneyin.
+
+Kapatmak için GitHub'daki `S3_PUBLIC_URL`'i tek bir `-` yapın. **UK GDPR:** Cloudflare veri işleyen olur; Cloudflare hesabında veri işleme sözleşmesini (DPA) kabul edin, gizlilik politikasına ekleyin.
+
 ## Sırada
 1. Alan adı (ör. `rtc.<alan>`) → `.env` `DOMAIN`, `Caddyfile`, `livekit.yaml` `turn.domain`, `API_BASE_URL` değişkeni.
 2. Yedekleri Cloudflare R2'ye kopyalama (yeni `backup.sh`).
