@@ -81,6 +81,26 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
+      # Push notifications (app lib/push): the Firebase file from the GOOGLE_SERVICES_JSON secret, when it is set.
+      # Without it the APK builds the same and push stays off. Its content is never printed (a broken one gets a
+      # warning without it).
+      - name: Firebase file
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then echo "No GOOGLE_SERVICES_JSON secret: push notifications stay off in this APK."; exit 0; fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+          node -e '
+            const fs = require("fs");
+            let g;
+            try { g = JSON.parse(fs.readFileSync("google-services.json", "utf8")); } catch { console.log("::warning::GOOGLE_SERVICES_JSON is not valid JSON: push stays off."); fs.rmSync("google-services.json"); process.exit(0); }
+            const ok = (g.client ?? []).some((c) => c?.client_info?.android_client_info?.package_name === "com.similarclub.app");
+            if (!ok) { console.log("::warning::GOOGLE_SERVICES_JSON has no Android app com.similarclub.app: push stays off."); fs.rmSync("google-services.json"); process.exit(0); }
+            const a = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            a.expo.android.googleServicesFile = "./google-services.json";
+            fs.writeFileSync("app.json", JSON.stringify(a, null, 2));
+            console.log("Firebase file added: push notifications on.");
+          '
       - run: npx expo prebuild --platform android --no-install
       # Release build signed with the debug keystore (fine for side-loading a preview).
       - name: Build APK

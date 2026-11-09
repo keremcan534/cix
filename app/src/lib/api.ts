@@ -450,7 +450,10 @@ export const verifyPurchase = (proof: StoreProof) =>
 export const roomAnimation = (room: string, animationId: string, ref = newRef()) =>
   call<{ user: ServerUser; replay: boolean; eventId: number; price: number }>('POST', '/api/rooms/animation', { room, animationId, ref });
 
-export const registerPush = (token: string, platform: 'ios' | 'android' | 'web') => call<{ registered: boolean }>('POST', '/api/push/register', { token, platform });
+/** This phone's push token: an Expo one, or Firebase's own (kind 'fcm', lib/push), which the server sends to through Firebase. */
+export const registerPush = (token: string, platform: 'ios' | 'android' | 'web', kind: 'expo' | 'fcm' = 'expo') =>
+  call<{ registered: boolean }>('POST', '/api/push/register', { token, platform, kind });
+export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
 export const uploadUrl = (kind: 'avatar' | 'moment' | 'notice' | 'music', contentType: string, size: number) =>
