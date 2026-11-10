@@ -1,11 +1,13 @@
 // Stickers: one PNG per sticker of the sticker packs (data/catalog STICKER_PACKS), custom-drawn at 192 px
-// (docs/GORSEL_URETIM_LISTESI.md §3), and the free 3D pack, Microsoft's Fluent Emoji 3D at 256 px (MIT). Stickers are what the packs sell; standard Unicode emoji are
+// (docs/GORSEL_URETIM_LISTESI.md §3), and the free Duygular pack: Google's Animated Noto Emoji as Lottie animations
+// (CC BY 4.0), played by components/lottie-sticker. Stickers are what the packs sell; standard Unicode emoji are
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
 // (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
 import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/text';
+import { LottieSticker, type StickerPlay } from '@/components/lottie-sticker';
 import { stickerById } from '@/data/catalog';
 import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
 import { mentionRuns } from '@/lib/room-mention';
@@ -63,40 +65,45 @@ const SRC: Record<string, number> = {
   'animasyonlu-disko-topu': require('../../assets/reactions/tepki-animasyonlu-disko-topu.png'),
   'oda-alkis': require('../../assets/reactions/tepki-oda-alkis.png'),
   'oda-saskin': require('../../assets/reactions/tepki-oda-saskin.png'),
-  // The 3D pack: Microsoft Fluent Emoji 3D, 256 px (MIT; data/art-licenses).
-  '3d-kahkaha': require('../../assets/reactions/3d/3d-kahkaha.png'),
-  '3d-yerlere-yattim': require('../../assets/reactions/3d/3d-yerlere-yattim.png'),
-  '3d-sirit': require('../../assets/reactions/3d/3d-sirit.png'),
-  '3d-asik': require('../../assets/reactions/3d/3d-asik.png'),
-  '3d-opucuk': require('../../assets/reactions/3d/3d-opucuk.png'),
-  '3d-sevgi': require('../../assets/reactions/3d/3d-sevgi.png'),
-  '3d-kalbim': require('../../assets/reactions/3d/3d-kalbim.png'),
-  '3d-yanan-kalp': require('../../assets/reactions/3d/3d-yanan-kalp.png'),
-  '3d-havali': require('../../assets/reactions/3d/3d-havali.png'),
-  '3d-goz-kirp': require('../../assets/reactions/3d/3d-goz-kirp.png'),
-  '3d-sarildim': require('../../assets/reactions/3d/3d-sarildim.png'),
-  '3d-yalvaris': require('../../assets/reactions/3d/3d-yalvaris.png'),
-  '3d-duygulandim': require('../../assets/reactions/3d/3d-duygulandim.png'),
-  '3d-hungur': require('../../assets/reactions/3d/3d-hungur.png'),
-  '3d-uyudum': require('../../assets/reactions/3d/3d-uyudum.png'),
-  '3d-of-ya': require('../../assets/reactions/3d/3d-of-ya.png'),
-  '3d-olamaz': require('../../assets/reactions/3d/3d-olamaz.png'),
-  '3d-dusunceli': require('../../assets/reactions/3d/3d-dusunceli.png'),
-  '3d-afalladim': require('../../assets/reactions/3d/3d-afalladim.png'),
-  '3d-beyin-yakti': require('../../assets/reactions/3d/3d-beyin-yakti.png'),
-  '3d-parti': require('../../assets/reactions/3d/3d-parti.png'),
-  '3d-alkis': require('../../assets/reactions/3d/3d-alkis.png'),
-  '3d-super': require('../../assets/reactions/3d/3d-super.png'),
-  '3d-alev': require('../../assets/reactions/3d/3d-alev.png'),
-  '3d-sinirli': require('../../assets/reactions/3d/3d-sinirli.png'),
-  '3d-sus': require('../../assets/reactions/3d/3d-sus.png'),
-  '3d-yildiz-goz': require('../../assets/reactions/3d/3d-yildiz-goz.png'),
-  '3d-eriyorum': require('../../assets/reactions/3d/3d-eriyorum.png'),
-  '3d-selam-dur': require('../../assets/reactions/3d/3d-selam-dur.png'),
-  '3d-deli-dolu': require('../../assets/reactions/3d/3d-deli-dolu.png'),
-  '3d-kikirdama': require('../../assets/reactions/3d/3d-kikirdama.png'),
-  '3d-yuz-numara': require('../../assets/reactions/3d/3d-yuz-numara.png'),
 };
+
+/** The animated stickers (Duygular): each animation is read only when it is first drawn (it is code-sized data). */
+const ANIM: Record<string, () => object> = {
+  'duygu-kahkaha': () => require('../../assets/reactions/duygu/duygu-kahkaha.json'),
+  'duygu-yerlere-yattim': () => require('../../assets/reactions/duygu/duygu-yerlere-yattim.json'),
+  'duygu-sirit': () => require('../../assets/reactions/duygu/duygu-sirit.json'),
+  'duygu-asik': () => require('../../assets/reactions/duygu/duygu-asik.json'),
+  'duygu-opucuk': () => require('../../assets/reactions/duygu/duygu-opucuk.json'),
+  'duygu-sevgi': () => require('../../assets/reactions/duygu/duygu-sevgi.json'),
+  'duygu-kalbim': () => require('../../assets/reactions/duygu/duygu-kalbim.json'),
+  'duygu-yanan-kalp': () => require('../../assets/reactions/duygu/duygu-yanan-kalp.json'),
+  'duygu-havali': () => require('../../assets/reactions/duygu/duygu-havali.json'),
+  'duygu-goz-kirp': () => require('../../assets/reactions/duygu/duygu-goz-kirp.json'),
+  'duygu-sarildim': () => require('../../assets/reactions/duygu/duygu-sarildim.json'),
+  'duygu-yalvaris': () => require('../../assets/reactions/duygu/duygu-yalvaris.json'),
+  'duygu-duygulandim': () => require('../../assets/reactions/duygu/duygu-duygulandim.json'),
+  'duygu-hungur': () => require('../../assets/reactions/duygu/duygu-hungur.json'),
+  'duygu-uyudum': () => require('../../assets/reactions/duygu/duygu-uyudum.json'),
+  'duygu-of-ya': () => require('../../assets/reactions/duygu/duygu-of-ya.json'),
+  'duygu-olamaz': () => require('../../assets/reactions/duygu/duygu-olamaz.json'),
+  'duygu-dusunceli': () => require('../../assets/reactions/duygu/duygu-dusunceli.json'),
+  'duygu-afalladim': () => require('../../assets/reactions/duygu/duygu-afalladim.json'),
+  'duygu-beyin-yakti': () => require('../../assets/reactions/duygu/duygu-beyin-yakti.json'),
+  'duygu-parti': () => require('../../assets/reactions/duygu/duygu-parti.json'),
+  'duygu-alkis': () => require('../../assets/reactions/duygu/duygu-alkis.json'),
+  'duygu-super': () => require('../../assets/reactions/duygu/duygu-super.json'),
+  'duygu-alev': () => require('../../assets/reactions/duygu/duygu-alev.json'),
+  'duygu-sinirli': () => require('../../assets/reactions/duygu/duygu-sinirli.json'),
+  'duygu-sus': () => require('../../assets/reactions/duygu/duygu-sus.json'),
+  'duygu-yildiz-goz': () => require('../../assets/reactions/duygu/duygu-yildiz-goz.json'),
+  'duygu-eriyorum': () => require('../../assets/reactions/duygu/duygu-eriyorum.json'),
+  'duygu-selam-dur': () => require('../../assets/reactions/duygu/duygu-selam-dur.json'),
+  'duygu-deli-dolu': () => require('../../assets/reactions/duygu/duygu-deli-dolu.json'),
+  'duygu-kikirdama': () => require('../../assets/reactions/duygu/duygu-kikirdama.json'),
+  'duygu-yuz-numara': () => require('../../assets/reactions/duygu/duygu-yuz-numara.json'),
+};
+/** Whether a sticker moves (an animation, not a picture). */
+export const isAnimatedSticker = (id: string) => id in ANIM;
 
 export const REACTION_TAB_ANIMATED = require('../../assets/reactions/tepki-sekme-hareketli.png');
 export const REACTION_TAB_RECENT = require('../../assets/reactions/tepki-sekme-son-kullanilanlar.png');
@@ -105,23 +112,27 @@ export const EMOJI_PACKS_ICON = require('../../assets/reactions/magaza-emoji-pak
 export const stickerArtOf = (id: string): number | undefined => SRC[id];
 
 /** The stickers of a stickers-only message (at most 3), or null for anything else. */
-export const stickersOf = (text: string) => matchStickers(text, (id) => id in SRC);
+export const stickersOf = (text: string) => matchStickers(text, (id) => id in SRC || id in ANIM);
 
 /** Text for previews (inbox, notifications): sticker tokens become their names. */
 export const messagePreview = (text: string) => stickerText(text, (id) => stickerById(id)?.name);
 
+export type { StickerPlay };
+
 /** A sticker by id. */
-export function StickerArt({ id, size }: { id: string; size: number }) {
+export function StickerArt({ id, size, play = 'still' }: { id: string; size: number; play?: StickerPlay }) {
   const src = SRC[id];
   const sticker = stickerById(id);
+  const anim = ANIM[id];
+  if (anim) return <LottieSticker source={anim()} size={size} play={play} label={sticker?.name} fallback={sticker?.emoji ?? '❔'} />;
   if (!src) return <Text style={{ fontSize: Math.round(size * 0.82), lineHeight: Math.round(size * 1.05) }}>{sticker?.emoji ?? '❔'}</Text>;
   return <Image source={src} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel={sticker?.name} accessibilityIgnoresInvertColors />;
 }
 
-/** A reaction: a sticker token draws its sticker, a standard emoji is drawn as text. */
-export function ReactionArt({ emoji, size, textStyle }: { emoji: string; size: number; textStyle?: StyleProp<TextStyle> }) {
+/** A reaction: a sticker token draws its sticker (an animated one plays as `play` says), a standard emoji is text. */
+export function ReactionArt({ emoji, size, textStyle, play }: { emoji: string; size: number; textStyle?: StyleProp<TextStyle>; play?: StickerPlay }) {
   const id = stickerIdOf(emoji);
-  if (id) return <StickerArt id={id} size={size} />;
+  if (id) return <StickerArt id={id} size={size} play={play} />;
   return <Text style={[{ fontSize: Math.round(size * 0.82), lineHeight: Math.round(size * 1.05) }, textStyle]}>{emoji}</Text>;
 }
 
@@ -178,7 +189,7 @@ export function MessageText({ text, style, size = 44 }: { text: string; style?: 
   return (
     <View style={{ flexDirection: 'row', gap: 2 }} accessibilityLabel={messagePreview(text)}>
       {stickers.map((id, i) => (
-        <StickerArt key={i} id={id} size={size} />
+        <StickerArt key={i} id={id} size={size} play="once" />
       ))}
     </View>
   );

@@ -1,14 +1,14 @@
-// Pictures the app ships that others made, with their licences (Ayarlar › Açık kaynak lisansları). The 3D sticker
-// pack (data/catalog '3d', assets/reactions/3d) is Microsoft's Fluent Emoji 3D; its MIT licence asks that the notice
-// travel with the copies.
+// Pictures the app ships that others made, with their licences (Ayarlar › Açık kaynak lisansları). The Duygular
+// sticker pack (data/catalog 'duygu', assets/reactions/duygu) is Google's Animated Noto Emoji; CC BY 4.0 asks for
+// this credit, a link to the licence, and a note of any changes.
 export type ArtLicense = { name: string; source: string; license: string; url: string; text: string };
 
 export const ART_LICENSES: ArtLicense[] = [
   {
-    name: 'Fluent Emoji (3D)',
-    source: 'Microsoft Corporation',
-    license: 'MIT',
-    url: 'https://github.com/microsoft/fluentui-emoji',
-    text: "MIT License\n\nCopyright (c) Microsoft Corporation.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE",
+    name: 'Animated Noto Emoji',
+    source: 'Google',
+    license: 'CC BY 4.0',
+    url: 'https://googlefonts.github.io/noto-emoji-animation/',
+    text: "Animated Noto Emoji\nCopyright Google LLC.\n\nThe animations in this folder (duygu-*.json, Lottie format) are Google's Animated Noto Emoji\n(https://googlefonts.github.io/noto-emoji-animation/), licensed under the Creative Commons\nAttribution 4.0 International License (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/legalcode\n\nThey are used unchanged, except that the JSON was written without spaces (minified). The file names are ours.",
   },
 ];

@@ -1,0 +1,8 @@
+Animated Noto Emoji
+Copyright Google LLC.
+
+The animations in this folder (duygu-*.json, Lottie format) are Google's Animated Noto Emoji
+(https://googlefonts.github.io/noto-emoji-animation/), licensed under the Creative Commons
+Attribution 4.0 International License (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/legalcode
+
+They are used unchanged, except that the JSON was written without spaces (minified). The file names are ours.

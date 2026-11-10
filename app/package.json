@@ -40,6 +40,7 @@
     "expo-status-bar": "~58.0.4",
     "expo-updates": "~58.0.20",
     "livekit-client": "^2.23.0",
+    "lottie-react-native": "~7.5.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",

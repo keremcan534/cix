@@ -35,7 +35,8 @@ describe('Görsel dosyaları', () => {
 
   test('her çıkartmanın görseli var, görseller birbirinin kopyası değil', () => {
     const reactionArt = read('components/ReactionArt.tsx');
-    const files = new Map([...reactionArt.matchAll(/^  '([^']+)': require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
+    // Pictures load with the file; animations (Duygular) only when drawn: `() => require(…)`.
+    const files = new Map([...reactionArt.matchAll(/^  '([^']+)': (?:\(\) => )?require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
     assert.deepEqual([...files.keys()].sort(), ALL_STICKERS.map((x) => x.id).sort());
     const bytes = new Set([...files.values()].map((f) => readFileSync(resolve(SRC, 'components', f)).toString('base64')));
     assert.equal(bytes.size, files.size, 'aynı görsel iki çıkartmada');
@@ -79,9 +80,9 @@ describe('Emoji ve çıkartma paketleri', () => {
   test('eski paket kimlikleri korunuyor, satın alınanlar kaybolmuyor', () => {
     assert.deepEqual(
       STICKER_PACKS.map((p) => p.id),
-      ['basic', '3d', 'fun', 'love', 'animals', 'vip', 'anim'],
+      ['basic', 'duygu', 'fun', 'love', 'animals', 'vip', 'anim'],
     );
-    assert.deepEqual(FREE_PACK_IDS, ['basic', '3d']);
+    assert.deepEqual(FREE_PACK_IDS, ['basic', 'duygu']);
   });
   test('ücretli paketler yalnız özel çizim çıkartma, standart emojiler ücretsiz ve ayrı', () => {
     for (const p of STICKER_PACKS) for (const x of p.stickers) assert.match(x.id, /^[a-z0-9-]+$/, `${p.name}: ${x.id}`);
@@ -93,19 +94,21 @@ describe('Emoji ve çıkartma paketleri', () => {
   });
 });
 
-describe('3D yüzler (Fluent Emoji 3D, MIT)', () => {
-  test('ücretsiz, her birinin resmi var, lisans notu uygulamayla gider', () => {
-    const pack = STICKER_PACKS.find((p) => p.id === '3d');
+describe('Duygular (Animated Noto Emoji, CC BY 4.0)', () => {
+  test('ücretsiz, her birinin animasyonu var, kaynak notu uygulamayla gider', () => {
+    const pack = STICKER_PACKS.find((p) => p.id === 'duygu');
     assert.ok(pack && !pack.price && !pack.minVip, 'ücretsiz paket');
     assert.equal(pack.stickers.length, 32);
     const art = read('components/ReactionArt.tsx');
     for (const x of pack.stickers) {
-      assert.match(x.id, /^3d-[a-z0-9-]+$/);
-      assert.ok(art.includes(`'${x.id}': require('../../assets/reactions/3d/${x.id}.png')`), x.id);
-      assert.ok(existsSync(resolve(SRC, '../assets/reactions/3d', `${x.id}.png`)), x.id);
+      assert.match(x.id, /^duygu-[a-z0-9-]+$/);
+      // Read only when drawn: a function per animation, not a require at load.
+      assert.ok(art.includes(`'${x.id}': () => require('../../assets/reactions/duygu/${x.id}.json'),`), x.id);
+      const anim = JSON.parse(readFileSync(resolve(SRC, '../assets/reactions/duygu', `${x.id}.json`), 'utf8'));
+      assert.ok(Array.isArray(anim.layers) && anim.layers.length > 0 && anim.fr > 0 && anim.op > anim.ip, `${x.id}: Lottie`);
     }
-    assert.match(readFileSync(resolve(SRC, '../assets/reactions/3d/LICENSE.txt'), 'utf8'), /MIT License[\s\S]*Copyright \(c\) Microsoft Corporation/);
-    assert.match(read('data/art-licenses.ts'), /Copyright \(c\) Microsoft Corporation/);
+    assert.match(readFileSync(resolve(SRC, '../assets/reactions/duygu/LICENSE.txt'), 'utf8'), /Animated Noto Emoji[\s\S]*CC BY 4\.0/);
+    assert.match(read('data/art-licenses.ts'), /creativecommons\.org\/licenses\/by\/4\.0/);
   });
 });
 

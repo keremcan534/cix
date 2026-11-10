@@ -40,8 +40,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
   const { catalog } = useAnimations();
   const styles = useStyles();
   const [kind, setKind] = useState<'free' | 'paid'>('free');
-  // In a room it opens on the 3D faces (on a mic they cover my photo); elsewhere on the standard emoji.
-  const firstFree = onAnimate && STICKER_PACKS.some((p) => p.id === '3d') ? '3d' : 'emoji';
+  // In a room it opens on Duygular, the animated faces (on a mic they cover my photo); elsewhere on the standard emoji.
+  const firstFree = onAnimate && STICKER_PACKS.some((p) => p.id === 'duygu') ? 'duygu' : 'emoji';
   const [tab, setTab] = useState<string>(firstFree);
   const [group, setGroup] = useState(STANDARD_EMOJI[0].id);
   const pack = STICKER_PACKS.find((p) => p.id === tab);
