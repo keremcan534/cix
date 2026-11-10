@@ -288,7 +288,8 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
         <View style={styles.heroBody}>
           <View style={styles.heroHost}>
             <Avatar uri={host.avatar} name={host.name} size={44} />
-            <SimilarityRing score={score} size={44} />
+            {/* The bead ring stays out of the live app, as on the room's mics: the server keeps no interests yet. */}
+            {!liveMode() && <SimilarityRing score={score} size={44} />}
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={styles.heroTitle} numberOfLines={1}>
