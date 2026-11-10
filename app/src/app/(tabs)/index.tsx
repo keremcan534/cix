@@ -35,11 +35,14 @@ import {
 } from '@/data/rooms-ui';
 import { StarterPath } from '@/components/starter';
 import { RoomBanners } from '@/components/room-banners';
+import { showAlert } from '@/lib/alert';
 import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
-import { isLockedRoom, liveMode, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
+import { isLockedRoom, liveMode, message as errorText, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
+import { setRoomFollow, useFollowedRooms } from '@/lib/live/room-follow';
 import { useJoinedRooms, useUpcomingEvents } from '@/lib/live/room-social';
+import { myRoomMark, myRoomRows, type MyRoomRow } from '@/lib/room-follow';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { RoomCardSkeleton, Skeletons } from '@/components/fx/skeleton';
@@ -72,6 +75,8 @@ export default function RoomsScreen() {
   const roomsState = useServerRoomsState();
   // Live: Odalarım › Katıl and the calendar from the server (server/api/room-social.mjs); null until read.
   const joinedLive = useJoinedRooms();
+  // The rooms I follow (live: the server's, open or closed; the demo: the sample rooms I followed).
+  const followedRooms = useFollowedRooms();
   const eventsLive = useUpcomingEvents();
   const visible = (live ? serverRooms : ROOMS).filter((r) => !blocked.has(r.hostId));
   // The home screen leads with the open room whose host has the most in common with you (lib/closest); a
@@ -107,13 +112,15 @@ export default function RoomsScreen() {
     .filter((r) => matchesTab(r, cat) && (country === 'ALL' || roomCountry(r.id) === country))
     .sort((a, b) => (cat === 'Popüler' ? popularScore(b) - popularScore(a) : b.listeners - a.listeners));
 
+  // Odalarım › Katıl: the rooms I'm a member of and the rooms I follow as one list (lib/room-follow): open ones
+  // first with their people count, a followed room that is closed after them, marked as closed.
+  const myRows = myRoomRows(live ? (joinedLive ?? []) : visible.filter((r) => isMemberRoom(r.id, agencyId, familyId)), followedRooms ?? []).filter((x) => !blocked.has(x.room.hostId));
+  const myRowOf = new Map(myRows.map((x) => [x.room.id, x]));
   const mineRooms =
     mineTab === 'recent'
       ? recentRooms.map((id) => visible.find((r) => r.id === id)).filter((r): r is Room => !!r)
       : mineTab === 'joined'
-        ? live
-          ? (joinedLive ?? []).filter((r) => !blocked.has(r.hostId))
-          : visible.filter((r) => isMemberRoom(r.id, agencyId, familyId))
+        ? myRows.map((x) => x.room)
         : visible.filter((r) => following.has(r.hostId));
 
   // "Benzerlerin": people online right now, the closest matches first.
@@ -136,7 +143,7 @@ export default function RoomsScreen() {
       : mineTab === 'recent'
         ? 'Henüz bir odaya girmedin.'
         : mineTab === 'joined'
-          ? 'Üyesi olduğun oda yok.'
+          ? 'Üyesi olduğun ya da takip ettiğin oda yok. Bir odayı takip etmek için oda adının yanındaki kalbe dokun.'
           : 'Takip ettiğin kimse şu an oda açmamış.';
 
   const header = (
@@ -236,7 +243,7 @@ export default function RoomsScreen() {
           )
         }
         ListFooterComponent={main === 'mine' ? <PromoBanner /> : undefined}
-        renderItem={({ item }) => <RoomRow room={item} match={similarity(me, userById(item.hostId)).score} />}
+        renderItem={({ item }) => <RoomRow room={item} match={similarity(me, userById(item.hostId)).score} mine={main === 'mine' && mineTab === 'joined' ? myRowOf.get(item.id) : undefined} />}
       />
 
       {/* Glass blurs what is already drawn beneath it, so the header comes after the list. */}
@@ -523,14 +530,33 @@ function PromoBanner() {
 
 const TOP_BG = ['#4A3510', '#241A3D'] as const;
 
-function RoomRow({ room, match }: { room: Room; /** How close the host is to you (lib/similarity). */ match: number }) {
+function RoomRow({
+  room,
+  match,
+  mine,
+}: {
+  room: Room;
+  /** How close the host is to you (lib/similarity). */
+  match: number;
+  /** Odalarım › Katıl: why the room is listed (member, followed) and whether it is closed now. */
+  mine?: MyRoomRow;
+}) {
   const styles = useStyles();
   const x = rowExtra(room);
+  const closed = !!mine?.closed;
   // Only the week's top room keeps the lit card; rank badges on every row read as a leaderboard, not a home.
-  const top = x.top === 1;
-  const content = <RoomRowBody room={room} match={match} pk={x.pk} />;
+  const top = x.top === 1 && !closed;
+  const content = <RoomRowBody room={room} match={match} pk={x.pk && !closed} mark={mine ? myRoomMark(mine) : undefined} closed={closed} />;
+  // A closed room can't be entered: the row says so, and is where its follow can be taken back.
+  const open = () =>
+    closed
+      ? showAlert('Oda şu an kapalı', `"${room.title}" odası açıldığında sana haber veririz.`, [
+          { text: 'Takibi bırak', style: 'destructive', onPress: () => void setRoomFollow(room.id, false).catch((e) => showAlert('Takip bırakılamadı', errorText(e))) },
+          { text: 'Tamam', style: 'cancel' },
+        ])
+      : router.push(`/oda/${room.id}`);
   return (
-    <PressableScale style={{ marginHorizontal: 16 }} to={0.98} onPress={() => router.push(`/oda/${room.id}`)} accessibilityHint={top ? 'Haftanın en iyi odası' : undefined}>
+    <PressableScale style={[{ marginHorizontal: 16 }, closed && { opacity: 0.6 }]} to={0.98} onPress={open} accessibilityHint={closed ? 'Oda kapalı' : top ? 'Haftanın en iyi odası' : undefined}>
       {top ? (
         <DepthCard tint={TOP_BG} style={[styles.roomCard, styles.roomCardTop, glow('rgba(246,189,96,0.18)', 22, 6)]}>
           {/* The top room's card is night gold in both schemes, so what sits on it reads in the dark one. */}
@@ -544,7 +570,7 @@ function RoomRow({ room, match }: { room: Room; /** How close the host is to you
   );
 }
 
-function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: boolean }) {
+function RoomRowBody({ room, match, pk, mark, closed }: { room: Room; match: number; pk?: boolean; /** Odalarım › Katıl: "Üye", "Takipte" or "Kapalı". */ mark?: string; closed?: boolean }) {
   const { colors } = useTheme();
   const styles = useStyles();
   const badge = roomBadge(room);
@@ -554,10 +580,17 @@ function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: bool
         <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.cover} />
         <EdgeLight inset={8} strength={0.4} />
         {/* The live count rides on the cover like the hero and suggestion cards, so the chip row never overflows. */}
-        <View style={styles.liveBadge} accessibilityLabel={`${room.listeners} kişi dinliyor`}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>{room.listeners.toLocaleString('tr-TR')}</Text>
-        </View>
+        {closed ? (
+          <View style={styles.liveBadge} accessibilityLabel="Oda kapalı">
+            <Ionicons name="moon" size={10} color="#fff" />
+            <Text style={styles.liveText}>Kapalı</Text>
+          </View>
+        ) : (
+          <View style={styles.liveBadge} accessibilityLabel={`${room.listeners} kişi dinliyor`}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>{room.listeners.toLocaleString('tr-TR')}</Text>
+          </View>
+        )}
       </View>
       <View style={{ flex: 1, gap: 5, justifyContent: 'center' }}>
         <View style={styles.titleRow}>
@@ -571,7 +604,13 @@ function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: bool
           {roomAnnouncement(room)}
         </Text>
         <View style={styles.chipRow}>
-          {badge && (
+          {/* Odalarım › Katıl: why the room is listed takes the badge's place, so the row never overflows. */}
+          {mark && (
+            <View style={styles.tagChip}>
+              <Text style={styles.tagText}>{mark}</Text>
+            </View>
+          )}
+          {badge && !mark && (
             <LinearGradient colors={badge.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.badgeChip}>
               <Gloss strength={0.3} />
               {badge.icon ? <Ionicons name={badge.icon} size={11} color="#fff" /> : <Text style={{ fontSize: 11 }}>{badge.emoji}</Text>}
@@ -581,7 +620,7 @@ function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: bool
             </LinearGradient>
           )}
           <SimilarityChip score={match} />
-          {!badge && (
+          {!badge && !mark && (
             <View style={styles.tagChip}>
               <Text style={styles.tagText}>{roomTagLabel(room)}</Text>
             </View>

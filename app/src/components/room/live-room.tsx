@@ -42,6 +42,7 @@ import {
   type RoomEvent,
 } from '@/components/room/community';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
+import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { LuckyCombo } from '@/components/room/lucky-combo';
@@ -151,6 +152,7 @@ import { ALL_FEATURES, applyServerStage, changeLayout, layoutById, modeById, see
 import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomState, setMicWant, setNoiseSuppression, setPlaybackVolume, useRoomSession, type MicBlock } from '@/lib/room-session';
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
+import { demoJoinMode } from '@/lib/room-follow';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
 import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
@@ -617,6 +619,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [bossRemoved, setBossRemoved] = useState<Set<string>>(new Set());
   const [membership, setMembership] = useState<'owner' | 'none' | 'pending' | 'member'>(isOwn ? 'owner' : 'none');
   const [memberApps, setMemberApps] = useState<string[]>(() => (isOwn ? ['u2', 'u9', 'u11'] : []));
+  // The demo's application to a sample room, accepted a moment later unless it is taken back first.
+  const demoApproval = useRef<ReturnType<typeof setTimeout> | null>(null);
   // A server room's members (server/api/rooms.mjs): read when the room opens and again after each change.
   const [serverMembers, setServerMembers] = useState<{ ids: string[]; total: number; canManage: boolean } | null>(null);
   // The room owner's family (their profile: server/api families.mjs familyOf), read when the room card opens.
@@ -1690,7 +1694,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addMsg({ system: true, text: `${ME.name} patron koltuğuna oturdu` });
   };
 
-  // Room membership: a server room asks the server (open: at once; apply: the owner or admins answer).
+  // Room membership: a server room asks the server (open: at once; apply: the owner or admins answer). A sample
+  // room takes members by its own rule (lib/room-follow demoJoinMode); its application is accepted a moment later.
+  const joinMode = real ? (liveRules?.joinMode ?? 'open') : isOwn ? myRoom.joinMode : demoJoinMode(base!);
   const joinRoom = () => {
     if (real) {
       if (membership !== 'none' || offlineBlocked()) return;
@@ -1701,13 +1707,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       });
     }
     if (membership !== 'none') return;
+    if (joinMode === 'open') {
+      setMembership('member');
+      return addMsg({ system: true, text: `✅ ${title} odasının üyesi oldun` });
+    }
     setMembership('pending');
     addMsg({ system: true, text: '📝 Oda üyeliği başvurun gönderildi' });
-    setTimeout(() => {
+    demoApproval.current = setTimeout(() => {
       setMembership('member');
       addMsg({ system: true, text: `✅ ${title} odasının üyesi oldun` });
       notify({ kind: 'social', icon: 'home', title: 'Oda üyeliğin onaylandı', body: title, href: `/oda/${id}` });
     }, 2000);
+  };
+  // Leaves the room's members, or takes a waiting application back.
+  const leaveMembers = () => {
+    if (membership !== 'member' && membership !== 'pending') return;
+    const line = membership === 'member' ? `${title} odasının üyeliğinden ayrıldın` : 'Üyelik başvurunu geri çektin';
+    if (real) return memberCall(membership === 'member' ? 'Üyelikten ayrılınamadı' : 'Başvuru geri çekilemedi', () => api.leaveRoomMembers(id), line, () => setMembership('none'));
+    if (demoApproval.current) clearTimeout(demoApproval.current);
+    setMembership('none');
+    addMsg({ system: true, text: line });
   };
 
   const onBossPress = () => {
@@ -2846,8 +2865,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     { key: 'effects', label: 'Efekt ayarları', icon: 'sparkles-outline' as const, onPress: fromCard(() => setPanel('effects')) },
   ];
 
-  // Room card data (members, clan).
-  // A server room has no member list on the server yet: none is shown (RoomInfoSheet `live`), never demo people.
+  // Room card data (members, clan). A server room: its members as the server keeps them, never demo people.
   const roomMembers = isOwn ? ['me', ...myRoom.memberIds] : real ? (serverMembers?.ids ?? []) : [...(membership === 'member' ? ['me'] : []), ...USERS.filter((u) => !kicked.has(u.id) && !blocked.has(u.id)).slice(0, 10).map((u) => u.id)];
   const memberTotal = isOwn ? roomMembers.length : real ? (serverMembers?.total ?? 0) : Math.min(memberLimit(level), Math.round(base!.listeners * 1.8)) + (membership === 'member' ? 1 : 0);
   const ownFamily = FAMILIES.find((f) => f.id === familyId);
@@ -3177,6 +3195,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                 <View style={styles.levelBadge}>
                   <Text style={styles.levelText}>Lv.{level}</Text>
                 </View>
+                {hostId !== 'me' && <RoomFollowHeart roomId={id} title={title} />}
               </Pressable>
               <Pressable onPress={() => setPeopleOpen(true)} style={styles.subRow} accessibilityLabel={`${listeners} kişi, ${capacity} mikrofon. Odadaki kullanıcıları aç`}>
                 <Ionicons name="people" size={11} color={colors.textDim} />
@@ -3509,7 +3528,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         canManageMembers={isOwn || (real && !!serverMembers?.canManage)}
         autoRemoveDays={isOwn ? myRoom.autoRemoveDays : (liveRules?.autoRemoveDays ?? 0)}
         membership={membership}
+        joinMode={joinMode}
+        memberStaff={[hostId, ...superIds, ...adminIds]}
+        memberRank={rankOf}
+        inRoom={live.members}
+        membersKey={serverMembers}
         onJoin={joinRoom}
+        onLeave={leaveMembers}
         onApprove={(uid) => {
           if (real) return memberCall('Onaylanamadı', () => api.answerRoomMember(id, toServer(uid) ?? '', true), `🏠 ${userById(uid).name} oda üyesi oldu`);
           if (roomMembers.length >= memberLimit(level)) return showAlert('Üye kapasitesi dolu', `Lv.${level} oda en fazla ${memberLimit(level)} üye alabilir.`);
