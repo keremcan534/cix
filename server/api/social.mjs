@@ -2,7 +2,8 @@
 //
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
-//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit)
+//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit;
+//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
 //   GET    /api/me/visitors                               → { count, visitors }  (last 7 days; visitors only with VIP)
 //   POST   /api/follow  { to, follow }                    → { following }
 //   GET    /api/following                                 → { users }
@@ -21,6 +22,7 @@ import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 import { listsHidden, shownToViewer } from './privacy.mjs';
+import { cardsMore, privateMore, profileMore } from './profiles.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -109,6 +111,10 @@ export async function eraseAccount(c, id, phone) {
     // Gizlilik choices and the "Arama geçmişini temizle" mark (privacy.mjs, call-log.mjs).
     await c.query('DELETE FROM privacy_settings WHERE user_id = $1', [id]);
     await c.query('DELETE FROM call_history_cleared WHERE user_id = $1', [id]);
+    // Profile extras, the album rows (their files go with removeUserFiles) and the gender choice (profiles.mjs).
+    await c.query('DELETE FROM profile_extras WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
+    await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
     await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
@@ -239,8 +245,17 @@ export const socialRoutes = {
     );
     // "Profilim herkese açık" off: someone they don't follow gets no age, city, bio or interests (privacy.mjs).
     const [shown] = await shownToViewer(db, me.id, [{ id: u.id, name: u.name, ...profileOf(u) }]);
+    const more = await profileMore(u, id === me.id);
     return {
-      user: { ...shown, followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
+      user: {
+        ...shown,
+        followers: Number(x.followers),
+        following: Number(x.following),
+        isFollowing: x.is_following,
+        blockedByMe: x.blocked_by_me,
+        // A private profile keeps its personal extras and album from people it doesn't follow, like age and city.
+        ...(shown.private ? privateMore(more) : more),
+      },
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
@@ -324,8 +339,11 @@ export const socialRoutes = {
       [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
-    // What each one shows me: "Profilim herkese açık" and "Çevrimiçi durumumu göster" (privacy.mjs).
-    return { users: await shownToViewer(db, me.id, r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh }))) };
+    // Each card's levels and country, for the whole list in a few queries (profiles.mjs); then what each one shows me:
+    // "Profilim herkese açık" (no country either) and "Çevrimiçi durumumu göster" (privacy.mjs).
+    const more = await cardsMore(r.rows.map((u) => u.id));
+    const users = await shownToViewer(db, me.id, r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh, ...more[u.id] })));
+    return { users: users.map((u) => (u.private ? { ...u, country: null } : u)) };
   },
 
   /** Who `user` follows (default: me). Another person's list leaves out anyone either of us blocked. */

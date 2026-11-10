@@ -90,7 +90,7 @@ const person = (x) => ({ id: x.user_id, name: x.name, avatarUrl: x.avatar_url ??
 
 export async function membersOf(id, q = db) {
   const r = await q.query(
-    `SELECT fm.user_id, fm.role, fm.joined_at, u.name, u.avatar_url, u.gender,
+    `SELECT fm.user_id, fm.role, fm.joined_at, u.name, u.avatar_url, CASE WHEN u.gender_hidden THEN NULL ELSE u.gender END AS gender,
             (SELECT COALESCE(sum(g.total), 0) FROM gift_events g WHERE g.sender = fm.user_id AND g.created_at >= GREATEST(fm.joined_at, ${WEEK}))::bigint AS weekly
        FROM family_members fm JOIN users u ON u.id = fm.user_id
       WHERE fm.family_id = $1 AND u.deleted_at IS NULL
@@ -102,7 +102,7 @@ export async function membersOf(id, q = db) {
 
 async function requestsOf(id, q = db) {
   const r = await q.query(
-    `SELECT fr.user_id, fr.created_at, u.name, u.avatar_url, u.gender FROM family_requests fr JOIN users u ON u.id = fr.user_id
+    `SELECT fr.user_id, fr.created_at, u.name, u.avatar_url, CASE WHEN u.gender_hidden THEN NULL ELSE u.gender END AS gender FROM family_requests fr JOIN users u ON u.id = fr.user_id
       WHERE fr.family_id = $1 AND u.deleted_at IS NULL ORDER BY fr.created_at LIMIT 100`,
     [id],
   );
@@ -428,7 +428,7 @@ export const familyRoutes = {
     if (!mine) throw new HttpError(403, 'Bir ailede değilsin');
     const after = Number(url.searchParams.get('after') ?? 0);
     const r = await db.query(
-      `SELECT * FROM (SELECT m.id, m.author, m.body, m.created_at, u.name, u.avatar_url, u.gender
+      `SELECT * FROM (SELECT m.id, m.author, m.body, m.created_at, u.name, u.avatar_url, CASE WHEN u.gender_hidden THEN NULL ELSE u.gender END AS gender
          FROM family_messages m JOIN users u ON u.id = m.author
         WHERE m.family_id = $1 AND m.id > $2 AND u.deleted_at IS NULL ORDER BY m.id DESC LIMIT 100) x ORDER BY id`,
       [mine.family_id, Number.isSafeInteger(after) && after > 0 ? after : 0],
@@ -447,7 +447,7 @@ export const familyRoutes = {
     const body = await publicText(b.text, 1, 500, 'Mesaj', me, 'family.chat', 'text');
     limit(`family-chat:${me.id}`, 30, 'Çok hızlı yazıyorsun, biraz bekle');
     const r = await db.query('INSERT INTO family_messages (family_id, author, body) VALUES ($1, $2, $3) RETURNING id, created_at', [mine.family_id, me.id, body]);
-    return { message: { id: String(r.rows[0].id), author: { id: me.id, name: me.name, avatarUrl: me.avatar_url ?? null, gender: me.gender ?? null }, text: body, createdAt: r.rows[0].created_at } };
+    return { message: { id: String(r.rows[0].id), author: { id: me.id, name: me.name, avatarUrl: me.avatar_url ?? null, gender: me.gender_hidden ? null : (me.gender ?? null) }, text: body, createdAt: r.rows[0].created_at } };
   },
 };
 

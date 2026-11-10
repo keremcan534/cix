@@ -218,11 +218,18 @@ export function staffBadgeOf(state: RbacState, userId: string): 'Yönetici' | 'M
 }
 
 /**
- * The staff badge a profile shows. With a server (live) only my own, and only from my server role (admin or
- * moderator); the local assignments above are the demo's.
+ * The staff badge a profile shows. With a server (live) only from server roles: mine from my own (admin or
+ * moderator), someone else's from their profile (`theirRole`, GET /api/user staff; undefined until read). The
+ * local assignments above are the demo's.
  */
-export function shownStaffBadge(state: RbacState, userId: string, live: boolean, serverRole: 'admin' | 'moderator' | null): 'Yönetici' | 'Moderatör' | null {
+export function shownStaffBadge(
+  state: RbacState,
+  userId: string,
+  live: boolean,
+  serverRole: 'admin' | 'moderator' | null,
+  theirRole?: 'admin' | 'moderator' | null,
+): 'Yönetici' | 'Moderatör' | null {
   if (!live) return staffBadgeOf(state, userId);
-  if (userId !== 'me') return null;
-  return serverRole === 'admin' ? 'Yönetici' : serverRole === 'moderator' ? 'Moderatör' : null;
+  const role = userId === 'me' ? serverRole : (theirRole ?? null);
+  return role === 'admin' ? 'Yönetici' : role === 'moderator' ? 'Moderatör' : null;
 }

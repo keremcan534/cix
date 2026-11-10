@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -15,8 +15,9 @@
 // in one place (core.mjs filesOut, filesIn).
 //
 // Files no longer used are deleted (removeFiles, removeUserFiles): an avatar replaced, a moment its author
-// deletes, a track taken out of a library, a removed notice, and every file of a deleted account (UK GDPR
-// erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
+// deletes, an album photo removed (profiles.mjs; the album's files are the rows of profile_photos, so anything that
+// clears unused files must count those as used), a track taken out of a library, a removed notice, and every file
+// of a deleted account (UK GDPR erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
 // Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
 // 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one.
 import crypto from 'node:crypto';
@@ -35,6 +36,8 @@ const KINDS = {
   moment: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   // A photo in a chat (messages.mjs; who may send one is checked when the message is sent).
   dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
+  // A profile album photo (profiles.mjs, at most ALBUM_MAX each), shrunk on the phone like a moment's.
+  album: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
   music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
 };
@@ -105,7 +108,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|notice|music)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -266,12 +269,12 @@ export function removeFiles(urls, owner) {
   if (keys.length && storageOn()) later('storage delete failed', () => deleteKeys(keys));
 }
 
-/** Deletes every file a deleted account uploaded (its avatars, moment and chat photos, music). A notice's
+/** Deletes every file a deleted account uploaded (its avatars, moment, chat and album photos, music). A notice's
  *  picture stays: it is the company's, whoever put it up. */
 export function removeUserFiles(uid) {
   if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
   later('storage erase failed', async () => {
-    for (const kind of ['avatar', 'moment', 'dm', 'music']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+    for (const kind of ['avatar', 'moment', 'dm', 'album', 'music']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
   });
 }
 

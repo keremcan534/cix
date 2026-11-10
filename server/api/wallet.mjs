@@ -186,12 +186,18 @@ export async function giftDiamonds(c, { sender, recipient, parts, total, label, 
  * took back ("İade: …"). Only giftDiamonds credits diamonds with a counterparty.
  */
 export async function charmPoints(c, userId) {
+  return (await charmPointsOf(c, [userId])).get(userId) ?? 0;
+}
+
+/** charmPoints of many people in one query (other people's levels in lists, profiles.mjs): id → points. */
+export async function charmPointsOf(c, ids) {
   const r = await c.query(
-    `SELECT coalesce(sum(amount), 0) AS n FROM ledger
-      WHERE user_id = $1 AND currency = 'diamond' AND counterparty IS NOT NULL AND counterparty <> $1 AND (amount > 0 OR reason ~ '^İade:')`,
-    [userId],
+    `SELECT user_id, coalesce(sum(amount), 0) AS n FROM ledger
+      WHERE user_id = ANY($1::uuid[]) AND currency = 'diamond' AND counterparty IS NOT NULL AND counterparty <> user_id AND (amount > 0 OR reason ~ '^İade:')
+      GROUP BY user_id`,
+    [ids],
   );
-  return Math.max(0, Number(r.rows[0].n));
+  return new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))]));
 }
 
 /** An account's diamonds: all of them, those still locked, and those that may leave. */

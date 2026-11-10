@@ -91,14 +91,17 @@ export const selfUser = (u) => ({
   gameCoins: Number(u.game_coins),
   createdAt: u.created_at,
   ...profileOf(u),
+  // My own gender even when I hide it from others ("Gizli", profiles.mjs).
+  gender: u.gender ?? null,
+  genderHidden: !!u.gender_hidden,
   role: u.role,
   phone: u.phone ?? null,
   svipXp: Number(u.svip_xp ?? 0),
 });
-/** What anyone may see about a person: never balances, birth date or role. */
+/** What anyone may see about a person: never balances, birth date or role, nor a gender they chose to hide. */
 export const profileOf = (u) => ({
   username: u.username ?? null,
-  gender: u.gender ?? null,
+  gender: u.gender_hidden ? null : (u.gender ?? null),
   age: u.birth_date ? ageOf(u.birth_date) : null,
   city: u.city ?? null,
   bio: u.bio ?? '',

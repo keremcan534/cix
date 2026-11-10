@@ -61,7 +61,7 @@ const hiddenWriter = (a) => `(wu.deleted_at IS NOT NULL
   OR EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = ${a} AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}))`;
 
 /** A post with its counts, as $1 (the reader) sees it. */
-const POST = `SELECT m.*, wu.name, wu.avatar_url, wu.gender, wu.birth_date,
+const POST = `SELECT m.*, wu.name, wu.avatar_url, CASE WHEN wu.gender_hidden THEN NULL ELSE wu.gender END AS gender, wu.birth_date,
     (SELECT count(*) FROM moment_likes l WHERE l.moment = m.id)::int AS likes,
     (SELECT count(*) FROM moment_comments c JOIN users cu ON cu.id = c.author WHERE c.moment = m.id AND c.deleted_at IS NULL AND cu.deleted_at IS NULL)::int AS comments,
     EXISTS (SELECT 1 FROM moment_likes l WHERE l.moment = m.id AND l.user_id = $1) AS liked
@@ -118,7 +118,7 @@ function photoOf(v, me) {
 
 async function comments(me, id) {
   const r = await db.query(
-    `SELECT c.*, wu.name, wu.avatar_url, wu.gender, wu.birth_date,
+    `SELECT c.*, wu.name, wu.avatar_url, CASE WHEN wu.gender_hidden THEN NULL ELSE wu.gender END AS gender, wu.birth_date,
         (SELECT count(*) FROM moment_comment_likes l WHERE l.comment = c.id)::int AS likes,
         EXISTS (SELECT 1 FROM moment_comment_likes l WHERE l.comment = c.id AND l.user_id = $1) AS liked
        FROM moment_comments c JOIN users wu ON wu.id = c.author

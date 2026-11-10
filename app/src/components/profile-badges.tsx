@@ -114,11 +114,14 @@ export function useAffiliations(user: User): { agency: Affiliation | null; kabil
   return { agency, kabile, known: true };
 }
 
-/** The staff badge on a profile: in live mode only my own, from my server role; in the demo the local roles. */
-export function useStaffBadge(userId: string) {
+/**
+ * The staff badge on a profile: in live mode from server roles (mine from my account, someone else's from their
+ * profile, `theirRole`); in the demo the local roles.
+ */
+export function useStaffBadge(userId: string, theirRole?: 'admin' | 'moderator' | null) {
   const { rbac } = useApp();
   const role = useStaffRole();
-  return shownStaffBadge(rbac, userId, liveMode(), role);
+  return shownStaffBadge(rbac, userId, liveMode(), role, theirRole);
 }
 
 // Assistants are an internal agency role; publicly they are hosts like everyone else.

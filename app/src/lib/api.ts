@@ -467,7 +467,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**
@@ -492,8 +492,9 @@ export const liveRooms = () => call<{ rooms: { room: string; listeners: number }
 
 // --- Live mode (lib/live): profile, people, rooms, messages, follows and the Gelir wallet on the server.
 export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null };
-export type ServerMe = ServerUser & ServerProfile & { role?: string };
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
+/** `genderHidden`: I chose "Gizli" (others don't get my gender; I still do). */
+export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidden?: boolean };
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore>;
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -566,7 +567,7 @@ export type ServerVisitor = { id: string; name: string; avatarUrl: string | null
 export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null }>('GET', '/api/me/visitors');
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first (no distance on the server: city only). */
-export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };
+export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean; levels?: Levels; country?: string | null };
 /** Keşfet's lists (server/api/social.mjs): most recently active, newest accounts, or who 1v1 lifts. */
 export type DiscoverList = 'home' | 'new' | 'featured';
 export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverUser[] }>('GET', `/api/discover${list === 'home' ? '' : `?list=${list}`}`).then((r) => r.users);
@@ -780,6 +781,34 @@ export const followerInviteInfo = (room: string) => call<FollowerInviteInfo>('GE
 export const inviteFollowers = (room: string) => call<FollowerInviteInfo & { sent: number }>('POST', '/api/rooms/invite-followers', { room });
 export type FollowerRoomInvite = { id: number; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
 export const myRoomInvites = () => call<{ invites: FollowerRoomInvite[] }>('GET', '/api/me/room-invites').then((r) => r.invites);
+// Other people's profiles (server/api/profiles.mjs): levels, personal extras, the album and the Vitrin.
+/** Cömertlik and Yankı levels as the server counts them (it never sends someone else's points); null: a level its
+ *  owner hides ("Seviyeyi Gizle", a VIP right). */
+export type Levels = { wealth: number | null; charm: number | null };
+/** What a person filled in about themselves; null or [] when they didn't. */
+export type ServerExtras = { height: number | null; weight: number | null; job: string | null; languages: string[]; zodiac: string | null; tags: string[]; relationship: string | null; education: string | null; slogan: string | null; country: string | null };
+export type AlbumPhoto = { id: number; url: string };
+/** What GET /api/user also carries for the profile screen (missing from an older server). Friends: people who follow
+ *  each other. `levelsHidden`: on my own profile only, which of my levels others don't see now. */
+export type ProfileMore = {
+  levels: Levels;
+  friends: number;
+  giftsReceived: number;
+  staff: 'admin' | 'moderator' | null;
+  extras: ServerExtras;
+  photos: AlbumPhoto[];
+  levelsHidden?: { wealth: boolean; charm: boolean };
+};
+/** Vitrin: catalog gifts received (by id), the rides and entry effects owned now (shop skus), medals and titles earned. */
+export type Showcase = { gifts: { id: string; count: number }[]; rides: string[]; entries: string[]; medals: string[]; titles: string[] };
+export const showcase = (id: string) => call<Showcase>('GET', `/api/user/showcase?id=${encodeURIComponent(id)}`);
+/** Only the fields sent change; null, '' or [] clears one. Hiding a level needs VIP (403 otherwise). */
+export type ExtrasPatch = Partial<ServerExtras> & { genderHidden?: boolean; hideWealth?: boolean; hideCharm?: boolean };
+export const saveExtras = (p: ExtrasPatch) =>
+  call<{ extras: ServerExtras & { genderHidden: boolean; hideWealth: boolean; hideCharm: boolean } }>('PATCH', '/api/me/extras', p).then((r) => r.extras);
+/** Albüm: a photo already in the storage (kind 'album'); the answer is my album, newest first. */
+export const addAlbumPhoto = (url: string) => call<{ photos: AlbumPhoto[] }>('POST', '/api/me/photos', { url }).then((r) => r.photos);
+export const removeAlbumPhoto = (id: number) => call<{ photos: AlbumPhoto[] }>('POST', '/api/me/photos/remove', { id }).then((r) => r.photos);
 
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
