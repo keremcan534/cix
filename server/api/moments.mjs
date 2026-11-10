@@ -28,6 +28,7 @@ import { SPAM_MESSAGES, checkSpam } from './spam-filter.mjs';
 import { charmPoints } from './wallet.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
 import { distancesFrom } from './distances.mjs';
+import { hiddenFrom } from './privacy.mjs';
 
 const PAGE = 50;
 /** The topics the app offers (app/src/data/social-ui.ts MOMENT_TOPICS). */
@@ -81,11 +82,14 @@ const writer = (x, looks) => ({
 
 /** Posts as `me` reads them; each writer with how far they are from me by our two cities (distances.mjs). */
 async function withWriters(rows, me) {
-  const looks = await looksOf([...new Set(rows.map((x) => x.author))]);
+  const authors = [...new Set(rows.map((x) => x.author))];
+  const looks = await looksOf(authors);
   const far = await distancesFrom(me, rows.map((x) => x.author));
+  // "Profilim herkese açık" off: someone the writer doesn't follow doesn't get their age (privacy.mjs).
+  const hidden = await hiddenFrom(db, me.id, authors);
   return rows.map((x) => ({
     id: String(x.id),
-    author: { ...writer(x, looks[x.author]), distance: far.get(x.author) ?? null },
+    author: { ...writer(x, looks[x.author]), ...(hidden.has(x.author) && { age: null }), distance: far.get(x.author) ?? null },
     text: x.body,
     imageUrl: x.image_url ?? null,
     topic: x.topic ?? null,

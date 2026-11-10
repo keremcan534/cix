@@ -146,7 +146,7 @@ export async function presenceOf(q, viewer, ids) {
 }
 
 /** Ids among `ids` whose profile isn't public and who don't follow `viewer`: their details stay hidden from them. */
-async function hiddenFrom(q, viewer, ids) {
+export async function hiddenFrom(q, viewer, ids) {
   const list = [...new Set(ids)].filter((id) => id !== viewer);
   if (!list.length) return new Set();
   const r = await q.query(

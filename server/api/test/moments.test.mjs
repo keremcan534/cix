@@ -100,6 +100,21 @@ describe('Anlar', () => {
     assert.equal((await call('POST', '/api/moments/like', { id: photo.moment.id, like: true }, b.session))[0], 404, 'silinen an beğenilmez');
   });
 
+  test('gizli profilin yaşı, takip etmediği kişiye anlarda da gitmez', async () => {
+    const a = await signUp('Gizli Yazar');
+    const b = await signUp('Okuyan');
+    assert.equal((await call('PATCH', '/api/me', { birthDate: '2000-05-20' }, a.session))[0], 200);
+    assert.equal((await call('POST', '/api/moments', { text: 'Bugün hava çok güzel', ref: rnd(10) }, a.session))[0], 200);
+    const ageSeen = async () => {
+      const [st, j] = await call('GET', '/api/moments?tab=recent', null, b.session);
+      assert.equal(st, 200);
+      return j.moments.find((m) => m.author.id === a.user.id)?.author.age;
+    };
+    assert.ok((await ageSeen()) > 18, 'açık profilde yaş görünür');
+    assert.equal((await call('PATCH', '/api/me/privacy', { profilePublic: false }, a.session))[0], 200);
+    assert.equal(await ageSeen(), null, 'gizli profilde yaş gitmez');
+  });
+
   test('küfür, cinsel içerik ve reklam paylaşılamaz; günlük yazı geçer', async () => {
     const a = await signUp('Filtreli');
     const refused = async (path, body, category) => {
