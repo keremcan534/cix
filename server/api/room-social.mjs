@@ -195,8 +195,8 @@ async function weekRanks() {
 
 /**
  * The Odalar row extras the server knows, on room views (rooms.mjs out): the owner's agency (an approved one they
- * stream for or own) and family, whether an in-room PK runs now, and the room's place in this week's gift ranking
- * (1–3, else null). Never fails the list: on an error the rooms go out without them.
+ * stream for or own) and family, whether a PK (in the room or with another room) runs now, and the room's place in
+ * this week's gift ranking (1–3, else null). Never fails the list: on an error the rooms go out without them.
  */
 export async function withRoomBadges(list) {
   if (!list.length) return list;
@@ -211,7 +211,12 @@ export async function withRoomBadges(list) {
        ) x JOIN agencies a ON a.id = x.aid WHERE a.status = 'approved' ORDER BY x.uid, x.pref, a.name`,
       [owners],
     );
-    const pk = await db.query("SELECT DISTINCT room_id FROM room_pks WHERE room_id = ANY($1::uuid[]) AND status = 'active' AND end_at > now()", [ids]);
+    // An Odalar arası PK (pk-cross.mjs) shows the same pill on both rooms.
+    const pk = await db.query(
+      `SELECT DISTINCT room_id FROM room_pks WHERE room_id = ANY($1::uuid[]) AND status = 'active' AND end_at > now()
+       UNION SELECT unnest(ARRAY[red_room, blue_room]) FROM room_cross_pks WHERE status = 'active' AND end_at > now() AND (red_room = ANY($1::uuid[]) OR blue_room = ANY($1::uuid[]))`,
+      [ids],
+    );
     const week = await weekRanks();
     const families = new Map(fam.rows.map((x) => [x.user_id, { id: String(x.id), name: x.name }]));
     const agencies = new Map(ag.rows.map((x) => [x.uid, { id: String(x.id), name: x.name }]));

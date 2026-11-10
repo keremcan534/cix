@@ -107,6 +107,10 @@ Web prototipinde Playwright ile denenenler (390, 360, 320 px): Normal PK başlat
 
 **Gerçek cihaz testleri:** farklı cihazlarda ve aynı anda gelen hediyelerle testler gerçek zamanlı altyapı (LiveKit + sunucu) kurulduğunda yapılmalı.
 
+## Canlı sürüm (sunucu)
+
+Sunucu adresi olan sürümde PK'ları telefon değil sunucu yürütür; `lib/live/pk.ts` sunucunun PK'sını bu modülün oturumlarına çevirir, panolar, sonuç ve taçlar aynı kalır. Oda içi PK: `server/api/pk.mjs`. Odalar arası PK: `server/api/pk-cross.mjs` (ayrıntı: [`SUNUCU.md`](SUNUCU.md)). A odasının sahibi veya yöneticisi açık odalardan birini seçer ya da 8 haneli oda ID'siyle arar; B odasının sahibi veya yöneticisi odada çıkan kartla 60 sn içinde kabul eder ya da reddeder. İki oda aynı skoru, sayacı ve sonucu görür; iki taraf da PK'yı erken bitirebilir (kazanan yok), oda kapanınca biter. Kazanana ödül yoktur (oda içi PK'da da yok). Davet edilen odada başlamayan bir davet pano ya da sonuç göstermez.
+
 ## Sunucuya taşınacaklar
 
 | Tablo | Alanlar |

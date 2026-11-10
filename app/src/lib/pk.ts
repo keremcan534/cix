@@ -9,7 +9,7 @@
 // (lib/room-presence) and never changes seats, microphones or room membership.
 import { useSyncExternalStore } from 'react';
 
-import type { ServerPk } from '@/lib/api';
+import type { ServerCrossPk, ServerPk } from '@/lib/api';
 
 import { GIFTS, ROOMS, roomById, userById } from '@/data/mock';
 import { liveBuild } from '@/lib/live-flag';
@@ -171,8 +171,8 @@ export const markPkSeen = (key: string) => !state.seen.includes(key) && emit({ s
 export type StartResult = { ok: true; pk: PkSession } | { ok: false; reason: string };
 function checkStart(kind: PkKind, mode: PkMode, roomId: string, starterId: string, durationMin: number): string | null {
   const c = state.config;
-  // A live build runs Oda içi PK on the server (lib/live/pk, server/api/pk.mjs), never here: a PK started on this
-  // phone would be seen by nobody else. Cross-room PK has no server side yet, so a live build offers none.
+  // A live build runs every PK on the server (lib/live/pk; server/api/pk.mjs and pk-cross.mjs), never here: a PK
+  // started on this phone would be seen by nobody else.
   if (liveBuild()) return 'PK şu an kapalı.';
   if (kind === 'room' && mode === 'solo' && !c.soloPkEnabled) return 'Normal PK şu an kapalı.';
   if (kind === 'room' && mode === 'team' && !c.roomPkEnabled) return 'Oda içi takım PK şu an kapalı.';
@@ -589,9 +589,85 @@ export function applyServerPk(roomId: string, pk: PkSession | null) {
   emit({ sessions: [...(pk ? [pk] : []), ...state.sessions.filter((x) => !held.includes(x) && x.id !== pk?.id)] });
 }
 
+/**
+ * Odalar arası PK from the server (server/api/pk-cross.mjs) as a session of this store: the inviting room is Red,
+ * the invited one Blue, each room's score its own gifts. Points per person are kept per room (`pointKey`). The
+ * rooms must already be known (lib/live roomOf) for their names. `skew` as in serverPkSession.
+ */
+export function serverCrossSession(v: ServerCrossPk, toLocal: (id: string) => string, skew: number, now = Date.now()): PkSession {
+  const at = (iso: string | null) => (iso ? Date.parse(iso) - skew : undefined);
+  const red = v.red.room?.id ?? '';
+  const blue = v.blue.room?.id ?? '';
+  const startAt = at(v.startAt);
+  const createdAt = at(v.createdAt) ?? now;
+  const records: PkRecord[] = v.pairs.map((p) => ({
+    txId: `${p.side}:${p.from}>${p.to}`,
+    teamId: p.side,
+    senderId: toLocal(p.from),
+    recipientId: toLocal(p.to),
+    giftId: '',
+    coins: p.points,
+    points: p.points,
+    at: startAt ?? createdAt,
+    status: 'Doğrulandı',
+    count: p.gifts,
+  }));
+  const points: Record<string, number> = {};
+  records.forEach((r) => {
+    const key = `${r.teamId === 'red' ? red : blue}|${r.recipientId}`;
+    points[key] = (points[key] ?? 0) + r.points;
+  });
+  const [r, b] = teams(red, blue, [], []);
+  const status: PkStatus = v.status === 'invite' ? 'invite' : v.status === 'active' ? (startAt !== undefined && now < startAt ? 'prep' : 'active') : v.status === 'done' ? 'done' : 'cancelled';
+  const by = v.endedRoom ? roomTitle(v.endedRoom) : 'Oda yönetimi';
+  const cancelReason =
+    v.status === 'declined'
+      ? `${roomTitle(blue)} daveti reddetti. PK başlamadı.`
+      : v.status === 'expired'
+        ? 'Rakip oda zamanında yanıt vermedi. PK başlamadı.'
+        : v.status !== 'cancelled'
+          ? undefined
+          : v.reason === 'room_closed'
+            ? `${by} kapandı; PK ${v.startAt ? 'bitti' : 'başlamadı'}.`
+            : v.startAt
+              ? `${by} PK’yı erken bitirdi.`
+              : `${by} daveti geri aldı. PK başlamadı.`;
+  const pk: PkSession = {
+    id: `XPK-${v.id}`,
+    kind: 'cross',
+    mode: 'team',
+    status,
+    roomId: red,
+    opponentRoomId: blue,
+    durationMin: v.durationMin as PkDuration,
+    configVersion: 0,
+    giftPoints: {},
+    teams: [
+      { ...r, score: v.red.score },
+      { ...b, score: v.blue.score },
+    ],
+    participants: [],
+    points,
+    createdAt,
+    records,
+    ...(status === 'invite' ? { inviteExpiresAt: at(v.inviteExpiresAt) } : {}),
+    ...(startAt !== undefined ? { startAt, endAt: at(v.endAt) } : {}),
+    ...(cancelReason ? { cancelReason } : {}),
+  };
+  return status === 'done' ? { ...pk, result: computeResult(pk) } : pk;
+}
+
+/** The server's cross-room PK for one room replaces the one held for it (null: none); newest first, by start. */
+export function applyServerCrossPk(roomId: string, pk: PkSession | null) {
+  const held = state.sessions.filter((x) => x.id.startsWith('XPK-') && (x.roomId === roomId || x.opponentRoomId === roomId));
+  if (pk ? held.length === 1 && JSON.stringify(held[0]) === JSON.stringify(pk) : !held.length) return;
+  const rest = state.sessions.filter((x) => !held.includes(x) && x.id !== pk?.id);
+  // Sorted, so the room's newest PK of either kind (Oda içi or this) is the one the room screen shows last.
+  emit({ sessions: (pk ? [pk, ...rest] : rest).sort((a, b) => b.createdAt - a.createdAt) });
+}
+
 export const roomTitle = (id: string) => (id === 'yeni' ? 'Benim Odam' : (roomById(id)?.title ?? id));
-/** Rooms that can be invited right now (not already in a PK). */
-/** Demo rooms to invite; none in live mode, where cross-room PK is not offered. */
+/** Demo rooms to invite; none in live mode, where the server lists them (lib/live/pk useCrossPkRooms). */
 export const invitableRooms = (roomId: string) => (liveBuild() ? [] : ROOMS.filter((r) => r.id !== roomId && !pkOfRoom(r.id)));
 
 /** Biggest supporters by PK points, for one team or (Normal PK) one recipient or the whole PK. */
