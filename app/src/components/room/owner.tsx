@@ -11,6 +11,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
+import { RoomMembersSection } from '@/components/room/members';
 import { SeatReaction, type SeatReactionData } from '@/components/room/parts';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
@@ -38,10 +39,11 @@ import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import type { ServerOwnerStats } from '@/lib/api';
+import type { JoinMode, Membership } from '@/lib/room-follow';
 import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
@@ -49,8 +51,6 @@ type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean; art?:
 
 const fmtMinutes = (m: number) => (m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${m % 60} dk`);
 const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m` : n >= 10_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString('tr-TR'));
-/** Mock "last entered the room" in days, for auto-removal previews. */
-export const lastSeenDays = (id: string) => (Number(id.replace(/\D/g, '') || 0) * 5) % 40;
 
 // --- Generic sheets -------------------------------------------------------------
 // The modal is edge to edge on Android: the sheet rises above the keyboard as a whole and keeps its last row
@@ -231,7 +231,13 @@ export function RoomInfoSheet({
   canManageMembers,
   autoRemoveDays,
   membership,
+  joinMode = 'open',
+  memberStaff = [],
+  memberRank = () => 0,
+  inRoom = [],
+  membersKey,
   onJoin,
+  onLeave,
   onApprove,
   onReject,
   onRemoveMember,
@@ -264,8 +270,19 @@ export function RoomInfoSheet({
   applications: string[];
   canManageMembers: boolean;
   autoRemoveDays: number;
-  membership: 'owner' | 'none' | 'pending' | 'member';
+  membership: Membership;
+  /** How the room takes members: at once, by application, or not at all. */
+  joinMode?: JoinMode;
+  /** The room's staff, the owner first, and everyone's rank (3 owner … 0 anyone else): they lead the member list. */
+  memberStaff?: string[];
+  memberRank?: (id: string) => number;
+  /** Who is in the room now (the demo's "Odada"; a server room asks the server). */
+  inRoom?: string[];
+  /** Changes whenever a server room's members were read again. */
+  membersKey?: unknown;
   onJoin: () => void;
+  /** Leaves the room's members, or takes the application back. */
+  onLeave: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onRemoveMember: (id: string) => void;
@@ -289,7 +306,7 @@ export function RoomInfoSheet({
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
   actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
-  const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
+  const [sub, setSub] = useState<null | 'level' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
   const textEditor = owner || canEditText;
@@ -380,42 +397,31 @@ export function RoomInfoSheet({
             </Pressable>
           </View>
 
-          {(
-            <>
-              <Pressable onPress={() => setSub('members')} accessibilityLabel="Oda üyeleri">
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={[styles.h2, { flex: 1 }]}>
-                    Oda üyesi ({memberTotal.toLocaleString('tr-TR')}/{memberLimit(level).toLocaleString('tr-TR')})
-                  </Text>
-                  {canManageMembers && applications.length > 0 && (
-                    <View style={styles.bell}>
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>🔔 {applications.length}</Text>
-                    </View>
-                  )}
-                  <Ionicons name="chevron-forward" size={20} color="#fff" />
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                  {members.slice(0, 12).map((id) => (
-                    <View key={id} style={{ alignItems: 'center', width: 58 }}>
-                      <Avatar uri={userById(id).avatar} size={52} />
-                      <Text style={styles.tiny} numberOfLines={1}>
-                        {id === 'me' ? '🏠 Sen' : userById(id).name}
-                      </Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </Pressable>
-              {membership === 'none' && (
-                <Pressable style={styles.joinBtn} onPress={onJoin}>
-                  <ArtText art={ROOM_ICON_ART.join} size={24} style={{ color: '#fff', fontWeight: '800' }}>
-                    Oda üyesi ol
-                  </ArtText>
-                </Pressable>
-              )}
-              {membership === 'pending' && <Text style={[styles.dim, { textAlign: 'center' }]}>⏳ Üyelik başvurun oda sahibi/yöneticilerin onayını bekliyor</Text>}
-              {membership === 'member' && <Text style={[styles.dim, { textAlign: 'center', color: colors.green }]}>✓ Bu odanın üyesisin</Text>}
-            </>
-          )}
+          {/* The room's members, the membership button and following the room (components/room/members). */}
+          <RoomMembersSection
+            roomId={roomId}
+            title={title}
+            live={live}
+            level={level}
+            owner={owner}
+            membership={membership}
+            joinMode={joinMode}
+            members={members}
+            memberTotal={memberTotal}
+            applications={applications}
+            canManage={canManageMembers}
+            autoRemoveDays={autoRemoveDays}
+            staffIds={memberStaff}
+            rankOf={memberRank}
+            inRoomIds={inRoom}
+            refreshKey={membersKey}
+            onJoin={onJoin}
+            onLeave={onLeave}
+            onApprove={onApprove}
+            onReject={onReject}
+            onRemove={onRemoveMember}
+            onNavigate={onClose}
+          />
 
           {owner && (
             <View style={{ gap: 10 }}>
@@ -480,47 +486,6 @@ export function RoomInfoSheet({
 
       <BottomSheet visible={sub === 'level'} onClose={() => setSub(null)} title={`Oda seviyesi Lv.${level}`}>
         <LevelTable xp={xp ?? ROOM_XP_THRESHOLDS[level - 1]} level={level} />
-      </BottomSheet>
-
-      <BottomSheet visible={sub === 'members'} onClose={() => setSub(null)} title={`Oda üyeleri (${memberTotal.toLocaleString('tr-TR')})`}>
-        {canManageMembers && applications.length > 0 && (
-          <>
-            <Text style={styles.h3}>Katılma başvuruları ({applications.length})</Text>
-            {applications.map((id) => (
-              <View key={id} style={styles.listRow}>
-                <Avatar uri={userById(id).avatar} size={36} />
-                <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
-                <Pressable style={[styles.pill, { backgroundColor: semantic.successFill }]} onPress={() => onApprove(id)}>
-                  <Text style={styles.pillText}>Onayla</Text>
-                </Pressable>
-                <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
-                  <Text style={styles.pillText}>Reddet</Text>
-                </Pressable>
-              </View>
-            ))}
-          </>
-        )}
-        <Text style={styles.h3}>Üyeler</Text>
-        {members.map((id) => {
-          const days = lastSeenDays(id);
-          // The demo's "last seen" is made up: a server room doesn't show it.
-          const due = owner && !live && autoRemoveDays > 0 && id !== 'me' && days >= autoRemoveDays;
-          return (
-            <View key={id} style={styles.listRow}>
-              <Avatar uri={userById(id).avatar} size={36} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#fff' }}>{id === 'me' ? 'Sen (oda sahibi)' : userById(id).name}</Text>
-                {owner && !live && id !== 'me' && <Text style={[styles.dim, due && { color: colors.gold }]}>{due ? `${days} gündür girmedi · bu gece otomatik çıkarılacak` : `Son giriş: ${days === 0 ? 'bugün' : `${days} gün önce`}`}</Text>}
-              </View>
-              {canManageMembers && id !== 'me' && (
-                <Pressable onPress={() => onRemoveMember(id)} hitSlop={6}>
-                  <Text style={{ color: colors.red, fontWeight: '700' }}>Çıkar</Text>
-                </Pressable>
-              )}
-            </View>
-          );
-        })}
-        {memberTotal > members.length && <Text style={styles.dim}>+{(memberTotal - members.length).toLocaleString('tr-TR')} üye daha</Text>}
       </BottomSheet>
 
       <BottomSheet visible={sub === 'traffic'} onClose={() => setSub(null)} title="Trafik paneli">

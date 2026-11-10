@@ -542,6 +542,9 @@ export type ServerRoom = {
   family?: { id: string; name: string } | null;
   pk?: boolean;
   weekRank?: number | null;
+  /** Following the room (server/api/room-follow.mjs), on the read of one room: how many follow it, and whether I do. */
+  followers?: number;
+  following?: boolean;
 };
 /** A server room's rules (server/api/room-rules.mjs). */
 export type RoomRules = {
@@ -644,6 +647,19 @@ export const joinRoomMembers = (room: string) => call<{ status: 'member' | 'pend
 export const leaveRoomMembers = (room: string) => call<{ status: null }>('POST', '/api/rooms/members/leave', { room });
 export const answerRoomMember = (room: string, user: string, accept: boolean) => call<{ status: 'member' | null }>('POST', '/api/rooms/members/answer', { room, user, accept });
 export const removeRoomMember = (room: string, user: string) => call<{ status: null }>('POST', '/api/rooms/members/remove', { room, user });
+/** The room card's member list (server/api/room-members.mjs): staff first, then members, a page at a time.
+ *  `seenAt`: when they were last in the room (null: not known, or they don't show it). */
+export type RoomMemberFilter = 'all' | 'in' | 'out' | 'pending';
+export type RoomMemberRow = UserCard & { role: 'owner' | 'super' | 'admin' | 'member' | 'pending'; since: string | null; seenAt: string | null; inRoom: boolean };
+export type RoomMemberPage = { rows: RoomMemberRow[]; counts: Record<RoomMemberFilter, number>; nextOffset: number | null; canManage: boolean };
+export const roomMemberList = (room: string, filter: RoomMemberFilter, offset = 0) =>
+  call<RoomMemberPage>('GET', `/api/rooms/members/list?room=${encodeURIComponent(room)}&filter=${filter}&offset=${offset}`);
+/** Following a room (server/api/room-follow.mjs): the follow is on the room's account, so it stays when the room
+ *  closes and opens again. `followedRooms`: open ones first, then the closed ones (`closed`). */
+export type RoomFollowAnswer = { following: boolean; followers: number };
+export const followRoom = (room: string) => call<RoomFollowAnswer>('POST', '/api/rooms/follow', { room });
+export const unfollowRoom = (room: string) => call<RoomFollowAnswer>('POST', '/api/rooms/unfollow', { room });
+export const followedRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms/followed').then((r) => r.rooms);
 /** Oda etkinlikleri (server/api/room-events.mjs). */
 export type ServerRoomEvent = { id: number; title: string; desc: string; when: string; type: string; by: { id: string; name: string }; going: boolean; attendees: number; cancelled: boolean; createdAt: string; mine: boolean };
 export const roomEvents = (room: string) => call<{ events: ServerRoomEvent[] }>('GET', `/api/rooms/events?room=${encodeURIComponent(room)}`).then((r) => r.events);
@@ -792,7 +808,8 @@ export const joinedRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/room
 export type FollowerInviteInfo = { count: number; lastAt: string | null; waitMs: number };
 export const followerInviteInfo = (room: string) => call<FollowerInviteInfo>('GET', `/api/rooms/invite-followers?room=${encodeURIComponent(room)}`);
 export const inviteFollowers = (room: string) => call<FollowerInviteInfo & { sent: number }>('POST', '/api/rooms/invite-followers', { room });
-export type FollowerRoomInvite = { id: number; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
+/** `kind: 'open'`: not an invite, a room I follow that opened (server/api/room-follow.mjs). */
+export type FollowerRoomInvite = { id: number; kind?: 'open'; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
 export const myRoomInvites = () => call<{ invites: FollowerRoomInvite[] }>('GET', '/api/me/room-invites').then((r) => r.invites);
 // Other people's profiles (server/api/profiles.mjs): levels, personal extras, the album and the Vitrin.
 /** Cömertlik and Yankı levels as the server counts them (it never sends someone else's points); null: a level its

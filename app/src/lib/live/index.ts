@@ -19,6 +19,7 @@ import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
 import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
+import { forgetRoomFollows, putRoomFollow } from '@/lib/room-follow';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
@@ -196,6 +197,7 @@ export function forgetLiveAccount() {
   }
   locked.clear();
   forgetRoomPasswords();
+  forgetRoomFollows();
   roomsState = 'loading';
   setRooms([]);
 }
@@ -337,6 +339,8 @@ export function roomOf(r: api.ServerRoom): Room {
     roomChips.set(r.id, chips);
   }
   if (r.boss) rememberUser(r.boss);
+  // The read of one room says whether I follow it and how many do (the heart in its header, lib/room-follow).
+  if (r.following !== undefined) putRoomFollow(r.id, { following: r.following, followers: r.followers ?? 0 });
   putServerRoom(room);
   return room;
 }
