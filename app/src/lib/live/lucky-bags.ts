@@ -1,7 +1,8 @@
-// Şanslı çanta on the server (server/api/lucky-bags.mjs): a bag of coins or of gifts dropped in a room, shared at
-// random by the first people who open it. The server takes the coins, draws the shares, pays each opener and gives
-// back what nobody took; the phone only shows its answers. A new bag is announced in the room by the server
-// (LiveKit packet 'bag', lib/live/room-bus), so the room reads its bags again at once.
+// Şanslı çanta on the server (server/api/lucky-bags.mjs): a bag of coins or of gifts dropped in a room. While it
+// falls (windowSeconds once it opens), whoever taps it joins; when its time is up the server deals its shares among
+// them at random and pays them all out, even to few people. The phone only shows its answers. A new bag and each
+// draw are announced in the room by the server (LiveKit packet 'bag', lib/live/room-bus), so the room reads its
+// bags again at once and whoever joined sees how it went.
 import { useEffect, useRef, useState } from 'react';
 
 import * as api from '@/lib/api';
@@ -26,8 +27,12 @@ export type Bag = {
   status: 'open' | 'done' | 'returned';
   from: BagPerson;
   mine: boolean;
-  /** What I took from it (units), or null. */
+  /** What I won from it (units), or null (not drawn yet, or nothing for me). */
   got: number | null;
+  /** The draw: how many joined, whether I did, and when it is (the bag's end). */
+  entrants: number;
+  joined: boolean;
+  drawAt: string;
 };
 export type BagGrab = { user: BagPerson; units: number; coins: number };
 export type BagRules = { coins: number[]; coinPackets: number[]; giftCounts: number[]; giftPackets: number[]; delays: number[]; windowSeconds: number };
@@ -35,7 +40,7 @@ export type BagDrop = { kind: 'coins'; amount: number; packets: number; delay: n
 export type BagGot = { units: number; coins: number; kind: BagKind; giftId: string | null };
 
 /** What the server allows when it hasn't answered yet (server/api/lucky-bag-rules.mjs). */
-export const BAG_DEFAULTS: BagRules = { coins: [1_000, 5_000, 10_000, 50_000], coinPackets: [5, 10, 20, 30], giftCounts: [10, 30, 99], giftPackets: [5, 10, 15], delays: [0, 120, 300], windowSeconds: 180 };
+export const BAG_DEFAULTS: BagRules = { coins: [1_000, 5_000, 10_000, 50_000], coinPackets: [5, 10, 20, 30], giftCounts: [10, 30, 99], giftPackets: [5, 10, 15], delays: [0, 120, 300], windowSeconds: 30 };
 
 let offset = 0;
 const clock = (serverNow: string | undefined) => {
@@ -66,11 +71,17 @@ export async function dropBag(room: string, d: BagDrop) {
   return r.bag;
 }
 
-/** Opens a bag: my share, the bag after it and who took what. Refusals (early, empty, taken, followers) are ApiErrors. */
-export async function grabBag(id: number) {
-  const r = await api.apiRequest<{ got: BagGot; bag: Bag; grabs: BagGrab[] }>('POST', '/api/lucky-bags/grab', { id });
-  void refreshWallet().catch(() => {});
-  return r;
+/** Joins a falling bag's draw (again: no change). Refusals (early, empty = drawn, followers) are ApiErrors. */
+export async function joinBag(id: number) {
+  return api.apiRequest<{ joined: boolean; bag: Bag }>('POST', '/api/lucky-bags/grab', { id });
+}
+
+/** A drawn bag up close: the bag (with what I won), who won what, and my winnings as the card shows them. */
+export async function bagResult(id: number) {
+  const r = await bagDetail(id);
+  const got: BagGot | null = r.bag.got ? { units: r.bag.got, coins: r.bag.got * r.bag.unitPrice, kind: r.bag.kind, giftId: r.bag.giftId } : null;
+  if (got) void refreshWallet().catch(() => {});
+  return { ...r, got };
 }
 
 /** Why the server refused to open a bag, as a code the sheet shows differently (or null for anything else). */
@@ -86,15 +97,29 @@ const POLL_MS = 15_000;
  * then while any is open. Bags past their time drop off here. `onNew` hears of each bag the first time a read
  * brings it (a bag `put` here never comes to it).
  */
-/** `onNew(bag, fresh)`: a bag seen for the first time; `fresh` when it came after the room's first answer (just dropped). */
-export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag, fresh: boolean) => void) {
+/**
+ * `onNew(bag, fresh)`: a bag seen for the first time; `fresh` when it came after the room's first answer (just
+ * dropped). `onDrawn(id)`: a bag I joined (or dropped) was drawn: its result can be read (bagResult).
+ */
+export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag, fresh: boolean) => void, onDrawn?: (id: number) => void) {
   const [state, setState] = useState<{ room: string; bags: Bag[]; rules: BagRules }>({ room, bags: [], rules: BAG_DEFAULTS });
   const [n, setN] = useState(0);
   const [now, setNow] = useState(() => serverNow());
   const heard = useRef(onNew);
+  const drawn = useRef(onDrawn);
   useEffect(() => {
     heard.current = onNew;
+    drawn.current = onDrawn;
   });
+  // Bags whose draw I wait for (joined or mine), and the draws already told.
+  const waiting = useRef(new Set<number>());
+  const told = useRef(new Set<number>());
+  const tell = (id: number) => {
+    waiting.current.delete(id);
+    if (told.current.has(id)) return;
+    told.current.add(id);
+    drawn.current?.(id);
+  };
   const seen = useRef(new Set<number>());
   // The bags already there when the room opened are no news: only later ones are "fresh".
   const loaded = useRef(false);
@@ -110,6 +135,10 @@ export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag, fresh: b
           heard.current?.(b, loaded.current);
         }
         loaded.current = true;
+        // A bag I wait for that is no longer open: drawn.
+        const open = new Set(r.bags.map((b) => b.id));
+        for (const id of [...waiting.current]) if (!open.has(id)) tell(id);
+        for (const b of r.bags) if (b.joined || b.mine) waiting.current.add(b.id);
         setState({ room, bags: r.bags, rules: r.rules });
       })
       .catch(() => {});
@@ -119,19 +148,28 @@ export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag, fresh: b
   }, [room, on, n]);
   useEffect(() => {
     if (!on) return;
-    return onServerBag(room, () => setN((x) => x + 1));
+    // A new bag or a draw: read the bags again (a draw I wait for is told by that read, or here at once).
+    return onServerBag(room, (news) => {
+      if (news.drawn && news.id !== null && waiting.current.has(news.id)) tell(news.id);
+      setN((x) => x + 1);
+    });
   }, [room, on]);
   const mine = state.room === room ? state.bags : [];
   const any = on && mine.length > 0;
   useEffect(() => {
     if (!any) return;
-    const tick = setInterval(() => setNow(serverNow()), 1000);
+    const tick = setInterval(() => {
+      const t = serverNow();
+      setNow(t);
+      // A draw a few seconds late (its packet lost): read again.
+      if (state.bags.some((b) => waiting.current.has(b.id) && Date.parse(b.drawAt) + 3_000 < t && Date.parse(b.drawAt) + 4_000 >= t)) setN((x) => x + 1);
+    }, 1000);
     const poll = setInterval(() => setN((x) => x + 1), POLL_MS);
     return () => {
       clearInterval(tick);
       clearInterval(poll);
     };
-  }, [any]);
+  }, [any, state.bags]);
   const bags = on ? mine.filter((b) => b.status === 'open' && Date.parse(b.closesAt) > now && (b.left > 0 || b.got !== null)) : [];
   return {
     bags,
@@ -141,6 +179,7 @@ export function useRoomBags(room: string, on: boolean, onNew?: (b: Bag, fresh: b
     /** A bag the screen learned about (dropped or opened here): shown at once, before the next read. */
     put: (b: Bag) => {
       seen.current.add(b.id);
+      if (b.joined || b.mine) waiting.current.add(b.id);
       setState((s) => (s.room === room ? { ...s, bags: [...s.bags.filter((x) => x.id !== b.id), b] } : s));
     },
   };

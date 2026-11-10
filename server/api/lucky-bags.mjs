@@ -1,24 +1,30 @@
-// Şanslı çanta: a bag of coins or of gifts dropped in a room; the first people to open it share it at random.
+// Şanslı çanta: a bag of coins or of gifts dropped in a room. While it falls, whoever taps it joins; when its time
+// is up the server deals its shares among them at random and pays them all out.
 //
 //   GET  /api/lucky-bags?room=                 → { bags, rules, serverNow }   the room's bags still open
-//   GET  /api/lucky-bags/one?id=               → { bag, grabs }                who took how much
+//   GET  /api/lucky-bags/one?id=               → { bag, grabs }                who won how much (after the draw)
 //   POST /api/lucky-bags       { room, kind, amount?, giftId?, count?, packets, delay, followersOnly, ref }
 //                                              → { bag, user, replay }
-//   POST /api/lucky-bags/grab  { id }          → { got, bag, grabs }
+//   POST /api/lucky-bags/grab  { id }          → { joined, bag }               I'm in the draw (again: no change)
 //
 // The sender pays the whole bag when it is dropped; the coins are kept aside in the bag lot by lot, so where they
 // came from (and the lock that follows from it) travels with them, and a store refund still finds them. The
-// split is drawn then, on the server. A coin bag gives coins (channel 'canta', the store lock). A gift bag gives
-// the gifts themselves: each share is a gift from the sender to whoever opened it (gift_events, diamonds, agency
-// income), exactly as if sent by hand. A bag can wait 0, 2 or 5 minutes before it opens, and stays open
-// windowSeconds after that; what nobody took then goes back to the sender. Putting coins in a bag never counts
+// shares are drawn then, on the server. A bag can wait 0, 2 or 5 minutes before it opens and falls windowSeconds
+// after that; everyone who taps it then joins (once). At its end (drawBags, every couple of seconds) the shares
+// are dealt among those who joined at random (lucky-bag-rules.mjs deal): with more people than shares not everyone
+// wins, with fewer some win more than one share, and the whole bag is always paid out. Nobody joined: it all goes
+// back to the sender. A coin bag gives coins (channel 'canta', the store lock). A gift bag gives the gifts
+// themselves: each winner's shares are a gift from the sender to them (gift_events, diamonds, agency income),
+// exactly as if sent by hand. Winners hear of it (notify: push and live line), the room by its 'bag' packet.
+// Putting coins in a bag never counts
 // for Cömertlik (wheel.mjs wealthPoints: "çantası"); reward coins ('odul') can't go in a bag (spendCoins 'paid').
 import { recordIncome } from './agency-lib.mjs';
 import { GIFTS, svipLevel } from './catalog.mjs';
 import { HttpError, auth, blockedBetween, claimRef, db, env, int, limit, once, readJson, tx } from './core.mjs';
 import { announceGift, liveKitRoom, ROOM } from './gifts.mjs';
 import { live } from './live-settings.mjs';
-import { BAG_RULES, split, takeParts } from './lucky-bag-rules.mjs';
+import { BAG_RULES, deal, split, takeParts } from './lucky-bag-rules.mjs';
+import { notify } from './push.mjs';
 import { presenceTracked, roomService } from './live.mjs';
 import { creditCoins, giftDiamonds, spendCoins } from './wallet.mjs';
 
@@ -40,11 +46,18 @@ const bagView = (b, me, mine = null) => ({
   status: b.status,
   from: { id: b.sender, name: b.sender_name ?? '', avatarUrl: b.sender_avatar ?? null },
   mine: b.sender === me,
-  // What I took from it (units), or null.
+  // What I won from it (units), or null (not drawn yet, or nothing for me).
   got: mine === null || mine === undefined ? null : Number(mine),
+  // The draw: how many joined, whether I did, and when it is (the bag's end).
+  entrants: Number(b.entrants ?? 0),
+  joined: !!b.joined,
+  drawAt: new Date(b.closes_at).toISOString(),
 });
 
 const SELECT = `SELECT b.*, u.name AS sender_name, u.avatar_url AS sender_avatar FROM lucky_bags b JOIN users u ON u.id = b.sender`;
+/** The draw's counts for a bag row `b` and me ($2). */
+const DRAW_COLS = `(SELECT count(*) FROM lucky_bag_entries e WHERE e.bag_id = b.id)::int AS entrants,
+  EXISTS (SELECT 1 FROM lucky_bag_entries e WHERE e.bag_id = b.id AND e.user_id = $2) AS joined`;
 
 async function grabsOf(c, id) {
   const r = await c.query('SELECT g.user_id, g.units, g.coins, u.name, u.avatar_url FROM lucky_bag_grabs g JOIN users u ON u.id = g.user_id WHERE g.bag_id = $1 ORDER BY g.units DESC, g.created_at', [id]);
@@ -56,21 +69,78 @@ function announceBag(room, packet) {
   roomService('SendData', { room, data, kind: 'RELIABLE' }, { roomAdmin: true, room }).catch((e) => console.error('livekit SendData bag', room, String(e).slice(0, 200)));
 }
 
-/** Bags past their time: what is left goes back to the sender. */
-export async function returnBags() {
+/** A bag that nobody joined: all of it goes back to the sender (lock held). */
+async function giveBack(c, b) {
+  const back = b.parts.reduce((sum, p) => sum + p.amount, 0);
+  if (back > 0) {
+    await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [b.sender]);
+    const portions = b.parts.map((p) => ({ channel: p.channel, amount: p.amount, lockHours: p.lockHours, sourceLot: p.lot }));
+    await creditCoins(c, b.sender, portions, 'Şanslı çanta: açılmayan payların iadesi', `bag:${b.id}:back`, null, { detail: { bag: Number(b.id) } });
+  }
+  await c.query("UPDATE lucky_bags SET status = 'returned', shares = '{}', parts = '[]', returned = $2 WHERE id = $1", [b.id, back]);
+}
+
+/** Bags whose time is up: their shares dealt among those who joined and paid, or back to the sender. */
+export async function drawBags() {
   const due = await db.query("SELECT id FROM lucky_bags WHERE status = 'open' AND closes_at <= now() ORDER BY id LIMIT 100");
   for (const { id } of due.rows) {
-    await tx(async (c) => {
-      const b = (await c.query("SELECT * FROM lucky_bags WHERE id = $1 AND status = 'open' FOR UPDATE", [id])).rows[0];
-      if (!b) return;
-      const back = b.parts.reduce((s, p) => s + p.amount, 0);
-      if (back > 0) {
-        await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [b.sender]);
-        const portions = b.parts.map((p) => ({ channel: p.channel, amount: p.amount, lockHours: p.lockHours, sourceLot: p.lot }));
-        await creditCoins(c, b.sender, portions, 'Şanslı çanta: açılmayan payların iadesi', `bag:${b.id}:back`, null, { detail: { bag: Number(b.id) } });
+    const out = await tx(async (c) => {
+      const b = (await c.query(`${SELECT} WHERE b.id = $1 AND b.status = 'open' FOR UPDATE OF b`, [id])).rows[0];
+      if (!b) return null;
+      const entrants = (await c.query('SELECT user_id FROM lucky_bag_entries WHERE bag_id = $1 ORDER BY created_at', [id])).rows.map((r) => r.user_id);
+      const winners = deal(b.shares, entrants);
+      if (!winners.length) {
+        await giveBack(c, b);
+        return { b, paid: [] };
       }
-      await c.query("UPDATE lucky_bags SET status = 'returned', shares = '{}', parts = '[]', returned = $2 WHERE id = $1", [b.id, back]);
-    }).catch((e) => console.error('lucky bag return', id, e.message));
+      // Every winner's row and the sender's (a gift's diamonds), in id order as gifts.mjs.
+      await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[b.sender, ...winners.map(([w]) => w)]]);
+      const label = b.kind === 'gift' ? (GIFTS.get(b.gift_id)?.name ?? 'Hediye') : null;
+      let parts = b.parts;
+      const paid = [];
+      for (const [k, [who, units]] of winners.entries()) {
+        const coins = units * Number(b.unit_price);
+        const [taken, kept] = takeParts(parts, coins);
+        parts = kept;
+        let event = null;
+        if (b.kind === 'coins') {
+          const portions = taken.map((p) => ({ channel: 'canta', amount: p.amount, lockHours: p.lockHours, sourceLot: p.lot, sourceUser: b.sender }));
+          await creditCoins(c, who, portions, `Şanslı çanta: ${b.sender_name}`, `bag:${id}`, b.sender, { detail: { bag: Number(id) } });
+        } else {
+          const ref = `bag:${id}:${k}`;
+          const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [
+            b.sender,
+            who,
+            b.gift_id,
+            units,
+            b.unit_price,
+            coins,
+            b.room,
+            ref,
+          ]);
+          event = Number(g.rows[0].id);
+          await giftDiamonds(c, { sender: b.sender, recipient: who, parts: taken, total: coins, label: `${label} ×${units}`, ref, giftEvent: event, reason: `Şanslı çanta: ${label} ×${units}` });
+          await recordIncome(c, who, 'gift', `gift:${event}`, coins);
+        }
+        await c.query('INSERT INTO lucky_bag_grabs (bag_id, user_id, units, coins, gift_event) VALUES ($1,$2,$3,$4,$5)', [id, who, units, coins, event]);
+        paid.push({ who, units, coins, event });
+      }
+      await c.query("UPDATE lucky_bags SET status = 'done', shares = '{}', parts = $2 WHERE id = $1", [id, JSON.stringify(parts)]);
+      return { b, paid, label };
+    }).catch((e) => {
+      console.error('lucky bag draw', id, e.message);
+      return null;
+    });
+    if (!out) continue;
+    const { b, paid, label } = out;
+    // The room reads the bag again (its winners); each winner hears what they got, even outside the room.
+    announceBag(b.room, { id: Number(id), from: b.sender, drawn: true });
+    for (const p of paid) {
+      const what = b.kind === 'coins' ? `${fmt(p.coins)} jeton` : `${label} ×${p.units}`;
+      notify([p.who], { title: 'Şanslı çanta', body: `${b.sender_name} kişisinin çantasından ${what} kazandın`, data: { type: 'bag', bag: Number(id) } });
+    }
+    // Gift winnings show on stage like any gift in the room (the first few: a big draw doesn't flood it).
+    for (const p of paid.filter((x) => x.event).slice(0, 10)) announceGift(b.room, { giftId: b.gift_id, count: p.units, from: b.sender, to: p.who, eventId: p.event });
   }
 }
 
@@ -79,7 +149,8 @@ export function startBagSweep() {
   if (timer) return;
   // BAG_SWEEP_MS: tests sweep faster.
   const every = Number(env.BAG_SWEEP_MS);
-  timer = setInterval(() => void returnBags().catch((e) => console.error('lucky bag sweep', e.message)), Number.isFinite(every) && every >= 100 ? every : 15_000);
+  // Every 2 s: the draw comes right after a bag stops falling.
+  timer = setInterval(() => void drawBags().catch((e) => console.error('lucky bag sweep', e.message)), Number.isFinite(every) && every >= 100 ? every : 2_000);
   timer.unref();
 }
 export function stopBagSweep() {
@@ -93,7 +164,7 @@ export const luckyBagRoutes = {
     const room = liveKitRoom(url.searchParams.get('room'));
     if (!room) throw new HttpError(400, 'Geçersiz oda');
     const r = await db.query(
-      `${SELECT.replace('SELECT b.*', 'SELECT b.*, g.units AS my_units')} LEFT JOIN lucky_bag_grabs g ON g.bag_id = b.id AND g.user_id = $2
+      `${SELECT.replace('SELECT b.*', `SELECT b.*, g.units AS my_units, ${DRAW_COLS}`)} LEFT JOIN lucky_bag_grabs g ON g.bag_id = b.id AND g.user_id = $2
         WHERE b.room = $1 AND b.status = 'open' AND b.closes_at > now() ORDER BY b.opens_at, b.id LIMIT 20`,
       [room, u.id],
     );
@@ -104,7 +175,7 @@ export const luckyBagRoutes = {
     const u = await auth(req);
     const id = int(Number(url.searchParams.get('id')), 1, Number.MAX_SAFE_INTEGER);
     if (!id) throw new HttpError(400, 'Geçersiz çanta');
-    const b = (await db.query(`${SELECT} WHERE b.id = $1`, [id])).rows[0];
+    const b = (await db.query(`${SELECT.replace('SELECT b.*', `SELECT b.*, ${DRAW_COLS}`)} WHERE b.id = $1`, [id, u.id])).rows[0];
     if (!b) throw new HttpError(404, 'Çanta bulunamadı');
     const grabs = await grabsOf(db, id);
     return { bag: bagView(b, u.id, grabs.find((g) => g.user.id === u.id)?.units ?? null), grabs, serverNow: new Date().toISOString() };
@@ -182,48 +253,14 @@ export const luckyBagRoutes = {
     if (peek.followers_only && !(await db.query('SELECT 1 FROM follows WHERE follower = $1 AND followee = $2', [u.id, peek.sender])).rowCount) {
       throw Object.assign(new HttpError(403, `Bu çantayı yalnızca ${peek.sender_name} kişisini takip edenler açabilir`), { extra: { code: 'followers' } });
     }
-    const label = peek.kind === 'gift' ? (GIFTS.get(peek.gift_id)?.name ?? 'Hediye') : null;
-    const got = await tx(async (c) => {
-      const bag = (await c.query('SELECT * FROM lucky_bags WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    // I join the draw: once, while the bag falls. A tap again changes nothing.
+    await tx(async (c) => {
+      const bag = (await c.query('SELECT status, opens_at, closes_at FROM lucky_bags WHERE id = $1 FOR SHARE', [id])).rows[0];
       if (Date.parse(bag.opens_at) > Date.now()) throw early();
-      if (bag.status !== 'open' || !bag.shares.length || Date.parse(bag.closes_at) <= Date.now()) throw Object.assign(new HttpError(409, 'Çanta boşaldı'), { extra: { code: 'empty' } });
-      if ((await c.query('SELECT 1 FROM lucky_bag_grabs WHERE bag_id = $1 AND user_id = $2', [id, u.id])).rowCount) {
-        throw Object.assign(new HttpError(409, 'Bu çantadan payını aldın'), { extra: { code: 'taken' } });
-      }
-      const k = bag.packets - bag.shares.length;
-      const units = bag.shares[0];
-      const coins = units * Number(bag.unit_price);
-      const [taken, kept] = takeParts(bag.parts, coins);
-      // The opener's row (and the sender's for a gift's diamonds) in id order, as gifts.mjs.
-      await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[u.id, bag.sender]]);
-      let event = null;
-      if (bag.kind === 'coins') {
-        const portions = taken.map((p) => ({ channel: 'canta', amount: p.amount, lockHours: p.lockHours, sourceLot: p.lot, sourceUser: bag.sender }));
-        await creditCoins(c, u.id, portions, `Şanslı çanta: ${peek.sender_name}`, `bag:${id}`, bag.sender, { detail: { bag: id } });
-      } else {
-        const g = await c.query('INSERT INTO gift_events (sender, recipient, gift_id, count, unit_price, total, room, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [
-          bag.sender,
-          u.id,
-          bag.gift_id,
-          units,
-          bag.unit_price,
-          coins,
-          bag.room,
-          `bag:${id}:${k}`,
-        ]);
-        event = Number(g.rows[0].id);
-        await giftDiamonds(c, { sender: bag.sender, recipient: u.id, parts: taken, total: coins, label: `${label} ×${units}`, ref: `bag:${id}:${k}`, giftEvent: event, reason: `Şanslı çanta: ${label} ×${units}` });
-        await recordIncome(c, u.id, 'gift', `gift:${event}`, coins);
-      }
-      await c.query('INSERT INTO lucky_bag_grabs (bag_id, user_id, units, coins, gift_event) VALUES ($1,$2,$3,$4,$5)', [id, u.id, units, coins, event]);
-      const rest = bag.shares.slice(1);
-      await c.query('UPDATE lucky_bags SET shares = $2, parts = $3, status = $4 WHERE id = $1', [id, rest, JSON.stringify(kept), rest.length ? 'open' : 'done']);
-      return { units, coins, kind: bag.kind, giftId: bag.gift_id, event };
+      if (bag.status !== 'open' || Date.parse(bag.closes_at) <= Date.now()) throw Object.assign(new HttpError(409, 'Süre doldu, çekiliş yapıldı'), { extra: { code: 'empty' } });
+      await c.query('INSERT INTO lucky_bag_entries (bag_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, u.id]);
     });
-    // A gift share shows on stage like any gift in the room.
-    if (got.event) announceGift(peek.room, { giftId: got.giftId, count: got.units, from: peek.sender, to: u.id, eventId: got.event });
-    const bag = (await db.query(`${SELECT} WHERE b.id = $1`, [id])).rows[0];
-    const grabs = await grabsOf(db, id);
-    return { got: { units: got.units, coins: got.coins, kind: got.kind, giftId: got.giftId }, bag: bagView(bag, u.id, got.units), grabs };
+    const bag = (await db.query(`${SELECT.replace('SELECT b.*', `SELECT b.*, ${DRAW_COLS}`)} WHERE b.id = $1`, [id, u.id])).rows[0];
+    return { joined: true, bag: bagView(bag, u.id) };
   },
 };

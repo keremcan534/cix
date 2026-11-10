@@ -19,7 +19,7 @@ import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { message } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
-import { bagDetail, dropBag, grabBag, grabCode, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
+import { bagResult, dropBag, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
 import { colors } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -183,97 +183,126 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
   );
 }
 
-/** One falling bag: where it starts across the screen, when it falls, how long it takes, how far it sways, its size. */
+/** One falling bag: where it starts across the screen, when it first falls, how long a fall takes, its sway, size. */
 type Drop = { x: number; delay: number; duration: number; sway: number; size: number };
-/** A new set of falling bags across `width`, spread so they don't bunch up (impure: once per show). */
+/** A new set of falling bags across `width`, spread so they don't bunch up (impure: once per show). Slow enough to
+ *  catch: a bag takes 5 to 7 s from top to bottom, and they keep coming for as long as the bag falls. */
 function makeDrops(count: number, width: number): Drop[] {
   return Array.from({ length: count }, (_, i) => ({
-    x: Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 56)),
-    delay: Math.round(Math.random() * 1500),
-    duration: 1700 + Math.round(Math.random() * 1000),
-    sway: Math.round((Math.random() - 0.5) * 40),
-    size: 38 + Math.round(Math.random() * 16),
+    x: Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 72)),
+    delay: Math.round(Math.random() * 3500),
+    duration: 5000 + Math.round(Math.random() * 2000),
+    sway: Math.round((Math.random() - 0.5) * 60),
+    size: 50 + Math.round(Math.random() * 18),
   }));
 }
-const RAIN_DROPS = 14;
+const RAIN_DROPS = 10;
+
+/** A soft, endless pulse (0 → 1 → 0) for things that should catch the eye; still when reduce motion is on. */
+function usePulse(on: boolean, ms = 1100) {
+  const [v] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!on) {
+      v.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: ms / 2, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: ms / 2, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [on, ms, v]);
+  return v;
+}
 
 /**
- * A bag was just dropped in the room: it comes down at the top with who dropped it and what is in it, then the room
- * dims a little and bags fall from the top to the bottom. A tap on a falling bag or on the top card opens the bag;
- * the show ends by itself after about five seconds and never blocks the room (only the bags take touches).
- * Reduce motion: the top card alone, a little longer.
+ * A bag is falling in the room (from the moment it opens until its draw): the room dims a little and bags keep
+ * coming down from the top, slowly. A tap on any of them (or on the top card) joins the draw; the card says so and
+ * counts down to the draw, with how many have joined. Never blocks the room (only the bags and the card take
+ * touches). Reduce motion: the card alone. The room shows it while the bag falls; at the draw it goes.
  */
-export function LuckyBagRain({ bag, width, height, still, onOpen, onDone }: { bag: Bag; width: number; height: number; still?: boolean; onOpen: (b: Bag) => void; onDone: () => void }) {
+export function LuckyBagRain({ bag, now, width, height, still, onJoin, onOpen }: { bag: Bag; now: number; width: number; height: number; still?: boolean; onJoin: (b: Bag) => void; onOpen: (b: Bag) => void }) {
   const { top } = useSafeAreaInsets();
   const [intro] = useState(() => new Animated.Value(0));
   const [dim] = useState(() => new Animated.Value(0));
   const [drops] = useState(() => makeDrops(still ? 0 : RAIN_DROPS, width));
   const [falls] = useState(() => drops.map(() => new Animated.Value(0)));
-  const done = useRef(onDone);
+  const left = Date.parse(bag.closesAt) - now;
   useEffect(() => {
-    done.current = onDone;
-  });
-  useEffect(() => {
-    const show = Animated.sequence([
+    const show = Animated.parallel([
       Animated.spring(intro, { toValue: 1, useNativeDriver: true, bounciness: 10, speed: 9 }),
-      Animated.delay(still ? 2600 : 450),
-      Animated.parallel([
-        Animated.timing(dim, { toValue: 1, duration: 380, useNativeDriver: true }),
-        ...falls.map((v, i) =>
-          Animated.sequence([Animated.delay(drops[i].delay), Animated.timing(v, { toValue: 1, duration: drops[i].duration, easing: Easing.in(Easing.quad), useNativeDriver: true })]),
-        ),
-      ]),
-      Animated.parallel([
-        Animated.timing(dim, { toValue: 0, duration: 420, useNativeDriver: true }),
-        Animated.timing(intro, { toValue: 0, duration: 320, useNativeDriver: true }),
-      ]),
+      Animated.timing(dim, { toValue: 1, duration: 380, useNativeDriver: true }),
+      ...falls.map((v, i) =>
+        Animated.sequence([
+          Animated.delay(drops[i].delay),
+          Animated.loop(Animated.timing(v, { toValue: 1, duration: drops[i].duration, easing: Easing.linear, useNativeDriver: true }), { iterations: -1, resetBeforeIteration: true }),
+        ]),
+      ),
     ]);
-    show.start(({ finished }) => finished && done.current());
+    show.start();
     return () => show.stop();
-  }, [intro, dim, falls, drops, still]);
+  }, [intro, dim, falls, drops]);
+  // A short bounce on the card when I join.
+  const [pop] = useState(() => new Animated.Value(1));
+  const wasJoined = useRef(bag.joined);
+  useEffect(() => {
+    if (bag.joined && !wasJoined.current) Animated.sequence([Animated.timing(pop, { toValue: 1.08, duration: 120, useNativeDriver: true }), Animated.spring(pop, { toValue: 1, useNativeDriver: true, bounciness: 14 })]).start();
+    wasJoined.current = bag.joined;
+  }, [bag.joined, pop]);
+  const glow = usePulse(!still && !bag.joined && !bag.mine);
 
-  const open = () => onOpen(bag);
+  const tap = () => {
+    if (bag.mine || bag.joined) return onOpen(bag);
+    onJoin(bag);
+  };
+  const title = bag.mine ? 'Çantan düşüyor' : bag.joined ? 'Çekilişe katıldın' : `${bag.from.name} Şanslı çanta attı`;
+  const sub = bag.mine || bag.joined ? `${bag.entrants} kişi katıldı · çekiliş ${mmss(left)}` : `${bagWhat(bag)} · dokun, çekilişe katıl`;
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.rainDim, { opacity: dim }]} />
       {drops.map((d, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            s.drop,
-            {
-              left: d.x,
-              transform: [
-                { translateY: falls[i].interpolate({ inputRange: [0, 1], outputRange: [0, height + 160] }) },
-                { translateX: falls[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, d.sway, 0] }) },
-                { rotate: falls[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-14deg', '12deg', '-8deg'] }) },
-              ],
-            },
-          ]}
-        >
-          <Pressable onPress={open} hitSlop={10} accessibilityRole="button" accessibilityLabel="Şanslı çantayı aç">
-            <Image source={ROOM_ICON_ART.envelope} style={{ width: d.size, height: d.size }} />
-          </Pressable>
-        </Animated.View>
-      ))}
+          <Animated.View
+            key={i}
+            style={[
+              s.drop,
+              {
+                left: d.x,
+                transform: [
+                  { translateY: falls[i].interpolate({ inputRange: [0, 1], outputRange: [0, height + 160] }) },
+                  { translateX: falls[i].interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, d.sway, 0, -d.sway, 0] }) },
+                  { rotate: falls[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-12deg', '12deg', '-8deg'] }) },
+                ],
+              },
+            ]}
+          >
+            <Pressable onPress={tap} hitSlop={14} accessibilityRole="button" accessibilityLabel={bag.joined ? 'Çekilişe katıldın' : 'Çantaya dokun, çekilişe katıl'}>
+              <Image source={ROOM_ICON_ART.envelope} style={{ width: d.size, height: d.size }} />
+            </Pressable>
+          </Animated.View>
+        ))}
       <Animated.View
         style={[
           s.rainCard,
-          { top: top + 64, opacity: intro, transform: [{ translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [-140, 0] }) }, { scale: intro.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) }] },
+          { top: top + 64, opacity: intro, transform: [{ translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [-140, 0] }) }, { scale: Animated.multiply(pop, intro.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] })) }] },
         ]}
       >
-        <Pressable onPress={open} style={s.rainInner} accessibilityRole="button" accessibilityLabel={`${bag.mine ? 'Şanslı çanta attın' : `${bag.from.name} Şanslı çanta attı`}: ${bagWhat(bag)}, ${bag.packets} pay. Açmak için dokun`}>
-          <Image source={ROOM_ICON_ART.envelope} style={{ width: 56, height: 56 }} />
+        <Pressable onPress={tap} style={[s.rainInner, bag.joined && s.rainJoined]} accessibilityRole="button" accessibilityLabel={`${title}: ${sub}`}>
+          <Animated.View style={{ transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }}>
+            <Image source={ROOM_ICON_ART.envelope} style={{ width: 56, height: 56 }} />
+          </Animated.View>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={s.rainTitle} numberOfLines={1}>
-              {bag.mine ? 'Şanslı çanta attın' : `${bag.from.name} Şanslı çanta attı`}
+              {title}
             </Text>
             <Text style={s.rainSub} numberOfLines={1}>
-              {bagWhat(bag)} · {bag.packets} pay
+              {sub}
             </Text>
           </View>
-          <View style={s.rainGo}>
-            <Text style={s.rainGoText}>Aç</Text>
+          <View style={[s.rainGo, (bag.joined || bag.mine) && s.rainGoDone]}>
+            {bag.joined ? <Ionicons name="checkmark" size={16} color="#1B1300" /> : <Text style={s.rainGoText}>{bag.mine ? mmss(left) : 'Katıl'}</Text>}
           </View>
         </Pressable>
       </Animated.View>
@@ -281,77 +310,116 @@ export function LuckyBagRain({ bag, width, height, still, onOpen, onDone }: { ba
   );
 }
 
-/** The room's open bags, floating over the room: the next one to open, its countdown and how many there are. */
-export function LuckyBagFloat({ bags, now, onOpen }: { bags: Bag[]; now: number; onOpen: (b: Bag) => void }) {
-  const ready = bags.find((b) => !b.mine && b.got === null && Date.parse(b.opensAt) <= now);
-  const b = ready ?? [...bags].sort((x, y) => Date.parse(x.opensAt) - Date.parse(y.opensAt))[0];
-  if (!b) return null;
+const clockOf = (iso: string) => new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+/** What a bag's page in the float says now: its countdown, its call to join, or how it stands for me. */
+function floatLine(b: Bag, now: number) {
   const wait = Date.parse(b.opensAt) - now;
-  const line = wait > 0 ? mmss(wait) : b.mine || b.got !== null ? 'Kimler aldı' : 'Aç!';
-  return (
-    <Pressable style={[s.float, !(wait > 0) && !b.mine && b.got === null && s.floatHot]} onPress={() => onOpen(b)} accessibilityRole="button" accessibilityLabel={`${b.from.name} Şanslı çanta attı. ${wait > 0 ? `${mmss(wait)} sonra açılır` : 'Açılabilir'}`}>
-      <Image source={ROOM_ICON_ART.envelope} style={{ width: 42, height: 42 }} />
-      <Text style={s.floatLine}>{line}</Text>
-      {bags.length > 1 && (
-        <View style={s.badge}>
-          <Text style={s.badgeText}>{bags.length}</Text>
-        </View>
-      )}
-    </Pressable>
-  );
+  if (wait > 0) return mmss(wait);
+  if (b.mine) return 'Çantan';
+  return b.joined ? 'Katıldın' : 'Katıl!';
 }
 
-type Opened = { got: BagGot | null; grabs: BagGrab[] | null; bag: Bag };
+/**
+ * The room's bags, over the Rüzgâr Gülü: one page per bag (the one opening first, first), swiped one by one, each
+ * with its countdown and the time it opens; a bag that is falling or about to (10 s) glows and pulses.
+ */
+export function LuckyBagFloat({ bags, now, bottom, still, onOpen }: { bags: Bag[]; now: number; bottom: number; still?: boolean; onOpen: (b: Bag) => void }) {
+  const list = [...bags].sort((x, y) => Date.parse(x.opensAt) - Date.parse(y.opensAt) || x.id - y.id);
+  const [page, setPage] = useState(0);
+  const hot = list.some((b) => Date.parse(b.opensAt) - now <= 10_000 && !b.mine && !b.joined);
+  const pulse = usePulse(!still && hot, 900);
+  if (!list.length) return null;
+  const at = Math.min(page, list.length - 1);
+  return (
+    <Animated.View style={[s.float, { bottom }, hot && s.floatHot, { transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] }) }] }]}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        style={{ width: FLOAT_W }}
+        onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / FLOAT_W))}
+      >
+        {list.map((b) => {
+          const wait = Date.parse(b.opensAt) - now;
+          return (
+            <Pressable
+              key={b.id}
+              style={s.floatPage}
+              onPress={() => onOpen(b)}
+              accessibilityRole="button"
+              accessibilityLabel={`${b.from.name} Şanslı çanta attı, ${bagWhat(b)}. ${wait > 0 ? `${mmss(wait)} sonra, saat ${clockOf(b.opensAt)} açılır` : b.joined ? 'Çekilişe katıldın' : 'Düşüyor, katılmak için dokun'}`}
+            >
+              <Image source={ROOM_ICON_ART.envelope} style={{ width: 44, height: 44 }} />
+              <Text style={s.floatLine}>{floatLine(b, now)}</Text>
+              <Text style={s.floatTime}>{clockOf(b.opensAt)}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      {list.length > 1 && (
+        <>
+          <View style={s.badge}>
+            <Text style={s.badgeText}>{list.length}</Text>
+          </View>
+          <View style={s.dots}>
+            {list.slice(0, 6).map((b, i) => (
+              <View key={b.id} style={[s.dot, i === at && s.dotOn]} />
+            ))}
+          </View>
+        </>
+      )}
+    </Animated.View>
+  );
+}
+const FLOAT_W = 70;
 
-/** A bag up close: who dropped it, what is in it, its countdown, the open button, then my share and who took what. */
-export function LuckyBagCard({ bag: first, now, onClose, onChange }: { bag: Bag; now: number; onClose: () => void; onChange: (b: Bag) => void }) {
-  const [st, setSt] = useState<Opened>({ got: null, grabs: null, bag: first });
+/** A drawn bag as the card shows it: what I won (null: nothing) and who won what. */
+export type BagOutcome = { got: BagGot | null; grabs: BagGrab[]; bagId?: number };
+
+/**
+ * A bag up close: who dropped it, what is in it, then by its state: the countdown to its opening; while it falls,
+ * Katıl (or "you're in") with the countdown to the draw and how many joined; after the draw, what I won (or that
+ * luck passed me by this time) and who won what.
+ */
+export function LuckyBagCard({ bag: first, now, outcome, onClose, onJoin }: { bag: Bag; now: number; outcome?: BagOutcome | null; onClose: () => void; onJoin: (b: Bag) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
-  const bag = st.bag.id === first.id ? st.bag : first;
-  const grabs = st.bag.id === first.id ? st.grabs : null;
-  const got = st.bag.id === first.id ? st.got : null;
+  // The draw's result: given by the room (it heard the draw), or read here for a bag drawn before it opened.
+  const [fetched, setFetched] = useState<BagOutcome | null>(null);
+  const res = outcome ?? (fetched && fetched.bagId === first.id ? fetched : null);
+  const bag = first;
   const wait = Date.parse(bag.opensAt) - now;
-  const doneForMe = bag.mine || bag.got !== null || got !== null;
-  // Mine or already opened: who took what.
+  const toDraw = Date.parse(bag.drawAt ?? bag.closesAt) - now;
+  const drawn = bag.status !== 'open' || !!res;
+  // A drawn bag (opened from the float after its draw, or mine): its winners.
   const bagId = bag.id;
   useEffect(() => {
-    if (!doneForMe) return;
+    if (!drawn || res) return;
     let alive = true;
-    bagDetail(bagId)
-      .then((r) => alive && setSt((x) => ({ ...x, bag: r.bag, grabs: r.grabs })))
+    bagResult(bagId)
+      .then((r) => alive && setFetched({ got: r.got, grabs: r.grabs, bagId }))
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [bagId, doneForMe]);
+  }, [bagId, drawn, res]);
   const gift = giftOf(bag.giftId);
-  const open = async () => {
+  const join = async () => {
     if (busy || wait > 0) return;
     setBusy(true);
     try {
-      const r = await grabBag(bag.id);
-      setSt({ got: r.got, grabs: r.grabs, bag: r.bag });
-      onChange(r.bag);
-    } catch (e) {
-      const code = grabCode(e);
-      if (code === 'empty' || code === 'taken') {
-        const r = await bagDetail(bag.id).catch(() => null);
-        if (r) {
-          setSt({ got: null, grabs: r.grabs, bag: r.bag });
-          onChange(r.bag);
-        }
-      }
-      if (code !== 'taken') showAlert(code === 'empty' ? 'Çanta boşaldı' : 'Çanta açılamadı', code === 'empty' ? 'Paylar bitti, bir dahaki sefere!' : message(e));
+      await onJoin(bag);
     } finally {
       setBusy(false);
     }
   };
+  const grabs = res?.grabs ?? null;
+  const got = res?.got ?? null;
   const best = grabs?.length ? grabs.reduce((m, g) => (g.units > m.units ? g : m), grabs[0]) : null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={[s.scrim, s.center]} onPress={onClose}>
-        <Pressable style={s.card} onPress={() => {}}>
+        <Pressable style={[s.card, got && s.cardWon]} onPress={() => {}}>
           <Pressable onPress={onClose} hitSlop={10} style={s.cardClose} accessibilityLabel="Kapat">
             <Ionicons name="close" size={20} color="rgba(255,255,255,0.75)" />
           </Pressable>
@@ -369,6 +437,7 @@ export function LuckyBagCard({ bag: first, now, onClose, onChange }: { bag: Bag;
 
           {got ? (
             <View style={s.prize}>
+              <Text style={s.wonTitle}>Kazandın!</Text>
               {got.kind === 'gift' ? <GiftArt giftId={got.giftId ?? undefined} emoji={gift?.emoji ?? '🎁'} size={72} /> : <Icon3D name="coin" size={64} />}
               <Text style={s.prizeValue}>{got.kind === 'gift' ? `${gift?.name ?? 'Hediye'} ×${fmt(got.units)}` : `+${fmt(got.coins)}`}</Text>
               <Text style={s.prizeNote}>{got.kind === 'gift' ? `${fmt(got.coins)} elmas hesabına geçti` : 'Jeton bakiyene eklendi'}</Text>
@@ -377,25 +446,40 @@ export function LuckyBagCard({ bag: first, now, onClose, onChange }: { bag: Bag;
             <View style={s.prize}>
               {bag.kind === 'gift' ? <GiftArt giftId={bag.giftId ?? undefined} emoji={gift?.emoji ?? '🎁'} size={72} /> : <Image source={ROOM_ICON_ART.envelope} style={{ width: 84, height: 84 }} />}
               <Text style={s.prizeValue}>{bagWhat(bag)}</Text>
-              <Text style={s.prizeNote}>{bag.status !== 'open' || bag.left === 0 ? 'Bütün paylar alındı' : `${bag.left} / ${bag.packets} pay duruyor`}</Text>
+              <Text style={s.prizeNote}>
+                {drawn
+                  ? bag.mine
+                    ? 'Çekiliş yapıldı'
+                    : bag.joined || res
+                      ? 'Bu sefer şans senden yana değildi'
+                      : 'Çekiliş yapıldı'
+                  : wait > 0
+                    ? 'Açılınca 30 saniye düşer: dokunan herkes çekilişe katılır, ödülün hepsi dağıtılır'
+                    : `${bag.entrants} kişi katıldı · ödülün hepsi katılanlara şansla dağıtılır`}
+              </Text>
             </View>
           )}
 
-          {!doneForMe &&
+          {!drawn &&
             (wait > 0 ? (
               <View style={s.wait}>
-                <Text style={s.waitLabel}>Açılmasına</Text>
+                <Text style={s.waitLabel}>Açılmasına · saat {clockOf(bag.opensAt)}</Text>
                 <Text style={s.waitValue}>{mmss(wait)}</Text>
               </View>
+            ) : bag.mine || bag.joined ? (
+              <View style={s.wait}>
+                <Text style={s.waitLabel}>{bag.joined ? 'Çekilişe katıldın · çekilişe' : 'Çekilişe'}</Text>
+                <Text style={s.waitValue}>{mmss(toDraw)}</Text>
+              </View>
             ) : (
-              <Pressable onPress={open} disabled={busy} style={[s.send, s.openBtn, busy && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Çantayı aç">
-                <Text style={s.sendText}>{busy ? 'Açılıyor…' : 'Aç'}</Text>
+              <Pressable onPress={join} disabled={busy} style={[s.send, s.openBtn, busy && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Çekilişe katıl">
+                <Text style={s.sendText}>{busy ? 'Katılıyor…' : `Katıl · ${mmss(toDraw)}`}</Text>
               </Pressable>
             ))}
 
           {grabs && (
             <View style={s.list}>
-              <Text style={s.listTitle}>{grabs.length ? `Açanlar · ${grabs.length}/${bag.packets}` : 'Henüz kimse açmadı'}</Text>
+              <Text style={s.listTitle}>{grabs.length ? `Kazananlar · ${grabs.length}` : 'Kimse katılmadı, çanta sahibine döndü'}</Text>
               <ScrollView style={{ maxHeight: 220 }}>
                 {grabs.map((g) => (
                   <View key={g.user.id} style={s.grab}>
@@ -455,9 +539,15 @@ const s = StyleSheet.create({
   walletLink: { color: colors.primaryText, fontSize: 13, fontWeight: '800', marginTop: 2 },
   send: { marginTop: 12, height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: GOLD, boxShadow: '0 6px 18px rgba(246,189,96,0.35)' },
   sendText: { color: '#1B1300', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
-  float: { position: 'absolute', right: 10, top: 186, width: 66, paddingVertical: 6, borderRadius: 18, alignItems: 'center', backgroundColor: 'rgba(20,12,4,0.78)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.55)' },
-  floatHot: { borderColor: GOLD, borderWidth: 2, boxShadow: '0 0 16px rgba(246,189,96,0.55)' },
-  floatLine: { color: GOLD, fontSize: 12, fontWeight: '900', marginTop: 1 },
+  // Over the Rüzgâr Gülü (live-room places it): a pager of the room's bags.
+  float: { position: 'absolute', right: 6, width: FLOAT_W + 4, paddingVertical: 6, borderRadius: 20, alignItems: 'center', backgroundColor: 'rgba(26,14,4,0.86)', borderWidth: 1.5, borderColor: 'rgba(246,189,96,0.6)', boxShadow: '0 6px 18px rgba(0,0,0,0.45)', zIndex: 31 },
+  floatHot: { borderColor: GOLD, borderWidth: 2, boxShadow: '0 0 22px rgba(246,189,96,0.75)' },
+  floatPage: { width: FLOAT_W, alignItems: 'center' },
+  floatLine: { color: GOLD, fontSize: 13, fontWeight: '900', marginTop: 1 },
+  floatTime: { color: 'rgba(255,255,255,0.72)', fontSize: 10, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  dots: { flexDirection: 'row', gap: 3, marginTop: 4 },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)' },
+  dotOn: { width: 10, backgroundColor: GOLD },
   badge: { position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: '#E5484D', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#140C04' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   // The drop show: a warm dark veil, bags falling from above the screen, and the card at the top.
@@ -469,6 +559,10 @@ const s = StyleSheet.create({
   rainSub: { color: GOLD, fontSize: 13, fontWeight: '700' },
   rainGo: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: GOLD },
   rainGoText: { color: '#1B1300', fontSize: 13, fontWeight: '900' },
+  rainGoDone: { backgroundColor: '#7BE0A6' },
+  rainJoined: { borderColor: '#7BE0A6', boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 22px rgba(123,224,166,0.35)' },
+  cardWon: { borderColor: GOLD, borderWidth: 2, boxShadow: '0 20px 50px rgba(0,0,0,0.55), 0 0 40px rgba(246,189,96,0.35)' },
+  wonTitle: { color: '#fff', fontSize: 20, fontWeight: '900', letterSpacing: 0.3 },
   card: { width: '100%', maxWidth: 360, borderRadius: 26, padding: 18, backgroundColor: '#1A1208', borderWidth: 1, borderColor: 'rgba(246,189,96,0.4)', boxShadow: '0 20px 50px rgba(0,0,0,0.55)' },
   cardClose: { position: 'absolute', top: 14, right: 14, zIndex: 2 },
   from: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 26 },

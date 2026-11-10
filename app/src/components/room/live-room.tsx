@@ -46,7 +46,7 @@ import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLog
 import { GiftSheet } from '@/components/room/gift-sheet';
 import { LuckyCombo } from '@/components/room/lucky-combo';
 import { LuckyResult } from '@/components/room/lucky-result';
-import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat } from '@/components/room/lucky-bag';
+import { LuckyBagCard, LuckyBagFloat, LuckyBagRain, LuckyBagSheet, bagWhat, type BagOutcome } from '@/components/room/lucky-bag';
 import { SeatMenu, type Rect, type SeatMenuItem } from '@/components/room/seat-menu';
 import { PersonCard } from '@/components/room/person-card';
 import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
@@ -88,7 +88,7 @@ import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, messag
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
-import { useRoomBags, type Bag } from '@/lib/live/lucky-bags';
+import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
 import { roomMusicAction, type MusicAction } from '@/lib/live/music';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
@@ -912,13 +912,41 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useRoomPkSync(id, real && unlocked, pk);
   // Şanslı çanta in a server room (lib/live/lucky-bags): the room's open bags; a new one gets a line in the chat.
   // A bag dropped while I'm in the room (not one that was already there) also gets its show (LuckyBagRain).
-  const [bagRain, setBagRain] = useState<Bag | null>(null);
-  const bags = useRoomBags(id, real && unlocked, (b, fresh) => {
-    if (b.mine || blocked.has(b.from.id)) return;
-    sysNote(`🧧 ${b.from.name} Şanslı çanta attı: ${bagWhat(b)} · ${b.packets} pay`);
-    if (fresh) setBagRain(b);
-  });
+  // A bag falls for everyone in the room from the moment it opens until its draw (LuckyBagRain); a tap joins the
+  // draw. When a bag I joined (or dropped) is drawn, its card shows how it went.
   const [bagOpen, setBagOpen] = useState<Bag | null>(null);
+  const [bagOutcome, setBagOutcome] = useState<BagOutcome | null>(null);
+  const bags = useRoomBags(
+    id,
+    real && unlocked,
+    (b) => {
+      if (b.mine || blocked.has(b.from.id)) return;
+      sysNote(`🧧 ${b.from.name} Şanslı çanta attı: ${bagWhat(b)} · ${b.packets} pay`);
+    },
+    (bagId) => {
+      void bagResult(bagId)
+        .then((r) => {
+          setBagOutcome({ got: r.got, grabs: r.grabs });
+          setBagOpen(r.bag);
+          if (r.got) successHaptic();
+        })
+        .catch(() => {});
+    },
+  );
+  // The bag falling now (opened, not drawn yet): its rain shows for as long as it falls.
+  const bagRain = real ? bags.bags.find((b) => !blocked.has(b.from.id) && Date.parse(b.opensAt) <= bags.now && bags.now < Date.parse(b.closesAt)) : undefined;
+  const joinLuckyBag = async (b: Bag) => {
+    if (b.mine || b.joined) return;
+    try {
+      const r = await joinBag(b.id);
+      bags.put(r.bag);
+      tapHaptic();
+    } catch (e) {
+      const code = grabCode(e);
+      if (code === 'followers') showAlert('Takipçilere özel', errorText(e));
+      else if (code !== 'early' && code !== 'empty') showAlert('Çekilişe katılamadın', errorText(e));
+    }
+  };
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
   const roomBondsNow = useRoomBonds(live.members, real);
   const roomBonds = roomBondsNow ?? NO_BONDS;
@@ -3180,19 +3208,32 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </SafeAreaView>
 
       {envelope && <EnvelopeDrop from={envelope.from} seconds={envelope.seconds} onGrab={grabEnvelope} />}
-      {real && bags.bags.length > 0 && <LuckyBagFloat bags={bags.bags.filter((b) => !blocked.has(b.from.id))} now={bags.now} onOpen={setBagOpen} />}
-      {real && bagRain && (
+      {/* Over the Rüzgâr Gülü (or where it would be): the room's bags, one page each, with their times. */}
+      {real && bags.bags.length > 0 && (
+        <LuckyBagFloat
+          bags={bags.bags.filter((b) => !blocked.has(b.from.id))}
+          now={bags.now}
+          bottom={wheelShown ? 222 : 150}
+          still={settings.reduceMotion}
+          onOpen={(b) => {
+            setBagOutcome(null);
+            setBagOpen(b);
+          }}
+        />
+      )}
+      {bagRain && (
         <LuckyBagRain
           key={bagRain.id}
           bag={bagRain}
+          now={bags.now}
           width={win.width}
           height={win.height}
           still={settings.reduceMotion}
+          onJoin={(b) => void joinLuckyBag(b)}
           onOpen={(b) => {
-            setBagRain(null);
+            setBagOutcome(null);
             setBagOpen(b);
           }}
-          onDone={() => setBagRain(null)}
         />
       )}
 
@@ -3383,13 +3424,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           svipLevel={svipLevel}
           onClose={closePanel}
           onDropped={(b) => {
+            // It falls for the room when it opens (now, or after its wait): the rain starts then by itself.
             bags.put(b);
             sysNote(`🧧 Şanslı çanta attın: ${bagWhat(b)} · ${b.packets} pay`);
-            setBagRain(b);
           }}
         />
       )}
-      {bagOpen && <LuckyBagCard bag={bagOpen} now={bags.now} onClose={() => setBagOpen(null)} onChange={bags.put} />}
+      {bagOpen && (
+        <LuckyBagCard
+          bag={bags.bags.find((b) => b.id === bagOpen.id) ?? bagOpen}
+          now={bags.now}
+          outcome={bagOutcome}
+          onClose={() => {
+            setBagOpen(null);
+            setBagOutcome(null);
+          }}
+          onJoin={joinLuckyBag}
+        />
+      )}
       <DiceModal visible={panel === 'dice'} onClose={closePanel} onPlay={playDice} playsLeft={dicePlays} />
       <ContributionModal visible={panel === 'contrib'} onClose={closePanel} data={contrib} locked={isOwn && level < 3} />
       <RequestsModal
