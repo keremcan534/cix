@@ -102,6 +102,32 @@ Mağazada satılan her şeyin (çerçeve, giriş efekti, binek, sohbet balonu, �
 
 **UK GDPR:** ürün kayıtları (`entitlements`) satın alma kaydıdır: hukuki dayanak sözleşme (Madde 6(1)(b)); hesap silinince geri alınır, mali kayıt olarak saklanır. Giyilenleri (`users.equipped`) odada ve profilde başkaları görür; hesap silinince silinir. Gizlilik politikasının "satın almalar" bölümüne ve işleme kaydına (record of processing) bu iki kayıt eklenmeli.
 
+**Oda süslemesi ve oda kapağı (`room-decor.mjs`, `catalog.mjs` `ROOM_COVERS` / `ROOM_BGS`)**
+
+İkisi ayrı şeydir. **Oda süslemesi** odanın sahnesinin arkasındaki resimdir; **oda kapağı** odanın listelerdeki (Odalar, oda kartı, Mesajlar) resmidir. Birini değiştirmek diğerini değiştirmez. Süslemeyi ve kapağı oda sahibi ya da Süper Yönetici seçer; yalnız oda sahibi öder ve kendi görselini yalnız o yükler, değiştirir, kaldırır. Her değişiklik odadaki telefonlara anında duyurulur (oda yeniden okunur).
+
+- **Ücretsiz** (`rooms.bg_id`): `bg1`–`bg4`, her biri oda seviyesiyle açılır (Lv.1, 2, 4, 7); boş bırakılırsa temanın kendi sahnesi çizilir. Eski uygulamaların seçtiği `cover_id` süsleme değildir: kapak yüklenene kadar listelerde görünen resim olarak kalır, böylece var olan odalar aynı görünür.
+- **Ücretli** (`ROOM_BGS`, `entitlements` türü `roombg`): mağaza ürünü gibi süreli sahip olunur (yeniden alınca süre uzar, iade edilen jetonla alınan geri alınır, hesap silinince biter). Görseli uygulamada olmayan süsleme satılmaz (`sale: false`, rafta "yakında"); şu an hiçbirinin görseli yok (`docs/GORSEL_URETIM_LISTESI.md` §14). Deneme sunucusunda `ROOM_BG_PREVIEW=1` hepsini satışa açar.
+- **Özel**: oda sahibi canlı ayardaki ücreti öder (varsayılan 5.000 jeton) ve kendi görseli canlı ayardaki gün kadar (varsayılan 30) odanın arka planı olur. Süre içinde görseli ücretsiz değiştirir (dakikada 3, günde 10) ve kaldırabilir; kaldırınca süre işlemeye devam eder. Süre bitince oda son ücretsiz süslemesine döner ve dosya birkaç dakika içinde silinir (`ROOM_DECOR_SWEEP_MS`, varsayılan 10 dk).
+- Ödenen şey odaya değil sahibine aittir (`room_decor`, sahip başına bir satır): oda kapatılıp yeniden açılırsa süre ve görsel yeni odada devam eder.
+- **Kapak** (`rooms.cover_url`) ücretsizdir; oda kapanınca dosyası silinir.
+- Görseller telefonda kırpılır: süsleme 1080 × 1920 (dikey), kapak 800 × 800 (kare). Yükleme türleri `roombg` (en çok 4 MB) ve `roomcover` (en çok 2 MB), JPEG/PNG/WebP.
+- **Canlı ayarlar › Oda süslemesi:** `room_decor_off` (`custom`, `paid`: satışı durdurur; alınmışlar kalır), `room_bg_custom_price`, `room_bg_custom_days`. `shop` özelliği kapanınca iki satış da durur.
+- **Denetim:** görseller otomatik denetlenmez. Şikâyet edilen odanın kartında (Yönetim › Şikâyetler) **Oda görsellerini göster** ile süsleme ve kapak görülür, kurala aykırıysa kaldırılır. Kaldırılan özel süslemenin süresi de biter, jeton iade edilmez (satın alma metni bunu söyler); işlem nedeniyle birlikte denetim kaydına yazılır (`room_background_remove`, `room_cover_remove`).
+
+| Çağrı | Ne yapar |
+|---|---|
+| `GET /api/rooms/decor?room=` | Sahip ya da Süper Yönetici: seçili süsleme, ücretsizler (kilitleriyle), ücretli raf (fiyat, sahip olunan süre), özel süslemenin ücreti, günü ve durumu, kapak. |
+| `POST /api/rooms/decor/pick` `{room, pick: 'free', bgId}` | Ücretsiz süsleme (`bgId: null` tema görünümü). `pick: 'custom'` ya da ücretli bir `sku`: sahibin elindekilerden biri. |
+| `POST /api/rooms/decor/buy` `{room, sku, price, ref}` | Yalnız sahip: ücretli süslemeyi alır; oda hemen gösterir. Aynı `ref` ikinci kez ödetmez. |
+| `POST /api/rooms/decor/custom` `{room, url, price, ref}` | Yalnız sahip: yüklediği görsel (`roombg`). Süre dışında satın almadır (`charged: true`), süre içinde ücretsiz değişikliktir. |
+| `POST /api/rooms/decor/custom/remove` `{room}` | Yalnız sahip: görseli kaldırır (dosya silinir). |
+| `POST /api/rooms/cover` `{room, url \| null}` | Sahip ya da Süper Yönetici: kapağı koyar ya da kaldırır. |
+| `GET /api/admin/rooms/background?room=` | Yetkili: odanın özel süslemesi ve kapağı. |
+| `POST /api/admin/rooms/background/remove`, `…/cover/remove` `{room, reason}` | Yetkili: görseli kaldırır; denetim kaydına yazılır. |
+
+**UK GDPR:** özel süsleme ve kapak kullanıcının yüklediği içeriktir; odadaki herkes (kapağı listelerde herkes) görür. Değiştirilince, kaldırılınca, süresi bitince, oda kapanınca (kapak) ve hesap silinince dosya depodan silinir; veri kopyasında yer alır (`rooms.decoration`, `rooms.owned[].coverUrl`). Gizlilik politikasının "yüklediğiniz içerik" bölümüne eklenmeli.
+
 **Para çekme (`withdraw.mjs`)**: yayıncı çekilebilir elmasını parayla ister; ödemeyi yönetim uygulama dışında (havale) yapar ve talebi "ödendi" işaretler. Talep açılınca elmas hemen bakiyeden düşer (defterde "Para çekme talebi", kanal `cekim`), iptal veya retle geri gelir; böylece aynı elmas ikinci kez harcanamaz.
 
 | Çağrı | Ne yapar |

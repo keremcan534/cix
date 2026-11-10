@@ -82,6 +82,7 @@ import { roomSocialRoutes } from './room-social.mjs';
 import { roomFollowRoutes } from './room-follow.mjs';
 import { roomMemberRoutes } from './room-members.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
+import { roomDecorRoutes, startDecorSweep, stopDecorSweep } from './room-decor.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, lineRoutes, openLine } from './live-line.mjs';
@@ -279,6 +280,7 @@ const routes = {
   ...roomFollowRoutes,
   ...roomMemberRoutes,
   ...roomOwnerRoutes,
+  ...roomDecorRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,
@@ -395,6 +397,7 @@ function shutdown(signal) {
   stopOtpSweep();
   stopCallSweep();
   stopBagSweep();
+  stopDecorSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -418,3 +421,4 @@ startLiveSync();
 startOtpSweep();
 startCallSweep();
 startBagSweep();
+startDecorSweep();

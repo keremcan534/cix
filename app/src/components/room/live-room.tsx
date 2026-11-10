@@ -74,6 +74,7 @@ import { InboxSheet, useInboxUnread } from '@/components/room/inbox-sheet';
 import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
 import { StageBackdrop } from '@/components/room/stage-backdrop';
+import { useRoomLook } from '@/components/room/decor';
 import { StageLayout } from '@/components/room/stage-layout';
 import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
@@ -1064,6 +1065,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [offline]);
   const logMod = (action: string, target: string, reason = '') =>
     setModLog((l) => [{ id: msgId(), time: new Date().toTimeString().slice(0, 5), actor: `${rankLabel('me').replace('Oda sahibi', 'Sahip')} (sen)`, action, target, reason }, ...l]);
+  // Oda Süslemesi (what the stage draws behind the mics) and Oda Kapağı (components/room/decor): a server room's as
+  // the room read has them, my demo room's from its own state.
+  const look = useRoomLook({ roomId: id, real, isOwn, rank: myRank, level, theme, cover, serverBackground: base?.background, serverFreeId: base?.bgId, serverCoverUrl: base?.coverUrl, onChanged: () => setRoomEdits((n) => n + 1), log: (what) => logMod(what, 'Oda') });
   // Mode / layout ("Yayına Katılma Modu"): only the stage server decides; its refusal goes back to the sheet as is.
   const pickLayout = (layoutId: string | null) => {
     const changed = (stage?.layoutId ?? null) !== layoutId;
@@ -3237,7 +3241,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   if (!full) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{gamePanel}</View>;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StageBackdrop theme={theme} />
+      <StageBackdrop theme={theme} background={look.stage} freeId={look.freeId} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoid style={{ flex: 1 }}>
@@ -3618,10 +3622,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         announcement={announcement ?? ''}
         // Server room: the owner and Süper Yönetici edit the name and bulletin (the server checks the rank).
         canEditText={real && myRank >= 2}
-        coverEdit={isOwn || (real && myRank >= 2)}
+        look={look}
         onSave={(p) => {
           if (!real) return updateMyRoom(p);
-          if (p.coverId !== undefined) return saveLook({ coverId: p.coverId }, 'Oda kapağını değiştirdi');
           const patch = { ...(p.title !== undefined && { title: p.title }), ...(p.announcement !== undefined && { announcement: p.announcement }) };
           if (!Object.keys(patch).length) return;
           updateServerRoom(id, patch)
@@ -3657,6 +3660,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               : myRoom
           }
           live={liveSettings}
+          look={look}
           // The room's own settings for my room and the staff of a server room; everyone gets the sections.
           standard={isOwn || !!liveSettings}
           sections={settingsSections}

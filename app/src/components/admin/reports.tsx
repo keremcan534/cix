@@ -1,7 +1,8 @@
 // Yönetim › Şikâyetler: the report queue, oldest open first. A report is closed as handled (optionally banning
 // the reported person for a while) or as "sorun yok". A running ban can be lifted from the same card, and staff
 // with Yaptırımlar open the reported person's full sanction record from it. A reported Anlar post or comment shows
-// what it says and who wrote it, and can be taken down from the card (the report closes as handled).
+// what it says and who wrote it, and can be taken down from the card (the report closes as handled). A reported
+// room shows its uploaded background and cover on request (room-pictures), each of which can be taken down.
 import { useState } from 'react';
 import { Image, View } from 'react-native';
 
@@ -10,6 +11,7 @@ import { BAN_OPTIONS, REPORT_TARGET_LABEL, ago, banPhrase, fmtDate } from '@/lib
 import * as admin from '@/lib/live/admin';
 
 import { Filters, ItemCard, Line, LoadState, Notice, Quote, SectionScroll, StatusPill, confirmThen, useAdmin, useLoad, type AdminCtx } from './parts';
+import { RoomPictures } from './room-pictures';
 
 const FILTERS: [admin.ReportStatus, string][] = [
   ['open', 'Açık'],
@@ -73,6 +75,8 @@ function ReportCard({ r, onDone }: { r: admin.Report; onDone: () => void }) {
       {!!content?.text && <Quote text={content.text} />}
       {content?.imageUrl && <Image source={{ uri: content.imageUrl }} style={{ width: 120, height: 150, borderRadius: 10 }} accessibilityLabel="Şikâyet edilen fotoğraf" />}
       {!!r.note && <Quote text={r.note} />}
+      {/* A reported room: its owner's uploaded background and cover, which can be taken down from here. */}
+      {r.target.type === 'room' && !!r.target.name && <RoomPictures roomId={r.target.id} reason={r.reason} />}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
         {r.status === 'open' && canBan && !banned && (
           <Button title="Askıya al" icon="ban-outline" variant="danger" small disabled={busy} onPress={() => askBan(ctx, r, name, onDone, setBusy)} />

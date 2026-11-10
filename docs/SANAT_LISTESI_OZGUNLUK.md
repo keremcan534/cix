@@ -16,7 +16,7 @@ Yeni adlarla uyumlu, rakip uygulamaların görünümünü taşımayan görseller
 12. Liman Pazarı: 6 ürün ikonu (midye, karides, kalamar, balık, ıstakoz, ahtapot) ve kapak.
 13. Gece Yarısı Çarkı ve Sihir Destesi: '77', meyve ve burç motifleri olmadan yeni dilim ve kart görselleri (8 takımyıldız + 'Pusula' kartı).
 14. 12 illüstre demo avatarı: gerçek yüz yok, karışık cinsiyet ve yaş, marka stilinde (pravatar yerine).
-15. 6 oda süsleme arka planı sahnesi (picsum yerine; içerik önerisi docs/ODA_GORSEL_LISTESI.md'de).
+15. 6 oda süsleme arka planı sahnesi (içerik önerisi docs/ODA_GORSEL_LISTESI.md'de). Oda Süslemesi › Ücretli rafı bunları bekliyor: adları, dosya adları ve ölçüsü (dikey 1080 × 1920) docs/GORSEL_URETIM_LISTESI.md §14'te. Ücretsiz dört süsleme artık mevcut deniz fotoğraflarını kullanıyor; picsum yalnızca eski sürümlerin seçtiği kapak resmi olarak kaldı.
 16. Uygulama logosunun vektör olarak yeniden çizimi: yalnızca bize ait bir öğe (iki eş dalga tepesi ya da iki figürü birleştiren fener ışığı), turkuaz ve mercan renklerde. Sonrasında şekil markası taraması yapılmalı.
 17. Sıralama ekranı için 'fener kulesi' arka planı ve Hemen Tanış için 'fener taraması' arka planı.
 18. Ayrıcalık programı için isteğe bağlı genel amblemler (İnci / VIP / Rütbe sekme başlıkları).

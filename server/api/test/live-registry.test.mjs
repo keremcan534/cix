@@ -67,6 +67,9 @@ describe('defaults are today', () => {
       casino_off: [],
       casino_max_bet: 25_000,
       casino_daily_rounds: 40,
+      room_decor_off: [],
+      room_bg_custom_price: 5_000,
+      room_bg_custom_days: 30,
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -114,6 +117,9 @@ describe('defaults are today', () => {
       'casino_off',
       'casino_max_bet',
       'casino_daily_rounds',
+      'room_decor_off',
+      'room_bg_custom_price',
+      'room_bg_custom_days',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);
@@ -288,6 +294,28 @@ describe('save rules', () => {
     assert.match(impactOf('withdraw_weekly_diamonds', 1e7, 1e6, { next: { withdraw_max_diamonds: 5e6 } }), /tek talepte de en çok bu kadar istenebilir/);
     assert.match(impactOf('withdraw_max_diamonds', 5e6, 1e6, { next: { withdraw_weekly_diamonds: 6e5 } }), /tek talepte en çok 600\.000 💎 istenebilir/);
     assert.match(impactOf('min_version', null, '1.4.0', { raw: '1.4.0' }), /1\.4\.0 sürümünden eski/);
+  });
+});
+
+describe('Oda süslemesi', () => {
+  test('a switch for each paid part, the price in hundreds, 1–90 days', () => {
+    assert.deepEqual(REGISTRY.room_decor_off.bounds.options, ['custom', 'paid']);
+    assert.deepEqual(validate('room_decor_off', ['paid', 'custom']), ['custom', 'paid']);
+    assert.equal(validate('room_decor_off', []), null);
+    refused(() => validate('room_decor_off', ['free']), /bilinmeyen/);
+    assert.equal(validate('room_bg_custom_price', 7_500), 7_500);
+    for (const v of [0, 50, 5_050, 100_100, '5000', 5_000.5]) refused(() => validate('room_bg_custom_price', v), /Özel süsleme ücreti/);
+    assert.equal(validate('room_bg_custom_days', 7), 7);
+    for (const v of [0, 91, 1.5]) refused(() => validate('room_bg_custom_days', v), /Özel süsleme süresi/);
+    // A price that more than doubles or halves asks again; the days never do.
+    assert.deepEqual([isBig('room_bg_custom_price', 5_000, 10_000), isBig('room_bg_custom_price', 5_000, 10_100), isBig('room_bg_custom_price', 5_000, 2_400), isBig('room_bg_custom_price', 5_000, null)], [false, true, true, false]);
+    assert.equal(isBig('room_bg_custom_days', 30, 90), false);
+    assert.equal(impactOf('room_bg_custom_price', 5_000, 7_000), 'Özel süsleme 5.000 → 7.000 jeton.');
+    assert.match(impactOf('room_decor_off', [], ['custom']), /Yeni özel süsleme satın alınamaz/);
+    assert.match(impactOf('room_decor_off', ['custom'], []), /Yeniden açılır: Özel süsleme/);
+    const s = snapshotOf([{ key: 'room_decor_off', value: ['paid'] }, { key: 'room_bg_custom_price', value: 6_000 }, { key: 'room_bg_custom_days', value: 500 }]);
+    assert.deepEqual([[...s.roomDecorOff], s.roomBgCustomPrice, s.roomBgCustomDays, s.invalid], [['paid'], 6_000, 30, ['room_bg_custom_days']]);
+    assert.deepEqual([[...snapshotOf().roomDecorOff], snapshotOf().roomBgCustomPrice, snapshotOf().roomBgCustomDays], [[], 5_000, 30]);
   });
 });
 

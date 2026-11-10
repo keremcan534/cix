@@ -98,6 +98,9 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
     case 'invite_daily_cap':
       // A reward or its cap that more than doubles.
       return typeof after === 'number' && typeof before === 'number' && after > before * 2;
+    case 'room_bg_custom_price':
+      // Özel süsleme's price when it more than doubles or halves.
+      return typeof after === 'number' && typeof before === 'number' && (after > before * 2 || after * 2 < before);
     default:
       return false;
   }
@@ -105,6 +108,14 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
 
 /** Çantam (server/api/backpack.mjs): above this many gifts a day the change asks twice (live-registry bounds.big). */
 export const BACKPACK_BIG = 2;
+
+/** Oda süslemesi (server/api/live-registry.mjs): the sales that can be switched off (room_decor_off) and Özel
+ *  süsleme's price and days, in card order. */
+export const DECOR_LABEL: Record<string, string> = { custom: 'Özel süsleme (kendi görselini yükleme)', paid: 'Ücretli süslemeler' };
+export const DECOR_NUMBER_KEYS: { key: 'room_bg_custom_price' | 'room_bg_custom_days'; unit: string }[] = [
+  { key: 'room_bg_custom_price', unit: ' jeton' },
+  { key: 'room_bg_custom_days', unit: ' gün' },
+];
 
 /** Oyun Salonu's numbers in the order the admin card shows them, with each one's unit. */
 export const CASINO_NUMBER_KEYS: { key: 'casino_max_bet' | 'casino_daily_rounds'; unit: string }[] = [
@@ -229,6 +240,12 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
     case 'casino_daily_rounds':
       return typeof v === 'number' ? `En yüksek bahisle ${fmtNum(v)} tur` : String(v);
+    case 'room_decor_off':
+      return Array.isArray(v) && v.length ? `Kapalı: ${v.map((k) => DECOR_LABEL[k] ?? k).join(', ')}` : 'Hepsi açık';
+    case 'room_bg_custom_price':
+      return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
+    case 'room_bg_custom_days':
+      return typeof v === 'number' ? `${fmtNum(v)} gün` : String(v);
     default:
       return String(v);
   }

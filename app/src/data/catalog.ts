@@ -383,17 +383,40 @@ export const MIC_COUNT_OPTIONS = [5, 8, 10, 12, 15];
 /** Stable public room number shown as "ID". */
 export const roomCode = (id: string) => String(10_000_000 + ([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7)));
 
+// Oda Süslemesi › Ücretsiz: the backgrounds drawn behind a room's stage, each opened by the room's level (the server
+// checks it: server/api/catalog.mjs ROOM_COVERS). The pictures are the app's own sea scenes
+// (components/room/stage-backdrop ROOM_BG_ART); `seed` is only the card picture older apps chose with the same id.
 export const ROOM_BACKGROUNDS = [
-  { id: 'bg1', name: 'Gece', seed: 'night', minLevel: 1 },
-  { id: 'bg2', name: 'Neon', seed: 'neon', minLevel: 2 },
-  { id: 'bg3', name: 'Deniz', seed: 'sea', minLevel: 4 },
-  { id: 'bg4', name: 'Galaksi', seed: 'galaxy', minLevel: 7 },
+  { id: 'bg1', name: 'Gün Batımı', seed: 'night', minLevel: 1 },
+  { id: 'bg2', name: 'Deniz Feneri', seed: 'neon', minLevel: 2 },
+  { id: 'bg3', name: 'Deniz Altı', seed: 'sea', minLevel: 4 },
+  { id: 'bg4', name: 'Turkuaz Koy', seed: 'galaxy', minLevel: 7 },
 ];
-/** A room background's picture ('' for none or an unknown id). A server room keeps only the id (server/api/catalog.mjs ROOM_COVERS). */
+/** The card picture an older app chose for a server room ('' for none or an unknown id): the lists fall back to it
+ *  while the room has no uploaded cover (Oda Kapağı). */
 export function roomCoverUrl(id: string | null | undefined) {
   const b = ROOM_BACKGROUNDS.find((x) => x.id === id);
   return b ? `https://picsum.photos/seed/${b.seed}/600/400` : '';
 }
+// Oda Süslemesi › Ücretli: backgrounds bought for a term, in step with the server (server/api/catalog.mjs ROOM_BGS;
+// tests/server-catalog.test.ts). Each can be bought once its picture is in the app (stage-backdrop ROOM_BG_ART) and
+// the server has it on sale; until then the shelf shows it as "yakında" (docs/GORSEL_URETIM_LISTESI.md §14).
+export const ROOM_BG_PAID = [
+  { id: 'rb-yildiz', name: 'Yıldızlı Gece', price: 600, days: 30 },
+  { id: 'rb-neon', name: 'Neon Sokak', price: 900, days: 30 },
+  { id: 'rb-konser', name: 'Konser Sahnesi', price: 900, days: 30 },
+  { id: 'rb-teras', name: 'Teras Partisi', price: 1_200, days: 30 },
+  { id: 'rb-galaksi', name: 'Galaksi', price: 1_200, days: 30 },
+  { id: 'rb-salon', name: 'Altın Salon', price: 2_000, days: 30 },
+];
+/** Oda Süslemesi › Özel in the demo (a server room takes the live price and days from the server). */
+export const ROOM_BG_CUSTOM = { price: 5_000, days: 30, changesPerDay: 10 };
+/** The sizes a room picture is cut to before it is uploaded: the stage's portrait shape, the lists' square. */
+export const ROOM_BG_SIZE = { width: 1080, height: 1920 };
+export const ROOM_COVER_SIZE = { width: 800, height: 800 };
+/** What a room draws behind its stage: a free or paid background by id (null: the theme's stage) or a picture.
+ *  `until`: when a paid or own picture's term ends; only the room's settings get it, not everyone who reads the room. */
+export type RoomBackground = { kind: 'free' | 'paid' | 'custom'; id: string | null; url: string | null; until?: string | null };
 
 // --- Room music (licensed in-app catalog; mock) -------------------------------
 export type Track = { id: string; title: string; artist: string; seconds: number };

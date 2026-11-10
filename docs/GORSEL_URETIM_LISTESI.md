@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`, Temel ücretsiz). Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 543 görsel.** Öncelik: P1 137 (çok görünen, para kazandıran) · P2 187 · P3 158 · P4 61 (küçük arayüz simgeleri).
+**Toplam 549 görsel.** Öncelik: P1 143 (çok görünen, para kazandıran) · P2 187 · P3 158 · P4 61 (küçük arayüz simgeleri).
 
 | Bölüm | Adet |
 |---|---|
@@ -30,6 +30,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 11. Para ve finans | 11 |
 | 12. Arayüz durum ve işlem simgeleri | 57 |
 | 13. Güncelleme 2: Odalar bannerları ve Mesajlar | 7 |
+| 14. Güncelleme 3: Ücretli oda süslemeleri | 6 |
 
 ## ChatGPT ile üretim
 
@@ -685,3 +686,26 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 5 | `mesaj-similar-ekibi.png` | Similar Ekibi | 3D zarf | Mesajlar üst kartı: mühürlü zarf ve küçük megafon (yönetimden gelen duyurular), şeffaf | P1 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
 | 6 | `mesaj-cevrimici-hizmet.png` | Çevrim içi hizmet | 3D sohbet | Mesajlar üst kartı: kulaklıklı sohbet balonu (canlı destek), şeffaf | P1 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
 | 7 | `mesaj-ajansim.png` | Ajansım | 3D çanta | Mesajlar üst kartı: ajans çantası ve yanında küçük yıldız rozeti, şeffaf | P1 | Yeni (güncelleme 2) · şu an mevcut 3D simge duruyor; gelince `components/room-banners.tsx` / `app/(tabs)/mesajlar.tsx` içinde değişir |
+
+
+## 14. Güncelleme 3: Ücretli oda süslemeleri (6)
+
+Oda Ayarları › **Oda Süslemesi › Ücretli** rafındaki arka planlar. Kod, fiyatlar ve raf hazır (`server/api/catalog.mjs` `ROOM_BGS`, `app/src/data/catalog.ts` `ROOM_BG_PAID`); görseli gelmeyen süsleme rafta "Yakında" olarak durur ve satılmaz. **Ücretsiz** sekmesindeki dört süsleme uygulamanın mevcut deniz fotoğraflarını kullanıyor (`app/assets/bg`, yeni görsel gerekmiyor); onlar ücretsiz stok fotoğraf olduğu için satılamaz, bu yüzden ücretli raf özgün görsel bekliyor.
+
+Ölçü ve stil (hepsi için aynı, `docs/ODA_GORSEL_LISTESI.md` ile uyumlu):
+
+- **Dikey, 1080 × 1920 px** (sahnenin biçimi, 9:16), PNG ya da JPG; şeffaflık yok, kenar boşluğu yok (ekranı tam kaplar).
+- Üst yarıda mekân hissi; **ortada ve üst üçte birde sakin, boş alan** (koltuklar ve avatarlar oraya gelir); **alt yarı koyu ve sade** (üstüne sohbet yazısı gelir, uygulama ayrıca koyulaştırır).
+- İnsan, yazı, logo, marka, bayrak yok. Yumuşak, hafif bulanık, az ayrıntı.
+- Satılacağı için **özgün** olmalı: başka uygulamaların görsellerinden kopya ya da "satılamaz" lisanslı stok fotoğraf kullanılmamalı (`docs/VARLIK_KAYNAKLARI.md`'ye kaynağı yazılır).
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `oda-susleme-yildizli-gece.png` | Yıldızlı Gece | "Yakında" kutusu | Durgun gece denizinin üstünde yıldızlı gökyüzü ve ince bir samanyolu; ufukta turkuaz bir parıltı | P1 | Yeni (güncelleme 3) · 600 jeton / 30 gün · kimlik `rb-yildiz` |
+| 2 | `oda-susleme-neon-sokak.png` | Neon Sokak | "Yakında" kutusu | Yağmur sonrası gece sokağı: ıslak zeminde turkuaz ve mercan neon yansımaları, bulanık tabela ışıkları (yazı okunmaz) | P1 | Yeni (güncelleme 3) · 900 jeton / 30 gün · kimlik `rb-neon` |
+| 3 | `oda-susleme-konser-sahnesi.png` | Konser Sahnesi | "Yakında" kutusu | Boş konser sahnesi: üstten inen spot ışıkları, hafif sahne dumanı, arkada bulanık ışık duvarı; mercan ve turkuaz | P1 | Yeni (güncelleme 3) · 900 jeton / 30 gün · kimlik `rb-konser` |
+| 4 | `oda-susleme-teras-partisi.png` | Teras Partisi | "Yakında" kutusu | Çatı katı terası: asılı ampul zincirleri, uzakta bulanık şehir ışıkları, gece gökyüzü; altın ve mercan ışık | P1 | Yeni (güncelleme 3) · 1.200 jeton / 30 gün · kimlik `rb-teras` |
+| 5 | `oda-susleme-galaksi.png` | Galaksi | "Yakında" kutusu | Derin uzay: sarmal galaksi ve yıldız tozu, turkuaz ve altın bulutsu; mor-pembe gradyan yok | P1 | Yeni (güncelleme 3) · 1.200 jeton / 30 gün · kimlik `rb-galaksi` |
+| 6 | `oda-susleme-altin-salon.png` | Altın Salon | "Yakında" kutusu | Yüksek tavanlı, altın ışıklı görkemli salon: avize ışıltısı, mermer zemin yansıması, lacivert gölgeler | P1 | Yeni (güncelleme 3) · 2.000 jeton / 30 gün · kimlik `rb-salon` |
+
+Teslimden sonra (her görsel için): dosya `app/assets/room/` içine konur → `app/src/components/room/stage-backdrop.tsx` içindeki `ROOM_BG_ART`'a kimliğiyle eklenir → `server/api/catalog.mjs` `ROOM_BG_ROWS`'ta o satırın sonundaki `false` `true` yapılır (satışa açılır). Uygulama sürümü yayımlanmadan sunucuda satışa açılmamalı: görseli olmayan eski sürüm o süslemeyi çizemez (ücretsiz süslemeyi gösterir). Yeni bir süsleme eklemek aynı üç adım artı iki katalog satırıdır.

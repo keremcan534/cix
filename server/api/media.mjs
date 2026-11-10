@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -16,11 +16,14 @@
 //
 // Files no longer used are deleted (removeFiles, removeUserFiles): an avatar replaced, a moment its author
 // deletes, an album photo removed (profiles.mjs; the album's files are the rows of profile_photos, so anything that
-// clears unused files must count those as used), a track taken out of a library, a removed notice, and every file
-// of a deleted account (UK GDPR erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
+// clears unused files must count those as used), a track taken out of a library, a removed notice, a room picture
+// replaced, removed or past its term (room-decor.mjs), and every file of a deleted account (UK GDPR erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
 // Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
 // 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one. 'ticket' (a
 // support ticket's evidence photo, support.mjs) is never deleted while its ticket holds it, whatever asks.
+// 'roombg' (an owner's own picture behind their room's stage) and 'roomcover' (a room's card picture), both
+// room-decor.mjs, are for people who have an open room (a cover also for its Süper Yönetici); each stays while the
+// room or its owner's decoration holds it.
 import crypto from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -43,6 +46,10 @@ const KINDS = {
   // Evidence on a support ticket (support.mjs): a screenshot, a receipt.
   ticket: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
+  // Room pictures (room-decor.mjs), cut to size on the phone first: the owner's own background (1080 × 1920) and the
+  // room's card picture (800 × 800).
+  roombg: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 4 * 1024 * 1024, may: hasOpenRoom, refused: 'Özel süsleme açık bir odası olan oda sahipleri için' },
+  roomcover: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 2 * 1024 * 1024, may: mayChangeCover, refused: 'Oda kapağını oda sahibi veya Süper Yönetici değiştirebilir' },
 };
 const EXPIRES = 10 * 60;
 
@@ -54,6 +61,16 @@ export async function mayKeepMusic(uid) {
     [uid],
   );
   return r.rows[0].ok;
+}
+
+/** Whether `uid` has an open room of their own (an owner's own background, room-decor.mjs). */
+async function hasOpenRoom(uid) {
+  return (await db.query('SELECT 1 FROM rooms WHERE owner = $1 AND closed_at IS NULL', [uid])).rowCount > 0;
+}
+/** Whether `uid` may change some open room's cover: its owner or a Süper Yönetici of it (room-decor.mjs). */
+async function mayChangeCover(uid) {
+  if (await hasOpenRoom(uid)) return true;
+  return (await db.query('SELECT 1 FROM room_admins a JOIN rooms r ON r.id = a.room_id WHERE a.user_id = $1 AND a.super AND r.closed_at IS NULL LIMIT 1', [uid])).rowCount > 0;
 }
 
 const hmac = (key, s) => crypto.createHmac('sha256', key).update(s).digest();
@@ -111,7 +128,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -208,6 +225,9 @@ async function deleteKeys(keys) {
     if (key.startsWith('ticket/') && (await db.query('SELECT 1 FROM support_tickets t WHERE EXISTS (SELECT 1 FROM unnest(t.photos) p WHERE position($1 in p) > 0) LIMIT 1', [key])).rowCount) continue;
     // An album photo stays while the album holds it (profiles.mjs removes the row first), even if it was also the avatar.
     if (key.startsWith('album/') && (await db.query('SELECT 1 FROM profile_photos WHERE position($1 in url) > 0 LIMIT 1', [key])).rowCount) continue;
+    // A room's own background and its card picture stay while they are in use (room-decor.mjs clears the row first).
+    if (key.startsWith('roombg/') && (await db.query('SELECT 1 FROM room_decor WHERE position($1 in custom_url) > 0 LIMIT 1', [key])).rowCount) continue;
+    if (key.startsWith('roomcover/') && (await db.query('SELECT 1 FROM rooms WHERE position($1 in cover_url) > 0 LIMIT 1', [key])).rowCount) continue;
     const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
     // 404: already gone, which is what was wanted.
     if (!res.ok && res.status !== 404) console.error('storage delete', res.status);
@@ -277,11 +297,11 @@ export function removeFiles(urls, owner) {
 }
 
 /** Deletes every file a deleted account uploaded (its avatars, moment, chat and album photos, music, ticket
- *  evidence). A notice's picture stays: it is the company's, whoever put it up. */
+ *  evidence, room pictures). A notice's picture stays: it is the company's, whoever put it up. */
 export function removeUserFiles(uid) {
   if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
   later('storage erase failed', async () => {
-    for (const kind of ['avatar', 'moment', 'dm', 'album', 'music', 'ticket']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+    for (const kind of ['avatar', 'moment', 'dm', 'album', 'music', 'ticket', 'roombg', 'roomcover']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
   });
 }
 

@@ -311,7 +311,8 @@ export function roomOf(r: api.ServerRoom): Room {
     id: r.id,
     title: r.title,
     category: 'Sohbet',
-    cover: roomCoverUrl(r.coverId),
+    // Oda kapağı: the uploaded card picture, else what the lists showed before it existed.
+    cover: r.coverUrl || roomCoverUrl(r.coverId),
     hostId: toLocal(r.owner.id),
     listeners: r.listeners,
     seatUserIds: Array(9).fill(null),
@@ -326,6 +327,7 @@ export function roomOf(r: api.ServerRoom): Room {
     micQueue: !!r.micQueue,
     theme: ROOM_THEMES.find((t) => t.id === r.theme)?.id ?? 'chat',
     giftEffects: r.giftEffects !== false,
+    ...(r.background && { background: r.background, bgId: r.bgId ?? null, coverUrl: r.coverUrl ?? null }),
     ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
     bossId: r.boss ? r.boss.id : null,
   };
@@ -415,6 +417,13 @@ export const isMyServerRoom = (id: string) => liveMode() && isServerId(id) && ro
  *  the open room show it right away, and the server tells the phones in the room. */
 export async function updateServerRoom(id: string, patch: api.RoomPatch) {
   const r = roomOf(await api.updateRoom(id, patch));
+  setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
+  return r;
+}
+/** A room as the server just answered it (Oda süslemesi, Oda kapağı: lib/live/room-decor): the lists and the open
+ *  room show it right away. */
+export function putRoomAnswer(answer: api.ServerRoom) {
+  const r = roomOf(answer);
   setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
   return r;
 }

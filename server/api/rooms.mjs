@@ -44,6 +44,8 @@ import { withRoomBadges } from './room-social.mjs';
 import { roomFollowOf, roomOpened } from './room-follow.mjs';
 // pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { endCrossPkOfRoom } from './pk-cross.mjs';
+// room-decor.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { shownBackground } from './room-decor.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -88,6 +90,12 @@ const out = (r) => ({
   coverId: r.cover_id ?? null,
   theme: r.theme ?? 'chat',
   giftEffects: r.gift_effects !== false,
+  // Oda süslemesi and Oda kapağı (room-decor.mjs): the free background chosen (null: the theme's stage), what
+  // every phone draws behind the stage now (a paid or the owner's own picture while its term runs, else the free
+  // one), and the uploaded card picture (null: the lists show what they did before, coverId's picture or none).
+  bgId: r.bg_id ?? null,
+  background: shownBackground(r),
+  coverUrl: r.cover_url ?? null,
   // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Patron koltuğu holder, if any.
   rules: rulesOf(r.rules),
   boss: r.boss_id && rulesOf(r.rules).bossSeat ? { id: r.boss_id, name: r.boss_name ?? 'Üye', avatarUrl: r.boss_avatar ?? null } : null,
@@ -95,8 +103,11 @@ const out = (r) => ({
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
 const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
                        b.name AS boss_name, b.avatar_url AS boss_avatar,
-                       (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners
-                  FROM rooms r JOIN users u ON u.id = r.owner LEFT JOIN users b ON b.id = r.boss_id`;
+                       (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners,
+                       d.pick AS bg_pick, d.custom_url AS bg_custom_url, d.custom_until AS bg_custom_until, d.custom_until > now() AS bg_custom_live,
+                       (SELECT max(e.ends_at) FROM entitlements e WHERE e.user_id = r.owner AND e.kind = 'roombg' AND e.sku = d.pick
+                           AND e.revoked_at IS NULL AND e.starts_at <= now() AND e.ends_at > now()) AS bg_paid_until
+                  FROM rooms r JOIN users u ON u.id = r.owner LEFT JOIN users b ON b.id = r.boss_id LEFT JOIN room_decor d ON d.owner = r.owner`;
 
 /** Puts LiveKit's people count on the rows of rooms it has open now (rooms it doesn't have keep room_presence's). */
 async function withVoiceCounts(rows) {
