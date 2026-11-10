@@ -935,8 +935,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   );
   // The bag falling now (opened, not drawn yet): its rain shows for as long as it falls.
   const bagRain = real ? bags.bags.find((b) => !blocked.has(b.from.id) && Date.parse(b.opensAt) <= bags.now && bags.now < Date.parse(b.closesAt)) : undefined;
+  // Bags whose join is on its way: quick taps on the falling bags send it once.
+  const joiningBags = useRef(new Set<Bag['id']>());
   const joinLuckyBag = async (b: Bag) => {
-    if (b.mine || b.joined) return;
+    if (b.mine || b.joined || joiningBags.current.has(b.id)) return;
+    joiningBags.current.add(b.id);
     try {
       const r = await joinBag(b.id);
       bags.put(r.bag);
@@ -945,6 +948,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const code = grabCode(e);
       if (code === 'followers') showAlert('Takipçilere özel', errorText(e));
       else if (code !== 'early' && code !== 'empty') showAlert('Çekilişe katılamadın', errorText(e));
+    } finally {
+      joiningBags.current.delete(b.id);
     }
   };
   // Bağlar in the room: Lv4 mic line, Lv8 joint entrance, Lv10 chat bubble (components/room/room-bonds).
@@ -2980,10 +2985,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics, in what the chat leaves (the chat keeps the height the person chose, so it never
-              jumps when a banner comes or goes); scrolls when taller. While typing the mics stay in view: the stage
-              keeps its height and only the chat gives way to the keyboard (down to a strip). */}
-          <ScrollView style={typing || strip ? { flexGrow: 0, flexShrink: 1 } : { flex: 1, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
+          {/* Stage: boards and mics, as tall as they are; the chat below takes the rest (at least the height the person
+              chose), so no empty band opens between the mics and the Balkon. When the stage needs more than the chat
+              leaves it scrolls, and it gives way first (the large shrink), so the chat keeps its chosen height. While
+              typing the mics stay in view: the stage keeps its height and only the chat gives way to the keyboard. */}
+          <ScrollView style={typing || strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
             {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
             {session && <SessionBanner session={session} />}
             {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}

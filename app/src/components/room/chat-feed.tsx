@@ -1,8 +1,9 @@
 // Room chat area with Tümü / Hediyeler / Sohbet tabs (lib/chat-feed decides what each shows). One list per
 // tab stays mounted, so switching tabs keeps each tab's own reading position and never reloads, rebuilds or
 // replays anything. A reader scrolled up is never pulled down by new events; a pill offers to jump instead.
-// The chat keeps the height the person chose (drag the handle above the tabs, or tap it: lib/room-chat-size);
-// the stage above takes what is left, so banners and mics coming and going never make the chat jump. The tab
+// The chat is at least the height the person chose (drag the handle above the tabs, or tap it: lib/room-chat-size)
+// and takes whatever the mics leave too, so there is never an empty band between the mics and the chat; when the
+// stage needs more (banners, boards), it scrolls before the chat gives up any of its chosen height. The tab
 // at the handle's right is the room's Küçült / Büyüt: Küçült turns the mics into a short strip and the chat takes
 // all the room below it; Büyüt brings the mics back to their size and the chat to the size it had.
 // While typing the chat keeps only a strip above the keyboard and the mics stay in view.
@@ -79,7 +80,7 @@ export function ChatFeed({
     [messages, visible],
   );
   return (
-    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { height: height.value, flexShrink: 1, minHeight: 96 }]}>
+    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { flexBasis: height.value, flexGrow: 1, flexShrink: 1, minHeight: 96 }]}>
       {!fill && (
         <View>
           <Handle height={height} />
@@ -225,7 +226,11 @@ function FeedList({ data, active, empty, renderItem, sideRoom }: { data: FeedMsg
           inverted
           keyExtractor={(m) => m.id}
           renderItem={renderItem}
-          contentContainerStyle={{ gap: 6, paddingVertical: 8, paddingRight: sideRoom }}
+          // The room for the button on the right is the list's own margin, not its content's padding: Android draws an
+          // inverted list turned around (scale -1), so a right padding would end up on the left, with the lines
+          // running under the button.
+          style={sideRoom ? { marginRight: sideRoom } : undefined}
+          contentContainerStyle={{ gap: 6, paddingVertical: 8 }}
           initialNumToRender={16}
           windowSize={9}
           scrollEventThrottle={100}

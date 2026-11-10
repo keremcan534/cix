@@ -186,12 +186,12 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
 /** One falling bag: where it starts across the screen, when it first falls, how long a fall takes, its sway, size. */
 type Drop = { x: number; delay: number; duration: number; sway: number; size: number };
 /** A new set of falling bags across `width`, spread so they don't bunch up (impure: once per show). Slow enough to
- *  catch: a bag takes 5 to 7 s from top to bottom, and they keep coming for as long as the bag falls. */
+ *  catch: a bag takes 4 to 5.6 s from top to bottom, and they keep coming for as long as the bag falls. */
 function makeDrops(count: number, width: number): Drop[] {
   return Array.from({ length: count }, (_, i) => ({
     x: Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 72)),
-    delay: Math.round(Math.random() * 3500),
-    duration: 5000 + Math.round(Math.random() * 2000),
+    delay: Math.round(Math.random() * 2800),
+    duration: 4000 + Math.round(Math.random() * 1600),
     sway: Math.round((Math.random() - 0.5) * 60),
     size: 50 + Math.round(Math.random() * 18),
   }));
@@ -278,7 +278,10 @@ export function LuckyBagRain({ bag, now, width, height, still, onJoin, onOpen }:
               },
             ]}
           >
-            <Pressable onPress={tap} hitSlop={14} accessibilityRole="button" accessibilityLabel={bag.joined ? 'Çekilişe katıldın' : 'Çantaya dokun, çekilişe katıl'}>
+            {/* A falling bag counts the moment the finger lands (onPressIn): its fall is drawn on the native side, so
+                the press area React Native measures is where the bag was laid out (above the screen), and a release
+                would always be read as "moved off it" and dropped. */}
+            <Pressable onPressIn={tap} hitSlop={18} accessibilityRole="button" accessibilityLabel={bag.joined ? 'Çekilişe katıldın' : 'Çantaya dokun, çekilişe katıl'}>
               <Image source={ROOM_ICON_ART.envelope} style={{ width: d.size, height: d.size }} />
             </Pressable>
           </Animated.View>
