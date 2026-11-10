@@ -42,6 +42,8 @@ export function startApi(extraEnv = {}) {
       LOG_REQUESTS: '0',
       PUSH_ENABLED: '0',
       ALLOW_DEV_AUTH: '1',
+      // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).
+      UPLOAD_VERIFY: '0',
       ...extraEnv,
     };
     for (const k of Object.keys(env)) if (env[k] === undefined || env[k] === null) delete env[k];

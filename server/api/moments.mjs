@@ -26,7 +26,7 @@ import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { SPAM_MESSAGES, checkSpam } from './spam-filter.mjs';
 import { charmPoints } from './wallet.mjs';
-import { removeFiles } from './media.mjs';
+import { removeFiles, verifyUpload } from './media.mjs';
 
 const PAGE = 50;
 /** The topics the app offers (app/src/data/social-ui.ts MOMENT_TOPICS). */
@@ -163,6 +163,7 @@ export const momentRoutes = {
     const b = await readJson(req);
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const image = photoOf(b.imageUrl, me);
+    if (image) await verifyUpload(image, 'moment');
     if (b.topic !== undefined && b.topic !== null && !TOPICS.includes(b.topic)) throw new HttpError(400, 'Geçersiz konu');
     const body = noSpam(await publicText(b.text ?? '', image ? 0 : 1, 1000, 'An', me, 'moment.post', 'text'), 'text');
     // A retry of a post already stored is not counted against the pace.

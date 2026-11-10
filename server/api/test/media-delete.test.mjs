@@ -9,8 +9,8 @@ import http from 'node:http';
 import { rnd, startApi } from './harness.mjs';
 
 const CDN = 'https://cdn.example.com';
-// The bucket: keys it holds, and what was asked of it.
-const stored = new Set();
+// The bucket: keys it holds (with their size and type), and what was asked of it.
+const stored = new Map();
 const asked = [];
 const S3_PORT = 19000 + (process.pid % 900);
 const bucket = http.createServer((req, res) => {
@@ -22,13 +22,20 @@ const bucket = http.createServer((req, res) => {
     return res.writeHead(204).end();
   }
   if (req.method === 'PUT') {
+    req.resume();
     if (!u.pathname.startsWith('/media/')) return res.writeHead(404).end('<?xml version="1.0"?><Error><Code>NoSuchBucket</Code></Error>');
-    stored.add(decodeURIComponent(u.pathname.slice('/media/'.length)));
+    // The size may be signed, the type may not: the phone sends a file's own type, often empty (media.mjs upload route).
+    if (u.searchParams.get('X-Amz-SignedHeaders') !== 'content-length;host') return res.writeHead(403).end('<?xml version="1.0"?><Error><Code>SignatureDoesNotMatch</Code></Error>');
+    stored.set(decodeURIComponent(u.pathname.slice('/media/'.length)), { size: Number(req.headers['content-length'] ?? 0), type: req.headers['content-type'] ?? '' });
     return res.writeHead(200).end();
+  }
+  if (req.method === 'HEAD') {
+    const f = stored.get(decodeURIComponent(u.pathname.replace(/^\/media\//, '')));
+    return f ? res.writeHead(200, { 'content-length': String(f.size), 'content-type': f.type }).end() : res.writeHead(404).end();
   }
   if (req.method === 'GET' && u.pathname === '/media' && u.searchParams.get('list-type') === '2') {
     const prefix = u.searchParams.get('prefix') ?? '';
-    const keys = [...stored].filter((k) => k.startsWith(prefix));
+    const keys = [...stored.keys()].filter((k) => k.startsWith(prefix));
     return res.writeHead(200, { 'content-type': 'application/xml' }).end(`<?xml version="1.0"?><ListBucketResult>${keys.map((k) => `<Contents><Key>${k}</Key></Contents>`).join('')}<IsTruncated>false</IsTruncated></ListBucketResult>`);
   }
   res.writeHead(400).end();
@@ -40,7 +47,7 @@ after(() => pub.close());
 bucket.listen(S3_PORT, '127.0.0.1');
 after(() => bucket.close());
 
-const h = startApi({ S3_ENDPOINT: `http://127.0.0.1:${S3_PORT}`, S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: CDN });
+const h = startApi({ S3_ENDPOINT: `http://127.0.0.1:${S3_PORT}`, S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: CDN, UPLOAD_VERIFY: '1' });
 const { call, signUp } = h;
 const q = (s, p) => h.sql.query(s, p);
 const ok = async (p, what) => {
@@ -49,9 +56,9 @@ const ok = async (p, what) => {
   return j;
 };
 /** A file in the bucket under kind/<owner>/, and its public address. */
-const file = (kind, owner) => {
+const file = (kind, owner, meta = { size: 1000, type: 'image/jpeg' }) => {
   const key = `${kind}/${owner}/${rnd(8)}.jpg`;
-  stored.add(key);
+  stored.set(key, meta);
   return { key, url: `${CDN}/${key}` };
 };
 /** The deletions run after the answer: waits until the bucket no longer holds `gone` (or gives up). */
@@ -133,7 +140,7 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     Object.assign(process.env, { S3_ENDPOINT: `http://127.0.0.1:${S3_PORT}`, S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: `http://127.0.0.1:${S3_PORT + 1}` });
     try {
       assert.match(await storageCheck(), /^yükleme 200, açık adres 200, silme 204/);
-      assert.ok(![...stored].some((k) => k.startsWith('check/')), 'deneme dosyası silindi');
+      assert.ok(![...stored.keys()].some((k) => k.startsWith('check/')), 'deneme dosyası silindi');
       process.env.S3_BUCKET = 'yanlis';
       assert.match(await storageCheck(), /^yükleme 404 NoSuchBucket/);
       process.env.S3_BUCKET = 'media';
@@ -170,6 +177,29 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     assert.match(storageNotes({ ...good, S3_ENDPOINT: `${good.S3_ENDPOINT}/baska-yol` }).join(), /fazladan yol/);
     assert.match(storageNotes({ ...good, S3_PUBLIC_URL: good.S3_ENDPOINT }).join(), /S3_PUBLIC_URL depo adresi olmuş/);
     assert.match(storageNotes({ ...good, S3_BUCKET: 'Similar Club' }).join(), /S3_BUCKET bir kova adı değil/);
+  });
+
+  test('yükleme adresinde tür imzalı değil (boyut imzalı); kullanılan dosya depoda aranır, yoksa, büyükse ya da türü yanlışsa reddedilip silinir', async () => {
+    const a = await signUp('Denetim');
+    const up = await ok(call('POST', '/api/media/upload-url', { kind: 'avatar', contentType: 'image/jpeg', size: 1000 }, a.session), 'yükleme adresi');
+    assert.match(up.uploadUrl, /X-Amz-SignedHeaders=content-length%3Bhost(&|$)/);
+    assert.deepEqual(up.headers, { 'content-type': 'image/jpeg' });
+    const [s1, j1] = await call('PATCH', '/api/me', { avatarUrl: `${CDN}/avatar/${a.user.id}/${rnd(8)}.jpg` }, a.session);
+    assert.equal(s1, 400);
+    assert.match(j1.error, /yüklenmemiş/);
+    const big = file('avatar', a.user.id, { size: 6 * 1024 * 1024, type: 'image/jpeg' });
+    const [s2, j2] = await call('PATCH', '/api/me', { avatarUrl: big.url }, a.session);
+    assert.equal(s2, 400);
+    assert.match(j2.error, /en fazla 5 MB/);
+    const page = file('avatar', a.user.id, { size: 500, type: 'text/html' });
+    const [s3, j3] = await call('PATCH', '/api/me', { avatarUrl: page.url }, a.session);
+    assert.equal(s3, 400);
+    assert.match(j3.error, /türü yüklenemez/);
+    await settle([big.key, page.key]);
+    assert.equal(stored.has(big.key), false, 'büyük dosya silindi');
+    assert.equal(stored.has(page.key), false, 'yanlış türdeki dosya silindi');
+    // A phone that couldn't name the type: the size still holds, the photo goes.
+    await ok(call('PATCH', '/api/me', { avatarUrl: file('avatar', a.user.id, { size: 500, type: 'application/octet-stream' }).url }, a.session), 'türü adsız fotoğraf');
   });
 
   test('Anlar ve sohbet için video ya da çok büyük dosya istenmez', async () => {

@@ -119,6 +119,37 @@ async function deleteKeys(keys) {
   }
 }
 
+/**
+ * An uploaded file checked where it is used (an avatar set, a moment posted, a chat photo sent, a notice, a track):
+ * it must be in the storage, no bigger than its kind allows and of an allowed type (or none the phone could name).
+ * The upload address binds the size but not the type (see the upload route), so this is where the type is held
+ * (and the size again): a file outside them is deleted and refused. A storage that can't be reached lets it through (the person isn't blocked by our outage).
+ * UPLOAD_VERIFY=0 turns it off (tests whose storage is a stand-in address).
+ */
+export async function verifyUpload(url, kind) {
+  const key = keyOf(url);
+  const k = KINDS[kind];
+  if (!key || !k || !storageOn() || env.UPLOAD_VERIFY === '0') return;
+  let res;
+  try {
+    res = await fetch(signed('HEAD', key), { method: 'HEAD', signal: AbortSignal.timeout(5_000) });
+  } catch (e) {
+    console.error('upload check failed', e?.cause?.code ?? e?.name);
+    return;
+  }
+  if (res.status === 404) throw new HttpError(400, 'Dosya yüklenmemiş, tekrar dene');
+  if (!res.ok) {
+    console.error('upload check', res.status);
+    return;
+  }
+  const size = Number(res.headers.get('content-length') ?? 0);
+  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  const typeOk = !type || type === 'application/octet-stream' || k.types.includes(type);
+  if (size <= k.max && typeOk) return;
+  later('storage delete failed', () => deleteKeys([key]));
+  throw new HttpError(400, typeOk ? `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir` : 'Bu dosya türü yüklenemez');
+}
+
 /** Every key under `prefix` (ListObjectsV2, a page of up to 1000 at a time). */
 async function listKeys(prefix) {
   const keys = [];
@@ -195,14 +226,14 @@ export async function storageCheck() {
   if (notes[0] === 'S3_ENDPOINT bir adres değil') return notes[0];
   const key = `check/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.txt`;
   const body = 'similar storage check';
-  const headers = { 'content-type': 'text/plain', 'content-length': String(Buffer.byteLength(body)) };
+  const headers = { 'content-type': 'text/plain' };
   const signal = () => AbortSignal.timeout(10_000);
   const codeOf = async (res) => `${res.status}${/<Code>([^<]{1,60})<\/Code>/.exec(await res.text().catch(() => ''))?.[1]?.replace(/^/, ' ') ?? ''}`;
   const failed = (step, e) => `${step} bağlanamadı (${e?.cause?.code ?? e?.name ?? 'hata'})`;
   const out = [];
   let put;
   try {
-    const url = presign({ method: 'PUT', url: `${endpointOf()}/${env.S3_BUCKET}/${key}`, region: env.S3_REGION ?? 'auto', accessKey: env.S3_KEY, secretKey: env.S3_SECRET, expires: 60, headers });
+    const url = presign({ method: 'PUT', url: `${endpointOf()}/${env.S3_BUCKET}/${key}`, region: env.S3_REGION ?? 'auto', accessKey: env.S3_KEY, secretKey: env.S3_SECRET, expires: 60, headers: { 'content-length': String(Buffer.byteLength(body)) } });
     put = await fetch(url, { method: 'PUT', headers, body, signal: signal() });
     out.push(`yükleme ${await codeOf(put)}`);
   } catch (e) {
@@ -237,7 +268,11 @@ export const mediaRoutes = {
     if (!Number.isSafeInteger(size) || size < 1 || size > k.max) throw new HttpError(400, `Dosya en fazla ${k.max / 1024 / 1024} MB olabilir`);
     // Not guessable, and grouped by person so an account's files can be found (and removed) together.
     const key = `${kind}/${u.id}/${Date.now().toString(36)}-${crypto.randomBytes(9).toString('base64url')}.${TYPES[contentType] ?? AUDIO[contentType]}`;
-    const headers = { 'content-type': contentType, 'content-length': String(size) };
+    // The address and the size are signed, the type isn't: Expo's fetch on the phone sends a file with the
+    // file's own type, which is empty for a file read from the phone, and the storage refused that against a
+    // signed type (403). The type is checked where the file is used (verifyUpload). It still goes back for the
+    // phone to send, as the storage keeps it with the file.
+    const headers = { 'content-type': contentType };
     const uploadUrl = presign({
       method: 'PUT',
       url: `${endpointOf()}/${env.S3_BUCKET}/${key}`,
@@ -245,7 +280,7 @@ export const mediaRoutes = {
       accessKey: env.S3_KEY,
       secretKey: env.S3_SECRET,
       expires: EXPIRES,
-      headers,
+      headers: { 'content-length': String(size) },
     });
     return { uploadUrl, method: 'PUT', headers, publicUrl: `${env.S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`, expiresIn: EXPIRES };
   },

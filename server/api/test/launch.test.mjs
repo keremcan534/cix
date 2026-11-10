@@ -320,13 +320,14 @@ describe('Fotoğraf yükleme', () => {
     assert.ok(u.endsWith('X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404'));
   });
 
-  test('yükleme adresi tür ve boyutla imzalanır; geçersiz tür ve boyut reddedilir', async () => {
+  test('yükleme adresi boyutla imzalanır; geçersiz tür ve boyut reddedilir', async () => {
     const a = await signUp('Fotoğraflı');
     const [st, j] = await call('POST', '/api/media/upload-url', { kind: 'avatar', contentType: 'image/jpeg', size: 200_000 }, a.session);
     assert.equal(st, 200, j.error);
     assert.ok(j.uploadUrl.startsWith(`https://acc.r2.cloudflarestorage.com/media/avatar/${a.user.id}/`));
-    assert.ok(j.uploadUrl.includes('X-Amz-SignedHeaders=content-length%3Bcontent-type%3Bhost'));
-    assert.deepEqual(j.headers, { 'content-type': 'image/jpeg', 'content-length': '200000' });
+    // The size is signed, the type isn't (phones send a file's own type, often empty); the type is checked on use.
+    assert.ok(j.uploadUrl.includes('X-Amz-SignedHeaders=content-length%3Bhost'));
+    assert.deepEqual(j.headers, { 'content-type': 'image/jpeg' });
     assert.ok(j.publicUrl.startsWith(`https://cdn.example.com/avatar/${a.user.id}/`) && j.publicUrl.endsWith('.jpg'));
     assert.equal((await call('PATCH', '/api/me', { avatarUrl: j.publicUrl }, a.session))[1].user.avatarUrl, j.publicUrl);
     assert.equal((await call('POST', '/api/media/upload-url', { kind: 'avatar', contentType: 'video/mp4', size: 1000 }, a.session))[0], 400);

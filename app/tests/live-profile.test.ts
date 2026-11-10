@@ -182,7 +182,9 @@ describe('Profil fotoğrafı sunucuya yüklenir', () => {
     );
     assert.deepEqual(seen[1].body, { kind: 'avatar', contentType: 'image/jpeg', size: 2048 });
     assert.deepEqual(seen[2].headers, TARGET.headers);
-    assert.ok(seen[2].body instanceof Blob);
+    // Bytes, not a Blob: Expo's fetch would send a Blob with its own (empty) type instead of the one asked for.
+    assert.ok(seen[2].body instanceof ArrayBuffer);
+    assert.equal((seen[2].body as ArrayBuffer).byteLength, 2048);
     assert.deepEqual(seen[3].body, { avatarUrl: TARGET.publicUrl });
     assert.equal(me.avatar, TARGET.publicUrl);
   });
@@ -199,6 +201,13 @@ describe('Profil fotoğrafı sunucuya yüklenir', () => {
     route = (s) => (s.url === 'file:///photo.jpg' ? { blob: PHOTO } : s.path === '/api/media/upload-url' ? { body: TARGET } : s.url === TARGET.uploadUrl ? { status: 403 } : { status: 200, body: {} });
     await assert.rejects(uploadAvatar({ uri: 'file:///photo.jpg' }), /Fotoğraf yüklenemedi \(403\)/);
     assert.equal(seen.some((s) => s.method === 'PATCH'), false);
+  });
+
+  test("depo nedenini söylerse (S3 <Code>) hata onu da gösterir", async () => {
+    const { uploadAvatar } = await profile();
+    const why = '<?xml version="1.0" encoding="UTF-8"?><Error><Code>SignatureDoesNotMatch</Code><Message>x</Message></Error>';
+    route = (s) => (s.url === 'file:///photo.jpg' ? { blob: PHOTO } : s.path === '/api/media/upload-url' ? { body: TARGET } : s.url === TARGET.uploadUrl ? { status: 403, body: why } : { status: 200, body: {} });
+    await assert.rejects(uploadAvatar({ uri: 'file:///photo.jpg' }), /Fotoğraf yüklenemedi \(403 SignatureDoesNotMatch\)/);
   });
 
   test('bağlantı koparsa anlaşılır bir hata verir ve avatar kaydedilmez', async () => {
