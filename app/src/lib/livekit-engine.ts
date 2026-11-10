@@ -10,6 +10,7 @@ import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livek
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
 import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
 import type { EngineEvent } from '@/lib/room-session';
+import { setAiDenoise } from '../../modules/similar-denoise';
 
 export type LiveKitConfig = {
   /** wss:// address of the LiveKit server. */
@@ -37,7 +38,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
   // My own `seat` writes the server hasn't echoed yet: their echo is not the owner or an admin moving me.
   let pendingSeats: { v: string; at: number }[] = [];
   const fail = (what: string, e: unknown) => cfg.onError?.(`${what}: ${e instanceof Error ? e.message : String(e)}`);
-  // "Mikrofon denoise": the mic is captured with these; a change takes a new mic track (recapture).
+  // "Mikrofon denoise": the mic is captured with these (WebRTC's own noise suppressor), and the AI denoise
+  // (modules/similar-denoise, RNNoise on Android) cleans it further; a change takes a new mic track (recapture).
   let denoise = true;
   const capture = () => ({ echoCancellation: true, noiseSuppression: denoise, autoGainControl: true });
   let recapturing: Promise<void> | null = null;
@@ -85,6 +87,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room !== r) return;
       await r.connect(cfg.url, token);
       if (room !== r) return void r.disconnect();
+      // The AI denoise goes into the mic's path once the voice engine has started (Android; no-op elsewhere).
+      setAiDenoise(denoise);
       // Browsers block sound until a user gesture; opening a room is one, so this usually succeeds at once.
       await r.startAudio().catch(() => {});
       if (s.publishing) setMic(r, true);
@@ -245,6 +249,8 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
       if (room) applyVolume(room);
     },
     setNoiseSuppression(on) {
+      // The AI denoise (RNNoise) cleans what the phone's own suppression leaves (traffic, keyboards, a TV).
+      setAiDenoise(on);
       if (on === denoise) return;
       denoise = on;
       const r = room;
