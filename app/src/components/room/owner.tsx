@@ -458,6 +458,8 @@ export function RoomInfoSheet({
           )}
 
           {lookEditor && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Image source={look.thumb} style={{ width: 27, height: 48, borderRadius: 6 }} />} />}
+          {/* The cover is its own thing (the picture on the room's card in lists), so it has its own line too. */}
+          {lookEditor && <Line label="Oda Kapağı" onPress={() => setSub('cover')} right={<Photo uri={cover} kind="cover" seed={roomId} style={{ width: 44, height: 44, borderRadius: 8 }} />} />}
           <Line label="Oda hediye kaydı" onPress={() => setSub('gifts')} />
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
