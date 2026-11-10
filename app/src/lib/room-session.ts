@@ -467,7 +467,7 @@ export const engineInfo = () => ({ name: engine.name, capabilities: engine.capab
 export function setEngine(next: AudioEngine) {
   engine = next;
   engine.setNoiseSuppression?.(denoise);
-  engine.setPlaybackVolume?.(volume);
+  engine.setPlaybackVolume?.(callHold ? 0 : volume);
 }
 // "Mikrofon denoise" (settings.micDenoise): kept here so a new engine starts with it.
 let denoise = true;
@@ -479,9 +479,23 @@ export function setNoiseSuppression(on: boolean) {
 let volume = 1;
 export function setPlaybackVolume(v: number) {
   volume = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1));
-  engine.setPlaybackVolume?.(volume);
+  engine.setPlaybackVolume?.(callHold ? 0 : volume);
+}
+/**
+ * A 1v1 call (lib/call-media) holds the room instead of ending it: I stay in the room (its screen takes me off my
+ * mic to the Balkon and says so) while its voices go quiet on this phone, and my mic in it is off. When the call
+ * ends the room plays again as set; the mic stays off until I ask for it.
+ */
+let callHold = false;
+export function holdForCall(on: boolean) {
+  if (callHold === on) return;
+  callHold = on;
+  engine.setPlaybackVolume?.(on ? 0 : volume);
+  const s = state.session;
+  if (on && s && s.status !== 'ended' && s.micWant) patchSession({ micWant: false });
 }
 export function resetSession() {
+  callHold = false;
   stopTimers();
   pendingLeave = null;
   openers.clear();

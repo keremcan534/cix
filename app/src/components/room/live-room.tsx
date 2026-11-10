@@ -796,7 +796,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const canControlMusic = real ? myRole !== 'member' || djIds.includes('me') : canFunctions;
   // A server room's music, as the room metadata has it, played on this phone at the room's clock.
   const liveMusic = real ? (liveState?.music ?? null) : null;
-  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled, musicVolume);
+  const nowMusic = useRoomMusicPlayer(liveMusic, real && musicEnabled && !callActive, musicVolume);
   const shownMusic: MusicState = real
     ? {
         queue: nowMusic && liveMusic ? liveMusic.tracks.slice(nowMusic.index).map((t) => ({ id: t.key, title: t.title, artist: t.byName || 'Oda müziği', seconds: t.seconds })) : [],

@@ -1,6 +1,7 @@
 // The voice and video of one 1v1 call (lib/live/one-on-one): a LiveKit room `call-<id>` with only the two people
 // in it, joined with the token the server gives for that call. Separate from the voice room engine
-// (livekit-engine): a call that starts ends the voice room this phone is in, so two rooms never play at once.
+// (livekit-engine): a call that starts holds the voice room this phone is in (room-session holdForCall: I stay in
+// it on the Balkon and its voices go quiet), so the two never play at once; when the call ends the room plays again.
 //
 // One call at a time, held in a module-level store (useCallMedia). Every async step checks the room is still
 // the current one, so hanging up mid-join never leaves a connection open.
@@ -8,7 +9,7 @@ import { ConnectionState, Room, RoomEvent, Track, type LocalVideoTrack, type Par
 import { useSyncExternalStore } from 'react';
 
 import { beginCall, endCall } from '@/lib/media';
-import { endRoom, getSession } from '@/lib/room-session';
+import { holdForCall } from '@/lib/room-session';
 import { ensureWebRtc, holdAudio, playRemote, releaseAudio } from '@/lib/webrtc-globals';
 
 /** What a video view shows (the shape of @livekit/components-react's TrackReference). */
@@ -67,9 +68,8 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
   if (room && state.callId === callId) return;
   leaveCallMedia();
   if (!URL) return patch({ ...IDLE, callId, status: 'failed', error: 'Arama sunucusu ayarlı değil' });
-  // A voice room would play over the call: the call wins.
-  const s = getSession().session;
-  if (s && s.status !== 'ended') endRoom('left');
+  // A voice room I'm in stays: I go to its Balkon and its voices go quiet until the call ends (room-session).
+  holdForCall(true);
   ensureWebRtc();
   endCall();
   beginCall({ kind: 'direct', mode: video ? 'video' : 'voice', peerId: peer });
@@ -115,6 +115,8 @@ export function leaveCallMedia() {
   const r = room;
   if (!r) return;
   room = null;
+  // The room I stayed in plays again.
+  holdForCall(false);
   playing.forEach((stop) => stop());
   playing.clear();
   void r.disconnect().finally(() => void releaseAudio('call'));
