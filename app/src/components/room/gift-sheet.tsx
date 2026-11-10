@@ -8,6 +8,8 @@
 // used only for the money action, and a short balance turns the action into "top up" instead of
 // failing after the tap. Product rule: no gift ever asks for a confirmation; one tap sends.
 // Gifts the owner hid in Yönetim › Canlı ayarlar are left off every shelf (lib/live/catalog-live visibleGifts).
+// Çantam: free gifts from rewards. A live build shows the server's backpack (lib/live/backpack), read each time the
+// sheet opens; the server takes the gifts out when it sends them. The demo keeps its sample stock on this phone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -18,10 +20,12 @@ import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { GIFTS, userById, type Gift, type GiftCat } from '@/data/mock';
 import { LUCKY_RECIPIENT_SHARE, pct } from '@/data/rules';
+import { bagCounts, bagLabel, bagNeed as needOf, bagShort as shortOf } from '@/lib/backpack';
 import { gamblingLevelOk } from '@/lib/games';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { liveMode } from '@/lib/live';
+import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
@@ -52,6 +56,8 @@ const SHELF_NOTE: Record<Shelf, string> = {
   fav: 'Bir hediyeye uzun basarak favorilere ekle veya çıkar.',
   bag: 'Görev ve giriş ödüllerin. Gönderirken jeton harcanmaz.',
 };
+/** Live: only the server's rewards fill the backpack (today the call task). */
+const LIVE_BAG_NOTE = 'Görev ödüllerin. Gönderirken jeton harcanmaz.';
 const COUNTS = [1, 5, 10, 25, 50, 100, 250];
 const COUNT_LABELS: Record<number, string> = { 5: 'Selam', 25: 'Alkış', 100: 'Dalga', 250: 'Gelgit' };
 /** Sender gift level: Lv(n+1) needs LEVEL_XP[n] coins spent in total. */
@@ -86,7 +92,6 @@ export function GiftSheet({
   coins,
   onSend,
   onSendLucky,
-  noBag = false,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -96,12 +101,13 @@ export function GiftSheet({
   listeners: string[];
   initialTo?: string | null;
   coins: number;
-  /** False when nothing was delivered (offline, no balance); the backpack is only charged on true. */
-  onSend: (g: Gift, to: string[], count: number) => boolean;
+  /**
+   * False when nothing was delivered (offline, no balance); the demo's backpack is only charged on true. `fromBag`:
+   * a free gift from Çantam (live: the server takes it out of the backpack and charges no coins).
+   */
+  onSend: (g: Gift, to: string[], count: number, fromBag?: boolean) => boolean;
   /** `count` Lucky gifts to each person picked (one draw per gift). */
   onSendLucky: (giftId: string, toIds: string[], count: number) => void;
-  /** Server room: the server charges every gift at its price, so the free backpack (a local reward) is hidden. */
-  noBag?: boolean;
 }) {
   const { svipLevel, spentTotal, me, spendBlock, wealthLevel } = useApp();
   // Android modals draw edge to edge: the Gönder row must sit above the navigation bar.
@@ -120,7 +126,15 @@ export function GiftSheet({
   const shelf: Shelf = pickedShelf === 'lucky' && !luckyShelf ? 'hot' : pickedShelf;
   const [sort, setSort] = useState<PriceSort>('default');
   const [favs, setFavs] = useState(() => new Set(favoriteGifts));
-  const [bag, setBag] = useState(() => ({ ...backpackStock }));
+  const [demoBag, setBag] = useState(() => ({ ...backpackStock }));
+  // Live: the server's backpack, read again each time the sheet opens.
+  const live = liveMode();
+  const server = useBackpack(live);
+  useEffect(() => {
+    if (visible && live) void refreshBackpack();
+  }, [visible, live]);
+  const bag = live ? bagCounts(server?.items ?? []) : demoBag;
+  const sourceOf = (id: string) => (live ? bagLabel(server?.items ?? [], id) : (BACKPACK_SOURCES[id] ?? 'Çanta'));
   const [sel, setSel] = useState<{ id: string; bag: boolean }>(() => ({ id: (shown.find((g) => (g.cat ?? 'hot') === 'hot') ?? shown[0]).id, bag: false }));
   const [count, setCount] = useState(1);
   const [countOpen, setCountOpen] = useState(false);
@@ -147,8 +161,8 @@ export function GiftSheet({
   const locked = !fromBag && isLocked(gift, svipLevel);
   const total = isLucky ? lg.price * count * targets.length : (fromBag ? 0 : gift.price) * count * targets.length;
   const short = fromBag ? 0 : total - coins;
-  const bagNeed = count * targets.length;
-  const bagShort = fromBag && bagNeed > (bag[gift.id] ?? 0);
+  const bagNeed = needOf(count, targets.length);
+  const bagShort = fromBag && shortOf(bag, gift.id, count, targets.length);
   // The daily spending limit (Ayarlar > Harcama kontrolü) is shown here, before the tap, like the balance.
   const overLimit = total > 0 && total <= coins ? spendBlock(total) : null;
 
@@ -203,9 +217,9 @@ export function GiftSheet({
     if (isLucky) return sendLucky();
     if (!targets.length || locked || bagShort) return;
     if (fromBag) {
-      // Stock goes down only after the gift really went out (offline sends nothing).
-      if (!onSend({ ...gift, price: 0 }, targets, count)) return;
-      const next = { ...bag, [gift.id]: (bag[gift.id] ?? 0) - bagNeed };
+      // Stock goes down only after the gift really went out (offline sends nothing). Live: the server's answer.
+      if (!onSend({ ...gift, price: 0 }, targets, count, true) || live) return;
+      const next = { ...demoBag, [gift.id]: (demoBag[gift.id] ?? 0) - bagNeed };
       Object.assign(backpackStock, next);
       setBag(next);
       return;
@@ -236,7 +250,7 @@ export function GiftSheet({
       : bagShort
         ? { tone: 'warn' as const, text: `Çantanda ${bag[gift.id] ?? 0} adet var, bu gönderim için ${bagNeed} adet gerekiyor.`, cta: 'Adedi azalt', variant: 'tonal' as const, onPress: () => setCountOpen(true) }
         : fromBag
-          ? { tone: 'info' as const, text: `${BACKPACK_SOURCES[gift.id] ?? 'Çanta'} · jeton harcanmaz.`, cta: 'Ücretsiz gönder', variant: 'hero' as const }
+          ? { tone: 'info' as const, text: `${sourceOf(gift.id)} · jeton harcanmaz.`, cta: 'Ücretsiz gönder', variant: 'hero' as const }
           : short > 0
             ? { tone: 'warn' as const, text: `Bakiyen ${fmt(coins)} jeton. Bu gönderim için ${fmt(short)} jeton eksik.`, cta: 'Jeton yükle', variant: 'money' as const }
             : overLimit
@@ -298,7 +312,7 @@ export function GiftSheet({
 
         {/* What: shelves */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={g.shelves}>
-          {SHELVES.filter((s) => (!noBag || s.key !== 'bag') && (luckyShelf || s.key !== 'lucky')).map((s) => {
+          {SHELVES.filter((s) => luckyShelf || s.key !== 'lucky').map((s) => {
             const on = shelf === s.key;
             const n = s.key === 'bag' ? Object.values(bag).filter((x) => x > 0).length : 0;
             return (
@@ -315,7 +329,7 @@ export function GiftSheet({
         <View style={g.noteRow}>
           {/* The Uğurlu note carries the disclaimer: always shown in full. */}
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={shelf === 'lucky' ? undefined : 2}>
-            {shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: İnci ${svipLevel}.` : SHELF_NOTE[shelf]}
+            {shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: İnci ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
           {isLucky && (
             <Pressable onPress={() => setLuckyView((v) => (v === 'odds' ? 'history' : 'odds'))} style={g.sortBtn} accessibilityRole="button">
@@ -353,7 +367,15 @@ export function GiftSheet({
             />
           ) : list.length === 0 ? (
             <Text style={[g.dim, { padding: space.xl, textAlign: 'center', width: '100%' }]}>
-              {shelf === 'fav' ? 'Henüz favorin yok. Bir hediyeye uzun basarak ekleyebilirsin.' : 'Çantan boş. Günlük giriş ve görevlerden ücretsiz hediye kazanabilirsin.'}
+              {shelf === 'fav'
+                ? 'Henüz favorin yok. Bir hediyeye uzun basarak ekleyebilirsin.'
+                : !live
+                  ? 'Çantan boş. Günlük giriş ve görevlerden ücretsiz hediye kazanabilirsin.'
+                  : server === null
+                    ? 'Çantan yükleniyor…'
+                    : server.sources.length
+                      ? 'Çantan boş. Günlük görevlerden ücretsiz hediye kazanabilirsin.'
+                      : 'Çantan boş.'}
             </Text>
           ) : (
             list.map((it) => (

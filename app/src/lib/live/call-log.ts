@@ -52,10 +52,13 @@ const task = focusStore(api.myCallTask);
 /** Today's call task as the server counts it, or null until read. */
 export const useLiveCallTask = (on = true) => task.useData(on);
 
-/** Takes the call task's reward on the server; the answer's balance reaches the wallet. `paid`: false for a repeat. */
+/**
+ * Takes the call task's reward on the server; the answer's balance reaches the wallet. `paid`: false for a repeat.
+ * `gift`: what it put in Çantam (server/api/backpack.mjs), or null.
+ */
 export async function claimLiveCallTask() {
   const r = await api.claimCallTask();
   applyServerUser(r, 'Görev ödülü');
   task.put(r.task);
-  return { paid: !r.replay, task: r.task };
+  return { paid: !r.replay, task: r.task, gift: r.backpack ?? null };
 }

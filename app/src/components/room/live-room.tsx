@@ -86,6 +86,7 @@ import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rul
 import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, userById, type Gift } from '@/data/mock';
 import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { liveBackpackGift } from '@/lib/live/backpack';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
@@ -2304,11 +2305,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
 
   // Product rule: gifts never ask for confirmation; one tap sends.
-  const sendGift = (gift: Gift, toIds: string[], count: number) => {
+  // `fromBag`: a free gift from Çantam (the gift sheet passes it at price 0).
+  const sendGift = (gift: Gift, toIds: string[], count: number, fromBag = false) => {
     setGiftOpen(false);
     if (offlineBlocked() || blockedFeature('gifts')) return false;
     if (real) {
-      void deliverLiveGifts(gift, toIds, count);
+      void deliverLiveGifts(gift, toIds, count, fromBag);
       return true;
     }
     // Live mode: a sample room's people are not real, and real coins never go to them (no spendCoins here).
@@ -2321,19 +2323,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   // Server room: each gift is paid on the server (its price, my real balance; the recipient's diamonds and
   // Gelir lock are written there). The server itself announces it to the other phones in the room
-  // (server/api/gifts.mjs); this phone draws its own gift once the server said it was paid.
-  const deliverLiveGifts = async (gift: Gift, toIds: string[], count: number) => {
+  // (server/api/gifts.mjs); this phone draws its own gift once the server said it was paid. From Çantam
+  // (server/api/backpack.mjs) no coins move: the server takes the gifts out of the backpack, and the room draws it at
+  // the catalog's price, as the other phones do.
+  const deliverLiveGifts = async (sheetGift: Gift, toIds: string[], count: number, fromBag = false) => {
+    const gift = fromBag ? (GIFTS.find((g) => g.id === sheetGift.id) ?? sheetGift) : sheetGift;
     const sent: string[] = [];
     let error: string | null = null;
     for (const uid of toIds) {
       // The daily limit holds here too (the balance is the server's to check); each answer counts toward it.
-      const limited = spendBlock(gift.price * count);
+      const limited = fromBag ? null : spendBlock(gift.price * count);
       if (limited && limited !== 'Yetersiz bakiye.') {
         error = limited;
         break;
       }
       try {
-        await liveGift(uid, gift.id, count, id);
+        if (fromBag) await liveBackpackGift(uid, gift.id, count, id);
+        else await liveGift(uid, gift.id, count, id);
         sent.push(uid);
       } catch (e) {
         error = errorText(e);
@@ -2342,6 +2348,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }
     if (!sent.length) {
       errorHaptic();
+      if (fromBag) return showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.');
       return showAlert('Hediye gönderilemedi', error ?? 'Gönderilemedi.', [
         { text: 'Tamam', style: 'cancel' },
         { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') },
@@ -3392,7 +3399,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         coins={coins}
         onSend={sendGift}
         onSendLucky={sendLuckyGift}
-        noBag={real}
       />
       <ActionSheet visible={!!sheet} title={sheet?.title} options={sheet?.options ?? []} onClose={() => (setSheet(null), backToMenu())} />
       {reporting.sheet}

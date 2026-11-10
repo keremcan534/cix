@@ -9,7 +9,10 @@ import { Text } from '@/components/text';
 import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
+import { GiftArt } from '@/components/GiftArt';
+import { GIFTS } from '@/data/mock';
 import { liveMode, message, oneOnOneOpen } from '@/lib/live';
+import { useBackpack } from '@/lib/live/backpack';
 import { claimLiveCallTask, useLiveCallTask } from '@/lib/live/call-log';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
@@ -53,6 +56,9 @@ export default function TaskCenter() {
   const [selected, setSelected] = useState((todayIndex + (checkedInToday ? 1 : 0)) % 7);
   const [left, setLeft] = useState(secsToMidnight);
   const liveCallTask = useLiveCallTask(liveMode() && oneOnOneOpen());
+  // Live: the gift the call task also puts in Çantam (Canlı ayarlar may set none).
+  const bagSource = useBackpack(liveMode() && oneOnOneOpen())?.sources.find((x) => x.key === 'call_task');
+  const bagGift = bagSource ? GIFTS.find((g) => g.id === bagSource.giftId) : undefined;
 
   useEffect(() => {
     const t = setInterval(() => setLeft(secsToMidnight()), 1000);
@@ -135,7 +141,10 @@ export default function TaskCenter() {
                 return setReward({ icon: 'tasks', title: `${t.title} tamamlandı`, amount: t.reward });
               }
               void claimLiveCallTask()
-                .then((r) => r.paid && setReward({ icon: 'tasks', title: `${t.title} tamamlandı`, amount: r.task.reward }))
+                .then((r) => {
+                  const g = r.gift ? GIFTS.find((x) => x.id === r.gift?.giftId) : undefined;
+                  if (r.paid) setReward({ icon: 'tasks', title: `${t.title} tamamlandı${g && r.gift ? ` · çantana ${g.name} ×${r.gift.count}` : ''}`, amount: r.task.reward });
+                })
                 .catch((e) => showAlert('Ödül alınamadı', message(e)));
             };
             return (
@@ -156,6 +165,13 @@ export default function TaskCenter() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Icon3D name="coin" size={16} />
                       <Text style={styles.taskReward}>{reward}</Text>
+                      {server && bagSource && bagGift && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }} accessibilityLabel={`ve çantana ${bagSource.count} ${bagGift.name}`}>
+                          <Text style={styles.taskReward}> + </Text>
+                          <GiftArt giftId={bagGift.id} emoji={bagGift.emoji} size={16} textStyle={{ fontSize: 13 }} />
+                          <Text style={styles.taskReward}>×{bagSource.count}</Text>
+                        </View>
+                      )}
                       <Text style={[styles.dim, { marginLeft: 'auto' }]}>
                         {progress}/{goal}
                       </Text>

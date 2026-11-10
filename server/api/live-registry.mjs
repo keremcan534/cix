@@ -86,6 +86,8 @@ export function defaultsOf(e = process.env) {
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
     ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [k, x.default])),
+    // Çantam (backpack.mjs): the demo gives one Kalp as the task reward.
+    backpack_call_task: 1,
   };
 }
 /**
@@ -127,6 +129,9 @@ const oneOnOneEntries = () =>
       },
     ]),
   );
+
+/** Çantam (backpack.mjs): the gift the call task puts in the backpack, as the demo's "Görev ödülü" (Kalp). */
+export const BACKPACK_TASK_GIFT = 'g2';
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -451,6 +456,18 @@ export const REGISTRY = {
     },
   },
   ...oneOnOneEntries(),
+  backpack_call_task: {
+    field: 'backpackCallTask',
+    group: 'Çantam',
+    label: `Görev ödülü: çantaya ${giftName(BACKPACK_TASK_GIFT)}`,
+    help: `Günlük "1 görüntülü arama yap" görevini tamamlayana ödül jetonuyla birlikte çantasına verilen ${giftName(BACKPACK_TASK_GIFT)} (${fmt(GIFTS.get(BACKPACK_TASK_GIFT).price)} jeton değerinde). Çantadan gönderen jeton harcamaz; alanın elması 7 gün kilitli kalır, ajans komisyonu ödenmez. 0: verilmez, çantadakiler yine gönderilebilir.`,
+    type: 'int',
+    bounds: { min: 0, max: 5, step: 1, big: 2 },
+    parse: (v) => wholeOf(v, REGISTRY.backpack_call_task.bounds, 'Çantaya verilen hediye', ' adet'),
+    big: (before, after) => after !== null && after > REGISTRY.backpack_call_task.bounds.big,
+    impact: (before, after) =>
+      after === 0 ? 'Görev ödülüyle çantaya hediye verilmez. Çantada olanlar gönderilebilir.' : `Görev ödülüyle çantaya günde ${fmt(before)} → ${fmt(after)} ${giftName(BACKPACK_TASK_GIFT)} verilir.`,
+  },
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -501,7 +518,7 @@ const readOnlySet = (xs) => {
  *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
- *     heartVideo, invalid }
+ *     heartVideo, backpackCallTask, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -535,6 +552,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),
     ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [x.field, val(k)])),
+    backpackCallTask: val('backpack_call_task'),
     invalid: Object.freeze([...invalid]),
   });
 }

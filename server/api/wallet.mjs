@@ -41,6 +41,8 @@ export const CHANNELS = {
   ugurlu: { label: 'Uğurlu ödülü', lock: 'store' },
   // Coins from someone's Şanslı çanta (lucky-bags.mjs); the store lock, whatever paid for them.
   canta: { label: 'Şanslı çanta', lock: 'store' },
+  // Not a coin lot: a gift sent free from Çantam (backpack.mjs). Its diamonds lock as free coins' do.
+  cantam: { label: 'Çanta hediyesi', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */

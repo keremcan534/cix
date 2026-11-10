@@ -143,13 +143,11 @@ function Dashboard() {
               <Ionicons name="cash-outline" size={18} color="#fff" />
               <Text style={styles.balanceBtnText}>Para çek</Text>
             </Pressable>
-            {/* Jeton Noktası is still a demo screen: a live build doesn't send anyone there. */}
-            {!live && (
-              <Pressable style={styles.balanceBtn} onPress={exchange}>
-                <Ionicons name="flash-outline" size={18} color="#fff" />
-                <Text style={styles.balanceBtnText}>Anında bozdur</Text>
-              </Pressable>
-            )}
+            {/* Live: /coins-bank is the server's Jeton Noktası, where the diamonds are sold to a bank. */}
+            <Pressable style={styles.balanceBtn} onPress={exchange}>
+              <Ionicons name="flash-outline" size={18} color="#fff" />
+              <Text style={styles.balanceBtnText}>Anında bozdur</Text>
+            </Pressable>
           </View>
         </LinearGradient>
 

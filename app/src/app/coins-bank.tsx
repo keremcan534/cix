@@ -1,4 +1,5 @@
-// Coins Bank – central virtual-economy screen (PROTOTYPE: mock data, no real payments).
+// Coins Bank – central virtual-economy screen (PROTOTYPE: mock data, no real payments). A live build shows the
+// server's Jeton Noktası instead (components/coins-bank-live).
 // Coins (bought, spent on gifts), Diamonds (creator earnings) and Bonus Credits (promotions, not
 // withdrawable) are separate currencies. Creator earnings are never reduced by agency/BD commissions;
 // those are separate platform liabilities. Payout state lives in src/lib/bank.ts.
@@ -12,7 +13,7 @@ import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
-import { ComingSoon } from '@/components/coming-soon';
+import { LiveCoinsBank } from '@/components/coins-bank-live';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Card, GradientButton, Header } from '@/components/ui';
 import { AGENCIES, AGENCY_MEMBERS } from '@/data/agency';
@@ -119,10 +120,10 @@ function bdNumbers(bank: BankState) {
 }
 
 // --- screen -------------------------------------------------------------------------
-// A live build shows a notice instead: the bonus balance, bonus ledger, agency and BD figures and payouts here are
-// sample data on this phone, not the user's money on the server (cash-out is Gelir > Para çek).
+// A live build shows the server's Jeton Noktası (the banks, a host's diamond sale, a bank's stock and coin sales):
+// the bonus balance, bonus ledger, agency and BD figures and payouts below are sample data on this phone.
 export default function CoinsBankScreen() {
-  return liveMode() ? <ComingSoon title="Jeton Noktası" /> : <DemoCoinsBank />;
+  return liveMode() ? <LiveCoinsBank /> : <DemoCoinsBank />;
 }
 
 // Everything below is sample data, so it always carries the PROTOTİP pill and the Demo banner (also in a build

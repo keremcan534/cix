@@ -1,6 +1,6 @@
 // Yönetim › Canlı ayarlar (admin only; server/api/live-settings.mjs): what the owner may change without a new
 // APK. Acil durum (a switch per feature, 'Para işlemlerini durdur', the notice) always on top, then Kampanya,
-// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, SMS, Zorunlu sürüm and Geçmiş. Every change opens
+// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Çantam, SMS, Zorunlu sürüm and Geçmiş. Every change opens
 // the same sheet (live-change-sheet): the server's preview, a reason, Uygula, and a second confirmation for a
 // big change. The server checks every value again; the local checks here only say early what it will refuse.
 // Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui';
 import { GIFTS } from '@/data/mock';
 import { ApiError, liveHistory, liveSettings, type CatalogCampaign, type LiveBatch, type LiveKey, type LiveSetting, type LiveSettingsView, type LiveValue } from '@/lib/api';
 import {
+  BACKPACK_BIG,
   bigChange,
   CAMPAIGN_DAYS,
   CAMPAIGN_PERCENT,
@@ -200,6 +201,7 @@ function Body({
             <RateCard kit={kit} />
             <WithdrawCard kit={kit} />
             {kit.get('dm_price') && <OneOnOneCard kit={kit} />}
+            {kit.get('backpack_call_task') && <BackpackCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -712,6 +714,36 @@ function OneOnOneCard({ kit }: { kit: Kit }) {
           style={{ flex: 1 }}
         />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Birebir ayarları değişsin', () => changes)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Çantam --------------------------------------------------------------------------------------------------
+/** The gift the call task puts in Çantam (server/api/backpack.mjs): how many a day, 0 stops it. */
+function BackpackCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const x = kit.get('backpack_call_task');
+  const current = numOf(x.effective);
+  const [text, setText] = useState(String(current));
+  const v = parseWhole(text);
+  const problem = wholeError(v, x.bounds as IntBounds, 'Çantaya verilen hediye', ' adet');
+  const changed = v !== null && v !== current;
+  return (
+    <Card title="Çantam" footer={lastChange(x)} pill={current === 0 ? <StatusPill text="Kapalı" tone="danger" /> : <InvalidPill x={x} />}>
+      <Field label={x.label} value={text} onChange={setText} keyboard="numeric" max={1} hint={`Şu an ${valueText('backpack_call_task', x.effective)} · ${x.help}`} />
+      {changed && <Problem text={problem} />}
+      {changed && !problem && v !== null && v > BACKPACK_BIG && <Text style={s.hint}>{`${BACKPACK_BIG}’nin üstü ikinci bir onay ister.`}</Text>}
+      <View style={s.row}>
+        <Button
+          title={x.value === null ? 'Durdur' : 'Varsayılana dön'}
+          variant="ghost"
+          small
+          disabled={kit.locked || (x.value === null && current === 0)}
+          onPress={() => (x.value === null ? kit.open('Çanta ödülü dursun', () => ({ backpack_call_task: 0 }), 'Acil durum') : kit.open('Çanta ödülü varsayılana dönsün', () => ({ backpack_call_task: null }), 'Geri dönüş'))}
+          style={{ flex: 1 }}
+        />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !changed || !!problem} onPress={() => v !== null && kit.open('Çanta ödülü değişsin', () => ({ backpack_call_task: v }))} style={{ flex: 1 }} />
       </View>
     </Card>
   );

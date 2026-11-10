@@ -17,6 +17,7 @@
 // Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
 // Support tickets: support.mjs. The data copy (UK GDPR access): my-data.mjs. The daily spending limit: spend-limit.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
+// Çantam (free gifts from rewards, sent without coins): backpack.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
@@ -34,6 +35,7 @@ import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
+import { backpackRoutes } from './backpack.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { wealthPoints, wheelRoutes } from './wheel.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
@@ -231,6 +233,7 @@ const routes = {
   ...whatsappRoutes,
   ...pushRoutes,
   ...giftRoutes,
+  ...backpackRoutes,
   ...pkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
