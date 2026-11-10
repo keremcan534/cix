@@ -1,6 +1,7 @@
 // Oyun Merkezi (profile entry point). Oyun Salonu games open here without joining any room; free room games
-// can be tried with online players and are meant to be played inside rooms. Same platform, wallet and
-// history as the in-room entry (lib/games).
+// can be tried here (the demo with sample online players, a live build against bots) and are meant to be played
+// inside rooms. Same platform, wallet and history as the in-room entry (lib/games); in a live build the server plays
+// every Oyun Salonu round and the catalog and history are the server's (lib/live/casino).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,8 +19,9 @@ import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { ME, USERS } from '@/data/mock';
-import { casinoAccess, casinoVisible, gamblingLevelOk, useGames } from '@/lib/games';
+import { casinoAccess, casinoVisible, gamblingLevelOk, practiceBots, useGames } from '@/lib/games';
 import { liveMode } from '@/lib/live';
+import { useLiveCasino } from '@/lib/live/casino';
 import { useApp } from '@/store';
 // Static `colors` is the dark scheme: only for the game panel modal, which is dark in both schemes.
 import { ThemeScope, colors, fonts, makeStyles, useTheme } from '@/theme';
@@ -34,16 +36,16 @@ export default function GameCenter() {
   const t = useTheme();
   const s = useStyles();
   // Below Cömertlik Lv.2 Oyun Salonu is not shown at all: no tab, and an old link to one of its games opens nothing.
-  // Rüzgâr Gülü runs on the server and needs only that level; the other casino games are decided on this phone,
-  // so a live build hides them at every level (casinoVisible).
+  // A live build reads the server's catalog (switches, stakes, history) each time the screen comes to the front.
+  useLiveCasino();
   const showSalon = gamblingLevelOk(wealthLevel);
   const showCasino = casinoVisible(wealthLevel);
   const [tab, setTab] = useState<Tab>(showSalon ? 'casino' : 'room');
   const [open, setOpen] = useState<OpenGame | null>(oyun === 'ruzgar' ? (showSalon ? { kind: 'wheel' } : null) : oyun && showCasino ? { kind: 'casino', id: oyun } : null);
   // Room games from the profile: the demo fills the table with sample online players. A live build has no
-  // matchmaking here, so room games are played only inside a room, with the people sitting there.
+  // matchmaking here, so they are tried against bots, named as bots.
   const live = liveMode();
-  const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...(live ? [] : USERS.filter((u) => u.online).slice(0, 5))]);
+  const [players] = useState(() => [{ id: 'me', name: ME.name, avatar: ME.avatar }, ...(live ? practiceBots(5) : USERS.filter((u) => u.online).slice(0, 5))]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }}>
@@ -130,7 +132,7 @@ export default function GameCenter() {
               <FloatIcon source={icon3dSourceFor('🎁')} size={36} hue={t.semantic.action} />
               <View style={{ flex: 1 }}>
                 <Text style={s.bannerTitle}>Herkese ücretsiz</Text>
-                <Text style={s.dim}>Oda oyunları odanın içinde, odadakilerle oynanır; mikrofonun ve koltuğun aynen kalır.{live ? ' Bir odaya gir, oyunlar menüsünden başlat.' : ' Buradan çevrimiçi oyuncularla deneyebilirsin.'}</Text>
+                <Text style={s.dim}>Oda oyunları odanın içinde, odadakilerle oynanır; mikrofonun ve koltuğun aynen kalır.{live ? ' Buradan botlara karşı deneyebilirsin.' : ' Buradan çevrimiçi oyuncularla deneyebilirsin.'}</Text>
               </View>
             </DepthCard>
             {[1, 2].map((phase) => (
@@ -140,7 +142,7 @@ export default function GameCenter() {
                   {roomGames
                     .filter((g) => g.phase === phase)
                     .map((g, i) => {
-                      const ready = g.active && g.playable && !live;
+                      const ready = g.active && g.playable;
                       return (
                         <View key={g.id} style={s.half}>
                           <BreakoutCard
@@ -156,7 +158,7 @@ export default function GameCenter() {
                               {g.name}
                             </Text>
                             <Text style={s.dim}>
-                              {live && g.active && g.playable ? `${g.minPlayers}–${g.maxPlayers} oyuncu · odada oynanır` : g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers}–${g.maxPlayers} oyuncu${ready ? '' : ' · pasif'}`}
+                              {g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers}–${g.maxPlayers} oyuncu${ready ? (live ? ' · botlarla dene' : '') : ' · pasif'}`}
                             </Text>
                             {ready && <GlossButton label="Dene" tone="action" small />}
                           </BreakoutCard>

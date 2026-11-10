@@ -1,7 +1,8 @@
 // One game platform for both entry points (profile Oyun Merkezi and rooms): one catalog, one coin
-// balance (the app wallet), one history. Casino rounds go through `playCasino`, which plays the part of
-// the game server: it re-checks VIP and limits on every request, is idempotent per request id, and
-// refunds when the provider fails after the stake was taken.
+// balance (the app wallet), one history. In a live build every casino round is the server's (lib/live/casino,
+// server/api/casino.mjs, the same rules) and lands here through applyLiveCasino and liveRound. In the demo
+// rounds go through `playCasino`, which plays the part of the game server: it re-checks VIP and limits on every
+// request, is idempotent per request id, and refunds when the provider fails after the stake was taken.
 //
 // House rule (lib/casino-odds): 60 % of every coin played stays with the house, 40 % is paid back as random
 // winnings. Each stake is split at once — 60 % booked to the house, 40 % into the payout pool — and wins are
@@ -94,12 +95,11 @@ export const updateCasino = (id: string, patch: Partial<CasinoGame>) => emit({ c
 /** Below this Cömertlik level Oyun Salonu does not exist for the user: no tab, tile, link, banner or mention.
  *  A game's own minWealth can only raise it. */
 export const CASINO_MIN_WEALTH = 2;
-/** The gambling level itself: below it no game of chance exists for the user. Rüzgâr Gülü, the one game the
- *  server runs, is gated by this alone. */
+/** The gambling level itself: below it no game of chance exists for the user. Rüzgâr Gülü is gated by this alone. */
 export const gamblingLevelOk = (wealthLevel: number) => wealthLevel >= CASINO_MIN_WEALTH;
-/** Oyun Salonu games (and Zar Düellosu) are decided on this phone: random draw, local winnings. The server has no
- *  round for them yet, so a live build has none of them, whatever the level. */
-export const casinoVisible = (wealthLevel: number) => !liveBuild() && gamblingLevelOk(wealthLevel);
+/** Oyun Salonu from Cömertlik Lv.2. A live build plays every round on the server (lib/live/casino, server/api/
+ *  casino.mjs), which checks the level again; the demo decides them on this phone (playCasino, playBoard). */
+export const casinoVisible = (wealthLevel: number) => gamblingLevelOk(wealthLevel);
 /** A win banner that is not news for this user, skipped and never shown: an Oyun Salonu win for someone who cannot
  *  see Oyun Salonu, and any other win of chance (Uğurlu) below the gambling level. */
 export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number) => (isCasinoWin(n) ? !casinoVisible(wealthLevel) : isChanceWin(n) && !gamblingLevelOk(wealthLevel));
@@ -107,7 +107,6 @@ const CASINO_OFF = 'Bu oyun şu an kapalı.';
 export type Access = { ok: true } | { ok: false; reason: string; needWealth?: number };
 /** Same check the server runs on every launch and every round; the UI only uses it to explain. */
 export function casinoAccess(game: CasinoGame, entry: Entry, wealthLevel: number): Access {
-  if (liveBuild()) return { ok: false, reason: CASINO_OFF };
   if (!game.active) return { ok: false, reason: `${game.name} şu an kapalı.` };
   if (game.providerStatus === 'down') return { ok: false, reason: `${game.name} sağlayıcısı bakımda. Bakiyen etkilenmez; oda ve sesli sohbetin devam eder.` };
   if (entry.from === 'profile' && !game.fromProfile) return { ok: false, reason: `${game.name} yalnızca oda içinden açılabilir.` };
@@ -262,6 +261,41 @@ function settle(
   // A real win (more back than the stake) is announced in every room.
   if (payout > bet * Math.max(1, ANNOUNCE_MIN[game.id] ?? 1)) announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((payout / bet) * 10) / 10, amount: payout, casino: true }, { mine: true });
   return finish({ ok: true, outcome, replay: false, row: { ...base, txId: id, payout, status: 'Tamamlandı', detail: outcome.detail } });
+}
+
+/**
+ * Live Oyun Merkezi: the free room games are tried against bots, named as bots (the demo fills the table with sample
+ * online people; a live build never shows real people making moves they didn't make).
+ */
+export const practiceBots = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `bot-${i + 1}`, name: `Bot ${i + 1}`, avatar: '' }));
+export const isPracticeBot = (id: string) => id.startsWith('bot-');
+
+// --- Live mode (lib/live/casino): the server's catalog, rounds and JACKPOT funds --------------------------------
+/** The server's catalog row of a game: on or off, the stakes it takes now, its daily limit. */
+export type LiveCasinoGame = { id: string; active: boolean; bets: number[]; dailyLimit: number };
+/**
+ * Puts the server's word into the store the screens read: each game's switch, stakes and daily limit (a game the
+ * server doesn't play is off), my history, the JACKPOT funds. Only lib/live/casino calls it; the demo never does.
+ */
+export function applyLiveCasino(p: { games?: LiveCasinoGame[]; history?: HistoryRow[]; jackpots?: Record<string, number> }) {
+  const games = p.games;
+  emit({
+    ...(games && {
+      casino: state.casino.map((g) => {
+        const x = games.find((y) => y.id === g.id);
+        return x ? { ...g, active: x.active, bets: x.bets.length ? x.bets : g.bets, dailyLimit: x.dailyLimit } : { ...g, active: false };
+      }),
+    }),
+    ...(p.history && { history: p.history.slice(0, 200) }),
+    ...(p.jackpots && { bank: { ...state.bank, jackpots: { ...state.bank.jackpots, ...p.jackpots } } }),
+  });
+}
+/** A round the server played: on top of my history, and a real win announced as the demo does. */
+export function liveRound(row: HistoryRow, entry: Entry, fund: number | null) {
+  emit({ history: [row, ...state.history.filter((h) => h.txId !== row.txId)].slice(0, 200), ...(fund !== null && { bank: { ...state.bank, jackpots: { ...state.bank.jackpots, [row.gameId]: fund } } }) });
+  const game = state.casino.find((g) => g.id === row.gameId);
+  if (game && row.payout > row.bet * Math.max(1, ANNOUNCE_MIN[game.id] ?? 1))
+    announceWin({ userName: ME.name, avatar: ME.avatar, source: `Oyun Merkezi › ${game.name}`, roomTitle: entry.from === 'room' ? entry.roomTitle : undefined, mult: Math.round((row.payout / row.bet) * 10) / 10, amount: row.payout, casino: true }, { mine: true });
 }
 
 /** Demo: simulate a provider outage from the admin screen (casino rounds then refund). */

@@ -150,6 +150,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);
     await c.query('DELETE FROM data_exports WHERE user_id = $1', [id]);
     await c.query('DELETE FROM spend_limits WHERE user_id = $1', [id]);
+    // Oyun Salonu rounds (casino.mjs); the ledger keeps the money trail.
+    await c.query('DELETE FROM casino_rounds WHERE user_id = $1', [id]);
 }
 
 export const socialRoutes = {

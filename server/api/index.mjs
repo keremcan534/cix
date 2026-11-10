@@ -16,7 +16,7 @@
 // messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower invites: room-social.mjs). Staff: admin.mjs.
 // Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
 // Support tickets: support.mjs. The data copy (UK GDPR access): my-data.mjs. The daily spending limit: spend-limit.mjs.
-// Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
+// Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs. Sıralama's Oda XP board: room-xp.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
@@ -36,6 +36,8 @@ import { recordIncome } from './agency-lib.mjs';
 import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { wealthPoints, wheelRoutes } from './wheel.mjs';
+import { casinoRoutes } from './casino.mjs';
+import { roomXpRoutes } from './room-xp.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, userId } from './core.mjs';
@@ -234,6 +236,8 @@ const routes = {
   ...pkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
+  ...casinoRoutes,
+  ...roomXpRoutes,
   ...luckyRoutes,
   ...familyRoutes,
   ...familyMoreRoutes,

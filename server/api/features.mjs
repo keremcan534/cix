@@ -36,6 +36,7 @@ export const ROUTES = {
   // New requests only: cancelling, the list and the owner's decision stay open, so held diamonds can come back.
   'POST /api/wallet/withdraw': ['withdraw'],
   'POST /api/wheel/spin': ['games'],
+  'POST /api/casino/play': ['games'],
   'POST /api/shop/buy': ['shop'],
   'POST /api/wallet/spend': ['shop'],
   'POST /api/messages': ['dm'],

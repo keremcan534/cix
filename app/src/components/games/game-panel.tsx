@@ -4,6 +4,7 @@
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -23,7 +24,8 @@ import { GameNav } from '@/components/games/slot-kit';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
-import { casinoVisible, gamblingLevelOk, useGames, type Entry } from '@/lib/games';
+import { casinoVisible, gamblingLevelOk, isPracticeBot, useGames, type Entry } from '@/lib/games';
+import { refreshCasino } from '@/lib/live/casino';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -91,13 +93,14 @@ export function GamePanel({
   const title = wheel ? WHEEL_NAME : (roomGame?.name ?? casinoGame?.name ?? '');
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
-    // Rüzgâr Gülü is played on the server: only the gambling level gates it. The other casino games are decided on
-    // this phone, so casinoVisible() is false for them in a live build.
+    // Rüzgâr Gülü and, in a live build, every other casino game are played on the server; the level gates them all.
     ...(gamblingLevelOk(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
     ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = keyOf(open);
   const openId = open.kind === 'wheel' ? 'wheel' : open.id;
+  // Live: the server's switches, stakes and JACKPOT funds again when a game opens (nothing to read in the demo).
+  useEffect(() => void refreshCasino(), [openId]);
   const titleEmoji = roomGame?.emoji ?? casinoGame?.emoji;
   const titleArt = wheel ? undefined : gameArtOf(open.id);
 
@@ -152,7 +155,8 @@ export function GamePanel({
               {openId === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
               {openId === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
               {openId === 'xox' && <Xox players={players.slice(0, 2)} />}
-              {openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1)} />}
+              {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
+              {openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
               <Text style={p.dim}>
                 {roomGame.minPlayers}–{roomGame.maxPlayers} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
                 {roomGame.note ? ` · ${roomGame.note}` : ''}

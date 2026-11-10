@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
+import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
@@ -844,6 +845,32 @@ export const spendLimit = () => call<ServerSpendLimit>('GET', '/api/me/spend-lim
 /** 0 lifts it. Lower applies now; higher (or 0) after `raiseHours`. */
 export const setSpendLimit = (limit: number) => call<ServerSpendLimit & { applied: 'now' | 'later' }>('POST', '/api/me/spend-limit', { limit });
 
+// Oyun Salonu (server/api/casino.mjs): the server draws and pays; winnings are game coins. `outcome` is the round
+// as lib/casino-odds outcomeOf builds it, for the screen to replay.
+export type ServerCasinoGame = { id: string; name: string; active: boolean; bets: number[]; dailyLimit: number; playedToday: number; jackpot: number | null };
+export type ServerCasinoRound = {
+  id: number;
+  game: string;
+  bet: number;
+  fromGame: number;
+  payout: number;
+  jackpot: number;
+  pick: string | null;
+  bets: Record<string, number> | null;
+  place: 'profile' | 'room';
+  detail: string;
+  at: string;
+  outcome?: Outcome;
+};
+export type ServerCasino = { games: ServerCasinoGame[]; needLevel: number; allowed: boolean; gameCoins: number; mine: ServerCasinoRound[] };
+export type CasinoPlayBody = { game: string; bet?: number; pick?: string; bets?: Record<string, number>; place: 'profile' | 'room' };
+export const casino = () => call<ServerCasino>('GET', '/api/casino');
+export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
+  call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
+/** Sıralama › Oda XP (server/api/room-xp.mjs): open rooms by the room XP their gifts earned in the period. */
+export type RoomXpRow = { rank: number; room: ServerRoom; score: number };
+export const roomXpRankings = (period: 'day' | 'week' | 'month') => call<{ rows: RoomXpRow[] }>('GET', `/api/rankings/room-xp?period=${period}`).then((r) => r.rows);
+
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
 /** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
@@ -883,7 +910,10 @@ export type LiveKey =
   | 'withdraw_max_diamonds'
   | 'withdraw_weekly_diamonds'
   | 'otp_global_per_hour'
-  | OneOnOneKey;
+  | OneOnOneKey
+  | CasinoKey;
+/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */
+export type CasinoKey = 'casino_off' | 'casino_max_bet' | 'casino_daily_rounds';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

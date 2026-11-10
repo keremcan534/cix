@@ -103,6 +103,7 @@ import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
 import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
+import { refreshCasino } from '@/lib/live/casino';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
@@ -2686,8 +2687,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           } satisfies MenuSection,
         ]
       : []),
-    // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it.
-    // The section is gated on the level alone (the server-run wheel); casinoVisible gates the phone-decided games.
+    // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it. A live build
+    // plays every one of its games on the server (lib/live/casino); a game the server switched off isn't listed.
     ...(gamblingLevelOk(app.wealthLevel)
       ? [
           {
@@ -2697,9 +2698,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             items: [
               // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
               { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
-              // The other Oyun Salonu games are played on the phone: live mode doesn't offer them (no real coins).
               ...gameCatalog.casino
-                .filter((g) => casinoVisible(app.wealthLevel) && g.active && g.fromRoom && !liveMode())
+                .filter((g) => casinoVisible(app.wealthLevel) && g.active && g.fromRoom)
                 .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
             ],
           } satisfies MenuSection,
@@ -3293,7 +3293,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
               field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
           <View style={styles.bottom}>
-            {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />}
+            {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => (setPanel('menu'), void refreshCasino())} />}
             <View style={styles.inputWrap}>
               <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />

@@ -12,7 +12,8 @@ import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import { BOARDS, LUCKY_WHEEL, type BoardResult } from '@/lib/board-games';
 import type { BoardId } from '@/lib/casino-odds';
-import { casinoAccess, newRequestId, playBoard, useGames, type Entry } from '@/lib/games';
+import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { playBoardRound } from '@/lib/live/casino';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 
@@ -92,14 +93,17 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
 
   const start = async (placed = bets) => {
     if (busy) return;
-    const res = playBoard(id, placed, entry, newRequestId());
+    // Busy while the round is decided (the server's answer in a live build), so a second tap doesn't play twice.
+    setBusy(true);
+    const res = await playBoardRound(id, placed, entry);
+    if (!alive.current) return;
     if (!res.ok) {
       setMsg({ text: res.reason });
       errorHaptic();
+      setBusy(false);
       return;
     }
     pressHaptic();
-    setBusy(true);
     setBets(placed);
     setMsg(null);
     setCenter(null);

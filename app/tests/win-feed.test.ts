@@ -60,9 +60,10 @@ describe('Kazanç bandı kime gösterilmez', () => {
     assert.equal(winNewsHidden(salon, 2), false);
   });
 
-  test('canlı modda Oyun Salonu yok: kazancı seviye ne olursa olsun gösterilmez', () => {
+  test('canlı modda Oyun Salonu sunucuda: kazancı demodaki gibi Lv.2’den görünür', () => {
     live(true);
-    assert.equal(winNewsHidden(salon, 9), true);
+    assert.equal(winNewsHidden(salon, 9), false);
+    assert.equal(winNewsHidden(salon, 1), true);
     assert.equal(winNewsHidden(lucky, 2), false);
     assert.equal(winNewsHidden(lucky, 1), true);
   });

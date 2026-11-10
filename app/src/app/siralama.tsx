@@ -15,13 +15,13 @@ import { ROOMS, USERS, type User } from '@/data/mock';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { periodLabel } from '@/lib/tr';
-import { agencyRankings, rankings, type AgencyRankingRow, type RankingRow } from '@/lib/api';
-import { liveMode, rememberUser, toLocal, useServerRooms } from '@/lib/live';
+import { agencyRankings, rankings, roomXpRankings, type AgencyRankingRow, type RankingRow, type RoomXpRow } from '@/lib/api';
+import { liveMode, rememberUser, roomOf, toLocal, useServerRooms } from '@/lib/live';
 import { userById } from '@/data/mock';
 import { BrandLoader } from '@/components/fx/brand-loader';
 
-/** Boards the server can rank in a live build (gift totals, agency income, open rooms); Oda XP is demo-only for now. */
-const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'ajans', 'oda'];
+/** Boards the server ranks in a live build: gift totals, agency income, open rooms, and Oda XP (server/api/room-xp.mjs). */
+const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'ajans', 'oda', 'odaxp'];
 type Period = 'daily' | 'weekly' | 'monthly';
 const PERIOD_KEYS: Period[] = ['daily', 'weekly', 'monthly'];
 
@@ -51,14 +51,14 @@ export default function Leaderboard() {
   const serverRooms = useServerRooms();
   // The answer is kept with the board and period it is for, so a tab change shows "loading" until its own answer.
   const key = `${board}:${period}`;
-  const [answer, setAnswer] = useState<{ key: string; rows: (RankingRow | AgencyRankingRow)[] | null } | null>(null);
+  const [answer, setAnswer] = useState<{ key: string; rows: (RankingRow | AgencyRankingRow | RoomXpRow)[] | null } | null>(null);
   const serverRows = answer?.key === key ? answer.rows : null;
   const rankError = answer?.key === key && answer.rows === null;
   useEffect(() => {
-    if (!live || (board !== 'zengin' && board !== 'yayinci' && board !== 'ajans')) return;
+    if (!live || board === 'oda') return;
     let alive = true;
     const p = period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month';
-    (board === 'ajans' ? agencyRankings(p) : rankings(board === 'zengin' ? 'wealth' : 'charm', p))
+    (board === 'ajans' ? agencyRankings(p) : board === 'odaxp' ? roomXpRankings(p) : rankings(board === 'zengin' ? 'wealth' : 'charm', p))
       .then((rows) => alive && setAnswer({ key: `${board}:${period}`, rows }))
       .catch(() => alive && setAnswer({ key: `${board}:${period}`, rows: null }));
     return () => {
@@ -73,6 +73,10 @@ export default function Leaderboard() {
       ? [...serverRooms].sort((a, b) => b.listeners - a.listeners).map((r) => ({ id: r.id, name: r.title, avatar: r.cover, score: r.listeners, roomId: r.id }))
       : (serverRows ?? []).map((r) => {
           if ('agency' in r) return { id: r.agency.id, name: r.agency.name, avatar: r.agency.avatarUrl ?? '', score: r.score };
+          if ('room' in r) {
+            const room = roomOf(r.room);
+            return { id: room.id, name: `${room.title} · LV${room.level ?? 1}`, avatar: room.cover, score: r.score, roomId: room.id };
+          }
           rememberUser(r.user);
           const id = toLocal(r.user.id);
           const user = userById(id);
@@ -131,7 +135,7 @@ export default function Leaderboard() {
                 <BrandLoader size={26} style={{ flex: 1, paddingVertical: 22 }} />
               ) : (
                 <Text style={[styles.how, { flex: 1, textAlign: 'center', paddingVertical: 28 }]}>
-                  {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : board === 'oda' ? 'Şu an açık oda yok.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
+                  {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : board === 'oda' ? 'Şu an açık oda yok.' : board === 'odaxp' ? 'Bu dönemde henüz XP kazanan oda yok. Odada gönderilen hediyeler odanın XP’si olur.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
                 </Text>
               ))}
           </LinearGradient>
