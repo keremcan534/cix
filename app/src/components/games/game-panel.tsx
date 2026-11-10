@@ -4,6 +4,7 @@
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,9 +22,12 @@ import { OkeyTable } from '@/components/games/okey';
 import { WheelPlayer } from '@/components/games/wheel';
 import { GameNav } from '@/components/games/slot-kit';
 import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
+import { LiveTable, isTableGame } from '@/components/games/room-tables';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
-import { casinoVisible, gamblingLevelOk, useGames, type Entry } from '@/lib/games';
+import { casinoVisible, gamblingLevelOk, isPracticeBot, useGames, type Entry } from '@/lib/games';
+import { isLiveRoom } from '@/lib/live';
+import { refreshCasino } from '@/lib/live/casino';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
@@ -68,6 +72,7 @@ export function GamePanel({
   onClose,
   onInvite,
   onLeave,
+  canOpenTable,
 }: {
   open: OpenGame;
   entry: Entry;
@@ -81,23 +86,28 @@ export function GamePanel({
   onInvite?: (gameName: string) => void;
   /** Before a game opens another screen: Oyun Merkezi closes its modal, which would otherwise cover that screen. */
   onLeave?: () => void;
+  /** A live room: I may open the room's game table (the room's staff; the server checks it again). */
+  canOpenTable?: boolean;
 }) {
   const { settings, setSetting, wealthLevel } = useApp();
   const { roomGames, casino } = useGames();
   const inRoom = entry.from === 'room';
+  // A server room plays its free games at the server's table (Ludo, Renk Kartları, XOX); Okey stays out of it there.
+  const tables = entry.from === 'room' && isLiveRoom(entry.roomId);
   const roomGame = open.kind === 'room' ? roomGames.find((g) => g.id === open.id) : undefined;
   const casinoGame = open.kind === 'casino' ? casino.find((g) => g.id === open.id) : undefined;
   const wheel = open.kind === 'wheel';
   const title = wheel ? WHEEL_NAME : (roomGame?.name ?? casinoGame?.name ?? '');
   const switchable = [
-    ...roomGames.filter((g) => g.active && g.playable).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
-    // Rüzgâr Gülü is played on the server: only the gambling level gates it. The other casino games are decided on
-    // this phone, so casinoVisible() is false for them in a live build.
+    ...roomGames.filter((g) => g.active && g.playable && (!tables || isTableGame(g.id))).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
+    // Rüzgâr Gülü and, in a live build, every other casino game are played on the server; the level gates them all.
     ...(gamblingLevelOk(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
     ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = keyOf(open);
   const openId = open.kind === 'wheel' ? 'wheel' : open.id;
+  // Live: the server's switches, stakes and JACKPOT funds again when a game opens (nothing to read in the demo).
+  useEffect(() => void refreshCasino(), [openId]);
   const titleEmoji = roomGame?.emoji ?? casinoGame?.emoji;
   const titleArt = wheel ? undefined : gameArtOf(open.id);
 
@@ -149,15 +159,17 @@ export function GamePanel({
         {roomGame &&
           (roomGame.playable ? (
             <>
-              {openId === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
-              {openId === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
-              {openId === 'xox' && <Xox players={players.slice(0, 2)} />}
-              {openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1)} />}
+              {tables && entry.from === 'room' && isTableGame(openId) && <LiveTable key={openId} roomId={entry.roomId} game={openId} canOpen={!!canOpenTable} />}
+              {!tables && openId === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
+              {!tables && openId === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
+              {!tables && openId === 'xox' && <Xox players={players.slice(0, 2)} />}
+              {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
+              {!tables && openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
               <Text style={p.dim}>
                 {roomGame.minPlayers}–{roomGame.maxPlayers} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
                 {roomGame.note ? ` · ${roomGame.note}` : ''}
               </Text>
-              {onInvite && (
+              {onInvite && !tables && (
                 <Pressable style={p.invite} onPress={() => onInvite(roomGame.name)} accessibilityLabel="Odayı oyuna davet et">
                   <Ionicons name="megaphone" size={16} color={colors.text} />
                   <Text style={p.chipText}>Odadakileri masaya davet et</Text>

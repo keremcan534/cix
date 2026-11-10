@@ -1,9 +1,9 @@
 // Yönetim › Canlı ayarlar (admin only; server/api/live-settings.mjs): what the owner may change without a new
 // APK. Acil durum (a switch per feature, 'Para işlemlerini durdur', the notice) always on top, then Kampanya,
-// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Birebir, Çantam, Yeni üye ödülleri, SMS, Zorunlu sürüm and Geçmiş. Every change opens
-// the same sheet (live-change-sheet): the server's preview, a reason, Uygula, and a second confirmation for a
-// big change. The server checks every value again; the local checks here only say early what it will refuse.
-// Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
+// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Birebir ve eşleşme, Çantam, Yeni üye ödülleri, Oyun Salonu,
+// SMS, Zorunlu sürüm and Geçmiş. Every change opens the same sheet (live-change-sheet): the server's preview, a reason,
+// Uygula, and a second confirmation for a big change. The server checks every value again; the local checks here only
+// say early what it will refuse. Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type HostInstance } from 'react-native';
@@ -19,6 +19,7 @@ import {
   BACKPACK_BIG,
   bigChange,
   CAMPAIGN_DAYS,
+  CASINO_NUMBER_KEYS,
   CAMPAIGN_PERCENT,
   campaignError,
   campaignExample,
@@ -167,7 +168,8 @@ function Body({
   const byKey = useMemo(() => new Map(view.settings.map((x) => [x.key, x])), [view]);
   const packLabels = (byKey.get('packs_hidden')?.bounds.labels ?? {}) as Record<string, string>;
   const shopLabels = (byKey.get('shop_hidden')?.bounds.labels ?? {}) as Record<string, string>;
-  const names: Names = { gift: (id) => GIFT_BY_ID.get(id)?.name ?? id, pack: (id) => packLabels[id] ?? id, shop: (sku) => shopLabels[sku] ?? sku };
+  const gameLabels = (byKey.get('casino_off')?.bounds.labels ?? {}) as Record<string, string>;
+  const names: Names = { gift: (id) => GIFT_BY_ID.get(id)?.name ?? id, pack: (id) => packLabels[id] ?? id, shop: (sku) => shopLabels[sku] ?? sku, game: (id) => gameLabels[id] ?? id };
   const serverNow = Date.parse((view as { serverNow?: string }).serverNow ?? '');
   const [skew] = useState(() => (Number.isFinite(serverNow) ? serverNow - Date.now() : 0));
   const kit: Kit = {
@@ -205,6 +207,7 @@ function Body({
             {kit.get('dm_price') && <OneOnOneCard kit={kit} />}
             {kit.get('backpack_call_task') && <BackpackCard kit={kit} />}
             {kit.get('rewards_off') && <RewardsCard kit={kit} />}
+            {kit.get('casino_off') && <CasinoCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -821,6 +824,81 @@ function RewardsCard({ kit }: { kit: Kit }) {
           style={{ flex: 1 }}
         />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Ödül miktarları değişsin', () => changes)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Oyun Salonu ---------------------------------------------------------------------------------------------
+/**
+ * Oyun Salonu (server/api/casino.mjs): a switch per game, the top stake and the daily limit. The odds are not here:
+ * the installed app shows them. Rüzgâr Gülü and every game stop together with Acil durum's Oyunlar.
+ */
+function CasinoCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const x = kit.get('casino_off');
+  const options = (x.bounds.options as string[] | undefined) ?? [];
+  const off = listOf(x.effective);
+  const rows = CASINO_NUMBER_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
+  const changes: LiveChanges = {};
+  const errors: Record<string, string | null> = {};
+  for (const r of rows) {
+    const v = parseWhole(texts[r.key] ?? '');
+    const changed = v !== r.x.effective;
+    errors[r.key] = changed ? wholeError(v, r.x.bounds as IntBounds, r.x.label, r.unit) : null;
+    if (changed && v !== null) changes[r.key] = v;
+  }
+  const dirty = Object.keys(changes).length > 0;
+  const bad = rows.some((r) => errors[r.key]);
+  const reset: LiveChanges = {};
+  for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
+  return (
+    <Card title="Oyun Salonu" footer={lastChange(x, ...rows.map((r) => r.x))} pill={<InvalidPill x={x.invalid ? x : rows.find((r) => r.x.invalid)?.x} />}>
+      <Text style={s.hint}>Turları sunucu oynar; oranlar uygulamada yazdığı gibidir ve buradan değişmez. Kapatılan oyunun yeni turu reddedilir, oyun bakiyesi kalır.</Text>
+      <ListGroup>
+        {options.map((id) => {
+          const on = !off.includes(id);
+          return (
+            <ListSwitch
+              key={id}
+              icon={on ? 'checkmark-circle-outline' : 'pause-circle-outline'}
+              tone={on ? 'success' : 'danger'}
+              title={kit.names.game?.(id) ?? id}
+              subtitle={on ? 'Açık' : 'Kapalı'}
+              value={on}
+              disabled={kit.locked}
+              onChange={(v) => {
+                const next = options.filter((g) => (g === id ? !v : off.includes(g)));
+                kit.open(`${kit.names.game?.(id) ?? id} ${v ? 'açılsın' : 'kapatılsın'}`, () => ({ casino_off: next.length ? next : null }), v ? 'Geri dönüş' : 'Acil durum');
+              }}
+            />
+          );
+        })}
+      </ListGroup>
+      {rows.map((r) => (
+        <View key={r.key}>
+          <Field
+            label={r.x.label}
+            value={texts[r.key] ?? ''}
+            onChange={(t) => setTexts((m) => ({ ...m, [r.key]: t }))}
+            keyboard="numeric"
+            max={6}
+            hint={`Şu an ${valueText(r.key, r.x.effective)} · ${r.x.help}`}
+          />
+          <Problem text={errors[r.key] ?? null} />
+        </View>
+      ))}
+      <View style={s.row}>
+        <Button
+          title="Varsayılana dön"
+          variant="ghost"
+          small
+          disabled={kit.locked || Object.keys(reset).length === 0}
+          onPress={() => kit.open('Oyun Salonu sınırları varsayılana dönsün', () => reset, 'Geri dönüş')}
+          style={{ flex: 1 }}
+        />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Oyun Salonu sınırları değişsin', () => changes)} style={{ flex: 1 }} />
       </View>
     </Card>
   );

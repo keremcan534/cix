@@ -162,6 +162,9 @@ export async function eraseAccount(c, id, phone) {
     // Arkadaşını Getir (referrals.mjs): my code and who entered whose code, both ways; the coins paid stay in the ledger.
     await c.query('DELETE FROM referrals WHERE invitee_id = $1 OR inviter_id = $1', [id]);
     await c.query('DELETE FROM referral_codes WHERE user_id = $1', [id]);
+    // Oyun Salonu rounds (casino.mjs); the ledger keeps the money trail. Room game tables they sit at or opened.
+    await c.query('DELETE FROM casino_rounds WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM room_tables WHERE $1 = ANY(seats) OR opened_by = $1', [id]);
 }
 
 export const socialRoutes = {

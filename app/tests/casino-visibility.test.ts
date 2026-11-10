@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 import { BOARDS } from '@/lib/board-games';
 import { PICKS } from '@/lib/casino-odds';
-import { CASINO_MIN_WEALTH, casinoAccess, casinoVisible, gamblingLevelOk, getGames, playBoard, playCasino, playDuel, resetGames, setGameDeps } from '@/lib/games';
+import { CASINO_MIN_WEALTH, applyLiveCasino, casinoAccess, casinoVisible, gamblingLevelOk, getGames, playBoard, playCasino, playDuel, resetGames, setGameDeps } from '@/lib/games';
 
 describe('Oyun Salonu görünürlüğü', () => {
   const game = getGames().casino.find((g) => g.active && g.fromProfile)!;
@@ -32,8 +32,9 @@ describe('Oyun Salonu görünürlüğü', () => {
   });
 });
 
-// Live build (server address set): the server has no round for these games, so the phone must not decide one.
-describe('Canlı mod: telefonda hesaplanan şans oyunları kapalı', () => {
+// Live build (server address set): the server plays every round (server/api/casino.mjs, lib/live/casino), so the
+// games show from the same Lv.2, and the phone must never decide one itself.
+describe('Canlı mod: Oyun Salonu sunucuda, telefon tur hesaplamaz', () => {
   const calls = { spend: 0, spendGame: 0, credit: 0, creditGame: 0 };
   const live = (on: boolean) => {
     if (on) process.env.EXPO_PUBLIC_API_URL = 'https://api.test';
@@ -61,13 +62,25 @@ describe('Canlı mod: telefonda hesaplanan şans oyunları kapalı', () => {
     assert.ok(calls.spend + calls.spendGame > 0);
   });
 
-  test('seviye ne olursa olsun Oyun Salonu görünmez; Rüzgâr Gülü Lv.2 kuralını korur', () => {
+  test('Oyun Salonu Lv.2’den görünür, altında görünmez; erişim kuralları demodaki gibi', () => {
     live(true);
-    assert.equal(casinoVisible(2), false);
-    assert.equal(casinoVisible(9), false);
+    assert.equal(casinoVisible(1), false);
+    assert.equal(casinoVisible(2), true);
     assert.equal(gamblingLevelOk(1), false);
     assert.equal(gamblingLevelOk(2), true);
-    assert.equal(casinoAccess(game, { from: 'profile' }, 9).ok, false);
+    assert.equal(casinoAccess(game, { from: 'profile' }, 9).ok, true);
+    assert.equal(casinoAccess(game, { from: 'profile' }, 1).ok, false);
+    assert.equal(casinoAccess({ ...game, active: false }, { from: 'profile' }, 9).ok, false);
+  });
+
+  test('sunucunun kataloğu: kapalı oyun, bahisler, günlük sınır; sunucunun oynamadığı oyun kapalı', () => {
+    live(true);
+    const bets = [250, 500];
+    applyLiveCasino({ games: [{ id: game.id, active: false, bets, dailyLimit: 1000 }], jackpots: { neon: 123 } });
+    const after = getGames().casino.find((g) => g.id === game.id)!;
+    assert.deepEqual([after.active, after.bets, after.dailyLimit], [false, bets, 1000]);
+    assert.ok(getGames().casino.filter((g) => g.id !== game.id).every((g) => !g.active));
+    assert.equal(getGames().bank.jackpots.neon, 123);
   });
 
   test('Oyun Salonu turu, bahis tahtası ve Zar Düellosu reddedilir; hiç jeton düşülmez veya yazılmaz', () => {

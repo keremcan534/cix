@@ -19,6 +19,8 @@
 // Arkadaşını Getir, the welcome coins and which packs still carry the first-purchase gift: referrals.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Çantam (free gifts from rewards, sent without coins): backpack.mjs.
+// Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs. Sıralama's Oda XP board: room-xp.mjs.
+// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX): room-games.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
@@ -39,6 +41,9 @@ import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs'
 import { backpackRoutes } from './backpack.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { wealthPoints, wheelRoutes } from './wheel.mjs';
+import { casinoRoutes } from './casino.mjs';
+import { roomXpRoutes } from './room-xp.mjs';
+import { roomGameRoutes } from './room-games.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, userId } from './core.mjs';
@@ -242,6 +247,9 @@ const routes = {
   ...crossPkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
+  ...casinoRoutes,
+  ...roomXpRoutes,
+  ...roomGameRoutes,
   ...luckyRoutes,
   ...familyRoutes,
   ...familyMoreRoutes,

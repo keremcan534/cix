@@ -80,6 +80,8 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       return typeof after === 'number' && after > 1000;
     case 'backpack_call_task':
       return typeof after === 'number' && after > BACKPACK_BIG;
+    case 'casino_daily_rounds':
+      return typeof after === 'number' && after > 80;
     case 'min_version':
       return after !== null;
     case 'dm_price':
@@ -103,6 +105,12 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
 
 /** Çantam (server/api/backpack.mjs): above this many gifts a day the change asks twice (live-registry bounds.big). */
 export const BACKPACK_BIG = 2;
+
+/** Oyun Salonu's numbers in the order the admin card shows them, with each one's unit. */
+export const CASINO_NUMBER_KEYS: { key: 'casino_max_bet' | 'casino_daily_rounds'; unit: string }[] = [
+  { key: 'casino_max_bet', unit: ' jeton' },
+  { key: 'casino_daily_rounds', unit: '' },
+];
 
 /** The 1v1 settings in the order the admin card shows them, with each one's unit. */
 export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
@@ -153,7 +161,7 @@ const some = (xs: string[]) => (xs.length > 4 ? `${xs.slice(0, 4).join(', ')} ve
 const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const isCampaign = (v: LiveValue): v is CatalogCampaign => !!v && typeof v === 'object' && !Array.isArray(v);
 
-export type Names = { gift?: (id: string) => string; pack?: (id: string) => string; shop?: (sku: string) => string };
+export type Names = { gift?: (id: string) => string; pack?: (id: string) => string; shop?: (sku: string) => string; game?: (id: string) => string };
 
 /**
  * A value as the admin reads it. `stored`: a saved value from the history, where null is "Varsayılan"; otherwise
@@ -215,6 +223,12 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
     case 'invite_daily_cap':
       return typeof v === 'number' ? `Günde ${fmtNum(v)} davet` : String(v);
+    case 'casino_off':
+      return Array.isArray(v) && v.length ? `Kapalı: ${some(v.map((id) => names.game?.(id) ?? id))}` : 'Hepsi açık';
+    case 'casino_max_bet':
+      return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
+    case 'casino_daily_rounds':
+      return typeof v === 'number' ? `En yüksek bahisle ${fmtNum(v)} tur` : String(v);
     default:
       return String(v);
   }

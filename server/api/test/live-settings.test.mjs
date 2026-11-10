@@ -105,6 +105,7 @@ describe('nothing saved', () => {
         ...['dm_price', 'call_voice_price', 'call_video_price', 'call_free', 'call_free_seconds', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'],
         'backpack_call_task',
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
+        ...['casino_off', 'casino_max_bet', 'casino_daily_rounds'],
       ],
     );
     const by = Object.fromEntries(j.settings.map((x) => [x.key, x]));

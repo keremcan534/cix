@@ -64,6 +64,9 @@ describe('defaults are today', () => {
       welcome_coins: 100,
       invite_coins: 200,
       invite_daily_cap: 10,
+      casino_off: [],
+      casino_max_bet: 25_000,
+      casino_daily_rounds: 40,
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -108,6 +111,9 @@ describe('defaults are today', () => {
       'welcome_coins',
       'invite_coins',
       'invite_daily_cap',
+      'casino_off',
+      'casino_max_bet',
+      'casino_daily_rounds',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);

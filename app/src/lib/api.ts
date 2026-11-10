@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
+import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
@@ -949,6 +950,63 @@ export type ServerInvite = { code: string; on: boolean; coins: number; dailyCap:
 export const myInvite = () => call<ServerInvite>('GET', '/api/invite');
 /** 404 unknown code; 409 with data.code already | invite_off | too_late | newer | device. */
 export const redeemInvite = (code: string) => call<{ mine: MyInvite }>('POST', '/api/invite/redeem', { code }).then((r) => r.mine);
+// Oyun Salonu (server/api/casino.mjs): the server draws and pays; winnings are game coins. `outcome` is the round
+// as lib/casino-odds outcomeOf builds it, for the screen to replay.
+export type ServerCasinoGame = { id: string; name: string; active: boolean; bets: number[]; dailyLimit: number; playedToday: number; jackpot: number | null };
+export type ServerCasinoRound = {
+  id: number;
+  game: string;
+  bet: number;
+  fromGame: number;
+  payout: number;
+  jackpot: number;
+  pick: string | null;
+  bets: Record<string, number> | null;
+  place: 'profile' | 'room';
+  detail: string;
+  at: string;
+  outcome?: Outcome;
+};
+export type ServerCasino = { games: ServerCasinoGame[]; needLevel: number; allowed: boolean; gameCoins: number; mine: ServerCasinoRound[] };
+export type CasinoPlayBody = { game: string; bet?: number; pick?: string; bets?: Record<string, number>; place: 'profile' | 'room' };
+export const casino = () => call<ServerCasino>('GET', '/api/casino');
+export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
+  call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
+/**
+ * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it. `hand` only for my
+ * own cards (Renk Kartları; null when I don't sit there), `counts` everyone's card count; `mySeat` −1 when I watch.
+ */
+export type TableCard = { color: number; value: number | '+2' | 'Atla' };
+export type ServerTable = {
+  room: string;
+  game: 'ludo' | 'cards' | 'xox';
+  name: string;
+  min: number;
+  max: number;
+  status: 'waiting' | 'playing' | 'over';
+  seats: UserCard[];
+  mySeat: number;
+  openedBy: string | null;
+  openedAt: string;
+  turn: number;
+  turnEndsAt: string | null;
+  winner: number | null;
+  log: string;
+  version: number;
+  board?: ('X' | 'O' | null)[];
+  pos?: number[];
+  die?: number | null;
+  top?: TableCard;
+  hand?: TableCard[] | null;
+  counts?: number[];
+};
+export type TableAction = 'open' | 'join' | 'start' | 'move' | 'leave' | 'again' | 'close';
+export const roomTable = (room: string) => call<{ table: ServerTable | null }>('GET', `/api/rooms/table?room=${encodeURIComponent(room)}`).then((r) => r.table);
+export const roomTableAction = (room: string, action: TableAction, extra: { game?: string; move?: { cell?: number; card?: number | null } } = {}) =>
+  call<{ table: ServerTable | null }>('POST', '/api/rooms/table', { room, action, ...extra }).then((r) => r.table);
+/** Sıralama › Oda XP (server/api/room-xp.mjs): open rooms by the room XP their gifts earned in the period. */
+export type RoomXpRow = { rank: number; room: ServerRoom; score: number };
+export const roomXpRankings = (period: 'day' | 'week' | 'month') => call<{ rows: RoomXpRow[] }>('GET', `/api/rankings/room-xp?period=${period}`).then((r) => r.rows);
 
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
@@ -991,9 +1049,12 @@ export type LiveKey =
   | 'otp_global_per_hour'
   | 'backpack_call_task'
   | OneOnOneKey
-  | RewardKey;
+  | RewardKey
+  | CasinoKey;
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
+/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */
+export type CasinoKey = 'casino_off' | 'casino_max_bet' | 'casino_daily_rounds';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

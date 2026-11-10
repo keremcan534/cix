@@ -10,7 +10,8 @@ import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import { ROCKET_TARGETS } from '@/lib/crash-rocket';
-import { casinoAccess, newRequestId, playCasino, useGames, type Entry } from '@/lib/games';
+import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { playRound } from '@/lib/live/casino';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 
@@ -35,6 +36,8 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
   const [note, setNote] = useState<string | null>(null);
   const alive = useRef(true);
   const autoOn = useRef(false);
+  // A launch waiting for its round (the server's answer in a live build): a second tap doesn't launch again.
+  const launching = useRef(false);
   useEffect(
     () => () => {
       alive.current = false;
@@ -48,7 +51,9 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
 
   /** One launch; resolves with the round's net, or null when it was refused. */
   const launch = async (): Promise<number | null> => {
-    const r = playCasino('rocket', bet, String(target), entry, newRequestId());
+    if (launching.current) return null;
+    launching.current = true;
+    const r = await playRound('rocket', bet, String(target), entry).finally(() => (launching.current = false));
     if (!r.ok) {
       setNote(r.reason);
       errorHaptic();

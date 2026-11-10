@@ -12,7 +12,8 @@
 //    phone's own 'anim' only when its catalog says that animation is free. The server also says when a PK starts or is cancelled
 //    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does; and when a Şanslı çanta is dropped
 //    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags); and when a mic invite was sent
-//    or answered, or the room poll changed (server/api/room-social.mjs): "read it again" (lib/live/room-social);
+//    or answered, or the room poll changed (server/api/room-social.mjs): "read it again" (lib/live/room-social); and
+//    when the room's game table changed (server/api/room-games.mjs): "read it again" (lib/live/room-table);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
 //    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs),
 //    which LiveKit hands every phone on join and on each change, and a seat the owner or an admin set for me (my
@@ -72,6 +73,7 @@ const bagListeners = new Set<(roomId: string, news: BagNews) => void>();
 export type InviteNews = { to: string | null; from: string | null };
 const inviteListeners = new Set<(roomId: string, news: InviteNews) => void>();
 const pollListeners = new Set<(roomId: string) => void>();
+const tableListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 // The same for paid Hareketli (their own ids: a room_animations row, not a gift_events one).
@@ -176,6 +178,8 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
       return inviteListeners.forEach((l) => l(roomId, news));
     }
     if (isServerPoll(raw)) return pollListeners.forEach((l) => l(roomId));
+    // The room's game table changed (server/api/room-games.mjs): read it again (lib/live/room-table).
+    if (isServerTable(raw)) return tableListeners.forEach((l) => l(roomId));
     if (isServerBag(raw)) {
       const p = raw as Record<string, unknown>;
       const news: BagNews = { id: typeof p.id === 'number' && Number.isSafeInteger(p.id) ? p.id : null, drawn: p.drawn === true };
@@ -265,6 +269,8 @@ export const isServerBag = (raw: unknown) => !!raw && typeof raw === 'object' &&
 export const isServerInvite = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'invite';
 /** The server's poll packet (server/api/room-social.mjs): the room's poll started, got votes or ended. */
 export const isServerPoll = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'poll';
+/** The server's table packet (server/api/room-games.mjs): the room's game table opened, changed or closed. */
+export const isServerTable = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'table';
 
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
@@ -321,6 +327,12 @@ export function onServerPoll(roomId: string, fn: () => void) {
   const l = (r: string) => r === roomId && fn();
   pollListeners.add(l);
   return () => void pollListeners.delete(l);
+}
+/** The server says the room's game table changed; returns the unsubscribe. */
+export function onServerTable(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  tableListeners.add(l);
+  return () => void tableListeners.delete(l);
 }
 /** Shows the other phones which mic I sit on (null = Balkon). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);

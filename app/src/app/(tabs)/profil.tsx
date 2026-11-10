@@ -21,7 +21,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
-import { casinoVisible } from '@/lib/games';
+import { casinoVisible, useGames } from '@/lib/games';
 import { liveMode, myServerId, oneOnOneOpen, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
@@ -62,6 +62,7 @@ export default function ProfileScreen() {
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const isAdmin = useIsAdmin();
+  const { casino } = useGames();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
   const live = liveMode();
@@ -222,8 +223,8 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* Live: the game hall's games run on this phone only, so the card stays in the demo. */}
-        {!live && casinoVisible(wealthLevel) && (
+        {/* From Cömertlik Lv.2; a live build plays these on the server (lib/live/casino). A game switched off there drops out. */}
+        {casinoVisible(wealthLevel) && (
           <View style={styles.gameCard}>
             <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
               <Icon3D name="wheel" size={30} />
@@ -241,14 +242,16 @@ export default function ProfileScreen() {
                   ['olympus', '🔦', 'Fener Kayalığı'],
                   ['fish', '🐟', 'Mercan Avı'],
                 ] as const
-              ).map(([id, e, l]) => (
-                <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
-                  <GameIcon id={id} emoji={e} size={26} />
-                  <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
-                    {l}
-                  </Text>
-                </Pressable>
-              ))}
+              )
+                .filter(([id]) => casino.find((g) => g.id === id)?.active)
+                .map(([id, e, l]) => (
+                  <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
+                    <GameIcon id={id} emoji={e} size={26} />
+                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
+                      {l}
+                    </Text>
+                  </Pressable>
+                ))}
             </View>
           </View>
         )}

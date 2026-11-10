@@ -270,6 +270,19 @@ export async function exportOf(c, uid) {
       jackpot: num(x.jackpot),
       at: x.created_at,
     })),
+    // Oyun Salonu rounds (casino.mjs): the game, the stake, what it paid and what came up.
+    casino: await all('SELECT game, bet, from_game, payout, jackpot, pick, bets, place, detail, created_at FROM casino_rounds WHERE user_id = $1 ORDER BY id', (x) => ({
+      game: x.game,
+      bet: num(x.bet),
+      fromGameCoins: num(x.from_game),
+      payout: num(x.payout),
+      jackpot: num(x.jackpot),
+      pick: x.pick ?? null,
+      bets: x.bets ?? null,
+      place: x.place,
+      detail: x.detail,
+      at: x.created_at,
+    })),
     luckyGifts: await all('SELECT gift_id, room, count, recipients, cost, shared, payout, created_at FROM lucky_sends WHERE user_id = $1 ORDER BY id', (x) => ({
       giftId: x.gift_id,
       room: x.room ?? null,

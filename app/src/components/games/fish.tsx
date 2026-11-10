@@ -10,7 +10,9 @@ import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BetStepper, GameBalanceNote, fmt } from '@/components/games/slot-kit';
 import { FISH, type FishKind } from '@/lib/fish-hunt';
-import { casinoAccess, newRequestId, playCasino, useGames, type Entry } from '@/lib/games';
+import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { liveMode } from '@/lib/live';
+import { playRound } from '@/lib/live/casino';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
 
@@ -20,6 +22,8 @@ const SCHOOL = 7;
 const FREEZE_MS = 6_000;
 const FREEZE_COOLDOWN = 30_000;
 const AUTO_EVERY = 700;
+/** A live build asks the server for every shot: Oto fires a little slower there (the server takes 90 rounds a minute). */
+const LIVE_AUTO_EVERY = 1000;
 /** Oto stops when the net loss reaches this many shots. */
 const AUTO_LOSS = 50;
 const SPAWN_TOTAL = FISH.reduce((n, f) => n + f.spawn, 0);
@@ -58,6 +62,8 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     fishRef.current = fish;
   }, [fish]);
   const autoNet = useRef(0);
+  // Fish with a shot on its way to the server: not a target again until its round is back.
+  const pending = useRef(new Set<number>());
 
   // Scene clock: advances only while the fish are not frozen.
   useEffect(() => {
@@ -94,7 +100,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     setShots((s) => s.filter((x) => now - x.at < 600));
   }, [now]);
 
-  const fire = (target: Fish | null, at: { x: number; y: number }) => {
+  const fire = async (target: Fish | null, at: { x: number; y: number }): Promise<number | null> => {
     const cx = width / 2;
     setAim((Math.atan2(at.x - cx, HEIGHT - 40 - at.y) * 180) / Math.PI);
     const key = nextKey.current++;
@@ -103,7 +109,8 @@ export function FishPlayer({ entry }: { entry: Entry }) {
       tapHaptic();
       return null;
     }
-    const r = playCasino('fish', bet, target.kind.id, entry, newRequestId());
+    pending.current.add(target.key);
+    const r = await playRound('fish', bet, target.kind.id, entry).finally(() => pending.current.delete(target.key));
     if (!r.ok) {
       setNote(r.reason);
       errorHaptic();
@@ -122,9 +129,9 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   // The tap layer is empty and covers the scene, so locationX/Y are scene coordinates.
   const onTap = (e: GestureResponderEvent) => {
     const { locationX: x, locationY: y } = e.nativeEvent;
-    const hit = fishRef.current.filter((f) => !f.caught).find((f) => Math.hypot(xOf(f, clock.current) - x, yOf(f, clock.current) - y) < f.kind.size / 2 + 12);
+    const hit = fishRef.current.filter((f) => !f.caught && !pending.current.has(f.key)).find((f) => Math.hypot(xOf(f, clock.current) - x, yOf(f, clock.current) - y) < f.kind.size / 2 + 12);
     if (lockOn && hit) setLockKey(hit.key);
-    fire(hit ?? null, { x, y });
+    void fire(hit ?? null, { x, y });
   };
 
   // Oto: fire at the locked fish, else at a random fish on screen; stops at the loss limit or any refusal.
@@ -133,17 +140,18 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     autoNet.current = 0;
     const id = setInterval(() => {
       const t = clock.current;
-      const live = fishRef.current.filter((f) => !f.caught && xOf(f, t) > 0 && xOf(f, t) < width);
+      const live = fishRef.current.filter((f) => !f.caught && !pending.current.has(f.key) && xOf(f, t) > 0 && xOf(f, t) < width);
       const target = live.find((f) => f.key === lockKey) ?? (lockOn ? undefined : live[Math.floor(Math.random() * live.length)]);
       if (!target) return;
-      const net = fire(target, { x: xOf(target, t), y: yOf(target, t) });
-      if (net === null) return setAuto(false);
-      autoNet.current += net;
-      if (-autoNet.current >= bet * AUTO_LOSS) {
-        setAuto(false);
-        setNote(`Oto durdu: kayıp limiti (${fmt(bet * AUTO_LOSS)} jeton)`);
-      }
-    }, AUTO_EVERY);
+      void fire(target, { x: xOf(target, t), y: yOf(target, t) }).then((net) => {
+        if (net === null) return setAuto(false);
+        autoNet.current += net;
+        if (-autoNet.current >= bet * AUTO_LOSS) {
+          setAuto(false);
+          setNote(`Oto durdu: kayıp limiti (${fmt(bet * AUTO_LOSS)} jeton)`);
+        }
+      });
+    }, liveMode() ? LIVE_AUTO_EVERY : AUTO_EVERY);
     return () => clearInterval(id);
     // fire/xOf read the latest fish through fishRef; restarting on every frame would reset the loss count.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -105,6 +105,9 @@ import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
 import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
+import { refreshCasino } from '@/lib/live/casino';
+import { useTableNews } from '@/lib/live/room-table';
+import { isTableGame } from '@/components/games/room-tables';
 import { announceWin, roomTitleOf } from '@/lib/broadcast';
 import { getLucky, luckyGift, luckyPkPoints, sendLuckyBatch, type LuckyRecord } from '@/lib/lucky';
 import { liveLuckySend, refreshLucky } from '@/lib/live/lucky';
@@ -859,6 +862,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   // A room note after a server call went through (so online), straight into the feed.
   const sysNote = (text: string) => setMessages((list) => mergeFeed(list, [{ system: true, text, id: msgId(), at: stamp() }]));
+  // A server room: when the staff open a game table (server/api/room-games.mjs), the room hears of it (not from
+  // someone I block).
+  useTableNews(id, real && unlocked, (t) => {
+    const by = t.seats[0];
+    if (by && blocked.has(toLocal(by.id))) return;
+    addMsg({ system: true, text: `🎮 ${by?.name ?? 'Oda yönetimi'} ${t.name} masası açtı · ${t.min}–${t.max} oyuncu · Menü › Oda Oyunları` });
+  });
   // Room staff's timed mutes (server room only); the note shows on my screen.
   const roomMute = useRoomMute(id, myRole === 'owner', (text) => {
     addMsg({ system: true, text });
@@ -2667,7 +2677,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (g.startBy === 'owner_mod' && myRole === 'member') return showAlert('Masayı oda yönetimi açar', `${g.name} masasını oda sahibi veya yöneticiler başlatır. Açık bir masaya davetle katılabilirsin.`);
     setGame({ kind: 'room', id: g.id });
     setGameMin(false);
-    addMsg({ system: true, text: `🎮 ${ME.name} ${g.name} masası açtı · ${g.minPlayers}–${g.maxPlayers} oyuncu` });
+    // A server room's table opens on the server; the room hears of it from there (useTableNews).
+    if (!real) addMsg({ system: true, text: `🎮 ${ME.name} ${g.name} masası açtı · ${g.minPlayers}–${g.maxPlayers} oyuncu` });
   };
   const openCasino = (gid: CasinoGame['id']) => {
     const g = gameCatalog.casino.find((x) => x.id === gid);
@@ -2695,20 +2706,22 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       ],
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
-    ...(canManage
+    // A server room plays them at the server's table (Ludo, Renk Kartları, XOX), so there everyone sees the section to
+    // sit at an open table; Okey (bots on this phone) stays in the demo.
+    ...(canManage || real
       ? [
           {
             title: 'Oda Oyunları · ücretsiz',
             variant: 'tile',
-            note: 'Masayı sen açarsın, herkes katılır · oyun açıkken mikrofonun ve koltuğun aynen kalır',
+            note: canManage ? 'Masayı sen açarsın, herkes katılır · oyun açıkken mikrofonun ve koltuğun aynen kalır' : 'Oda yönetiminin açtığı masaya otur · mikrofonun ve koltuğun aynen kalır',
             items: gameCatalog.roomGames
-              .filter((g) => g.active)
+              .filter((g) => g.active && (!real || !g.playable || isTableGame(g.id)))
               .map((g) => ({ key: `rg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), badge: g.playable ? undefined : ('SOON' as const), onPress: () => openRoomGame(g.id) })),
           } satisfies MenuSection,
         ]
       : []),
-    // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it.
-    // The section is gated on the level alone (the server-run wheel); casinoVisible gates the phone-decided games.
+    // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it. A live build
+    // plays every one of its games on the server (lib/live/casino); a game the server switched off isn't listed.
     ...(gamblingLevelOk(app.wealthLevel)
       ? [
           {
@@ -2718,9 +2731,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             items: [
               // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
               { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
-              // The other Oyun Salonu games are played on the phone: live mode doesn't offer them (no real coins).
               ...gameCatalog.casino
-                .filter((g) => casinoVisible(app.wealthLevel) && g.active && g.fromRoom && !liveMode())
+                .filter((g) => casinoVisible(app.wealthLevel) && g.active && g.fromRoom)
                 .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
             ],
           } satisfies MenuSection,
@@ -3092,6 +3104,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       open={game}
       entry={gameEntry}
       players={gamePlayers}
+      canOpenTable={canManage}
       hidden={gameMin || !full}
       voice={{ seated: amSeated, micOn, onToggleMic: () => !devicesBusy() && setMicOn((m) => !m) }}
       onSwitch={setGame}
@@ -3314,7 +3327,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           {/* While typing only the field and a send button stay, so the field is wide; the `&&` slots keep the
               field in the same place in the tree, so it keeps its focus and the keyboard stays up. */}
           <View style={styles.bottom}>
-            {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => setPanel('menu')} />}
+            {!typing && <RoundBtn label="Menü" icon="ellipsis-horizontal" onPress={() => (setPanel('menu'), void refreshCasino())} />}
             <View style={styles.inputWrap}>
               <Pressable onPress={() => setEmojiOpen((v) => !v)} accessibilityLabel={amSeated ? 'Emoji gönder' : 'Emoji ekle'} hitSlop={8}>
                 <Ionicons name={emojiOpen ? 'close-circle' : 'happy-outline'} size={24} color={colors.textDim} />

@@ -8,7 +8,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, BetStepper, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
-import { casinoAccess, newRequestId, playCasino, useGames, type Entry } from '@/lib/games';
+import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { playRound } from '@/lib/live/casino';
 import { TREE_LABEL, TREE_PAYS, TREE_STRIPS, treeWindow, type TreeSym } from '@/lib/gold-tree';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp } from '@/store';
@@ -62,7 +63,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
   const spinOnce = async (): Promise<{ net: number; stop: string | null } | null> => {
-    const r = playCasino('goldtree', bet, '', entry, newRequestId());
+    const r = await playRound('goldtree', bet, '', entry);
     if (!r.ok) {
       setStatus({ text: r.reason, tone: 'err' });
       errorHaptic();
