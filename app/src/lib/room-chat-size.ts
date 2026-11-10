@@ -1,6 +1,6 @@
-// How tall the room chat is: a share of the screen height the person chose by dragging the handle above the
-// chat tabs (components/room/chat-feed). It stays the same while banners, boards and mics come and go above
-// it (the stage takes the rest and scrolls), and is kept on this phone for the next room.
+// How tall the room chat is at least: a share of the screen height the person chose by dragging the handle above
+// the chat tabs (components/room/chat-feed). The chat also takes whatever the mics leave below them; when the stage
+// needs more, the stage scrolls and the chat keeps this height. Kept on this phone for the next room.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'similarclub:roomChatShare:v1';
