@@ -13,6 +13,7 @@ import { isContactBlocked } from '@/lib/contact-filter';
 import { hideIds, settle, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
 import { noteRefusal } from '@/lib/sanctions';
 import { liveMode, message, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
+import { onLine } from '@/lib/live/live-line';
 import { isServerId } from '@/data/mock';
 
 const SEEN_KEY = 'similarclub:dm-seen';
@@ -165,7 +166,15 @@ export function useLiveThread(userId: string, app: Inbox) {
     };
     tick();
     const t = setInterval(tick, THREAD_MS);
-    return () => clearInterval(t);
+    // The live line: a message from this person, or my messages read by them, shows at once.
+    const peer = toServer(userId);
+    const off = onLine((e) => {
+      if ((e.type === 'message' || e.type === 'message_read') && e.from === peer) tick();
+    });
+    return () => {
+      clearInterval(t);
+      off();
+    };
   }, [userId]);
 }
 

@@ -17,6 +17,7 @@ import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
 import { verifyUpload } from './media.mjs';
 import { pairOf, payOneOnOne } from './one-on-one.mjs';
+import { line } from './live-line.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 
@@ -148,6 +149,8 @@ export const messageRoutes = {
     const me = await auth(req);
     const peer = userId((await readJson(req)).with);
     const r = await db.query('UPDATE messages SET read_at = now() WHERE recipient = $1 AND sender = $2 AND read_at IS NULL', [me.id, peer]);
+    // The writer's open chat turns its ticks blue at once.
+    if (r.rowCount) line([peer], 'message_read', { from: me.id });
     return { read: r.rowCount };
   },
 };

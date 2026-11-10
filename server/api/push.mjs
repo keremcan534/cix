@@ -15,6 +15,7 @@
 import crypto from 'node:crypto';
 
 import { HttpError, auth, db, env, readJson } from './core.mjs';
+import { line } from './live-line.mjs';
 
 const URL = env.PUSH_URL ?? 'https://exp.host/--/api/v2/push/send';
 const ENABLED = env.PUSH_ENABLED !== '0';
@@ -122,6 +123,8 @@ async function sendExpo(tokens, { title, body, data }) {
  * so a tap can open the right screen.
  */
 export function notify(userIds, { title, body, data = {} }) {
+  // The open app hears of it at once on its live line (only the type and ids), whether or not pushes are on.
+  line(userIds, data.type ?? 'note', data);
   if (!ENABLED || !userIds.length) return;
   (async () => {
     const r = await db.query('SELECT token, kind FROM push_tokens WHERE user_id = ANY($1::uuid[])', [userIds]);
