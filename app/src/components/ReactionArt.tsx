@@ -1,5 +1,5 @@
-// Custom-drawn stickers (docs/GORSEL_URETIM_LISTESI.md §3): one 192 px PNG per sticker of the sticker
-// packs (data/catalog STICKER_PACKS). Stickers are what the packs sell; standard Unicode emoji are
+// Stickers: one PNG per sticker of the sticker packs (data/catalog STICKER_PACKS), custom-drawn at 192 px
+// (docs/GORSEL_URETIM_LISTESI.md §3), and the free 3D pack, Microsoft's Fluent Emoji 3D at 256 px (MIT). Stickers are what the packs sell; standard Unicode emoji are
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
 // (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
@@ -63,6 +63,39 @@ const SRC: Record<string, number> = {
   'animasyonlu-disko-topu': require('../../assets/reactions/tepki-animasyonlu-disko-topu.png'),
   'oda-alkis': require('../../assets/reactions/tepki-oda-alkis.png'),
   'oda-saskin': require('../../assets/reactions/tepki-oda-saskin.png'),
+  // The 3D pack: Microsoft Fluent Emoji 3D, 256 px (MIT; data/art-licenses).
+  '3d-kahkaha': require('../../assets/reactions/3d/3d-kahkaha.png'),
+  '3d-yerlere-yattim': require('../../assets/reactions/3d/3d-yerlere-yattim.png'),
+  '3d-sirit': require('../../assets/reactions/3d/3d-sirit.png'),
+  '3d-asik': require('../../assets/reactions/3d/3d-asik.png'),
+  '3d-opucuk': require('../../assets/reactions/3d/3d-opucuk.png'),
+  '3d-sevgi': require('../../assets/reactions/3d/3d-sevgi.png'),
+  '3d-kalbim': require('../../assets/reactions/3d/3d-kalbim.png'),
+  '3d-yanan-kalp': require('../../assets/reactions/3d/3d-yanan-kalp.png'),
+  '3d-havali': require('../../assets/reactions/3d/3d-havali.png'),
+  '3d-goz-kirp': require('../../assets/reactions/3d/3d-goz-kirp.png'),
+  '3d-sarildim': require('../../assets/reactions/3d/3d-sarildim.png'),
+  '3d-yalvaris': require('../../assets/reactions/3d/3d-yalvaris.png'),
+  '3d-duygulandim': require('../../assets/reactions/3d/3d-duygulandim.png'),
+  '3d-hungur': require('../../assets/reactions/3d/3d-hungur.png'),
+  '3d-uyudum': require('../../assets/reactions/3d/3d-uyudum.png'),
+  '3d-of-ya': require('../../assets/reactions/3d/3d-of-ya.png'),
+  '3d-olamaz': require('../../assets/reactions/3d/3d-olamaz.png'),
+  '3d-dusunceli': require('../../assets/reactions/3d/3d-dusunceli.png'),
+  '3d-afalladim': require('../../assets/reactions/3d/3d-afalladim.png'),
+  '3d-beyin-yakti': require('../../assets/reactions/3d/3d-beyin-yakti.png'),
+  '3d-parti': require('../../assets/reactions/3d/3d-parti.png'),
+  '3d-alkis': require('../../assets/reactions/3d/3d-alkis.png'),
+  '3d-super': require('../../assets/reactions/3d/3d-super.png'),
+  '3d-alev': require('../../assets/reactions/3d/3d-alev.png'),
+  '3d-sinirli': require('../../assets/reactions/3d/3d-sinirli.png'),
+  '3d-sus': require('../../assets/reactions/3d/3d-sus.png'),
+  '3d-yildiz-goz': require('../../assets/reactions/3d/3d-yildiz-goz.png'),
+  '3d-eriyorum': require('../../assets/reactions/3d/3d-eriyorum.png'),
+  '3d-selam-dur': require('../../assets/reactions/3d/3d-selam-dur.png'),
+  '3d-deli-dolu': require('../../assets/reactions/3d/3d-deli-dolu.png'),
+  '3d-kikirdama': require('../../assets/reactions/3d/3d-kikirdama.png'),
+  '3d-yuz-numara': require('../../assets/reactions/3d/3d-yuz-numara.png'),
 };
 
 export const REACTION_TAB_ANIMATED = require('../../assets/reactions/tepki-sekme-hareketli.png');

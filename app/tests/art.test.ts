@@ -79,9 +79,9 @@ describe('Emoji ve çıkartma paketleri', () => {
   test('eski paket kimlikleri korunuyor, satın alınanlar kaybolmuyor', () => {
     assert.deepEqual(
       STICKER_PACKS.map((p) => p.id),
-      ['basic', 'fun', 'love', 'animals', 'vip', 'anim'],
+      ['basic', '3d', 'fun', 'love', 'animals', 'vip', 'anim'],
     );
-    assert.deepEqual(FREE_PACK_IDS, ['basic']);
+    assert.deepEqual(FREE_PACK_IDS, ['basic', '3d']);
   });
   test('ücretli paketler yalnız özel çizim çıkartma, standart emojiler ücretsiz ve ayrı', () => {
     for (const p of STICKER_PACKS) for (const x of p.stickers) assert.match(x.id, /^[a-z0-9-]+$/, `${p.name}: ${x.id}`);
@@ -90,6 +90,22 @@ describe('Emoji ve çıkartma paketleri', () => {
     assert.equal(new Set(all).size, all.length, 'tekrar eden emoji');
     // Every emoji the old paid packs sold is now in the free standard set.
     for (const x of ALL_STICKERS) assert.ok(all.includes(x.emoji), `${x.name}: ${x.emoji}`);
+  });
+});
+
+describe('3D yüzler (Fluent Emoji 3D, MIT)', () => {
+  test('ücretsiz, her birinin resmi var, lisans notu uygulamayla gider', () => {
+    const pack = STICKER_PACKS.find((p) => p.id === '3d');
+    assert.ok(pack && !pack.price && !pack.minVip, 'ücretsiz paket');
+    assert.equal(pack.stickers.length, 32);
+    const art = read('components/ReactionArt.tsx');
+    for (const x of pack.stickers) {
+      assert.match(x.id, /^3d-[a-z0-9-]+$/);
+      assert.ok(art.includes(`'${x.id}': require('../../assets/reactions/3d/${x.id}.png')`), x.id);
+      assert.ok(existsSync(resolve(SRC, '../assets/reactions/3d', `${x.id}.png`)), x.id);
+    }
+    assert.match(readFileSync(resolve(SRC, '../assets/reactions/3d/LICENSE.txt'), 'utf8'), /MIT License[\s\S]*Copyright \(c\) Microsoft Corporation/);
+    assert.match(read('data/art-licenses.ts'), /Copyright \(c\) Microsoft Corporation/);
   });
 });
 
