@@ -68,6 +68,12 @@ describe('Hoş geldin sözü', () => {
     assert.match(welcomeText(false, true), /100 jeton/);
     assert.doesNotMatch(welcomeText(true, false), /jeton/);
   });
+
+  test('canlıda sunucunun verdiği hoş geldin jetonu söylenir; vermediyse söz edilmez', () => {
+    assert.equal(welcomeText(true, false, 100), "Hoş geldin hediyesi olarak 100 jeton hesabına eklendi; Mağaza'da kullanabilirsin.");
+    assert.match(welcomeText(true, true, 1000), /1\.000 jeton hesabına eklendi.*test jetonu da/);
+    assert.equal(welcomeText(true, false, 0), 'Hesabın açıldı.');
+  });
 });
 
 describe('Kayıt adım sayacı', () => {

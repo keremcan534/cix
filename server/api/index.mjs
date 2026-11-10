@@ -16,6 +16,7 @@
 // messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower invites: room-social.mjs). Staff: admin.mjs.
 // Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
 // Support tickets: support.mjs. The data copy (UK GDPR access): my-data.mjs. The daily spending limit: spend-limit.mjs.
+// Arkadaşını Getir, the welcome coins and which packs still carry the first-purchase gift: referrals.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Çantam (free gifts from rewards, sent without coins): backpack.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
@@ -79,6 +80,7 @@ import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
+import { referralRoutes } from './referrals.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -251,6 +253,7 @@ const routes = {
   ...supportRoutes,
   ...myDataRoutes,
   ...spendLimitRoutes,
+  ...referralRoutes,
   ...messageRoutes,
   ...oneOnOneRoutes,
   ...privacyRoutes,

@@ -14,6 +14,8 @@ import { GIFTS } from '@/data/mock';
 import { liveMode, message, oneOnOneOpen } from '@/lib/live';
 import { useBackpack } from '@/lib/live/backpack';
 import { claimLiveCallTask, useLiveCallTask } from '@/lib/live/call-log';
+import { useRewards } from '@/lib/live/rewards';
+import { inviteBannerText } from '@/lib/invite-view';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
@@ -59,6 +61,8 @@ export default function TaskCenter() {
   // Live: the gift the call task also puts in Çantam (Canlı ayarlar may set none).
   const bagSource = useBackpack(liveMode() && oneOnOneOpen())?.sources.find((x) => x.key === 'call_task');
   const bagGift = bagSource ? GIFTS.find((g) => g.id === bagSource.giftId) : undefined;
+  const rewards = useRewards();
+  const inviteLine = inviteBannerText(liveMode(), rewards);
 
   useEffect(() => {
     const t = setInterval(() => setLeft(secsToMidnight()), 1000);
@@ -199,14 +203,14 @@ export default function TaskCenter() {
           })}
         </View>
 
-        {/* Davet has no server referral yet (it shows ComingSoon in a live build), so the banner is demo only. */}
-        {!liveMode() && (
+        {/* Ödüllü davet: the demo's, or the server's in a live build (its amount; hidden while the owner pauses it). */}
+        {inviteLine && (
           <Pressable onPress={() => router.push('/davet')} accessibilityLabel="Ödüllü davet">
             <LinearGradient colors={[semantic.socialFill, '#6E2440']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.invite}>
               <Icon3D name="envelope" size={48} />
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ color: '#fff', fontWeight: '800', fontSize: 17 }}>Ödüllü davet</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Arkadaşlarını davet et, kayıt ve gelir görevlerinden ödül kazan</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>{inviteLine}</Text>
               </View>
               <Ionicons name="chevron-forward" size={22} color="#fff" />
             </LinearGradient>

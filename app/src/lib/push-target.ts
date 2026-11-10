@@ -17,6 +17,9 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
       return '/aile';
     case 'withdrawal':
       return '/cuzdan';
+    // An invite reward paid (server/api/referrals.mjs): Arkadaşını Getir.
+    case 'invite':
+      return '/davet';
     // A room invite from an account I follow (server/api/room-social.mjs): the room. An Odalar arası PK invite to my
     // room (server/api/pk-cross.mjs): my room, where its answer card waits.
     case 'room_invite':

@@ -21,6 +21,7 @@ import { statusOf } from './economy.mjs';
 import { vipLevelOf } from './catalog.mjs';
 import { spendLimitOf } from './spend-limit.mjs';
 import { ticketsOf } from './support.mjs';
+import { referralDataOf } from './referrals.mjs';
 
 export const EXPORT_HOURS = 24;
 
@@ -535,6 +536,8 @@ export async function exportOf(c, uid) {
     roomSocial,
     safety,
     support: await ticketsOf(c, uid),
+    // Arkadaşını Getir: my code, whose code I entered, and who entered mine.
+    referrals: await referralDataOf(c, uid),
     notices,
     noticesSeenUpTo: num(seenUpTo),
     previousExport: lastExport,

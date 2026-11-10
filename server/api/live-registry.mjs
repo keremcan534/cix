@@ -9,7 +9,7 @@
 // hours, test and sandbox flags, TEST_DAILY, pack coins / product ids / TL prices (Play Console owns the price),
 // gift prices (installed apps show the compiled price), the SMS provider and every secret.
 //
-// Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden) is kept in
+// Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden, rewards_off) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
@@ -88,6 +88,8 @@ export function defaultsOf(e = process.env) {
     ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [k, x.default])),
     // Çantam (backpack.mjs): the demo gives one Kalp as the task reward.
     backpack_call_task: 1,
+    rewards_off: [],
+    ...Object.fromEntries(Object.entries(REWARD_AMOUNTS).map(([k, x]) => [k, x.default])),
   };
 }
 /**
@@ -132,6 +134,65 @@ const oneOnOneEntries = () =>
 
 /** Çantam (backpack.mjs): the gift the call task puts in the backpack, as the demo's "Görev ödülü" (Kalp). */
 export const BACKPACK_TASK_GIFT = 'g2';
+
+/**
+ * Yeni üye ödülleri (referrals.mjs, purchases.mjs): the welcome coins, the invite reward for both people and its daily
+ * cap per inviter, and a switch for each reward (the first-purchase gift's amounts are the packs', catalog.mjs). The
+ * defaults are the demo's. Welcome and invite coins are reward coins ('odul', the shop only), so they never become
+ * diamonds.
+ */
+const REWARDS = 'Yeni üye ödülleri';
+export const REWARD_SWITCHES = ['welcome', 'invite', 'first_purchase'];
+export const REWARD_LABEL = { welcome: 'Hoş geldin jetonu', invite: 'Davet ödülü', first_purchase: 'İlk alım hediyesi' };
+const REWARD_OFF_EFFECT = {
+  welcome: 'Yeni hesaplar hoş geldin jetonu almaz.',
+  invite: 'Yeni davet kodu girilemez ve davet ödülü ödenmez; bekleyen davetler açılınca ilk oda girişinde ödenir.',
+  first_purchase: 'Paketlerde "Hoş geldin paketi" görünmez; ilk alımlar hediyesiz yüklenir.',
+};
+const REWARD_AMOUNTS = {
+  welcome_coins: { field: 'welcomeCoins', label: 'Hoş geldin jetonu', default: 100, bounds: { min: 10, max: 1_000, step: 10 }, unit: ' jeton', help: 'Yeni hesaba bir kez verilen ödül jetonu (yalnız mağazada harcanır). Daha önce başka hesap açılmış telefona verilmez.', text: (a, b) => `Yeni hesaba ${a} → ${b} hoş geldin jetonu.` },
+  invite_coins: { field: 'inviteCoins', label: 'Davet ödülü (kişi başı)', default: 200, bounds: { min: 10, max: 2_000, step: 10 }, unit: ' jeton', help: 'Davet edilen ilk odasına girince ikisine de verilen ödül jetonu (yalnız mağazada harcanır).', text: (a, b) => `Davet ödülü kişi başı ${a} → ${b} jeton.` },
+  invite_daily_cap: { field: 'inviteDailyCap', label: 'Günlük davet ödülü sınırı', default: 10, bounds: { min: 1, max: 100, step: 1 }, unit: '', help: 'Bir kişinin bir günde (Türkiye saati) en çok kaç davetten ödül alacağı. Fazlası ertesi günkü ilk oda girişinde ödenir.', text: (a, b) => `Bir kişi günde en çok ${a} → ${b} davetten ödül alır.` },
+};
+/** The reward keys as registry entries; an amount or a cap that more than doubles needs the second confirmation. */
+const rewardEntries = () => {
+  const switches = { options: REWARD_SWITCHES, labels: REWARD_LABEL, max: REWARD_SWITCHES.length };
+  return {
+    rewards_off: {
+      field: 'rewardsOff',
+      group: REWARDS,
+      label: 'Kapalı ödüller',
+      help: 'Kapatılan ödül sunucuda hemen durur; verilmiş jetonlar geri alınmaz.',
+      type: 'set',
+      bounds: switches,
+      parse: (v) => setOf(v, switches, 'Kapalı ödüller'),
+      big: () => false,
+      impact(before, after) {
+        const off = added(before, after);
+        const on = added(after, before);
+        const out = off.map((k) => REWARD_OFF_EFFECT[k]);
+        if (on.length) out.push(`Yeniden açılır: ${on.map((k) => REWARD_LABEL[k]).join(', ')}.`);
+        return out.join(' ') || 'Görünür bir etkisi yok.';
+      },
+    },
+    ...Object.fromEntries(
+      Object.entries(REWARD_AMOUNTS).map(([k, x]) => [
+        k,
+        {
+          field: x.field,
+          group: REWARDS,
+          label: x.label,
+          help: x.help,
+          type: 'int',
+          bounds: x.bounds,
+          parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+          big: (before, after) => after !== null && after > before * 2,
+          impact: (before, after) => x.text(fmt(before), fmt(after)),
+        },
+      ]),
+    ),
+  };
+};
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -468,6 +529,7 @@ export const REGISTRY = {
     impact: (before, after) =>
       after === 0 ? 'Görev ödülüyle çantaya hediye verilmez. Çantada olanlar gönderilebilir.' : `Görev ödülüyle çantaya günde ${fmt(before)} → ${fmt(after)} ${giftName(BACKPACK_TASK_GIFT)} verilir.`,
   },
+  ...rewardEntries(),
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -519,6 +581,7 @@ const readOnlySet = (xs) => {
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, backpackCallTask, invalid }
+ *     heartVideo, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -553,6 +616,8 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     otpPerHour: val('otp_global_per_hour'),
     ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [x.field, val(k)])),
     backpackCallTask: val('backpack_call_task'),
+    rewardsOff: readOnlySet(val('rewards_off')),
+    ...Object.fromEntries(Object.entries(REWARD_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     invalid: Object.freeze([...invalid]),
   });
 }

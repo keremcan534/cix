@@ -1,6 +1,6 @@
 // Yönetim › Canlı ayarlar (admin only; server/api/live-settings.mjs): what the owner may change without a new
 // APK. Acil durum (a switch per feature, 'Para işlemlerini durdur', the notice) always on top, then Kampanya,
-// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Çantam, SMS, Zorunlu sürüm and Geçmiş. Every change opens
+// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Birebir, Çantam, Yeni üye ödülleri, SMS, Zorunlu sürüm and Geçmiş. Every change opens
 // the same sheet (live-change-sheet): the server's preview, a reason, Uygula, and a second confirmation for a
 // big change. The server checks every value again; the local checks here only say early what it will refuse.
 // Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
@@ -39,6 +39,8 @@ import {
   rateError,
   rateLine,
   rateWindow,
+  REWARD_KEYS,
+  REWARD_LABEL,
   valueText,
   versionError,
   wholeError,
@@ -202,6 +204,7 @@ function Body({
             <WithdrawCard kit={kit} />
             {kit.get('dm_price') && <OneOnOneCard kit={kit} />}
             {kit.get('backpack_call_task') && <BackpackCard kit={kit} />}
+            {kit.get('rewards_off') && <RewardsCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -744,6 +747,80 @@ function BackpackCard({ kit }: { kit: Kit }) {
           style={{ flex: 1 }}
         />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !changed || !!problem} onPress={() => v !== null && kit.open('Çanta ödülü değişsin', () => ({ backpack_call_task: v }))} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Yeni üye ödülleri ---------------------------------------------------------------------------------------
+/**
+ * The welcome coins, the invite reward and the first-purchase gift: a switch each (rewards_off), and the welcome and
+ * invite amounts with the invite's daily cap per person, saved together. Reward coins: the shop only.
+ */
+function RewardsCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const off = kit.get('rewards_off');
+  const effective = listOf(off.effective);
+  const stored = off.invalid ? [] : listOf(off.value);
+  const options = (off.bounds.options as string[] | undefined) ?? Object.keys(REWARD_LABEL);
+  const saveOff = (next: string[]) => (next.length ? options.filter((k) => next.includes(k)) : null);
+  const rows = REWARD_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
+  const changes: LiveChanges = {};
+  const errors: Record<string, string | null> = {};
+  for (const r of rows) {
+    const v = parseWhole(texts[r.key] ?? '');
+    const changed = v !== r.x.effective;
+    errors[r.key] = changed ? wholeError(v, r.x.bounds as IntBounds, r.x.label, r.unit) : null;
+    if (changed && v !== null) changes[r.key] = v;
+  }
+  const dirty = Object.keys(changes).length > 0;
+  const bad = rows.some((r) => errors[r.key]);
+  const reset: LiveChanges = {};
+  for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
+  return (
+    <Card title="Yeni üye ödülleri" footer={lastChange(off, ...rows.map((r) => r.x))} pill={<InvalidPill x={[off, ...rows.map((r) => r.x)].find((x) => x.invalid)} />}>
+      <Text style={s.hint}>Hoş geldin ve davet jetonları ödül jetonudur: yalnız mağazada harcanır, hediye edilemez. Kapatılan ödül hemen durur; verilmiş jetonlar geri alınmaz.</Text>
+      <ListGroup>
+        {options.map((k) => {
+          const on = !effective.includes(k);
+          return (
+            <ListSwitch
+              key={k}
+              icon={on ? 'checkmark-circle-outline' : 'pause-circle-outline'}
+              tone={on ? 'success' : 'danger'}
+              title={REWARD_LABEL[k] ?? k}
+              subtitle={on ? 'Açık' : 'Kapalı'}
+              value={on}
+              disabled={kit.locked}
+              onChange={(v) => kit.open(`${REWARD_LABEL[k]} ${v ? 'açılsın' : 'kapatılsın'}`, () => ({ rewards_off: saveOff(v ? stored.filter((x) => x !== k) : [...stored, k]) }), v ? 'Geri dönüş' : 'Acil durum')}
+            />
+          );
+        })}
+      </ListGroup>
+      {rows.map((r) => (
+        <View key={r.key}>
+          <Field
+            label={r.x.label}
+            value={texts[r.key] ?? ''}
+            onChange={(t) => setTexts((m) => ({ ...m, [r.key]: t }))}
+            keyboard="numeric"
+            max={6}
+            hint={`Şu an ${valueText(r.key, r.x.effective)} · ${r.x.help}`}
+          />
+          <Problem text={errors[r.key] ?? null} />
+        </View>
+      ))}
+      <View style={s.row}>
+        <Button
+          title="Varsayılana dön"
+          variant="ghost"
+          small
+          disabled={kit.locked || Object.keys(reset).length === 0}
+          onPress={() => kit.open('Ödül miktarları varsayılana dönsün', () => reset, 'Geri dönüş')}
+          style={{ flex: 1 }}
+        />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Ödül miktarları değişsin', () => changes)} style={{ flex: 1 }} />
       </View>
     </Card>
   );

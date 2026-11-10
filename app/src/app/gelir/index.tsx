@@ -119,12 +119,10 @@ export default function IncomeScreen() {
         title="Gelir"
         right={
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {/* The invite programme is not on the server yet: in live builds /davet is only the "yakında" screen. */}
-            {!live && (
-              <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
-                <Ionicons name="gift" size={18} color={colors.gold} />
-              </Pressable>
-            )}
+            {/* Arkadaşını Getir: the demo's, or the server's in a live build (server/api/referrals.mjs). */}
+            <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
+              <Ionicons name="gift" size={18} color={colors.gold} />
+            </Pressable>
             <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
               <Ionicons name="headset" size={18} color={colors.primaryText} />
             </Pressable>

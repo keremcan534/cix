@@ -183,8 +183,8 @@ export default function ProfileScreen() {
         <View style={[styles.card, { flexDirection: 'row' }]}>
           <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
           <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />
-          {/* Invite rewards run only in the demo; the server has none yet. */}
-          {!live && <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />}
+          {/* Invite rewards: the demo's, or the server's in a live build (server/api/referrals.mjs). */}
+          <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />
         </View>
 
         {myRoom.profileVisible && live && (

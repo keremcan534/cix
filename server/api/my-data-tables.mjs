@@ -13,7 +13,7 @@ export const EXPORTED = [
   'contact_refusals', 'team_notices', 'team_notice_seen', 'support_tickets', 'support_messages', 'data_exports',
   'profile_extras', 'profile_photos', 'privacy_settings', 'call_history_cleared', 'room_mic_invites', 'room_polls',
   'room_poll_votes', 'room_follower_invites',
-  'backpack_items', 'backpack_moves',
+  'backpack_items', 'backpack_moves', 'referral_codes', 'referrals',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */

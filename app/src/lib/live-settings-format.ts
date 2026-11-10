@@ -2,7 +2,7 @@
 // tests can hold them to the server's rules (server/api/live-registry.mjs): the server checks every value again
 // and its dryRun preview is what the admin confirms; these only keep the panel honest before anyone taps.
 // Times are Istanbul time (UTC+3 all year since 2016), whatever the phone's own time zone.
-import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey } from '@/lib/api';
+import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey, RewardKey } from '@/lib/api';
 import { RULES } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { campaignCoins } from '@/lib/live/catalog-live';
@@ -91,6 +91,11 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
     case 'match_video_price':
       // A price that more than doubles or halves.
       return typeof after === 'number' && typeof before === 'number' && (after > before * 2 || after * 2 < before);
+    case 'welcome_coins':
+    case 'invite_coins':
+    case 'invite_daily_cap':
+      // A reward or its cap that more than doubles.
+      return typeof after === 'number' && typeof before === 'number' && after > before * 2;
     default:
       return false;
   }
@@ -114,6 +119,14 @@ export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'match_free_seconds', unit: ' saniye' },
   { key: 'match_voice_price', unit: ' jeton' },
   { key: 'match_video_price', unit: ' jeton' },
+];
+
+/** Yeni üye ödülleri (server/api/live-registry.mjs): the switches (rewards_off) and the amounts, in card order. */
+export const REWARD_LABEL: Record<string, string> = { welcome: 'Hoş geldin jetonu', invite: 'Davet ödülü', first_purchase: 'İlk alım hediyesi' };
+export const REWARD_KEYS: { key: Exclude<RewardKey, 'rewards_off'>; unit: string }[] = [
+  { key: 'welcome_coins', unit: ' jeton' },
+  { key: 'invite_coins', unit: ' jeton' },
+  { key: 'invite_daily_cap', unit: '' },
 ];
 
 // --- Values as text ------------------------------------------------------------------------------------------
@@ -195,6 +208,13 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
     case 'call_free':
     case 'match_free':
       return typeof v === 'number' ? `24 saatte ${v}` : String(v);
+    case 'rewards_off':
+      return Array.isArray(v) && v.length ? `Kapalı: ${v.map((k) => REWARD_LABEL[k] ?? k).join(', ')}` : 'Hepsi açık';
+    case 'welcome_coins':
+    case 'invite_coins':
+      return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
+    case 'invite_daily_cap':
+      return typeof v === 'number' ? `Günde ${fmtNum(v)} davet` : String(v);
     default:
       return String(v);
   }

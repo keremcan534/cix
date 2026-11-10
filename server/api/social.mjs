@@ -159,6 +159,9 @@ export async function eraseAccount(c, id, phone) {
     // Çantam (backpack.mjs): what was in it and its moves; the gift events it sent stay as accounting records.
     await c.query('DELETE FROM backpack_moves WHERE user_id = $1', [id]);
     await c.query('DELETE FROM backpack_items WHERE user_id = $1', [id]);
+    // Arkadaşını Getir (referrals.mjs): my code and who entered whose code, both ways; the coins paid stay in the ledger.
+    await c.query('DELETE FROM referrals WHERE invitee_id = $1 OR inviter_id = $1', [id]);
+    await c.query('DELETE FROM referral_codes WHERE user_id = $1', [id]);
 }
 
 export const socialRoutes = {

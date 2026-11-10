@@ -74,6 +74,7 @@ import { HttpError, auth, bannedError, clientIp, countRefusal, db, env, liveBan,
 import { googleClientIds, verifyGoogleIdToken } from './google.mjs';
 import { live } from './live-settings.mjs';
 import { assertDeliverable, assertMailOn, isGmail, mailboxOf, normalizeEmail, sendMail, sendNotice } from './mail.mjs';
+import { welcomeNewAccount } from './referrals.mjs';
 import { audit, deviceSignals, linkDevice, registerDevice } from './sanctions.mjs';
 import { sendCode, smsProvider } from './sms.mjs';
 
@@ -231,7 +232,10 @@ async function deviceGate(dev, b, existing) {
   throw bannedError(ban, { appealSession: await newSession(u.id, b.device, { deviceId: dev.id, scope: 'appeal' }) });
 }
 
-/** The end of every sign-in: a banned account (or device) gets the ban and an appeal session, everyone else a session. */
+/**
+ * The end of every sign-in: a banned account (or device) gets the ban and an appeal session, everyone else a session.
+ * A new account (more.isNew) gets its welcome coins first (referrals.mjs), so `user` carries them.
+ */
 async function signedIn(u, dev, b, more = {}) {
   const ban = await liveBan(db, u.id, dev?.matched ?? []);
   if (dev) await linkDevice(dev, u.id);
@@ -239,6 +243,7 @@ async function signedIn(u, dev, b, more = {}) {
     await audit(db, { actor: u.id, role: 'user', action: 'sign_in', sanction: ban.id, target: u.id, device: dev?.id ?? null, result: 'blocked' });
     throw bannedError(ban, { appealSession: await newSession(u.id, b.device, { deviceId: dev?.id ?? null, scope: 'appeal' }) });
   }
+  if (more.isNew) u = (await welcomeNewAccount(u.id)) ?? u;
   return { session: await newSession(u.id, b.device, { deviceId: dev?.id ?? null }), user: await withSignIn(u), ...more };
 }
 
