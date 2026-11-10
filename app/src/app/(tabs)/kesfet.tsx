@@ -300,7 +300,8 @@ function UserRow({
             user.verified && <VerifiedBadge size={16} />
           )}
           {user.vip && <VipBadge />}
-          <CharmBadge level={wealthCharmOf(user.id).charm} />
+          {/* The demo's levels are made up from the id: a live build shows none until the server sends them. */}
+          {!liveMode() && <CharmBadge level={wealthCharmOf(user.id).charm} />}
         </View>
         <View style={styles.chips}>
           {showDistance && (

@@ -369,17 +369,14 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
           style={styles.catFade}
         />
       </View>
-      {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
-      {!liveMode() && (
-        <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
-          <LinearGradient colors={gradientDeep} style={styles.catIcon}>
-            <Ionicons name="people" size={18} color="#fff" />
-            <View style={styles.plusBadge}>
-              <Ionicons name="add" size={10} color={colors.primaryText} />
-            </View>
-          </LinearGradient>
-        </Pressable>
-      )}
+      <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Aile kur / katıl">
+        <LinearGradient colors={gradientDeep} style={styles.catIcon}>
+          <Ionicons name="people" size={18} color="#fff" />
+          <View style={styles.plusBadge}>
+            <Ionicons name="add" size={10} color={colors.primaryText} />
+          </View>
+        </LinearGradient>
+      </Pressable>
       <Pressable onPress={onCountry} hitSlop={6} accessibilityLabel="Ülke seç" style={{ marginRight: 16 }}>
         <View style={[styles.catIcon, { backgroundColor: colors.cardAlt }]}>
           {flag ? <Text style={{ fontSize: 18 }}>{flag}</Text> : <Ionicons name="globe" size={20} color={dark ? '#38BDF8' : '#0284C7'} />}

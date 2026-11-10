@@ -3602,7 +3602,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         sent={sharedTo}
         onSend={sendToFriend}
         onExternal={shareExternal}
-        followers={canManage ? { count: followerCount(hostId), lastAt: followerInvites[id], onSend: inviteFollowers } : null}
+        followers={canManage && !liveMode() ? { count: followerCount(hostId), lastAt: followerInvites[id], onSend: inviteFollowers } : null}
       />
       <RoomMenuSheet visible={panel === 'menu'} onClose={() => setPanel(null)} sections={menuSections.map((sec) => ({ ...sec, items: sec.items.map((it) => (MENU_TOGGLES.has(it.key) ? it : { ...it, onPress: () => (menuReturn.current.push('menu'), it.onPress()) })) }))} />
       <ActionSheet

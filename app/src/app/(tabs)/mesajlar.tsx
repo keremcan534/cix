@@ -181,19 +181,14 @@ export default function MessagesScreen() {
             onPress={openParty}
             right={<Image source={{ uri: partyCover }} style={styles.roomCover} />}
           />
-          {/* Aile (families) only exists in the demo: a live build leaves this row out. */}
-          {!liveMode() && (
-            <>
-              <View style={styles.sep} />
-              <SystemRow
-                icon={<Icon3D name="coin" size={30} />}
-                iconColors={['#F59E0B', '#FBBF24']}
-                title="Aileni bul"
-                subtitle="Birlikte konuşacak insanlar seni bekliyor"
-                onPress={() => router.push('/aile')}
-              />
-            </>
-          )}
+          <View style={styles.sep} />
+          <SystemRow
+            icon={<Icon3D name="coin" size={30} />}
+            iconColors={['#F59E0B', '#FBBF24']}
+            title="Aileni bul"
+            subtitle="Birlikte konuşacak insanlar seni bekliyor"
+            onPress={() => router.push('/aile')}
+          />
           {/* Only shown when someone came; with VIP the sheet lists them. */}
           {visitorCount > 0 && (
             <>

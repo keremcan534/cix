@@ -42,11 +42,11 @@ const GROWTH: Item[] = [
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
   ...(oneOnOneOpen() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
-  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true },
-  { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true },
-  { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true },
-  { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true },
-  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true },
+  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true, localOnly: true },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (demo)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true, localOnly: true },
 ];
 const SUPPORT: Item[] = [
@@ -182,8 +182,8 @@ export default function ProfileScreen() {
 
         <View style={[styles.card, { flexDirection: 'row' }]}>
           <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
-          {/* Aile and invite rewards run only in the demo; the server has neither yet. */}
-          {!live && <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />}
+          <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />
+          {/* Invite rewards run only in the demo; the server has none yet. */}
           {!live && <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />}
         </View>
 
