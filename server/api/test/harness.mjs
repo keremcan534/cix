@@ -46,6 +46,8 @@ export function startApi(extraEnv = {}) {
       UPLOAD_VERIFY: '0',
       ...extraEnv,
     };
+    // PUBLIC_URL 'self': the address phones open stored files at is this API's own (core.mjs servedFiles).
+    if (env.PUBLIC_URL === 'self') env.PUBLIC_URL = base;
     for (const k of Object.keys(env)) if (env[k] === undefined || env[k] === null) delete env[k];
     h.api = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'index.mjs')], { env, stdio: ['ignore', 'pipe', 'inherit'] });
     let buf = '';

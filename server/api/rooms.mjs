@@ -29,7 +29,7 @@
 // set for someone else (taken off the mic, moved, or let up from the mic queue). The room's locked mics, layout,
 // mic count and mic queue are kept here and written into the LiveKit room's metadata (pushRoomMeta), which
 // LiveKit hands every phone in the room the moment it changes, and again on joining.
-import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
+import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, db, env, filesOut, int, limit, publicText, readJson, sanctionView, sha, text, userId } from './core.mjs';
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction, refreshVoice } from './sanctions.mjs';
@@ -141,14 +141,17 @@ export async function pushRoomMeta(roomId) {
   try {
     const r = (await db.query('SELECT locked_seats, layout_id, mic_count, mic_queue FROM rooms WHERE id = $1', [roomId])).rows[0];
     if (!r) return false;
-    const metadata = JSON.stringify({
-      lockedSeats: (r.locked_seats ?? []).map(Number),
-      layoutId: r.layout_id ?? null,
-      micCount: r.mic_count ?? null,
-      micQueue: !!r.mic_queue,
-      queue: await queueOf(roomId),
-      music: await roomMusic(roomId),
-    });
+    // The music's files go out at this server's address, like every answer (core.mjs filesOut).
+    const metadata = filesOut(
+      JSON.stringify({
+        lockedSeats: (r.locked_seats ?? []).map(Number),
+        layoutId: r.layout_id ?? null,
+        micCount: r.mic_count ?? null,
+        micQueue: !!r.mic_queue,
+        queue: await queueOf(roomId),
+        music: await roomMusic(roomId),
+      }),
+    );
     const name = liveKitName(roomId);
     return await roomService('UpdateRoomMetadata', { room: name, metadata }, { roomAdmin: true, room: name });
   } catch (e) {

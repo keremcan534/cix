@@ -200,14 +200,15 @@ jobs:
           done
           echo "The new API did not answer (last answer: ${body:-none})"; exit 1
       # Photo storage, end to end (media.mjs storageCheck): a small file put the way the phone puts a photo, read
-      # back through the public address and deleted. Only status and error codes are printed, never a setting.
+      # back through the storage's public address and through the API (the way phones open it, "uygulama adresi"),
+      # then deleted. Only status and error codes are printed, never a setting.
       - name: Check the photo storage
         if: steps.key.outputs.ready == 'true'
         working-directory: .
         run: |
           out=$(ssh -i ~/.ssh/deploy ubuntu@$HOST 'cd /opt/similar && sudo docker compose exec -T api node --input-type=module -e "const m = await import(\"./media.mjs\"); console.log(await m.storageCheck()); process.exit(0)"') || out="could not run"
           echo "storage check: $out"
-          case "$out" in *"yükleme 200"*"açık adres 200"*) ;; *) echo "::warning::photo storage: $out" ;; esac
+          case "$out" in *"yükleme 200"*"uygulama adresi 200"*) ;; *) echo "::warning::photo storage: $out" ;; esac
       # On a failed deploy, show what the server's services say (state and recent logs; no settings or secrets).
       - name: Show the server's service state
         if: failure() && steps.key.outputs.ready == 'true'
