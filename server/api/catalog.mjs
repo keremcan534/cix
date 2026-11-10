@@ -215,3 +215,19 @@ export const ROOM_COVERS = [
   { id: 'bg4', minLevel: 7 },
 ];
 export const ROOM_THEMES = ['chat', 'pk', 'music', 'game', 'party', 'friends'];
+
+// --- Oda süslemesi › Ücretli (room-decor.mjs): the paid room backgrounds, in step with the app (app/src/data/catalog.ts
+// ROOM_BG_PAID); tests/server-catalog.test.ts fails when they drift. Owned like a shop item (entitlements, kind
+// 'roombg'), at the shop's 30-day price levels. `sale`: the picture is in the released app, so it may be bought. None
+// is yet (docs/GORSEL_URETIM_LISTESI.md §14 asks for them): the shelf shows them as "yakında". A test or staging
+// server sells them all with ROOM_BG_PREVIEW=1. Prices and durations change only with a deploy.
+/** [sku, name, price in coins, days, on sale] */
+const ROOM_BG_ROWS = [
+  ['rb-yildiz', 'Yıldızlı Gece', 600, 30, false],
+  ['rb-neon', 'Neon Sokak', 900, 30, false],
+  ['rb-konser', 'Konser Sahnesi', 900, 30, false],
+  ['rb-teras', 'Teras Partisi', 1_200, 30, false],
+  ['rb-galaksi', 'Galaksi', 1_200, 30, false],
+  ['rb-salon', 'Altın Salon', 2_000, 30, false],
+];
+export const ROOM_BGS = new Map(ROOM_BG_ROWS.map(([sku, name, price, days, sale]) => [sku, Object.freeze({ sku, kind: 'roombg', name, price, days, tier: null, minVip: 0, sale })]));

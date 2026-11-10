@@ -24,6 +24,7 @@ import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 import { listsHidden, shownToViewer } from './privacy.mjs';
 import { cardsMore, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
+import { eraseDecor } from './room-decor.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -152,6 +153,9 @@ export async function eraseAccount(c, id, phone) {
     await c.query('UPDATE room_cross_pks SET answered_by = NULL WHERE answered_by = $1', [id]);
     await c.query('UPDATE room_cross_pks SET ended_by = NULL WHERE ended_by = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
+    // Oda süslemesi and Oda kapağı (room-decor.mjs): their own picture and its term, and the covers they uploaded
+    // (the files go with removeUserFiles).
+    await eraseDecor(c, id);
     // Destek: their tickets and threads (the photos go with removeUserFiles); the data copy's date; the spending limit.
     await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);
     await c.query('DELETE FROM data_exports WHERE user_id = $1', [id]);

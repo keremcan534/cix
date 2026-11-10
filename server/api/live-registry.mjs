@@ -95,6 +95,9 @@ export function defaultsOf(e = process.env) {
     casino_off: [],
     casino_max_bet: CASINO_TOP,
     casino_daily_rounds: CASINO_DAILY_ROUNDS,
+    // Oda süslemesi (room-decor.mjs): both paid parts on, Özel süsleme 5.000 jeton for 30 days.
+    room_decor_off: [],
+    ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [k, x.default])),
   };
 }
 const CASINO_TOP = CASINO_STAKES.wide[CASINO_STAKES.wide.length - 1];
@@ -193,6 +196,61 @@ const rewardEntries = () => {
           bounds: x.bounds,
           parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
           big: (before, after) => after !== null && after > before * 2,
+          impact: (before, after) => x.text(fmt(before), fmt(after)),
+        },
+      ]),
+    ),
+  };
+};
+
+/**
+ * Oda süslemesi (room-decor.mjs): a switch for each paid part of a room's background, and the price and length of
+ * Özel süsleme (the owner's own picture). The paid backgrounds' own prices are the catalog's (catalog.mjs ROOM_BGS).
+ */
+const DECOR = 'Oda süslemesi';
+export const DECOR_SWITCHES = ['custom', 'paid'];
+export const DECOR_LABEL = { custom: 'Özel süsleme (kendi görselini yükleme)', paid: 'Ücretli süslemeler' };
+const DECOR_OFF_EFFECT = {
+  custom: 'Yeni özel süsleme satın alınamaz; süresi devam edenler kalır ve görselini değiştirebilir.',
+  paid: 'Ücretli süsleme satın alınamaz; alınmış olanlar süresi bitene kadar kullanılır.',
+};
+const DECOR_AMOUNTS = {
+  room_bg_custom_price: { field: 'roomBgCustomPrice', label: 'Özel süsleme ücreti', default: 5_000, bounds: { min: 100, max: 100_000, step: 100, money: true }, unit: ' jeton', help: 'Oda sahibinin kendi görselini odasının arka planı yapmak için ödediği jeton. Yalnız yeni alımlarda geçerli olur.', text: (a, b) => `Özel süsleme ${a} → ${b} jeton.` },
+  room_bg_custom_days: { field: 'roomBgCustomDays', label: 'Özel süsleme süresi (gün)', default: 30, bounds: { min: 1, max: 90, step: 1 }, unit: ' gün', help: 'Ödenen özel süslemenin kaç gün odada kalacağı. Süren süslemelerin bitiş günü değişmez.', text: (a, b) => `Yeni alınan özel süsleme ${a} → ${b} gün kalır.` },
+};
+/** The decoration keys as registry entries; a price that more than doubles or halves needs the second confirmation. */
+const decorEntries = () => {
+  const switches = { options: DECOR_SWITCHES, labels: DECOR_LABEL, max: DECOR_SWITCHES.length };
+  return {
+    room_decor_off: {
+      field: 'roomDecorOff',
+      group: DECOR,
+      label: 'Kapalı süsleme satışları',
+      help: 'Kapatılan satış sunucuda hemen durur; alınmış süslemeler süresi bitene kadar kalır. Ücretsiz süslemeler ve oda kapağı etkilenmez.',
+      type: 'set',
+      bounds: switches,
+      parse: (v) => setOf(v, switches, 'Kapalı süsleme satışları'),
+      big: () => false,
+      impact(before, after) {
+        const off = added(before, after);
+        const on = added(after, before);
+        const out = off.map((k) => DECOR_OFF_EFFECT[k]);
+        if (on.length) out.push(`Yeniden açılır: ${on.map((k) => DECOR_LABEL[k]).join(', ')}.`);
+        return out.join(' ') || 'Görünür bir etkisi yok.';
+      },
+    },
+    ...Object.fromEntries(
+      Object.entries(DECOR_AMOUNTS).map(([k, x]) => [
+        k,
+        {
+          field: x.field,
+          group: DECOR,
+          label: x.label,
+          help: x.help,
+          type: 'int',
+          bounds: x.bounds,
+          parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+          big: (before, after) => after !== null && !!x.bounds.money && (after > before * 2 || after * 2 < before),
           impact: (before, after) => x.text(fmt(before), fmt(after)),
         },
       ]),
@@ -578,6 +636,7 @@ export const REGISTRY = {
     big: (before, after) => after !== null && after > REGISTRY.casino_daily_rounds.bounds.big,
     impact: (before, after) => `Bir oyunda günde en çok ${fmt(before)} → ${fmt(after)} tur (en yüksek bahisle); Yörünge’de ${fmt(before * CASINO_TOP)} → ${fmt(after * CASINO_TOP)} jeton.`,
   },
+  ...decorEntries(),
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -629,7 +688,7 @@ const readOnlySet = (xs) => {
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoMaxBet,
- *     casinoDailyRounds, invalid }
+ *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -669,6 +728,8 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     casinoOff: readOnlySet(val('casino_off')),
     casinoMaxBet: val('casino_max_bet'),
     casinoDailyRounds: val('casino_daily_rounds'),
+    roomDecorOff: readOnlySet(val('room_decor_off')),
+    ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     invalid: Object.freeze([...invalid]),
   });
 }
