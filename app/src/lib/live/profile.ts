@@ -156,24 +156,24 @@ export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
   return meFromServer(await api.updateProfile({ avatarUrl: await uploadPhoto('avatar', img) }));
 }
 
-/** The picked photo, made smaller first (shrinkPhoto), put in the app's storage for `kind` (a signed address for
- *  its exact type and size, then PUT); resolves with its public address. Throws when a step fails, e.g. 503 while
+/** The picked photo, made smaller first (shrinkPhoto), put in the app's storage for `kind` (an upload address for
+ *  its type and size, then its bytes PUT there); resolves with its public address. Throws when a step fails, e.g. 503 while
  *  storage isn't set up. */
 export async function uploadPhoto(kind: PhotoKind, picked: PickedImage): Promise<string> {
   const img = await shrinkPhoto(kind, picked);
-  let file: Blob;
+  let file: { data: ArrayBuffer; type: string };
   try {
-    file = await (await fetch(img.uri)).blob();
+    file = await api.readFile(img.uri);
   } catch {
     throw new Error('Fotoğraf okunamadı. Başka bir fotoğraf seç.');
   }
-  const target = await api.uploadUrl(kind, imageType(img.uri, img.mimeType, file.type), file.size);
+  const target = await api.uploadUrl(kind, imageType(img.uri, img.mimeType, file.type), file.data.byteLength);
   let res: Response;
   try {
-    res = await fetch(target.uploadUrl, { method: target.method ?? 'PUT', headers: target.headers, body: file });
+    res = await fetch(target.uploadUrl, { method: target.method ?? 'PUT', headers: target.headers, body: file.data });
   } catch {
     throw new Error('Fotoğraf yüklenemedi. İnternetini kontrol edip tekrar dene.');
   }
-  if (!res.ok) throw new Error(`Fotoğraf yüklenemedi (${res.status}). Tekrar dene.`);
+  if (!res.ok) throw new Error(`Fotoğraf yüklenemedi (${await api.storageRefusal(res)}). Tekrar dene.`);
   return target.publicUrl;
 }

@@ -15,6 +15,7 @@
 import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, env, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
+import { verifyUpload } from './media.mjs';
 import { pairOf, payOneOnOne } from './one-on-one.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
@@ -62,6 +63,7 @@ export const messageRoutes = {
     const to = userId(b.to, 'alıcı');
     if (to === me.id) throw new HttpError(400, 'Kendine mesaj gönderemezsin');
     const image = photoOf(b.image, me);
+    if (image) await verifyUpload(image, 'dm');
     const body = image && (b.text === undefined || b.text === null || String(b.text).trim() === '') ? PHOTO_TEXT : await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);

@@ -77,22 +77,23 @@ export async function uploadTrack(a: PickedAudio, seconds: number, title = track
   if (a.size && a.size > TRACK_MAX_BYTES) throw new Error('Dosya en fazla 20 MB olabilir.');
   const secs = Math.round(seconds);
   if (!(secs >= 5 && secs <= 1200)) throw new Error('Parça 5 saniye ile 20 dakika arası olmalı.');
-  let file: Blob;
+  let file: ArrayBuffer;
   try {
-    file = await (await fetch(a.uri)).blob();
+    file = (await api.readFile(a.uri)).data;
   } catch {
     throw new Error('Dosya okunamadı. Başka bir dosya seç.');
   }
-  if (!file.size || file.size > TRACK_MAX_BYTES) throw new Error('Dosya en fazla 20 MB olabilir.');
-  const target = await api.uploadUrl('music', type, file.size);
+  const size = file.byteLength;
+  if (!size || size > TRACK_MAX_BYTES) throw new Error('Dosya en fazla 20 MB olabilir.');
+  const target = await api.uploadUrl('music', type, size);
   let res: Response;
   try {
     res = await fetch(target.uploadUrl, { method: target.method ?? 'PUT', headers: target.headers, body: file });
   } catch {
     throw new Error('Parça yüklenemedi. İnternetini kontrol edip tekrar dene.');
   }
-  if (!res.ok) throw new Error(`Parça yüklenemedi (${res.status}). Tekrar dene.`);
-  return (await api.apiRequest<{ track: LibraryTrack }>('POST', '/api/music', { title, url: target.publicUrl, seconds: secs, size: file.size })).track;
+  if (!res.ok) throw new Error(`Parça yüklenemedi (${await api.storageRefusal(res)}). Tekrar dene.`);
+  return (await api.apiRequest<{ track: LibraryTrack }>('POST', '/api/music', { title, url: target.publicUrl, seconds: secs, size })).track;
 }
 
 /** The room's music now and whether I may play there; also sets the server clock the position is read on. */

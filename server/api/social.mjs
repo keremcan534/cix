@@ -17,7 +17,7 @@ import { autoFromReports } from './sanctions.mjs';
 import { looksOf, revokeAllForDelete } from './economy.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
-import { removeFiles, removeUserFiles } from './media.mjs';
+import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -143,6 +143,8 @@ export const socialRoutes = {
     }
     const keys = Object.keys(set);
     if (!keys.length) return { user: await withSignIn(u) };
+    // A new photo of ours must really be in the storage, within the avatar's type and size.
+    if (set.avatar_url) await verifyUpload(set.avatar_url, 'avatar');
     try {
       const r = await db.query(`UPDATE users SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`, [u.id, ...keys.map((k) => set[k])]);
       // The photo it replaced leaves the storage (only one this person uploaded).

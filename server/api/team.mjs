@@ -15,7 +15,7 @@
 import { HttpError, auth, db, env, int, limit, readJson, text, userId } from './core.mjs';
 import { PERIODS, topBoard } from './gifts.mjs';
 import { notify } from './push.mjs';
-import { removeFiles } from './media.mjs';
+import { removeFiles, verifyUpload } from './media.mjs';
 
 export const KINDS = ['event', 'update', 'reward', 'rule', 'notice'];
 const PAGE = 30;
@@ -136,6 +136,7 @@ export const teamRoutes = {
     const title = text(b.title, 2, 80, 'Başlık');
     const body = text(b.body ?? '', 0, 1000, 'Metin');
     const imageUrl = photoOf(b.imageUrl);
+    if (imageUrl) await verifyUpload(imageUrl, 'notice');
     const link = b.link === undefined || b.link === null || b.link === '' ? null : typeof b.link === 'string' && LINK.test(b.link) ? b.link : null;
     if ((b.link ?? '') !== '' && !link) throw new HttpError(400, 'Bağlantı uygulamada bir yol olmalı (ör. /siralama)');
     let target = null;

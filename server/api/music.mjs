@@ -21,7 +21,7 @@
 // mayKeepMusic before it hands out an upload address). Playing music to a room is a public performance: see
 // docs (PRS/PPL licence) before launch.
 import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
-import { mayKeepMusic, removeFiles } from './media.mjs';
+import { mayKeepMusic, removeFiles, verifyUpload } from './media.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { ROOM_MAX_LEVEL, pushRoomMeta, roomLevel } from './rooms.mjs';
 
@@ -139,6 +139,7 @@ export const musicRoutes = {
     // Everyone in the room reads the name: no contact details (contact-filter.mjs).
     const title = await publicText(b.title, 1, 80, 'Parça adı', me, 'room.music', 'title');
     const url = musicUrl(b.url, me.id);
+    await verifyUpload(url, 'music');
     const seconds = int(b.seconds, 5, 1200);
     if (seconds === null) throw new HttpError(400, 'Parça 5 saniye ile 20 dakika arası olmalı');
     const size = int(b.size, 1, 20 * 1024 * 1024);

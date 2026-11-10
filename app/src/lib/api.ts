@@ -459,6 +459,23 @@ export const unregisterPush = (token: string) => call<{ registered: boolean }>('
 export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
+/**
+ * A file picked on the phone, read as bytes with the type the phone gave it ('' when unknown). Bytes, not a Blob:
+ * Expo's fetch sends a Blob with the Blob's own type, which is empty for files read from the phone, so the type
+ * the server was asked for would be lost on the upload.
+ */
+export async function readFile(uri: string): Promise<{ data: ArrayBuffer; type: string }> {
+  const res = await fetch(uri);
+  if (!res.ok) throw new Error(`read ${res.status}`);
+  return { type: res.headers.get('content-type')?.split(';')[0].trim() ?? '', data: await res.arrayBuffer() };
+}
+
+/** Why the storage refused an upload: its status, and the reason word it gave when there is one ("403 AccessDenied"). */
+export async function storageRefusal(res: Response): Promise<string> {
+  const code = /<Code>([A-Za-z]{2,40})<\/Code>/.exec(await res.text().catch(() => ''))?.[1];
+  return code ? `${res.status} ${code}` : String(res.status);
+}
+
 /** Listener counts of every voice room with people in it (LiveKit room names, e.g. oda-r1). */
 export const liveRooms = () => call<{ rooms: { room: string; listeners: number }[] }>('GET', '/api/rooms/live').then((r) => r.rooms);
 
