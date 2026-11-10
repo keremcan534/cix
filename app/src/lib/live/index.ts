@@ -290,6 +290,7 @@ const locked = new Set<string>();
 /** A server room that asks for a password before anyone but its staff gets in. */
 export const isLockedRoom = (id: string) => locked.has(id);
 
+const roomChips = new Map<string, NonNullable<Room['serverChips']>>();
 /** A server room as the app's Room (its own cover or none, empty mics: who sits where comes from LiveKit). */
 export function roomOf(r: api.ServerRoom): Room {
   rememberUser(r.owner);
@@ -317,6 +318,15 @@ export function roomOf(r: api.ServerRoom): Room {
     ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
     bossId: r.boss ? r.boss.id : null,
   };
+  // The Odalar chips come with the room lists (server/api/room-social.mjs); a read of the room alone keeps the last.
+  const chips: Room['serverChips'] =
+    r.pk === undefined
+      ? roomChips.get(r.id)
+      : { pk: !!r.pk, ...(r.agency && { agency: r.agency.name }), ...(r.family && { family: r.family.name }), ...(r.weekRank && { weekRank: r.weekRank }) };
+  if (chips) {
+    room.serverChips = chips;
+    roomChips.set(r.id, chips);
+  }
   if (r.boss) rememberUser(r.boss);
   putServerRoom(room);
   return room;
@@ -362,6 +372,8 @@ export function useServerRooms(): Room[] {
   }, [focused]);
   return list;
 }
+/** The open server rooms as last read, without reading them again (a screen that only looks one up). */
+export const useServerRoomList = (): Room[] => useSyncExternalStore(subscribeRooms, () => rooms, () => rooms);
 /** Whether the last read of the room list worked ('failed': the list offers "Tekrar dene"). */
 export const useServerRoomsState = () => useSyncExternalStore(subscribeRooms, () => roomsState, () => roomsState);
 

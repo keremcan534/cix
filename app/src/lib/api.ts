@@ -522,6 +522,12 @@ export type ServerRoom = {
   rules?: RoomRules;
   /** Dümen koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
   boss?: UserCard | null;
+  /** The Odalar row's chips (server/api/room-social.mjs): the owner's agency or family, a running in-room PK, and
+   *  the room's place in this week's gift ranking (1–3, else null). */
+  agency?: { id: string; name: string } | null;
+  family?: { id: string; name: string } | null;
+  pk?: boolean;
+  weekRank?: number | null;
 };
 /** A server room's rules (server/api/room-rules.mjs). */
 export type RoomRules = {
@@ -751,6 +757,29 @@ export const myCallStats = () => call<{ week: ServerCallStats }>('GET', '/api/me
 export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean };
 export const myCallTask = () => call<{ task: ServerCallTask }>('GET', '/api/me/call-task').then((r) => r.task);
 export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask }>('POST', '/api/me/call-task/claim', {});
+// Room social (server/api/room-social.mjs): mic invites, the room poll, upcoming events, my rooms, follower invites.
+export type MicInviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'failed' | 'cancelled';
+/** `expiresIn`: ms left to answer by the server's clock (0 once answered); `seat` null: any free mic. */
+export type ServerMicInvite = { id: number; room: string; from: { id: string; name: string }; to: { id: string; name: string }; seat: number | null; status: MicInviteStatus; note: string; expiresIn: number; createdAt: string };
+export const roomMicInvites = (room: string) => call<{ invites: ServerMicInvite[] }>('GET', `/api/rooms/invites?room=${encodeURIComponent(room)}`).then((r) => r.invites);
+export const sendMicInvite = (room: string, user: string, seat?: number) => call<{ invite: ServerMicInvite }>('POST', '/api/rooms/invite', { room, user, ...(seat === undefined ? {} : { seat }) }).then((r) => r.invite);
+export const answerMicInvite = (id: number, accept: boolean, seat?: number) =>
+  call<{ invite: ServerMicInvite }>('POST', '/api/rooms/invite/answer', { id, accept, ...(seat === undefined ? {} : { seat }) }).then((r) => r.invite);
+/** `votes` / `total` are null while the poll hides its results from me (not live, I haven't voted, still open). */
+export type ServerPoll = { id: number; room: string; question: string; options: { text: string; votes: number | null }[]; total: number | null; myVote: number | null; live: boolean; endsIn: number; closed: boolean; by: { id: string; name: string } };
+export const roomPoll = (room: string) => call<{ poll: ServerPoll | null }>('GET', `/api/rooms/poll?room=${encodeURIComponent(room)}`).then((r) => r.poll);
+export const startRoomPoll = (room: string, p: { question: string; options: string[]; seconds: number; live: boolean }) => call<{ poll: ServerPoll }>('POST', '/api/rooms/poll', { room, ...p }).then((r) => r.poll);
+export const voteRoomPoll = (id: number, option: number) => call<{ poll: ServerPoll }>('POST', '/api/rooms/poll/vote', { id, option }).then((r) => r.poll);
+export const closeRoomPoll = (id: number) => call<{ poll: ServerPoll }>('POST', '/api/rooms/poll/close', { id }).then((r) => r.poll);
+export type UpcomingEvent = { id: number; title: string; when: string; type: string; room: { id: string; title: string }; attendees: number; going: boolean; createdAt: string };
+export const upcomingEvents = () => call<{ events: UpcomingEvent[] }>('GET', '/api/rooms/events/upcoming').then((r) => r.events);
+export const joinedRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms/joined').then((r) => r.rooms);
+/** `waitMs`: how long until the room's account may invite its followers again (0: now). */
+export type FollowerInviteInfo = { count: number; lastAt: string | null; waitMs: number };
+export const followerInviteInfo = (room: string) => call<FollowerInviteInfo>('GET', `/api/rooms/invite-followers?room=${encodeURIComponent(room)}`);
+export const inviteFollowers = (room: string) => call<FollowerInviteInfo & { sent: number }>('POST', '/api/rooms/invite-followers', { room });
+export type FollowerRoomInvite = { id: number; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
+export const myRoomInvites = () => call<{ invites: FollowerRoomInvite[] }>('GET', '/api/me/room-invites').then((r) => r.invites);
 
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };

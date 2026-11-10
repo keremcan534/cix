@@ -169,6 +169,17 @@ export function setServerBans(roomId: string, bans: { uid: string; until: number
   if (keys.length === Object.keys(r.bans).length && keys.every((uid) => r.bans[uid] === next[uid])) return;
   put({ ...r, bans: next });
 }
+/**
+ * Server room: the mic invites as the server keeps them (lib/live/room-social), in place of the demo's own. The
+ * server decides who may invite, answer and sit; this only draws them (the prompt, "davet bekliyor", the answers).
+ */
+export function setServerInvites(roomId: string, invites: MicInvite[]) {
+  const r = state.rooms[roomId];
+  if (!r) return;
+  const key = (l: MicInvite[]) => l.map((i) => `${i.id}:${i.status}:${i.seat ?? ''}:${i.expiresAt}`).join();
+  if (key(r.invites) === key(invites)) return;
+  put({ ...r, invites });
+}
 /** Room blacklist (owner settings): listed people are out and can't enter; people taken off it can enter again. */
 export function setBlacklist(roomId: string, ids: string[]) {
   const r = state.rooms[roomId];

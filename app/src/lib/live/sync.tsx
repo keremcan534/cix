@@ -14,6 +14,7 @@ import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@
 import { resumePurchases } from '@/lib/live/billing';
 import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
+import { checkRoomInvites } from '@/lib/live/room-social';
 import { onLine, startLiveLine } from '@/lib/live/live-line';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
@@ -49,6 +50,7 @@ export function LiveSync() {
     let running = false;
     let again = false;
     let resumed = false;
+    let invitesDue = false;
     const run = async () => {
       // A nudge from the live line while a run is going: one more run right after it, so nothing waits a tick.
       if (running) {
@@ -86,6 +88,11 @@ export function LiveSync() {
           resumed = false;
           void checkNewFollowers((n) => alive && appRef.current.notify(n)).catch(() => {});
         }
+        // Room invites from accounts I follow (server/api/room-social.mjs), unless I turned invite notices off.
+        if (alive && (tick % 4 === 0 || invitesDue)) {
+          invitesDue = false;
+          void checkRoomInvites((n) => alive && appRef.current.settings.notifyTypes.invite && appRef.current.notify(n)).catch(() => {});
+        }
       } catch (e) {
         if (e instanceof SignInAgain) {
           // A Google, e-mail or phone account's session ended (signed out on the server, or expired): back to the welcome screen.
@@ -115,6 +122,7 @@ export function LiveSync() {
     const offLine = onLine((e) => {
       if (e.type === 'call' || e.type === 'message_read') return;
       if (e.type === 'follow' || e.type === 'reconnected') resumed = true;
+      if (e.type === 'room_invite' || e.type === 'reconnected') invitesDue = true;
       void run();
     });
     const sub = AppState.addEventListener('change', (s) => {
