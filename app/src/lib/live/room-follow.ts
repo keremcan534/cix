@@ -7,7 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { ROOMS, roomById, type Room } from '@/data/mock';
+import { ROOMS, type Room } from '@/data/mock';
 import * as api from '@/lib/api';
 import { isLiveRoom, liveMode, rememberUser, roomOf, toLocal } from '@/lib/live';
 import { focusStore } from '@/lib/live/focus-store';
@@ -36,9 +36,11 @@ if (!liveMode()) {
     })
     .catch(() => {});
 }
+/** A sample room's follow as the demo shows it; my own demo room (not a sample room) has a few sample followers. */
 const demoFollow = (roomId: string, ids: readonly string[]): RoomFollow => {
   const following = ids.includes(roomId);
-  return { following, followers: demoFollowers(roomById(roomId)) + (following ? 1 : 0) };
+  const room = ROOMS.find((r) => r.id === roomId);
+  return { following, followers: (room ? demoFollowers(room) : 12) + (following ? 1 : 0) };
 };
 
 // --- Follow and unfollow -----------------------------------------------------------------------------------------

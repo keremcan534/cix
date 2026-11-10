@@ -231,8 +231,8 @@ export function RoomMembersSection(p: RoomMembersProps) {
 function RoleMark({ role }: { role: MemberRole }) {
   if (role === 'owner') {
     return (
-      <View style={[styles.mark, { backgroundColor: 'transparent', borderWidth: 0 }]} accessibilityLabel={MEMBER_ROLE_LABEL.owner}>
-        <Icon3D name="crown" size={18} />
+      <View style={[styles.mark, { backgroundColor: '#24232B', padding: 2 }]} accessibilityLabel={MEMBER_ROLE_LABEL.owner}>
+        <Icon3D name="crown" size={13} />
       </View>
     );
   }
@@ -438,7 +438,8 @@ const styles = StyleSheet.create({
   bellText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   more: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   moreText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  mark: { position: 'absolute', right: -3, bottom: -3, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: '#24232B' },
+  // Bottom left: the bottom right is where a list row's "in the room" dot sits.
+  mark: { position: 'absolute', left: -3, bottom: -3, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: '#24232B' },
   joinBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   joinText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   state: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
