@@ -437,6 +437,20 @@ describe('Oda Kapağı', () => {
     j = await ok(cover(owner, null), 'kapağı kaldır');
     assert.equal(j.room.coverUrl, null);
     assert.ok(await gone(second), 'kaldırılan kapak silindi');
+
+    // Staff take a cover down for breaking the rules: audited, the file goes, the owner may upload another.
+    const third = file('roomcover', owner);
+    await ok(cover(owner, third.url), 'yeni kapak');
+    const mod = await h.account('Kapak Moderatörü', 'moderator');
+    assert.equal((await call('POST', '/api/admin/rooms/cover/remove', { room: id, reason: 'Uygunsuz kapak' }, owner.session))[0], 403);
+    assert.equal((await ok(call('GET', `/api/admin/rooms/background?room=${id}`, null, mod.session), 'yetkili bakar')).coverUrl, third.url);
+    await ok(call('POST', '/api/admin/rooms/cover/remove', { room: id, reason: 'Uygunsuz kapak' }, mod.session), 'yetkili kaldırır');
+    assert.ok(await gone(third), 'dosya silindi');
+    assert.equal((await roomOf(id, guest)).coverUrl, null);
+    const log = (await q("SELECT actor, target_user, detail FROM sanction_audit_logs WHERE action = 'room_cover_remove'")).rows;
+    assert.deepEqual(log.map((x) => [x.actor, x.target_user, x.detail.room, x.detail.reason]), [[mod.user.id, owner.user.id, id, 'Uygunsuz kapak']]);
+    assert.equal((await call('POST', '/api/admin/rooms/cover/remove', { room: id, reason: 'Uygunsuz kapak' }, mod.session))[0], 404);
+    assert.equal((await cover(owner, file('roomcover', owner).url))[0], 200, 'sahibi yenisini yükleyebilir');
   });
 
   test('oda kapanınca kapağın dosyası silinir', async () => {

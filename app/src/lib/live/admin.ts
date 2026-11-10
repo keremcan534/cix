@@ -117,6 +117,15 @@ export const handleReport = (id: number, status: 'actioned' | 'dismissed', banDa
     ...(remove ? { remove: true } : {}),
   });
 };
+/**
+ * A reported room's own pictures (server/api/room-decor.mjs): its owner's uploaded background (`url`, null: none;
+ * `until`: the paid term's end) and its uploaded cover. Taking one down for breaking the rules deletes the file;
+ * a background's paid term ends with it, without a refund.
+ */
+export type RoomPictures = { room: { id: string; title: string }; owner: { id: string; name: string }; url: string | null; until: string | null; shown: boolean; coverUrl: string | null };
+export const roomPictures = (room: string) => get<RoomPictures>(`/api/admin/rooms/background${q({ room })}`);
+export const removeRoomBackground = (room: string, reason: string) => post<{ removed: boolean }>('/api/admin/rooms/background/remove', { room, reason });
+export const removeRoomCover = (room: string, reason: string) => post<{ removed: boolean }>('/api/admin/rooms/cover/remove', { room, reason });
 /** days = null lifts the ban; 'Süresiz' also sends permanent: true (banBody). */
 export const ban = (user: string, days: number | null) => post<{ bannedUntil: string | null }>('/api/admin/ban', { user, ...(days === null ? { days } : banBody(days)) });
 

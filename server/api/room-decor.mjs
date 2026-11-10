@@ -10,6 +10,7 @@
 //   POST /api/rooms/cover        { room, url | null }          → { room }                        (owner or Süper Yönetici)
 //   GET  /api/admin/rooms/background?room=                     (staff) → { room, owner, url, until }
 //   POST /api/admin/rooms/background/remove { room, reason }   (staff) → { removed }
+//   POST /api/admin/rooms/cover/remove      { room, reason }   (staff) → { removed }
 //
 // Who: the owner or a Süper Yönetici picks what the room shows and changes the cover (the rule the room's name
 // and bulletin have); only the owner pays, and only the owner uploads, replaces or removes their own picture.
@@ -402,6 +403,24 @@ export const roomDecorRoutes = {
     await audit(db, { actor: me.id, role: me.role, action: 'room_background_remove', target: room.owner, detail: { room: room.id, reason, until: iso(old.until), price: Number(old.price ?? 0) } });
     removeFiles([old.url]);
     await announceOwner(room.owner);
+    return { removed: true };
+  },
+
+  /** Staff take a room's card picture down for breaking the rules: the file is deleted and the lists show what they
+   *  showed before. Audited with the reason. The owner may put up another one. */
+  async 'POST /api/admin/rooms/cover/remove'(req) {
+    const me = await staffOf(req);
+    const b = await readJson(req);
+    if (typeof b.room !== 'string' || !UUID.test(b.room)) throw new HttpError(400, 'Geçersiz oda');
+    const reason = text(b.reason, 3, 300, 'Neden');
+    const r = await db.query(
+      'UPDATE rooms r SET cover_url = NULL FROM (SELECT id, owner, cover_url FROM rooms WHERE id = $1 AND cover_url IS NOT NULL FOR UPDATE) old WHERE r.id = old.id RETURNING old.owner, old.cover_url AS url',
+      [b.room],
+    );
+    if (!r.rowCount) throw new HttpError(404, 'Bu odanın yüklenmiş kapağı yok');
+    await audit(db, { actor: me.id, role: me.role, action: 'room_cover_remove', target: r.rows[0].owner, detail: { room: b.room, reason } });
+    removeFiles([r.rows[0].url]);
+    announceRoom(liveKitName(b.room));
     return { removed: true };
   },
 };

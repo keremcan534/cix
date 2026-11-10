@@ -11,6 +11,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
+import type { RoomLook } from '@/components/room/decor';
 import { SeatReaction, type SeatReactionData } from '@/components/room/parts';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
@@ -20,7 +21,6 @@ import {
   LOCK_MIN_LEVEL,
   MIC_COUNT_OPTIONS,
   MIC_PERMISSION_MIN_LEVEL,
-  ROOM_BACKGROUNDS,
   ROOM_LEVEL_REWARDS,
   ROOM_LIMITS,
   ROOM_THEMES,
@@ -29,7 +29,6 @@ import {
   adminCapacity,
   memberLimit,
   roomCode,
-  roomCoverUrl,
   roomThemeInfo,
   type RoomTheme,
 } from '@/data/catalog';
@@ -239,7 +238,7 @@ export function RoomInfoSheet({
   giftLog,
   announcement,
   canEditText = false,
-  coverEdit,
+  look,
   onSave,
   onSettings,
   onShare,
@@ -272,11 +271,11 @@ export function RoomInfoSheet({
   stats: { coins: number; peak: number; minutes: number };
   giftLog: GiftLogRow[];
   announcement: string;
-  /** May change the cover (default: the owner). A server room: its owner and Süper Yöneticiler. */
-  coverEdit?: boolean;
+  /** Oda Süslemesi and Oda Kapağı (components/room/decor): two lines here for those who may change them. */
+  look?: RoomLook;
   /** Name and bulletin can be edited without the other owner tools (my live-mode server room). */
   canEditText?: boolean;
-  onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement' | 'cover'>> & { coverId?: string }) => void;
+  onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement'>>) => void;
   onSettings: () => void;
   onShare: () => void;
   onInvite: () => void;
@@ -289,11 +288,11 @@ export function RoomInfoSheet({
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
   actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
-  const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
+  const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'cover' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
   const textEditor = owner || canEditText;
-  const coverEditor = coverEdit ?? owner;
+  const lookEditor = !!look?.available && look.canEdit;
   const paddingBottom = useSheetBottom();
   const editText = (which: 'title' | 'bulletin') => {
     setDraft(which === 'title' ? title : announcement);
@@ -306,9 +305,9 @@ export function RoomInfoSheet({
       <View style={[styles.sheet, { maxHeight: '82%', paddingTop: 18, paddingBottom }]}>
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <Pressable onPress={() => coverEditor && setSub('decor')} accessibilityLabel="Kapak seç">
-              <Photo uri={cover} kind="cover" style={styles.cover} />
-              {coverEditor && <Text style={styles.coverLabel}>Kapak Seç</Text>}
+            <Pressable onPress={() => lookEditor && setSub('cover')} accessibilityLabel="Oda kapağı">
+              <Photo uri={cover} kind="cover" seed={roomId} style={styles.cover} />
+              {lookEditor && <Text style={styles.coverLabel}>Kapak Seç</Text>}
             </Pressable>
             <View style={{ flex: 1, gap: 6 }}>
               <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => textEditor && editText('title')} accessibilityLabel="Oda adını düzenle">
@@ -452,7 +451,7 @@ export function RoomInfoSheet({
             </View>
           )}
 
-          {coverEditor && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Photo uri={cover} kind="cover" style={{ width: 34, height: 44, borderRadius: 6 }} />} />}
+          {lookEditor && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Image source={look.thumb} style={{ width: 27, height: 48, borderRadius: 6 }} />} />}
           <Line label="Oda hediye kaydı" onPress={() => setSub('gifts')} />
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -548,24 +547,7 @@ export function RoomInfoSheet({
         )}
       </BottomSheet>
 
-      <BottomSheet visible={sub === 'decor'} onClose={() => setSub(null)} title="Oda süslemesi">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {ROOM_BACKGROUNDS.map((b) => {
-            const open = level >= b.minLevel;
-            const uri = roomCoverUrl(b.id);
-            return (
-              <Pressable key={b.id} disabled={!open} onPress={() => onSave({ cover: uri, coverId: b.id })} style={[styles.decor, cover === uri && { borderColor: colors.primaryText }, !open && { opacity: 0.4 }]}>
-                <Image source={{ uri }} style={{ width: '100%', height: 70, borderRadius: 8 }} />
-                <Text style={styles.tiny}>
-                  {open ? '' : '🔒 '}
-                  {b.name}
-                  {open ? '' : ` Lv.${b.minLevel}`}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </BottomSheet>
+      {look?.render(sub === 'decor' || sub === 'cover' ? sub : null, () => setSub(null))}
 
       <BottomSheet visible={sub === 'title' || sub === 'bulletin'} onClose={() => setSub(null)} title={sub === 'title' ? 'Oda adı' : 'Bülten'}>
         <TextInput value={draft} onChangeText={setDraft} style={[styles.input, sub === 'bulletin' && { minHeight: 70 }]} multiline={sub === 'bulletin'} maxLength={sub === 'title' ? 30 : 120} />
@@ -719,6 +701,8 @@ function LiveTraffic({ stats }: { stats: ServerOwnerStats | null }) {
 // --- Full-screen "Oda Ayarları" ---------------------------------------------------------
 type Picker =
   | null
+  | 'decor'
+  | 'cover'
   | 'type'
   | 'theme'
   | 'mics'
@@ -753,6 +737,7 @@ export function RoomSettingsScreen({
   live,
   standard = true,
   sections = [],
+  look,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -779,6 +764,8 @@ export function RoomSettingsScreen({
   standard?: boolean;
   /** Extra sections after the room's own: room tools for staff, then my own settings (effects, sound…). */
   sections?: SettingsSection[];
+  /** Oda Süslemesi and Oda Kapağı (components/room/decor), their screens opened on top of this one. */
+  look?: RoomLook;
 }) {
   const [picker, setPicker] = useState<Picker>(null);
   const close = () => setPicker(null);
@@ -834,6 +821,26 @@ export function RoomSettingsScreen({
           )}
           <Row label="Oda Günlüğü" hint="Susturma, indirme, çıkarma ve ayar değişiklikleri (bu oturum)" onPress={() => setPicker('log')} />
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
+
+          {look?.available && (
+            <>
+              <Section title="Görünüm" />
+              <Row
+                label="Oda Süslemesi"
+                hint="Odanın arka planı: ücretsiz, ücretli ya da kendi görselin"
+                value={look.decorLabel}
+                onPress={() => setPicker('decor')}
+                locked={look.canEdit ? undefined : 'Oda süslemesini oda sahibi veya Süper Yönetici değiştirir.'}
+              />
+              <Row
+                label="Oda Kapağı"
+                hint="Oda listelerinde ve oda kartında görünen resim"
+                value={look.coverLabel}
+                onPress={() => setPicker('cover')}
+                locked={look.canEdit ? undefined : 'Oda kapağını oda sahibi veya Süper Yönetici değiştirir.'}
+              />
+            </>
+          )}
 
           <Section title="Mikrofon pozisyonu" />
           <Row label="Sahne Düzeni" value={layoutLabel} onPress={() => setPicker('layouts')} />
@@ -995,6 +1002,7 @@ export function RoomSettingsScreen({
       />
 
       {renderLayouts(picker === 'layouts', close)}
+      {look?.render(picker === 'decor' || picker === 'cover' ? picker : null, close)}
 
       <BottomSheet visible={picker === 'blacklist'} onClose={close} title={`Oda kara listesi (${blacklist.length})`}>
         {blacklist.length === 0 && <Text style={styles.dim}>Kara listede kimse yok.</Text>}
@@ -1242,7 +1250,6 @@ const styles = StyleSheet.create({
   actionText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', paddingHorizontal: 2 },
   pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  decor: { width: '47%', borderWidth: 2, borderColor: 'transparent', borderRadius: 10, padding: 3 },
   bossRing: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },
   bossEmpty: { width: 62, height: 62, borderRadius: 31, backgroundColor: 'rgba(30,20,10,0.85)', alignItems: 'center', justifyContent: 'center' },
   bossTag: { color: '#1C1B22', backgroundColor: '#FBBF24', fontSize: 9, fontWeight: '900', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, marginTop: -10, overflow: 'hidden' },

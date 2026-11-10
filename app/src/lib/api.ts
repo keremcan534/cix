@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
+import type { RoomBackground } from '@/data/catalog';
 import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
@@ -477,7 +478,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**
@@ -532,6 +533,11 @@ export type ServerRoom = {
   coverId?: string | null;
   theme?: string;
   giftEffects?: boolean;
+  /** Oda süslemesi and Oda kapağı (server/api/room-decor.mjs): the free background chosen (null: the theme's
+   *  stage), what every phone draws behind the stage now, and the uploaded card picture. An older server sends none. */
+  bgId?: string | null;
+  background?: RoomBackground;
+  coverUrl?: string | null;
   /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
   rules?: RoomRules;
   /** Patron koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
@@ -638,6 +644,35 @@ export type RoomPatch = {
   rules?: Partial<RoomRules>;
 };
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
+/**
+ * Oda Süslemesi and Oda Kapağı as the room's settings show them (server/api/room-decor.mjs; the demo builds the same
+ * from its own state, lib/room-decor). `pick`: what is chosen over the free background ('custom', a paid sku or
+ * null); `showing`: what the room draws now. `paid.items[].until`: owned until then; `custom.until`: the paid term.
+ */
+export type RoomDecor = {
+  level: number;
+  canEdit: boolean;
+  owner: boolean;
+  bgId: string | null;
+  pick: string | null;
+  showing: RoomBackground;
+  free: { id: string; minLevel: number; open: boolean }[];
+  paid: { on: boolean; items: { sku: string; name: string; price: number; days: number; onSale: boolean; until: string | null }[] };
+  custom: { on: boolean; price: number; days: number; until: string | null; url: string | null; changesLeft: number; removed: boolean };
+  cover: { url: string | null };
+};
+type DecorAnswer = { room: ServerRoom; decor: RoomDecor };
+export const roomDecor = (room: string) => call<{ decor: RoomDecor }>('GET', `/api/rooms/decor?room=${encodeURIComponent(room)}`).then((r) => r.decor);
+/** A free background (`bgId` null: the theme's stage), or one of what the owner has: 'custom' or a paid sku. */
+export const pickRoomBackground = (room: string, pick: { pick: 'free'; bgId: string | null } | { pick: string }) => call<DecorAnswer>('POST', '/api/rooms/decor/pick', { room, ...pick });
+export const buyRoomBackground = (room: string, sku: string, price: number, ref: string) =>
+  call<DecorAnswer & { user: ServerUser; replay: boolean }>('POST', '/api/rooms/decor/buy', { room, sku, price, ref });
+/** The owner's own picture (already uploaded, kind 'roombg'): a purchase outside a term (`charged`), a free change inside one. */
+export const setRoomCustomBackground = (room: string, url: string, price: number, ref: string) =>
+  call<DecorAnswer & { user?: ServerUser; replay?: boolean; charged: boolean }>('POST', '/api/rooms/decor/custom', { room, url, price, ref });
+export const removeRoomCustomBackground = (room: string) => call<DecorAnswer>('POST', '/api/rooms/decor/custom/remove', { room });
+/** Oda Kapağı: an uploaded picture (kind 'roomcover') as the room's card picture; null takes it off. */
+export const setRoomCover = (room: string, url: string | null) => call<{ room: ServerRoom }>('POST', '/api/rooms/cover', { room, url }).then((r) => r.room);
 /** Oda üyeleri (server/api/rooms.mjs): the list, my membership and, for those who answer them, the requests. */
 export const roomMembers = (room: string) => call<RoomMembers>('GET', `/api/rooms/members?room=${encodeURIComponent(room)}`);
 export const joinRoomMembers = (room: string) => call<{ status: 'member' | 'pending' }>('POST', '/api/rooms/members/join', { room });
@@ -1059,7 +1094,10 @@ export type LiveKey =
   | 'backpack_call_task'
   | OneOnOneKey
   | RewardKey
-  | CasinoKey;
+  | CasinoKey
+  | DecorKey;
+/** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */
+export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
 /** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */

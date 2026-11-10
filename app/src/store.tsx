@@ -21,6 +21,7 @@ import { exchangeOwnDiamonds } from '@/lib/coins-bank';
 import { addLock, diamondSplit, fromServerLock, lockMs, lockedReason, locksFor, unlistedLocked, type DiamondLock } from '@/lib/diamond-locks';
 import { clearState, loadState, saveState, today } from '@/lib/persist';
 import { validAnyIban } from '@/lib/withdraw-rules';
+import { DEMO_DECOR, DEMO_ROOM_COVER, demoDecorOf, type DemoDecor } from '@/lib/room-decor';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setHapticsEnabled } from '@/lib/haptics';
@@ -105,7 +106,9 @@ export type MyRoom = { title: string; announcement: string; cover: string; passw
   micQueue: boolean; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
   theme: RoomTheme; micCount: number; /** Selected mic layout (data/room-layouts); null = classic grid. */ layoutId: string | null; micPermission: 'everyone' | 'members'; bossSeat: boolean;
   joinMode: 'open' | 'apply' | 'closed'; manageMembers: 'owner' | 'admins'; manageFunctions: 'owner' | 'admins';
-  autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[] };
+  autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[];
+  /** Oda Süslemesi in the demo (lib/room-decor): the free background, what is chosen over it and what I paid for. `cover` is the card picture (Oda Kapağı). */
+  decor: DemoDecor };
 export type OwnedAgency = { name: string; code: string; status: 'İnceleniyor' | 'Onaylandı' };
 export type TransferStep = { label: string; status: 'Bekliyor' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı'; time?: string; note?: string };
 export type TransferRequest = {
@@ -538,7 +541,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       {
         title: 'Benim Odam 🎙️',
         announcement: 'Hoş geldiniz! Saygılı olalım 💜',
-        cover: 'https://picsum.photos/seed/myroom/600/400',
+        cover: DEMO_ROOM_COVER,
         password: '',
         locked: false,
         limit: 50,
@@ -563,9 +566,11 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         videoPrivacy: true,
         memberIds: ['u3', 'u5', 'u8', 'u10', 'u12', 'u1', 'u4'],
         blacklist: ['u6'],
+        decor: DEMO_DECOR,
       },
       s.myRoom,
     );
+    room.decor = demoDecorOf(room.decor);
     // The room screen looks these up in fixed lists; a saved value the lists no longer have falls back.
     room.roomType = oneOf(room.roomType, ROOM_TYPES.map((t) => t.id)) ?? 'stage';
     room.theme = oneOf(room.theme, ROOM_THEMES.map((t) => t.id)) ?? 'chat';

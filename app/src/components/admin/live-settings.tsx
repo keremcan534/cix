@@ -20,6 +20,8 @@ import {
   bigChange,
   CAMPAIGN_DAYS,
   CASINO_NUMBER_KEYS,
+  DECOR_LABEL,
+  DECOR_NUMBER_KEYS,
   CAMPAIGN_PERCENT,
   campaignError,
   campaignExample,
@@ -208,6 +210,7 @@ function Body({
             {kit.get('backpack_call_task') && <BackpackCard kit={kit} />}
             {kit.get('rewards_off') && <RewardsCard kit={kit} />}
             {kit.get('casino_off') && <CasinoCard kit={kit} />}
+            {kit.get('room_decor_off') && <DecorCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -899,6 +902,81 @@ function CasinoCard({ kit }: { kit: Kit }) {
           style={{ flex: 1 }}
         />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Oyun Salonu sınırları değişsin', () => changes)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Oda süslemesi -------------------------------------------------------------------------------------------
+/**
+ * Oda süslemesi (server/api/room-decor.mjs): a switch for each paid part of a room's background, and the price and
+ * length of Özel süsleme (the owner's own picture). The free backgrounds and the room's cover are not sold.
+ */
+function DecorCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const x = kit.get('room_decor_off');
+  const options = (x.bounds.options as string[] | undefined) ?? Object.keys(DECOR_LABEL);
+  const off = listOf(x.effective);
+  const rows = DECOR_NUMBER_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
+  const changes: LiveChanges = {};
+  const errors: Record<string, string | null> = {};
+  for (const r of rows) {
+    const v = parseWhole(texts[r.key] ?? '');
+    const changed = v !== r.x.effective;
+    errors[r.key] = changed ? wholeError(v, r.x.bounds as IntBounds, r.x.label, r.unit) : null;
+    if (changed && v !== null) changes[r.key] = v;
+  }
+  const dirty = Object.keys(changes).length > 0;
+  const bad = rows.some((r) => errors[r.key]);
+  const reset: LiveChanges = {};
+  for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
+  return (
+    <Card title="Oda süslemesi" footer={lastChange(x, ...rows.map((r) => r.x))} pill={<InvalidPill x={x.invalid ? x : rows.find((r) => r.x.invalid)?.x} />}>
+      <Text style={s.hint}>Jetonu sunucu alır. Kapatılan satış hemen durur; alınmış süslemeler süresi bitene kadar kalır. Yeni fiyat ve gün yalnız yeni alımlarda geçerli olur. Ücretsiz süslemeler ve oda kapağı satılmaz.</Text>
+      <ListGroup>
+        {options.map((k) => {
+          const on = !off.includes(k);
+          return (
+            <ListSwitch
+              key={k}
+              icon={on ? 'checkmark-circle-outline' : 'pause-circle-outline'}
+              tone={on ? 'success' : 'danger'}
+              title={DECOR_LABEL[k] ?? k}
+              subtitle={on ? 'Satışta' : 'Kapalı'}
+              value={on}
+              disabled={kit.locked}
+              onChange={(v) => {
+                const next = options.filter((o) => (o === k ? !v : off.includes(o)));
+                kit.open(`${DECOR_LABEL[k] ?? k} ${v ? 'açılsın' : 'kapatılsın'}`, () => ({ room_decor_off: next.length ? next : null }), v ? 'Geri dönüş' : 'Acil durum');
+              }}
+            />
+          );
+        })}
+      </ListGroup>
+      {rows.map((r) => (
+        <View key={r.key}>
+          <Field
+            label={r.x.label}
+            value={texts[r.key] ?? ''}
+            onChange={(t) => setTexts((m) => ({ ...m, [r.key]: t }))}
+            keyboard="numeric"
+            max={7}
+            hint={`Şu an ${valueText(r.key, r.x.effective)} · ${r.x.help}`}
+          />
+          <Problem text={errors[r.key] ?? null} />
+        </View>
+      ))}
+      <View style={s.row}>
+        <Button
+          title="Varsayılana dön"
+          variant="ghost"
+          small
+          disabled={kit.locked || Object.keys(reset).length === 0}
+          onPress={() => kit.open('Özel süsleme ücreti ve süresi varsayılana dönsün', () => reset, 'Geri dönüş')}
+          style={{ flex: 1 }}
+        />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Özel süsleme ücreti ve süresi değişsin', () => changes)} style={{ flex: 1 }} />
       </View>
     </Card>
   );
