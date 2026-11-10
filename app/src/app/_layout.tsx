@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { RootCrashScreen, ScreenCrashScreen } from '@/components/crash-screen';
 import { Intro } from '@/components/fx/intro';
+import { ThemeFade } from '@/components/fx/theme-fade';
 import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
@@ -71,6 +72,8 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <RootStack />
       </ThemeProvider>
+      {/* Dark ↔ light: the old background fades off the new look instead of a flash (components/fx/theme-fade). */}
+      <ThemeFade />
       {/* Over everything while the first screen draws beneath it: the opening (components/fx/intro). */}
       <Intro />
     </AppProvider>

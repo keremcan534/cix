@@ -14,6 +14,7 @@ import { liveMode } from '@/lib/live';
 import { TEAM_KIND_LABEL, markTeamSeen, teamPage, type TeamKind, type TeamNotice } from '@/lib/live/team';
 import { noticeHref } from '@/lib/notice-links';
 import { makeStyles, radius, space, useTheme } from '@/theme';
+import { BrandLoader } from '@/components/fx/brand-loader';
 
 const PAGE = 30;
 const KIND_ICON: Record<TeamKind, keyof typeof Ionicons.glyphMap> = {
@@ -109,7 +110,7 @@ function InboxBody({ onClose, onUnread }: { onClose: () => void; onUnread: (n: n
           </View>
         ) : (
           <View style={s.center}>
-            <ActivityIndicator color={colors.textDim} />
+            <BrandLoader size={26} />
           </View>
         )
       ) : (

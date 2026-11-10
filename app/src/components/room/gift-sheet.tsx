@@ -28,6 +28,7 @@ import { useApp } from '@/store';
 import { colors, radius, semantic, space, type } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
+import { RollingNumber } from '@/components/fx/rolling-number';
 
 type Shelf = GiftCat | 'lucky' | 'fav' | 'bag';
 type PriceSort = 'default' | 'asc' | 'desc';
@@ -264,7 +265,7 @@ export function GiftSheet({
           </View>
           <Pressable onPress={goWallet} style={g.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
             <Icon3D name="coin" size={20} />
-            <Text style={g.balanceText}>{fmt(coins)}</Text>
+            <RollingNumber value={coins} style={g.balanceText} />
             <Ionicons name="add-circle" size={18} color={semantic.money} />
           </Pressable>
           <Pressable onPress={onClose} hitSlop={10} style={g.close} accessibilityRole="button" accessibilityLabel="Kapat">

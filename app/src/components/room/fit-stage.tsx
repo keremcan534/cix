@@ -4,9 +4,13 @@
 // the chat gives way, down to its least height; only past that (a small phone with many boards on) does the stage
 // scroll. While typing, the mics keep their size. A drag of the chat's handle redraws only this part, not the room.
 import { useMemo, useState, type ReactNode } from 'react';
-import { ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { LayoutAnimation, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
-import type { Fitted } from '@/lib/seat-fit';
+import { easedChange, type Fitted } from '@/lib/seat-fit';
+import { useSettings } from '@/store';
+
+/** A real change of the mics' sizes (a banner came or went, the emoji panel, another layout) glides into place. */
+const GLIDE = { duration: 260, update: { type: LayoutAnimation.Types.easeInEaseOut } };
 
 /** The chat's least height under the stage (chat-feed's normal minHeight). */
 const CHAT_LEAST = 96;
@@ -59,8 +63,12 @@ export function FitStage({
   const next = fit ? fit(known ? box - bar - chatH - topH - PAD_BOTTOM : guess) : null;
   // The sizes the mics are drawn with: kept while typing, and replaced only when they change, so a drag of the
   // chat's handle doesn't draw every mic again for every pixel.
+  const { reduceMotion } = useSettings();
   const [shown, setShown] = useState(next);
-  if (next && !frozen && !same(shown, next)) setShown(next);
+  if (next && !frozen && !same(shown, next)) {
+    if (shown && !reduceMotion && easedChange(shown, next)) LayoutAnimation.configureNext(GLIDE);
+    setShown(next);
+  }
   const fitted = fit ? (shown ?? next) : null;
   const seatsNode = useMemo(() => seats(fitted), [seats, fitted]);
   const chatNode = useMemo(() => chat((px) => setBasis(Math.round(px))), [chat]);

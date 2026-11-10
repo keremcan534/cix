@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -15,6 +15,7 @@ import { NetworkHub } from '@/components/agency-net-hub';
 import { apiEnabled } from '@/lib/api';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
+import { BrandLoader } from '@/components/fx/brand-loader';
 
 export default function AgencyHub() {
   // With our server the agency network is the server's (hierarchy, commission, approvals); the local prototype
@@ -38,7 +39,7 @@ function Pending() {
     <SafeAreaView style={styles.safe}>
       <Header title="Ajans" />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
-        <ActivityIndicator color={colors.primaryText} size="large" />
+        <BrandLoader size={36} />
         <Text style={styles.title}>{a ? `${a.name} başvurunu inceliyor` : `${ownedAgency?.name} ajans başvurun inceleniyor`}</Text>
         <Text style={[styles.dim, { textAlign: 'center' }]}>Sonuç bildirim olarak gelecek. Ret durumunda gerekçe gösterilir ve itiraz edebilirsin. (Demo: birkaç saniye)</Text>
       </View>

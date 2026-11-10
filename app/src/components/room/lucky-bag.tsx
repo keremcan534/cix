@@ -21,6 +21,7 @@ import { message } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { bagResult, dropBag, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
 import { colors } from '@/theme';
+import { RollingNumber } from '@/components/fx/rolling-number';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const mmss = (ms: number) => {
@@ -171,7 +172,9 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
             </View>
           </View>
           <Pressable onPress={toWallet} style={s.wallet} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton. Jeton yükle`}>
-            <Text style={s.walletText}>Bakiye {fmt(coins)}</Text>
+            <Text style={s.walletText}>
+              Bakiye <RollingNumber value={coins} />
+            </Text>
             <Text style={s.walletLink}>Jeton yükle</Text>
           </Pressable>
         </View>

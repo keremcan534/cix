@@ -41,6 +41,7 @@ import { useApp } from '@/store';
 import { isLockedRoom, liveMode, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
+import { RoomCardSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -212,7 +213,11 @@ export default function RoomsScreen() {
           )
         }
         ListEmptyComponent={
-          live && roomsState === 'failed' ? (
+          live && roomsState === 'loading' && main === 'rec' ? (
+            <Skeletons count={4}>
+              <RoomCardSkeleton />
+            </Skeletons>
+          ) : live && roomsState === 'failed' ? (
             <View style={styles.errorBox}>
               <Text style={styles.errorTitle}>Bağlantı kurulamadı</Text>
               <Text style={styles.errorText}>Odalar şu an yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>

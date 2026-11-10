@@ -144,7 +144,7 @@ import { MIC_BLOCK_LABEL, endRoom, getSession, micBlock, micSending, reportRoomS
 import { shareLink } from '@/lib/links';
 import { balconyOnly, canInviteFollowers, defaultMicQueue, followerCount, knownFollowers, roomInviteText, seatAccess } from '@/lib/room-invites';
 import { BUSY_DEVICES, getMedia, leaveRoom, reportRoom, useMedia } from '@/lib/media';
-import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
+import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
@@ -656,6 +656,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => setBoss(id, bossId), [id, bossId]);
   const mySeat = allSeats.indexOf('me');
   const amSeated = mySeat >= 0 || bossId === 'me';
+  // Landing on a mic (by myself, by an invite, moved by the staff): one firm tick, so it is felt as well as seen.
+  const wasSeated = useRef(amSeated);
+  useEffect(() => {
+    if (amSeated && !wasSeated.current) micHaptic();
+    wasSeated.current = amSeated;
+  }, [amSeated]);
   const seatedOthers = allSeats.filter((s): s is string => !!s && s !== 'me');
   // "%82 benzer" for everyone else on a mic: the bead ring around their seat and the seat menu title
   // (a handful of small set lookups, cheap enough to redo each render). Not in a server room: the server keeps
@@ -2892,6 +2898,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         slotWidth={extra?.slot?.width ?? extra?.grid?.width}
         bondLink={link && extra?.next ? { bond: link, gap: extra.next.gap } : null}
         mini={extra?.mini}
+        enterDelay={Math.min(i, 24) * 22}
         onPress={() => onSeatPress(i)}
       />
     );

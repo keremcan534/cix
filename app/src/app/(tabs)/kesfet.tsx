@@ -16,7 +16,9 @@ import { charmRankBoost } from '@/data/charm';
 import { wealthCharmOf } from '@/data/profile';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { fonts, makeStyles, useTheme } from '@/theme';
+import { firstName, greetingFor } from '@/lib/greeting';
+import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 import { EmojiIcon } from '@/components/Icon3D';
 import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
@@ -43,6 +45,8 @@ export default function DiscoverScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const { hasGreeted, greet } = useGreet();
   const { blocked, settings, setSetting, following, toggleFollow, me } = useApp();
+  // The hour when the screen opened: the greeting doesn't change under the reader's eyes.
+  const [hour] = useState(() => new Date().getHours());
   // A live build lists real people from the server (no sample profiles, no distances: the server knows cities only).
   const live = liveMode();
   const list = LIST_OF[tab];
@@ -92,6 +96,11 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         ListHeaderComponent={
           <View>
+            {/* A word for the person, by the time of day ("Günaydın, Ayşe"). */}
+            <Text style={styles.greet} accessibilityRole="header" numberOfLines={1}>
+              {greetingFor(hour)}
+              {firstName(me.name) ? <Text style={styles.greetName}>, {firstName(me.name)}</Text> : null}
+            </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
               {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
               {DISCOVER_SHORTCUTS.filter((s) => s.id !== 'call' || oneOnOneOpen()).map((s) => (
@@ -163,6 +172,10 @@ export default function DiscoverScreen() {
                 <Text style={{ color: colors.textDim }}>Şimdilik herkesi göster</Text>
               </Pressable>
             </View>
+          ) : live && serverPeople === null && peopleState !== 'failed' ? (
+            <Skeletons count={6} gap={6} style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+              <RowSkeleton face={52} />
+            </Skeletons>
           ) : live && serverPeople === null && peopleState === 'failed' ? (
             <View style={styles.optIn}>
               <StateIcon name="cloud-offline-outline" size={56} />
@@ -399,6 +412,8 @@ function FilterSheet({
 }
 
 const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
+  greet: { color: colors.textDim, fontSize: 20, fontFamily: fonts.displayBold, letterSpacing: -0.3, paddingHorizontal: 16, paddingTop: 12 },
+  greetName: { color: colors.text },
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
   shortcut: { width: 92, height: 104, borderRadius: 16, padding: 10, overflow: 'hidden', justifyContent: 'flex-end', gap: 2, borderWidth: 1, borderColor: surface.hairline, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
   shortcutWide: { width: 150 },

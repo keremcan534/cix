@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
@@ -16,12 +16,15 @@ import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
-import { Gloss, Shine } from '@/components/fx/surface';
+import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
 import { SimilarityRing } from '@/components/similarity';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
+import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
+import { RollingNumber } from '@/components/fx/rolling-number';
+import { BounceBadge } from '@/components/fx/bounce-badge';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -51,6 +54,7 @@ export function Seat({
   similarity,
   bondLink,
   mini,
+  enterDelay,
   onPress,
 }: {
   index: number;
@@ -89,19 +93,30 @@ export function Seat({
   bondLink?: { bond: RoomBond; gap: number } | null;
   /** Küçült: a small avatar (no frame) over the mic's number, in the room's mic strip; nothing else under it. */
   mini?: boolean;
+  /** Entering the room the mics come in one after another, like a wave: this seat's wait (ms). */
+  enterDelay?: number;
   onPress: () => void;
 }) {
-  const [pulse] = useState(() => new Animated.Value(0));
-
+  // The ring around a speaker grows and glows with their voice (lib/live/voice-level). The demo's rooms have no
+  // voices: while someone "talks" there, the level flickers the way speech does.
+  const level = userId ? voiceLevel(userId) : voiceLevel('');
   useEffect(() => {
-    if (!speaking) {
-      pulse.setValue(0);
-      return;
-    }
-    const anim = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }));
-    anim.start();
-    return () => anim.stop();
-  }, [speaking, pulse]);
+    if (!speaking || still || levelsLive()) return;
+    const steps = [0.55, 0.2, 0.85, 0.35, 0.7, 0.15, 0.95, 0.4];
+    const talk = Animated.loop(Animated.sequence(steps.map((toValue, i) => Animated.timing(level, { toValue, duration: 110 + (i % 3) * 45, useNativeDriver: true }))));
+    talk.start();
+    return () => {
+      talk.stop();
+      level.setValue(0);
+    };
+  }, [speaking, still, level]);
+  // The wave on entering, and the face sinking a little under the finger.
+  const [appear] = useState(() => new Animated.Value(enterDelay === undefined || still ? 1 : 0));
+  useEffect(() => {
+    if (enterDelay === undefined || still) return;
+    Animated.timing(appear, { toValue: 1, delay: enterDelay, duration: 420, easing: Easing.out(Easing.back(1.4)), useNativeDriver: true }).start();
+  }, [appear, enterDelay, still]);
+  const press = useSpringPress(0.9);
 
   const user = userId ? userById(userId) : null;
   const size = avatarSize ?? (host ? 60 : 48);
@@ -115,62 +130,79 @@ export function Seat({
     : `${index + 1}. mikrofon, ${locked ? 'kilitli' : invitee ? `${invitee} için davet bekliyor` : 'boş'}`;
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}>
-      <View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }, speaking && styles.speakingGlow]}>
-        {speaking && (
-          <Animated.View
-            style={[
-              styles.ring,
-              { width: size, height: size, borderRadius: size / 2 },
-              { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] }) }] },
-            ]}
-          />
-        )}
-        {user && !mini && (vipLevel > 0 || frameId) ? (
-          <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
-        ) : user ? (
-          <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+    <Pressable
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[styles.seat, slotWidth ? { width: slotWidth } : host ? (compact ? { width: 96 } : styles.hostSeat) : { width: '20%' }]}
+    >
+      <Animated.View
+        style={[
+          styles.seatBody,
+          { opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }, { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
+        ]}
+      >
+        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && styles.speakingGlow]}>
+          {speaking && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.ring,
+                { width: size, height: size, borderRadius: size / 2 },
+                still
+                  ? { opacity: 0.85, transform: [{ scale: 1.08 }] }
+                  : { opacity: level.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }), transform: [{ scale: level.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1.38] }) }] },
+              ]}
+            />
+          )}
+          {user && !mini && (vipLevel > 0 || frameId) ? (
+            <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
+          ) : user ? (
+            <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+          ) : (
+            // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
+            <LinearGradient
+              colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)']}
+              style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
+            >
+              <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : Math.round(Math.max(15, Math.min(28, size * 0.32)))} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
+            </LinearGradient>
+          )}
+          {user && similarity !== undefined && !teamColor && !mini && <SimilarityRing score={similarity} size={size} />}
+          {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
+          {camera && user && (
+            <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
+              <Ionicons name="videocam" size={10} color={semantic.liveInk} />
+            </View>
+          )}
+          {(muted || modMuted) && (
+            <View style={[styles.mutedBadge, !modMuted && styles.selfMutedBadge]}>
+              <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
+            </View>
+          )}
+          {role === 'admin' && (
+            <View style={styles.roleBadge} accessibilityLabel="Oda yöneticisi">
+              <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
+            </View>
+          )}
+          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
+        </Animated.View>
+        {mini ? (
+          // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
+          <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
         ) : (
-          // A glass bubble lit from above instead of a dashed outline; gold while a mic invite is pending.
-          <LinearGradient
-            colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)']}
-            style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
-          >
-            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : Math.round(Math.max(15, Math.min(28, size * 0.32)))} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
-          </LinearGradient>
-        )}
-        {user && similarity !== undefined && !teamColor && !mini && <SimilarityRing score={similarity} size={size} />}
-        {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
-        {camera && user && (
-          <View style={styles.camBadge} accessibilityLabel="Kamerası açık">
-            <Ionicons name="videocam" size={10} color={semantic.liveInk} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            {host && <Icon3D name="crown" size={14} />}
+            <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
+              {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
+            </Text>
+            {user?.verified && !small && <VerifiedBadge size={11} />}
           </View>
         )}
-        {(muted || modMuted) && (
-          <View style={[styles.mutedBadge, !modMuted && styles.selfMutedBadge]}>
-            <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
-          </View>
-        )}
-        {role === 'admin' && (
-          <View style={styles.roleBadge} accessibilityLabel="Oda yöneticisi">
-            <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
-          </View>
-        )}
-        {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
-      </View>
-      {mini ? (
-        // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
-        <View style={styles.miniLabel}>{host ? <Icon3D name="crown" size={11} /> : <Text style={styles.miniNum}>{index + 1}</Text>}</View>
-      ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-          {host && <Icon3D name="crown" size={14} />}
-          <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
-            {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
-          </Text>
-          {user?.verified && !small && <VerifiedBadge size={11} />}
-        </View>
-      )}
-      {user && pkPoints !== undefined && !mini && <PkPoints value={pkPoints} still={still} />}
+        {user && pkPoints !== undefined && !mini && <PkPoints value={pkPoints} still={still} />}
+      </Animated.View>
       {user && bondLink && !mini && <BondLink bond={bondLink.bond} size={size} gap={bondLink.gap} />}
     </Pressable>
   );
@@ -201,7 +233,7 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
     <View style={styles.pkWrap}>
       <Animated.View style={[styles.pkPill, big && styles.pkPillBig, { transform: [{ scale: v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, big ? 1.35 : 1.18, 1] }) }] }]}>
         <Text style={styles.pkText} numberOfLines={1}>
-          🎁 {value.toLocaleString('tr-TR')}
+          🎁 <RollingNumber value={value} duration={500} />
         </Text>
       </Animated.View>
       {delta && !still && (
@@ -409,6 +441,7 @@ export function RoundBtn({
   label: string;
   badge?: number;
 }) {
+  const press = useSpringPress(0.88);
   return (
     <Pressable
       onPress={() => {
@@ -416,25 +449,24 @@ export function RoundBtn({
         else tapHaptic();
         onPress();
       }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       accessibilityLabel={label}
       accessibilityRole="button"
-      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.92 : 1 }] })}
     >
-      {gift ? (
-        <View style={[styles.round, styles.giftRound]}>
-          <Icon3D name="gift" size={34} />
-          <Shine radius={24} every={3600} />
-        </View>
-      ) : (
-        <View style={[styles.round, styles.glassRound]}>
-          <Ionicons name={icon} size={22} color="#fff" />
-        </View>
-      )}
-      {!!badge && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
-        </View>
-      )}
+      <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+        {gift ? (
+          <View style={[styles.round, styles.giftRound]}>
+            <Icon3D name="gift" size={34} />
+            <Shine radius={24} every={3600} />
+          </View>
+        ) : (
+          <View style={[styles.round, styles.glassRound]}>
+            <Ionicons name={icon} size={22} color="#fff" />
+          </View>
+        )}
+      </Animated.View>
+      <BounceBadge count={badge ?? 0} style={styles.badge} textStyle={styles.badgeText} />
     </Pressable>
   );
 }
@@ -550,6 +582,7 @@ export const roomStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
+  seatBody: { alignSelf: 'stretch', alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
   ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live, boxShadow: '0 0 12px rgba(19,217,223,0.8)' },
   speakingGlow: { boxShadow: '0 0 18px rgba(19,217,223,0.65)' },

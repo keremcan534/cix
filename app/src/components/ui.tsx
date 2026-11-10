@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useState, type ReactNode } from 'react';
-import { Image, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/text';
 import { cosmeticById } from '@/data/catalog';
@@ -16,6 +16,8 @@ import { useSettings } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
+import { FadeImage } from '@/components/photo';
+import { RollingNumber } from '@/components/fx/rolling-number';
 
 export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; size?: number; online?: boolean; ring?: boolean; name?: string }) {
   const { colors, semantic, gradient } = useTheme();
@@ -24,7 +26,7 @@ export function Avatar({ uri, size = 44, online, ring, name }: { uri?: string; s
   // No photo (sample people carry none): a tinted disc with the name's initial, or a person glyph.
   const face = (style: object) =>
     uri && uri !== failed ? (
-      <Image source={{ uri }} style={style} onError={() => setFailed(uri)} />
+      <FadeImage source={{ uri }} style={style} onError={() => setFailed(uri)} />
     ) : (
       <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
         {name?.trim() ? (
@@ -180,7 +182,7 @@ export function CoinPill({ coins, onPress }: { coins: number; onPress?: () => vo
   return (
     <Pressable onPress={onPress} style={styles.coin}>
       <Icon3D name="coin" size={18} />
-      <Text style={styles.coinText}>{coins.toLocaleString('tr-TR')}</Text>
+      <RollingNumber value={coins} style={styles.coinText} />
       {onPress && <Ionicons name="add-circle" size={16} color={colors.gold} />}
     </Pressable>
   );
@@ -275,7 +277,7 @@ function FaceImage({ uri, size, style }: { uri?: string; size: number; style: ob
   const { colors, semantic } = useTheme();
   // A photo that can't be loaded counts as none, as in Avatar.
   const [failed, setFailed] = useState<string>();
-  if (uri && uri !== failed) return <Image source={{ uri }} style={style} onError={() => setFailed(uri)} />;
+  if (uri && uri !== failed) return <FadeImage source={{ uri }} style={style} onError={() => setFailed(uri)} />;
   return (
     <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt }]}>
       <Ionicons name="person" size={Math.round(size * 0.5)} color={semantic.actionText} />
@@ -386,7 +388,7 @@ export function DiamondPill({ diamonds }: { diamonds: number }) {
   return (
     <View style={[styles.coin, { backgroundColor: 'rgba(56,189,248,0.15)' }]}>
       <Icon3D name="diamond" size={17} />
-      <Text style={[styles.coinText, { color: semantic.diamondText }]}>{diamonds.toLocaleString('tr-TR')}</Text>
+      <RollingNumber value={diamonds} style={[styles.coinText, { color: semantic.diamondText }]} />
     </View>
   );
 }

@@ -4,7 +4,7 @@
 // "Odayı küçült" (stay in the room, mini card) or "Odadan çık".
 import { router, useIsFocused, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { CreateRoomSheet } from '@/components/room/create-room-sheet';
 import { Text, TextInput } from '@/components/text';
@@ -19,6 +19,7 @@ import { endRoom, getSession, openRoom, registerOpener, requestLeave, setLeaving
 import { savedAtStart } from '@/lib/room-session-persist';
 import { useApp } from '@/store';
 import { colors, radius, space } from '@/theme';
+import { BrandLoader } from '@/components/fx/brand-loader';
 
 const stepBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -114,7 +115,7 @@ function LiveRoomGate({ id }: { id: string }) {
   if (gate === 'open') return <RoomOpen />;
   return (
     <View style={[st.screen, st.center]}>
-      <ActivityIndicator color={colors.primary} />
+      <BrandLoader />
     </View>
   );
 }

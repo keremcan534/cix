@@ -3,12 +3,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, View } from 'react-native';
+import { FlatList, Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { makeStyles, radius, space, type, useTheme } from '@/theme';
+import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 export type ListedPerson = { id: string; name: string; avatarUrl?: string | null };
 
@@ -78,9 +79,9 @@ export function FollowListSheet({
             <Button title="Tekrar dene" variant="tonal" onPress={() => setAttempt((n) => n + 1)} />
           </View>
         ) : people === null ? (
-          <View style={s.state}>
-            <ActivityIndicator color={colors.textDim} />
-          </View>
+          <Skeletons count={5} gap={6} style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+            <RowSkeleton />
+          </Skeletons>
         ) : people.length === 0 ? (
           <View style={s.state}>
             <Text style={s.stateText}>{empty}</Text>

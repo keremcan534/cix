@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
 import { EdgeLight, Glass } from '@/components/fx/surface';
+import { BounceBadge } from '@/components/fx/bounce-badge';
 import { unreadTotal } from '@/lib/unread';
 import { useApp } from '@/store';
 import { TAB_BAR_HEIGHT, makeStyles, themes, useTheme } from '@/theme';
@@ -24,12 +25,14 @@ const NAV = {
 export const unstable_settings = { anchor: 'index' };
 
 /** Every tab the same: line icon at rest, filled icon on a soft turquoise pill when active. */
-function icon(name: IconName, active: IconName) {
+function icon(name: IconName, active: IconName, badge?: () => number) {
   return function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
     const s = useStyles();
     return (
       <View style={[s.pill, focused && s.pillOn]}>
         <Ionicons name={focused ? active : name} size={22} color={color as string} />
+        {/* A new message: the count hops once (components/fx/bounce-badge). */}
+        {badge && <BounceBadge count={badge()} style={s.badge} textStyle={s.badgeText} />}
       </View>
     );
   };
@@ -92,9 +95,7 @@ export default function TabLayout() {
           name="mesajlar"
           options={{
             title: 'Mesajlar',
-            tabBarIcon: icon('chatbox-ellipses-outline', 'chatbox-ellipses'),
-            tabBarBadge: unread || undefined,
-            tabBarBadgeStyle: { backgroundColor: colors.red },
+            tabBarIcon: icon('chatbox-ellipses-outline', 'chatbox-ellipses', () => unread),
           }}
         />
         <Tabs.Screen name="profil" options={{ title: 'Ben', tabBarIcon: icon('person-circle-outline', 'person-circle') }} />
@@ -103,8 +104,10 @@ export default function TabLayout() {
   );
 }
 
-const useStyles = makeStyles(({ dark, surface }) => ({
+const useStyles = makeStyles(({ colors, dark, surface }) => ({
   pill: { width: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   pillOn: { backgroundColor: dark ? 'rgba(19,217,223,0.16)' : 'rgba(0,140,148,0.10)' },
+  badge: { position: 'absolute', top: -5, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.red, borderWidth: 2, borderColor: colors.bg },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
   hairline: { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: surface.hairline },
 }));
