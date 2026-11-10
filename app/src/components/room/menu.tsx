@@ -24,7 +24,8 @@ export type MenuItem = {
   /** small corner tag: on/off state or a ribbon; SOON = listed but not playable yet ("Yakında") */
   badge?: 'on' | 'off' | 'HOT' | 'NEW' | 'SOON' | number;
 };
-export type MenuSection = { title: string; variant: 'round' | 'tile' | 'tool'; items: MenuItem[]; note?: string };
+/** `alignEnd`: a row that isn't full sits on the right (the last item by the right thumb). */
+export type MenuSection = { title: string; variant: 'round' | 'tile' | 'tool'; items: MenuItem[]; note?: string; alignEnd?: boolean };
 
 const SHEET = '#111B2E';
 
@@ -40,7 +41,7 @@ export function RoomMenuSheet({ visible, onClose, sections }: { visible: boolean
             <View key={s.title} style={{ marginBottom: 10 }}>
               <Text style={styles.title}>{s.title}</Text>
               {s.note && <Text style={styles.note}>{s.note}</Text>}
-              <View style={styles.grid}>
+              <View style={[styles.grid, s.alignEnd && { justifyContent: 'flex-end' }]}>
                 {s.items.map((it, i) => {
                   const hue = it.hue ?? it.colors?.[0] ?? hueAt(i);
                   const press = () => {

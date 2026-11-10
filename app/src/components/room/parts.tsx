@@ -12,7 +12,7 @@ import { cosmeticById } from '@/data/catalog';
 import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
-import { colors, semantic } from '@/theme';
+import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine } from '@/components/fx/surface';
@@ -267,6 +267,8 @@ export function ChatLine({
   bond,
   onRetry,
   mentionsMe,
+  mentionNames,
+  myName,
   onPerson,
 }: {
   msg: ChatMsg;
@@ -276,8 +278,11 @@ export function ChatLine({
   /** Lv10 bond: the special bubble (a bubble I equipped wins). */
   bond?: RoomBond | null;
   onRetry?: (msg: ChatMsg) => void;
-  /** The line names me (@bahset): its bubble gets a gold ring. */
+  /** The line names me (@bahset): its bubble gets a gold ring and the line a "senden bahsetti" tag. */
   mentionsMe?: boolean;
+  /** The room's names: each "@Name" of one of them is drawn in color, mine (`myName`) in gold. */
+  mentionNames?: readonly string[];
+  myName?: string;
   /** A tap on the writer's photo or name (their person card). */
   onPerson?: (uid: string) => void;
 }) {
@@ -332,7 +337,7 @@ export function ChatLine({
       ))}
     </View>
   ) : (
-    <EmojiText text={messagePreview(msg.text)} style={styles.chatText} />
+    <EmojiText text={messagePreview(msg.text)} style={styles.chatText} mentions={mentionNames} me={myName} />
   );
   const bubbleView = stickers ? (
     body
@@ -358,6 +363,7 @@ export function ChatLine({
           </Text>
           {u.vip && <Text style={styles.chatVip}>VIP</Text>}
           {bond && <BondChip bond={bond} />}
+          {mentionsMe && <Text style={styles.chatMentionTag}>senden bahsetti</Text>}
         </Pressable>
         {mentionsMe ? <View style={styles.chatMention}>{bubbleView}</View> : bubbleView}
       </View>
@@ -569,7 +575,8 @@ const styles = StyleSheet.create({
   chatName: { fontSize: 12, fontWeight: '800', maxWidth: 160 },
   chatVip: { color: colors.bg, backgroundColor: colors.gold, fontSize: 9, fontWeight: '900', borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
   chatBubble: { alignSelf: 'flex-start', borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 11, paddingVertical: 7 },
-  chatMention: { alignSelf: 'flex-start', borderRadius: 16, borderTopLeftRadius: 6, borderWidth: 1.5, borderColor: colors.gold, padding: 1 },
+  chatMention: { alignSelf: 'flex-start', borderRadius: 16, borderTopLeftRadius: 6, borderWidth: 1.5, borderColor: colors.gold, padding: 1, boxShadow: `0 0 12px ${colors.gold}55` },
+  chatMentionTag: { color: '#1B1405', backgroundColor: colors.gold, fontFamily: fonts.displayBold, fontSize: 10, lineHeight: 14, paddingHorizontal: 6, borderRadius: 7, overflow: 'hidden' },
   chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
   // Dark glass: keeps white text readable over the stage, with a lit top edge.
   chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },

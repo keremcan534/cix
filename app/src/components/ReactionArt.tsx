@@ -8,7 +8,9 @@ import { Image, StyleSheet, View, type StyleProp, type TextStyle } from 'react-n
 import { Text } from '@/components/text';
 import { stickerById } from '@/data/catalog';
 import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
+import { mentionRuns } from '@/lib/room-mention';
 import { stickerIdOf, stickersOf as matchStickers, stickerText } from '@/lib/stickers';
+import { colors, fonts } from '@/theme';
 
 const SRC: Record<string, number> = {
   'temel-gulumseme': require('../../assets/reactions/tepki-temel-gulumseme.png'),
@@ -92,25 +94,49 @@ export function ReactionArt({ emoji, size, textStyle }: { emoji: string; size: n
 
 /** Message body: a stickers-only message shows its stickers large; anything else is text. */
 /** Message text with its emoji drawn larger: one to three emoji alone are drawn large, emoji in text a size up. */
-export function EmojiText({ text, style }: { text: string; style?: StyleProp<TextStyle> }) {
+/** A plain run with its emoji drawn a little larger than the text around them. */
+function emojiPieces(text: string, base: number, key: string) {
+  return emojiRuns(text).map((r, i) =>
+    r.emoji ? (
+      <Text key={`${key}-${i}`} style={{ fontSize: base + 5 }}>
+        {r.text}
+      </Text>
+    ) : (
+      r.text
+    ),
+  );
+}
+
+// @bahset: a name in the line stands out; mine in gold on a light of its own, so I see it's me at a glance.
+const MENTION: TextStyle = { color: '#7FE7EC', fontFamily: fonts.displayBold };
+const MENTION_ME: TextStyle = { color: colors.gold, fontFamily: fonts.displayBold, backgroundColor: 'rgba(246,189,96,0.18)' };
+const same = (a: string, b?: string) => !!b && a.trim().toLocaleLowerCase('tr-TR') === b.trim().toLocaleLowerCase('tr-TR');
+
+/** A line of text. `mentions` (the room's names) draws each "@Name" in its own color; `me` (my name) in gold. */
+export function EmojiText({ text, style, mentions, me }: { text: string; style?: StyleProp<TextStyle>; mentions?: readonly string[]; me?: string }) {
+  const named = mentions?.length ? mentionRuns(text, mentions) : null;
+  if (named?.some((r) => r.name)) {
+    const base = StyleSheet.flatten(style)?.fontSize ?? 15;
+    return (
+      <Text style={style}>
+        {named.map((r, i) =>
+          r.name ? (
+            <Text key={i} style={same(r.name, me) ? MENTION_ME : MENTION}>
+              {r.text}
+            </Text>
+          ) : (
+            emojiPieces(r.text, base, String(i))
+          ),
+        )}
+      </Text>
+    );
+  }
   const big = bigEmojiSize(emojiOnlyCount(text));
   if (big) return <Text style={[style, { fontSize: big, lineHeight: Math.round(big * 1.2) }]}>{text.trim()}</Text>;
   const runs = emojiRuns(text);
   if (!runs.some((r) => r.emoji)) return <Text style={style}>{text}</Text>;
   const base = StyleSheet.flatten(style)?.fontSize ?? 15;
-  return (
-    <Text style={style}>
-      {runs.map((r, i) =>
-        r.emoji ? (
-          <Text key={i} style={{ fontSize: base + 5 }}>
-            {r.text}
-          </Text>
-        ) : (
-          r.text
-        ),
-      )}
-    </Text>
-  );
+  return <Text style={style}>{emojiPieces(text, base, 'e')}</Text>;
 }
 
 export function MessageText({ text, style, size = 44 }: { text: string; style?: StyleProp<TextStyle>; size?: number }) {

@@ -48,6 +48,8 @@ export function ChatThread({
   user,
   header,
   compact,
+  last,
+  onMore,
   avoidKeyboard = true,
 }: {
   user: User;
@@ -55,6 +57,9 @@ export function ChatThread({
   header: (typing: boolean, pair: Pair | null) => ReactNode;
   /** Smaller intro, for sheets. */
   compact?: boolean;
+  /** Only the newest `last` messages (the room's sheet); the older ones are a tap away (`onMore`). */
+  last?: number;
+  onMore?: () => void;
   /** Off when the screen around it already keeps the composer above the keyboard (a bottom sheet rises as a whole). */
   avoidKeyboard?: boolean;
 }) {
@@ -264,18 +269,25 @@ export function ChatThread({
       {paidPair(pair) && <HeartBar pair={pair} />}
       <Body style={{ flex: 1 }}>
         <FlatList
-          data={[...messages].reverse()}
+          data={[...(last && messages.length > last ? messages.slice(-last) : messages)].reverse()}
           inverted
           keyExtractor={(m) => m.id}
           // A touch on the messages closes the emoji panel (as does the back button).
           onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
           contentContainerStyle={{ padding: compact ? 12 : 16, gap: 8 }}
           ListFooterComponent={
+            last && messages.length > last ? (
+              <Pressable onPress={onMore} disabled={!onMore} style={styles.more} accessibilityRole="button" accessibilityLabel="Önceki mesajlar: sohbetin tamamını aç">
+                <Text style={styles.moreText}>Önceki mesajlar</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+              </Pressable>
+            ) : (
             <View style={[styles.intro, compact && { paddingVertical: 12 }]}>
               <Avatar uri={missing ? '' : user.avatar} size={compact ? 52 : 72} ring />
               <Text style={styles.introName}>{missing ? 'Kullanıcı bulunamadı' : user.age > 0 ? `${user.name}, ${user.age}` : user.name}</Text>
               {!missing && !!user.bio && <Text style={styles.status}>{user.bio}</Text>}
             </View>
+            )
           }
           renderItem={({ item }) =>
             item.fromMe ? (
@@ -461,6 +473,8 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   safetyLink: { color: colors.gold, fontWeight: '800', fontSize: 13 },
   status: { color: colors.textDim, fontSize: 12 },
   intro: { alignItems: 'center', gap: 6, paddingVertical: 24 },
+  more: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 4, borderRadius: 14, backgroundColor: `${colors.primary}17` },
+  moreText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   introName: { color: colors.text, fontSize: 18, fontWeight: '700' },
   bubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
   photo: { width: 200, height: 200, borderRadius: 12, marginTop: 2, marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.2)' },

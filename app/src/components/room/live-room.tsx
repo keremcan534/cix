@@ -84,7 +84,7 @@ import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
 import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
 import * as api from '@/lib/api';
-import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, oneOnOneOpen, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
+import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
 import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
@@ -147,7 +147,7 @@ import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
 
@@ -819,6 +819,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     .map((u) => userById(u).name)
     .concat(app.me.name)
     .join('\n');
+  const roomNames = useMemo(() => roomNamesKey.split('\n'), [roomNamesKey]);
+  // Someone wrote my name (@bahset): a short buzz and a note over the chat, so I don't miss it.
+  const [mentionNote, setMentionNote] = useState<{ name: string; n: number } | null>(null);
+  useEffect(() => {
+    if (!mentionNote) return;
+    const t = setTimeout(() => setMentionNote(null), 4_000);
+    return () => clearTimeout(t);
+  }, [mentionNote]);
   const mask = (text: string) => (liveWords !== null ? (liveWords ? liveWords.split('\n') : []) : words).reduce((t, w) => t.replace(new RegExp(w, 'gi'), '***'), text);
   // Room events arrive once by id (lib/chat-feed). While the connection is down they wait in a buffer and
   // are merged, in time order and without duplicates, when it comes back.
@@ -862,6 +870,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         if (liveSlow && !staffIdsKey.split('\n').includes(from)) {
           if (nowMs() - (lastLineFrom.current.get(from) ?? 0) < SLOW_MS - 1_500) return;
           lastLineFrom.current.set(from, nowMs());
+        }
+        if (mentions(msg.text, app.me.name)) {
+          successHaptic();
+          setMentionNote((n) => ({ name: userById(from).name, n: (n?.n ?? 0) + 1 }));
         }
         return addMsg({ userId: from, text: mask(msg.text) });
       }
@@ -2130,10 +2142,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         bond={item.userId && !item.system && !item.bot ? bubbleBondOf(roomBonds, item.userId) : null}
         onRetry={retrySend}
         mentionsMe={!!item.userId && item.userId !== 'me' && mentions(item.text, myName)}
+        mentionNames={roomNames}
+        myName={myName}
         onPerson={openPerson}
       />
     ),
-    [equipped.bubble, bubbleOf, retrySend, roomBonds, myName, openPerson],
+    [equipped.bubble, bubbleOf, retrySend, roomBonds, myName, roomNames, openPerson],
   );
   // @bahset: "@" in the line offers the people on the mics and the balcony; a pick (or the card's Bahset) writes "@Name ".
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -2514,14 +2528,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       items: [
         // In live mode Oda içi PK runs on the server (lib/live/pk), so only in a server room.
         ...(myRole !== 'member' && !pk && (!liveMode() || real) ? [{ key: 'pk', label: 'PK', emoji: '⚔️', art: artSource('pk-takim-pk'), colors: ['#FF6576', '#087A80'] as [string, string], onPress: () => (setPanel(null), setPkSetup(true)) }] : []),
-        ...(oneOnOneOpen() ? [{ key: 'match', label: 'Hemen Tanış', emoji: '⚡', colors: ['#13D9DF', '#0A8F95'] as [string, string], onPress: () => router.push('/eslesme') }] : []),
         // Live mode: the server's Şanslı çanta, in a server room only (lib/live/lucky-bags); the demo keeps its envelope.
         ...(!liveMode() || real ? [{ key: 'env', label: 'Şanslı çanta', emoji: '🧧', art: ROOM_ICON_ART.envelope, colors: ['#B91C1C', '#F59E0B'] as [string, string], onPress: () => setPanel(liveMode() ? 'bag' : 'envelope') }] : []),
-        { key: 'tasks', label: 'Günlük görev', emoji: '📋', colors: ['#0E7C9A', '#13D9DF'], onPress: () => router.push('/gorevler') },
-        { key: 'events', label: 'Aktivite', emoji: '🎉', art: ROOM_ICON_ART.activity, colors: ['#0A8F95', '#FF6576'], onPress: () => setPanel('events') },
         ...(canFunctions ? [{ key: 'poll', label: 'Anket', emoji: '📊', art: ROOM_ICON_ART.poll, colors: ['#0EA5E9', '#2563EB'] as [string, string], onPress: () => setPanel('poll') }] : []),
         ...(roomType === 'qa' ? [{ key: 'qa', label: 'Sorular', emoji: '❓', art: ROOM_ICON_ART.questions, colors: ['#F97316', '#DC2626'] as [string, string], onPress: () => setPanel('qa'), badge: questions.filter((q) => !q.picked).length }] : []),
-        { key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'], onPress: () => setPanel('music') },
+        // Müzik is the room's staff's and its DJs' (they play it); everyone else just hears it.
+        ...(canControlMusic ? [{ key: 'music', label: 'Müzik', emoji: '🎵', art: ROOM_ICON_ART.music, colors: ['#C93C4F', '#0A8F95'] as [string, string], onPress: () => setPanel('music') }] : []),
       ],
     },
     // The free room games are opened by the room's staff (owner and admins); everyone else joins the table they open.
@@ -2557,14 +2569,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         ]
       : []),
     // Oda kartı, Oda ayarları, Yayına Katılma Modu, Odadakiler and Katkı sıralaması open from the room's top bar
-    // and its card, so the menu doesn't repeat them. Ses and Mikrofon denoise live in Efektler.
+    // and its card, so the menu doesn't repeat them. Ses and Mikrofon denoise live in Efektler. Hemen Tanış has
+    // its own way in, so it isn't here. Günlük görev comes last: the row ends on the right, by the right thumb.
     {
       title: 'Oda',
       variant: 'tool',
+      alignEnd: true,
       items: [
+        ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: leaveQueue }] : []),
         { key: 'share', label: 'Paylaş', icon: 'arrow-redo-outline', onPress: shareRoom },
         { key: 'fx', label: 'Efektler ve ses', icon: 'sparkles-outline', badge: settings.effectsOff ? 'off' : 'on', onPress: () => setPanel('effects') },
-        ...(myQueuePos !== null ? [{ key: 'queue', label: 'Kuyruktan çık', icon: 'exit-outline' as const, onPress: leaveQueue }] : []),
+        { key: 'events', label: 'Aktivite', icon: 'calendar-outline', onPress: () => setPanel('events') },
+        { key: 'tasks', label: 'Günlük görev', icon: 'checkbox-outline', onPress: () => router.push('/gorevler') },
       ],
     },
   ];
@@ -2799,11 +2815,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // A team PK keeps its arena (the teams need their sides).
   const [seatsSmall, setSeatsSmall] = useState(() => isLargeChat(getChatShare()));
   const strip = seatsSmall && !teamPk;
-  // Classic mics are sized by how many there are: up to 8 guest mics go four to a row, more go five. Each mic
-  // takes an equal share of the row and its avatar fills it (sharper faces).
-  const seatCols = Math.min(6, allSeats.length - 1 <= 8 ? 4 : 5);
+  // Classic mics are sized by how many there are: the fewer, the bigger. Up to 3 guest mics go three to a row,
+  // up to 8 four, more five; each takes an equal share of the row and its avatar fills it, up to a size that
+  // shrinks as the mics grow in number (few mics: big, sharp faces; many: all of them still fit).
+  const guestMics = allSeats.length - 1;
+  const seatCols = guestMics <= 3 ? 3 : guestMics <= 8 ? 4 : 5;
+  const seatCap = guestMics <= 4 ? 84 : guestMics <= 8 ? 70 : guestMics <= 12 ? 58 : 50;
   const seatW = Math.floor((Math.min(win.width, 640) - 16) / seatCols);
-  const gridSlot: ArenaSlot = { width: seatW, size: Math.max(34, Math.min(64, seatW - 20)) };
+  const gridSlot: ArenaSlot = { width: seatW, size: Math.max(34, Math.min(seatCap, seatW - 20)) };
   const small = gridSlot.size < 46;
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
@@ -3053,6 +3072,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
           {/* A touch on the stage or the chat closes the emoji panel (as does the back button). */}
           <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
+          {mentionNote && (
+            <View key={mentionNote.n} style={styles.mentionNote} pointerEvents="none" accessibilityLiveRegion="polite">
+              <Text style={styles.mentionNoteAt}>@</Text>
+              <Text style={styles.mentionNoteText} numberOfLines={1}>
+                {mentionNote.name} senden bahsetti
+              </Text>
+            </View>
+          )}
 
           {emojiOpen && (
             <EmojiPanel
@@ -3615,6 +3642,27 @@ const styles = StyleSheet.create({
   gameChip: { position: 'absolute', right: 12, bottom: 96, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, zIndex: 30 },
   gameChipText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
   wheelBtn: { position: 'absolute', right: 10, bottom: 150, alignItems: 'center', gap: 2, zIndex: 30 },
+  // @bahset: the note over the chat when someone writes my name; it goes by itself.
+  mentionNote: {
+    position: 'absolute',
+    alignSelf: 'center',
+    bottom: 72,
+    maxWidth: '86%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 6,
+    paddingRight: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: 'rgba(17,27,46,0.94)',
+    borderWidth: 1,
+    borderColor: colors.gold,
+    boxShadow: `0 6px 18px ${colors.gold}40`,
+    zIndex: 40,
+  },
+  mentionNoteAt: { width: 22, height: 22, borderRadius: 11, overflow: 'hidden', textAlign: 'center', lineHeight: 22, backgroundColor: colors.gold, color: '#1B1405', fontFamily: fonts.displayBold, fontSize: 13 },
+  mentionNoteText: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 13, flexShrink: 1 },
   wheelDisc: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#F6BD60', borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(246,189,96,0.6)' },
   wheelText: { color: '#fff', fontSize: 10, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 3 },
   callBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 6, backgroundColor: semantic.success, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
