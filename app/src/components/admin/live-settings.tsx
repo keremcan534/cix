@@ -1,9 +1,9 @@
 // Yönetim › Canlı ayarlar (admin only; server/api/live-settings.mjs): what the owner may change without a new
 // APK. Acil durum (a switch per feature, 'Para işlemlerini durdur', the notice) always on top, then Kampanya,
-// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, SMS, Zorunlu sürüm and Geçmiş. Every change opens
-// the same sheet (live-change-sheet): the server's preview, a reason, Uygula, and a second confirmation for a
-// big change. The server checks every value again; the local checks here only say early what it will refuse.
-// Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
+// Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Birebir ve eşleşme, Oyun Salonu, SMS, Zorunlu sürüm and
+// Geçmiş. Every change opens the same sheet (live-change-sheet): the server's preview, a reason, Uygula, and a second
+// confirmation for a big change. The server checks every value again; the local checks here only say early what it
+// will refuse. Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type HostInstance } from 'react-native';

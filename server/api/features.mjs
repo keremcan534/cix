@@ -37,6 +37,7 @@ export const ROUTES = {
   'POST /api/wallet/withdraw': ['withdraw'],
   'POST /api/wheel/spin': ['games'],
   'POST /api/casino/play': ['games'],
+  'POST /api/rooms/table': ['games'],
   'POST /api/shop/buy': ['shop'],
   'POST /api/wallet/spend': ['shop'],
   'POST /api/messages': ['dm'],

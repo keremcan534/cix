@@ -50,4 +50,5 @@ export const NOT_EXPORTED = {
   room_mic_queue: 'kept while waiting for a seat in a room',
   room_music_queue: 'kept while a track waits to play',
   phone_claims: 'a phone check’s one-time code, kept minutes',
+  room_tables: 'a free game table in a room, kept only while it is played',
 };

@@ -1,4 +1,5 @@
-// Free room games, playable in the prototype with room participants (other players are simulated).
+// Free room games, playable in the prototype with room participants (other players are simulated). A live build's
+// room plays them at the server's table instead (components/games/room-tables, same look: COLORS, CardView, styles).
 // Pure game state: these components never touch the room, seats or microphones.
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,11 +11,11 @@ import { colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type Player = Pick<User, 'id' | 'name' | 'avatar'>;
-const COLORS = ['#13D9DF', '#FF6576', '#F6BD60', '#22C55E'];
+export const COLORS = ['#13D9DF', '#FF6576', '#F6BD60', '#22C55E'];
 const rnd = (n: number) => Math.floor(Math.random() * n);
 
 // --- Ludo (quick version: one token each, 6 to leave base, exact roll to finish, landing on someone sends them home)
-const TRACK = 24;
+export const TRACK = 24;
 export function Ludo({ players: roomPlayers }: { players: Player[] }) {
   // The line-up is fixed when the game opens and on "Yeniden oyna": people joining or leaving the room mid-game
   // don't reset the board or leave it out of step with the players.
@@ -103,9 +104,9 @@ export function Ludo({ players: roomPlayers }: { players: Player[] }) {
 }
 
 // --- Renk Kartları (UNO-like mechanic with original naming)
-type Card = { color: number; value: number | '+2' | 'Atla' };
+export type Card = { color: number; value: number | '+2' | 'Atla' };
 const newCard = (): Card => ({ color: rnd(4), value: rnd(10) < 8 ? rnd(10) : rnd(2) ? '+2' : 'Atla' });
-const playable = (c: Card, top: Card) => c.color === top.color || c.value === top.value;
+export const playable = (c: Card, top: Card) => c.color === top.color || c.value === top.value;
 
 export function ColorCards({ players: roomPlayers }: { players: Player[] }) {
   // Fixed when the game opens and on "Yeniden oyna" (like Ludo): a hand per player, even if the room changes.
@@ -202,7 +203,7 @@ export function ColorCards({ players: roomPlayers }: { players: Player[] }) {
   );
 }
 
-function CardView({ card, big }: { card: Card; big?: boolean }) {
+export function CardView({ card, big }: { card: Card; big?: boolean }) {
   return (
     <View style={[g.card, { backgroundColor: COLORS[card.color] }, big && g.cardBig]}>
       <Text style={[g.cardText, big && { fontSize: 26 }]}>{card.value}</Text>
@@ -212,7 +213,7 @@ function CardView({ card, big }: { card: Card; big?: boolean }) {
 
 // --- XOX
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-const winnerOf = (b: (string | null)[]) => LINES.find(([a, c, d]) => b[a] && b[a] === b[c] && b[a] === b[d]);
+export const winnerOf = (b: (string | null)[]) => LINES.find(([a, c, d]) => b[a] && b[a] === b[c] && b[a] === b[d]);
 function botMove(b: (string | null)[]) {
   for (const mark of ['O', 'X']) {
     for (const [a, c, d] of LINES) {
@@ -281,3 +282,4 @@ const g = StyleSheet.create({
   xoxCell: { width: 66, height: 66, borderRadius: 12, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   xoxText: { fontSize: 34, fontWeight: '900' },
 });
+export { g as roomGameStyles };

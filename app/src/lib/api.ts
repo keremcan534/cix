@@ -867,6 +867,38 @@ export type CasinoPlayBody = { game: string; bet?: number; pick?: string; bets?:
 export const casino = () => call<ServerCasino>('GET', '/api/casino');
 export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
   call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
+/**
+ * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it. `hand` only for my
+ * own cards (Renk Kartları; null when I don't sit there), `counts` everyone's card count; `mySeat` −1 when I watch.
+ */
+export type TableCard = { color: number; value: number | '+2' | 'Atla' };
+export type ServerTable = {
+  room: string;
+  game: 'ludo' | 'cards' | 'xox';
+  name: string;
+  min: number;
+  max: number;
+  status: 'waiting' | 'playing' | 'over';
+  seats: UserCard[];
+  mySeat: number;
+  openedBy: string | null;
+  openedAt: string;
+  turn: number;
+  turnEndsAt: string | null;
+  winner: number | null;
+  log: string;
+  version: number;
+  board?: ('X' | 'O' | null)[];
+  pos?: number[];
+  die?: number | null;
+  top?: TableCard;
+  hand?: TableCard[] | null;
+  counts?: number[];
+};
+export type TableAction = 'open' | 'join' | 'start' | 'move' | 'leave' | 'again' | 'close';
+export const roomTable = (room: string) => call<{ table: ServerTable | null }>('GET', `/api/rooms/table?room=${encodeURIComponent(room)}`).then((r) => r.table);
+export const roomTableAction = (room: string, action: TableAction, extra: { game?: string; move?: { cell?: number; card?: number | null } } = {}) =>
+  call<{ table: ServerTable | null }>('POST', '/api/rooms/table', { room, action, ...extra }).then((r) => r.table);
 /** Sıralama › Oda XP (server/api/room-xp.mjs): open rooms by the room XP their gifts earned in the period. */
 export type RoomXpRow = { rank: number; room: ServerRoom; score: number };
 export const roomXpRankings = (period: 'day' | 'week' | 'month') => call<{ rows: RoomXpRow[] }>('GET', `/api/rankings/room-xp?period=${period}`).then((r) => r.rows);

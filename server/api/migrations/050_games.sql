@@ -45,3 +45,21 @@ CREATE TABLE IF NOT EXISTS casino_jackpots (
   won_at     timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Oda oyunları (room-games.mjs): the one table a room has for Ludo, Renk Kartları or XOX, with its players in seat
+-- order and the game's state (the board, the tokens, the cards). Kept while it is played; one nobody touched for a
+-- day goes when a new table opens, and a deleted account's tables go with it (eraseAccount).
+CREATE TABLE IF NOT EXISTS room_tables (
+  room_id    uuid PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE,
+  game       text NOT NULL CHECK (game IN ('ludo', 'cards', 'xox')),
+  opened_by  uuid REFERENCES users(id) ON DELETE SET NULL,
+  seats      uuid[] NOT NULL,
+  state      jsonb NOT NULL,
+  version    int NOT NULL DEFAULT 1,
+  -- When the current turn started (a turn runs out TURN_MS later).
+  turn_at    timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS room_tables_seats ON room_tables USING gin (seats);
+CREATE INDEX IF NOT EXISTS room_tables_updated ON room_tables (updated_at);

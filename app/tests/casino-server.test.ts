@@ -14,10 +14,12 @@ import { FISH, FISH_HIT } from '@/lib/fish-hunt';
 import { JACKPOT_SEEDS, POOL_SEED } from '@/lib/games';
 import { TREE_PAYS, TREE_STRIPS } from '@/lib/gold-tree';
 import { stripsOf } from '@/lib/line-slot';
+import { bigChange, valueText } from '@/lib/live-settings-format';
 import { SLOT_CONFIGS } from '@/lib/slot-configs';
 // Plain JavaScript modules of the server; TypeScript reads them through allowJs.
 import * as rules from '../../server/api/casino-rules.mjs';
 import * as slots from '../../server/api/casino-slots.mjs';
+import * as registry from '../../server/api/live-registry.mjs';
 
 const serverIds = rules.GAMES.map((g) => g.id);
 
@@ -91,5 +93,22 @@ describe('Aynı çekilişler aynı turu verir', () => {
         for (const draw of [() => 0, (n: number) => n - 1]) assert.deepEqual(rules.outcomeOf(id, pick, draw), outcomeOf(id as CasinoId, pick, draw), `${id}/${pick}`);
       }
     }
+  });
+});
+
+describe('Canlı ayarlar paneli Oyun Salonu’nu sunucu gibi okur', () => {
+  test('ikinci onay ve değerlerin yazısı', () => {
+    for (const [before, after] of [
+      [40, 81],
+      [40, 80],
+      [40, 1],
+    ])
+      assert.equal(bigChange('casino_daily_rounds', before, after), registry.isBig('casino_daily_rounds', before, after), `${before} → ${after}`);
+    assert.equal(bigChange('casino_max_bet', 25_000, 250), registry.isBig('casino_max_bet', 25_000, 250));
+    assert.equal(valueText('casino_off', ['fish', 'neon'], { names: { game: (id) => rules.gameById(id)!.name } }), 'Kapalı: Mercan Avı, Neon Bulvar');
+    assert.equal(valueText('casino_off', []), 'Hepsi açık');
+    assert.equal(valueText('casino_max_bet', 25_000), '25.000 jeton');
+    assert.equal(valueText('casino_daily_rounds', 40), 'En yüksek bahisle 40 tur');
+    assert.deepEqual(registry.REGISTRY.casino_off.bounds.options, serverIds);
   });
 });

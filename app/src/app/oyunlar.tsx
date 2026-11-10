@@ -176,7 +176,13 @@ export default function GameCenter() {
 
         {tab === 'history' &&
           (history.length === 0 ? (
-            <Text style={s.dim}>{showCasino ? 'Henüz oyun hareketi yok. Oyun Salonu turları, iadeler ve reddedilen istekler burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.' : 'Henüz oyun hareketi yok.'}</Text>
+            <Text style={s.dim}>
+              {!showCasino
+                ? 'Henüz oyun hareketi yok.'
+                : live
+                  ? 'Henüz oyun hareketi yok. Oyun Salonu turların burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.'
+                  : 'Henüz oyun hareketi yok. Oyun Salonu turları, iadeler ve reddedilen istekler burada işlem numarasıyla listelenir; jeton hareketleri Cüzdan geçmişinde de görünür.'}
+            </Text>
           ) : (
             history.map((h) => (
               <Card key={h.requestId + h.txId} style={{ gap: 2 }}>

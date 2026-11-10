@@ -75,7 +75,9 @@ const roundOut = (r, withOutcome = false) => ({
 
 /** Every slot's JACKPOT fund; a missing row starts from the demo's seed. `lock`: one game's row, FOR UPDATE. */
 async function jackpots(c, lock = null) {
-  for (const [game, seed] of Object.entries(JACKPOT_SEEDS)) await c.query('INSERT INTO casino_jackpots (game, fund) VALUES ($1, $2) ON CONFLICT DO NOTHING', [game, seed]);
+  for (const [game, seed] of Object.entries(JACKPOT_SEEDS)) {
+    if (!lock || game === lock) await c.query('INSERT INTO casino_jackpots (game, fund) VALUES ($1, $2) ON CONFLICT DO NOTHING', [game, seed]);
+  }
   const r = await c.query(`SELECT game, fund FROM casino_jackpots${lock ? ' WHERE game = $1 FOR UPDATE' : ''}`, lock ? [lock] : []);
   return Object.fromEntries(r.rows.map((x) => [x.game, Number(x.fund)]));
 }
