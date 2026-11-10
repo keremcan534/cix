@@ -7,10 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { Avatar, FramedAvatar, VerifiedBadge } from '@/components/ui';
 import { GiftArt, giftArtOf, giftSource } from '@/components/GiftArt';
-import { EmojiText, ReactionArt, StickerArt, messagePreview, stickersOf } from '@/components/ReactionArt';
+import { EmojiText, ReactionArt, StickerArt, isAnimatedSticker, messagePreview, stickersOf } from '@/components/ReactionArt';
 import { cosmeticById } from '@/data/catalog';
 import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
+import { stickerIdOf } from '@/lib/stickers';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { colors, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
@@ -216,8 +217,15 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
 export type SeatReactionData = { emoji: string; key: number };
 export const REACTION_MS = 2600;
 
-/** An emoji that pops over a seated person's avatar, wiggles, then fades (seat reaction). */
+/**
+ * An emoji over a seated person's avatar (seat reaction): it pops in, beats a few times, then fades. A sticker covers
+ * the photo and stays on it; an animated one (Duygular) plays over and over instead of beating. A plain emoji is
+ * smaller and rises as it goes.
+ */
 function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
+  const id = stickerIdOf(emoji);
+  const cover = !!id;
+  const moving = !!id && isAnimatedSticker(id);
   const [v] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {
     if (still) {
@@ -226,17 +234,20 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
     }
     Animated.sequence([
       Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(v, { toValue: 1.15, duration: 220, useNativeDriver: true }),
-          Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: true }),
-        ]),
-        { iterations: 3 },
-      ),
+      // An animation moves by itself: it just stays; a picture or a plain emoji beats three times.
+      moving
+        ? Animated.delay(REACTION_MS - 900)
+        : Animated.loop(
+            Animated.sequence([
+              Animated.timing(v, { toValue: 1.15, duration: 220, useNativeDriver: true }),
+              Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: true }),
+            ]),
+            { iterations: 3 },
+          ),
       Animated.delay(250),
       Animated.timing(v, { toValue: 2, duration: 320, useNativeDriver: true }),
     ]).start();
-  }, [v, still]);
+  }, [v, still, moving]);
   return (
     <Animated.View
       pointerEvents="none"
@@ -249,13 +260,13 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
         justifyContent: 'center',
         opacity: v.interpolate({ inputRange: [0, 0.2, 1, 1.15, 1.7, 2], outputRange: [0, 1, 1, 1, 1, 0] }),
         transform: [
-          { scale: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [0.2, 1, 1.12, 1.3] }) },
+          { scale: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [0.2, 1, 1.12, cover ? 1.06 : 1.3] }) },
           { rotate: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: ['-20deg', '0deg', '8deg', '0deg'] }) },
-          { translateY: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [size * 0.3, 0, -2, -size * 0.35] }) },
+          { translateY: v.interpolate({ inputRange: [0, 1, 1.15, 2], outputRange: [size * 0.3, 0, -2, cover ? 0 : -size * 0.35] }) },
         ],
       }}
     >
-      <ReactionArt emoji={emoji} size={size * 0.95} />
+      <ReactionArt emoji={emoji} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
     </Animated.View>
   );
 }
@@ -333,7 +344,7 @@ export function ChatLine({
   const body = stickers ? (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       {stickers.map((id, i) => (
-        <StickerArt key={i} id={id} size={34} />
+        <StickerArt key={i} id={id} size={34} play="once" />
       ))}
     </View>
   ) : (

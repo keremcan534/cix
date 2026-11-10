@@ -13,7 +13,7 @@ import { GIFTS, type Gift, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { liveGift, liveMode, message, toServer } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
-import { loadPair, MODE_NAME, type CallMode, type Pair } from '@/lib/live/one-on-one';
+import { loadPair, MODE_NAME, type CallGate, type CallMode, type Pair } from '@/lib/live/one-on-one';
 import { useApp } from '@/store';
 import { makeStyles, radius, useTheme } from '@/theme';
 
@@ -81,23 +81,34 @@ export function HeartBar({ pair }: { pair: Pair }) {
   );
 }
 
-/** Calls them: a locked call says why, a paid one shows its price first. */
+/** Whether I'd pay this call (an older server says it for the pair only). */
+const iPayFor = (pair: Pair, gate: CallGate) => (gate.iPay ?? pair.iPay) && gate.price > 0;
+/** When a used free call comes back: "bugün 14:20" or "yarın 09:05". */
+function backAt(iso: string) {
+  const d = new Date(iso);
+  const day = d.toDateString() === new Date().toDateString() ? 'bugün' : 'yarın';
+  return `${day} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/** Calls them: a locked call says why, a paid one shows its price first (and, past my free calls, when they're back). */
 export function callPair(userId: string, pair: Pair, mode: CallMode) {
   const gate = pair.calls[mode];
   if (!gate.open) return showAlert(`${MODE_NAME[mode]} arama kapalı`, gate.why ?? 'Bu kişiyi şu an arayamazsın.');
   const go = () => router.push({ pathname: '/arama/[id]', params: { id: userId, mode: mode === 'voice' ? 'sesli' : 'goruntulu' } });
-  if (!pair.iPay || gate.price <= 0) return go();
-  showAlert(`${MODE_NAME[mode]} arama`, `Dakikası ${fmt(gate.price)} jeton. Her dakikanın başında ödenir; jetonun bitince görüşme biter.`, [
+  if (!iPayFor(pair, gate)) return go();
+  const used = gate.free ? `Bugünkü ${gate.free.total} ücretsiz araman bitti${gate.free.nextAt ? `; ilki ${backAt(gate.free.nextAt)} yenilenir` : ''}. ` : '';
+  showAlert(`${MODE_NAME[mode]} arama`, `${used}Dakikası ${fmt(gate.price)} jeton. Her dakikanın başında ödenir; jetonun bitince görüşme biter.`, [
     { text: 'Vazgeç', style: 'cancel' },
     { text: 'Ara', onPress: go },
   ]);
 }
 
-/** A call's line in a menu: its price, or why it is closed. */
+/** A call's line in a menu: its price or my free calls left, or that it is closed. */
 export const callLabel = (pair: Pair, mode: CallMode) => {
   const gate = pair.calls[mode];
   if (!gate.open) return `${MODE_NAME[mode]} arama · kapalı`;
-  return pair.iPay && gate.price > 0 ? `${MODE_NAME[mode]} arama · ${fmt(gate.price)} jeton/dk` : `${MODE_NAME[mode]} arama · ücretsiz`;
+  if (gate.free && gate.price === 0) return `${MODE_NAME[mode]} arama · ücretsiz (${gate.free.left}/${gate.free.total} hak, ${gate.free.seconds} sn)`;
+  return iPayFor(pair, gate) ? `${MODE_NAME[mode]} arama · ${fmt(gate.price)} jeton/dk` : `${MODE_NAME[mode]} arama · ücretsiz`;
 };
 
 /** The voice and video buttons in the chat's header. */

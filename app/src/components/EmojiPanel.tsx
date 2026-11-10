@@ -40,7 +40,9 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
   const { catalog } = useAnimations();
   const styles = useStyles();
   const [kind, setKind] = useState<'free' | 'paid'>('free');
-  const [tab, setTab] = useState<string>('emoji');
+  // In a room it opens on Duygular, the animated faces (on a mic they cover my photo); elsewhere on the standard emoji.
+  const firstFree = onAnimate && STICKER_PACKS.some((p) => p.id === 'duygu') ? 'duygu' : 'emoji';
+  const [tab, setTab] = useState<string>(firstFree);
   const [group, setGroup] = useState(STANDARD_EMOJI[0].id);
   const pack = STICKER_PACKS.find((p) => p.id === tab);
   const locked = !!pack && !packUnlocked(pack.id);
@@ -70,7 +72,7 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
   const paidAnim = tab === 'animated';
   const switchKind = (k: 'free' | 'paid') => {
     setKind(k);
-    setTab(k === 'free' ? 'emoji' : (tabsOf('paid')[0]?.id ?? 'emoji'));
+    setTab(k === 'free' ? firstFree : (tabsOf('paid')[0]?.id ?? 'emoji'));
   };
   const micFxList = catalog.filter((a) => a.display_type === 'mic_effect' && isLive(a) && a.is_free === !paidAnim);
 

@@ -1,6 +1,6 @@
 // 1v1 (one-on-one.mjs) against a real Postgres: paid messages to a streamer, free ones on a mutual follow, the
-// heart level that opens calls, a call's minutes paid as they start and cut off when the coins run out, free
-// calls between people who follow each other, and Eşleşme with its free matches and their time limit.
+// heart level that opens calls, a call's minutes paid as they start and cut off when the coins run out, the free
+// calls between people who follow each other (3 a day, 58 s each, then paid), and Eşleşme with its free matches.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -192,7 +192,7 @@ describe('Birebir arama', () => {
     assert.equal((await pair(man.session, star.user.id)).heart.points, 5500, 'dakikalar kalbe sayılır');
   });
 
-  test('karşılıklı takipte ücretsiz arama; reddetme, vazgeçme, cevapsız', async () => {
+  test('karşılıklı takipte arayanın 24 saatte 3 ücretsiz hakkı, her biri 58 saniye; sonra arayan dakika öder', async () => {
     const a = await person('Ali', 'Erkek');
     const b = await person('Su', 'Kadın');
     let [st, j] = await ring(a.session, b.user.id);
@@ -200,27 +200,71 @@ describe('Birebir arama', () => {
     assert.equal(j.error, 'Arama için karşılıklı takip gerekli');
     await follow(a.session, b.user.id);
     await follow(b.session, a.user.id);
+    const rights = async (s = a.session, other = b.user.id) => (await pair(s, other)).calls.voice;
+    assert.deepEqual(await rights(), { open: true, price: 0, iPay: false, free: { total: 3, left: 3, seconds: 58, nextAt: null }, why: null });
 
+    // One right, however long the call: it is cut at 58 s, and nobody pays.
     const { call: k } = await ok(ring(a.session, b.user.id, 'video'), 'ara');
     assert.equal(k.price, 0);
-    assert.equal(k.iPay, false);
+    assert.equal(k.free, true);
+    assert.equal(k.maxSeconds, 58);
+    assert.equal((await rights()).free.left, 2, 'çalarken hak ayrılır');
+    assert.equal((await rights(b.session, a.user.id)).free.left, 3, 'arananın hakkı gitmez');
     const ans = await ok(call('POST', '/api/calls/answer', { id: k.id }, b.session), 'aç');
     assert.deepEqual(tokenOf(ans.token).video.canPublishSources, ['microphone', 'camera']);
-    await backdate(k.id, 200);
-    assert.equal((await beat(a.session, k.id)).call.status, 'live', 'ücretsiz arama sürer');
-    const end = await ok(call('POST', '/api/calls/end', { id: k.id }, a.session), 'kapat');
-    assert.equal(end.call.status, 'ended');
-    assert.equal(end.call.coins, 0);
+    await backdate(k.id, 30);
+    assert.equal((await beat(a.session, k.id)).call.status, 'live');
+    await backdate(k.id, 29);
+    const over = (await beat(b.session, k.id)).call;
+    assert.equal(over.status, 'ended', '58. saniyede kesilir');
+    assert.equal(over.endReason, 'time');
+    assert.equal(over.coins, 0);
+    assert.equal((await me(a.session)).coins, 0);
 
+    // Declined, cancelled and missed calls give their right back.
     const d = (await ok(ring(a.session, b.user.id), 'ara 2')).call;
     assert.equal((await ok(call('POST', '/api/calls/end', { id: d.id }, b.session), 'reddet')).call.status, 'declined');
     const c = (await ok(ring(a.session, b.user.id), 'ara 3')).call;
     assert.equal((await ok(call('POST', '/api/calls/end', { id: c.id }, a.session), 'vazgeç')).call.status, 'cancelled');
     assert.equal((await call('POST', '/api/calls/answer', { id: c.id }, b.session))[0], 409, 'biten arama açılmaz');
-
     const m = (await ok(ring(a.session, b.user.id), 'ara 4')).call;
     await q("UPDATE calls SET created_at = now() - interval '41 seconds' WHERE id = $1", [m.id]);
     await until(async () => (await q('SELECT status FROM calls WHERE id = $1', [m.id])).rows[0].status === 'missed');
+    assert.equal((await rights()).free.left, 2, 'açılmayan aramalar hak harcamaz');
+
+    // The day's two other free calls (one of them yesterday's: it no longer counts), then paid minutes.
+    const used = (ago) =>
+      q(`INSERT INTO calls (kind, mode, caller, callee, payer, free, max_seconds, status, created_at, started_at, ref)
+         VALUES ('call', 'voice', $1, $2, $1, true, 58, 'ended', now() - make_interval(hours => $3), now() - make_interval(hours => $3), $4)`, [a.user.id, b.user.id, ago, rnd(6)]);
+    await used(25);
+    assert.equal((await rights()).free.left, 2, '24 saatten eski hak geri gelmiştir');
+    await used(1);
+    await used(2);
+    const gate = await rights();
+    assert.equal(gate.free.left, 0);
+    assert.equal(gate.price, 600);
+    assert.equal(gate.iPay, true);
+    assert.ok(Math.abs(Date.parse(gate.free.nextAt) - (Date.now() + 22 * 3600_000)) < 60_000, 'ilk kullanılan hak 24 saat sonra döner');
+    assert.equal((await pair(a.session, b.user.id)).calls.video.price, 750);
+    [st, j] = await ring(a.session, b.user.id);
+    assert.equal(st, 409, 'hakkı biten ve jetonu olmayan arayamaz');
+    assert.equal(j.code, 'insufficient');
+    await topUp(a.session, 5000);
+    const paid = (await ok(ring(a.session, b.user.id), 'ücretli ara')).call;
+    assert.equal(paid.free, false);
+    assert.equal(paid.price, 600);
+    assert.equal(paid.maxSeconds, null);
+    assert.equal(paid.iPay, true);
+    await ok(call('POST', '/api/calls/answer', { id: paid.id }, b.session), 'aç');
+    assert.equal((await me(a.session)).coins, 4400, 'ilk dakika açılınca');
+    assert.equal((await me(b.session)).diamonds, 0, 'kimse kazanmaz');
+    assert.deepEqual((await q('SELECT kind, coins, earner FROM paid_events WHERE call_id = $1', [paid.id])).rows, [{ kind: 'voice_call', coins: 600, earner: null }]);
+    await backdate(paid.id, 100);
+    const on = (await beat(a.session, paid.id)).call;
+    assert.equal(on.status, 'live', 'ücretli arama 58 saniyede kesilmez');
+    assert.equal(on.minutes, 2);
+    assert.equal((await me(a.session)).coins, 3800);
+    await ok(call('POST', '/api/calls/end', { id: paid.id }, a.session), 'kapat');
 
     await q('INSERT INTO blocks (blocker, blocked) VALUES ($1, $2)', [b.user.id, a.user.id]);
     assert.equal((await ring(a.session, b.user.id))[0], 403, 'engelde arama yok');

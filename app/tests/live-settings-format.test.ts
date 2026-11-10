@@ -76,9 +76,9 @@ describe('the second confirmation', () => {
     for (const k of ['features_off', 'notice', 'packs_hidden', 'withdraw_max_diamonds', 'withdraw_weekly_diamonds'] as LiveKey[]) cases.push([k, null, null]);
     cases.push(['features_off', [], [...registry.FEATURES]], ['notice', null, 'Bakım var'], ['packs_hidden', [], ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']]);
     cases.push(['withdraw_max_diamonds', 5_000_000, 50_000], ['withdraw_weekly_diamonds', 10_000_000, 50_000]);
-    for (const k of ['dm_price', 'call_voice_price', 'call_video_price', 'match_voice_price', 'match_video_price'] as LiveKey[])
+    for (const k of ['dm_price', 'call_voice_price', 'call_video_price', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price'] as LiveKey[])
       for (const a of [0, 100, 119, 120, 240, 480, 481, 2000, null]) cases.push([k, 240, a]);
-    for (const k of ['match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'] as LiveKey[]) cases.push([k, 3, 20], [k, 3, 0], [k, 3, null]);
+    for (const k of ['call_free', 'call_free_seconds', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'] as LiveKey[]) cases.push([k, 3, 20], [k, 3, 0], [k, 3, null]);
     for (const [k, b, a] of cases) assert.equal(bigChange(k, b, a), isBig(k, b, a), `${k}: ${JSON.stringify(b)} → ${JSON.stringify(a)}`);
   });
 
