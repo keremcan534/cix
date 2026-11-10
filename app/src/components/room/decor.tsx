@@ -177,7 +177,7 @@ export function useRoomLook(o: {
     buy: (sku, price) =>
       o.real
         ? !short(price) && act('Ücretli oda süslemesi aldı', () => server.buyBackground(id, sku, price))
-        : demo('Ücretli oda süslemesi aldı', `Oda süslemesi: ${backgroundName({ kind: 'paid', id: sku, url: null, until: null })}`, demoBuy(myRoom.decor, sku, Date.now())),
+        : demo('Ücretli oda süslemesi aldı', `Oda süslemesi: ${backgroundName({ kind: 'paid', id: sku, url: null })}`, demoBuy(myRoom.decor, sku, Date.now())),
     choose: async (size) => {
       try {
         return await pickRoomPicture(size);
@@ -300,8 +300,8 @@ function Tile({
   onPress?: () => void;
   children?: ReactNode;
 }) {
-  return (
-    <Pressable style={s.tile} onPress={onPress} disabled={!onPress} accessibilityRole="button" accessibilityLabel={name} accessibilityState={{ selected: !!selected }}>
+  const face = (
+    <>
       <View style={[s.tileArt, selected && { borderColor: colors.primaryText }]}>
         {source ? (
           <Image source={source} resizeMode="cover" style={[s.fill, !!locked && { opacity: 0.45 }]} />
@@ -326,6 +326,20 @@ function Tile({
       <Text style={s.tileName} numberOfLines={1}>
         {name}
       </Text>
+    </>
+  );
+  // A tile with its own buttons under it is not one button itself, so a screen reader reaches each of them.
+  if (!onPress) {
+    return (
+      <View style={s.tile}>
+        {face}
+        {children}
+      </View>
+    );
+  }
+  return (
+    <Pressable style={s.tile} onPress={onPress} accessibilityRole="button" accessibilityLabel={locked ? `${name}, kilitli, ${locked}` : name} accessibilityState={{ selected: !!selected }}>
+      {face}
       {children}
     </Pressable>
   );
@@ -406,7 +420,7 @@ function FreeTab({ view, ctl }: { view: RoomDecor; ctl: Ctl }) {
       </View>
       <Text style={s.small}>
         Ücretsiz süslemeler oda seviyesiyle açılır; “Tema görünümü” odanın temasının kendi sahnesidir. Ücretli ya da özel süslemenin süresi bitince oda buradaki seçimine döner
-        {!free ? ` (${backgroundName({ kind: 'free', id: view.bgId, url: null, until: null })})` : ''}.
+        {!free ? ` (${backgroundName({ kind: 'free', id: view.bgId, url: null })})` : ''}.
       </Text>
     </>
   );
@@ -425,7 +439,7 @@ function PaidTab({ view, ctl, now }: { view: RoomDecor; ctl: Ctl; now: number })
           const showing = view.showing.kind === 'paid' && view.showing.id === it.sku;
           const sale = buyable(it.sku, it.onSale);
           const ask = () =>
-            showAlert(it.name, `${fmt(it.price)} jeton karşılığında ${it.days} gün boyunca senindir ve odada hemen görünür.${left > 0 ? ' Kalan sürene eklenir.' : ''}`, [
+            showAlert(it.name, `${fmt(it.price)} jeton karşılığında ${it.days} gün boyunca senindir ve odada hemen görünür.`, [
               { text: 'Vazgeç', style: 'cancel' },
               { text: 'Satın al', onPress: () => ctl.buy(it.sku, it.price) },
             ]);

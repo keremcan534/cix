@@ -130,11 +130,11 @@ describe('Oda süslemesi: demo odası sunucunun kurallarıyla', () => {
 describe('Oda görselleri: adlar, kalan gün, kırpma', () => {
   test('odanın gösterdiği şeyin adı ve kalan günü', () => {
     assert.equal(backgroundName(null), 'Tema görünümü');
-    assert.equal(backgroundName({ kind: 'free', id: null, url: null, until: null }), 'Tema görünümü');
-    assert.equal(backgroundName({ kind: 'free', id: 'bg2', url: null, until: null }), 'Deniz Feneri');
-    assert.equal(backgroundName({ kind: 'paid', id: 'rb-salon', url: null, until: null }), 'Altın Salon');
-    assert.equal(backgroundName({ kind: 'paid', id: 'rb-yeni', url: null, until: null }), 'Süsleme', 'bu sürümün tanımadığı süsleme');
-    assert.equal(backgroundName({ kind: 'custom', id: null, url: 'https://x/y.jpg', until: null }), 'Özel görsel');
+    assert.equal(backgroundName({ kind: 'free', id: null, url: null }), 'Tema görünümü');
+    assert.equal(backgroundName({ kind: 'free', id: 'bg2', url: null }), 'Deniz Feneri');
+    assert.equal(backgroundName({ kind: 'paid', id: 'rb-salon', url: null }), 'Altın Salon');
+    assert.equal(backgroundName({ kind: 'paid', id: 'rb-yeni', url: null }), 'Süsleme', 'bu sürümün tanımadığı süsleme');
+    assert.equal(backgroundName({ kind: 'custom', id: null, url: 'https://x/y.jpg' }), 'Özel görsel');
     assert.equal(daysLeft(new Date(NOW + 30 * DAY).toISOString(), NOW), 30);
     assert.equal(daysLeft(new Date(NOW + 29 * DAY + 1).toISOString(), NOW), 30, 'yukarı yuvarlanır');
     assert.equal(daysLeft(new Date(NOW + 1000).toISOString(), NOW), 1);

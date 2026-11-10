@@ -43,7 +43,7 @@ import { withRoomBadges } from './room-social.mjs';
 // pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { endCrossPkOfRoom } from './pk-cross.mjs';
 // room-decor.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { backgroundOf } from './room-decor.mjs';
+import { shownBackground } from './room-decor.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -92,7 +92,7 @@ const out = (r) => ({
   // every phone draws behind the stage now (a paid or the owner's own picture while its term runs, else the free
   // one), and the uploaded card picture (null: the lists show what they did before, coverId's picture or none).
   bgId: r.bg_id ?? null,
-  background: backgroundOf(r),
+  background: shownBackground(r),
   coverUrl: r.cover_url ?? null,
   // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Patron koltuğu holder, if any.
   rules: rulesOf(r.rules),

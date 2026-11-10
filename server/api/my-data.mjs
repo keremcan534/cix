@@ -333,7 +333,7 @@ export async function exportOf(c, uid) {
       customUrl: x.custom_url ?? null,
       customUntil: x.custom_until,
       customPaidAt: x.custom_paid_at,
-      customPrice: x.custom_price === null ? null : num(x.custom_price),
+      customPrice: num(x.custom_price),
       customRemovedByStaffAt: x.custom_removed_at,
     })),
     admin: await all('SELECT room_id, super FROM room_admins WHERE user_id = $1', (x) => ({ room: x.room_id, super: x.super })),

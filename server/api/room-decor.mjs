@@ -57,6 +57,12 @@ export function backgroundOf(r) {
   if (r.bg_pick && r.bg_pick !== 'custom' && r.bg_paid_until && ROOM_BGS.has(r.bg_pick)) return { kind: 'paid', id: r.bg_pick, url: null, until: r.bg_paid_until };
   return { kind: 'free', id: r.bg_id ?? null, url: null, until: null };
 }
+/** The same as everyone reads it with the room: what to draw, without when the owner's term ends (that is the
+ *  settings' business, for those who may change it). */
+export function shownBackground(r) {
+  const { kind, id, url } = backgroundOf(r);
+  return { kind, id, url };
+}
 
 /** One of `me`'s own uploads of `kind`, or a 400. */
 function ownUpload(url, kind, me) {
@@ -287,8 +293,11 @@ export const roomDecorRoutes = {
         const price = s.roomBgCustomPrice;
         const days = s.roomBgCustomDays;
         const paid = await once(me.id, 'coin', b.ref, async (c) => {
+          // The person's row is locked first, so two purchases at once run one after the other and the second
+          // finds the term the first one started: nobody pays twice for the same days.
           await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [me.id]);
           await claimRef(c, me.id, 'coin', b.ref);
+          if ((await c.query('SELECT 1 FROM room_decor WHERE owner = $1 AND custom_until > now()', [me.id])).rowCount) throw err(409, 'Özel süslemen zaten sürüyor; görselini ücretsiz değiştirebilirsin', 'already_running');
           if (!(Number.isSafeInteger(b.price) && b.price >= price)) throw err(409, `Fiyat değişti: şimdi ${fmt(price)} jeton`, 'price_changed', { price });
           await spendCoins(c, me.id, price, `Oda süslemesi: özel görsel (${days} gün)`, b.ref, null, { detail: { room: room.id, decor: 'custom', days } });
           await c.query(
@@ -311,7 +320,7 @@ export const roomDecorRoutes = {
       throw e;
     }
     // The picture this one replaced (also one left from a term that ended before the sweep came by).
-    if (before?.custom_url && before.custom_url !== url && !out.replay) removeFiles([before.custom_url]);
+    if (before?.custom_url && before.custom_url !== url && !out.replay) removeFiles([before.custom_url], me.id);
     const fresh = await changed(room.id);
     return { ...out, room: roomOut(fresh), decor: await decorOf(fresh, rank) };
   },
@@ -328,7 +337,7 @@ export const roomDecorRoutes = {
          FROM (SELECT owner, custom_url FROM room_decor WHERE owner = $1 FOR UPDATE) old WHERE d.owner = old.owner RETURNING old.custom_url AS url`,
       [me.id],
     );
-    if (r.rows[0]?.url) removeFiles([r.rows[0].url]);
+    if (r.rows[0]?.url) removeFiles([r.rows[0].url], me.id);
     const fresh = await changed(room.id);
     return { room: roomOut(fresh), decor: await decorOf(fresh, rank) };
   },

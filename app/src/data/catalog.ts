@@ -344,7 +344,7 @@ export const roomCode = (id: string) => String(10_000_000 + ([...id].reduce((h, 
 export const ROOM_BACKGROUNDS = [
   { id: 'bg1', name: 'Gün Batımı', seed: 'night', minLevel: 1 },
   { id: 'bg2', name: 'Deniz Feneri', seed: 'neon', minLevel: 2 },
-  { id: 'bg3', name: 'Derin Mavi', seed: 'sea', minLevel: 4 },
+  { id: 'bg3', name: 'Deniz Altı', seed: 'sea', minLevel: 4 },
   { id: 'bg4', name: 'Turkuaz Koy', seed: 'galaxy', minLevel: 7 },
 ];
 /** The card picture an older app chose for a server room ('' for none or an unknown id): the lists fall back to it
@@ -369,8 +369,9 @@ export const ROOM_BG_CUSTOM = { price: 5_000, days: 30, changesPerDay: 10 };
 /** The sizes a room picture is cut to before it is uploaded: the stage's portrait shape, the lists' square. */
 export const ROOM_BG_SIZE = { width: 1080, height: 1920 };
 export const ROOM_COVER_SIZE = { width: 800, height: 800 };
-/** What a room draws behind its stage: a free or paid background by id (null: the theme's stage) or a picture. */
-export type RoomBackground = { kind: 'free' | 'paid' | 'custom'; id: string | null; url: string | null; until: string | null };
+/** What a room draws behind its stage: a free or paid background by id (null: the theme's stage) or a picture.
+ *  `until`: when a paid or own picture's term ends; only the room's settings get it, not everyone who reads the room. */
+export type RoomBackground = { kind: 'free' | 'paid' | 'custom'; id: string | null; url: string | null; until?: string | null };
 
 // --- Room music (licensed in-app catalog; mock) -------------------------------
 export type Track = { id: string; title: string; artist: string; seconds: number };

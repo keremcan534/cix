@@ -114,14 +114,14 @@ describe('Oda Süslemesi', () => {
     await makeSuper(id, owner, boss);
     await ok(call('POST', '/api/rooms/admin', { room: id, user: helper.user.id, admin: true }, owner.session), 'yönetici');
     let r = await roomOf(id, guest);
-    assert.deepEqual([r.bgId, r.background, r.coverUrl, r.coverId], [null, { kind: 'free', id: null, url: null, until: null }, null, null]);
+    assert.deepEqual([r.bgId, r.background, r.coverUrl, r.coverId], [null, { kind: 'free', id: null, url: null }, null, null]);
     // What an older app picks as the room's "cover" stays the card's picture: it is not the background.
     r = (await ok(call('POST', '/api/rooms/update', { id, coverId: 'bg1' }, owner.session), 'eski kapak')).room;
     assert.deepEqual([r.coverId, r.bgId, r.background.id], ['bg1', null, null]);
 
     const mark = lkCalls.length;
     let j = await ok(call('POST', '/api/rooms/decor/pick', { room: id, pick: 'free', bgId: 'bg1' }, owner.session), 'ücretsiz süsleme');
-    assert.deepEqual([j.room.bgId, j.room.background], ['bg1', { kind: 'free', id: 'bg1', url: null, until: null }]);
+    assert.deepEqual([j.room.bgId, j.room.background], ['bg1', { kind: 'free', id: 'bg1', url: null }]);
     assert.equal(j.decor.bgId, 'bg1');
     assert.deepEqual(j.decor.free.map((x) => [x.id, x.minLevel, x.open]), [['bg1', 1, true], ['bg2', 2, false], ['bg3', 4, false], ['bg4', 7, false]]);
     assert.ok(await until(() => roomPackets(id, mark).length >= 1), 'odadaki telefonlara "odayı yeniden oku" gitti');
@@ -160,8 +160,9 @@ describe('Oda Süslemesi', () => {
     const mark = lkCalls.length;
     let j = await ok(custom(owner, id, first, { ref }), 'özel süsleme');
     assert.deepEqual([j.charged, j.replay, j.user.coins], [true, false, 5_000]);
-    assert.deepEqual([j.room.background.kind, j.room.background.url, j.room.bgId], ['custom', first.url, 'bg1']);
-    assert.ok(Math.abs(Date.parse(j.room.background.until) - Date.now() - 30 * DAY) < 60_000, '30 gün sonra biter');
+    assert.deepEqual([j.room.background, j.room.bgId], [{ kind: 'custom', id: null, url: first.url }, 'bg1'], 'herkes ne çizileceğini okur, bitiş gününü değil');
+    assert.deepEqual([j.decor.showing.kind, j.decor.showing.url], ['custom', first.url]);
+    assert.ok(Math.abs(Date.parse(j.decor.showing.until) - Date.now() - 30 * DAY) < 60_000, '30 gün sonra biter');
     assert.deepEqual([j.decor.pick, j.decor.custom.url, j.decor.custom.changesLeft], ['custom', first.url, 10]);
     assert.ok(await until(() => roomPackets(id, mark).length >= 1), 'odaya duyuruldu');
     const line = (await q("SELECT amount, reason, detail FROM ledger WHERE user_id = $1 AND ref = $2 AND currency = 'coin'", [owner.user.id, ref])).rows[0];
@@ -240,7 +241,14 @@ describe('Oda Süslemesi', () => {
     assert.equal(st, 409);
     assert.equal((await roomOf(id, owner)).background.kind, 'free');
 
-    await ok(custom(owner, id, file('roombg', owner)), 'özel süsleme');
+    // Two purchases at the same moment (two taps, two request ids): one term, one charge.
+    const twice = await Promise.all([custom(owner, id, file('roombg', owner)), custom(owner, id, file('roombg', owner))]);
+    // The other one finds the term running: refused, or (when it came a moment later) a free change of picture.
+    const how = twice.map(([st, j]) => (st === 200 ? (j.charged ? 'paid' : 'replaced') : j.code));
+    assert.equal(how.filter((x) => x === 'paid').length, 1, how.join(', '));
+    assert.ok(how.every((x) => ['paid', 'replaced', 'already_running'].includes(x)), how.join(', '));
+    assert.equal(await coins(owner), 11_000 - 20 - 5_000, 'bir kez ödendi');
+    assert.equal((await q("SELECT count(*)::int AS n FROM ledger WHERE user_id = $1 AND reason LIKE 'Oda süslemesi: özel%'", [owner.user.id])).rows[0].n, 1);
     await q('UPDATE room_decor SET changes = 10, changes_day = current_date WHERE owner = $1', [owner.user.id]);
     const late = file('roombg', owner);
     [st, j] = await custom(owner, id, late);
@@ -262,7 +270,7 @@ describe('Oda Süslemesi', () => {
     assert.equal((await roomOf(id, owner)).background.kind, 'custom');
     const mark = lkCalls.length;
     await q("UPDATE room_decor SET custom_until = now() - interval '1 second' WHERE owner = $1", [owner.user.id]);
-    assert.deepEqual((await roomOf(id, owner)).background, { kind: 'free', id: 'bg1', url: null, until: null }, 'hemen son ücretsiz süsleme');
+    assert.deepEqual((await roomOf(id, owner)).background, { kind: 'free', id: 'bg1', url: null }, 'hemen son ücretsiz süsleme');
     assert.ok(await gone(f), 'süresi biten görsel depodan silindi');
     assert.ok(await until(() => roomPackets(id, mark).length >= 1), 'odaya duyuruldu');
     const row = (await q('SELECT pick, custom_url FROM room_decor WHERE owner = $1', [owner.user.id])).rows[0];
@@ -290,7 +298,7 @@ describe('Oda Süslemesi', () => {
       assert.deepEqual([st, j.code, j.price], [409, 'price_changed', 7_000]);
       j = await ok(custom(owner, id, file('roombg', owner), { price: 7_000 }), 'yeni fiyatla');
       assert.equal(j.user.coins, 3_000);
-      assert.ok(Math.abs(Date.parse(j.room.background.until) - Date.now() - 7 * DAY) < 60_000, '7 gün');
+      assert.ok(Math.abs(Date.parse(j.decor.showing.until) - Date.now() - 7 * DAY) < 60_000, '7 gün');
       assert.match((await q("SELECT reason FROM ledger WHERE user_id = $1 AND amount = -7000", [owner.user.id])).rows[0].reason, /7 gün/);
 
       await setLive({ room_decor_off: ['custom'] });
@@ -334,14 +342,19 @@ describe('Oda Süslemesi', () => {
     j = await ok(buy(owner, { ref }), 'satın al');
     assert.deepEqual([j.replay, j.user.coins], [false, 10_000 - item.price]);
     assert.deepEqual([j.room.background.kind, j.room.background.id, j.decor.pick], ['paid', item.sku, item.sku]);
-    assert.ok(Math.abs(Date.parse(j.room.background.until) - Date.now() - item.days * DAY) < 60_000);
+    assert.ok(Math.abs(Date.parse(j.decor.showing.until) - Date.now() - item.days * DAY) < 60_000);
     assert.ok(j.decor.paid.items[0].until);
     assert.ok(await until(() => roomPackets(id, mark).length >= 1), 'odaya duyuruldu');
     j = await ok(buy(owner, { ref }), 'aynı istek');
     assert.deepEqual([j.replay, j.user.coins], [true, 10_000 - item.price]);
     const e = (await q("SELECT id, kind, price, source FROM entitlements WHERE user_id = $1 AND sku = $2", [owner.user.id, item.sku])).rows;
     assert.deepEqual(e.map((x) => [x.kind, Number(x.price), x.source]), [['roombg', item.price, 'buy']]);
-    assert.match((await q('SELECT reason FROM ledger WHERE user_id = $1 AND ref = $2', [owner.user.id, ref])).rows[0].reason, /^Oda süslemesi: Yıldızlı Gece \(30 gün\)$/);
+    // The charge names the item, so a store refund of the coins that paid for it takes the background back
+    // (economy.mjs refundItems finds item spends by detail.sku and the entitlement by the charge's ref).
+    const charge = (await q('SELECT reason, detail FROM ledger WHERE user_id = $1 AND ref = $2', [owner.user.id, ref])).rows[0];
+    assert.match(charge.reason, /^Oda süslemesi: Yıldızlı Gece \(30 gün\)$/);
+    assert.deepEqual([charge.detail.sku, charge.detail.kind, charge.detail.room], [item.sku, 'roombg', id]);
+    assert.equal((await q('SELECT 1 FROM entitlements WHERE user_id = $1 AND ref = $2 AND revoked_at IS NULL', [owner.user.id, ref])).rowCount, 1);
 
     // The Süper Yönetici switches between the free background and what the owner owns.
     await ok(call('POST', '/api/rooms/decor/pick', { room: id, pick: 'free', bgId: 'bg1' }, boss.session), 'ücretsize geç');
@@ -352,7 +365,7 @@ describe('Oda Süslemesi', () => {
     // Its term ends (here: support takes the item back): the room is on its last free background at once.
     admin ??= await h.account('Yönetici', 'admin');
     await ok(call('POST', '/api/admin/economy/revoke', { id: Number(e[0].id), reason: 'test: süre bitti' }, admin.session), 'geri al');
-    assert.deepEqual((await roomOf(id, owner)).background, { kind: 'free', id: 'bg1', url: null, until: null });
+    assert.deepEqual((await roomOf(id, owner)).background, { kind: 'free', id: 'bg1', url: null });
     assert.equal((await call('POST', '/api/rooms/decor/pick', { room: id, pick: item.sku }, owner.session))[0], 403);
     // A term that runs out by the clock, the same way.
     await q("INSERT INTO entitlements (user_id, sku, kind, price, starts_at, ends_at, source, ref) VALUES ($1, 'rb-neon', 'roombg', 900, now() - interval '30 days', now() + interval '1 second', 'buy', $2)", [owner.user.id, rnd(6)]);

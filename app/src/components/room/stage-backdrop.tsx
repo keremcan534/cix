@@ -70,8 +70,9 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
       <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none', overflow: 'hidden', backgroundColor: colors.bg }]}>
         <Image source={look.photo} resizeMode="cover" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
         <Image source={picture} resizeMode="cover" onError={() => setFailed(uri)} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
-        {/* A light veil at the top so the picture shows behind the mics, solid toward the chat. */}
-        <LinearGradient colors={['rgba(8,15,30,0.30)', 'rgba(8,15,30,0.42)', 'rgba(8,15,30,0.86)', colors.bg]} locations={[0, 0.4, 0.7, 0.92]} style={StyleSheet.absoluteFill} />
+        {/* A navy veil, lighter than the theme's so the picture shows behind the mics (names and seats stay readable
+            on a bright picture), solid toward the chat. */}
+        <LinearGradient colors={['rgba(8,15,30,0.40)', 'rgba(8,15,30,0.50)', 'rgba(8,15,30,0.88)', colors.bg]} locations={[0, 0.4, 0.68, 0.9]} style={StyleSheet.absoluteFill} />
         <LinearGradient colors={['transparent', 'rgba(8,15,30,0.85)', colors.bg]} locations={[0, 0.6, 1]} style={s.floor} />
       </View>
     );
