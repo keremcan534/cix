@@ -241,6 +241,15 @@ export async function openLiveLine(signal: AbortSignal): Promise<Response | null
   return fetch(`${BASE}/api/live`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
 }
 
+/** The live line's address and my session, for the line's second way of reading it (XMLHttpRequest). */
+export async function liveLineTarget(): Promise<{ url: string; token: string } | null> {
+  if (!BASE) return null;
+  await restoreSession();
+  return session ? { url: `${BASE}/api/live`, token: session } : null;
+}
+/** Ayarlar › Bağlantı testi: the server sends a ping on my line; `open` is how many lines it has from me. */
+export const pingLiveLine = () => call<{ open: number }>('POST', '/api/live/ping', {});
+
 /** Signs in with this device (creating the account with `name` the first time). */
 export async function signIn(name: string): Promise<ServerUser> {
   lastName = name;

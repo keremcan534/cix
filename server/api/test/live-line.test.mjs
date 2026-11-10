@@ -65,6 +65,15 @@ describe('Anlık hat', () => {
     line.close();
   });
 
+  test('Bağlantı testi: ping kendi hattına gelir, açık hat sayısı söylenir', async () => {
+    const a = await signUp('Ping');
+    assert.equal((await ok(call('POST', '/api/live/ping', {}, a.session))).open, 0, 'hat yokken 0');
+    const line = await open(a.session);
+    assert.equal((await ok(call('POST', '/api/live/ping', {}, a.session))).open, 1);
+    assert.equal((await line.next('ping')).type, 'ping');
+    line.close();
+  });
+
   test('takip, mesaj, okundu ve arama anında gelir; içerik gelmez', async () => {
     const a = await signUp('Ayla');
     const b = await signUp('Bora');

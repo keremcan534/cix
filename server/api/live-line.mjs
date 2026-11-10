@@ -10,7 +10,7 @@
 // says only what changed (its type and ids, never a message's text or a name): the phone reads the thing itself
 // through the usual routes, with their usual checks, so a line can't show anyone anything they couldn't read.
 // The lines live in this process's memory (one API process). The polls stay: they cover a line that is down.
-import { auth } from './core.mjs';
+import { auth, limit } from './core.mjs';
 
 /** Open lines by user id. A phone that reconnects before its old line is noticed gone has two for a moment. */
 const lines = new Map();
@@ -72,6 +72,20 @@ export function closeLines() {
   for (const mine of lines.values()) for (const res of mine) res.end();
   lines.clear();
 }
+
+/**
+ * Ayarlar › "Bağlantı testi": the phone asks for a ping on its own line and times how long it takes to come back.
+ * Says how many of my lines are open, so the phone can tell "the server has no line from me" from "it is slow".
+ */
+export const lineRoutes = {
+  async 'POST /api/live/ping'(req) {
+    const me = await auth(req);
+    limit(`lineping:${me.id}`, 20, 'Çok sık denedin, biraz bekle');
+    const open = lines.get(String(me.id))?.size ?? 0;
+    line([me.id], 'ping', { at: Date.now() });
+    return { open };
+  },
+};
 
 /** Open lines now (tests and the health note). */
 export const lineCount = () => [...lines.values()].reduce((n, mine) => n + mine.size, 0);

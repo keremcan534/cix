@@ -82,7 +82,7 @@ import { roomSocialRoutes } from './room-social.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
-import { closeLines, openLine } from './live-line.mjs';
+import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { referralRoutes } from './referrals.mjs';
@@ -232,6 +232,7 @@ const walletRoutes = {
 const LIVE_LINE = '/api/live';
 const routes = {
   [`GET ${LIVE_LINE}`]: () => null,
+  ...lineRoutes,
   ...walletRoutes,
   ...walletInfoRoutes,
   ...economyRoutes,

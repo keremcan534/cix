@@ -369,14 +369,14 @@ const subscribeRooms = (l: () => void) => {
   roomListeners.add(l);
   return () => roomListeners.delete(l);
 };
-/** The open server rooms, re-read every 15 seconds while the screen is in front (once more when it comes back). */
+/** The open server rooms, re-read every 6 seconds while the screen is in front (once more when it comes back). */
 export function useServerRooms(): Room[] {
   const list = useSyncExternalStore(subscribeRooms, () => rooms, () => rooms);
   const focused = useIsFocused();
   useEffect(() => {
     if (!liveMode() || !focused) return;
     reloadServerRooms();
-    const t = setInterval(reloadServerRooms, 15_000);
+    const t = setInterval(reloadServerRooms, 6_000);
     return () => clearInterval(t);
   }, [focused]);
   return list;

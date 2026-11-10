@@ -15,7 +15,7 @@ import { resumePurchases } from '@/lib/live/billing';
 import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { checkRoomInvites } from '@/lib/live/room-social';
-import { onLine, startLiveLine } from '@/lib/live/live-line';
+import { lineOpen, onLine, startLiveLine } from '@/lib/live/live-line';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
 import { refreshSpendLimit } from '@/lib/live/spend-limit';
@@ -24,6 +24,8 @@ import { startPush } from '@/lib/push';
 import { useApp } from '@/store';
 
 const TICK_MS = 15_000;
+/** While the live line is down nothing nudges the reads, so they run this often instead (lib/live/live-line). */
+const LINE_DOWN_TICK_MS = 3_000;
 
 export function LiveSync() {
   const app = useApp();
@@ -117,8 +119,16 @@ export function LiveSync() {
         void run();
       }
     };
+    let lastRun = 0;
+    const timed = () => {
+      // Every 15 s while the line is open (it nudges a run the moment something happens), every 3 s while it isn't.
+      if (Date.now() - lastRun < (lineOpen() ? TICK_MS : LINE_DOWN_TICK_MS) - 500) return;
+      lastRun = Date.now();
+      void run();
+    };
+    lastRun = Date.now();
     void run();
-    const t = setInterval(() => void run(), TICK_MS);
+    const t = setInterval(timed, LINE_DOWN_TICK_MS);
     // The live line (lib/live/live-line): a message, follow, gift, bond, family or team note for me is read now.
     // Calls and an open chat listen for their own events (lib/live/one-on-one, useLiveThread).
     const stopLine = startLiveLine();
