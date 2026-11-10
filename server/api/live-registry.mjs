@@ -98,6 +98,10 @@ const ONE_ON_ONE = {
   dm_price: { field: 'dmPrice', label: 'Mesaj ücreti', default: 240, bounds: price(10_000), unit: ' jeton', help: 'Yayıncıya karşılıklı takip olmadan gönderilen her mesaj. 0: ücretsiz.', text: (a, b) => `Mesaj başı ${a} → ${b} jeton.` },
   call_voice_price: { field: 'callVoice', label: 'Sesli arama (dakika)', default: 2000, bounds: price(100_000), unit: ' jeton', help: 'Yayıncıyla sesli aramanın dakikası.', text: (a, b) => `Sesli arama dakikası ${a} → ${b} jeton. Süren aramalar başladıkları fiyatla devam eder.` },
   call_video_price: { field: 'callVideo', label: 'Görüntülü arama (dakika)', default: 3200, bounds: price(100_000), unit: ' jeton', help: 'Yayıncıyla görüntülü aramanın dakikası.', text: (a, b) => `Görüntülü arama dakikası ${a} → ${b} jeton. Süren aramalar başladıkları fiyatla devam eder.` },
+  call_free: { field: 'callFree', label: 'Ücretsiz arama (24 saatte)', default: 3, bounds: { min: 0, max: 20, step: 1 }, unit: '', help: 'Kimsenin kazanmadığı aramalarda (yayıncı olmayan iki kişi ya da iki yayıncı) arayanın 24 saatte kullanabileceği ücretsiz arama. Her arama 1 hak.', text: (a, b) => `24 saatte ${a} → ${b} ücretsiz arama.` },
+  call_free_seconds: { field: 'callSeconds', label: 'Ücretsiz arama süresi (saniye)', default: 58, bounds: { min: 15, max: 600, step: 1 }, unit: ' saniye', help: 'Ücretsiz bir arama en çok bu kadar sürer.', text: (a, b) => `Ücretsiz arama en çok ${a} → ${b} saniye sürer.` },
+  call_plain_voice_price: { field: 'callPlainVoice', label: 'Sesli arama, hak bitince (dakika)', default: 600, bounds: price(100_000), unit: ' jeton', help: 'Kimsenin kazanmadığı sesli aramada ücretsiz hak bitince dakikası. Arayan öder.', text: (a, b) => `Hak bitince sesli arama dakikası ${a} → ${b} jeton.` },
+  call_plain_video_price: { field: 'callPlainVideo', label: 'Görüntülü arama, hak bitince (dakika)', default: 750, bounds: price(100_000), unit: ' jeton', help: 'Kimsenin kazanmadığı görüntülü aramada ücretsiz hak bitince dakikası. Arayan öder.', text: (a, b) => `Hak bitince görüntülü arama dakikası ${a} → ${b} jeton.` },
   match_voice_price: { field: 'matchVoice', label: 'Sesli eşleşme (dakika)', default: 600, bounds: price(100_000), unit: ' jeton', help: 'Ücretsiz eşleşme hakkı bitince sesli eşleşmenin dakikası.', text: (a, b) => `Sesli eşleşme dakikası ${a} → ${b} jeton.` },
   match_video_price: { field: 'matchVideo', label: 'Görüntülü eşleşme (dakika)', default: 750, bounds: price(100_000), unit: ' jeton', help: 'Ücretsiz eşleşme hakkı bitince görüntülü eşleşmenin dakikası.', text: (a, b) => `Görüntülü eşleşme dakikası ${a} → ${b} jeton.` },
   match_free: { field: 'matchFree', label: 'Ücretsiz eşleşme (24 saatte)', default: 3, bounds: { min: 0, max: 20, step: 1 }, unit: '', help: 'Yayıncı olmayan herkesin 24 saatte kullanabileceği ücretsiz eşleşme.', text: (a, b) => `24 saatte ${a} → ${b} ücretsiz eşleşme.` },
@@ -495,7 +499,8 @@ const readOnlySet = (xs) => {
  * unknown keys are ignored; the first are listed in `invalid`. FEATURES_OFF is always added to the live list,
  * and the live notice and minimum version replace .env's ('' = no notice, null = .env's).
  *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
- *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
+ *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
+ *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {

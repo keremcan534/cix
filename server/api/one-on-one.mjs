@@ -14,9 +14,12 @@
 //
 // Who pays: between a streamer (an approved agency streamer) and anyone else, the other one pays and the streamer
 // earns the same number of diamonds. Messages are free when the two follow each other, calls open at a heart
-// level (heart_voice_level, heart_video_level). Between two streamers, or two people who aren't: messages and
-// calls are free, and calls need a mutual follow. In a match of two people who aren't streamers the man pays and
-// nobody earns. Non-streamers get match_free free matches in 24 hours, each at most match_free_seconds long.
+// level (heart_voice_level, heart_video_level). Between two streamers, or two people who aren't: messages are free
+// and calls need a mutual follow; nobody earns from such a call, and its caller has call_free free calls in 24
+// hours, each at most call_free_seconds long and one right however long it lasts (a call declined or never
+// answered gives its right back). Past them the caller pays its minutes (call_plain_*_price). In a match of two
+// people who aren't streamers the man pays and nobody earns. Non-streamers get match_free free matches in 24
+// hours, each at most match_free_seconds long.
 // Prices are live settings (live-registry.mjs, "Birebir ve eşleşme"); a call keeps the price it started with.
 //
 // A minute is paid when it starts: the first when the call goes live, the next at 60 s, and so on. A payer who
@@ -61,6 +64,26 @@ export async function heartPoints(c, a, b) {
   return Number(r.rows[0].points);
 }
 
+/**
+ * My free calls (calls nobody earns from) left in the last 24 hours, and when the first used one comes back. A
+ * call counts while it rings and once it was answered: a declined, cancelled or missed one gives its right back.
+ */
+export async function callRightsOf(c, me) {
+  const s = live();
+  const r = await c.query(
+    `SELECT count(*)::int AS n, min(created_at) AS oldest FROM calls
+      WHERE caller = $1 AND kind = 'call' AND free AND created_at > now() - interval '24 hours' AND (started_at IS NOT NULL OR status = 'ringing')`,
+    [me],
+  );
+  const used = r.rows[0].n;
+  return {
+    total: s.callFree,
+    left: Math.max(0, s.callFree - used),
+    seconds: s.callSeconds,
+    nextAt: used >= s.callFree && r.rows[0].oldest ? new Date(Date.parse(r.rows[0].oldest) + 24 * 3600_000).toISOString() : null,
+  };
+}
+
 /** The two people as 1v1 sees them: who pays, the message price, the heart level, which calls are open. */
 export async function pairOf(c, me, other) {
   const s = live();
@@ -77,10 +100,15 @@ export async function pairOf(c, me, other) {
   const payer = paid ? (x.me_s ? other : me) : null;
   const points = await heartPoints(c, me, other);
   const level = heartLevel(points);
+  // A call nobody earns from: free while I have rights, then I pay its minutes (iPay: I'd pay for this call).
+  const rights = paid ? null : await callRightsOf(c, me);
   const call = (mode) => {
     const need = mode === 'voice' ? s.heartVoice : s.heartVideo;
-    if (!paid) return { open: mutual, price: 0, why: mutual ? null : 'Arama için karşılıklı takip gerekli' };
-    return { open: level >= need, price: mode === 'voice' ? s.callVoice : s.callVideo, why: level >= need ? null : `${MODE_TEXT[mode]} arama kalp seviyesi ${need} olunca açılır` };
+    if (!paid) {
+      const price = rights.left > 0 ? 0 : mode === 'voice' ? s.callPlainVoice : s.callPlainVideo;
+      return { open: mutual, price, iPay: price > 0, free: rights, why: mutual ? null : 'Arama için karşılıklı takip gerekli' };
+    }
+    return { open: level >= need, price: mode === 'voice' ? s.callVoice : s.callVideo, iPay: payer === me, free: null, why: level >= need ? null : `${MODE_TEXT[mode]} arama kalp seviyesi ${need} olunca açılır` };
   };
   return {
     streamer: x.other_s,
@@ -379,15 +407,21 @@ export const oneOnOneRoutes = {
       if (!gate.open) throw Object.assign(new HttpError(403, gate.why), { extra: { code: 'locked' } });
       if (await openCallOf(c, me.id)) throw new HttpError(409, 'Zaten bir görüşmedesin');
       if (await openCallOf(c, to)) throw Object.assign(new HttpError(409, 'Şu an başka bir görüşmede'), { extra: { code: 'busy' } });
-      if (pair.payer === me.id && gate.price > 0 && (await paidCoins(c, me.id)) < gate.price) throw insufficient();
-      const r = await c.query('INSERT INTO calls (kind, mode, caller, callee, payer, earner, price, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [
+      if (gate.iPay && gate.price > 0 && (await paidCoins(c, me.id)) < gate.price) throw insufficient();
+      // A call nobody earns from: one of my free calls (cut at its time), else I pay its minutes. With a streamer:
+      // the one who isn't pays, the streamer earns.
+      const free = !!gate.free && gate.price === 0;
+      const payer = gate.free ? me.id : gate.price > 0 ? pair.payer : null;
+      const r = await c.query('INSERT INTO calls (kind, mode, caller, callee, payer, earner, price, free, max_seconds, ref) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id', [
         'call',
         mode,
         me.id,
         to,
-        gate.price > 0 ? pair.payer : null,
-        gate.price > 0 ? pair.earner : null,
+        payer,
+        gate.price > 0 && !gate.free ? pair.earner : null,
         gate.price,
+        free,
+        free ? gate.free.seconds : null,
         b.ref,
       ]);
       return r.rows[0].id;

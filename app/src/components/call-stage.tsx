@@ -16,7 +16,7 @@ import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { applyBeautyStrength, BEAUTY_LEVELS, nextBeautyLevel, useBeautyLevel } from '@/lib/beauty';
 import { flipCallCamera, setCallCamera, setCallMic, useCallMedia } from '@/lib/call-media';
-import { liveSeconds, MODE_NAME, otherId, type CallView } from '@/lib/live/one-on-one';
+import { beatNow, liveSeconds, MODE_NAME, otherId, type CallView } from '@/lib/live/one-on-one';
 import { useApp } from '@/store';
 import { colors } from '@/theme';
 
@@ -36,7 +36,7 @@ export function useCallSeconds(call: CallView | null) {
 
 /** What the call costs or earns, in one line. */
 export function priceLine(c: CallView) {
-  if (c.free) return c.maxSeconds ? `Ücretsiz eşleşme · ${c.maxSeconds} saniye` : 'Ücretsiz';
+  if (c.free) return c.maxSeconds ? `Ücretsiz ${c.kind === 'match' ? 'eşleşme' : 'arama'} · ${c.maxSeconds} saniye` : 'Ücretsiz';
   if (c.iPay && c.price > 0) return `${c.price.toLocaleString('tr-TR')} jeton / dakika`;
   if (c.iEarn && c.price > 0) return 'Her dakika için elmas kazanırsın';
   return 'Ücretsiz';
@@ -84,6 +84,11 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
   const video = call.mode === 'video';
   const safety = useSafetyMenu(peer, call.other.name, onEnd);
   const left = call.free && call.maxSeconds ? Math.max(0, call.maxSeconds - seconds) : null;
+  // A free call's time ran out here: ask the server now, so the call ends on time rather than at the next beat.
+  const timeUp = left === 0 && call.status === 'live';
+  useEffect(() => {
+    if (timeUp) beatNow();
+  }, [timeUp]);
   const avatar = call.other.avatarUrl ?? user.avatar;
   // Güzellik filtresi: women's own camera in a video call, at the level they chose (one tap: the next level).
   const me = useApp().me;

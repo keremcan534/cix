@@ -35,7 +35,11 @@ export type CallView = {
   coins: number;
   serverNow: string;
 };
-export type CallGate = { open: boolean; price: number; why: string | null };
+/** My free calls with someone nobody earns from (server one-on-one.mjs callRightsOf): 24 hours, `seconds` each. */
+export type CallRights = { total: number; left: number; seconds: number; nextAt: string | null };
+/** One kind of call to them: open or not and why, its price a minute, whether I'd pay it, my free calls if any.
+ *  `iPay` and `free` are missing from an older server. */
+export type CallGate = { open: boolean; price: number; why: string | null; iPay?: boolean; free?: CallRights | null };
 export type Pair = {
   streamer: boolean;
   meStreamer: boolean;
@@ -142,6 +146,8 @@ export function watchCalls() {
     off();
   };
 }
+/** Asks about the open call now, not at the next beat (a free call's time just ran out on this phone). */
+export const beatNow = () => void tick();
 /** Reads the open call now (a screen that just opened). */
 export async function refreshCall() {
   const r = await api.apiRequest<{ call: CallView | null }>('GET', '/api/calls/current');
@@ -192,7 +198,7 @@ export function endText(c: CallView): string {
   if (c.status === 'missed') return c.incoming ? 'Cevapsız arama' : 'Cevap yok';
   if (c.status === 'declined') return c.incoming ? 'Aramayı reddettin' : `${c.other.name} aramayı reddetti`;
   if (c.status === 'cancelled') return c.incoming ? `${c.other.name} aramayı iptal etti` : 'Arama iptal edildi';
-  if (c.endReason === 'time') return 'Ücretsiz eşleşme süresi doldu';
+  if (c.endReason === 'time') return c.kind === 'match' ? 'Ücretsiz eşleşme süresi doldu' : 'Ücretsiz arama süresi doldu';
   if (c.endReason === 'coins') return c.iPay ? 'Jetonun bittiği için görüşme bitti' : 'Karşı tarafın jetonu bittiği için görüşme bitti';
   if (c.endReason === 'lost') return 'Bağlantı koptuğu için görüşme bitti';
   if (c.endReason === 'deleted') return 'Görüşme sona erdi';

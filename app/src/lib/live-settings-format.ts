@@ -83,6 +83,8 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
     case 'dm_price':
     case 'call_voice_price':
     case 'call_video_price':
+    case 'call_plain_voice_price':
+    case 'call_plain_video_price':
     case 'match_voice_price':
     case 'match_video_price':
       // A price that more than doubles or halves.
@@ -99,6 +101,10 @@ export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'call_video_price', unit: ' jeton' },
   { key: 'heart_voice_level', unit: '' },
   { key: 'heart_video_level', unit: '' },
+  { key: 'call_free', unit: '' },
+  { key: 'call_free_seconds', unit: ' saniye' },
+  { key: 'call_plain_voice_price', unit: ' jeton' },
+  { key: 'call_plain_video_price', unit: ' jeton' },
   { key: 'match_free', unit: '' },
   { key: 'match_free_seconds', unit: ' saniye' },
   { key: 'match_voice_price', unit: ' jeton' },
@@ -168,14 +174,18 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
     case 'dm_price':
     case 'call_voice_price':
     case 'call_video_price':
+    case 'call_plain_voice_price':
+    case 'call_plain_video_price':
     case 'match_voice_price':
     case 'match_video_price':
       return typeof v === 'number' ? (v === 0 ? 'Ücretsiz' : `${fmtNum(v)} jeton`) : String(v);
+    case 'call_free_seconds':
     case 'match_free_seconds':
       return typeof v === 'number' ? `${fmtNum(v)} saniye` : String(v);
     case 'heart_voice_level':
     case 'heart_video_level':
       return typeof v === 'number' ? (v === 0 ? 'Hemen' : `Kalp Lv.${v}`) : String(v);
+    case 'call_free':
     case 'match_free':
       return typeof v === 'number' ? `24 saatte ${v}` : String(v);
     default:
