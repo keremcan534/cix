@@ -128,6 +128,8 @@ export function useRoomLook(o: {
       .catch((e: unknown) => {
         errorHaptic();
         showAlert('Kaydedilemedi', message(e));
+        // What the server refused may have changed since the screen read it (a new price, an ended term).
+        server.loadRoomDecor(o.roomId).then(setDecor, () => {});
       })
       .finally(() => {
         working.current = false;
@@ -150,6 +152,12 @@ export function useRoomLook(o: {
     after?.();
   };
   const id = o.roomId;
+  /** A server room: the coins are checked here first, so a picture isn't uploaded for a purchase that can't go through. */
+  const short = (price: number) => {
+    if (coins >= price) return false;
+    showAlert('Yetersiz jeton', `Bu süsleme ${fmt(price)} jeton. Cüzdan’dan jeton yükleyebilirsin.`);
+    return true;
+  };
   const ctl: Ctl = {
     view,
     error,
@@ -168,7 +176,7 @@ export function useRoomLook(o: {
     pickOwned: (pick) => (o.real ? act('Oda süslemesini değiştirdi', () => server.pickOwnedBackground(id, pick)) : demo('Oda süslemesini değiştirdi', '', demoPick(myRoom.decor, pick, Date.now()))),
     buy: (sku, price) =>
       o.real
-        ? act('Ücretli oda süslemesi aldı', () => server.buyBackground(id, sku, price))
+        ? !short(price) && act('Ücretli oda süslemesi aldı', () => server.buyBackground(id, sku, price))
         : demo('Ücretli oda süslemesi aldı', `Oda süslemesi: ${backgroundName({ kind: 'paid', id: sku, url: null, until: null })}`, demoBuy(myRoom.decor, sku, Date.now())),
     choose: async (size) => {
       try {
@@ -180,7 +188,8 @@ export function useRoomLook(o: {
     },
     useCustom: (img, price, done) =>
       o.real
-        ? act('Özel oda süslemesi yükledi', async () => (await server.setCustomBackground(id, img, price)).decor, done)
+        ? // Inside a paid term the picture is only replaced: nothing to pay.
+          !(daysLeft(view?.custom.until, Date.now()) === 0 && short(price)) && act('Özel oda süslemesi yükledi', async () => (await server.setCustomBackground(id, img, price)).decor, done)
         : demo('Özel oda süslemesi yükledi', `Oda süslemesi: özel görsel (${ROOM_BG_CUSTOM.days} gün)`, demoSetCustom(myRoom.decor, img.uri, Date.now()), done),
     removeCustom: () => (o.real ? act('Özel oda süslemesini kaldırdı', () => server.removeCustomBackground(id)) : demo('Özel oda süslemesini kaldırdı', '', demoRemoveCustom(myRoom.decor))),
     setCover: (img) => {
