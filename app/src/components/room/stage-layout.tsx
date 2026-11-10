@@ -1,7 +1,8 @@
 // Draws a room's mic layout from its schema (data/room-layouts). Seats themselves are the room's normal Seat
 // (gifts, menus, reactions, PK points keep working): this only decides where each numbered mic goes and how big
-// it is. Everything is in normal flow (no absolute positioning), so the stage never overlaps the chat: on a small
-// phone it wraps and the room's stage area scrolls.
+// it is. The sizes come from lib/seat-fit, which the room also uses to fit the stage to the height the chat
+// leaves it (`face`), so what is measured there is what is drawn here. Everything is in normal flow (no absolute
+// positioning), so the stage never overlaps the chat.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -10,6 +11,7 @@ import { Text } from '@/components/text';
 import type { LayoutSlot, RoomLayout } from '@/data/room-layouts';
 import { Art } from '@/components/Art';
 import type { ArenaSlot } from '@/components/room/pk';
+import { layoutPlan, layoutSizes, videoTile as videoSize } from '@/lib/seat-fit';
 import { colors, radius, semantic, space } from '@/theme';
 
 const PAD = 12;
@@ -19,6 +21,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 export function StageLayout({
   layout,
   width,
+  face,
   seats,
   pkRoom,
   cameraOf,
@@ -26,6 +29,8 @@ export function StageLayout({
 }: {
   layout: RoomLayout;
   width: number;
+  /** The mic face that fits the stage's height (lib/seat-fit fitLayout); the host and main seats follow it. */
+  face: number;
   seats: (string | null)[];
   /** PK room theme: each team row sits in a labeled red/blue band. Outside PK rooms team rows are plain rows. */
   pkRoom: boolean;
@@ -35,20 +40,15 @@ export function StageLayout({
   renderSeat: (index: number, slot: ArenaSlot, next?: { index: number; gap: number }) => ReactNode;
 }) {
   const s = layout.layoutSchema;
-  const inner = Math.max(240, Math.min(width, 640) - PAD * 2);
   const stage = s.slots.filter((x) => x.area === 'stage');
   const side = s.slots.filter((x) => x.area === 'side');
-  const micCols = Math.max(4, ...[...Array(s.rows).keys()].map((r) => stage.filter((x) => x.row === r && x.kind === 'mic').length));
-  // Team rows are drawn as rows, the way the "Sahne Düzeni" card shows them; in PK rooms each sits in a
-  // tinted band (padding 5 + 5, border 1 + 1).
-  const bands = pkRoom && stage.some((x) => x.team);
-  const rowW = inner - (bands ? 12 : 0);
-  // The widest mic row must fit on one line together with the gaps between its seats, or its last seat wraps
-  // onto a line of its own (5 mics on a 412 px phone were 4 + 1; 7 team mics on a 360 px phone were 6 + 1).
-  // Six across get a narrower gap.
-  const micGap = micCols >= 6 ? space.xs : space.sm;
-  const micW = Math.floor(clamp((rowW - (micCols - 1) * micGap) / micCols, 40, 84));
-  const micSlot: ArenaSlot = { width: micW, size: clamp(micW - 28, 30, 48) };
+  // Team rows are drawn as rows, the way the "Sahne Düzeni" card shows them; in PK rooms each sits in a tinted
+  // band (padding 5 + 5, border 1 + 1). The widest mic row fits on one line with the gaps between its seats (or its
+  // last seat would wrap onto a line of its own); six across get a narrower gap.
+  const plan = layoutPlan(s, width, pkRoom);
+  const { inner, bands, micGap } = plan;
+  const sizes = layoutSizes(plan, face);
+  const micSlot: ArenaSlot = sizes.mic;
   const paired = new Set(s.pairs.flat());
 
   const videoTile = (x: LayoutSlot, w: number, h: number) => {
@@ -63,7 +63,7 @@ export function StageLayout({
       </View>
     );
   };
-  const mainSeat = (x: LayoutSlot) => renderSeat(x.index, { width: clamp(inner / 3, 84, 120), size: clamp(inner / 5, 50, 66) });
+  const mainSeat = (x: LayoutSlot) => renderSeat(x.index, sizes.main);
   const heart = (a: number, b: number) => {
     const both = !!seats[a] && !!seats[b];
     return (
@@ -76,8 +76,7 @@ export function StageLayout({
     const xs = stage.filter((x) => x.row === r);
     const videos = xs.filter((x) => x.kind === 'video');
     if (videos.length === xs.length) {
-      const w = Math.floor(clamp((inner - (xs.length - 1) * space.sm) / xs.length, 96, xs.length === 1 ? inner * 0.72 : 220));
-      const h = Math.round(clamp(w * 0.72, 96, 170));
+      const { w, h } = videoSize(plan, xs.length);
       return (
         <View key={r} style={st.row}>
           {xs.map((x) => videoTile(x, w, h))}
@@ -91,7 +90,7 @@ export function StageLayout({
           const linked = paired.has(x.index) && next && s.pairs.some(([a, b]) => a === x.index && b === next.index);
           const beside = x.kind === 'mic' && next?.kind === 'mic' && !x.host && !next.host ? { index: next.index, gap: micGap } : undefined;
           return [
-            <View key={x.index}>{x.kind === 'main' ? mainSeat(x) : renderSeat(x.index, x.host && xs.length === 1 ? { width: Math.max(micW, 96), size: 56 } : micSlot, beside)}</View>,
+            <View key={x.index}>{x.kind === 'main' ? mainSeat(x) : renderSeat(x.index, x.host && xs.length === 1 ? sizes.host : micSlot, beside)}</View>,
             linked ? heart(x.index, next.index) : null,
           ];
         })}

@@ -183,13 +183,16 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
           ))}
         </View>
       ) : pack ? (
-        <View style={[styles.grid, locked && { opacity: 0.4 }]}>
-          {pack.stickers.map((x) => (
-            <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.stickerCell} accessibilityLabel={`${x.name} çıkartması${locked ? ', kilitli' : ''}`}>
-              <StickerArt id={x.id} size={40} />
-            </Pressable>
-          ))}
-        </View>
+        // A long pack (Duygular has 32) scrolls inside the panel, so the panel doesn't push the room's mics away.
+        <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
+          <View style={[styles.grid, locked && { opacity: 0.4 }]}>
+            {pack.stickers.map((x) => (
+              <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.stickerCell} accessibilityLabel={`${x.name} çıkartması${locked ? ', kilitli' : ''}`}>
+                <StickerArt id={x.id} size={40} />
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
       ) : null}
       {locked && pack && (
         <Pressable
@@ -225,6 +228,8 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   stickerCell: { width: '20%', alignItems: 'center', paddingVertical: 6 },
   emoji: { fontSize: 26, lineHeight: 34 },
   emojiScroll: { maxHeight: 200 },
+  // Four rows and a part of the fifth, so it shows there is more.
+  stickerScroll: { maxHeight: 236 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.cardAlt, borderColor: colors.cardAlt },
   chipText: { color: colors.text, fontSize: 11, fontWeight: '700' },

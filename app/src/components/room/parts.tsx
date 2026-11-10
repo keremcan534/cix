@@ -21,6 +21,7 @@ import { Photo } from '@/components/photo';
 import { SimilarityRing } from '@/components/similarity';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
+import { nameLine, nameSize } from '@/lib/seat-fit';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -30,7 +31,6 @@ export function Seat({
   index,
   userId,
   host,
-  small,
   vipLevel,
   frameId,
   speaking,
@@ -56,7 +56,6 @@ export function Seat({
   index: number;
   userId: string | null;
   host: boolean;
-  small: boolean;
   vipLevel: number;
   frameId?: string;
   speaking: boolean;
@@ -105,7 +104,11 @@ export function Seat({
   }, [speaking, pulse]);
 
   const user = userId ? userById(userId) : null;
-  const size = avatarSize ?? (host ? 60 : small ? 42 : 48);
+  const size = avatarSize ?? (host ? 60 : 48);
+  // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
+  // sizes the stage by the same numbers) and may be as wide as the seat's slot.
+  const small = size < 46;
+  const name = { fontSize: nameSize(size), lineHeight: nameLine(size), maxWidth: slotWidth ? slotWidth - 6 : 64 };
   const muteText = modMuted ? ', yönetim tarafından susturuldu' : muted ? ', mikrofonu kapalı' : '';
   const label = user
     ? `${index + 1}. mikrofon, ${user.name}${similarity !== undefined ? `, sana yüzde ${similarity} benzer` : ''}${muteText}${pkPoints !== undefined ? `, ${pkPoints} PK puanı` : ''}`
@@ -133,7 +136,7 @@ export function Seat({
             colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)']}
             style={[styles.emptySeat, { width: size, height: size, borderRadius: size / 2 }, invitee && !locked ? styles.invitedSeat : null]}
           >
-            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : small ? 15 : 17} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
+            <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : Math.round(Math.max(15, Math.min(28, size * 0.32)))} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
           </LinearGradient>
         )}
         {user && similarity !== undefined && !teamColor && !mini && <SimilarityRing score={similarity} size={size} />}
@@ -161,7 +164,7 @@ export function Seat({
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
           {host && <Icon3D name="crown" size={14} />}
-          <Text style={[styles.seatName, small && { fontSize: 12 }, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
+          <Text style={[styles.seatName, name, !user && { color: colors.textDim, fontWeight: '500' }]} numberOfLines={1}>
             {user ? user.name : invitee && !locked ? 'Davet' : `${index + 1}`}
           </Text>
           {user?.verified && !small && <VerifiedBadge size={11} />}

@@ -15,7 +15,6 @@ import { showAlert } from '@/lib/alert';
 import { message } from '@/lib/live';
 import {
   LIBRARY_MAX,
-  QUEUE_MAX,
   mmss,
   myMusic,
   playingNow,
@@ -179,21 +178,15 @@ export function LiveMusicSheet({ visible, onClose, room, music, np, canPlay, ena
 
   const tracks = music?.tracks ?? [];
   const upNext = np ? tracks.slice(np.index + 1) : [];
-  const queued = np ? tracks.length - np.index : 0;
 
   const act = (body: MusicAction, done?: string) => {
     if (busy) return;
-    setBusy(body.action === 'add' ? `add:${body.track}` : body.action);
+    setBusy(body.action === 'add' || body.action === 'play' ? `play:${body.track}` : body.action);
     roomMusicAction(room, body)
       .then(() => done && onDone?.(done))
       .catch((e) => showAlert('Müzik değişmedi', message(e)))
       .finally(() => setBusy(null));
   };
-  const confirmClear = () =>
-    showAlert('Sıra temizlensin mi?', 'Çalan parça durur ve sıradaki tüm parçalar çıkar.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Temizle', style: 'destructive', onPress: () => act({ action: 'clear' }, 'Müzik sırası temizlendi') },
-    ]);
   const confirmDelete = (t: LibraryTrack) =>
     showAlert('Parça silinsin mi?', `"${t.title}" kütüphanenden ve çalındığı odaların sırasından çıkar.`, [
       { text: 'Vazgeç', style: 'cancel' },
@@ -285,33 +278,15 @@ export function LiveMusicSheet({ visible, onClose, room, music, np, canPlay, ena
                       <Text style={s.time}>{mmss(np.track.seconds)}</Text>
                     </View>
                     {may && (
+                      // Durdur (pause, and Devam to go on) and Kapat (the music stops for everyone, the bar goes).
                       <View style={s.controls}>
-                        <Pressable
-                          style={s.ctrl}
-                          onPress={confirmClear}
-                          disabled={!!busy}
-                          accessibilityRole="button"
-                          accessibilityLabel="Sırayı temizle"
-                        >
-                          <Ionicons name="stop" size={18} color="#fff" />
+                        <Pressable style={[s.ctrlWide, s.ctrlMain]} onPress={() => act({ action: np.paused ? 'resume' : 'pause' })} disabled={!!busy} accessibilityRole="button">
+                          {busy === 'pause' || busy === 'resume' ? <ActivityIndicator color="#05262A" /> : <Ionicons name={np.paused ? 'play' : 'pause'} size={20} color="#05262A" />}
+                          <Text style={s.ctrlTextMain}>{np.paused ? 'Devam' : 'Durdur'}</Text>
                         </Pressable>
-                        <Pressable
-                          style={[s.ctrl, s.ctrlMain]}
-                          onPress={() => act({ action: np.paused ? 'resume' : 'pause' })}
-                          disabled={!!busy}
-                          accessibilityRole="button"
-                          accessibilityLabel={np.paused ? 'Devam ettir' : 'Duraklat'}
-                        >
-                          {busy === 'pause' || busy === 'resume' ? <ActivityIndicator color="#05262A" /> : <Ionicons name={np.paused ? 'play' : 'pause'} size={26} color="#05262A" />}
-                        </Pressable>
-                        <Pressable
-                          style={s.ctrl}
-                          onPress={() => act({ action: 'skip' })}
-                          disabled={!!busy}
-                          accessibilityRole="button"
-                          accessibilityLabel="Sonraki parça"
-                        >
-                          <Ionicons name="play-skip-forward" size={18} color="#fff" />
+                        <Pressable style={s.ctrlWide} onPress={() => act({ action: 'clear' }, 'Müzik kapatıldı')} disabled={!!busy} accessibilityRole="button">
+                          {busy === 'clear' ? <ActivityIndicator color="#fff" /> : <Ionicons name="close" size={20} color="#fff" />}
+                          <Text style={s.ctrlText}>Kapat</Text>
                         </Pressable>
                       </View>
                     )}
@@ -320,7 +295,7 @@ export function LiveMusicSheet({ visible, onClose, room, music, np, canPlay, ena
                   <View style={s.empty}>
                     <Ionicons name="musical-notes-outline" size={30} color={colors.textDim} />
                     <Text style={s.emptyTitle}>Şu an çalan parça yok</Text>
-                    <Text style={s.emptyText}>{may ? 'Kütüphanem’den sıraya parça ekle; odadaki herkes duyar.' : 'Odada müziği oda sahibi, yöneticiler ve DJ’ler çalar.'}</Text>
+                    <Text style={s.emptyText}>{may ? 'Kütüphanem’den bir parçaya “Çal” de; odadaki herkes duyar.' : 'Odada müziği oda sahibi, yöneticiler ve DJ’ler çalar.'}</Text>
                     {may && (
                       <Pressable style={s.pill} onPress={() => setTab('library')} accessibilityRole="button">
                         <Text style={s.pillText}>Kütüphanem</Text>
@@ -389,24 +364,26 @@ export function LiveMusicSheet({ visible, onClose, room, music, np, canPlay, ena
               {lib === null && <ActivityIndicator color={ACCENT} style={{ marginVertical: 16 }} />}
               {lib?.length === 0 && <Text style={s.emptyText}>Henüz parça yok. Telefonundaki müzik dosyalarından seç; kütüphanene eklenir.</Text>}
               {lib?.map((t) => {
-                const adding = busy === `add:${t.id}`;
+                const starting = busy === `play:${t.id}`;
+                // The one playing now (the room's first track is this file).
+                const playing = !!np && np.track.url === t.url;
                 return (
                   <View key={t.id} style={s.row}>
-                    <Ionicons name="musical-note" size={18} color={ACCENT} />
+                    <Ionicons name={playing ? 'volume-high' : 'musical-note'} size={18} color={ACCENT} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.rowTitle} numberOfLines={1}>
                         {t.title}
                       </Text>
-                      <Text style={s.rowSub}>{mmss(t.seconds)}</Text>
+                      <Text style={s.rowSub}>{playing ? (np.paused ? 'Durduruldu' : 'Çalıyor') : mmss(t.seconds)}</Text>
                     </View>
                     <Pressable
-                      style={[s.pill, queued >= QUEUE_MAX && { opacity: 0.4 }]}
-                      disabled={!!busy || queued >= QUEUE_MAX}
-                      onPress={() => act({ action: 'add', track: t.id }, `🎵 ${t.title} sıraya eklendi`)}
+                      style={[s.pill, playing && s.pillOff]}
+                      disabled={!!busy || playing}
+                      onPress={() => act({ action: 'play', track: t.id }, `🎵 ${t.title} çalıyor`)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${t.title} sıraya eklensin`}
+                      accessibilityLabel={playing ? `${t.title} çalıyor` : `${t.title} çalsın`}
                     >
-                      {adding ? <ActivityIndicator size="small" color="#05262A" /> : <Text style={s.pillText}>Sıraya ekle</Text>}
+                      {starting ? <ActivityIndicator size="small" color="#05262A" /> : <Text style={[s.pillText, playing && s.pillTextOff]}>{playing ? 'Çalıyor' : 'Çal'}</Text>}
                     </Pressable>
                     <Pressable onPress={() => confirmDelete(t)} hitSlop={8} accessibilityLabel={`${t.title} silinsin`}>
                       <Ionicons name="trash-outline" size={18} color={colors.textDim} />
@@ -415,7 +392,7 @@ export function LiveMusicSheet({ visible, onClose, room, music, np, canPlay, ena
                 );
               })}
               <Text style={s.note}>
-                Eklediğin parçaları odadaki herkes duyar: yalnızca çalma hakkın olan müzikleri ekle. Parça başına en fazla 20 MB ve 20 dakika; sırada en fazla {QUEUE_MAX} parça.
+                Telefondan eklediğin parçalar kütüphanende durur; “Çal” dediğin parçayı odadaki herkes duyar. Yalnızca çalma hakkın olan müzikleri ekle. Parça başına en fazla 20 MB ve 20 dakika.
               </Text>
             </>
           )}
@@ -444,9 +421,11 @@ const s = StyleSheet.create({
   barFill: { height: 4, borderRadius: 2, backgroundColor: ACCENT },
   times: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   time: { color: colors.textDim, fontSize: 11, fontVariant: ['tabular-nums'] },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22, marginTop: 10 },
-  ctrl: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
-  ctrlMain: { width: 60, height: 60, borderRadius: 30, backgroundColor: ACCENT, boxShadow: '0 6px 18px rgba(19,217,223,0.35)' },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  ctrlMain: { backgroundColor: ACCENT, boxShadow: '0 6px 18px rgba(19,217,223,0.35)' },
+  ctrlWide: { flex: 1, height: 48, borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.1)' },
+  ctrlText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  ctrlTextMain: { color: '#05262A', fontSize: 15, fontWeight: '800' },
   empty: { alignItems: 'center', gap: 6, paddingVertical: 8 },
   emptyTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
   emptyText: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 17 },
@@ -457,6 +436,8 @@ const s = StyleSheet.create({
   rowSub: { color: colors.textDim, fontSize: 11, marginTop: 1 },
   pill: { minWidth: 92, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: ACCENT },
   pillText: { color: '#05262A', fontSize: 12, fontWeight: '800' },
+  pillOff: { backgroundColor: 'rgba(19,217,223,0.16)' },
+  pillTextOff: { color: ACCENT },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   switchText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
   chips: { flexDirection: 'row', gap: 8 },

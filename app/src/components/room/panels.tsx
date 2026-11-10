@@ -95,7 +95,8 @@ export function PasswordGate({ title, password, onPass }: { title: string; passw
 // --- Music -------------------------------------------------------------------
 export type MusicState = { queue: Track[]; playing: boolean; position: number };
 
-export function MusicBar({ music, canControl, onOpen, onToggle, onNext }: { music: MusicState; canControl: boolean; onOpen: () => void; onToggle: () => void; onNext: () => void }) {
+/** What plays in the room. The staff and DJs pause it (Durdur) or stop it for everyone (Kapat: the bar goes). */
+export function MusicBar({ music, canControl, onOpen, onToggle, onClose }: { music: MusicState; canControl: boolean; onOpen: () => void; onToggle: () => void; onClose: () => void }) {
   const track = music.queue[0];
   if (!track) return null;
   return (
@@ -115,11 +116,11 @@ export function MusicBar({ music, canControl, onOpen, onToggle, onNext }: { musi
       </Text>
       {canControl && (
         <>
-          <Pressable onPress={onToggle} hitSlop={8} accessibilityLabel="Oynat/duraklat">
+          <Pressable onPress={onToggle} hitSlop={8} accessibilityLabel={music.playing ? 'Müziği durdur' : 'Müziğe devam et'}>
             <Ionicons name={music.playing ? 'pause' : 'play'} size={18} color="#fff" />
           </Pressable>
-          <Pressable onPress={onNext} hitSlop={8} accessibilityLabel="Sonraki parça">
-            <Ionicons name="play-skip-forward" size={18} color="#fff" />
+          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Müziği kapat">
+            <Ionicons name="close" size={20} color="#fff" />
           </Pressable>
         </>
       )}
