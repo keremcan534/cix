@@ -23,6 +23,7 @@ import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 import { listsHidden, shownToViewer } from './privacy.mjs';
 import { cardsMore, privateMore, profileMore } from './profiles.mjs';
+import { cityDistance } from './city-coords.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -257,6 +258,9 @@ export const socialRoutes = {
         following: Number(x.following),
         isFollowing: x.is_following,
         blockedByMe: x.blocked_by_me,
+        // How far they are from me by our two cities (city-coords.mjs): none for me, for a city either of us didn't
+        // give or that isn't in the table, and for a private profile (its city is hidden above).
+        distance: id === me.id ? null : cityDistance(me.city, shown.city),
         // A private profile keeps its personal extras and album from people it doesn't follow, like age and city.
         ...(shown.private ? privateMore(more) : more),
       },
@@ -347,6 +351,8 @@ export const socialRoutes = {
     // "Profilim herkese açık" (no country either) and "Çevrimiçi durumumu göster" (privacy.mjs).
     const more = await cardsMore(r.rows.map((u) => u.id));
     const users = await shownToViewer(db, me.id, r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh, ...more[u.id] })));
+    // How far each one is from me by our two cities (city-coords.mjs); none where a city is unknown or hidden.
+    for (const u of users) u.distance = cityDistance(me.city, u.city);
     return { users: users.map((u) => (u.private ? { ...u, country: null } : u)) };
   },
 

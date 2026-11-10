@@ -27,6 +27,7 @@ import { assertMay } from './sanctions.mjs';
 import { SPAM_MESSAGES, checkSpam } from './spam-filter.mjs';
 import { charmPoints } from './wallet.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
+import { distancesFrom } from './distances.mjs';
 
 const PAGE = 50;
 /** The topics the app offers (app/src/data/social-ui.ts MOMENT_TOPICS). */
@@ -78,11 +79,13 @@ const writer = (x, looks) => ({
   frame: looks?.frame ?? null,
 });
 
-async function withWriters(rows) {
+/** Posts as `me` reads them; each writer with how far they are from me by our two cities (distances.mjs). */
+async function withWriters(rows, me) {
   const looks = await looksOf([...new Set(rows.map((x) => x.author))]);
+  const far = await distancesFrom(me, rows.map((x) => x.author));
   return rows.map((x) => ({
     id: String(x.id),
-    author: writer(x, looks[x.author]),
+    author: { ...writer(x, looks[x.author]), distance: far.get(x.author) ?? null },
     text: x.body,
     imageUrl: x.image_url ?? null,
     topic: x.topic ?? null,
@@ -152,7 +155,7 @@ export const momentRoutes = {
       order = 'p.likes + 2 * p.comments DESC, p.id DESC';
     } else if (Number.isSafeInteger(before) && before > 0) where.push(`m.id < $${args.push(before)}`);
     const r = await db.query(`SELECT * FROM (${POST}${where.map((w) => ` AND ${w}`).join('')}) p ORDER BY ${order} LIMIT ${PAGE}`, args);
-    return { moments: await withWriters(r.rows), posting: await posting(me) };
+    return { moments: await withWriters(r.rows, me), posting: await posting(me) };
   },
 
   async 'POST /api/moments'(req) {
@@ -175,7 +178,7 @@ export const momentRoutes = {
     const id = r.rowCount ? r.rows[0].id : (await db.query('SELECT id FROM moments WHERE author = $1 AND ref = $2', [me.id, b.ref])).rows[0].id;
     const row = await db.query(`${POST} AND m.id = $2`, [me.id, id]);
     if (!row.rowCount) throw new HttpError(404, 'Bu an artık yok');
-    return { moment: (await withWriters(row.rows))[0], replay: !r.rowCount };
+    return { moment: (await withWriters(row.rows, me))[0], replay: !r.rowCount };
   },
 
   async 'POST /api/moments/delete'(req) {

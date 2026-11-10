@@ -12,6 +12,7 @@ import { useSyncExternalStore } from 'react';
 import * as api from '@/lib/api';
 import { putServerUser, type User } from '@/data/mock';
 import { putLevels } from '@/lib/live/levels';
+import { putDistance } from '@/lib/live/distances';
 import { extrasPatch, showcaseView, type ExtrasDraft, type ShowcaseView } from '@/lib/profile-more';
 
 // Someone's agency and family as their profile last answered, by server id (the profile pills and sections).
@@ -67,6 +68,8 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
   const p = await api.userProfile(serverId, visit && !mine);
   putTies(serverId, p);
   putLevels(serverId, p.levels);
+  // "Ankara · 350 km" after their city (lib/live/distances).
+  putDistance(serverId, p.distance);
   if (!mine) {
     putServerUser({
       id: p.id,

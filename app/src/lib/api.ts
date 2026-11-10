@@ -494,7 +494,10 @@ export const liveRooms = () => call<{ rooms: { room: string; listeners: number }
 export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null };
 /** `genderHidden`: I chose "Gizli" (others don't get my gender; I still do). */
 export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidden?: boolean };
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore>;
+/** How far someone is from me by our two profile cities (server/api/city-coords.mjs), rounded: never a location.
+ *  Null when either city is unknown or their profile is private to me; an older server sends none. */
+export type CityDistance = { km: number; sameCity: boolean };
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -566,8 +569,8 @@ export type ServerVisitor = { id: string; name: string; avatarUrl: string | null
 /** Profil ziyaretçileri: how many came (everyone), and who (`visitors`, VIP only: null without it). */
 export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null }>('GET', '/api/me/visitors');
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
-/** Keşfet: real people, most recently active first (no distance on the server: city only). */
-export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean; levels?: Levels; country?: string | null };
+/** Keşfet: real people, most recently active first, with how far each is from me by city (no location). */
+export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean; levels?: Levels; country?: string | null; distance?: CityDistance | null };
 /** Keşfet's lists (server/api/social.mjs): most recently active, newest accounts, or who 1v1 lifts. */
 export type DiscoverList = 'home' | 'new' | 'featured';
 export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverUser[] }>('GET', `/api/discover${list === 'home' ? '' : `?list=${list}`}`).then((r) => r.users);

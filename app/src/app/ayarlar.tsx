@@ -287,10 +287,11 @@ export default function SettingsScreen() {
 
         {live && (
           <>
-            {/* Only this phone's Keşfet › Yakındaki list: it shows people whose profile city is mine. Nothing is
-                sent to the server, so it does not promise who can find me. */}
+            {/* Only what this phone shows: Keşfet › Yakındaki (people whose profile city is mine) and how far people are
+                by our two cities (lib/live/distances). Nothing is sent to the server, so it does not promise who can
+                find me. */}
             <ListGroup label="Keşfet">
-              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Keşfet'teki Yakındaki sekmesi, profilindeki şehre göre listelenir. Kesin konumun kullanılmaz." />
+              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Keşfet'teki Yakındaki sekmesi ve kişilerin sana uzaklığı, profilindeki şehre göre gösterilir. Kesin konumun kullanılmaz." />
             </ListGroup>
           </>
         )}

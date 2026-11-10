@@ -33,6 +33,7 @@ import { contactRefusal } from '@/lib/contact-filter';
 import { liveGift, liveMode, message, toLocal } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import * as live from '@/lib/live/moments';
+import { cityDistanceText } from '@/lib/live/distances';
 import type { PickedImage } from '@/lib/live/profile';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
@@ -192,7 +193,7 @@ function charmGate(p: live.Posting) {
 // The server's Anlar. A post or comment shows once the server has taken it (and stays in the composer if it
 // didn't); a like shows at once and goes back if the server refuses it.
 function LiveMoments() {
-  const { bump, blocked, me, toggleBlock } = useApp();
+  const { bump, blocked, me, settings, toggleBlock } = useApp();
   const [tab, setTab] = useState<Tab>('Önerilen');
   const [topic, setTopic] = useState<string | null>(null);
   const [items, setItems] = useState<live.LiveMoment[] | null>(null);
@@ -498,7 +499,8 @@ function LiveMoments() {
               isMe={isMe}
               svip={item.author.vipLevel}
               frameId={item.author.frame ?? undefined}
-              showDistance={false}
+              showDistance={settings.cityDiscovery}
+              distanceText={cityDistanceText(item.author.distance)}
               liked={item.liked}
               likeCount={item.likes}
               timeLabel={live.agoText(item.createdAt)}
@@ -684,6 +686,7 @@ function MomentCard({
   svip,
   frameId,
   showDistance,
+  distanceText,
   liked,
   likeCount,
   timeLabel,
@@ -702,6 +705,8 @@ function MomentCard({
   svip: number;
   frameId?: string;
   showDistance: boolean;
+  /** A live build's distance by city ("Aynı şehir", "350 km"; null: none to show); the demo's sample one without it. */
+  distanceText?: string | null;
   liked: boolean;
   likeCount: number;
   timeLabel: string;
@@ -720,7 +725,7 @@ function MomentCard({
   const styles = useStyles();
   const female = author.gender === 'Kadın';
   const nameColor = NAME_COLORS[author.id] ? (dark ? NAME_COLORS[author.id] : (LIGHT_NAME_COLOR[NAME_COLORS[author.id]] ?? NAME_COLORS[author.id])) : null;
-  const meta = [timeLabel, !isMe && showDistance ? distanceLabel(author.distanceKm) : null].filter(Boolean).join('  |  ');
+  const meta = [timeLabel, !isMe && showDistance ? (distanceText !== undefined ? distanceText : distanceLabel(author.distanceKm)) : null].filter(Boolean).join('  |  ');
   const openProfile = () => (isMe ? router.push('/(tabs)/profil') : router.push(`/kullanici/${author.id}`));
 
   return (

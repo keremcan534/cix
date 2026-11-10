@@ -39,6 +39,7 @@ import { loadFollowList, type FollowSide } from '@/lib/live/follows';
 import { agoText, feed as momentFeed } from '@/lib/live/moments';
 import { addAlbumPhoto, followOnServer, loadMe, loadPublicProfile, loadShowcase, profilePatch, removeAlbumPhoto, saveMyExtras, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
 import { lookOf, useLooks } from '@/lib/live/looks';
+import { cityDistanceText, distanceOf } from '@/lib/live/distances';
 import { MEDAL_HOWTO, TITLE_HOWTO, draftFromExtras, extrasFromServer, noteExtrasRefusal, showcaseView, validateExtras, type ExtrasDraft, type ShowcaseView } from '@/lib/profile-more';
 import { ProfileExtrasForm } from '@/components/profile-extras-form';
 import { PostSkeleton, Skeletons } from '@/components/fx/skeleton';
@@ -176,6 +177,8 @@ export default function UserProfile() {
   // Live mode: the country they chose (none until read or when not given).
   const countryCode = live ? (counts?.extras?.country ?? null) : (user.country ?? 'TR');
   const country = countryCode ? COUNTRIES.find((c) => c.code === countryCode) : undefined;
+  // Live mode: how far they are from me by our two cities, as the server sent it (none when unknown or private).
+  const distanceText = live && serverId && !isMe ? cityDistanceText(distanceOf(serverId)) : null;
   // Live mode: the server's counts (null = not read yet, shown as "—"). Friends: people who follow each other.
   const followers = live ? (counts?.followers ?? null) : (user.age * 37) % 900;
   const followingCount = live ? (counts?.following ?? null) : isMe ? following.size : (user.age * 13) % 200;
@@ -579,8 +582,8 @@ export default function UserProfile() {
                     <Ionicons name="location-outline" size={14} color={colors.textDim} />
                     <Text style={styles.meta}>
                       {user.city}
-                      {/* The server knows cities, not distances. */}
-                      {!isMe && !live && settings.cityDiscovery && ` · ${user.distanceKm} km`}
+                      {/* Live: the server's distance by city ("Aynı şehir", "350 km"); the demo's sample one. */}
+                      {!isMe && settings.cityDiscovery && (live ? (distanceText ? ` · ${distanceText}` : null) : ` · ${user.distanceKm} km`)}
                     </Text>
                   </>
                 )}

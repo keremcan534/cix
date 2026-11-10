@@ -1,12 +1,14 @@
 // Live mode (lib/live): Anlar on the server (server/api/moments.mjs). Posts, likes and comments are the server's;
 // the screen (app/(tabs)/anlar) shows what it answers and never keeps a post the server refused.
-// Ids here are server ids. Only lib/api, lib/live/profile (photo upload) and data/mock are used, so the unit tests can run this under Node.
+// Ids here are server ids. Only lib/api, lib/live/profile (photo upload), lib/live/distances and data/mock are used, so the unit tests can run this under Node.
 import * as api from '@/lib/api';
 import { putServerUser } from '@/data/mock';
+import { putDistance } from '@/lib/live/distances';
 
 import { uploadPhoto, type PickedImage } from '@/lib/live/profile';
 
-export type MomentAuthor = { id: string; name: string; avatarUrl: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; vipLevel: number; frame: string | null };
+/** `distance`: how far the writer is from me by our two cities (posts only; null when unknown or private). */
+export type MomentAuthor = { id: string; name: string; avatarUrl: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; vipLevel: number; frame: string | null; distance?: api.CityDistance | null };
 export type LiveMoment = {
   id: string;
   author: MomentAuthor;
@@ -27,6 +29,7 @@ export type FeedTab = 'popular' | 'recent' | 'friends';
 /** What this phone knows about a writer, so their profile and chat open with their name and photo. */
 function know(a: MomentAuthor) {
   putServerUser({ id: a.id, name: a.name, ...(a.avatarUrl && { avatar: a.avatarUrl }), ...(a.gender && { gender: a.gender }), ...(typeof a.age === 'number' && { age: a.age }) });
+  putDistance(a.id, a.distance);
 }
 
 type FeedQuery = { tab?: FeedTab; topic?: string | null; user?: string; before?: string };

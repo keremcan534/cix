@@ -16,6 +16,7 @@ import * as api from '@/lib/api';
 import { ROOM_THEMES, roomCoverUrl } from '@/data/catalog';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
 import { putLevels } from '@/lib/live/levels';
+import { putDistance } from '@/lib/live/distances';
 import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
@@ -218,6 +219,7 @@ export function rememberUser(c: { id: string; name: string; avatarUrl?: string |
 /** A full profile (age, city, interests, follow state) from the server. */
 export async function loadProfile(id: string) {
   const p = await api.userProfile(id);
+  putDistance(p.id, p.distance);
   return putServerUser({
     id: p.id,
     name: p.name,
@@ -251,6 +253,8 @@ export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
     people[list] = rows.map((p) => {
       // The card's Yankı badge and the list's order (lib/live/levels).
       putLevels(p.id, p.levels);
+      // The card's "Aynı şehir" or "350 km" (lib/live/distances).
+      putDistance(p.id, p.distance);
       return putServerUser({
         id: p.id,
         name: p.name,
