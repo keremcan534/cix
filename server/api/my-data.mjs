@@ -522,6 +522,18 @@ export async function exportOf(c, uid) {
     followerInvitesSent: await all('SELECT room_id, recipients, created_at FROM room_follower_invites WHERE sent_by = $1 OR owner_id = $1 ORDER BY id', (x) => ({
       room: x.room_id, recipients: x.recipients, at: x.created_at,
     })),
+    // Following rooms (room-follow.mjs): a follow is on the room's account, so it is named by its owner.
+    roomsFollowed: await all(
+      `SELECT u.id, u.name, f.created_at FROM room_follows f JOIN users u ON u.id = f.owner_id WHERE f.user_id = $1 AND u.deleted_at IS NULL AND ${NOT_BLOCKED('u.id')} ORDER BY f.created_at`,
+      (x) => ({ roomOf: person(x.id, x.name), since: x.created_at }),
+    ),
+    roomFollowers: await all(
+      `SELECT u.id, u.name, f.created_at FROM room_follows f JOIN users u ON u.id = f.user_id WHERE f.owner_id = $1 AND u.deleted_at IS NULL AND ${NOT_BLOCKED('u.id')} ORDER BY f.created_at`,
+      (x) => ({ ...person(x.id, x.name), since: x.created_at }),
+    ),
+    roomOpenNotices: await all('SELECT room_id, recipients, created_at FROM room_open_notices WHERE owner_id = $1 ORDER BY id', (x) => ({
+      room: x.room_id, recipients: x.recipients, at: x.created_at,
+    })),
   };
 
   return {

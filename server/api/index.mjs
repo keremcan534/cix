@@ -79,6 +79,8 @@ import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { roomSocialRoutes } from './room-social.mjs';
+import { roomFollowRoutes } from './room-follow.mjs';
+import { roomMemberRoutes } from './room-members.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
@@ -274,6 +276,8 @@ const routes = {
   ...roomFxRoutes,
   ...roomEventRoutes,
   ...roomSocialRoutes,
+  ...roomFollowRoutes,
+  ...roomMemberRoutes,
   ...roomOwnerRoutes,
   ...roomRoutes,
   ...adminRoutes,

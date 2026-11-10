@@ -12,7 +12,8 @@
 //   GET  /api/rooms/joined                                      → { rooms }    (rooms I'm a member or an admin of)
 //   GET  /api/rooms/invite-followers?room=                      → { count, lastAt, waitMs }   (owner or admin)
 //   POST /api/rooms/invite-followers { room }                   → { sent, lastAt, waitMs }    (once per 24 h per room account)
-//   GET  /api/me/room-invites                                   → { invites }  (invites from accounts I follow, last 7 days)
+//   GET  /api/me/room-invites                                   → { invites }  (invites from accounts I follow, last 7 days;
+//                                                                                 and followed rooms that opened: room-follow.mjs)
 //
 // Mic invites and polls reach the room's phones as LiveKit data packets with no sending participant, like the
 // room's other server news (live.mjs announceRoom): { type: 'invite', id, to, from } and { type: 'poll', id }. A
@@ -25,6 +26,8 @@ import { presenceTracked, roomService, voiceParticipants } from './live.mjs';
 import { inviteRefusal } from './privacy.mjs';
 import { notify } from './push.mjs';
 import { rulesOf } from './room-rules.mjs';
+// room-follow.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { openNoticesFor } from './room-follow.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { ROOM_SELECT, liveKitName, pushRoomMeta, rankOf, roomOut, roomRow, withVoiceCounts } from './rooms.mjs';
 
@@ -65,7 +68,7 @@ function packet(roomId, data) {
 }
 
 /** Who is in the room's voice now, with their mic (null: not on one). LiveKit's own list, else the webhooks' (no mics). */
-async function inRoom(roomId) {
+export async function inRoom(roomId) {
   const name = liveKitName(roomId);
   try {
     const list = await voiceParticipants(name);
@@ -570,7 +573,8 @@ export const roomSocialRoutes = {
 
   /**
    * Room invites for me as a follower: from accounts I followed before they sent it, in the last 7 days, for rooms
-   * still open, with no block between me and the account or the one who sent it. Newest first, at most 20.
+   * still open, with no block between me and the account or the one who sent it; and the rooms I follow that
+   * opened in the last 6 hours. Newest first, at most 20.
    */
   async 'GET /api/me/room-invites'(req) {
     const me = await auth(req);
@@ -585,6 +589,9 @@ export const roomSocialRoutes = {
         ORDER BY i.id DESC LIMIT 20`,
       [me.id],
     );
-    return { invites: r.rows.map((x) => ({ id: Number(x.id), room: { id: x.room_id, title: x.title }, host: { id: x.owner_id, name: x.owner_name }, at: x.created_at })) };
+    const invites = r.rows.map((x) => ({ id: Number(x.id), room: { id: x.room_id, title: x.title }, host: { id: x.owner_id, name: x.owner_name }, at: x.created_at }));
+    // With them, the rooms I follow that opened (room-follow.mjs; `kind: 'open'`): the phone tells both the same way.
+    const opened = await openNoticesFor(me.id);
+    return { invites: [...invites, ...opened].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 20) };
   },
 };

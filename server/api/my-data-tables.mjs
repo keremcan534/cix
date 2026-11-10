@@ -12,7 +12,7 @@ export const EXPORTED = [
   'agency_requests', 'agency_transfers', 'profile_visits', 'reports', 'user_sanctions', 'sanction_appeals',
   'contact_refusals', 'team_notices', 'team_notice_seen', 'support_tickets', 'support_messages', 'data_exports',
   'profile_extras', 'profile_photos', 'privacy_settings', 'call_history_cleared', 'room_mic_invites', 'room_polls',
-  'room_poll_votes', 'room_follower_invites',
+  'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds',
 ];
 

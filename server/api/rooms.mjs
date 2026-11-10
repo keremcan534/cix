@@ -40,6 +40,8 @@ import { statusOf } from './economy.mjs';
 import { clearRoomMusic, roomMusic } from './music.mjs';
 // room-social.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { withRoomBadges } from './room-social.mjs';
+// room-follow.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { roomFollowOf, roomOpened } from './room-follow.mjs';
 // pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { endCrossPkOfRoom } from './pk-cross.mjs';
 
@@ -240,6 +242,8 @@ export async function voiceAccess(name, u, password) {
     if (here >= cap) throw new HttpError(403, `Oda dolu (en fazla ${cap.toLocaleString('tr-TR')} kişi)`);
   }
   if (member) await db.query('UPDATE room_members SET seen_at = now() WHERE room_id = $1 AND user_id = $2', [room.id, u.id]);
+  // The owner comes into their room: its followers hear that it opened (room-follow.mjs, at most every 6 hours).
+  if (room.owner === u.id && !already) void roomOpened(room.id, room.owner);
 }
 
 /**
@@ -281,7 +285,7 @@ async function purgeMembers(room) {
   );
 }
 /** Whether `rank` may answer and remove the room's members (rules.manageMembers). */
-const mayManageMembers = (rules, rank) => rank === OWNER || (rules.manageMembers === 'admins' && rank >= 1);
+export const mayManageMembers = (rules, rank) => rank === OWNER || (rules.manageMembers === 'admins' && rank >= 1);
 /** Everyone in the room's voice gets their mic right again (the mic permission or their membership changed). */
 async function refreshRoomVoices(roomId, only = null) {
   const name = liveKitName(roomId);
@@ -370,12 +374,13 @@ export const roomRoutes = {
   },
 
   async 'GET /api/room'(req, url) {
-    await auth(req);
+    const me = await auth(req);
     // The Patron koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
     const id = url.searchParams.get('id');
     if (typeof id === 'string' && UUID.test(id)) await refreshBoss(id);
     const [room] = await withVoiceCounts([await roomRow(id)]);
-    return { room: out(room) };
+    // Following the room (room-follow.mjs): how many follow it, and whether I do.
+    return { room: { ...out(room), ...(await roomFollowOf(room.owner, me.id)) } };
   },
 
   async 'POST /api/rooms/close'(req) {
