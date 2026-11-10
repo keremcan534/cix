@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import Ionicons from '@expo/vector-icons/Ionicons';
+
 import { Text } from '@/components/text';
 import { AssetView } from '@/components/fx/anim-player';
 import { Icon3D } from '@/components/Icon3D';
@@ -65,7 +67,8 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
           { id: 'recent', name: '', icon: REACTION_TAB_RECENT },
           { id: 'emoji', name: 'Emoji' },
           ...(onAnimate ? [{ id: 'animated-free', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []),
-          ...STICKER_PACKS.filter((p) => FREE_PACK_IDS.includes(p.id)).map(packTab),
+          // Hamle acts on the room's mics: a chat's panel doesn't have it.
+          ...STICKER_PACKS.filter((p) => FREE_PACK_IDS.includes(p.id) && (!p.roomOnly || !!onAnimate)).map(packTab),
         ]
       : [...(onAnimate ? [{ id: 'animated', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []), ...STICKER_PACKS.filter((p) => !FREE_PACK_IDS.includes(p.id)).map(packTab)];
   const tabs = tabsOf(kind);
@@ -186,11 +189,28 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
         // A long pack (Duygular has 32) scrolls inside the panel, so the panel doesn't push the room's mics away.
         <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
           <View style={[styles.grid, locked && { opacity: 0.4 }]}>
-            {pack.stickers.map((x) => (
-              <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.stickerCell} accessibilityLabel={`${x.name} çıkartması${locked ? ', kilitli' : ''}`}>
-                <StickerArt id={x.id} size={40} />
-              </Pressable>
-            ))}
+            {pack.stickers.map((x) =>
+              pack.roomOnly ? (
+                // A Hamle pick does something, so it says what: its name, and an arrow for the side it goes to.
+                <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.moveCell} accessibilityRole="button" accessibilityLabel={x.name}>
+                  <View>
+                    <StickerArt id={x.id} size={40} />
+                    {/-(sol|sag)$/.test(x.id) && (
+                      <View style={[styles.moveArrow, x.id.endsWith('-sol') ? { left: -8 } : { right: -8 }]}>
+                        <Ionicons name={x.id.endsWith('-sol') ? 'arrow-back' : 'arrow-forward'} size={11} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.moveName} numberOfLines={2}>
+                    {x.name}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.stickerCell} accessibilityLabel={`${x.name} çıkartması${locked ? ', kilitli' : ''}`}>
+                  <StickerArt id={x.id} size={40} />
+                </Pressable>
+              ),
+            )}
           </View>
         </ScrollView>
       ) : null}
@@ -226,6 +246,9 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 6, minHeight: 60 },
   cell: { width: '12.5%', alignItems: 'center', paddingVertical: 6 },
   stickerCell: { width: '20%', alignItems: 'center', paddingVertical: 6 },
+  moveCell: { width: '33.33%', alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 4 },
+  moveArrow: { position: 'absolute', bottom: -2, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action },
+  moveName: { color: colors.text, fontSize: 11, fontWeight: '600', textAlign: 'center' },
   emoji: { fontSize: 26, lineHeight: 34 },
   emojiScroll: { maxHeight: 200 },
   // Four rows and a part of the fifth, so it shows there is more.

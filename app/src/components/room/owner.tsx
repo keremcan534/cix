@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, type HostInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -1142,6 +1142,7 @@ export function BossSeat({
   mini,
   reaction,
   still,
+  anchor,
 }: {
   userId: string | null;
   speaking: boolean;
@@ -1151,12 +1152,15 @@ export function BossSeat({
   /** The holder's emoji, played over their photo like on any mic. */
   reaction?: SeatReactionData;
   still?: boolean;
+  /** The ring's view, for what flies to or from this seat (measured like the numbered mics). */
+  anchor?: (v: HostInstance | null) => void;
 }) {
   const u = userId ? userById(userId) : null;
   if (mini) {
     const ring = mini.size + 6;
     return (
       <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: mini.width }} accessibilityLabel={u ? `Patron koltuğu: ${userId === 'me' ? 'sen' : u.name}` : 'Patron koltuğu, boş'}>
+        <View ref={anchor} collapsable={false}>
         <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={{ width: ring, height: ring, borderRadius: ring / 2, alignItems: 'center', justifyContent: 'center' }}>
           {u ? (
             <Photo uri={u.avatar} kind="face" style={{ width: mini.size, height: mini.size, borderRadius: mini.size / 2 }} />
@@ -1165,14 +1169,16 @@ export function BossSeat({
               <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
             </View>
           )}
-          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={mini.size} still={still} />}
+          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
         </LinearGradient>
+        </View>
         <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
       </Pressable>
     );
   }
   return (
     <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Patron koltuğu">
+      <View ref={anchor} collapsable={false}>
       <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
         {u ? (
           <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
@@ -1181,8 +1187,9 @@ export function BossSeat({
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
-        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={62} still={still} />}
+        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
       </LinearGradient>
+      </View>
       <Text style={styles.bossTag}>PATRON</Text>
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>
         {u ? (userId === 'me' ? 'Sen' : u.name) : 'Patron Koltuğu'}

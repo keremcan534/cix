@@ -90,7 +90,7 @@ export const STANDARD_EMOJI: { id: string; name: string; emojis: string[] }[] = 
   {
     id: 'activity',
     name: 'Etkinlik',
-    emojis: list('⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🥊 🎮 🕹️ 🎲 🧩 ♟️ 🎯 🎳 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎬 🎨 🎭 🎉 🎊 🎈 🎁 🎆 🎇 ✨ 🏆 🥇 🥈 🥉 🏅 🎖️'),
+    emojis: list('⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🥊 🎮 🕹️ 🎲 🧩 ♟️ 🎯 🎳 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🪇 💃 🎬 🎨 🎭 🎉 🎊 🎈 🎁 🎆 🎇 ✨ 🏆 🥇 🥈 🥉 🏅 🎖️'),
   },
   {
     id: 'objects',
@@ -107,7 +107,16 @@ export const STANDARD_EMOJI: { id: string; name: string; emojis: string[] }[] = 
 /** A custom-drawn sticker; `emoji` is the closest Unicode emoji, used only as a text fallback. */
 export type Sticker = { id: string; name: string; emoji: string };
 /** A sticker pack. Pack ids are the ids users bought before (the store keeps them as `emojiPacks`). */
-export type StickerPack = { id: string; name: string; stickers: Sticker[]; price: number; minVip?: number; animated?: boolean };
+export type StickerPack = {
+  id: string;
+  name: string;
+  stickers: Sticker[];
+  price: number;
+  minVip?: number;
+  animated?: boolean;
+  /** Only in a room's emoji panel (Hamle: its picks act on the mics), never in a chat's panel or the shop. */
+  roomOnly?: boolean;
+};
 const st = (id: string, name: string, emoji: string): Sticker => ({ id, name, emoji });
 export const STICKER_PACKS: StickerPack[] = [
   {
@@ -170,6 +179,42 @@ export const STICKER_PACKS: StickerPack[] = [
       st('duygu-deli-dolu', 'Deli dolu', '🤪'),
       st('duygu-kikirdama', 'Kıkır kıkır', '🤭'),
       st('duygu-yuz-numara', 'Tam puan', '💯'),
+    ],
+  },
+  {
+    // Dance and music, for when the room's music plays: the same animated set as Duygular, free for everyone.
+    id: 'muzik',
+    name: 'Müzik',
+    price: 0,
+    stickers: [
+      st('muzik-dans', 'Dans', '💃'),
+      st('muzik-disko', 'Disko topu', '🪩'),
+      st('muzik-eller-havaya', 'Eller havaya', '🙌'),
+      st('muzik-rock', 'Rock', '🤘'),
+      st('muzik-notalar', 'Notalar', '🎶'),
+      st('muzik-konfeti', 'Konfeti', '🎉'),
+      st('muzik-davul', 'Davul', '🥁'),
+      st('muzik-gitar', 'Gitar', '🎸'),
+      st('muzik-marakas', 'Marakas', '🪇'),
+      st('muzik-trompet', 'Trompet', '🎺'),
+      st('muzik-saksafon', 'Saksafon', '🎷'),
+      st('muzik-keman', 'Keman', '🎻'),
+    ],
+  },
+  {
+    // Hamle (lib/room-moves): each pick does something on the mics. A kiss or a punch flies to the mic on my left
+    // or right; the dice and Taş Kağıt Makas show a result the whole room sees. Room only, free for everyone.
+    id: 'hamle',
+    name: 'Hamle',
+    price: 0,
+    roomOnly: true,
+    stickers: [
+      st('hamle-opucuk-sol', 'Sola öpücük', '💋'),
+      st('hamle-opucuk-sag', 'Sağa öpücük', '💋'),
+      st('hamle-yumruk-sol', 'Sola yumruk', '🤛'),
+      st('hamle-yumruk-sag', 'Sağa yumruk', '🤜'),
+      st('hamle-zar', 'Zar at', '🎲'),
+      st('hamle-tkm', 'Taş Kağıt Makas', '✊'),
     ],
   },
   {

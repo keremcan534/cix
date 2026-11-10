@@ -1,6 +1,6 @@
 // Stickers: one PNG per sticker of the sticker packs (data/catalog STICKER_PACKS), custom-drawn at 192 px
-// (docs/GORSEL_URETIM_LISTESI.md §3), and the free Duygular pack: Google's Animated Noto Emoji as Lottie animations
-// (CC BY 4.0), played by components/lottie-sticker. Stickers are what the packs sell; standard Unicode emoji are
+// (docs/GORSEL_URETIM_LISTESI.md §3), and the free Duygular, Müzik and Hamle packs: Google's Animated Noto Emoji as
+// Lottie animations (CC BY 4.0), played by components/lottie-sticker. Stickers are what the packs sell; standard Unicode emoji are
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
 // (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
@@ -11,6 +11,7 @@ import { LottieSticker, type StickerPlay } from '@/components/lottie-sticker';
 import { stickerById } from '@/data/catalog';
 import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
 import { mentionRuns } from '@/lib/room-mention';
+import { MOVE_ART } from '@/lib/room-moves';
 import { stickerIdOf, stickersOf as matchStickers, stickerText } from '@/lib/stickers';
 import { colors, fonts } from '@/theme';
 
@@ -101,6 +102,30 @@ const ANIM: Record<string, () => object> = {
   'duygu-deli-dolu': () => require('../../assets/reactions/duygu/duygu-deli-dolu.json'),
   'duygu-kikirdama': () => require('../../assets/reactions/duygu/duygu-kikirdama.json'),
   'duygu-yuz-numara': () => require('../../assets/reactions/duygu/duygu-yuz-numara.json'),
+  'muzik-dans': () => require('../../assets/reactions/duygu/muzik-dans.json'),
+  'muzik-disko': () => require('../../assets/reactions/duygu/muzik-disko.json'),
+  'muzik-eller-havaya': () => require('../../assets/reactions/duygu/muzik-eller-havaya.json'),
+  'muzik-rock': () => require('../../assets/reactions/duygu/muzik-rock.json'),
+  'muzik-notalar': () => require('../../assets/reactions/duygu/muzik-notalar.json'),
+  'muzik-konfeti': () => require('../../assets/reactions/duygu/muzik-konfeti.json'),
+  'muzik-davul': () => require('../../assets/reactions/duygu/muzik-davul.json'),
+  'muzik-gitar': () => require('../../assets/reactions/duygu/muzik-gitar.json'),
+  'muzik-marakas': () => require('../../assets/reactions/duygu/muzik-marakas.json'),
+  'muzik-trompet': () => require('../../assets/reactions/duygu/muzik-trompet.json'),
+  'muzik-saksafon': () => require('../../assets/reactions/duygu/muzik-saksafon.json'),
+  'muzik-keman': () => require('../../assets/reactions/duygu/muzik-keman.json'),
+  'hamle-yumruk-sol': () => require('../../assets/reactions/duygu/hamle-yumruk-sol.json'),
+  'hamle-yumruk-sag': () => require('../../assets/reactions/duygu/hamle-yumruk-sag.json'),
+  'hamle-zar': () => require('../../assets/reactions/duygu/hamle-zar.json'),
+  'hamle-tas': () => require('../../assets/reactions/duygu/hamle-tas.json'),
+  'hamle-kagit': () => require('../../assets/reactions/duygu/hamle-kagit.json'),
+  'hamle-makas': () => require('../../assets/reactions/duygu/hamle-makas.json'),
+  'hamle-carpma': () => require('../../assets/reactions/duygu/hamle-carpma.json'),
+  'hamle-opucuk': () => require('../../assets/reactions/duygu/hamle-opucuk.json'),
+  // Hamle picks that share a result's art: the kiss to either side, and Taş Kağıt Makas shown by its fist.
+  'hamle-opucuk-sol': () => require('../../assets/reactions/duygu/hamle-opucuk.json'),
+  'hamle-opucuk-sag': () => require('../../assets/reactions/duygu/hamle-opucuk.json'),
+  'hamle-tkm': () => require('../../assets/reactions/duygu/hamle-tas.json'),
 };
 /** Whether a sticker moves (an animation, not a picture). */
 export const isAnimatedSticker = (id: string) => id in ANIM;
@@ -122,7 +147,8 @@ export type { StickerPlay };
 /** A sticker by id. */
 export function StickerArt({ id, size, play = 'still' }: { id: string; size: number; play?: StickerPlay }) {
   const src = SRC[id];
-  const sticker = stickerById(id);
+  // A catalog sticker, or one of the pictures a Hamle plays (lib/room-moves).
+  const sticker = stickerById(id) ?? MOVE_ART[id];
   const anim = ANIM[id];
   if (anim) return <LottieSticker source={anim()} size={size} play={play} label={sticker?.name} fallback={sticker?.emoji ?? '❔'} />;
   if (!src) return <Text style={{ fontSize: Math.round(size * 0.82), lineHeight: Math.round(size * 1.05) }}>{sticker?.emoji ?? '❔'}</Text>;

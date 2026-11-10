@@ -62,7 +62,7 @@ import { GiftShowFx, type GiftShowPlay } from '@/components/fx/gift-show';
 import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
-import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
+import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, RESULT_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
 import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
@@ -158,6 +158,7 @@ import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
 import { fitGrid, fitLayout, layoutPlan, type Fitted } from '@/lib/seat-fit';
 import { patronOnSeat } from '@/lib/patron-seat';
+import { RPS, isMovePick, moveLine, moveOfPick, needsMic, sideTarget, type Move, type Rect as MicRect } from '@/lib/room-moves';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
@@ -914,6 +915,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       }
       // An emoji over their seat: only one from this phone's own emoji and sticker lists (never free text).
       if (msg.t === 'react') return seatEmojiOk(msg.emoji) ? react(from, msg.emoji) : undefined;
+      // A Hamle (lib/room-moves): at most one a second from each person.
+      if (msg.t === 'act') {
+        if (nowMs() - (lastMoveFrom.current.get(from) ?? 0) < 1_000) return;
+        lastMoveFrom.current.set(from, nowMs());
+        return playMove(from, msg);
+      }
       // Another phone's Hareketli: only a free one (a paid one comes from the server as 'fx').
       if (msg.t === 'anim') {
         if (animById(msg.animationId)?.is_free && freeAnimOk(from)) playRoomAnim(id, from, msg.animationId, `p:${from}:${msgId()}`);
@@ -1323,10 +1330,56 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [speaking]);
 
   // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
-  const react = (uid: string, emoji: string) => {
+  const react = (uid: string, emoji: string, more?: Pick<SeatReactionData, 'pre' | 'badge' | 'badgeAt' | 'ms'>) => {
     const key = reactionKey();
-    setReactions((r) => ({ ...r, [uid]: { emoji, key } }));
-    setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), REACTION_MS);
+    setReactions((r) => ({ ...r, [uid]: { emoji, key, ...more } }));
+    setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), more?.ms ?? REACTION_MS);
+  };
+  // --- Hamle (lib/room-moves): a kiss or a punch to the mic beside mine, the dice, Taş Kağıt Makas ---------------
+  const lastMoveFrom = useRef(new Map<string, number>());
+  const measured = (v: HostInstance) => new Promise<MicRect | null>((done) => v.measureInWindow((x, y, w, h) => done(w ? { x, y, w, h } : null)));
+  /** A kiss or a punch leaves `uid`'s mic for the mic on that side and lands on whoever sits there. */
+  const flyMove = async (uid: string, move: Extract<Move, { a: 'kiss' | 'punch' }>) => {
+    const fromView = seatViews.get(uid);
+    if (!fromView) return;
+    const from = await measured(fromView);
+    if (!from) return;
+    // Every mic's place on the screen, the Patron seat as mic -1.
+    const places = [...seatSlots.entries()].filter(([, v]) => v !== fromView);
+    const patron = bossId ? seatViews.get(bossId) : undefined;
+    if (patron && patron !== fromView) places.push([-1, patron]);
+    const slots = (await Promise.all(places.map(async ([index, v]) => ({ index, rect: await measured(v) })))).filter((x): x is { index: number; rect: MicRect } => !!x.rect);
+    const hit = sideTarget(from, slots, move.d);
+    const flying = stickerToken(move.a === 'kiss' ? 'hamle-opucuk' : move.d === 'l' ? 'hamle-yumruk-sol' : 'hamle-yumruk-sag');
+    const key = `mv-${reactionKey()}`;
+    setFlights((f) => [...f.slice(-11), { key, emoji: move.a === 'kiss' ? '💋' : '👊', count: 1, from: { x: from.x + from.w / 2, y: from.y + from.h / 2 }, to: hit.to, delay: 0, sticker: flying }]);
+    const target = hit.index === null ? null : hit.index === -1 ? bossId : allSeats[hit.index];
+    // It lands as the flight arrives: a heart for a kiss, a bang for a punch.
+    if (target) setTimeout(() => react(target, stickerToken(move.a === 'kiss' ? 'duygu-kalbim' : 'hamle-carpma')), 800);
+  };
+  /** Draws a Hamle from `uid` on this phone (mine, or one another phone sent). */
+  const playMove = (uid: string, move: Move) => {
+    const name = uid === 'me' ? ME.name : userById(uid).name;
+    const line = moveLine(name, move);
+    // A result is also a chat line, so it can be read after the picture is gone (and from the Balkon, where no mic shows it).
+    if (line) addMsg({ system: true, text: line });
+    if (!settings.seatReactions) return;
+    if (move.a === 'dice') return react(uid, stickerToken('hamle-zar'), { badge: String(move.n), badgeAt: 1_100, ms: RESULT_MS });
+    if (move.a === 'rps') {
+      const hands = RPS.map((h) => stickerToken(h.id));
+      return react(uid, hands[move.n], { pre: [...hands, ...hands], badge: RPS[move.n].name, ms: RESULT_MS });
+    }
+    react(uid, stickerToken(move.a === 'kiss' ? 'duygu-opucuk' : move.d === 'l' ? 'hamle-yumruk-sol' : 'hamle-yumruk-sag'));
+    if (visibleRef.current && !settings.effectsOff && !settings.reduceMotion) void flyMove(uid, move);
+  };
+  /** My own pick in the Hamle tab: drawn here, and sent to the other phones of a server room. */
+  const doMove = (move: Move) => {
+    if (needsMic(move) && !amSeated) return showAlert('Mikrofonda değilsin', 'Öpücük ve yumruk, oturduğun mikrofondan yanındakine gider. Önce bir mikrofona geç.');
+    if (nowMs() - (lastMoveFrom.current.get('me') ?? 0) < 1_200) return;
+    lastMoveFrom.current.set('me', nowMs());
+    tapHaptic();
+    playMove('me', move);
+    if (real) sendSignal({ t: 'act', ...move });
   };
   // Only recipients sitting on a seat get a flight; listeners see the chat line instead.
   const flyGift = (emoji: string, count: number, toIds: string[], from: Point, giftId?: string) => {
@@ -3093,27 +3146,33 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   // The Patron seat plays its holder's emoji like any mic.
   const bossReaction = bossId && settings.seatReactions ? reactions[bossId] : undefined;
+  // Its place on the screen, kept with the mics' (gift flights and a Hamle's kiss or punch).
+  const bossAnchor = (v: HostInstance | null) => {
+    if (!bossId) return;
+    if (v) seatViews.set(bossId, v);
+    else seatViews.delete(bossId);
+  };
   /** The stage's mics, drawn with the sizes FitStage gives them (`f`: null for the strip and a team PK). */
   const stageSeats = (f: Fitted | null) =>
     teamPk ? (
       <>
         {bossOn && (
           <View style={[styles.topRow, { marginTop: 6 }]}>
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
           </View>
         )}
         <TeamArena pk={teamPk} seats={allSeats} boss={bossId} width={win.width} canManage={canManage && !offline} renderSeat={(i, slot) => renderSeat(i, { slot })} />
       </>
     ) : strip || !f ? (
       <View style={styles.micStrip}>
-        {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} reaction={bossReaction} still={settings.reduceMotion} />}
+        {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />}
         {allSeats.map((_, i) => renderSeat(i, { host: i === 0, grid: stripSlot, mini: true }))}
       </View>
     ) : layout ? (
       <>
         {bossOn && (
           <View style={[styles.topRow, { marginTop: 6 }]}>
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
           </View>
         )}
         <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
@@ -3124,7 +3183,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         {bossOn ? (
           <View style={styles.topRow}>
             {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} anchor={bossAnchor} />
           </View>
         ) : (
           <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
@@ -3334,6 +3393,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               onAnimate={sendAnim}
               hint={amSeated ? 'Seçtiğin emoji koltuğundaki avatarının üzerinde oynar.' : 'Koltukta değilsin: emoji mesajına eklenir. Mikrofona geçince avatarının üzerinde oynar.'}
               onPick={(e) => {
+                // A Hamle pick does something (lib/room-moves); it is never a chat sticker.
+                if (isMovePick(stickerIdOf(e))) {
+                  const move = moveOfPick(stickerIdOf(e));
+                  if (move) doMove(move);
+                  return setEmojiOpen(false);
+                }
                 if (amSeated) {
                   tapHaptic();
                   react('me', e);

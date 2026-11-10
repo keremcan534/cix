@@ -12,6 +12,7 @@ import { ANIMATION_SEED } from '@/data/animations';
 import { CASINO_GAMES, ROOM_GAMES } from '@/data/games';
 import { ALL_STICKERS, COSMETICS, COSMETIC_KINDS, FREE_PACK_IDS, ROOM_LEVEL_ICONS, ROOM_THEMES, ROOM_TYPES, STANDARD_EMOJI, STICKER_PACKS } from '@/data/catalog';
 import { GIFTS } from '@/data/mock';
+import { MOVE_ART, RPS } from '@/lib/room-moves';
 import { stickerIdOf, stickersOf, stickerText, stickerToken } from '@/lib/stickers';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
@@ -37,9 +38,19 @@ describe('Görsel dosyaları', () => {
     const reactionArt = read('components/ReactionArt.tsx');
     // Pictures load with the file; animations (Duygular) only when drawn: `() => require(…)`.
     const files = new Map([...reactionArt.matchAll(/^  '([^']+)': (?:\(\) => )?require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
-    assert.deepEqual([...files.keys()].sort(), ALL_STICKERS.map((x) => x.id).sort());
-    const bytes = new Set([...files.values()].map((f) => readFileSync(resolve(SRC, 'components', f)).toString('base64')));
-    assert.equal(bytes.size, files.size, 'aynı görsel iki çıkartmada');
+    const ids = ALL_STICKERS.map((x) => x.id);
+    for (const id of ids) assert.ok(files.has(id), `${id}: görsel yok`);
+    // Art that isn't a pick: what a Hamle plays on the mics (the three hands, the bang, the flying kiss).
+    assert.deepEqual([...files.keys()].filter((k) => !ids.includes(k)).sort(), ['hamle-carpma', 'hamle-kagit', 'hamle-makas', 'hamle-opucuk', 'hamle-tas']);
+    // Two names for one file only where a Hamle means it: a kiss to either side, and Taş Kağıt Makas's own tile.
+    const shared = new Map<string, string[]>();
+    for (const [id, f] of files) shared.set(f, [...(shared.get(f) ?? []), id]);
+    assert.deepEqual(
+      [...shared.values()].filter((v) => v.length > 1).map((v) => v.sort()).sort((a, b) => a[0].localeCompare(b[0])),
+      [['hamle-opucuk', 'hamle-opucuk-sag', 'hamle-opucuk-sol'], ['hamle-tas', 'hamle-tkm']],
+    );
+    const bytes = new Set([...shared.keys()].map((f) => readFileSync(resolve(SRC, 'components', f)).toString('base64')));
+    assert.equal(bytes.size, shared.size, 'aynı görsel iki çıkartmada');
   });
 
   test('mağaza görselleri gerçek ürünlere ve sekmelere bağlı', () => {
@@ -80,9 +91,9 @@ describe('Emoji ve çıkartma paketleri', () => {
   test('eski paket kimlikleri korunuyor, satın alınanlar kaybolmuyor', () => {
     assert.deepEqual(
       STICKER_PACKS.map((p) => p.id),
-      ['basic', 'duygu', 'fun', 'love', 'animals', 'vip', 'anim'],
+      ['basic', 'duygu', 'muzik', 'hamle', 'fun', 'love', 'animals', 'vip', 'anim'],
     );
-    assert.deepEqual(FREE_PACK_IDS, ['basic', 'duygu']);
+    assert.deepEqual(FREE_PACK_IDS, ['basic', 'duygu', 'muzik', 'hamle']);
   });
   test('ücretli paketler yalnız özel çizim çıkartma, standart emojiler ücretsiz ve ayrı', () => {
     for (const p of STICKER_PACKS) for (const x of p.stickers) assert.match(x.id, /^[a-z0-9-]+$/, `${p.name}: ${x.id}`);
@@ -109,6 +120,32 @@ describe('Duygular (Animated Noto Emoji, CC BY 4.0)', () => {
     }
     assert.match(readFileSync(resolve(SRC, '../assets/reactions/duygu/LICENSE.txt'), 'utf8'), /Animated Noto Emoji[\s\S]*CC BY 4\.0/);
     assert.match(read('data/art-licenses.ts'), /creativecommons\.org\/licenses\/by\/4\.0/);
+  });
+
+  test('Müzik ve Hamle: aynı setten, ücretsiz; Hamle yalnız odada ve her seçimin animasyonu var', () => {
+    const art = read('components/ReactionArt.tsx');
+    const files = (id: string) => new RegExp(`'${id}': \\(\\) => require\\('\\.\\./\\.\\./assets/reactions/duygu/([a-z0-9-]+)\\.json'\\),`).exec(art)?.[1];
+    for (const id of ['muzik', 'hamle']) {
+      const pack = STICKER_PACKS.find((p) => p.id === id);
+      assert.ok(pack && !pack.price && !pack.minVip, `${id}: ücretsiz paket`);
+      for (const x of pack.stickers) {
+        const file = files(x.id);
+        assert.ok(file, `${x.id}: animasyon bağlı`);
+        const anim = JSON.parse(readFileSync(resolve(SRC, '../assets/reactions/duygu', `${file}.json`), 'utf8'));
+        assert.ok(Array.isArray(anim.layers) && anim.layers.length > 0 && anim.fr > 0 && anim.op > anim.ip, `${x.id}: Lottie`);
+      }
+    }
+    assert.equal(STICKER_PACKS.find((p) => p.id === 'hamle')?.roomOnly, true, 'Hamle sohbet panelinde ve mağazada yok');
+    assert.ok(!STICKER_PACKS.find((p) => p.id === 'muzik')?.roomOnly);
+    // What a Hamle draws that isn't a pick: the three hands, the bang, the flying kiss.
+    for (const id of ['hamle-tas', 'hamle-kagit', 'hamle-makas', 'hamle-carpma', 'hamle-opucuk']) {
+      assert.ok(files(id), id);
+      // Not in the catalog, so they carry their own name and the emoji drawn where the animation can't play.
+      assert.ok(MOVE_ART[id]?.name && MOVE_ART[id].emoji, `${id}: yedek emoji`);
+    }
+    assert.deepEqual(Object.keys(MOVE_ART).sort(), ['hamle-carpma', 'hamle-kagit', 'hamle-makas', 'hamle-opucuk', 'hamle-tas']);
+    assert.deepEqual(RPS.map((h) => MOVE_ART[h.id].name), RPS.map((h) => h.name));
+    assert.match(readFileSync(resolve(SRC, '../assets/reactions/duygu/LICENSE.txt'), 'utf8'), /muzik-\*\.json and hamle-\*\.json/);
   });
 });
 
