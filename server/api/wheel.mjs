@@ -36,17 +36,23 @@ const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT T
  * purchase (coin_lots.refunded_by, read now, so a refund drops the points the moment it lands) never counts either.
  */
 export async function wealthPoints(c, userId) {
+  return (await wealthPointsOf(c, [userId])).get(userId) ?? 0;
+}
+
+/** wealthPoints of many people in one query (other people's levels in lists, profiles.mjs): id → points. */
+export async function wealthPointsOf(c, ids) {
   const r = await c.query(
-    `SELECT coalesce(sum(-l.amount - coalesce(x.skip, 0)), 0) AS n FROM ledger l
+    `SELECT l.user_id, coalesce(sum(-l.amount - coalesce(x.skip, 0)), 0) AS n FROM ledger l
        LEFT JOIN LATERAL (SELECT sum((p->>'amount')::bigint) AS skip
                             FROM jsonb_array_elements(coalesce(l.detail->'lots', '[]'::jsonb)) p
                             LEFT JOIN coin_lots k ON k.id = (p->>'lot')::bigint
                            WHERE p->>'channel' IN ('odul', 'ugurlu') OR k.refunded_by IS NOT NULL) x ON true
-      WHERE l.user_id = $1 AND l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|çantası|transfer|jeton gönder)'
-        AND l.reason !~ '^(Jeton Noktası satışı|İade:)'`,
-    [userId],
+      WHERE l.user_id = ANY($1::uuid[]) AND l.currency = 'coin' AND l.amount < 0 AND l.reason !~ '· tur' AND l.reason !~* '(zar düellosu|zarf|çantası|transfer|jeton gönder)'
+        AND l.reason !~ '^(Jeton Noktası satışı|İade:)'
+      GROUP BY l.user_id`,
+    [ids],
   );
-  return Number(r.rows[0].n);
+  return new Map(r.rows.map((x) => [x.user_id, Number(x.n)]));
 }
 
 async function funds(c, lock = null) {

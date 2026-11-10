@@ -150,12 +150,17 @@ describe('Personel rozeti', () => {
     assert.ok(initialUserRoles({ live: false, demo: true }).some((u) => u.userId === 'me'));
   });
 
-  test('canlıda rozet yalnızca benim, sunucudaki rolümden', () => {
+  test('canlıda rozet sunucudaki rollerden: benimki hesabımdan, başkasınınki profilinden', () => {
     const demoRoles = { ...INITIAL_RBAC, userRoles: initialUserRoles({ live: false, demo: true }) };
     assert.equal(shownStaffBadge(demoRoles, 'me', true, null), null);
     assert.equal(shownStaffBadge(demoRoles, 'me', true, 'admin'), 'Yönetici');
     assert.equal(shownStaffBadge(demoRoles, 'me', true, 'moderator'), 'Moderatör');
+    // My role never becomes someone else's; theirs comes with their profile (undefined until read).
     assert.equal(shownStaffBadge(demoRoles, 'u3', true, 'admin'), null);
+    assert.equal(shownStaffBadge(demoRoles, 'u3', true, null, 'moderator'), 'Moderatör');
+    assert.equal(shownStaffBadge(demoRoles, 'u3', true, null, 'admin'), 'Yönetici');
+    assert.equal(shownStaffBadge(demoRoles, 'u3', true, 'admin', null), null);
+    assert.equal(shownStaffBadge(demoRoles, 'me', true, null, 'admin'), null, 'benim rozetim yalnızca kendi rolümden');
   });
 
   test('demoda rozet yerel rollerden', () => {

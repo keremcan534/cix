@@ -15,6 +15,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import * as api from '@/lib/api';
 import { ROOM_THEMES, roomCoverUrl } from '@/data/catalog';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
+import { putLevels } from '@/lib/live/levels';
 import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
@@ -247,8 +248,10 @@ const emitPeople = () => peopleListeners.forEach((l) => l());
 export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
   try {
     const rows = await api.discover(list);
-    people[list] = rows.map((p) =>
-      putServerUser({
+    people[list] = rows.map((p) => {
+      // The card's Yankı badge and the list's order (lib/live/levels).
+      putLevels(p.id, p.levels);
+      return putServerUser({
         id: p.id,
         name: p.name,
         ...(p.age ? { age: p.age } : {}),
@@ -259,8 +262,10 @@ export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
         ...(p.gender && { gender: p.gender }),
         ...(p.username && { username: p.username }),
         ...(p.avatarUrl && { avatar: p.avatarUrl }),
-      }),
-    );
+        // No country given stays none (an older server sends no field: what was known stays).
+        ...(p.country !== undefined && { country: p.country ?? undefined }),
+      });
+    });
     peopleState[list] = 'ready';
   } catch {
     peopleState[list] = 'failed';

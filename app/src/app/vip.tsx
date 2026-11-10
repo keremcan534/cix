@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +16,9 @@ import { SCENES } from '@/components/fx/scenes';
 import { Backdrop } from '@/components/fx/surface';
 import { Art } from '@/components/Art';
 import { Avatar, LevelChips } from '@/components/ui';
+import { saveExtras } from '@/lib/api';
+import { liveMode, message, myServerId } from '@/lib/live';
+import { loadPublicProfile } from '@/lib/live/profile';
 
 type Tab = 'svip' | 'vip' | 'noble';
 const GOLD = '#F5D7A1';
@@ -201,7 +204,33 @@ function Vip() {
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('VIP aktif 🎉', `${p.days} gün eklendi.`) },
     ]);
+  // Live mode: what others see is the server's (server/api/profiles.mjs, VIP by İnci or Rütbe there), so the switches
+  // start from it and a change goes there first; the server says no without VIP.
+  const live = liveMode();
+  useEffect(() => {
+    const id = myServerId();
+    if (!live || !id) return;
+    let alive = true;
+    loadPublicProfile(id, true)
+      .then((c) => {
+        if (!alive || !c.levelsHidden) return;
+        setSetting('hideWealth', c.levelsHidden.wealth);
+        setSetting('hideCharm', c.levelsHidden.charm);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // Read once when the screen opens; setSetting is a new function on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
   const toggleHide = (k: 'hideWealth' | 'hideCharm', v: boolean) => {
+    if (live) {
+      saveExtras({ [k]: v })
+        .then((x) => setSetting(k, x[k]))
+        .catch((e) => showAlert('Kaydedilemedi', message(e)));
+      return;
+    }
     if (vipDays <= 0)
       return showAlert('VIP ayrıcalığı', 'Seviyeleri gizlemek VIP ayrıcalığıdır.', [
         { text: 'Vazgeç', style: 'cancel' },
@@ -302,7 +331,7 @@ function Vip() {
         <View style={{ alignItems: 'center', gap: 8 }}>
           <Avatar uri={me.avatar} size={76} />
           <Text style={{ color: gold, fontWeight: '800', fontSize: 17 }}>{me.name}</Text>
-          <LevelChips wealth={wealthLevel} charm={charmLevel} hideWealth={vipDays > 0 && settings.hideWealth} hideCharm={vipDays > 0 && settings.hideCharm} />
+          <LevelChips wealth={wealthLevel} charm={charmLevel} hideWealth={(live || vipDays > 0) && settings.hideWealth} hideCharm={(live || vipDays > 0) && settings.hideCharm} />
         </View>
         <View style={styles.toggles}>
           {(
@@ -313,7 +342,7 @@ function Vip() {
           ).map(([k, l], i) => (
             <View key={k} style={[styles.toggleRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ink(0.1) }]}>
               <Text style={{ color: colors.textDim, fontSize: 15, flex: 1 }}>{l}</Text>
-              <Switch value={vipDays > 0 && settings[k]} onValueChange={(v) => toggleHide(k, v)} trackColor={{ true: '#E8B979' }} thumbColor="#fff" accessibilityLabel={l} />
+              <Switch value={(live || vipDays > 0) && settings[k]} onValueChange={(v) => toggleHide(k, v)} trackColor={{ true: '#E8B979' }} thumbColor="#fff" accessibilityLabel={l} />
             </View>
           ))}
         </View>

@@ -12,7 +12,8 @@
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
 // Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
-// and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
+// and account deletion: social.mjs (levels, extras, album and Vitrin of a profile: profiles.mjs). Direct messages:
+// messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
@@ -52,6 +53,7 @@ import { momentRoutes } from './moments.mjs';
 import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
+import { profileRoutes } from './profiles.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
@@ -231,6 +233,7 @@ const routes = {
   ...mediaRoutes,
   ...liveRoutes,
   ...socialRoutes,
+  ...profileRoutes,
   ...messageRoutes,
   ...oneOnOneRoutes,
   ...luckyBagRoutes,

@@ -2,7 +2,8 @@
 //
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
-//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit)
+//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit;
+//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
 //   GET    /api/me/visitors                               → { count, visitors }  (last 7 days; visitors only with VIP)
 //   POST   /api/follow  { to, follow }                    → { following }
 //   GET    /api/following                                 → { users }
@@ -20,6 +21,7 @@ import { svipLevel, vipLevelOf } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
+import { cardsMore, profileMore } from './profiles.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -103,6 +105,10 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
+    // Profile extras, the album rows (their files go with removeUserFiles) and the gender choice (profiles.mjs).
+    await c.query('DELETE FROM profile_extras WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
+    await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
     await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
@@ -225,7 +231,7 @@ export const socialRoutes = {
       [id],
     );
     return {
-      user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
+      user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me, ...(await profileMore(u, id === me.id)) },
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
@@ -309,7 +315,9 @@ export const socialRoutes = {
       [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
-    return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };
+    // Each card's levels and country, for the whole list in a few queries (profiles.mjs).
+    const more = await cardsMore(r.rows.map((u) => u.id));
+    return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh, ...more[u.id] })) };
   },
 
   /** Who `user` follows (default: me). Another person's list leaves out anyone either of us blocked. */
