@@ -56,6 +56,7 @@ import { useApp } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art, type ArtName } from '@/components/Art';
+import { RollingNumber } from '@/components/fx/rolling-number';
 
 type Tab = 'wallet' | 'creator' | 'agency' | 'bd';
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -179,7 +180,7 @@ function WalletTab() {
         <Text style={styles.heroLabel}>Jeton bakiyesi</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon3D name="coin" size={40} />
-          <Text style={styles.heroN}>{fmt(coins)}</Text>
+          <RollingNumber value={coins} style={styles.heroN} />
         </View>
         <Text style={styles.heroSub}>Jetonlar satın alınır ve hediyelerde harcanır. Nakde çevrilmez.</Text>
         <Pressable style={styles.heroBtn} onPress={() => router.push('/cuzdan')} accessibilityLabel="Jeton yükle">

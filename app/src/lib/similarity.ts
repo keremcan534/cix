@@ -25,9 +25,3 @@ export function similarity(me: User, other: User): Similarity {
   } else if (ageGap <= 6) score += 2;
   return { score: Math.round(Math.min(98, Math.max(30, score))), shared, reasons };
 }
-
-/**
- * Seat ring in rooms: how many of `count` beads light up. Spread over the scores people actually get (30 is the
- * floor; interests, city and age together top out at 93), so the floor lights one bead and a top match fills it.
- */
-export const litBeads = (score: number, count = 12) => Math.max(1, Math.min(count, Math.round(1 + ((score - 30) / 65) * (count - 1))));

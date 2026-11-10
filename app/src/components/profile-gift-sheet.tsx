@@ -15,6 +15,7 @@ import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { GIFTS, type Gift } from '@/data/mock';
 import { makeStyles, radius, space, type, useTheme } from '@/theme';
+import { RollingNumber } from '@/components/fx/rolling-number';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
@@ -82,7 +83,7 @@ export function ProfileGiftSheet({
           </Text>
           <Pressable onPress={goWallet} style={s.balance} accessibilityRole="button" accessibilityLabel={`Bakiye ${fmt(coins)} jeton, jeton yükle`}>
             <Icon3D name="coin" size={20} />
-            <Text style={s.balanceText}>{fmt(coins)}</Text>
+            <RollingNumber value={coins} style={s.balanceText} />
             <Ionicons name="add-circle" size={18} color={semantic.money} />
           </Pressable>
           <Pressable onPress={close} hitSlop={10} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">

@@ -27,6 +27,7 @@ import { openLegal } from '@/lib/legal';
 import { blockedFeature } from '@/lib/remote-control';
 import { today } from '@/lib/persist';
 import { stampLabel } from '@/lib/tr';
+import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 export default function WalletScreen() {
   const { coins, buyPack, firstBuys, ledger, spentToday, settings, svipLevel, svipXp, addCoins } = useApp();
@@ -141,7 +142,15 @@ export default function WalletScreen() {
                 data={serverRows}
                 keyExtractor={(r) => String(r.id)}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
-                ListEmptyComponent={<Text style={[styles.note, { marginTop: 30 }]}>{history.status === 'ready' ? 'Henüz hareket yok.' : 'Yükleniyor…'}</Text>}
+                ListEmptyComponent={
+                  history.status === 'ready' ? (
+                    <Text style={[styles.note, { marginTop: 30 }]}>Henüz hareket yok.</Text>
+                  ) : (
+                    <Skeletons count={5} gap={4} style={{ paddingTop: 12 }}>
+                      <RowSkeleton face={36} />
+                    </Skeletons>
+                  )
+                }
                 ListFooterComponent={history.rows.length >= LEDGER_PAGE ? <Text style={[styles.note, { marginTop: 12 }]}>Son {LEDGER_PAGE} hareket gösteriliyor.</Text> : undefined}
                 renderItem={({ item }) => (
                   <View style={styles.row}>

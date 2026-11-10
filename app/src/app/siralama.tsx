@@ -18,6 +18,7 @@ import { periodLabel } from '@/lib/tr';
 import { agencyRankings, rankings, type AgencyRankingRow, type RankingRow } from '@/lib/api';
 import { liveMode, rememberUser, toLocal, useServerRooms } from '@/lib/live';
 import { userById } from '@/data/mock';
+import { BrandLoader } from '@/components/fx/brand-loader';
 
 /** Boards the server can rank in a live build (gift totals, agency income, open rooms); Oda XP is demo-only for now. */
 const LIVE_BOARDS: Board[] = ['zengin', 'yayinci', 'ajans', 'oda'];
@@ -125,11 +126,14 @@ export default function Leaderboard() {
             {second && <Podium row={second} place={2} unit={unit} onPress={() => open(second)} />}
             {first && <Podium row={first} place={1} unit={unit} onPress={() => open(first)} />}
             {third && <Podium row={third} place={3} unit={unit} onPress={() => open(third)} />}
-            {!first && (
-              <Text style={[styles.how, { flex: 1, textAlign: 'center', paddingVertical: 28 }]}>
-                {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : live && board !== 'oda' && serverRows === null ? 'Yükleniyor…' : board === 'oda' ? 'Şu an açık oda yok.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
-              </Text>
-            )}
+            {!first &&
+              (!rankError && live && board !== 'oda' && serverRows === null ? (
+                <BrandLoader size={26} style={{ flex: 1, paddingVertical: 22 }} />
+              ) : (
+                <Text style={[styles.how, { flex: 1, textAlign: 'center', paddingVertical: 28 }]}>
+                  {rankError ? 'Sıralama şu an yüklenemedi. Biraz sonra tekrar dene.' : board === 'oda' ? 'Şu an açık oda yok.' : 'Bu dönemde henüz kimse yok. İlk hediyeyi sen gönder!'}
+                </Text>
+              ))}
           </LinearGradient>
         }
         renderItem={({ item, index }) => (

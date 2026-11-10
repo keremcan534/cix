@@ -4,10 +4,30 @@
 // so the same room keeps the same picture.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Image, StyleSheet, View, type ImageProps, type ImageStyle, type StyleProp } from 'react-native';
+import { Animated, Image, Platform, StyleSheet, View, type ImageProps, type ImageStyle, type StyleProp } from 'react-native';
 
 import { SCENES } from '@/components/fx/scenes';
+import { useSettings } from '@/store';
 import { useTheme } from '@/theme';
+
+/**
+ * A picture from the network that fades in once it is there instead of popping in (a fifth of a second). It
+ * starts when the load ends either way, so a picture never stays hidden; "Animasyonları azalt" shows it at once.
+ */
+export function FadeImage({ style, onLoadEnd, ...rest }: Omit<ImageProps, 'style'> & { style?: StyleProp<ImageStyle> }) {
+  const { reduceMotion } = useSettings();
+  const [o] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
+  return (
+    <Animated.Image
+      {...rest}
+      style={[style, { opacity: o }]}
+      onLoadEnd={() => {
+        Animated.timing(o, { toValue: 1, duration: 220, useNativeDriver: Platform.OS !== 'web' }).start();
+        onLoadEnd?.();
+      }}
+    />
+  );
+}
 
 const COVERS = Object.values(SCENES).map((s) => s.photo);
 
@@ -25,7 +45,7 @@ export function Photo({ uri, kind, seed, style, onError, ...rest }: Props) {
   const [failed, setFailed] = useState<string>();
   if (uri && uri !== failed) {
     return (
-      <Image
+      <FadeImage
         source={{ uri }}
         style={style}
         {...rest}

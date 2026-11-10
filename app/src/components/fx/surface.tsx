@@ -132,6 +132,16 @@ function ShineBase({ radius = 16, every = 9000, delay = 0 }: { radius?: number; 
 }
 const SHINE_W = 56;
 
+/**
+ * A press that sinks under the finger and springs back when it lifts (native driver, no drawing per frame). Put
+ * `onPressIn`/`onPressOut` on the Pressable and `scale` on the part that moves; `to` is how far it sinks.
+ */
+export function useSpringPress(to = 0.96) {
+  const [scale] = useState(() => new Animated.Value(1));
+  const spring = (toValue: number) => Animated.spring(scale, { toValue, speed: 40, bounciness: toValue === 1 ? 8 : 0, useNativeDriver: true }).start();
+  return { scale, onPressIn: () => spring(to), onPressOut: () => spring(1) };
+}
+
 /** Pressable that springs down a little under the finger and ticks a light haptic. */
 export function PressableScale({
   children,
@@ -140,13 +150,13 @@ export function PressableScale({
   to = 0.96,
   ...rest
 }: Omit<PressableProps, 'style' | 'children'> & { children: ReactNode; style?: StyleProp<ViewStyle>; to?: number }) {
-  const [v] = useState(() => new Animated.Value(1));
-  const spring = (toValue: number) => Animated.spring(v, { toValue, speed: 40, bounciness: toValue === 1 ? 8 : 0, useNativeDriver: true }).start();
+  const press = useSpringPress(to);
+  const v = press.scale;
   return (
     <Pressable
       {...rest}
-      onPressIn={() => spring(to)}
-      onPressOut={() => spring(1)}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       onPress={
         onPress &&
         ((e: GestureResponderEvent) => {

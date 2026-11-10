@@ -12,7 +12,7 @@ import { FloatIcon } from '@/components/fx/float';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
 import { icon3dSource } from '@/components/Icon3D';
-import { SimilarityChip, SimilarityRing } from '@/components/similarity';
+import { SimilarityChip } from '@/components/similarity';
 import { Avatar, Button } from '@/components/ui';
 import { roomCode } from '@/data/catalog';
 import { ROOMS, USERS, userById, type Room, type User } from '@/data/mock';
@@ -41,6 +41,7 @@ import { useApp } from '@/store';
 import { isLockedRoom, liveMode, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
+import { RoomCardSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 type MainTab = 'mine' | 'rec';
 type MineTab = 'recent' | 'joined' | 'following';
@@ -212,7 +213,11 @@ export default function RoomsScreen() {
           )
         }
         ListEmptyComponent={
-          live && roomsState === 'failed' ? (
+          live && roomsState === 'loading' && main === 'rec' ? (
+            <Skeletons count={4}>
+              <RoomCardSkeleton />
+            </Skeletons>
+          ) : live && roomsState === 'failed' ? (
             <View style={styles.errorBox}>
               <Text style={styles.errorTitle}>Bağlantı kurulamadı</Text>
               <Text style={styles.errorText}>Odalar şu an yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>
@@ -288,8 +293,6 @@ function ClosestRoomCard({ match }: { match: RoomMatch }) {
         <View style={styles.heroBody}>
           <View style={styles.heroHost}>
             <Avatar uri={host.avatar} name={host.name} size={44} />
-            {/* The bead ring stays out of the live app, as on the room's mics: the server keeps no interests yet. */}
-            {!liveMode() && <SimilarityRing score={score} size={44} />}
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={styles.heroTitle} numberOfLines={1}>
@@ -386,7 +389,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
   );
 }
 
-/** "Benzerlerin": people online now, closest match first, each wearing the same bead ring as room seats. */
+/** "Benzerlerin": people online now, closest match first, each with how close they are (%). */
 function SimilarPeople({ people, rooms }: { people: { u: User; score: number }[]; rooms: Room[] }) {
   const { semantic } = useTheme();
   const styles = useStyles();
@@ -409,7 +412,6 @@ function SimilarPeople({ people, rooms }: { people: { u: User; score: number }[]
             >
               <View style={styles.personAvatar}>
                 <Avatar uri={u.avatar} name={u.name} size={54} />
-                <SimilarityRing score={score} size={54} />
                 {hosted && (
                   <View style={styles.personLive}>
                     <Ionicons name="mic" size={9} color={semantic.liveInk} />

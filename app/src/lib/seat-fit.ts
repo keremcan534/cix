@@ -42,6 +42,12 @@ export type FitOpts = { boss?: boolean; pk?: boolean };
  */
 export type Fitted = { face: number; host: number; slot: number; cols: number; height: number };
 
+/**
+ * A change of sizes worth easing on screen (components/room/fit-stage): other columns, faces 4 px or more apart, or
+ * a stage 24 px or more taller or shorter. A drag of the chat's handle changes them a pixel at a time: not eased.
+ */
+export const easedChange = (a: Fitted, b: Fitted) => a.cols !== b.cols || Math.abs(a.face - b.face) >= 4 || Math.abs(a.height - b.height) >= 24;
+
 // ── The classic grid (no layout chosen): the host's row, then the guests `cols` to a row ──
 
 /** The grid's inner width (the room's padding taken off). */

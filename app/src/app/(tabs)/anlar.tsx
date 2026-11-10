@@ -38,6 +38,8 @@ import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
+import { BrandLoader } from '@/components/fx/brand-loader';
+import { PostSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 const TABS = ['Arkadaşlar', 'Önerilen', 'Son'] as const;
 type Tab = (typeof TABS)[number];
@@ -453,10 +455,12 @@ function LiveMoments() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={hasMore && shown.length > 0 ? <ActivityIndicator color={colors.primary} style={{ padding: 16 }} /> : undefined}
+        ListFooterComponent={hasMore && shown.length > 0 ? <BrandLoader size={20} /> : undefined}
         ListEmptyComponent={
           items === null && !failed ? (
-            <ActivityIndicator color={colors.primary} style={{ padding: 40 }} />
+            <Skeletons count={2} gap={24} style={{ paddingTop: 8 }}>
+              <PostSkeleton />
+            </Skeletons>
           ) : failed ? (
             <View style={styles.empty}>
               <StateIcon name="cloud-offline-outline" />

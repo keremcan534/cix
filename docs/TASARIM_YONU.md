@@ -53,6 +53,18 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
 - **Efekt ölçüsü.** Parlama (`Gloss`), kenar ışığı (`EdgeLight`) ve ışık süpürmesi (`Shine`) yalnız değerli öğelerde (sıralama, en iyi odalar, ana buton); sıradan kartlar düzdür.
 - **Oda sohbeti.** Kullanıcı mesajı: avatar + üstte ad + ayrı balon. Oda olayları ve bot sessiz haplar; kişilerin mesajlarının önüne geçmez.
 - **Hareket.** Basma geri bildirimi 90 ms; geçişler ≤ 250 ms. "Hareketi azalt" ve "efektleri kapat" ayarları hediye animasyonlarını ve titreşimi kapatır.
+- **Küçük dokunuşlar (Kasım 2026).** Hepsi "Animasyonları azalt" ile durur.
+  - Basılan şey yayla içe çöker, geri gelir (`useSpringPress`, `PressableScale`): koltuklar, odanın yuvarlak düğmeleri, kartlar.
+  - Fotoğraflar yüklenince yumuşakça belirir (`FadeImage`).
+  - Bakiyeler ve PK puanı sayaç gibi döner (`RollingNumber`).
+  - Liste yüklenirken dönen çark yerine kartların gri taslağı ve üzerinden geçen ışık görünür (`fx/skeleton`).
+  - Bekleyen ekranlarda açılışın S ve C harfleri sırayla altına döner (`BrandLoader`). Küçük çark yalnız düğme içinde kalır.
+  - Sayı rozeti, sayı artınca bir kez zıplar (`BounceBadge`).
+  - Koyu ve açık tema arasında eski zemin yumuşakça kaybolur (`ThemeFade`).
+  - Ana Sayfa saate göre karşılar ("Günaydın, Ayşe").
+  - Odada mikrofonlar girişte dalga gibi sırayla gelir. Boyları değişince yerlerine kayar.
+  - Konuşanın halkası sesiyle büyür (`lib/live/voice-level`).
+  - Mikrofona inince telefon bir kez titrer.
 
 ---
 

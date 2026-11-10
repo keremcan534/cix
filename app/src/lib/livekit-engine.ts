@@ -9,6 +9,7 @@ import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livek
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
 import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
+import { reportLevel } from '@/lib/live/voice-level';
 import type { EngineEvent } from '@/lib/room-session';
 import { setAiDenoise } from '../../modules/similar-denoise';
 
@@ -157,6 +158,13 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     r.on(RoomEvent.Reconnected, () => {
       if (seat !== null) pushSeat(r);
       tell(r, { type: 'connected' });
+    });
+    // How loud each speaker is, for the ring around their seat (lib/live/voice-level); the others go quiet.
+    r.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+      if (room !== r) return;
+      const loud = new Map(speakers.map((p) => [p === r.localParticipant ? 'me' : p.identity, p.audioLevel]));
+      reportLevel('me', loud.get('me') ?? 0);
+      for (const p of r.remoteParticipants.values()) reportLevel(p.identity, loud.get(p.identity) ?? 0);
     });
     r.on(RoomEvent.Reconnecting, () => tell(r, { type: 'lost' }));
     r.on(RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
