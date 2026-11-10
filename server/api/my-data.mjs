@@ -469,6 +469,34 @@ export async function exportOf(c, uid) {
   const seenUpTo = (await c.query('SELECT last_id FROM team_notice_seen WHERE user_id = $1', [uid])).rows[0]?.last_id ?? null;
   const lastExport = (await c.query('SELECT last_at FROM data_exports WHERE user_id = $1', [uid])).rows[0]?.last_at ?? null;
 
+  // Profile extras and the album (profiles.mjs), the Gizlilik choices and the call-history mark (privacy.mjs,
+  // call-log.mjs), and the room invites and polls I took part in (room-social.mjs).
+  const profileMore = {
+    extras: (await all('SELECT height_cm, weight_kg, job, languages, zodiac, tags, relationship, education, slogan, country, updated_at FROM profile_extras WHERE user_id = $1'))[0] ?? null,
+    album: await all('SELECT url, created_at FROM profile_photos WHERE user_id = $1 ORDER BY id', (x) => ({ url: x.url, at: x.created_at })),
+  };
+  const privacy = {
+    settings: (await all('SELECT profile_public, show_online, show_last_seen, show_current_room, dm_from, calls_from, invites_from, updated_at FROM privacy_settings WHERE user_id = $1'))[0] ?? null,
+    callHistoryClearedAt: (await all('SELECT cleared_at FROM call_history_cleared WHERE user_id = $1'))[0]?.cleared_at ?? null,
+  };
+  const roomSocial = {
+    micInvitesSent: await all('SELECT room_id, to_user, seat, status, created_at, answered_at FROM room_mic_invites WHERE from_user = $1 ORDER BY id', (x) => ({
+      room: x.room_id, to: x.to_user, seat: x.seat, status: x.status, at: x.created_at, answeredAt: x.answered_at,
+    })),
+    micInvitesReceived: await all('SELECT room_id, from_user, seat, status, created_at, answered_at FROM room_mic_invites WHERE to_user = $1 ORDER BY id', (x) => ({
+      room: x.room_id, from: x.from_user, seat: x.seat, status: x.status, at: x.created_at, answeredAt: x.answered_at,
+    })),
+    pollsStarted: await all('SELECT room_id, question, options, ends_at, closed_at, created_at FROM room_polls WHERE creator = $1 ORDER BY id', (x) => ({
+      room: x.room_id, question: x.question, options: x.options, endsAt: x.ends_at, closedAt: x.closed_at, at: x.created_at,
+    })),
+    pollVotes: await all('SELECT p.question, p.options, v.option, v.created_at FROM room_poll_votes v JOIN room_polls p ON p.id = v.poll_id WHERE v.user_id = $1 ORDER BY v.created_at', (x) => ({
+      question: x.question, answer: x.options[x.option] ?? null, at: x.created_at,
+    })),
+    followerInvitesSent: await all('SELECT room_id, recipients, created_at FROM room_follower_invites WHERE sent_by = $1 OR owner_id = $1 ORDER BY id', (x) => ({
+      room: x.room_id, recipients: x.recipients, at: x.created_at,
+    })),
+  };
+
   return {
     account,
     signIn,
@@ -488,6 +516,9 @@ export async function exportOf(c, uid) {
     bonds,
     agency,
     visits,
+    profileMore,
+    privacy,
+    roomSocial,
     safety,
     support: await ticketsOf(c, uid),
     notices,
