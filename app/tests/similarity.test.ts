@@ -1,11 +1,11 @@
 /// <reference types="node" />
-// "%82 benzer": the score behind the app's name, and the bead ring that shows it on room seats.
+// "%82 benzer": the score behind the app's name.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Room, User } from '@/data/mock';
 import { closestRooms } from '@/lib/closest';
-import { litBeads, similarity } from '@/lib/similarity';
+import { similarity } from '@/lib/similarity';
 
 const person = (over: Partial<User>): User => ({ id: 'x', name: 'X', age: 25, avatar: '', ...over }) as User;
 
@@ -28,19 +28,6 @@ describe('Benzerlik skoru', () => {
     assert.ok(similarity(me, person({ interests: [], age: 60 })).score >= 30);
     // No interests on either side still gives a number, never NaN.
     assert.ok(Number.isFinite(similarity(person({}), person({})).score));
-  });
-});
-
-describe('Koltuk halkası', () => {
-  test('taban skor bir boncuk, en iyi eşleşme (93) halkanın tamamı', () => {
-    assert.equal(litBeads(30), 1);
-    assert.equal(litBeads(50), 4);
-    assert.equal(litBeads(70), 8);
-    assert.equal(litBeads(82), 10);
-    assert.equal(litBeads(93), 12);
-    assert.equal(litBeads(0), 1);
-    assert.equal(litBeads(150), 12);
-    assert.equal(litBeads(93, 8), 8);
   });
 });
 

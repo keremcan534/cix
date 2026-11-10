@@ -18,7 +18,6 @@ import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
-import { SimilarityRing } from '@/components/similarity';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
@@ -87,7 +86,7 @@ export function Seat({
   modMuted?: boolean;
   /** Empty seat held for a pending mic invite (name of the invited person). */
   invitee?: string;
-  /** How much this person has in common with you (lib/similarity), drawn as a bead ring; not on your own seat. */
+  /** How much this person has in common with you (lib/similarity), read out with the seat; not on your own seat. */
   similarity?: number;
   /** Lv4 bond with the person on the next seat of the row: a line to their avatar (`gap`: the row's gap). */
   bondLink?: { bond: RoomBond; gap: number } | null;
@@ -170,7 +169,6 @@ export function Seat({
               <Ionicons name={locked ? 'lock-closed' : invitee ? 'hourglass-outline' : 'add'} size={mini ? 13 : Math.round(Math.max(15, Math.min(28, size * 0.32)))} color={invitee && !locked ? colors.gold : 'rgba(255,255,255,0.42)'} />
             </LinearGradient>
           )}
-          {user && similarity !== undefined && !teamColor && !mini && <SimilarityRing score={similarity} size={size} />}
           {teamColor && user && <View pointerEvents="none" style={[styles.teamRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: teamColor }]} />}
           {camera && user && (
             <View style={styles.camBadge} accessibilityLabel="Kamerası açık">

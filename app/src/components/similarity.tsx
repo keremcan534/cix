@@ -1,8 +1,7 @@
-import { memo } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { litBeads, type Similarity } from '@/lib/similarity';
+import type { Similarity } from '@/lib/similarity';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 
 /** High matches get the brand turquoise, the rest stay neutral so the chip never reads as a warning. */
@@ -45,48 +44,7 @@ export function SimilarityCard({ sim, name }: { sim: Similarity; name: string })
   );
 }
 
-const BEADS = 12;
-
-/**
- * A bead necklace around a seat's avatar: the more the person has in common with you, the more beads light up,
- * clockwise from the top (lib/similarity litBeads). Plain Views, no SVG; static, so motion settings don't apply.
- */
-export const SimilarityRing = memo(function SimilarityRing({ score, size }: { score: number; size: number }) {
-  const bead = Math.max(4, Math.round(size * 0.085));
-  const r = size / 2 + bead * 0.9;
-  const t = useTheme();
-  const s = useStyles();
-  const lit = litBeads(score, BEADS);
-  const on = tone(t, score);
-  const off = t.ink(0.16);
-  return (
-    <View pointerEvents="none" style={[s.ringLayer, { width: size, height: size }]}>
-      {Array.from({ length: BEADS }, (_, i) => {
-        const a = (i / BEADS) * 2 * Math.PI;
-        return (
-          <View
-            key={i}
-            style={[
-              s.bead,
-              {
-                width: bead,
-                height: bead,
-                borderRadius: bead / 2,
-                left: size / 2 + r * Math.sin(a) - bead / 2,
-                top: size / 2 - r * Math.cos(a) - bead / 2,
-                backgroundColor: i < lit ? on : off,
-              },
-            ]}
-          />
-        );
-      })}
-    </View>
-  );
-});
-
 const useStyles = makeStyles(({ colors, lift, dark }) => ({
-  ringLayer: { position: 'absolute', left: 0, top: 0 },
-  bead: { position: 'absolute' },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1 },
   chipText: { fontSize: 11, fontWeight: '800' },
   card: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.border, ...(dark ? {} : { boxShadow: lift.boxShadow }) },
