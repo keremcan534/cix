@@ -9,7 +9,9 @@ import { Text } from '@/components/text';
 import { CoinPill, Header } from '@/components/ui';
 import { CHECKIN_REWARDS, TASKS, type TaskKey } from '@/data/economy';
 import { RewardBurst, type Reward } from '@/components/fx/reward';
-import { callsAvailable, liveMode } from '@/lib/live';
+import { liveMode, message, oneOnOneOpen } from '@/lib/live';
+import { claimLiveCallTask, useLiveCallTask } from '@/lib/live/call-log';
+import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
 import { fonts, makeStyles, useTheme } from '@/theme';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
@@ -23,7 +25,8 @@ const TASK_INFO: Record<TaskKey, { desc: string; go: () => void }> = {
   giftsSent: { desc: 'Ödül almak için sohbet odasında hediyeler gönderin', go: () => router.push('/(tabs)') },
   greetings: { desc: 'Keşfet ekranında yeni kişilere selam ver', go: () => router.push('/(tabs)/kesfet') },
   moments: { desc: 'Günlük an paylaş; incelemeyi geçince sayılır', go: () => router.push('/(tabs)/anlar') },
-  calls: { desc: 'Bir arkadaşınla görüntülü sohbet et', go: () => router.push('/(tabs)/mesajlar') },
+  // Live: the server counts a video call that stayed on at least a minute (server/api/call-log.mjs).
+  calls: { desc: liveMode() ? 'Bir arkadaşınla en az bir dakika görüntülü sohbet et' : 'Bir arkadaşınla görüntülü sohbet et', go: () => router.push('/(tabs)/mesajlar') },
 };
 // Tomorrow's check-in reward bundle (cards + coins), mirrors the 7-day cycle.
 const TOMORROW = (coins: number): { icon: Icon3DName; name: string; n: string }[] => [
@@ -35,9 +38,9 @@ const secsToMidnight = () => {
   const d = new Date();
   return Math.max(0, Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - d.getTime()) / 1000));
 };
-// Only the rows a user can actually do are listed: calls are 'Yakında' while callsAvailable() is false. Display
-// only; the reward and claim rules are untouched.
-const shownTask = (key: TaskKey) => (key === 'calls' ? callsAvailable() : true);
+// Only the rows a user can actually do are listed: the call task needs calls in this build (the demo's, or the
+// server's with LiveKit). In a live build the server counts that task and pays its reward (lib/live/call-log).
+const shownTask = (key: TaskKey) => (key === 'calls' ? oneOnOneOpen() : true);
 const pad = (n: number) => String(n).padStart(2, '0');
 const hms = (s: number) => `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 
@@ -49,6 +52,7 @@ export default function TaskCenter() {
   const todayIndex = (checkedInToday ? checkInDay - 1 : checkInDay) % 7;
   const [selected, setSelected] = useState((todayIndex + (checkedInToday ? 1 : 0)) % 7);
   const [left, setLeft] = useState(secsToMidnight);
+  const liveCallTask = useLiveCallTask(liveMode() && oneOnOneOpen());
 
   useEffect(() => {
     const t = setInterval(() => setLeft(secsToMidnight()), 1000);
@@ -118,9 +122,22 @@ export default function TaskCenter() {
         </View>
         <View style={[styles.card, { paddingVertical: 4 }]}>
           {TASKS.filter((t) => shownTask(t.key)).map((t, i) => {
-            const progress = Math.min(stats[t.key], t.goal);
-            const complete = progress >= t.goal;
-            const claimed = claimedTasks.has(t.id);
+            // Live: the call task as the server counts it (nothing done until it has answered).
+            const server = liveMode() && t.key === 'calls';
+            const goal = server ? (liveCallTask?.goal ?? t.goal) : t.goal;
+            const reward = server ? (liveCallTask?.reward ?? t.reward) : t.reward;
+            const progress = server ? Math.min(liveCallTask?.done ?? 0, goal) : Math.min(stats[t.key], t.goal);
+            const complete = progress >= goal;
+            const claimed = server ? !!liveCallTask?.claimed : claimedTasks.has(t.id);
+            const claim = () => {
+              if (!server) {
+                claimTask(t.id);
+                return setReward({ icon: 'tasks', title: `${t.title} tamamlandı`, amount: t.reward });
+              }
+              void claimLiveCallTask()
+                .then((r) => r.paid && setReward({ icon: 'tasks', title: `${t.title} tamamlandı`, amount: r.task.reward }))
+                .catch((e) => showAlert('Ödül alınamadı', message(e)));
+            };
             return (
               <View key={t.id} style={[styles.task, i > 0 && styles.sep]}>
                 {t.art ? (
@@ -138,13 +155,13 @@ export default function TaskCenter() {
                   <View style={{ flex: 1, gap: 6 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Icon3D name="coin" size={16} />
-                      <Text style={styles.taskReward}>{t.reward}</Text>
+                      <Text style={styles.taskReward}>{reward}</Text>
                       <Text style={[styles.dim, { marginLeft: 'auto' }]}>
-                        {progress}/{t.goal}
+                        {progress}/{goal}
                       </Text>
                     </View>
                     <View style={styles.track}>
-                      <View style={[styles.fill, { width: `${(progress / t.goal) * 100}%` }, complete && { backgroundColor: semantic.success }]} />
+                      <View style={[styles.fill, { width: `${(progress / goal) * 100}%` }, complete && { backgroundColor: semantic.success }]} />
                     </View>
                   </View>
                   {claimed ? (
@@ -152,10 +169,7 @@ export default function TaskCenter() {
                       <Ionicons name="checkmark" size={20} color="#fff" />
                     </View>
                   ) : complete ? (
-                    <Pressable style={[styles.goBtn, { backgroundColor: semantic.successFill }]} onPress={() => {
-                        claimTask(t.id);
-                        setReward({ icon: 'tasks', title: `${t.title} tamamlandı`, amount: t.reward });
-                      }} accessibilityLabel={`${t.title} ödülünü al`}>
+                    <Pressable style={[styles.goBtn, { backgroundColor: semantic.successFill }]} onPress={claim} accessibilityLabel={`${t.title} ödülünü al`}>
                       <Text style={styles.goText}>Al</Text>
                     </Pressable>
                   ) : (

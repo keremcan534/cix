@@ -15,6 +15,7 @@
 import { HttpError, auth, claimRef, db, limit, once, readJson } from './core.mjs';
 import { CHEST_MIN_CONTRIBUTION, CP_GIFT_IDS, FAMILY_CHESTS, FAMILY_RATES, FAMILY_TASKS, taskPoints } from './family-rules.mjs';
 import { WEEK, familyView, membersOf, myMembership, statsOf } from './families.mjs';
+import { privacyMap } from './privacy.mjs';
 import { creditCoins } from './wallet.mjs';
 
 const TZ = 'Europe/Istanbul';
@@ -131,7 +132,10 @@ async function overviewOf(uid) {
     [id, uid],
   );
   const fresh = Date.now() - 5 * 60_000;
+  // Each one's "Çevrimiçi durumumu göster" and "Bulunduğum odayı göster" (privacy.mjs): hidden, it isn't told here.
+  const shows = await privacyMap(db, seen.rows.map((x) => x.id));
   const online = seen.rows
+    .map((x) => ({ ...x, room_id: shows.get(x.id).showCurrentRoom ? x.room_id : null, seen: shows.get(x.id).showOnline ? x.seen : null }))
     .filter((x) => x.room_id || (x.seen && new Date(x.seen).getTime() > fresh))
     .sort((a, b) => Number(!!b.room_id) - Number(!!a.room_id))
     .slice(0, 20)

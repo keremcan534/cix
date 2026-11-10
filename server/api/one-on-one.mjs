@@ -21,6 +21,8 @@
 // people who aren't streamers the man pays and nobody earns. Non-streamers get match_free free matches in 24
 // hours, each at most match_free_seconds long.
 // Prices are live settings (live-registry.mjs, "Birebir ve eşleşme"); a call keeps the price it started with.
+// Whoever is called decides who may call them (Ayarlar › "Beni kimler arayabilir?", privacy.mjs callRefusal);
+// Eşleşme isn't a call to anyone, so it doesn't ask.
 //
 // A minute is paid when it starts: the first when the call goes live, the next at 60 s, and so on. A payer who
 // can't pay the next minute is cut off. Both phones say they are still there (beat); a call nobody hears from in
@@ -33,6 +35,7 @@ import { HttpError, REF, auth, blockedBetween, db, env, limit, readJson, tx, use
 import { line } from './live-line.mjs';
 import { live } from './live-settings.mjs';
 import { deleteVoiceRoom, liveKitJwt } from './live.mjs';
+import { callRefusal } from './privacy.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { giftDiamonds, paidCoins, spendCoins } from './wallet.mjs';
@@ -110,6 +113,9 @@ export async function pairOf(c, me, other) {
     }
     return { open: level >= need, price: mode === 'voice' ? s.callVoice : s.callVideo, iPay: payer === me, free: null, why: level >= need ? null : `${MODE_TEXT[mode]} arama kalp seviyesi ${need} olunca açılır` };
   };
+  // "Beni kimler arayabilir?" (privacy.mjs): their choice closes both calls, with their reason.
+  const refused = await callRefusal(c, me, other);
+  const closed = (gate) => (refused ? { ...gate, open: false, why: refused } : gate);
   return {
     streamer: x.other_s,
     meStreamer: x.me_s,
@@ -119,7 +125,7 @@ export async function pairOf(c, me, other) {
     iPay: payer === me,
     dmPrice: payer === me && !mutual ? s.dmPrice : 0,
     heart: { points, level, next: HEART_LEVELS[level + 1] ?? null, floor: HEART_LEVELS[level], voiceAt: s.heartVoice, videoAt: s.heartVideo, photoAt: PHOTO_HEART_LEVEL },
-    calls: { voice: call('voice'), video: call('video') },
+    calls: { voice: closed(call('voice')), video: closed(call('video')) },
     // A photo in the chat: with a streamer from the heart level, otherwise between people who follow each other.
     photo: paid
       ? { open: level >= PHOTO_HEART_LEVEL, why: level >= PHOTO_HEART_LEVEL ? null : `Mesajda fotoğraf kalp seviyesi ${PHOTO_HEART_LEVEL} olunca açılır` }

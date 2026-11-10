@@ -4,8 +4,9 @@
 //   GET  /api/messages?with=&before=                → { messages }       (newest first, 50 per page)
 //   GET  /api/conversations                         → { conversations }  (last message and unread count)
 //   POST /api/messages/read  { with }               → { read }
-// Messages to or from someone either side has blocked are refused. A new message rings the recipient's
-// phone (push.mjs); an open app polls. At most 30 messages a minute per person, against spam. A message that
+// Messages to or from someone either side has blocked are refused, and so are messages the recipient's "Bana
+// kimler mesaj gönderebilir?" doesn't allow (privacy.mjs dmRefusal: 403, code privacy). A new message rings the
+// recipient's phone (push.mjs); an open app polls. At most 30 messages a minute per person, against spam. A message that
 // shares a phone number, IBAN, e-mail, link or social media account is refused (contact-filter.mjs).
 // A message from someone who isn't a streamer to a streamer they don't follow each other with costs dm_price
 // coins (one-on-one.mjs pairOf), paid with the message; the answer then carries the sender's coins.
@@ -17,6 +18,7 @@ import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
 import { verifyUpload } from './media.mjs';
 import { pairOf, payOneOnOne } from './one-on-one.mjs';
+import { dmRefusal } from './privacy.mjs';
 import { line } from './live-line.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
@@ -70,6 +72,10 @@ export const messageRoutes = {
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);
     if (!peer.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
     if (await blockedBetween(me.id, to)) throw new HttpError(403, 'Bu kişiye mesaj gönderemezsin');
+    // Their "Bana kimler mesaj gönderebilir?" (privacy.mjs). A retry of a message already stored is answered below.
+    const refused = await dmRefusal(db, me.id, to);
+    if (refused && !(await db.query('SELECT 1 FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref])).rowCount)
+      throw Object.assign(new HttpError(403, refused), { extra: { code: 'privacy' } });
     if (!(image && body === PHOTO_TEXT)) await assertNoSplitNumber(me, to, body, b.ref);
     if (image) {
       const gate = (await pairOf(db, me.id, to)).photo;

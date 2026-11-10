@@ -20,6 +20,7 @@ import { svipLevel, vipLevelOf } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
+import { listsHidden, shownToViewer } from './privacy.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -41,6 +42,8 @@ async function followList(me, url, side) {
   if (id !== me.id) {
     await liveUser(id);
     if (await blockedBetween(me.id, id)) throw new HttpError(403, 'Bu listeyi göremezsin');
+    // "Profilim herkese açık" off: only people they follow see their lists (privacy.mjs).
+    if (await listsHidden(db, me.id, id)) throw new HttpError(403, 'Bu kişinin takip listeleri gizli');
   }
   const [mine, other] = side === 'followers' ? ['followee', 'follower'] : ['follower', 'followee'];
   const r = await db.query(
@@ -103,6 +106,9 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
     await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
+    // Gizlilik choices and the "Arama geçmişini temizle" mark (privacy.mjs, call-log.mjs).
+    await c.query('DELETE FROM privacy_settings WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM call_history_cleared WHERE user_id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
     await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
@@ -224,8 +230,10 @@ export const socialRoutes = {
         WHERE s.streamer_id = $1 AND s.ended_at IS NULL AND s.contract = 'approved' AND a.status = 'approved' LIMIT 1`,
       [id],
     );
+    // "Profilim herkese açık" off: someone they don't follow gets no age, city, bio or interests (privacy.mjs).
+    const [shown] = await shownToViewer(db, me.id, [{ id: u.id, name: u.name, ...profileOf(u) }]);
     return {
-      user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
+      user: { ...shown, followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
@@ -309,7 +317,8 @@ export const socialRoutes = {
       [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
-    return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };
+    // What each one shows me: "Profilim herkese açık" and "Çevrimiçi durumumu göster" (privacy.mjs).
+    return { users: await shownToViewer(db, me.id, r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh }))) };
   },
 
   /** Who `user` follows (default: me). Another person's list leaves out anyone either of us blocked. */

@@ -709,6 +709,49 @@ export const spend = (amount: number, reason: string, ref = newRef()) => call<{ 
 export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>
   call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref, ...(usdTry === undefined ? {} : { usdTry }) });
 
+// Gizlilik, who may reach me and Arkadaşlarım (server/api/privacy.mjs); call history, heart points, the call figures and
+// the call task (server/api/call-log.mjs).
+export type ServerPrivacy = {
+  profilePublic: boolean;
+  showOnline: boolean;
+  showLastSeen: boolean;
+  showCurrentRoom: boolean;
+  dmFrom: 'everyone' | 'following' | 'mutual';
+  callsFrom: 'everyone' | 'following' | 'nobody';
+  invitesFrom: 'everyone' | 'following' | 'nobody';
+};
+export const myPrivacy = () => call<{ privacy: ServerPrivacy }>('GET', '/api/me/privacy').then((r) => r.privacy);
+/** Changes some settings; the answer is all of them as the server has them now. */
+export const updatePrivacy = (patch: Partial<ServerPrivacy>) => call<{ privacy: ServerPrivacy }>('PATCH', '/api/me/privacy', patch).then((r) => r.privacy);
+/** Someone I follow or who follows me; `online` and `lastSeenAt` only as far as they (and I) show them. */
+export type ServerFriend = UserCard & { iFollow: boolean; followsMe: boolean; online: boolean; lastSeenAt: string | null };
+export const myFriends = () => call<{ friends: ServerFriend[] }>('GET', '/api/me/friends').then((r) => r.friends);
+/** A finished call (status: ended = answered, missed, declined, cancelled by the caller). */
+export type ServerCallLog = {
+  id: number;
+  mode: 'voice' | 'video';
+  outgoing: boolean;
+  status: 'ended' | 'missed' | 'declined' | 'cancelled';
+  seconds: number;
+  coins: number;
+  iPay: boolean;
+  iEarn: boolean;
+  other: UserCard;
+  at: string;
+};
+/** My calls both ways, newest first; `next` is the `before` of the next page (null: no more). */
+export const myCalls = (before?: number) => call<{ calls: ServerCallLog[]; next: number | null }>('GET', `/api/me/calls${before ? `?before=${before}` : ''}`);
+export const clearMyCalls = () => call<{ cleared: boolean }>('POST', '/api/me/calls/clear', {});
+/** Heart points with each person I share any (most first). */
+export const myHearts = () => call<{ hearts: { id: string; points: number; level: number }[] }>('GET', '/api/me/hearts').then((r) => r.hearts);
+/** This week's paid calls and matches I earned from: how many, their paid minutes, the diamonds. */
+export type ServerCallStats = { calls: number; minutes: number; diamonds: number };
+export const myCallStats = () => call<{ week: ServerCallStats }>('GET', '/api/me/call-stats').then((r) => r.week);
+/** Görevler › "1 görüntülü arama yap" today, as the server counts it. */
+export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean };
+export const myCallTask = () => call<{ task: ServerCallTask }>('GET', '/api/me/call-task').then((r) => r.task);
+export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask }>('POST', '/api/me/call-task/claim', {});
+
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
 /** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
