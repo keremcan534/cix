@@ -850,10 +850,10 @@ export function RoomSettingsScreen({
             locked={ownerLock ?? (micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`)}
           />
           <Row
-            label="Dümen Koltuğu"
+            label="Patron Koltuğu"
             hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · ${live ? 'son 24 saatte odada en çok hediye gönderen kişi oturur' : 'oturumun en çok hediye gönderen kişisi oturur'}`}
             toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
-            locked={ownerLock ?? (bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
+            locked={ownerLock ?? (bossOpen ? undefined : `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
           />
 
           <Section title="Oda üyeleri" />
@@ -888,7 +888,7 @@ export function RoomSettingsScreen({
           <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
             {live
               ? 'Bu ayarlar sunucuda saklanır ve odadaki herkeste aynı anda geçerli olur. Yeni şifre, odaya bir sonraki girişte sorulur.'
-              : 'Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.'}
+              : 'Ayarlar anında uygulanır. Kilit, mikrofon izni ve patron koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.'}
           </Text>
             </>
           )}
@@ -1133,13 +1133,13 @@ function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen:
   );
 }
 
-// --- Boss seat ("Dümen Koltuğu") ---------------------------------------------------------
+// --- Boss seat ("Patron Koltuğu") ---------------------------------------------------------
 export function BossSeat({ userId, speaking, onPress, mini }: { userId: string | null; speaking: boolean; onPress: () => void; /** Küçült: a small gold ring in the mic strip (`size` its avatar, `width` its slot). */ mini?: { size: number; width: number } }) {
   const u = userId ? userById(userId) : null;
   if (mini) {
     const ring = mini.size + 6;
     return (
-      <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: mini.width }} accessibilityLabel={u ? `Dümen koltuğu: ${userId === 'me' ? 'sen' : u.name}` : 'Dümen koltuğu, boş'}>
+      <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: mini.width }} accessibilityLabel={u ? `Patron koltuğu: ${userId === 'me' ? 'sen' : u.name}` : 'Patron koltuğu, boş'}>
         <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={{ width: ring, height: ring, borderRadius: ring / 2, alignItems: 'center', justifyContent: 'center' }}>
           {u ? (
             <Photo uri={u.avatar} kind="face" style={{ width: mini.size, height: mini.size, borderRadius: mini.size / 2 }} />
@@ -1149,12 +1149,12 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
             </View>
           )}
         </LinearGradient>
-        <Text style={[styles.bossTag, { fontSize: 9 }]}>DÜMEN</Text>
+        <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
       </Pressable>
     );
   }
   return (
-    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Dümen koltuğu">
+    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Patron koltuğu">
       <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
         {u ? (
           <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
@@ -1164,9 +1164,9 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
           </View>
         )}
       </LinearGradient>
-      <Text style={styles.bossTag}>DÜMEN</Text>
+      <Text style={styles.bossTag}>PATRON</Text>
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>
-        {u ? (userId === 'me' ? 'Sen' : u.name) : 'Dümen Koltuğu'}
+        {u ? (userId === 'me' ? 'Sen' : u.name) : 'Patron Koltuğu'}
       </Text>
     </Pressable>
   );
@@ -1175,8 +1175,8 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
 export const bossSeatInfo = (current: string | null, myContribution: number, top: number) => {
   const need = Math.max(BOSS_SEAT_MIN_COINS, top + 1) - myContribution;
   return current === 'me'
-    ? 'Dümen koltuğundasın. Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
-    : `Dümen koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
+    ? 'Patron koltuğundasın. Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
+    : `Patron koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
 };
 
 const styles = StyleSheet.create({

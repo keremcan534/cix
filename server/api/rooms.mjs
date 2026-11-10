@@ -86,7 +86,7 @@ const out = (r) => ({
   coverId: r.cover_id ?? null,
   theme: r.theme ?? 'chat',
   giftEffects: r.gift_effects !== false,
-  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Dümen koltuğu holder, if any.
+  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Patron koltuğu holder, if any.
   rules: rulesOf(r.rules),
   boss: r.boss_id && rulesOf(r.rules).bossSeat ? { id: r.boss_id, name: r.boss_name ?? 'Üye', avatarUrl: r.boss_avatar ?? null } : null,
 });
@@ -243,7 +243,7 @@ export async function voiceAccess(name, u, password) {
 }
 
 /**
- * Dümen koltuğu: the room's top gifter of the last 24 hours (once past BOSS_SEAT_MIN_COINS) sits on it while the
+ * Patron koltuğu: the room's top gifter of the last 24 hours (once past BOSS_SEAT_MIN_COINS) sits on it while the
  * owner keeps it on and the room is Lv.3 or more; anyone banned from the room is left out. When the holder changes,
  * the room's phones are told to read the room again. Never throws.
  */
@@ -371,7 +371,7 @@ export const roomRoutes = {
 
   async 'GET /api/room'(req, url) {
     await auth(req);
-    // The Dümen koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
+    // The Patron koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
     const id = url.searchParams.get('id');
     if (typeof id === 'string' && UUID.test(id)) await refreshBoss(id);
     const [room] = await withVoiceCounts([await roomRow(id)]);

@@ -69,7 +69,7 @@ export type Room = {
   bossSeat?: boolean;
   /** A server room: the owner turned gift effects off for everyone in it (undefined/true: on). */
   giftEffects?: boolean;
-  /** A server room: its rules (Oda ayarları, Moderasyon) and its Dümen koltuğu holder (server id). */
+  /** A server room: its rules (Oda ayarları, Moderasyon) and its Patron koltuğu holder (server id). */
   rules?: RoomRulesLike;
   bossId?: string | null;
   /** The rules' forbidden words, one per line (plain text, so the room screen can hand it to the voice handlers). */

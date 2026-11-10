@@ -286,7 +286,7 @@ export const ROOM_LEVEL_REWARDS = [
   '9 yöneticiye kadar, yeni oda arka planları ve özel mikrofon düzenleri',
   '1.200 kişilik üye sınırı, 12 yöneticiye kadar, üst seviye oda simgesi, +2 mikrofon',
   '1.350 kişilik üye sınırı, ek tema ve hediye animasyonları',
-  '1.500 kişilik üye sınırı, 15 yöneticiye kadar, özel yönetici yeri (Dümen koltuğu)',
+  '1.500 kişilik üye sınırı, 15 yöneticiye kadar, özel yönetici yeri (Patron koltuğu)',
   '1.750 kişilik üye sınırı, 17 yöneticiye kadar, yeni oda teması',
   '2.000 kişilik üye sınırı, 20 yöneticiye kadar, özel hediye paketi',
   '2.500 kişilik üye sınırı, 23 yöneticiye kadar, gelişmiş mikrofon düzeni',

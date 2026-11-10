@@ -2,7 +2,7 @@
 
 Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir görsel**. Liste kodun taranmasıyla çıkarıldı (uygulamada 1.398 emoji kullanımı, 330 farklı emoji). Aynı görselin birden çok yerde kullanıldığı durumlarda tek satır ve tek dosya adı var.
 
-**Ad değişikliği notu:** Bu liste teslim edilen dosyaların kaydıdır; dosya adları ve görsel tarifleri teslim anındaki haliyle kalır. Ekrandaki adlar değişti: SVIP → İnci, Asil → Rütbe (Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa), Kabile/Aile → Aile, Patron koltuğu → Dümen koltuğu, Lucky → Uğurlu, CP → İkili, Casino → Oyun Salonu, Servet → Cömertlik, Cazibe → Yankı. Yeni adlara uygun görseller ayrı bir sanat listesiyle üretilecek.
+**Ad değişikliği notu:** Bu liste teslim edilen dosyaların kaydıdır; dosya adları ve görsel tarifleri teslim anındaki haliyle kalır. Ekrandaki adlar değişti: SVIP → İnci, Asil → Rütbe (Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa), Kabile/Aile → Aile, Patron koltuğu → Patron koltuğu, Lucky → Uğurlu, CP → İkili, Casino → Oyun Salonu, Servet → Cömertlik, Cazibe → Yankı. Yeni adlara uygun görseller ayrı bir sanat listesiyle üretilecek.
 
 **Teslim durumu:** 536 görselin hepsi 512 px PNG olarak teslim alındı (iki ZIP, klasör 01–12). Tablonun "Not" sütunu her satırın durumunu söyler.
 

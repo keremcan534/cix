@@ -4,7 +4,7 @@ Yeni adlarla uyumlu, rakip uygulamaların görünümünü taşımayan görseller
 
 1. İnci 1–10 rozet ailesi: mevcut svip-01…svip-10.png taç motifli (svip-03 kontrol edildi: altın taç). Taç yerine inci ve istiridye motifi, seviyeyle büyüyen parıltı. Ayrıca svip-svip-isareti.png, ayricalik-svip-rozeti.png, ayricalik-svip-etiket.png, ayricalik-svip-e-ozel-hediye.png yeniden çizilmeli; üzerlerinde 'SVIP' yazısı veya taç olmasın.
 2. Rütbe 5 amblemi: Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa (asil-1-sovalye … asil-5-duk.png yerine). Soylu kalkan ve aslan motifi yok; dümen, halat, çapa, yıldızlı apolet gibi denizci öğeler kullanılsın. Ayrıca ayricalik-asil-etiketi / -koltugu / -madalyasi.png → 'Rütbe Nişanı' ve rütbe koltuğu.
-3. Oda sahibi 'Kaptan' rozeti (koltukta taç yerine) ve 'Dümen koltuğu' çerçevesi ve ikonu.
+3. Oda sahibi 'Kaptan' rozeti (koltukta taç yerine) ve 'Patron koltuğu' çerçevesi ve ikonu.
 4. Boş koltuk kabuğu, 3 durum: boş, davetli, kilitli (sade deniz camı halka).
 5. Fener ışık konisi dokusu: şeffaf PNG, 2 yoğunluk (konuşma göstergesi ve sıralama podyumu için).
 6. 'Balkona çıktı' giriş şeridinin köpük kenarı dokusu.

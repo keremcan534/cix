@@ -1,4 +1,4 @@
-// A server room's rules, members and Dümen koltuğu (rooms.mjs, room-rules.mjs) against a real Postgres and a fake
+// A server room's rules, members and Patron koltuğu (rooms.mjs, room-rules.mjs) against a real Postgres and a fake
 // LiveKit: who may change which rule and at what level, the Sahne room's mic queue, members in open, apply and closed
 // rooms, private rooms and the people limit at the voice token, mics for members only, and the top gifter's seat.
 import { after, describe, test } from 'node:test';
@@ -203,15 +203,15 @@ describe('Oda üyeleri', () => {
   });
 });
 
-describe('Dümen koltuğu', () => {
+describe('Patron koltuğu', () => {
   test('son 24 saatin en çok hediye göndereni oturur (1.000 jetondan sonra); koltuk kapanınca kalkar', async () => {
-    const owner = await signUp('Dümen Sahibi');
+    const owner = await signUp('Patron Sahibi');
     const big = await signUp('Büyük Gönderen');
     const small = await signUp('Küçük Gönderen');
     const room = await roomOf(owner);
     assert.equal((await update(owner.session, { id: room, rules: { bossSeat: true } }))[0], 403, 'Lv.3 gerekir');
     await setLevelXp(owner, 300); // Lv.3
-    await ok(update(owner.session, { id: room, rules: { bossSeat: true } }), 'dümen');
+    await ok(update(owner.session, { id: room, rules: { bossSeat: true } }), 'patron koltuğu');
     for (const s of [big, small]) await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: rnd(6) }, s.session), 'yükleme');
     const gift = (s, giftId, count) => ok(call('POST', '/api/gifts/send', { to: owner.user.id, giftId, count, room, ref: rnd(6) }, s.session), 'hediye');
     const catalog = (await ok(call('GET', '/api/catalog'), 'katalog')).gifts;

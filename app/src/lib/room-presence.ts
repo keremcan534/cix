@@ -23,7 +23,7 @@ export type RoomLive = {
   /** Invisible entry: not listed or counted while on the Balkon (still listed once on a mic). */
   hidden: string[];
   seats: (string | null)[];
-  /** Boss seat ("Dümen koltuğu"): a speaking seat outside the numbered mics; counts as being on a mic. */
+  /** Boss seat ("Patron koltuğu"): a speaking seat outside the numbered mics; counts as being on a mic. */
   boss: string | null;
   locked: number[];
   /** Mic switched off by a moderator (different from someone's own mic toggle). */

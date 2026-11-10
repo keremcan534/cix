@@ -13,7 +13,7 @@ const HOST_MAX = 112;
 export const ROW_GAP = 10;
 /** Room beside a face in its slot, so neighbouring faces and names don't touch. */
 const SIDE = 14;
-/** The Dümen seat: its ring, the tag on it and the name under it. */
+/** The Patron seat: its ring, the tag on it and the name under it. */
 const BOSS_H = 98;
 /** The points pill under a name while a PK runs. */
 const PK_ROOM = 24;
@@ -34,7 +34,7 @@ export function fitFace(heightAt: (face: number) => number, height: number, max:
   return FACE_MIN;
 }
 
-/** What every stage shape is told: the Dümen seat is on, a PK is running (the points pill under the names). */
+/** What every stage shape is told: the Patron seat is on, a PK is running (the points pill under the names). */
 export type FitOpts = { boss?: boolean; pk?: boolean };
 /**
  * Seats fitted to a height: the mic face, the host's (alone on its row), the width a mic takes, the columns (the
@@ -55,7 +55,7 @@ const gridWidth = (width: number) => Math.max(200, Math.min(width, 640) - 16);
 
 function gridAt(guests: number, w: number, cols: number, face: number, o: FitOpts): Fitted {
   const rows = Math.ceil(guests / cols);
-  // Beside the Dümen seat the host is at most the boss seat's ring; alone on its row a little bigger than the rest.
+  // Beside the Patron seat the host is at most the boss seat's ring; alone on its row a little bigger than the rest.
   const host = o.boss ? Math.min(hostFaceOf(face), 70) : hostFaceOf(face);
   const top = o.boss ? Math.max(BOSS_H, seatHeight(host, o.pk)) : seatHeight(host, o.pk);
   return { cols, slot: Math.floor(w / cols), face, host, height: 8 + top + rows * (ROW_GAP + seatHeight(face, o.pk)) };
@@ -133,7 +133,7 @@ export function layoutSizes(plan: LayoutPlan, face: number) {
   };
 }
 
-/** The layout's height with mic faces of `face` px (the Dümen seat's row above it included). */
+/** The layout's height with mic faces of `face` px (the Patron seat's row above it included). */
 export function layoutHeight(s: LayoutSchema, plan: LayoutPlan, face: number, o: FitOpts = {}): number {
   const boss = o.boss ? BOSS_H + 6 : 0;
   if (plan.sided) {

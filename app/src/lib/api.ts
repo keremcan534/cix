@@ -534,7 +534,7 @@ export type ServerRoom = {
   giftEffects?: boolean;
   /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
   rules?: RoomRules;
-  /** Dümen koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
+  /** Patron koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
   boss?: UserCard | null;
   /** The Odalar row's chips (server/api/room-social.mjs): the owner's agency or family, a running in-room PK, and
    *  the room's place in this week's gift ranking (1–3, else null). */

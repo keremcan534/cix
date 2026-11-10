@@ -41,7 +41,7 @@ describe('Klasik mikrofon düzeni', () => {
     for (let cols = 3; cols < f.cols; cols++) assert.ok(Math.ceil(29 / cols) >= Math.ceil(29 / f.cols));
   });
 
-  test('Dümen koltuğu ve PK puanı yüksekliğe katılır', () => {
+  test('Patron koltuğu ve PK puanı yüksekliğe katılır', () => {
     const plain = fitGrid(8, 390, 1000);
     assert.ok(fitGrid(8, 390, 1000, { boss: true }).height >= plain.height - 60);
     assert.ok(fitGrid(8, 390, 1000, { pk: true }).height > plain.height);

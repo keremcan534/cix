@@ -160,7 +160,7 @@ export const backpackRoutes = {
       if (!again) throw new HttpError(409, 'Geçersiz istek kimliği');
       return answer(u.id, true, again.total);
     }
-    // The room sees it on stage like any gift; a new top gifter may take the Dümen koltuğu.
+    // The room sees it on stage like any gift; a new top gifter may take the Patron koltuğu.
     announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
     await refreshBoss(lkRoom.slice(4));
     return answer(u.id, false, total);

@@ -1189,7 +1189,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     lastBoss.current = bossId;
     if (!bossId) return;
     const t = setTimeout(() => {
-      addMsg({ system: true, text: `${bossId === 'me' ? ME.name : userById(bossId).name} dümen koltuğuna oturdu!` });
+      addMsg({ system: true, text: `${bossId === 'me' ? ME.name : userById(bossId).name} patron koltuğuna oturdu!` });
       if (bossId === 'me') setMicOn(true);
     }, 0);
     return () => clearTimeout(t);
@@ -1701,23 +1701,23 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const options: SheetOption[] = [
         { label: 'Profili gör', icon: 'person-outline', onPress: () => router.push(`/kullanici/${bossId}`) },
         { label: 'Hediye gönder', icon: 'gift-outline', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
-        { label: `Dümene geç: ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} jeton daha gönder`, icon: 'information-circle-outline', onPress: () => showAlert('Dümen Koltuğu', bossSeatInfo(bossId, mine, top)) },
+        { label: `Patron koltuğuna geç: ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} jeton daha gönder`, icon: 'information-circle-outline', onPress: () => showAlert('Patron Koltuğu', bossSeatInfo(bossId, mine, top)) },
       ];
       if (myRole === 'owner')
         options.push({
-          label: 'Dümen koltuğundan indir',
+          label: 'Patron koltuğundan indir',
           icon: 'arrow-down-circle-outline',
           destructive: true,
           onPress: () => {
             setBossRemoved((s) => new Set(s).add(bossId));
-            addMsg({ system: true, text: `${u.name} dümen koltuğundan indirildi` });
-            logMod('Dümen koltuğundan indirdi', u.name);
+            addMsg({ system: true, text: `${u.name} patron koltuğundan indirildi` });
+            logMod('Patron koltuğundan indirdi', u.name);
           },
         });
-      setSheet({ title: `Dümen · ${u.name} · 🪙 ${top.toLocaleString('tr-TR')}`, options });
+      setSheet({ title: `Patron · ${u.name} · 🪙 ${top.toLocaleString('tr-TR')}`, options });
       return;
     }
-    showAlert('Dümen Koltuğu', bossSeatInfo(bossId, mine, top), bossId === 'me' ? undefined : [
+    showAlert('Patron Koltuğu', bossSeatInfo(bossId, mine, top), bossId === 'me' ? undefined : [
       { text: 'Kapat', style: 'cancel' },
       { text: 'Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
     ]);
@@ -3080,7 +3080,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       </>
     ) : (
       <View style={styles.seatGrid}>
-        {/* Seat 0 has a row of its own (beside the Dümen seat when there is one), a little bigger than the rest. */}
+        {/* Seat 0 has a row of its own (beside the Patron seat when there is one), a little bigger than the rest. */}
         {bossOn ? (
           <View style={styles.topRow}>
             {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
