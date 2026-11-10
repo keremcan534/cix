@@ -158,7 +158,8 @@ export const roomFollowRoutes = {
     const r = await db.query(
       `${ROOM_SELECT} JOIN room_follows f ON f.owner_id = r.owner AND f.user_id = $1
         WHERE u.deleted_at IS NULL
-          AND r.id = (SELECT x.id FROM rooms x WHERE x.owner = r.owner ORDER BY (x.closed_at IS NULL) DESC, x.created_at DESC LIMIT 1)
+          AND r.id = coalesce((SELECT x.id FROM rooms x WHERE x.owner = f.owner_id AND x.closed_at IS NULL),
+                              (SELECT x.id FROM rooms x WHERE x.owner = f.owner_id ORDER BY x.created_at DESC LIMIT 1))
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = r.owner AND b.blocked = $1) OR (b.blocker = $1 AND b.blocked = r.owner))
           AND NOT ${banOf('r.id', '$1')}
         ORDER BY f.created_at DESC LIMIT ${ROOM_FOLLOW_MAX}`,

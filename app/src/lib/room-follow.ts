@@ -49,8 +49,8 @@ export function myRoomRows(joined: readonly Room[], followed: readonly { room: R
   const list = [...rows.values()];
   return [...list.filter((r) => !r.closed).sort((a, b) => b.room.listeners - a.room.listeners), ...list.filter((r) => r.closed)];
 }
-/** The small mark on a row of that list. */
-export const myRoomMark = (r: Pick<MyRoomRow, 'member' | 'followed' | 'closed'>) => (r.closed ? 'Kapalı' : r.member && r.followed ? 'Üye · Takipte' : r.member ? 'Üye' : 'Takipte');
+/** The small mark on a row of that list: why the room is on it (that it is closed shows on its cover). */
+export const myRoomMark = (r: Pick<MyRoomRow, 'member' | 'followed'>) => (r.member && r.followed ? 'Üye · Takipte' : r.member ? 'Üye' : 'Takipte');
 
 // --- Membership ------------------------------------------------------------------------------------------------
 export type Membership = 'owner' | 'none' | 'pending' | 'member';

@@ -570,7 +570,7 @@ function RoomRow({
   );
 }
 
-function RoomRowBody({ room, match, pk, mark, closed }: { room: Room; match: number; pk?: boolean; /** Odalarım › Katıl: "Üye", "Takipte" or "Kapalı". */ mark?: string; closed?: boolean }) {
+function RoomRowBody({ room, match, pk, mark, closed }: { room: Room; match: number; pk?: boolean; /** Odalarım › Katıl: "Üye" or "Takipte". */ mark?: string; closed?: boolean }) {
   const { colors } = useTheme();
   const styles = useStyles();
   const badge = roomBadge(room);

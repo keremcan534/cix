@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS room_follows (
 );
 -- The rooms I follow, newest first (Odalarım).
 CREATE INDEX IF NOT EXISTS room_follows_user ON room_follows (user_id, created_at DESC);
+-- An account's last room, for a followed room that is closed now (an open one has rooms_one_open_per_owner).
+CREATE INDEX IF NOT EXISTS rooms_owner_created ON rooms (owner, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS room_open_notices (
   id         bigserial PRIMARY KEY,

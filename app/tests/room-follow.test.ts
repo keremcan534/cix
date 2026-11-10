@@ -79,7 +79,7 @@ describe('Odalarım › Katıl', () => {
       ['c', false, true, true],
       ['e', false, true, true],
     ]);
-    assert.deepEqual(rows.map(myRoomMark), ['Üye · Takipte', 'Takipte', 'Üye', 'Kapalı', 'Kapalı']);
+    assert.deepEqual(rows.map(myRoomMark), ['Üye · Takipte', 'Takipte', 'Üye', 'Takipte', 'Takipte']);
     assert.deepEqual(myRoomRows([], []), []);
     assert.deepEqual(myRoomRows([a], []).map((r) => r.room.id), ['a']);
   });
