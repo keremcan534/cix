@@ -2,7 +2,8 @@
 //
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
-//   GET    /api/user?id=                                  → { user }  (public profile + counts + relation)
+//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit)
+//   GET    /api/me/visitors                               → { count, visitors }  (last 7 days; visitors only with VIP)
 //   POST   /api/follow  { to, follow }                    → { following }
 //   GET    /api/following                                 → { users }
 //   POST   /api/block   { to, block }                     → { blocked }
@@ -14,7 +15,8 @@ import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
-import { looksOf, revokeAllForDelete } from './economy.mjs';
+import { looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
+import { svipLevel, vipLevelOf } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
@@ -57,6 +59,31 @@ async function liveUser(id) {
   return r.rows[0];
 }
 
+/** "Sessiz ziyaret" (silent visit): from this İnci level on, opening a profile leaves no trace (app data/status). */
+export const SILENT_VISIT_SVIP = 7;
+let visitsPrunedAt = 0;
+
+/**
+ * `me` opened `owner`'s profile. A visit within 10 minutes of the last one counts once; after a week without one
+ * the count starts again. Not recorded with "Sessiz ziyaret". Once an hour, rows past the week (and a day) go.
+ */
+async function recordVisit(owner, me) {
+  if (svipLevel(Number(me.svip_xp) || 0) >= SILENT_VISIT_SVIP) return;
+  await db.query(
+    `INSERT INTO profile_visits (owner_id, visitor_id) VALUES ($1, $2)
+     ON CONFLICT (owner_id, visitor_id) DO UPDATE SET
+       visits = CASE WHEN profile_visits.last_at < now() - interval '7 days' THEN 1
+                     WHEN profile_visits.last_at < now() - interval '10 minutes' THEN profile_visits.visits + 1
+                     ELSE profile_visits.visits END,
+       last_at = now()`,
+    [owner, me.id],
+  );
+  if (Date.now() - visitsPrunedAt > 3_600_000) {
+    visitsPrunedAt = Date.now();
+    await db.query("DELETE FROM profile_visits WHERE last_at < now() - interval '8 days'").catch((e) => console.error('visits prune', e.message));
+  }
+}
+
 /** The erasure of DELETE /api/me inside transaction `c`, for account `id` (its phone `phone`); also the admin's
  * deletion of test accounts (admin.mjs). */
 export async function eraseAccount(c, id, phone) {
@@ -75,6 +102,7 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM sessions WHERE user_id = $1', [id]);
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
+    await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
     await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
@@ -189,6 +217,7 @@ export const socialRoutes = {
       [id, me.id],
     );
     const x = r.rows[0];
+    if (url.searchParams.get('visit') === '1' && id !== me.id && !x.blocked_by_me) await recordVisit(id, me);
     // A streamer's agency (an approved one they are in now) and anyone's family, shown on the profile.
     const ag = await db.query(
       `SELECT a.id, a.name FROM agency_streamers s JOIN agencies a ON a.id = s.agency_id
@@ -200,6 +229,28 @@ export const socialRoutes = {
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
+    };
+  },
+
+  /**
+   * Profil ziyaretçileri: who opened my profile in the last 7 days. How many is for everyone; who they are is a VIP
+   * right (VIP 1 and up, by İnci or Rütbe), so without it `visitors` is null. Blocked people either way and deleted
+   * accounts are left out. Newest first, at most 100.
+   */
+  async 'GET /api/me/visitors'(req) {
+    const me = await auth(req);
+    const r = await db.query(
+      `SELECT v.visitor_id AS id, u.name, u.avatar_url, v.visits, v.last_at, count(*) OVER () AS total
+         FROM profile_visits v JOIN users u ON u.id = v.visitor_id
+        WHERE v.owner_id = $1 AND v.last_at > now() - interval '7 days' AND u.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = v.visitor_id) OR (b.blocker = v.visitor_id AND b.blocked = $1))
+        ORDER BY v.last_at DESC LIMIT 100`,
+      [me.id],
+    );
+    const vip = vipLevelOf(me.svip_xp, (await statusOf(db, me.id)).noble?.tier) >= 1;
+    return {
+      count: Number(r.rows[0]?.total ?? 0),
+      visitors: vip ? r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null, visits: x.visits, lastAt: x.last_at })) : null,
     };
   },
 

@@ -551,8 +551,13 @@ export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDa
 export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
 /** Someone's agency (an approved one they stream in now) and family, on their profile. */
 export type ProfileTies = { agency: { id: string; name: string } | null; family: { id: string; name: string; role: 'owner' | 'helper' | 'member' } | null };
-export const userProfile = (id: string) =>
-  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+/** `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. */
+export const userProfile = (id: string, visit = false) =>
+  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+/** Someone who opened my profile in the last 7 days. */
+export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
+/** Profil ziyaretçileri: how many came (everyone), and who (`visitors`, VIP only: null without it). */
+export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null }>('GET', '/api/me/visitors');
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
 /** Keşfet: real people, most recently active first (no distance on the server: city only). */
 export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };

@@ -51,10 +51,11 @@ export async function loadMe(): Promise<Partial<User>> {
 
 /**
  * Someone's public profile with their counts. Another person's age, city and interests also update what this
- * phone knows about them (data/mock); `mine`: my own profile, of which only the counts are used.
+ * phone knows about them (data/mock); `mine`: my own profile, of which only the counts are used. `visit`: opened
+ * on the profile screen, so it counts as a visit (their Profil ziyaretçileri).
  */
-export async function loadPublicProfile(serverId: string, mine = false): Promise<SocialCounts> {
-  const p = await api.userProfile(serverId);
+export async function loadPublicProfile(serverId: string, mine = false, visit = false): Promise<SocialCounts> {
+  const p = await api.userProfile(serverId, visit && !mine);
   putTies(serverId, p);
   if (!mine) {
     putServerUser({

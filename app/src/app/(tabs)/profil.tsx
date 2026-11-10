@@ -9,7 +9,7 @@ import { Text } from '@/components/text';
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
-import { PROFILE_VISITORS } from '@/data/messages-ui';
+import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 import { FollowListSheet } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
 import { displayId } from '@/data/profile';
@@ -58,7 +58,7 @@ const SUPPORT: Item[] = [
 const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
+  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const isAdmin = useIsAdmin();
@@ -70,7 +70,7 @@ export default function ProfileScreen() {
   const serverRooms = useServerRooms();
   const ownRoom = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
   // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through. Live:
-  // Mesajlar's friends are the people I follow, and profile visitors are not recorded on the server.
+  // Mesajlar's friends are the people I follow; visitors come from the server (who they are only with VIP).
   const followers = live ? (server.stats?.followers ?? null) : [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
   const followingCount = live ? (server.stats?.following ?? following.size) : following.size;
   const friendCount = live ? [...following].filter((id) => id !== 'me' && !blocked.has(id)).length : new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
@@ -81,7 +81,8 @@ export default function ProfileScreen() {
     const ids = side === 'followers' ? [...FOLLOWS_ME] : [...following];
     return ids.filter((id) => id !== 'me' && !blocked.has(id)).map((id) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
   };
-  const visitorCount = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId)).length;
+  const visitors = useProfileVisitors();
+  const [visitorsOpen, setVisitorsOpen] = useState(false);
   const completion = myCompletion(me, live);
   // My public id: the one others see on my profile (data/profile displayId of my server id); none until known.
   const serverId = server.stats?.serverId ?? myServerId();
@@ -142,14 +143,23 @@ export default function ProfileScreen() {
           <Stat n={followers} label="Takipçiler" onPress={() => setList('followers')} />
           <Stat n={followingCount} label="Takip" onPress={() => setList('following')} />
           <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
-          {!live && (
-            <Stat
-              n={visitorCount}
-              label="Ziyaretçiler"
-              dot
-              onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? `Son 7 günde profilini ${visitorCount} kişi ziyaret etti. (VIP ayrıcalığı)` : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
-            />
-          )}
+          <Stat
+            n={visitors.count}
+            label="Ziyaretçiler"
+            dot={(visitors.count ?? 0) > 0}
+            onPress={() =>
+              visitors.unlocked
+                ? setVisitorsOpen(true)
+                : showAlert(
+                    'Ziyaretçiler',
+                    `${visitors.count ? `Son 7 günde profiline ${visitors.count} kişi baktı. ` : ''}Kimlerin baktığını görmek VIP ayrıcalığıdır.`,
+                    [
+                      { text: 'Kapat', style: 'cancel' },
+                      { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) },
+                    ],
+                  )
+            }
+          />
         </View>
 
         <View style={styles.card}>
@@ -265,6 +275,7 @@ export default function ProfileScreen() {
         load={() => loadList(list ?? 'followers')}
         onClose={() => setList(null)}
       />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
     </SafeAreaView>
   );
 }

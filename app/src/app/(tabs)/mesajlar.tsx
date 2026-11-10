@@ -2,14 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlatList, Image, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
-import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime, type CallLog } from '@/data/messages-ui';
+import { CALL_HISTORY, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime, type CallLog } from '@/data/messages-ui';
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
@@ -20,6 +20,7 @@ import { TeamInbox } from '@/components/team-inbox';
 import { teamUnread } from '@/lib/live/team';
 import { messagePreview } from '@/components/ReactionArt';
 import { callsAvailable, liveMode } from '@/lib/live';
+import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
@@ -45,7 +46,7 @@ const POPULAR_ROOM = [...ROOMS].sort((a, b) => b.listeners - a.listeners)[0];
 type Friend = { user: User; iFollow: boolean; followsMe: boolean };
 
 export default function MessagesScreen() {
-  const { conversations, blocked, following, recentRooms, vipDays, markRead, myRoom } = useApp();
+  const { conversations, blocked, following, recentRooms, markRead, myRoom } = useApp();
   // Profil › Arkadaşlar opens this tab on Arkadaşlarım (the tab stays mounted, so follow later visits too).
   const params = useLocalSearchParams<{ tab?: string }>();
   const asked = params.tab === 'friends' || (params.tab === 'calls' && callsAvailable()) ? params.tab : null;
@@ -100,8 +101,10 @@ export default function MessagesScreen() {
     .sort((a, b) => Number(b.iFollow && b.followsMe) - Number(a.iFollow && a.followsMe) || Number(b.user.online) - Number(a.user.online));
 
   const calls = clearedCalls ? [] : CALL_HISTORY.filter((c) => !blocked.has(c.userId));
-  // Profile visitors are sample data: the server doesn't record visits yet, so a live build shows no visitors row.
-  const visitors = liveMode() ? [] : PROFILE_VISITORS.filter((v) => !blocked.has(v.userId));
+  // Profil ziyaretçileri: from the server in a live build (how many for everyone, who only with VIP), the sample
+  // visitors in the demo; the Ben tab shows the same numbers (components/visitors-sheet).
+  const visitors = useProfileVisitors();
+  const visitorCount = visitors.count ?? 0;
 
   // Last visited room for the "Canlı Odalar" row.
   const lastRoomId = recentRooms[0];
@@ -110,7 +113,7 @@ export default function MessagesScreen() {
   const openParty = () => (lastRoomId ? router.push(`/oda/${lastRoomId}`) : router.push('/(tabs)'));
 
   const openVisitors = () => {
-    if (vipDays > 0) {
+    if (visitors.unlocked) {
       setVisitorsSeen(true);
       setVisitorsOpen(true);
       return;
@@ -191,19 +194,19 @@ export default function MessagesScreen() {
               />
             </>
           )}
-          {/* Only shown when there are visitors to list; the count is the same list the sheet shows. */}
-          {visitors.length > 0 && (
+          {/* Only shown when someone came; with VIP the sheet lists them. */}
+          {visitorCount > 0 && (
             <>
               <View style={styles.sep} />
               <SystemRow
                 icon={<Ionicons name="eye" size={22} color="#fff" />}
                 iconColors={['#FF8A97', '#FF6576']}
                 title="Profil ziyaretçilerin"
-                subtitle={`Son 7 günde ${visitors.length} kişi profiline baktı`}
+                subtitle={`Son 7 günde ${visitorCount} kişi profiline baktı`}
                 onPress={openVisitors}
                 right={
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {!visitorsSeen && <CountBadge n={visitors.length} />}
+                    {!visitorsSeen && <CountBadge n={visitorCount} />}
                     <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
                   </View>
                 }
@@ -280,7 +283,7 @@ export default function MessagesScreen() {
       )}
 
       <ActionSheet visible={menuOpen} options={menuOptions} onClose={() => setMenuOpen(false)} />
-      <VisitorsSheet visible={visitorsOpen} visitors={visitors} onClose={() => setVisitorsOpen(false)} />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
       <TeamInbox visible={teamOpen} onClose={() => setTeamOpen(false)} onUnread={setTeamNew} />
     </SafeAreaView>
   );
@@ -501,58 +504,6 @@ function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }
   );
 }
 
-function VisitorsSheet({ visible, visitors, onClose }: { visible: boolean; visitors: typeof PROFILE_VISITORS; onClose: () => void }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  // Android draws the modal edge to edge: the last row stays above the navigation bar.
-  const { bottom } = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(34, bottom + 8) }]}>
-        <View style={styles.sheetHandle} />
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={styles.sheetTitle}>Profilimi Kimler Ziyaret Etti</Text>
-          <VipBadge />
-        </View>
-        <Text style={styles.sheetSub}>Son 7 günde {visitors.length} kişi profilini ziyaret etti</Text>
-        <ScrollView>
-          {visitors.map((v) => {
-            const u = userById(v.userId);
-            return (
-              <Pressable
-                key={v.id}
-                style={({ pressed }) => [styles.visitorRow, pressed && { backgroundColor: colors.cardAlt }]}
-                onPress={() => {
-                  onClose();
-                  router.push(`/kullanici/${u.id}`);
-                }}
-              >
-                <Avatar uri={u.avatar} size={44} online={u.online} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.name}>{u.age > 0 ? `${u.name}, ${u.age}` : u.name}</Text>
-                  <Text style={styles.last}>
-                    {v.count} kez ziyaret etti · {u.city}
-                  </Text>
-                </View>
-                <Text style={styles.time}>{v.time}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        {visitors.length === 0 && <Text style={styles.empty}>Henüz ziyaretçin yok.</Text>}
-      </View>
-    </Modal>
-  );
-}
-
 const useStyles = makeStyles(({ colors, lift, dark }) => ({
   topBar: {
     flexDirection: 'row',
@@ -702,38 +653,5 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-  },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 12,
-    paddingBottom: 34,
-    maxHeight: '75%',
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: 10,
-  },
-  sheetTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  sheetSub: {
-    color: colors.textDim,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  visitorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderRadius: 14,
   },
 }));

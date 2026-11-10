@@ -119,7 +119,7 @@ export default function UserProfile() {
     let retry: ReturnType<typeof setTimeout> | undefined;
     let tries = 0;
     const read = () =>
-      loadPublicProfile(serverId, isMe)
+      loadPublicProfile(serverId, isMe, true)
         .then((counts) => {
           if (!alive) return;
           setSocial({ id: serverId, counts });
