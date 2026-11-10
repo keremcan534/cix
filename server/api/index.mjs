@@ -15,6 +15,7 @@
 // and account deletion: social.mjs (levels, extras, album and Vitrin of a profile: profiles.mjs). Direct messages:
 // messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower invites: room-social.mjs). Staff: admin.mjs.
 // Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
+// Support tickets: support.mjs. The data copy (UK GDPR access): my-data.mjs. The daily spending limit: spend-limit.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
@@ -61,6 +62,9 @@ import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
+import { supportRoutes } from './support.mjs';
+import { myDataRoutes } from './my-data.mjs';
+import { spendLimitRoutes } from './spend-limit.mjs';
 import { teamRoutes } from './team.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
@@ -238,6 +242,9 @@ const routes = {
   ...liveRoutes,
   ...socialRoutes,
   ...profileRoutes,
+  ...supportRoutes,
+  ...myDataRoutes,
+  ...spendLimitRoutes,
   ...messageRoutes,
   ...oneOnOneRoutes,
   ...privacyRoutes,

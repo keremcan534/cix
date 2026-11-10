@@ -1,19 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { Art } from '@/components/Art';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
-import { Card, GradientButton, Header } from '@/components/ui';
+import { Button, Card, GradientButton, Header } from '@/components/ui';
 import { FAQ, TICKET_CATEGORIES, type TicketCategory } from '@/data/catalog';
 import { showAlert } from '@/lib/alert';
-import { liveMode, myServerId } from '@/lib/live';
+import { ApiError } from '@/lib/api';
+import { liveMode, message, myServerId } from '@/lib/live';
+import { type PickedImage } from '@/lib/live/profile';
+import { answerTicket, closeMyTicket, refreshTickets, sendTicket, useLiveTickets } from '@/lib/live/support';
 import { openSupportMail } from '@/lib/open-mail';
 import { SUPPORT_EMAIL, supportRequestMail } from '@/lib/support-mail';
+import { TICKET_MAX_PHOTOS, ticketProblem, ticketSummary, type TicketView } from '@/lib/support-tickets';
 import { useApp, type Ticket } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 
@@ -35,19 +40,24 @@ const FAQ_PREVIEW = 3;
 type View_ = 'home' | 'faq' | 'new' | 'list';
 
 export default function SupportScreen() {
-  const { kategori } = useLocalSearchParams<{ kategori?: string }>();
-  const { tickets, createTicket } = useApp();
+  // tab=talepler: Taleplerim (a staff reply's notice links here).
+  const { kategori, tab: tabParam } = useLocalSearchParams<{ kategori?: string; tab?: string }>();
+  const { tickets: demoTickets, createTicket } = useApp();
   const { colors, gradientDeep } = useTheme();
   const styles = useStyles();
   const initial = TICKET_CATEGORIES.includes(kategori as TicketCategory) ? (kategori as TicketCategory) : 'Teknik';
-  const [tab, setTab] = useState<View_>(kategori ? 'new' : 'home');
+  const [tab, setTab] = useState<View_>(kategori ? 'new' : tabParam === 'talepler' ? 'list' : 'home');
   const [category, setCategory] = useState<TicketCategory>(initial);
   const [feedback, setFeedback] = useState(false);
   const [text, setText] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  // A live build has no ticket route on the server yet: a request goes to support as an e-mail, and there is no
-  // ticket list here (no made-up answers either). The demo keeps the prototype tickets (giris-3).
+  // Live mode: tickets, their threads and evidence photos are on the server (lib/live/support, server/api/support.mjs);
+  // staff answer from Yönetim › Destek. The demo keeps its prototype tickets with a sample answer.
   const live = liveMode();
+  const server = useLiveTickets();
+  const tickets: (Ticket & { photos?: string[] })[] = live ? (server.tickets ?? []) : demoTickets;
+  const [photos, setPhotos] = useState<PickedImage[]>([]);
+  const [sending, setSending] = useState(false);
 
   const openNew = (c: TicketCategory, isFeedback = false) => {
     setCategory(c);
@@ -55,16 +65,44 @@ export default function SupportScreen() {
     setTab('new');
   };
 
-  const submit = () => {
-    if (text.trim().length < 10) return showAlert('Lütfen sorunu biraz daha detaylı anlat (en az 10 karakter)');
-    const no = createTicket(category, (feedback ? '[Geri bildirim] ' : '') + text.trim());
-    setText('');
-    setFeedback(false);
-    setTab('list');
-    showAlert('Talep oluşturuldu', `Talep numaran #${no}. Yanıtlar ve durum değişiklikleri burada görünür.`);
+  const email = () => openSupportMail(supportRequestMail(feedback ? 'Geri bildirim' : category, live ? myServerId() : null, feedback));
+
+  const submit = async () => {
+    if (!live) {
+      if (text.trim().length < 10) return showAlert('Lütfen sorunu biraz daha detaylı anlat (en az 10 karakter)');
+      const no = createTicket(category, (feedback ? '[Geri bildirim] ' : '') + text.trim());
+      setText('');
+      setFeedback(false);
+      setTab('list');
+      return showAlert('Talep oluşturuldu', `Talep numaran #${no}. Yanıtlar ve durum değişiklikleri burada görünür.`);
+    }
+    const problem = ticketProblem(text, photos.length);
+    if (problem) return showAlert(problem);
+    setSending(true);
+    try {
+      const t = await sendTicket({ category, text: text.trim(), feedback, photos });
+      setText('');
+      setFeedback(false);
+      setPhotos([]);
+      setTab('list');
+      showAlert('Talep oluşturuldu', `Talep numaran #${t.number}. Yanıt geldiğinde Similar Ekibi’nde ve bildirimle haber veririz; yanıtlar burada görünür.`);
+    } catch (e) {
+      // A server without tickets yet: the request can still go as an e-mail.
+      if (e instanceof ApiError && e.status === 404) showAlert('Talep gönderilemedi', 'Destek talebi şu an açılamıyor. E-postayla yazabilirsin.', [{ text: 'Vazgeç', style: 'cancel' }, { text: 'E-posta yaz', onPress: email }]);
+      else showAlert('Talep gönderilemedi', message(e));
+    } finally {
+      setSending(false);
+    }
   };
 
-  const email = () => openSupportMail(supportRequestMail(feedback ? 'Geri bildirim' : category, live ? myServerId() : null, feedback));
+  const addEvidence = async () => {
+    if (!live) return showAlert('Kanıt ekleme', 'Ekran görüntüsü ekleme gerçek sürümde dosya seçiciyle yapılır (demo).');
+    if (photos.length >= TICKET_MAX_PHOTOS) return showAlert('Kanıt ekleme', `En fazla ${TICKET_MAX_PHOTOS} fotoğraf eklenebilir.`);
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    setPhotos((p) => [...p, { uri: a.uri, mimeType: a.mimeType, width: a.width, height: a.height }].slice(0, TICKET_MAX_PHOTOS));
+  };
 
   const faqItem = (f: (typeof FAQ)[number], i: number, last: boolean) => (
     <Pressable key={f.q} onPress={() => setOpenFaq(openFaq === i ? null : i)} style={[styles.faqRow, !last && styles.divider]}>
@@ -88,8 +126,8 @@ export default function SupportScreen() {
             {(
               [
                 ['faq', 'SSS'],
-                ['new', feedback ? 'Geri bildirim' : live ? 'E-posta ile yaz' : 'Yeni talep'],
-                ...(live ? [] : ([['list', `Taleplerim (${tickets.length})`]] as const)),
+                ['new', feedback ? 'Geri bildirim' : 'Yeni talep'],
+                ['list', `Taleplerim (${tickets.length})`],
               ] as const
             ).map(([k, l]) => (
               <Pressable key={k} onPress={() => setTab(k)} style={[styles.segBtn, tab === k && styles.segActive]}>
@@ -134,48 +172,17 @@ export default function SupportScreen() {
                 {FAQ.slice(0, FAQ_PREVIEW).map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}
               </Card>
 
-              {!live && <ServiceRow icon="headset" tint={['#13D9DF', '#0A8F95']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />}
+              {/* The same place Mesajlar › Çevrim içi hizmet opens: a ticket the support team answers here. */}
+              <ServiceRow icon="headset" tint={['#13D9DF', '#0A8F95']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
               <ServiceRow icon="create" tint={['#3B82F6', '#0E7C9A']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
-              {!live && (
-                <ServiceRow
-                  icon="chatbubbles"
-                  tint={['#38BDF8', '#3B82F6']}
-                  title="Sorun Takibi"
-                  sub={tickets.length ? `${tickets.length} talep · ${tickets.filter((t) => t.status === 'Yanıtlandı').length} yanıtlandı` : undefined}
-                  onPress={() => setTab('list')}
-                />
-              )}
+              <ServiceRow icon="chatbubbles" tint={['#38BDF8', '#3B82F6']} title="Sorun Takibi" sub={ticketSummary(tickets)} onPress={() => setTab('list')} />
               <ServiceRow icon="mail" tint={['#5B7BA6', '#34507A']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={() => openSupportMail({ subject: 'Similar Club destek' })} />
             </>
           )}
 
           {tab === 'faq' && <Card style={{ paddingVertical: 4 }}>{FAQ.map((f, i, arr) => faqItem(f, i, i === arr.length - 1))}</Card>}
 
-          {tab === 'new' && live && (
-            <Card style={{ gap: 10 }}>
-              <Text style={styles.dim}>
-                {feedback
-                  ? 'Uygulamayı geliştirmemize yardım et: öneri, hata veya beğenmediğin bir şeyi e-postayla yaz.'
-                  : 'Destek taleplerini e-postayla alıyoruz. Konuyu seç; açılan e-postaya ne olduğunu yaz. Tarih, kullanıcı ID veya işlem numarası eklersen daha hızlı çözeriz.'}
-              </Text>
-              {!feedback && (
-                <>
-                  <Text style={styles.label}>Konu</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {TICKET_CATEGORIES.map((c) => (
-                      <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { borderColor: colors.primaryText }]}>
-                        <Text style={styles.chipText}>{c}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </>
-              )}
-              <GradientButton title="E-posta yaz" icon="mail" onPress={email} />
-              <Text style={[styles.dim, { textAlign: 'center' }]}>Yanıtımız e-postana gelir · {SUPPORT_EMAIL}</Text>
-            </Card>
-          )}
-
-          {tab === 'new' && !live && (
+          {tab === 'new' && (
             <Card style={{ gap: 10 }}>
               {feedback && <Text style={styles.dim}>Uygulamayı geliştirmemize yardım et: öneri, hata veya beğenmediğin bir şeyi yaz.</Text>}
               <Text style={styles.label}>Kategori</Text>
@@ -191,20 +198,47 @@ export default function SupportScreen() {
                 value={text}
                 onChangeText={setText}
                 multiline
+                maxLength={live ? 2000 : undefined}
                 placeholder={feedback ? 'Önerini veya geri bildirimini yaz…' : 'Ne oldu? Tarih, kullanıcı ID veya işlem numarası eklersen daha hızlı çözeriz.'}
                 placeholderTextColor={colors.textDim}
                 style={[styles.input, { minHeight: 110 }]}
               />
-              <Pressable onPress={() => showAlert('Kanıt ekleme', 'Ekran görüntüsü ekleme gerçek sürümde dosya seçiciyle yapılır (demo).')} style={styles.attach}>
+              {photos.length > 0 && (
+                <View style={styles.photos}>
+                  {photos.map((p, i) => (
+                    <View key={p.uri}>
+                      <Image source={{ uri: p.uri }} style={styles.photo} accessibilityLabel={`Kanıt ${i + 1}`} />
+                      <Pressable onPress={() => setPhotos((xs) => xs.filter((x) => x.uri !== p.uri))} hitSlop={8} style={styles.photoRemove} accessibilityLabel={`Kanıt ${i + 1} kaldır`}>
+                        <Ionicons name="close" size={14} color="#fff" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <Pressable onPress={() => void addEvidence()} style={styles.attach} accessibilityRole="button">
                 <Ionicons name="attach" size={18} color={colors.textDim} />
-                <Text style={styles.dim}>Kanıt ekle (ekran görüntüsü)</Text>
+                <Text style={styles.dim}>{live ? `Kanıt ekle (ekran görüntüsü · ${photos.length}/${TICKET_MAX_PHOTOS})` : 'Kanıt ekle (ekran görüntüsü)'}</Text>
               </Pressable>
-              <GradientButton title="Gönder" icon="send" onPress={submit} />
+              {live ? <Button title={sending ? 'Gönderiliyor…' : 'Gönder'} icon="send" disabled={sending} onPress={() => void submit()} /> : <GradientButton title="Gönder" icon="send" onPress={() => void submit()} />}
               <Text style={[styles.dim, { textAlign: 'center' }]}>Canlı destek 9:00 - 19:00 arasında yanıt verir; diğer saatlerde talebin sıraya alınır.</Text>
             </Card>
           )}
 
-          {tab === 'list' && !live && (tickets.length === 0 ? <Text style={[styles.dim, { textAlign: 'center', marginTop: 30 }]}>Henüz talebin yok.</Text> : tickets.map((t) => <TicketCard key={t.id} t={t} />))}
+          {tab === 'list' &&
+            (live && server.tickets === null ? (
+              server.failed ? (
+                <View style={{ alignItems: 'center', gap: 10, marginTop: 30 }}>
+                  <Text style={styles.dim}>Talepler yüklenemedi. İnternetini kontrol edip tekrar dene.</Text>
+                  <Button title="Tekrar dene" icon="refresh" small variant="tonal" onPress={() => void refreshTickets()} />
+                </View>
+              ) : (
+                <Text style={[styles.dim, { textAlign: 'center', marginTop: 30 }]}>Talepler yükleniyor…</Text>
+              )
+            ) : tickets.length === 0 ? (
+              <Text style={[styles.dim, { textAlign: 'center', marginTop: 30 }]}>Henüz talebin yok.</Text>
+            ) : (
+              tickets.map((t) => <TicketCard key={t.id} t={t} live={live} />)
+            ))}
         </ScrollView>
       </KeyboardAvoid>
     </SafeAreaView>
@@ -230,13 +264,34 @@ function ServiceRow({ icon, tint, title, sub, onPress }: { icon: keyof typeof Io
   );
 }
 
-function TicketCard({ t }: { t: Ticket }) {
+/** One ticket and its thread. Live mode: a reply and the close go to the server (lib/live/support). */
+function TicketCard({ t, live }: { t: Ticket & Partial<Pick<TicketView, 'photos'>>; live: boolean }) {
   const { replyTicket, setTicketStatus } = useApp();
   const theme = useTheme();
   const { colors, dark } = theme;
   const styles = useStyles();
   const [reply, setReply] = useState('');
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const run = (job: () => Promise<void>, failed: string) => {
+    setBusy(true);
+    job()
+      .catch((e: unknown) => showAlert(failed, message(e)))
+      .finally(() => setBusy(false));
+  };
+  const send = () => {
+    const text = reply.trim();
+    if (!text) return;
+    if (!live) {
+      replyTicket(t.id, text);
+      return setReply('');
+    }
+    run(async () => {
+      await answerTicket(t.id, text);
+      setReply('');
+    }, 'Mesaj gönderilemedi');
+  };
+  const close = () => (live ? run(() => closeMyTicket(t.id), 'Talep kapatılamadı') : setTicketStatus(t.id, 'Çözüldü'));
   return (
     <Card style={{ gap: 8 }}>
       <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -252,6 +307,13 @@ function TicketCard({ t }: { t: Ticket }) {
       </Pressable>
       {open && (
         <>
+          {!!t.photos?.length && (
+            <View style={styles.photos}>
+              {t.photos.map((uri, i) => (
+                <Image key={uri} source={{ uri }} style={styles.photo} accessibilityLabel={`Kanıt ${i + 1}`} />
+              ))}
+            </View>
+          )}
           {t.replies.map((r, i) => (
             <View key={i} style={[styles.reply, r.from === 'me' && { alignSelf: 'flex-end', backgroundColor: colors.primary }]}>
               <Text style={{ color: r.from === 'me' ? '#fff' : colors.text, fontSize: 13 }}>{r.text}</Text>
@@ -260,19 +322,11 @@ function TicketCard({ t }: { t: Ticket }) {
               </Text>
             </View>
           ))}
-          <TextInput value={reply} onChangeText={setReply} placeholder="Ek bilgi yaz / itiraz et" placeholderTextColor={colors.textDim} style={styles.input} />
+          <TextInput value={reply} onChangeText={setReply} maxLength={live ? 2000 : undefined} placeholder="Ek bilgi yaz / itiraz et" placeholderTextColor={colors.textDim} style={styles.input} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <GradientButton
-              small
-              title="Gönder"
-              onPress={() => {
-                if (!reply.trim()) return;
-                replyTicket(t.id, reply.trim());
-                setReply('');
-              }}
-            />
+            {live ? <Button small title={busy ? 'Gönderiliyor…' : 'Gönder'} disabled={busy} onPress={send} /> : <GradientButton small title="Gönder" onPress={send} />}
             {t.status !== 'Çözüldü' && (
-              <Pressable style={styles.secondary} onPress={() => setTicketStatus(t.id, 'Çözüldü')}>
+              <Pressable style={[styles.secondary, busy && { opacity: 0.5 }]} disabled={busy} onPress={close}>
                 <Text style={{ color: colors.green, fontWeight: '700' }}>Çözüldü olarak kapat</Text>
               </Pressable>
             )}
@@ -309,6 +363,9 @@ const useStyles = makeStyles(({ colors, lift }) => ({
   chipText: { color: colors.text, fontWeight: '600', fontSize: 12 },
   input: { backgroundColor: colors.cardAlt, borderRadius: 14, color: colors.text, fontSize: 15, paddingHorizontal: 14, paddingVertical: 11, textAlignVertical: 'top' },
   attach: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  photos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  photo: { width: 72, height: 72, borderRadius: 10, backgroundColor: colors.cardAlt },
+  photoRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   reply: { backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10, maxWidth: '90%', gap: 2 },
   secondary: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.cardAlt, justifyContent: 'center' },
 }));

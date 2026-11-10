@@ -31,6 +31,9 @@ import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
 import { useLiveSessions } from '@/lib/live/sessions';
 import { openSupportMail } from '@/lib/open-mail';
 import { dataRequestMail } from '@/lib/support-mail';
+import { ApiError } from '@/lib/api';
+import { exportMyData } from '@/lib/live/my-data';
+import { LiveSpendLimit } from '@/components/spend-limit-live';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -138,6 +141,25 @@ function LiveSessions() {
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
+  // Live mode: Verilerimin kopyası (lib/live/my-data). A server without the route yet takes the request by e-mail.
+  const [exporting, setExporting] = useState(false);
+  const askExport = () =>
+    showAlert(
+      'Verilerimin kopyası',
+      'Sunucuda hesabınla ilgili tutulan kişisel veriler bir JSON dosyası olarak hazırlanır; dosyayı kaydedebilir veya paylaşabilirsin. Dosya kişisel verilerini içerir, yalnızca güvendiğin yere kaydet. 24 saatte bir alınabilir.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Hazırla',
+          onPress: () => {
+            setExporting(true);
+            exportMyData()
+              .catch((e: unknown) => (e instanceof ApiError && e.status === 404 ? openSupportMail(dataRequestMail(myServerId(), me.name)) : showAlert('Kopya hazırlanamadı', message(e))))
+              .finally(() => setExporting(false));
+          },
+        },
+      ],
+    );
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
   const { signIn, verify } = useRemoteConfig();
@@ -204,7 +226,7 @@ export default function SettingsScreen() {
             <ListRow
               icon="speedometer-outline"
               title="Yönetim"
-              subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar ve itirazlar'}
+              subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar, itirazlar ve destek talepleri'}
               onPress={() => setAdminOpen(true)}
             />
           )}
@@ -242,17 +264,12 @@ export default function SettingsScreen() {
           </ListGroup>
         )}
 
-        {/* The daily limit lives only on this phone. A live build does not offer it, but a limit saved here
-            earlier is still applied to spending, so it stays on screen until it is lifted. */}
-        {(!live || settings.dailySpendLimit > 0) && (
-          <ListGroup
-            label="Harcama"
-            footer={
-              live
-                ? 'Bu limit yalnızca bu telefonda geçerli. Limitsiz seçersen kaldırılır.'
-                : 'Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.'
-            }
-          >
+        {/* A live build keeps the daily limit on the server, which checks every coin spend against it
+            (components/spend-limit-live). The demo keeps it on this phone. */}
+        {live ? (
+          <LiveSpendLimit />
+        ) : (
+          <ListGroup label="Harcama" footer="Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.">
             <ListBlock title="Günlük harcama limiti">
               <ChoiceChips
                 value={settings.dailySpendLimit}
@@ -423,7 +440,7 @@ export default function SettingsScreen() {
         </ListGroup>
 
         <ListGroup label="Destek">
-          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle={live ? 'SSS ve e-posta ile destek' : 'Taleplerin ve yanıtlar'} onPress={() => router.push('/destek')} />
+          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle="Taleplerin ve yanıtlar" onPress={() => router.push('/destek')} />
           <ListRow
             icon="scale-outline"
             title="Bir karara itiraz et"
@@ -457,13 +474,13 @@ export default function SettingsScreen() {
           }
         >
           {live ? (
-            // No export route on the server yet: the request goes to support as an e-mail from the person's mail app.
+            // The server puts the copy together at once (lib/live/my-data); the share sheet saves or sends the file.
             <ListRow
               icon="download-outline"
               tone="neutral"
-              title="Verilerimin kopyasını iste"
-              subtitle="UK GDPR veri erişim talebi · destek ekibine e-postayla"
-              onPress={() => openSupportMail(dataRequestMail(myServerId(), me.name))}
+              title={exporting ? 'Verilerin hazırlanıyor…' : 'Verilerimin kopyasını iste'}
+              subtitle="UK GDPR veri erişim hakkı · JSON dosyası olarak kaydet veya paylaş · 24 saatte bir"
+              onPress={exporting ? undefined : askExport}
               chevron={false}
             />
           ) : (

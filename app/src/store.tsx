@@ -29,6 +29,7 @@ import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
 import { forgetSeen, hideDms, markLiveRead } from '@/lib/live/messages';
+import { noteSpent, serverLimitBlock } from '@/lib/live/spend-limit';
 import { applyThread, markSent, type ServerDm, type ThreadSync } from '@/lib/dm-thread';
 import type { CallsFrom, DmFrom } from '@/data/privacy';
 import { ThemeScope, type Appearance, type Scheme } from '@/theme';
@@ -689,6 +690,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   }, [diamondLocks]);
 
   const limitBlock = (n: number) => {
+    // Live mode: the limit is the server's (lib/live/spend-limit); its last known state is checked here too.
+    if (liveMode() && !settingsRef.current.dailySpendLimit) return serverLimitBlock(n);
     const limit = settingsRef.current.dailySpendLimit;
     if (!limit || spentTodayRef.current + n <= limit) return null;
     return `Günlük harcama limitin ${limit.toLocaleString('tr-TR')} jeton (Ayarlar > Harcama kontrolü). Bugün kalan: ${Math.max(0, limit - spentTodayRef.current).toLocaleString('tr-TR')} jeton.`;
@@ -714,6 +717,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // Coins that left the balance: today's spending (the daily limit), the total and Cömertlik. Shared by `spend`
   // and live gifts, which the server takes without a local spend.
   const countSpend = (n: number, reason: string) => {
+    if (liveMode()) noteSpent(n);
     spentTodayRef.current += n;
     setSpentToday(spentTodayRef.current);
     setSpentTotal((t) => t + n);

@@ -12,7 +12,7 @@ import { makeStyles, radius, space, useTheme } from '@/theme';
 import { LoadState, SectionScroll, useLoad, type Load } from './parts';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-export type Tab = 'ozet' | 'kullanici' | 'ayarlar' | 'ugurlu' | 'duyuru' | 'sikayet' | 'cekim' | 'ajans' | 'iade' | 'yaptirim';
+export type Tab = 'ozet' | 'kullanici' | 'ayarlar' | 'ugurlu' | 'duyuru' | 'sikayet' | 'destek' | 'cekim' | 'ajans' | 'iade' | 'yaptirim';
 
 type Overview = {
   health: admin.Health | null;
@@ -96,6 +96,7 @@ function PendingTiles({ pending, goTo }: { pending: Partial<Pending> | null; goT
     { tab: 'cekim', label: 'Para çekme', value: pending?.withdrawals, icon: 'cash-outline' },
     { tab: 'ajans', label: 'Ajans ödemesi', value: pending?.payouts, icon: 'business-outline' },
     { tab: 'sikayet', label: 'Şikâyet', value: pending?.reports, icon: 'flag-outline' },
+    { tab: 'destek', label: 'Destek', value: pending?.support, icon: 'chatbubbles-outline' },
   ];
   return (
     <View style={{ gap: space.sm }}>

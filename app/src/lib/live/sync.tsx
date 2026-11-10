@@ -18,6 +18,7 @@ import { checkRoomInvites } from '@/lib/live/room-social';
 import { onLine, startLiveLine } from '@/lib/live/live-line';
 import { pollMessages } from '@/lib/live/messages';
 import { loadPrivacy } from '@/lib/live/privacy';
+import { refreshSpendLimit } from '@/lib/live/spend-limit';
 import { settleWithdrawals } from '@/lib/live/withdraw';
 import { startPush } from '@/lib/push';
 import { useApp } from '@/store';
@@ -76,6 +77,8 @@ export function LiveSync() {
           // So are the Gizlilik and "Kimler ulaşabilir" choices (lib/live/privacy).
           void loadPrivacy((k, v) => alive && appRef.current.setSetting(k, v)).catch(() => {});
           await refreshEarnings();
+          // The daily spending limit, so the store's own check knows it before the first spend (lib/live/spend-limit).
+          void refreshSpendLimit();
         } else {
           // A rejected withdrawal gives diamonds back: known before the balance is read, so it isn't a gift.
           await settleWithdrawals().catch(() => {});

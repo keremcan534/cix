@@ -1,6 +1,6 @@
 // Yönetim: the owner's panel in a live build, opened from Ayarlar for admin accounts (lib/live/admin useIsAdmin).
-// A full-screen sheet, not a route: Özet, Kullanıcılar, Canlı ayarlar, Para çekme, Ajans ödemeleri, Şikâyetler, İadeler and
-// Yaptırımlar on the server's admin routes. Every money or account action asks first, then shows a short result and reloads
+// A full-screen sheet, not a route: Özet, Kullanıcılar, Canlı ayarlar, Para çekme, Ajans ödemeleri, Şikâyetler, Destek, İadeler
+// and Yaptırımlar on the server's admin routes. Moderators get Destek and Yaptırımlar. Every money or account action asks first, then shows a short result and reloads
 // its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
 // sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
 // Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it); Uğurlu hediyeler
@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { Header } from '@/components/ui';
 import { type Pending } from '@/lib/admin-format';
-import { ApiError } from '@/lib/api';
+import { ApiError, staffTickets } from '@/lib/api';
 import * as admin from '@/lib/live/admin';
 import { type SanctionMeta } from '@/lib/sanction-format';
 import { makeStyles, radius, space, useTheme } from '@/theme';
@@ -27,6 +27,7 @@ import { RefundsSection } from './refunds';
 import { ReportsSection } from './reports';
 import { SanctionUserScreen } from './sanction-user';
 import { SanctionsSection } from './sanctions';
+import { SupportSection } from './support';
 import { TeamSection } from './team-notices';
 import { UsersSection } from './users';
 import { WithdrawalsSection } from './withdrawals';
@@ -40,6 +41,7 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
   { key: 'sikayet', label: 'Şikâyetler', count: 'reports' },
+  { key: 'destek', label: 'Destek', count: 'support' },
   { key: 'iade', label: 'İadeler' },
   { key: 'yaptirim', label: 'Yaptırımlar' },
 ];
@@ -67,15 +69,16 @@ const noLive = async (): Promise<LiveAccess> => ({ view: null });
 
 /** What waits for the owner; a part that can't be read stays undefined (shown as –, no badge). */
 async function loadPending(): Promise<Partial<Pending>> {
-  const [r, w, p] = await Promise.allSettled([admin.reports('open'), admin.withdrawals('pending'), admin.agencyPayouts()]);
+  const [r, w, p, t] = await Promise.allSettled([admin.reports('open'), admin.withdrawals('pending'), admin.agencyPayouts(), staffTickets('waiting')]);
   return {
     reports: r.status === 'fulfilled' ? r.value.length : undefined,
+    support: t.status === 'fulfilled' ? t.value.waiting : undefined,
     withdrawals: w.status === 'fulfilled' ? w.value.rows.length : undefined,
     payouts: p.status === 'fulfilled' ? p.value.filter((x) => x.status === 'pending' || x.status === 'ready').length : undefined,
   };
 }
 
-/** `moderator`: only the sanctions tab (the other tabs are the admin's). */
+/** `moderator`: only the support and sanctions tabs (the other tabs are the admin's). */
 export function AdminPanel({ visible, onClose, moderator = false }: { visible: boolean; onClose: () => void; moderator?: boolean }) {
   const [sheet, setSheet] = useState<SheetSpec | null>(null);
   const [account, setAccount] = useState<Person | null>(null);
@@ -150,7 +153,7 @@ function PanelBody({
   // Canlı ayarlar: admins only, same rule (a 403 from the server hides the tab).
   const showLive = isAdmin && !moderator && (!!live.data?.view || !!live.error);
   const tabs = moderator
-    ? TABS.filter((t) => t.key === 'yaptirim')
+    ? TABS.filter((t) => t.key === 'yaptirim' || t.key === 'destek')
     : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin) && (t.key !== 'duyuru' || isAdmin));
 
   const ctx: AdminCtx = {
@@ -215,6 +218,7 @@ function PanelBody({
             {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
             {tab === 'kullanici' && <UsersSection />}
             {tab === 'sikayet' && <ReportsSection />}
+            {tab === 'destek' && <SupportSection />}
             {tab === 'cekim' && <WithdrawalsSection />}
             {tab === 'ajans' && <AgencyPayoutsSection />}
             {tab === 'iade' && <RefundsSection />}

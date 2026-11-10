@@ -467,7 +467,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**
@@ -809,6 +809,40 @@ export const saveExtras = (p: ExtrasPatch) =>
 /** Albüm: a photo already in the storage (kind 'album'); the answer is my album, newest first. */
 export const addAlbumPhoto = (url: string) => call<{ photos: AlbumPhoto[] }>('POST', '/api/me/photos', { url }).then((r) => r.photos);
 export const removeAlbumPhoto = (id: number) => call<{ photos: AlbumPhoto[] }>('POST', '/api/me/photos/remove', { id }).then((r) => r.photos);
+// Destek talepleri (server/api/support.mjs): my tickets and their threads; staff answer them in Yönetim › Destek.
+// Staff lines reach me as 'support', never with a name. Evidence photos go up first (lib/live/profile uploadPhoto 'ticket').
+export type ServerTicketStatus = 'open' | 'answered' | 'reopened' | 'closed';
+export type ServerTicketLine = { id: string; from: 'user' | 'support'; text: string; createdAt: string; by?: { id: string; name: string } };
+export type ServerTicket = {
+  id: string; number: string; category: string; feedback: boolean; text: string; photos: string[]; status: ServerTicketStatus;
+  createdAt: string; updatedAt: string; closedAt: string | null; messages: ServerTicketLine[];
+};
+/** A ticket as staff see it: whose it is, who closed it, and in the queue how many lines and the last one. */
+export type StaffTicket = ServerTicket & {
+  user: { id: string; name: string; username: string | null; since: string }; closedBy: string | null;
+  lines?: number; last?: { from: 'user' | 'support'; text: string; createdAt: string } | null;
+};
+export type StaffQueue = 'waiting' | 'answered' | 'closed';
+export const myTickets = () => call<{ tickets: ServerTicket[]; open: number; maxOpen: number }>('GET', '/api/support/tickets');
+export const openTicket = (t: { category: string; text: string; photos?: string[]; feedback?: boolean }, ref = newRef()) =>
+  call<{ ticket: ServerTicket; replay: boolean }>('POST', '/api/support/tickets', { ...t, ref }).then((r) => r.ticket);
+export const replyTicket = (id: string, text: string) => call<{ ticket: ServerTicket }>('POST', '/api/support/reply', { id, text }).then((r) => r.ticket);
+export const closeTicket = (id: string) => call<{ ticket: ServerTicket }>('POST', '/api/support/close', { id }).then((r) => r.ticket);
+/** Staff only (403 otherwise). */
+export const staffTickets = (status: StaffQueue) => call<{ tickets: StaffTicket[]; waiting: number }>('GET', `/api/admin/support?status=${status}`);
+export const staffTicket = (id: string) => call<{ ticket: StaffTicket }>('GET', `/api/admin/support/ticket?id=${encodeURIComponent(id)}`).then((r) => r.ticket);
+export const staffReply = (id: string, text: string, close = false) => call<{ ticket: StaffTicket }>('POST', '/api/admin/support/reply', { id, text, close }).then((r) => r.ticket);
+export const staffTicketStatus = (id: string, status: 'open' | 'answered' | 'closed') =>
+  call<{ ticket: StaffTicket }>('POST', '/api/admin/support/status', { id, status }).then((r) => r.ticket);
+
+/** Verilerimin kopyası (server/api/my-data.mjs, UK GDPR right of access): once in 24 hours; 429 export_wait (data.nextAt) after that. */
+export const myDataExport = () => call<{ format: string; generatedAt: string } & Record<string, unknown>>('GET', '/api/me/export');
+
+/** Günlük harcama limiti (server/api/spend-limit.mjs). `limit` null: none; `next`: a raise or a lift waiting its hours. */
+export type ServerSpendLimit = { limit: number | null; next: { limit: number | null; at: string } | null; spentToday: number; left: number | null; day: string; resetsAt: string; raiseHours: number };
+export const spendLimit = () => call<ServerSpendLimit>('GET', '/api/me/spend-limit');
+/** 0 lifts it. Lower applies now; higher (or 0) after `raiseHours`. */
+export const setSpendLimit = (limit: number) => call<ServerSpendLimit & { applied: 'now' | 'later' }>('POST', '/api/me/spend-limit', { limit });
 
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };

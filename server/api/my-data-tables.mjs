@@ -1,0 +1,51 @@
+// Which tables the data copy (my-data.mjs) reads, and why the others that point at an account are left out. Plain
+// data, so the test can check that every table pointing at users is in one list or the other: a new table that holds
+// someone's personal data must be added to the copy (or here, with the reason it isn't theirs to receive).
+export const EXPORTED = [
+  'users', 'auth_identities', 'sessions', 'device_accounts', 'push_tokens', 'follows', 'blocks', 'messages',
+  'moments', 'moment_comments', 'moment_likes', 'moment_comment_likes', 'gift_events', 'ledger', 'coin_lots',
+  'diamond_locks', 'purchases', 'coin_transfers', 'withdrawals', 'entitlements', 'paid_events', 'income_events',
+  'spend_limits', 'calls', 'wheel_spins', 'lucky_sends', 'lucky_bags', 'lucky_bag_grabs', 'lucky_bag_entries',
+  'rooms', 'room_admins', 'room_djs', 'room_members', 'room_bans', 'presence_log', 'room_animations', 'room_events',
+  'room_event_going', 'music_tracks', 'families', 'family_members', 'family_requests', 'family_invites',
+  'family_messages', 'family_checkins', 'family_chest_claims', 'bonds', 'agencies', 'agency_streamers',
+  'agency_requests', 'agency_transfers', 'profile_visits', 'reports', 'user_sanctions', 'sanction_appeals',
+  'contact_refusals', 'team_notices', 'team_notice_seen', 'support_tickets', 'support_messages', 'data_exports',
+];
+
+/** Tables that point at an account but are not that person's to receive, with the reason. */
+export const NOT_EXPORTED = {
+  admin_permissions: 'staff access settings',
+  audit_events: 'staff action log (who on the staff did what)',
+  sanction_audit_logs: 'staff action log of sanctions',
+  moderation_evidence: 'staff evidence for a decision',
+  device_bans: 'device recognition for bans',
+  sanction_policies: 'platform rules, set by staff',
+  staff_roles: 'platform roles, set by staff',
+  staff_assignments: 'staff roles in agencies, set by staff',
+  live_settings: 'platform settings, set by staff',
+  lucky_config: 'platform settings, set by staff',
+  agency_settings: 'platform settings, set by staff',
+  agency_appeals: 'an agency’s own records',
+  agency_audit: 'an agency’s own records',
+  agency_commissions: 'an agency’s own records',
+  agency_ledger: 'an agency’s own records',
+  agency_parents: 'an agency’s own records',
+  agency_payout_history: 'an agency’s own records',
+  agency_payouts: 'an agency’s own records',
+  agency_perf_runs: 'an agency’s own records',
+  agency_periods: 'an agency’s own records',
+  agency_rates: 'an agency’s own records',
+  agency_status_history: 'an agency’s own records',
+  agency_tier_history: 'an agency’s own records',
+  agency_transitions: 'an agency’s own records',
+  agency_violations: 'an agency’s own records',
+  bd_assignments: 'an agency’s own records',
+  bd_ledger: 'an agency’s own records',
+  room_pks: 'a room’s match record; the gifts in it are in gift_events',
+  room_pk_gifts: 'the same gifts as gift_events',
+  match_queue: 'kept for seconds while waiting for a match',
+  room_mic_queue: 'kept while waiting for a seat in a room',
+  room_music_queue: 'kept while a track waits to play',
+  phone_claims: 'a phone check’s one-time code, kept minutes',
+};
