@@ -16,6 +16,8 @@ import { showAlert } from '@/lib/alert';
 import { contactRefusal, isContactBlocked, refusalTitle } from '@/lib/contact-filter';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, message, saveProfile } from '@/lib/live';
+import { cleanInviteCode } from '@/lib/invite-view';
+import { enterInviteCode, useRewards } from '@/lib/live/rewards';
 import { ageFromYear, birthDateOf, birthYearError, firstSignupProblem, signupStep, welcomeText } from '@/lib/signup';
 import { GENDER_ART, interestParts } from '@/data/profile-art';
 import { useApp } from '@/store';
@@ -51,6 +53,11 @@ export default function ProfileSetupScreen() {
   const valid = !problem;
   const live = liveMode();
   const { step, total } = signupStep('profil', live);
+  // Live mode: the welcome coins the server gave this account, and whether a friend's invite code can go in now.
+  const rewards = useRewards();
+  const inviteOpen = live && !!rewards?.invite.on && rewards.invite.canEnter;
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const pickPhoto = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 });
@@ -66,6 +73,10 @@ export default function ProfileSetupScreen() {
     if (problem) return showAlert('Profilini tamamla', problem);
     const refusal = contactRefusal(name.trim(), 'profile.name') ?? contactRefusal(city.trim(), 'profile.city');
     if (refusal) return setContactError(refusal);
+    // A friend's code (optional, live): checked before anything is saved, so a typo is fixed here.
+    const typed = inviteOpen && inviteCode.trim() ? inviteCode : '';
+    const code = typed ? cleanInviteCode(typed) : null;
+    if (typed && !code) return setInviteError('Davet kodu SIMI-AB23CD gibi 6 harf ve rakamdan oluşur.');
     updateMe({
       name: name.trim(),
       gender: gender!,
@@ -82,6 +93,16 @@ export default function ProfileSetupScreen() {
     // no selfie check behind it yet, so sign-up ends here and nothing claims the person is verified (giris-6).
     if (live) {
       setBusy(true);
+      if (code) {
+        try {
+          // Entering the same code again (after a failed save below) is a replay on the server.
+          await enterInviteCode(code);
+        } catch (e) {
+          setInviteError(message(e));
+          setBusy(false);
+          return;
+        }
+      }
       try {
         await saveProfile({ ...ME }, Number(year));
       } catch (e) {
@@ -93,7 +114,8 @@ export default function ProfileSetupScreen() {
         setBusy(false);
       }
       login();
-      showAlert('Hoş geldin! 🎉', welcomeText(true, IS_DEMO));
+      const invited = code ? ` Davet kodun kaydedildi: ilk odana girdiğinde ikinize de ${rewards!.invite.coins.toLocaleString('tr-TR')} jeton gelir.` : '';
+      showAlert('Hoş geldin! 🎉', welcomeText(true, IS_DEMO, rewards?.welcome.coins ?? 0) + invited);
       return;
     }
     router.push('/giris/dogrulama');
@@ -157,6 +179,32 @@ export default function ProfileSetupScreen() {
             </Text>
           )}
 
+          {inviteOpen && (
+            <Field label="Davet kodu (isteğe bağlı)">
+              <TextInput
+                value={inviteCode}
+                onChangeText={(t) => {
+                  setInviteCode(t.toUpperCase());
+                  setInviteError(null);
+                }}
+                placeholder="SIMI-AB23CD"
+                placeholderTextColor={colors.textDim}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={14}
+                style={styles.input}
+                accessibilityLabel="Davet kodu, isteğe bağlı"
+              />
+              {inviteError ? (
+                <Text style={styles.inviteError} accessibilityRole="alert">
+                  {inviteError}
+                </Text>
+              ) : (
+                <Text style={styles.hint}>Seni davet eden arkadaşının kodu; ilk odana girdiğinde ikinize de {rewards!.invite.coins.toLocaleString('tr-TR')} jeton.</Text>
+              )}
+            </Field>
+          )}
+
           <Field label={`İlgi alanları (${interests.length}/5)`}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {INTERESTS.map((i) => (
@@ -208,6 +256,8 @@ const useStyles = makeStyles(({ colors, dark, lift }) => ({
   label: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   input: { backgroundColor: colors.card, borderRadius: 14, color: colors.text, fontSize: 16, paddingHorizontal: 16, paddingVertical: 13, ...lift },
   error: { color: colors.red, fontSize: 13, marginTop: -12 },
+  inviteError: { color: colors.red, fontSize: 13 },
+  hint: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   // Light: white chips carry a hairline-blue outline so they read on the paper background.
   chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1.5, borderColor: dark ? 'transparent' : colors.border },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

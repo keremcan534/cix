@@ -2,7 +2,9 @@
 //
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
-//   GET    /api/user?id=                                  → { user }  (public profile + counts + relation)
+//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit;
+//                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
+//   GET    /api/me/visitors                               → { count, visitors }  (last 7 days; visitors only with VIP)
 //   POST   /api/follow  { to, follow }                    → { following }
 //   GET    /api/following                                 → { users }
 //   POST   /api/block   { to, block }                     → { blocked }
@@ -14,10 +16,14 @@ import { CATEGORIES } from './contact-filter.mjs';
 import { withSignIn } from './auth.mjs';
 import { notify } from './push.mjs';
 import { autoFromReports } from './sanctions.mjs';
-import { looksOf, revokeAllForDelete } from './economy.mjs';
+import { looksOf, revokeAllForDelete, statusOf } from './economy.mjs';
+import { svipLevel, vipLevelOf } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
+import { listsHidden, shownToViewer } from './privacy.mjs';
+import { cardsMore, privateMore, profileMore } from './profiles.mjs';
+import { cityDistance } from './city-coords.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -39,6 +45,8 @@ async function followList(me, url, side) {
   if (id !== me.id) {
     await liveUser(id);
     if (await blockedBetween(me.id, id)) throw new HttpError(403, 'Bu listeyi göremezsin');
+    // "Profilim herkese açık" off: only people they follow see their lists (privacy.mjs).
+    if (await listsHidden(db, me.id, id)) throw new HttpError(403, 'Bu kişinin takip listeleri gizli');
   }
   const [mine, other] = side === 'followers' ? ['followee', 'follower'] : ['follower', 'followee'];
   const r = await db.query(
@@ -55,6 +63,31 @@ async function liveUser(id) {
   const r = await db.query('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);
   if (!r.rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
   return r.rows[0];
+}
+
+/** "Sessiz ziyaret" (silent visit): from this İnci level on, opening a profile leaves no trace (app data/status). */
+export const SILENT_VISIT_SVIP = 7;
+let visitsPrunedAt = 0;
+
+/**
+ * `me` opened `owner`'s profile. A visit within 10 minutes of the last one counts once; after a week without one
+ * the count starts again. Not recorded with "Sessiz ziyaret". Once an hour, rows past the week (and a day) go.
+ */
+async function recordVisit(owner, me) {
+  if (svipLevel(Number(me.svip_xp) || 0) >= SILENT_VISIT_SVIP) return;
+  await db.query(
+    `INSERT INTO profile_visits (owner_id, visitor_id) VALUES ($1, $2)
+     ON CONFLICT (owner_id, visitor_id) DO UPDATE SET
+       visits = CASE WHEN profile_visits.last_at < now() - interval '7 days' THEN 1
+                     WHEN profile_visits.last_at < now() - interval '10 minutes' THEN profile_visits.visits + 1
+                     ELSE profile_visits.visits END,
+       last_at = now()`,
+    [owner, me.id],
+  );
+  if (Date.now() - visitsPrunedAt > 3_600_000) {
+    visitsPrunedAt = Date.now();
+    await db.query("DELETE FROM profile_visits WHERE last_at < now() - interval '8 days'").catch((e) => console.error('visits prune', e.message));
+  }
 }
 
 /** The erasure of DELETE /api/me inside transaction `c`, for account `id` (its phone `phone`); also the admin's
@@ -75,6 +108,14 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM sessions WHERE user_id = $1', [id]);
     await c.query('DELETE FROM follows WHERE follower = $1 OR followee = $1', [id]);
     await c.query('DELETE FROM blocks WHERE blocker = $1 OR blocked = $1', [id]);
+    await c.query('DELETE FROM profile_visits WHERE owner_id = $1 OR visitor_id = $1', [id]);
+    // Gizlilik choices and the "Arama geçmişini temizle" mark (privacy.mjs, call-log.mjs).
+    await c.query('DELETE FROM privacy_settings WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM call_history_cleared WHERE user_id = $1', [id]);
+    // Profile extras, the album rows (their files go with removeUserFiles) and the gender choice (profiles.mjs).
+    await c.query('DELETE FROM profile_extras WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM profile_photos WHERE user_id = $1', [id]);
+    await c.query('UPDATE users SET gender_hidden = false WHERE id = $1', [id]);
     await c.query('DELETE FROM messages WHERE sender = $1 OR recipient = $1', [id]);
     // 1v1: out of the match queue, an open call ends (the paid rows stay as accounting records).
     await c.query('DELETE FROM match_queue WHERE user_id = $1', [id]);
@@ -98,7 +139,32 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM family_requests WHERE user_id = $1', [id]);
     await c.query('DELETE FROM family_invites WHERE user_id = $1', [id]);
     await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
+    // Room social (room-social.mjs): their mic invites, poll votes and polls, and the follower invites they sent or
+    // that were for their account.
+    await c.query('DELETE FROM room_mic_invites WHERE from_user = $1 OR to_user = $1', [id]);
+    await c.query('DELETE FROM room_poll_votes WHERE user_id = $1', [id]);
+    await c.query('UPDATE room_polls SET closed_by = NULL WHERE closed_by = $1', [id]);
+    await c.query('DELETE FROM room_polls WHERE creator = $1', [id]);
+    await c.query('DELETE FROM room_follower_invites WHERE owner_id = $1 OR sent_by = $1', [id]);
+    // Odalar arası PK (pk-cross.mjs): the match stays the rooms' record without who invited, answered or ended it;
+    // an open one of their room ends when the room closes just below.
+    await c.query('UPDATE room_cross_pks SET invited_by = NULL WHERE invited_by = $1', [id]);
+    await c.query('UPDATE room_cross_pks SET answered_by = NULL WHERE answered_by = $1', [id]);
+    await c.query('UPDATE room_cross_pks SET ended_by = NULL WHERE ended_by = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
+    // Destek: their tickets and threads (the photos go with removeUserFiles); the data copy's date; the spending limit.
+    await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM data_exports WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM spend_limits WHERE user_id = $1', [id]);
+    // Çantam (backpack.mjs): what was in it and its moves; the gift events it sent stay as accounting records.
+    await c.query('DELETE FROM backpack_moves WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM backpack_items WHERE user_id = $1', [id]);
+    // Arkadaşını Getir (referrals.mjs): my code and who entered whose code, both ways; the coins paid stay in the ledger.
+    await c.query('DELETE FROM referrals WHERE invitee_id = $1 OR inviter_id = $1', [id]);
+    await c.query('DELETE FROM referral_codes WHERE user_id = $1', [id]);
+    // Oyun Salonu rounds (casino.mjs); the ledger keeps the money trail. Room game tables they sit at or opened.
+    await c.query('DELETE FROM casino_rounds WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM room_tables WHERE $1 = ANY(seats) OR opened_by = $1', [id]);
 }
 
 export const socialRoutes = {
@@ -189,17 +255,54 @@ export const socialRoutes = {
       [id, me.id],
     );
     const x = r.rows[0];
+    if (url.searchParams.get('visit') === '1' && id !== me.id && !x.blocked_by_me) await recordVisit(id, me);
     // A streamer's agency (an approved one they are in now) and anyone's family, shown on the profile.
     const ag = await db.query(
       `SELECT a.id, a.name FROM agency_streamers s JOIN agencies a ON a.id = s.agency_id
         WHERE s.streamer_id = $1 AND s.ended_at IS NULL AND s.contract = 'approved' AND a.status = 'approved' LIMIT 1`,
       [id],
     );
+    // "Profilim herkese açık" off: someone they don't follow gets no age, city, bio or interests (privacy.mjs).
+    const [shown] = await shownToViewer(db, me.id, [{ id: u.id, name: u.name, ...profileOf(u) }]);
+    const more = await profileMore(u, id === me.id);
     return {
-      user: { id: u.id, name: u.name, ...profileOf(u), followers: Number(x.followers), following: Number(x.following), isFollowing: x.is_following, blockedByMe: x.blocked_by_me },
+      user: {
+        ...shown,
+        followers: Number(x.followers),
+        following: Number(x.following),
+        isFollowing: x.is_following,
+        blockedByMe: x.blocked_by_me,
+        // How far they are from me by our two cities (city-coords.mjs): none for me, for a city either of us didn't
+        // give or that isn't in the table, and for a private profile (its city is hidden above).
+        distance: id === me.id ? null : cityDistance(me.city, shown.city),
+        // A private profile keeps its personal extras and album from people it doesn't follow, like age and city.
+        ...(shown.private ? privateMore(more) : more),
+      },
       looks: (await looksOf([u.id]))[u.id] ?? null,
       agency: ag.rowCount ? { id: String(ag.rows[0].id), name: ag.rows[0].name } : null,
       family: await familyOf(id),
+    };
+  },
+
+  /**
+   * Profil ziyaretçileri: who opened my profile in the last 7 days. How many is for everyone; who they are is a VIP
+   * right (VIP 1 and up, by İnci or Rütbe), so without it `visitors` is null. Blocked people either way and deleted
+   * accounts are left out. Newest first, at most 100.
+   */
+  async 'GET /api/me/visitors'(req) {
+    const me = await auth(req);
+    const r = await db.query(
+      `SELECT v.visitor_id AS id, u.name, u.avatar_url, v.visits, v.last_at, count(*) OVER () AS total
+         FROM profile_visits v JOIN users u ON u.id = v.visitor_id
+        WHERE v.owner_id = $1 AND v.last_at > now() - interval '7 days' AND u.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = v.visitor_id) OR (b.blocker = v.visitor_id AND b.blocked = $1))
+        ORDER BY v.last_at DESC LIMIT 100`,
+      [me.id],
+    );
+    const vip = vipLevelOf(me.svip_xp, (await statusOf(db, me.id)).noble?.tier) >= 1;
+    return {
+      count: Number(r.rows[0]?.total ?? 0),
+      visitors: vip ? r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null, visits: x.visits, lastAt: x.last_at })) : null,
     };
   },
 
@@ -258,7 +361,13 @@ export const socialRoutes = {
       [me.id, me.gender ?? null],
     );
     const fresh = Date.now() - 5 * 60_000;
-    return { users: r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh })) };
+    // Each card's levels and country, for the whole list in a few queries (profiles.mjs); then what each one shows me:
+    // "Profilim herkese açık" (no country either) and "Çevrimiçi durumumu göster" (privacy.mjs).
+    const more = await cardsMore(r.rows.map((u) => u.id));
+    const users = await shownToViewer(db, me.id, r.rows.map((u) => ({ id: u.id, name: u.name, ...profileOf(u), online: !!u.seen && new Date(u.seen).getTime() > fresh, ...more[u.id] })));
+    // How far each one is from me by our two cities (city-coords.mjs); none where a city is unknown or hidden.
+    for (const u of users) u.distance = cityDistance(me.city, u.city);
+    return { users: users.map((u) => (u.private ? { ...u, country: null } : u)) };
   },
 
   /** Who `user` follows (default: me). Another person's list leaves out anyone either of us blocked. */

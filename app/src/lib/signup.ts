@@ -44,10 +44,16 @@ export function firstSignupProblem(d: SignupDraft, today = new Date()): string |
   return birthYearError(d.year, today);
 }
 
-/** The text of the welcome alert at the end of sign-up. Test coins are mentioned only in a demo build. */
-export function welcomeText(live: boolean, demo: boolean): string {
+/**
+ * The text of the welcome alert at the end of sign-up. Test coins are mentioned only in a demo build. `coins`: the
+ * welcome coins the server gave this new account (server/api/referrals.mjs; 0 when none, e.g. a phone that had an
+ * account before).
+ */
+export function welcomeText(live: boolean, demo: boolean, coins = 0): string {
   if (!live) return 'Hoş geldin hediyesi olarak 100 jeton hesabına eklendi.';
-  return demo ? 'Hesabın açıldı. Jeton Yükle ekranından ücretsiz test jetonu ekleyebilirsin.' : 'Hesabın açıldı.';
+  const gift = coins > 0 ? `Hoş geldin hediyesi olarak ${coins.toLocaleString('tr-TR')} jeton hesabına eklendi; Mağaza'da kullanabilirsin.` : '';
+  if (demo) return gift ? `${gift} Jeton Yükle ekranından ücretsiz test jetonu da ekleyebilirsin.` : 'Hesabın açıldı. Jeton Yükle ekranından ücretsiz test jetonu ekleyebilirsin.';
+  return gift || 'Hesabın açıldı.';
 }
 
 export type SignupScreen = 'telefon' | 'kod' | 'profil' | 'dogrulama';

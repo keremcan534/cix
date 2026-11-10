@@ -24,6 +24,8 @@ import { SimilarityChip } from '@/components/similarity';
 import { similarity } from '@/lib/similarity';
 import { Photo } from '@/components/photo';
 import { liveMode, oneOnOneOpen, reloadDiscoverPeople, useDiscoverPeople, useDiscoverState } from '@/lib/live';
+import { levelsOf } from '@/lib/live/levels';
+import { cityDistanceText, distanceOf } from '@/lib/live/distances';
 import type { DiscoverList } from '@/lib/api';
 
 const TABS = ['Ana Sayfa', 'Yakındakiler', 'Öne çıkanlar', 'Çevrim içi', 'Yeni kullanıcılar'] as const;
@@ -37,7 +39,9 @@ const DEFAULT_FILTERS: Filters = { country: 'ALL' };
 const isDefault = (f: Filters) => f.country === 'ALL';
 /** Men see women and women see men; anyone, while either of the two hasn't given a gender. */
 const matches = (me: User, u: User) => !me.gender || !u.gender || me.gender !== u.gender;
-const byOnlineThenCharm = (a: User, b: User) => Number(b.online) - Number(a.online) || charmRankBoost(wealthCharmOf(b.id).charm) - charmRankBoost(wealthCharmOf(a.id).charm);
+/** Someone's Yankı level: the server's in a live build (lib/live/levels; 0 until sent or when hidden), the demo's offline. */
+const charmOf = (u: User) => (liveMode() ? (levelsOf(u.id)?.charm ?? 0) : wealthCharmOf(u.id).charm);
+const byOnlineThenCharm = (a: User, b: User) => Number(b.online) - Number(a.online) || charmRankBoost(charmOf(b)) - charmRankBoost(charmOf(a));
 
 export default function DiscoverScreen() {
   const [tab, setTab] = useState<Tab>('Ana Sayfa');
@@ -47,7 +51,7 @@ export default function DiscoverScreen() {
   const { blocked, settings, setSetting, following, toggleFollow, me } = useApp();
   // The hour when the screen opened: the greeting doesn't change under the reader's eyes.
   const [hour] = useState(() => new Date().getHours());
-  // A live build lists real people from the server (no sample profiles, no distances: the server knows cities only).
+  // A live build lists real people from the server (no sample profiles; distances by city: lib/live/distances).
   const live = liveMode();
   const list = LIST_OF[tab];
   const serverPeople = useDiscoverPeople(list);
@@ -57,14 +61,15 @@ export default function DiscoverScreen() {
   const styles = useStyles();
   // Nearby discovery only with the user's opt-in; blocked users never show up (spec §8.3, PRIV-01).
   const needsOptIn = tab === 'Yakındakiler' && !settings.cityDiscovery;
-  const showDistance = !live && (tab === 'Yakındakiler' || settings.cityDiscovery);
+  const showDistance = tab === 'Yakındakiler' || settings.cityDiscovery;
 
   const base = pool.filter((u) => !blocked.has(u.id) && matches(me, u) && (filters.country === 'ALL' || countryOf(u) === filters.country));
   // The server orders its lists (new accounts, who 1v1 lifts); the demo orders its sample people the same way here.
   const users =
     tab === 'Yakındakiler'
       ? live
-        ? base.filter((u) => !!me.city && u.city.toLocaleLowerCase('tr-TR') === me.city.toLocaleLowerCase('tr-TR'))
+        ? // My city: the same text, or what the server reads as one city ('İzmit' and 'Kocaeli', lib/live/distances).
+          base.filter((u) => !!me.city && (!!distanceOf(u.id)?.sameCity || u.city.toLocaleLowerCase('tr-TR') === me.city.toLocaleLowerCase('tr-TR')))
         : base.filter((u) => u.distanceKm < 20).sort((a, b) => a.distanceKm - b.distanceKm)
       : tab === 'Çevrim içi'
         ? base.filter((u) => u.online)
@@ -77,10 +82,9 @@ export default function DiscoverScreen() {
               ? base
               : // A woman sees the men who spend most, a man the women who earn most (Yankı stands in for 1v1 here).
                 [...base].sort((a, b) => (me.gender === 'Kadın' ? wealthCharmOf(b.id).wealth - wealthCharmOf(a.id).wealth : wealthCharmOf(b.id).charm - wealthCharmOf(a.id).charm))
-            : // Online first, then Yankı level: charm is what lifts a profile in discovery.
-              live
-              ? base
-              : [...base].sort(byOnlineThenCharm);
+            : // Online first, then Yankı level: charm is what lifts a profile in discovery (live: the server's levels;
+              // equal ones keep the server's most-recently-active order).
+              [...base].sort(byOnlineThenCharm);
 
   const rows: Row[] = needsOptIn ? [] : users.map((user) => ({ kind: 'user', user }));
   if (rows.length > 0 && !live) rows.splice(Math.min(DISCOVER_PROMO.afterIndex, rows.length), 0, { kind: 'promo' });
@@ -281,6 +285,11 @@ function UserRow({
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const sim = similarity(me, user);
+  // A live build: the server's levels (none until sent); the demo's are made up from the id.
+  const levels = liveMode() ? levelsOf(user.id) : wealthCharmOf(user.id);
+  // Live: the server's distance between our two cities ("Aynı şehir", "350 km"; none when a city is unknown or the
+  // profile is private); the demo's sample one.
+  const distance = !showDistance ? null : liveMode() ? cityDistanceText(distanceOf(user.id)) : preciseKm(user);
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]} onPress={() => router.push(`/kullanici/${user.id}`)}>
       <View>
@@ -300,12 +309,12 @@ function UserRow({
             user.verified && <VerifiedBadge size={16} />
           )}
           {user.vip && <VipBadge />}
-          <CharmBadge level={wealthCharmOf(user.id).charm} />
+          {typeof levels?.charm === 'number' && <CharmBadge level={levels.charm} />}
         </View>
         <View style={styles.chips}>
-          {showDistance && (
+          {!!distance && (
             <View style={styles.chip}>
-              <Text style={styles.chipText}>{preciseKm(user)}</Text>
+              <Text style={styles.chipText}>{distance}</Text>
             </View>
           )}
           {/* An age or gender the person didn't give stays out (never "0", never a guessed icon). */}

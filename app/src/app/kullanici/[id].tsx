@@ -11,7 +11,7 @@ import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { GiftArt } from '@/components/GiftArt';
 import { FollowListSheet } from '@/components/follow-list-sheet';
 import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
-import { COSMETICS, FAN_LEVELS, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
+import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
@@ -27,6 +27,7 @@ import {
   profileCompletion,
   profileExtras,
   titlesOf,
+  type ProfileExtras,
   vehiclesOf,
   wealthCharmOf,
 } from '@/data/profile';
@@ -36,7 +37,13 @@ import { callsAvailable, liveCalls, liveGift, liveMode, loadRooms, message, toSe
 import { callLabel, callPair, usePair } from '@/components/one-on-one-bar';
 import { loadFollowList, type FollowSide } from '@/lib/live/follows';
 import { agoText, feed as momentFeed } from '@/lib/live/moments';
-import { followOnServer, loadMe, loadPublicProfile, profilePatch, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
+import { addAlbumPhoto, followOnServer, loadMe, loadPublicProfile, loadShowcase, profilePatch, removeAlbumPhoto, saveMyExtras, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
+import { lookOf, useLooks } from '@/lib/live/looks';
+import { cityDistanceText, distanceOf } from '@/lib/live/distances';
+import { MEDAL_HOWTO, TITLE_HOWTO, draftFromExtras, extrasFromServer, noteExtrasRefusal, showcaseView, validateExtras, type ExtrasDraft, type ShowcaseView } from '@/lib/profile-more';
+import { ProfileExtrasForm } from '@/components/profile-extras-form';
+import { PostSkeleton, Skeletons } from '@/components/fx/skeleton';
+import { LoadError } from '@/components/load-error';
 import { copyText } from '@/lib/clipboard';
 import { goBack } from '@/lib/nav';
 import { errorHaptic, successHaptic } from '@/lib/haptics';
@@ -65,9 +72,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'onur', label: 'Vitrin' },
   { id: 'iliski', label: 'Bağlar' },
 ];
-// Live mode: Anlar and Vitrin (medals, titles, rides, gift wall) have nothing on the server yet.
-const LIVE_TABS = TABS.filter((t) => t.id === 'profil' || t.id === 'iliski');
 type Sheet = 'none' | 'more' | 'report' | 'call' | 'gift';
+const NO_SHOWCASE = showcaseView({ gifts: [], rides: [], entries: [], medals: [], titles: [] });
 const BAR_H = 52;
 const TAB_H = 48;
 
@@ -119,7 +125,7 @@ export default function UserProfile() {
     let retry: ReturnType<typeof setTimeout> | undefined;
     let tries = 0;
     const read = () =>
-      loadPublicProfile(serverId, isMe)
+      loadPublicProfile(serverId, isMe, true)
         .then((counts) => {
           if (!alive) return;
           setSocial({ id: serverId, counts });
@@ -146,12 +152,18 @@ export default function UserProfile() {
   }, [serverId, isMe, reloads, isBlocked]);
   // Live mode: the server's follow state once read (a block ends the follow there too).
   const isFollowing = !isBlocked && (counts ? counts.isFollowing : following.has(user.id));
-  const extras = profileExtras(user);
+  // Live mode: what the person filled in, as the server has it (none until read); the demo's sample values offline.
+  const extras = live ? extrasFromServer(counts?.extras) : profileExtras(user);
   const moments = live ? (liveMoments ?? []) : MOMENTS.filter((m) => m.userId === user.id);
   const photos = moments.filter((m) => m.image).map((m) => m.image!);
-  const completion = profileCompletion(user, extras, photos.length);
-  // Others: demo values; me: my real Cömertlik (wealth) and Yankı (charm) levels.
-  const levels = user.id === 'me' ? { wealth: wealthLevel, charm: charmLevel } : wealthCharmOf(user.id);
+  // Live mode: the album is on the server (with ids, to remove one of mine).
+  const livePhotos = counts?.photos ?? [];
+  const completion = profileCompletion(user, extras, photos.length + (live ? livePhotos.length : 0));
+  // Me: my real Cömertlik (wealth) and Yankı (charm) levels. Others: the server's (live; none until read, null for one
+  // they hide) or the demo's.
+  const levels: { wealth: number | null; charm: number | null } | null = user.id === 'me' ? { wealth: wealthLevel, charm: charmLevel } : live ? (counts?.levels ?? null) : wealthCharmOf(user.id);
+  // "Seviyeyi Gizle" on my own profile: live, what the server hides from others now; the demo's local VIP choice.
+  const myHidden = live ? { wealth: !!counts?.levelsHidden?.wealth, charm: !!counts?.levelsHidden?.charm } : { wealth: vipDays > 0 && settings.hideWealth, charm: vipDays > 0 && settings.hideCharm };
   const guardian = guardianOf(user.id);
   const bondState = useBonds(user.id);
   const topBondShown = shownTopBond(bondState, isMe);
@@ -160,31 +172,58 @@ export default function UserProfile() {
   const priv = isMe ? { ...privacyOf('me'), showOnline: settings.showOnline, showLastSeen: settings.showLastSeen, showCurrentRoom: settings.showCurrentRoom } : privacyOf(user.id);
   // Like most messengers: hiding your own last seen also hides everyone else's from you.
   const lastSeen = !isMe && !user.online && priv.showLastSeen && settings.showLastSeen ? user.lastSeen : undefined;
-  // Live mode: only my own badge, from my server role (never the demo's local roles).
-  const staff = useStaffBadge(user.id);
-  // The server keeps no country: live mode shows none.
-  const country = live ? undefined : COUNTRIES.find((c) => c.code === (user.country ?? 'TR'));
-  // Live mode: the server's counts (null = not read yet, shown as "—"). The server has no friend count yet.
+  // Live mode: from server roles only (mine from my account, theirs from their profile), never the demo's local roles.
+  const staff = useStaffBadge(user.id, counts?.staff);
+  // Live mode: the country they chose (none until read or when not given).
+  const countryCode = live ? (counts?.extras?.country ?? null) : (user.country ?? 'TR');
+  const country = countryCode ? COUNTRIES.find((c) => c.code === countryCode) : undefined;
+  // Live mode: how far they are from me by our two cities, as the server sent it (none when unknown or private).
+  const distanceText = live && serverId && !isMe ? cityDistanceText(distanceOf(serverId)) : null;
+  // Live mode: the server's counts (null = not read yet, shown as "—"). Friends: people who follow each other.
   const followers = live ? (counts?.followers ?? null) : (user.age * 37) % 900;
   const followingCount = live ? (counts?.following ?? null) : isMe ? following.size : (user.age * 13) % 200;
-  const friends = live ? null : isMe ? USERS.filter((u) => following.has(u.id) && FOLLOWS_ME.has(u.id)).length : (user.age * 7) % 60;
+  const friends = live ? (counts?.friends ?? null) : isMe ? USERS.filter((u) => following.has(u.id) && FOLLOWS_ME.has(u.id)).length : (user.age * 7) % 60;
+  // Live mode: their public ID, the one their own Ben tab shows: a special ID they wear, else the number made from
+  // their server id (data/profile displayId), which agency invites also take. Someone else's look is read here.
+  useLooks(serverId && !isMe ? [serverId] : [], live);
+  const special = live ? cosmeticById(isMe ? equipped.specialId : lookOf(serverId)?.specialId) : undefined;
+  const publicId = !live ? displayId(user.id) : special?.kind === 'specialId' ? special.name.replace('ID ', '') : serverId ? displayId(serverId) : null;
   const can = (a: Action) => checkInteraction(a, user, { blocked, following, myAge: me.age });
   const guard = (a: Action, run: () => void) => {
     const c = can(a);
     if (!c.ok) return showAlert('Şu an yapılamıyor', c.reason);
     run();
   };
-  const album = [...(user.photos ?? []), ...MOMENTS.filter((m) => m.userId === user.id && m.image).map((m) => m.image!)];
+  const album = live ? [...livePhotos.map((p) => p.url), ...photos] : [...(user.photos ?? []), ...MOMENTS.filter((m) => m.userId === user.id && m.image).map((m) => m.image!)];
+  // How many album photos of mine count towards the limit (moment photos don't).
+  const myAlbumCount = live ? livePhotos.length : (me.photos?.length ?? 0);
+  const albumIdOf = (url: string) => livePhotos.find((p) => p.url === url)?.id;
   const [openedAt] = useState(() => Date.now());
   const vipUntil = vipDays > 0 ? new Date(openedAt + vipDays * 86_400_000).toLocaleDateString('tr-TR') : null;
 
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [albumBusy, setAlbumBusy] = useState(false);
+  /** Live mode: my album as the server answered (after an add or a remove). */
+  const takePhotos = (list: NonNullable<SocialCounts['photos']>) => setSocial((s) => (s && s.id === serverId ? { id: s.id, counts: { ...s.counts, photos: list } } : s));
   const pickPhoto = async (forAlbum: boolean) => {
-    if (avatarBusy) return;
+    if (avatarBusy || albumBusy) return;
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: !forAlbum, aspect: [1, 1], quality: 0.7 });
     if (res.canceled || !res.assets[0]) return;
     const asset = res.assets[0];
-    if (forAlbum) {
+    if (forAlbum && live) {
+      // Live mode: the photo goes to the server's storage and into my album there; shown once the server has it.
+      setAlbumBusy(true);
+      try {
+        takePhotos(await addAlbumPhoto(asset));
+        successHaptic();
+        showAlert('Fotoğraf eklendi', 'Albüm fotoğrafları da topluluk kurallarına göre denetlenir.');
+      } catch (e) {
+        errorHaptic();
+        showAlert('Fotoğraf yüklenemedi', message(e));
+      } finally {
+        setAlbumBusy(false);
+      }
+    } else if (forAlbum) {
       updateMe({ photos: [asset.uri, ...(me.photos ?? [])].slice(0, LIMITS.photos) });
       showAlert('Fotoğraf eklendi', 'Albüm fotoğrafları da topluluk kurallarına göre denetlenir.');
     } else if (live) {
@@ -217,11 +256,31 @@ export default function UserProfile() {
   const [list, setList] = useState<FollowSide | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
+  // Live mode: the Vitrin as the server has it (gift wall, rides, entry effects, medals, titles), read when the tab
+  // opens and again after a gift; kept with the id it is for. 'failed': no answer (Tekrar dene).
+  const [showcase, setShowcase] = useState<{ id: string; view: ShowcaseView | 'failed' } | null>(null);
+  const [showcaseTry, setShowcaseTry] = useState(0);
+  useEffect(() => {
+    if (!serverId || tab !== 'onur') return;
+    let alive = true;
+    loadShowcase(serverId)
+      .then((view) => alive && setShowcase({ id: serverId, view }))
+      // A read that fails keeps what was shown before; with nothing shown yet it says so.
+      .catch(() => alive && setShowcase((s) => (s && s.id === serverId && s.view !== 'failed' ? s : { id: serverId, view: 'failed' })));
+    return () => {
+      alive = false;
+    };
+  }, [serverId, tab, reloads, showcaseTry]);
+  // Nobody on the server to read (a sample person, or me before sign-in): an empty Vitrin, never the demo's.
+  const liveShowcase = !serverId ? NO_SHOWCASE : showcase && showcase.id === serverId ? showcase.view : null;
+
   // Gift wall: my own wall is only what I really received; another user's wall is their simulated
   // history plus every gift I sent them (room, profile, call).
   const received = wallOf[user.id] ?? {};
   const giftWall = giftWallOf(user.id).map((g) => ({ ...g, count: (isMe ? 0 : g.count) + (received[g.id] ?? 0) }));
   const giftTotal = giftWall.reduce((s, g) => s + g.count, 0);
+  // Live mode: the catalog gifts they received, counted by the server (null until read).
+  const giftCount = live ? (counts?.giftsReceived ?? null) : giftTotal;
 
   const followPoints = () => {
     if (!club?.history.some((h) => h.text === 'Takip ettin')) addFanPoints(user.id, 10, 'Takip ettin');
@@ -300,6 +359,8 @@ export default function UserProfile() {
       return false;
     }
     recordGift(user.id, g.id, 1);
+    // Live mode: their gift count and Vitrin are read again from the server, which now has this gift.
+    if (live) setReloads((n) => n + 1);
     bump('giftsSent', 1);
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
     successHaptic();
@@ -314,7 +375,12 @@ export default function UserProfile() {
     return deliverGift(g);
   };
 
-  const copyId = () => copyText(displayId(user.id), 'ID');
+  const copyId = () => publicId && copyText(publicId, 'ID');
+  /** Live mode: takes a photo out of my album on the server (its file goes too). */
+  const removeFromAlbum = (photoId: number) =>
+    removeAlbumPhoto(photoId)
+      .then(takePhotos)
+      .catch((e) => showAlert('Fotoğraf kaldırılamadı', message(e)));
   const copyUsername = () => user.username && copyText(`@${user.username}`, 'Kullanıcı adı');
 
   // Blocking also ends the follows both ways (on the server too), so it asks first; unblocking doesn't.
@@ -330,14 +396,19 @@ export default function UserProfile() {
   const [editLoading, setEditLoading] = useState(false);
   // My age on the server (null: no birth date there yet, so the form may take one, once).
   const [serverAge, setServerAge] = useState<number | null>(null);
+  // Live mode: my extras as the server has them when the form opens (null: an older server that keeps none, so the
+  // form doesn't offer them). Read fresh, so a save never sends empty fields over ones not read yet.
+  const [serverExtras, setServerExtras] = useState<ProfileExtras | null>(null);
   const openEdit = async () => {
     if (!live) return setEditOpen(true);
     if (editLoading) return;
     setEditLoading(true);
     try {
-      const mine = await loadMe();
+      const [mine, now] = await Promise.all([loadMe(), serverId ? loadPublicProfile(serverId, true) : Promise.resolve(null)]);
       updateMe(mine);
       setServerAge(mine.age ?? null);
+      if (now && serverId) setSocial({ id: serverId, counts: now });
+      setServerExtras(now?.extras ? extrasFromServer(now.extras) : null);
       setEditOpen(true);
     } catch (e) {
       showAlert('Profil açılamadı', message(e));
@@ -349,8 +420,14 @@ export default function UserProfile() {
   const saveEdit = async (e: EditResult): Promise<boolean> => {
     if (live) {
       try {
+        // The extras first (with the country and the gender's visibility), so my profile answer below has them.
+        if (e.extras) {
+          const x = await saveMyExtras(e.extras, e.country || null, !e.showGender);
+          setSocial((s) => (s && s.id === serverId ? { id: s.id, counts: { ...s.counts, extras: x } } : s));
+        }
         // The server never sends the birth date back (only the age): keep the one just set to show it to me.
         updateMe({ ...(await saveMyProfile(e)), ...(e.birthDate && { birthDate: e.birthDate }) });
+        setReloads((n) => n + 1);
       } catch (err) {
         errorHaptic();
         showAlert('Profil kaydedilemedi', message(err));
@@ -402,12 +479,12 @@ export default function UserProfile() {
   const showRoom = !live || !!room;
   const showAgency = !live || known;
 
-  // Live mode: the tabs and blocks with something real behind them (the rest is sample data in the demo).
-  const tabs = live ? LIVE_TABS : TABS;
+  // Live mode: every tab has the server's data behind it (Anlar: their posts; Vitrin: profiles.mjs showcase).
+  const tabs = TABS;
   const birthday = user.birthDate ? formatTrDate(user.birthDate) : extras.birthday;
   const hasPersonal = extras.height > 0 || extras.weight > 0 || !!extras.job || extras.languages.length > 0 || !!extras.zodiac || (user.interests?.length ?? 0) > 0;
   const showsGender = !!user.gender && (isMe || user.showGender !== false);
-  const hasBasics = !live || !!user.username || showsGender || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
+  const hasBasics = !live || publicId !== null || !!user.username || showsGender || !!country || (isMe && !!birthday) || !!user.joinedAt || !!extras.relationship || !!extras.education;
 
   const presence = priv.showCurrentRoom ? presenceOf(user.id) : null;
   // The collapsed bar is solid background: the light scheme swaps the photo's dark chip for a soft ink one.
@@ -468,9 +545,14 @@ export default function UserProfile() {
               )}
               <View style={[styles.row, { flexWrap: 'wrap' }]}>
                 <GenderChip user={user} owner={isMe} />
-                {/* Live mode: someone else's levels aren't on the server yet. */}
-                {(!live || isMe) && (
-                  <LevelChips wealth={levels.wealth} charm={levels.charm} hideWealth={isMe && vipDays > 0 && settings.hideWealth} hideCharm={isMe && vipDays > 0 && settings.hideCharm} />
+                {/* Live mode: someone else's levels once the server sent them. */}
+                {levels && (
+                  <LevelChips
+                    wealth={levels.wealth ?? 0}
+                    charm={levels.charm ?? 0}
+                    hideWealth={levels.wealth === null || (isMe && myHidden.wealth)}
+                    hideCharm={levels.charm === null || (isMe && myHidden.charm)}
+                  />
                 )}
                 {isMe ? <VipTitle level={vipLevel} /> : user.vip && <VipBadge />}
                 {staff && (
@@ -500,8 +582,8 @@ export default function UserProfile() {
                     <Ionicons name="location-outline" size={14} color={colors.textDim} />
                     <Text style={styles.meta}>
                       {user.city}
-                      {/* The server knows cities, not distances. */}
-                      {!isMe && !live && settings.cityDiscovery && ` · ${user.distanceKm} km`}
+                      {/* Live: the server's distance by city ("Aynı şehir", "350 km"); the demo's sample one. */}
+                      {!isMe && settings.cityDiscovery && (live ? (distanceText ? ` · ${distanceText}` : null) : ` · ${user.distanceKm} km`)}
                     </Text>
                   </>
                 )}
@@ -524,15 +606,10 @@ export default function UserProfile() {
             <Stat n={followers} label="Takipçi" onPress={serverId ? () => setList('followers') : undefined} />
             <View style={styles.vSep} />
             <Stat n={followingCount} label="Takip" onPress={serverId ? () => setList('following') : undefined} />
-            {/* Live mode: no friend count or gift wall on the server yet. */}
-            {!live && (
-              <>
-                <View style={styles.vSep} />
-                <Stat n={friends} label="Arkadaş" />
-                <View style={styles.vSep} />
-                <Stat n={giftTotal} label="Hediye" onPress={() => setTab('onur')} />
-              </>
-            )}
+            <View style={styles.vSep} />
+            <Stat n={friends} label="Arkadaş" />
+            <View style={styles.vSep} />
+            <Stat n={giftCount} label="Hediye" onPress={() => setTab('onur')} />
           </View>
           {isBlocked && <Text style={{ color: colors.red, marginTop: 8 }}>Bu kullanıcıyı engelledin.</Text>}
           {!isMe && priv.status !== 'active' && (
@@ -590,8 +667,8 @@ export default function UserProfile() {
                   wealthXp={wealthXp}
                   charmXp={charmXp}
                   giftsSent={stats.giftsSent}
-                  // Live mode: gifts I received aren't all known on this phone (Gelir has them).
-                  giftsReceived={live ? null : giftTotal}
+                  // Live mode: the catalog gifts I received, as the server counts them (null until read).
+                  giftsReceived={giftCount}
                 />
               </View>
             ) : (
@@ -601,34 +678,43 @@ export default function UserProfile() {
             )}
             <Band />
 
-            {/* Live mode: album photos stay on this phone (not on the server), so no album there yet. */}
-            {!live && (
+            {/* Live mode: the album is on the server (profiles.mjs), with their moment photos after it as in the demo. */}
+            {(!live || counts?.photos !== undefined) && (
               <>
                 <View style={styles.section}>
-                  <SectionTitle title={`Albüm${isMe ? ` · ${me.photos?.length ?? 0}/${LIMITS.photos}` : ''}`} onPress={() => setTab('dinamik')} />
+                  <SectionTitle title={`Albüm${isMe ? ` · ${myAlbumCount}/${LIMITS.photos}` : ''}`} onPress={() => setTab('dinamik')} />
                   {album.length > 0 || isMe ? (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                      {isMe && (me.photos?.length ?? 0) < LIMITS.photos && (
-                        <Pressable style={[styles.photo, styles.addPhoto]} onPress={() => pickPhoto(true)} accessibilityLabel="Albüme fotoğraf ekle">
-                          <Ionicons name="add" size={30} color={colors.textDim} />
-                          <Text style={styles.meta}>Fotoğraf ekle</Text>
+                      {isMe && myAlbumCount < LIMITS.photos && (
+                        <Pressable
+                          style={[styles.photo, styles.addPhoto]}
+                          onPress={() => pickPhoto(true)}
+                          disabled={albumBusy}
+                          accessibilityLabel="Albüme fotoğraf ekle"
+                          accessibilityState={{ busy: albumBusy }}
+                        >
+                          <Ionicons name={albumBusy ? 'hourglass-outline' : 'add'} size={30} color={colors.textDim} />
+                          <Text style={styles.meta}>{albumBusy ? 'Yükleniyor…' : 'Fotoğraf ekle'}</Text>
                         </Pressable>
                       )}
-                      {album.map((p) => (
-                        <View key={p}>
-                          <Image source={{ uri: p }} style={styles.photo} />
-                          {isMe && me.photos?.includes(p) && (
-                            <Pressable
-                              style={styles.removePhoto}
-                              hitSlop={6}
-                              onPress={() => updateMe({ photos: (me.photos ?? []).filter((x) => x !== p) })}
-                              accessibilityLabel="Fotoğrafı kaldır"
-                            >
-                              <Ionicons name="close" size={14} color="#fff" />
-                            </Pressable>
-                          )}
-                        </View>
-                      ))}
+                      {album.map((p, i) => {
+                        const liveId = live ? albumIdOf(p) : undefined;
+                        return (
+                          <View key={`${i}-${p}`}>
+                            <Image source={{ uri: p }} style={styles.photo} />
+                            {isMe && (live ? liveId !== undefined : me.photos?.includes(p)) && (
+                              <Pressable
+                                style={styles.removePhoto}
+                                hitSlop={6}
+                                onPress={() => (liveId !== undefined ? removeFromAlbum(liveId) : updateMe({ photos: (me.photos ?? []).filter((x) => x !== p) }))}
+                                accessibilityLabel="Fotoğrafı kaldır"
+                              >
+                                <Ionicons name="close" size={14} color="#fff" />
+                              </Pressable>
+                            )}
+                          </View>
+                        );
+                      })}
                     </ScrollView>
                   ) : (
                     <InfoBox icon="image" text={isMe ? 'Serbest paylaş, ama kendi kurallarına göre' : 'Henüz albüm fotoğrafı yok.'} />
@@ -667,12 +753,12 @@ export default function UserProfile() {
               </>
             )}
 
-            {/* Live mode: no slogan on the server, so no sample one for me either. */}
-            {(extras.slogan || (isMe && !live)) && (
+            {/* Live mode: their slogan from the server; mine, when I have none, is an invitation to write one (no sample). */}
+            {(extras.slogan || (isMe && (!live || counts?.extras !== undefined))) && (
               <>
                 <View style={styles.section}>
                   <SectionTitle title="Arkadaşlık Sloganı" onPress={isMe ? openEdit : undefined} />
-                  <InfoBox icon="heart" text={extras.slogan ?? 'Bir soruyu yanıtla, seninle aynı frekansta olan biriyle tanış.'} />
+                  <InfoBox icon="heart" text={extras.slogan ?? (live ? 'Bir slogan yaz; seninle aynı frekanstakiler seni bulsun.' : 'Bir soruyu yanıtla, seninle aynı frekansta olan biriyle tanış.')} />
                 </View>
                 <Band />
               </>
@@ -710,12 +796,12 @@ export default function UserProfile() {
               <View style={styles.section}>
                 <SectionTitle title="Temel Bilgiler" />
                 <View style={styles.infoCard}>
-                  {/* The 12-digit public ID is made from the demo id; the server has no such number. */}
-                  {!live && (
+                  {/* The public ID their own Ben tab shows (live: a special ID they wear, else the one made from their server id). */}
+                  {publicId !== null && (
                     <InfoRow icon="person-outline" label="ID">
                       <Pressable style={styles.row} onPress={copyId} hitSlop={6} accessibilityLabel="ID kopyala">
-                        <Text selectable style={styles.infoValue}>
-                          {displayId(user.id)}
+                        <Text selectable style={[styles.infoValue, special?.kind === 'specialId' && { color: colors.gold }]}>
+                          {special?.kind === 'specialId' ? `${publicId} ✦` : publicId}
                         </Text>
                         <Ionicons name="copy-outline" size={16} color={colors.textDim} />
                       </Pressable>
@@ -811,7 +897,12 @@ export default function UserProfile() {
 
         {tab === 'dinamik' && (
           <View style={{ padding: 16, gap: 12 }}>
-            {moments.length > 0 ? (
+            {/* Live mode: their posts are still coming from the server. */}
+            {live && !!serverId && liveMoments === null ? (
+              <Skeletons count={2}>
+                <PostSkeleton />
+              </Skeletons>
+            ) : moments.length > 0 ? (
               moments.map((m) => <MomentItem key={m.id} moment={m} user={user} />)
             ) : (
               <View style={styles.empty}>
@@ -823,14 +914,27 @@ export default function UserProfile() {
           </View>
         )}
 
-        {tab === 'onur' && (
-          <OnurTab
-            userId={user.id}
-            isMe={isMe}
-            giftWall={giftWall}
-            myRides={isMe ? COSMETICS.filter((c) => c.kind === 'ride' && inventory.has(c.id)).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name })) : null}
-          />
-        )}
+        {tab === 'onur' &&
+          (!live ? (
+            <OnurTab
+              userId={user.id}
+              isMe={isMe}
+              giftWall={giftWall}
+              myRides={isMe ? COSMETICS.filter((c) => c.kind === 'ride' && inventory.has(c.id)).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name })) : null}
+            />
+          ) : liveShowcase && liveShowcase !== 'failed' ? (
+            <OnurTab userId={user.id} isMe={isMe} giftWall={liveShowcase.giftWall} myRides={null} server={liveShowcase} />
+          ) : liveShowcase === 'failed' ? (
+            <View style={{ padding: 16 }}>
+              <LoadError text="Vitrin şu an yüklenemedi." onRetry={() => setShowcaseTry((n) => n + 1)} />
+            </View>
+          ) : (
+            <View style={{ padding: 16 }}>
+              <Skeletons count={3}>
+                <PostSkeleton />
+              </Skeletons>
+            </View>
+          ))}
 
         {tab === 'iliski' && <BondsTab user={user} isMe={isMe} state={bondState} isBlocked={isBlocked} onMeetInvite={() => router.push('/oda/yeni')} />}
       </ScrollView>
@@ -935,7 +1039,19 @@ export default function UserProfile() {
       )}
       {giftable && <ProfileGiftSheet visible={sheet === 'gift'} name={user.name} gifts={giftChoices} coins={coins} svipLevel={svipLevel} onClose={() => setSheet('none')} onSend={sendGift} />}
 
-      {editOpen && <EditSheet user={me} live={live} serverAge={serverAge} photoBusy={avatarBusy} onPhoto={() => pickPhoto(false)} onClose={() => setEditOpen(false)} onSave={saveEdit} />}
+      {editOpen && (
+        <EditSheet
+          user={me}
+          live={live}
+          serverAge={serverAge}
+          extras={serverExtras}
+          myCountry={counts?.extras?.country ?? null}
+          photoBusy={avatarBusy}
+          onPhoto={() => pickPhoto(false)}
+          onClose={() => setEditOpen(false)}
+          onSave={saveEdit}
+        />
+      )}
 
     </View>
   );
@@ -1227,12 +1343,25 @@ function Pedestals({ items, tint }: { items: { id: string; emoji: string; name: 
   );
 }
 
-function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: boolean; giftWall: (Gift & { count: number })[]; myRides: { id: string; emoji: string; name: string }[] | null }) {
+/** `server`: live mode, the Vitrin as the server has it (only what was earned or bought; no gift collections). */
+function OnurTab({
+  userId,
+  isMe,
+  giftWall,
+  myRides,
+  server,
+}: {
+  userId: string;
+  isMe: boolean;
+  giftWall: (Gift & { count: number })[];
+  myRides: { id: string; emoji: string; name: string }[] | null;
+  server?: ShowcaseView;
+}) {
   const { colors, dark } = useTheme();
   const styles = useStyles();
-  const medals = medalsOf(userId);
-  const titles = titlesOf(userId);
-  const rides = myRides ?? vehiclesOf(userId).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name }));
+  const medals = server ? server.medals : medalsOf(userId);
+  const titles = server ? server.titles : titlesOf(userId);
+  const rides = server ? server.rides : (myRides ?? vehiclesOf(userId).map((c) => ({ id: c.id, emoji: c.emoji, name: c.name })));
   const lit = giftWall.filter((g) => g.count > 0).length;
   const gold = medals.filter((m) => m.tier === 'gold').length;
   const collections = GIFT_COLLECTIONS.map((c) => ({ ...c, done: collectionProgress(userId, c) }));
@@ -1244,7 +1373,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
       <WallBanner
         title="Madalyalar"
         colors={['#B45309', '#F59E0B', '#92400E']}
-        onPress={explain('Madalyalar', isMe ? 'Etkinliklere katılarak ve görevleri tamamlayarak madalya kazan.' : `${medals.length} madalya kazanılmış.`)}
+        onPress={explain('Madalyalar', server ? `${isMe ? '' : `${medals.length} madalya kazanılmış. `}${MEDAL_HOWTO}` : isMe ? 'Etkinliklere katılarak ve görevleri tamamlayarak madalya kazan.' : `${medals.length} madalya kazanılmış.`)}
         right={
           <>
             <Text style={styles.wallCount}>🏅 {gold}</Text>
@@ -1260,7 +1389,7 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
         title="Unvanlar"
         colors={['#0B3B4A', '#087A80', '#0B3B4A']}
         subtitle="Yalnızca dinamik unvanları göster"
-        onPress={explain('Unvanlar', 'Sıralamalarda ve etkinliklerde derece yaparak unvan kazan.')}
+        onPress={explain('Unvanlar', server ? TITLE_HOWTO : 'Sıralamalarda ve etkinliklerde derece yaparak unvan kazan.')}
         right={
           <>
             <Text style={styles.wallCount}>{titles.length}</Text>
@@ -1298,6 +1427,23 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
         <Pedestals items={rides} tint="rgba(254,202,202,0.4)" />
       </WallBanner>
 
+      {/* Live mode: the entry effects they own on the server, beside the rides. */}
+      {server && (
+        <WallBanner
+          title="Giriş Efektleri"
+          colors={['#312E81', '#6366F1', '#312E81']}
+          onPress={() => router.push('/magaza')}
+          right={
+            <>
+              <Text style={styles.wallCount}>Satın al</Text>
+              <Ionicons name="chevron-forward" size={14} color="#fff" />
+            </>
+          }
+        >
+          <Pedestals items={server.entries} tint="rgba(199,210,254,0.4)" />
+        </WallBanner>
+      )}
+
       <View style={[styles.sectionHead, { marginTop: 6 }]}>
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 }]}>Hediye Koleksiyonu</Text>
         <View style={{ flex: 1 }} />
@@ -1317,30 +1463,33 @@ function OnurTab({ userId, isMe, giftWall, myRides }: { userId: string; isMe: bo
         ))}
       </View>
 
-      <View style={styles.catalog}>
-        <View style={styles.sectionHead}>
-          <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>Hediye Kataloğu</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={styles.meta}>
-            <Text style={{ color: colors.text, fontWeight: '800' }}>{doneCollections}</Text>/{collections.length}
-          </Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-          {collections.map((c) => (
-            <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : dark ? ['#3F3A52', '#1F1B2E'] : ['#E9EFF7', '#D5DEEA']} style={styles.collection}>
-              <Text style={{ fontSize: 44, opacity: c.done > 0 ? 1 : 0.4 }}>{c.emoji}</Text>
-              <Text style={[styles.collectionName, c.done === 0 && styles.collectionNameLocked]} numberOfLines={2}>
-                {c.name}
-              </Text>
-              <View style={styles.collectionBar}>
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
-                  {c.done}/{c.total}
+      {/* The gift collections are the demo's sample progress: live mode has none on the server. */}
+      {!server && (
+        <View style={styles.catalog}>
+          <View style={styles.sectionHead}>
+            <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>Hediye Kataloğu</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.meta}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>{doneCollections}</Text>/{collections.length}
+            </Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            {collections.map((c) => (
+              <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : dark ? ['#3F3A52', '#1F1B2E'] : ['#E9EFF7', '#D5DEEA']} style={styles.collection}>
+                <Text style={{ fontSize: 44, opacity: c.done > 0 ? 1 : 0.4 }}>{c.emoji}</Text>
+                <Text style={[styles.collectionName, c.done === 0 && styles.collectionNameLocked]} numberOfLines={2}>
+                  {c.name}
                 </Text>
-              </View>
-            </LinearGradient>
-          ))}
-        </ScrollView>
-      </View>
+                <View style={styles.collectionBar}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
+                    {c.done}/{c.total}
+                  </Text>
+                </View>
+              </LinearGradient>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 }
@@ -1352,16 +1501,22 @@ const GENDERS: [User['gender'] | 'hidden', string][] = [
   ['Erkek', 'Erkek'],
   ['hidden', 'Belirtmek istemiyorum'],
 ];
-// Live mode: the server keeps Kadın or Erkek (or nothing yet); hiding it is a demo-only choice.
+// Live mode against a server that keeps no extras: Kadın or Erkek (or nothing yet), no hiding. With them, "Gizli"
+// keeps the gender for matching and stops it showing to others (server/api/profiles.mjs genderHidden).
 const LIVE_GENDERS = GENDERS.filter(([g]) => g !== 'hidden');
 
-/** What the edit form hands back: what the server takes, plus the demo-only country and gender visibility. */
-type EditResult = ProfileEdit & { country: string; showGender: boolean };
+/**
+ * What the edit form hands back: what PATCH /api/me takes, the country and whether the gender shows, and (live
+ * mode, when the server keeps them) the personal extras.
+ */
+type EditResult = ProfileEdit & { country: string; showGender: boolean; extras?: ExtrasDraft };
 
 function EditSheet({
   user,
   live,
   serverAge,
+  extras,
+  myCountry,
   photoBusy,
   onSave,
   onClose,
@@ -1371,6 +1526,10 @@ function EditSheet({
   live: boolean;
   /** Live mode: my age as the server has it; a number means my birth date is already set there. */
   serverAge: number | null;
+  /** Live mode: my extras as the server has them; null when it keeps none (no extras, country or "Gizli" then). */
+  extras: ProfileExtras | null;
+  /** Live mode: my country on the server (null: none chosen). */
+  myCountry: string | null;
   photoBusy: boolean;
   /** Saves; true once saved (the caller closes the sheet and says so), false to stay here. */
   onSave: (e: EditResult) => Promise<boolean>;
@@ -1387,10 +1546,14 @@ function EditSheet({
   // The birth date is set once (sign-up or here, the first time) and never again: the server refuses a second one.
   const birthLocked = live ? serverAge !== null || !!user.birthDate : !!user.birthDate;
   const [birth, setBirth] = useState(birthLocked ? '' : formatTrDate(user.birthDate));
-  const [gender, setGender] = useState<User['gender'] | 'hidden'>(!live && user.showGender === false ? 'hidden' : user.gender);
-  const [country, setCountry] = useState(user.country ?? 'TR');
+  // Live mode: the extras, the country and "Gizli" only when the server keeps them.
+  const withExtras = !live || !!extras;
+  const [gender, setGender] = useState<User['gender'] | 'hidden'>(withExtras && user.showGender === false ? 'hidden' : user.gender);
+  const [country, setCountry] = useState(live ? (myCountry ?? '') : (user.country ?? 'TR'));
   const [interests, setInterests] = useState<string[]>(user.interests ?? []);
   const [errors, setErrors] = useState<ProfileErrors>({});
+  const [extrasDraft, setExtrasDraft] = useState<ExtrasDraft | null>(() => (live && extras ? draftFromExtras(extras) : null));
+  const [extrasErrors, setExtrasErrors] = useState<ReturnType<typeof validateExtras>>({});
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -1403,9 +1566,14 @@ function EditSheet({
     // Live mode: an account may have no username yet; leaving it empty keeps it that way.
     if (live && !username.trim() && !user.username) delete e.username;
     setErrors(e);
-    noteProfileRefusal(draft, e);
+    const xe = extrasDraft ? validateExtras(extrasDraft) : {};
+    setExtrasErrors(xe);
+    // One refusal counted per save, as the server counts one per request.
+    if (Object.keys(e).length) noteProfileRefusal(draft, e);
+    else if (extrasDraft) noteExtrasRefusal(extrasDraft, xe);
     // The contact note can come from several fields; it is said once.
-    if (Object.keys(e).length) return showAlert('Profil kaydedilemedi', [...new Set(Object.values(e))].join('\n'));
+    const all = [...Object.values(e), ...Object.values(xe)];
+    if (all.length) return showAlert('Profil kaydedilemedi', [...new Set(all)].join('\n'));
     setSaving(true);
     const ok = await onSave({
       name,
@@ -1417,6 +1585,7 @@ function EditSheet({
       gender: gender === 'hidden' ? undefined : gender,
       showGender: gender !== 'hidden',
       birthDate: birthLocked ? undefined : (parseTrDate(birth) ?? undefined),
+      ...(extrasDraft && { extras: extrasDraft }),
     });
     if (!ok) setSaving(false);
   };
@@ -1459,13 +1628,17 @@ function EditSheet({
                 <TextInput value={birth} onChangeText={setBirth} keyboardType="numbers-and-punctuation" maxLength={10} style={styles.input} placeholder="GG.AA.YYYY" placeholderTextColor={colors.textDim} />
               </Field>
             )}
-            <Field label="Cinsiyet (isteğe bağlı)">
-              <ChipRow value={gender} options={live ? LIVE_GENDERS : GENDERS} onChange={setGender} />
+            <Field label="Cinsiyet (isteğe bağlı)" hint={withExtras && gender === 'hidden' && live ? 'Cinsiyetin eşleşme için kalır; diğerleri yalnızca yaşını görür.' : undefined}>
+              <ChipRow value={gender} options={withExtras ? GENDERS : LIVE_GENDERS} onChange={setGender} />
             </Field>
-            {/* Live mode: the server keeps no country. */}
-            {!live && (
+            {/* Live mode: only when the server keeps it (an older one doesn't); it may be left out there. */}
+            {withExtras && (
               <Field label="Ülke">
-                <ChipRow value={country} options={COUNTRIES.filter((c) => c.code !== 'ALL').map((c) => [c.code, `${c.flag} ${c.name}`] as [string, string])} onChange={setCountry} />
+                <ChipRow
+                  value={country}
+                  options={[...(live ? [['', 'Belirtme'] as [string, string]] : []), ...COUNTRIES.filter((c) => c.code !== 'ALL').map((c) => [c.code, `${c.flag} ${c.name}`] as [string, string])]}
+                  onChange={setCountry}
+                />
               </Field>
             )}
             <Field label="Şehir (isteğe bağlı)" error={errors.city} hint="Boş bırakırsan profilinde şehir görünmez.">
@@ -1480,6 +1653,7 @@ function EditSheet({
                 ))}
               </View>
             </Field>
+            {extrasDraft && <ProfileExtrasForm draft={extrasDraft} errors={extrasErrors} onChange={setExtrasDraft} />}
           </ScrollView>
           <View style={[styles.row, { gap: 10, marginTop: 12 }]}>
             <Pressable style={styles.cancelBtn} onPress={onClose}>

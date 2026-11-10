@@ -36,6 +36,7 @@ import { userById } from '@/data/mock';
 import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
+import type { ServerOwnerStats } from '@/lib/api';
 import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
@@ -243,6 +244,7 @@ export function RoomInfoSheet({
   onShare,
   onInvite,
   live = false,
+  ownerStats,
   details = [],
   actions = [],
 }: {
@@ -277,8 +279,10 @@ export function RoomInfoSheet({
   onSettings: () => void;
   onShare: () => void;
   onInvite: () => void;
-  /** A server room: room membership and Aile aren't on the server yet, so the card doesn't show them. */
+  /** A server room: its numbers come from the server, never the demo's. */
   live?: boolean;
+  /** A server room's owner: Oda Sahibi Merkezi's numbers from the server (null while they load). */
+  ownerStats?: ServerOwnerStats | null;
   /** The room at a glance (owner, my rank, listeners, mics, queue, lock…). */
   details?: { label: string; value: string }[];
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
@@ -416,10 +420,13 @@ export function RoomInfoSheet({
             <View style={{ gap: 10 }}>
               <Text style={styles.h2}>Oda Sahibi Merkezi</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <LinearGradient colors={['#C2410C', '#9A3412']} style={[styles.card, { flex: 1, flexDirection: 'row', alignItems: 'center' }]}>
-                  <Text style={[styles.cardLabel, { flex: 1 }]}>Oda Sahibi Payı</Text>
-                  <Text style={[styles.cardValue, { fontSize: 22 }]}>{pct(RULES.roomOwnerBonus)}</Text>
-                </LinearGradient>
+                {/* A server room pays its owner no share of the gifts (their value goes to the recipient): none shown. */}
+                {!live && (
+                  <LinearGradient colors={['#C2410C', '#9A3412']} style={[styles.card, { flex: 1, flexDirection: 'row', alignItems: 'center' }]}>
+                    <Text style={[styles.cardLabel, { flex: 1 }]}>Oda Sahibi Payı</Text>
+                    <Text style={[styles.cardValue, { fontSize: 22 }]}>{pct(RULES.roomOwnerBonus)}</Text>
+                  </LinearGradient>
+                )}
                 <Pressable style={{ flex: 1 }} onPress={() => setSub('traffic')} accessibilityLabel="Trafik paneli izleme">
                   <LinearGradient colors={['#0A8F95', '#076A70']} style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
                     <Text style={[styles.cardLabel, { flex: 1 }]}>Trafik paneli izleme</Text>
@@ -427,14 +434,20 @@ export function RoomInfoSheet({
                   </LinearGradient>
                 </Pressable>
               </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Stat label="Hediye paraları (bu sefer)" value={compact(stats.coins)} />
-                <Stat label="Çevrimiçi maksimum kişi (bu sefer)" value={stats.peak.toLocaleString('tr-TR')} />
-                <Stat label="Süre (bu sefer)" value={fmtMinutes(stats.minutes)} />
-              </View>
-              <Text style={styles.dim}>
-                Oda sahibi payı, odandaki uygun hediyelerden ayrıca hesaplanır; yayıncının kazancından kesilmez.
-              </Text>
+              {live ? (
+                <LiveOwnerStats stats={ownerStats ?? null} />
+              ) : (
+                <>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Stat label="Hediye paraları (bu sefer)" value={compact(stats.coins)} />
+                    <Stat label="Çevrimiçi maksimum kişi (bu sefer)" value={stats.peak.toLocaleString('tr-TR')} />
+                    <Stat label="Süre (bu sefer)" value={fmtMinutes(stats.minutes)} />
+                  </View>
+                  <Text style={styles.dim}>
+                    Oda sahibi payı, odandaki uygun hediyelerden ayrıca hesaplanır; yayıncının kazancından kesilmez.
+                  </Text>
+                </>
+              )}
             </View>
           )}
 
@@ -489,13 +502,14 @@ export function RoomInfoSheet({
         <Text style={styles.h3}>Üyeler</Text>
         {members.map((id) => {
           const days = lastSeenDays(id);
-          const due = owner && autoRemoveDays > 0 && id !== 'me' && days >= autoRemoveDays;
+          // The demo's "last seen" is made up: a server room doesn't show it.
+          const due = owner && !live && autoRemoveDays > 0 && id !== 'me' && days >= autoRemoveDays;
           return (
             <View key={id} style={styles.listRow}>
               <Avatar uri={userById(id).avatar} size={36} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#fff' }}>{id === 'me' ? 'Sen (oda sahibi)' : userById(id).name}</Text>
-                {owner && id !== 'me' && <Text style={[styles.dim, due && { color: colors.gold }]}>{due ? `${days} gündür girmedi · bu gece otomatik çıkarılacak` : `Son giriş: ${days === 0 ? 'bugün' : `${days} gün önce`}`}</Text>}
+                {owner && !live && id !== 'me' && <Text style={[styles.dim, due && { color: colors.gold }]}>{due ? `${days} gündür girmedi · bu gece otomatik çıkarılacak` : `Son giriş: ${days === 0 ? 'bugün' : `${days} gün önce`}`}</Text>}
               </View>
               {canManageMembers && id !== 'me' && (
                 <Pressable onPress={() => onRemoveMember(id)} hitSlop={6}>
@@ -509,7 +523,7 @@ export function RoomInfoSheet({
       </BottomSheet>
 
       <BottomSheet visible={sub === 'traffic'} onClose={() => setSub(null)} title="Trafik paneli">
-        <Traffic peak={stats.peak} minutes={stats.minutes} />
+        {live ? <LiveTraffic stats={ownerStats ?? null} /> : <Traffic peak={stats.peak} minutes={stats.minutes} />}
       </BottomSheet>
 
       <BottomSheet visible={sub === 'gifts'} onClose={() => setSub(null)} title="Oda hediye kaydı">
@@ -625,6 +639,75 @@ function Traffic({ peak, minutes }: { peak: number; minutes: number }) {
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 90 }}>
         {HOURS.map((h, i) => (
           <View key={`h${i}`} style={{ flex: 1, height: `${(h / max) * 100}%`, backgroundColor: i === HOURS.length - 1 ? colors.primaryText : colors.primary, borderRadius: 4 }} />
+        ))}
+      </View>
+      <Text style={styles.dim}>Trafik verileri yalnızca oda sahibine görünür; kişisel veri içermez (toplu istatistik).</Text>
+    </View>
+  );
+}
+
+/** How long the numbers of a server room cover: since I came in, or the last 24 hours while I'm not in it. */
+const spanOf = (s: ServerOwnerStats | null) => (s && !s.session ? 'son 24 saat' : 'bu sefer');
+const num = (n: number) => n.toLocaleString('tr-TR');
+
+/** Oda Sahibi Merkezi of a server room: the server's numbers (no owner share: the server pays none). */
+function LiveOwnerStats({ stats }: { stats: ServerOwnerStats | null }) {
+  const span = spanOf(stats);
+  const show = (f: (s: ServerOwnerStats) => string) => (stats ? f(stats) : '…');
+  const progress = !stats ? 0 : stats.nextXp === null ? 1 : Math.max(0, Math.min(1, (stats.xp - stats.levelXp) / Math.max(1, stats.nextXp - stats.levelXp)));
+  return (
+    <>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Stat label={`Hediye paraları (${span})`} value={show((s) => compact(s.gifts.coins))} />
+        <Stat label={`Çevrimiçi maksimum kişi (${span})`} value={show((s) => num(s.peak))} />
+        <Stat label="Süre (bu sefer)" value={show((s) => (s.minutes === null ? '—' : fmtMinutes(s.minutes)))} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Stat label={`Ziyaretçi (${span})`} value={show((s) => num(s.visitors))} />
+        <Stat label={`Hediye (${span})`} value={show((s) => num(s.gifts.count))} />
+        <Stat label="Şu an odada" value={show((s) => num(s.listeners))} />
+      </View>
+      <View style={{ gap: 4 }} accessibilityLabel={stats ? `Oda seviyesi ${stats.level}${stats.nextXp === null ? ', en üst seviye' : `, ${stats.xp} / ${stats.nextXp} XP`}` : undefined}>
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={[styles.dim, { flex: 1, color: '#fff' }]}>Oda seviyesi ilerlemesi{stats ? ` · Lv.${stats.level}` : ''}</Text>
+          <Text style={styles.dim}>{show((s) => (s.nextXp === null ? 'En üst seviye' : `${compact(s.xp)} / ${compact(s.nextXp)} XP`))}</Text>
+        </View>
+        <View style={styles.track}>
+          <View style={{ height: 8, width: `${Math.round(progress * 100)}%`, backgroundColor: colors.primary }} />
+        </View>
+      </View>
+      <Text style={styles.dim}>
+        {stats && !stats.session ? 'Odada değilken son 24 saat gösterilir. ' : ''}Odandaki hediyeler alan kişiye yazılır ve oda seviyeni yükseltir; sayılar sunucudan gelir.
+      </Text>
+    </>
+  );
+}
+
+/** Trafik paneli of a server room: what the server knows (visits, stays, new members, people per hour). */
+function LiveTraffic({ stats }: { stats: ServerOwnerStats | null }) {
+  if (!stats) return <Text style={styles.dim}>Yükleniyor…</Text>;
+  const span = spanOf(stats);
+  const max = Math.max(1, ...stats.hours.map((h) => h.people));
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Stat label={`Ziyaret (${span})`} value={num(stats.visits)} />
+        <Stat label="Ort. kalış" value={`${num(stats.avgStayMin)} dk`} />
+        <Stat label="Yeni üye" value={num(stats.newMembers)} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Stat label={`Ziyaretçi (${span})`} value={num(stats.visitors)} />
+        <Stat label={`Hediye gönderen (${span})`} value={num(stats.gifts.senders)} />
+        <Stat label="Şu an odada" value={num(stats.listeners)} />
+      </View>
+      <Text style={styles.h3}>Saatlik dinleyici (son 10 saat)</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 90 }}>
+        {stats.hours.map((h, i) => (
+          <View
+            key={h.at}
+            accessibilityLabel={`${new Date(h.at).toTimeString().slice(0, 5)}: ${h.people} kişi`}
+            style={{ flex: 1, height: `${(h.people / max) * 100}%`, backgroundColor: i === stats.hours.length - 1 ? colors.primaryText : colors.primary, borderRadius: 4 }}
+          />
         ))}
       </View>
       <Text style={styles.dim}>Trafik verileri yalnızca oda sahibine görünür; kişisel veri içermez (toplu istatistik).</Text>

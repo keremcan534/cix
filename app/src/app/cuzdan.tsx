@@ -18,12 +18,15 @@ import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
 import { LEDGER_PAGE, useLiveLedger } from '@/lib/live/earnings';
+import { useServerSpendLimit } from '@/lib/live/spend-limit';
 import { coinsAddedOn, ledgerTime } from '@/lib/ledger-view';
 import { buyCoins, openShop, useShop } from '@/lib/live/billing';
 import { activeCampaign, campaignCoins, useLiveCatalog } from '@/lib/live/catalog-live';
 import { fmtIstanbul } from '@/lib/live-settings-format';
 import { outcomeAlert, SHOP_NOTICE } from '@/lib/live/billing-core';
 import { openLegal } from '@/lib/legal';
+import { firstBonusOf } from '@/lib/invite-view';
+import { refreshRewards, useRewards } from '@/lib/live/rewards';
 import { blockedFeature } from '@/lib/remote-control';
 import { today } from '@/lib/persist';
 import { stampLabel } from '@/lib/tr';
@@ -50,6 +53,8 @@ export default function WalletScreen() {
     return () => clearInterval(t);
   }, [live]);
   const campaign = live ? activeCampaign(now, liveCat) : null;
+  // Live mode: which packs still carry my first-purchase gift (server/api/referrals.mjs; the server pays it).
+  const rewards = useRewards();
   useEffect(() => {
     if (live) void openShop();
   }, [live]);
@@ -73,7 +78,11 @@ export default function WalletScreen() {
         const a = outcomeAlert(o);
         if (a) showAlert(a.title, a.body);
       })
-      .finally(() => setProcessing(null));
+      .finally(() => {
+        setProcessing(null);
+        // A bought pack loses its "Hoş geldin paketi" tag.
+        void refreshRewards();
+      });
   };
 
   const buy = (pack: RechargePack) => {
@@ -97,6 +106,10 @@ export default function WalletScreen() {
   };
   const rows = ledger.filter((r) => r.currency === filter);
   const day = today();
+  // Live mode: today's spending and the limit as the server counts them (server/api/spend-limit.mjs).
+  const serverLimit = useServerSpendLimit();
+  const spent = live && serverLimit ? serverLimit.spentToday : spentToday;
+  const limitShown = live ? (serverLimit?.limit ?? 0) : settings.dailySpendLimit;
   const loadedToday = live ? coinsAddedOn(history.rows) : ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
   const serverRows = history.rows.filter((r) => r.currency === filter);
 
@@ -119,8 +132,8 @@ export default function WalletScreen() {
       {tab === 'history' ? (
         <>
           <Text style={[styles.note, { marginBottom: 8 }]}>
-            Bugün: 🪙 {spentToday.toLocaleString('tr-TR')} harcandı · 🪙 {loadedToday.toLocaleString('tr-TR')} eklendi
-            {settings.dailySpendLimit ? ` · Limit ${settings.dailySpendLimit.toLocaleString('tr-TR')}` : ''}
+            Bugün: 🪙 {spent.toLocaleString('tr-TR')} harcandı · 🪙 {loadedToday.toLocaleString('tr-TR')} eklendi
+            {limitShown ? ` · Limit ${limitShown.toLocaleString('tr-TR')}` : ''}
           </Text>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 }}>
             {(
@@ -235,16 +248,22 @@ export default function WalletScreen() {
           {live ? (
             shop.status === 'ready' ? (
               <View style={styles.grid}>
-                {shop.packs.map((p) => (
-                  <PackTile
-                    key={p.productId}
-                    coins={p.coins}
-                    price={p.price}
-                    busy={processing === p.productId}
-                    onPress={() => buyLive(p.productId)}
-                    campaign={campaign ? { percent: campaign.percent, extra: campaignCoins(p.coins, campaign.percent) } : undefined}
-                  />
-                ))}
+                {shop.packs.map((p) => {
+                  // The server's first-purchase gift for this pack while I haven't bought it (GET /api/rewards).
+                  const first = firstBonusOf(rewards, p.productId);
+                  return (
+                    <PackTile
+                      key={p.productId}
+                      coins={p.coins}
+                      bonus={first || undefined}
+                      first={first > 0}
+                      price={p.price}
+                      busy={processing === p.productId}
+                      onPress={() => buyLive(p.productId)}
+                      campaign={campaign ? { percent: campaign.percent, extra: campaignCoins(p.coins, campaign.percent) } : undefined}
+                    />
+                  );
+                })}
               </View>
             ) : (
               <Text style={styles.shopNotice}>{SHOP_NOTICE[shop.status]}</Text>
@@ -291,8 +310,9 @@ export default function WalletScreen() {
   );
 }
 
-/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). `campaign`: the
- *  running campaign's tag and this pack's extra coins (live store packs only). */
+/** One pack in the grid: coins, an optional bonus, and its price (the store's, in a live build). `first`: the
+ *  "Hoş geldin paketi" tag with its first-purchase `bonus`. `campaign`: the running campaign's tag and this pack's
+ *  extra coins (live store packs only); with a first-purchase gift both add up under the welcome tag. */
 function PackTile({
   coins,
   bonus,
@@ -316,7 +336,7 @@ function PackTile({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
+      accessibilityLabel={`${coins.toLocaleString('tr-TR')} jeton${first && bonus ? `, artı ${bonus.toLocaleString('tr-TR')} ilk alım hediyesi` : ''}${campaign?.extra ? `, artı ${campaign.extra.toLocaleString('tr-TR')} kampanya jetonu` : ''}, ${price}`}
       style={{ width: '31.3%', margin: '1%' }}
     >
       <LinearGradient

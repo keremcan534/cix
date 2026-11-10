@@ -107,4 +107,4 @@ export function voidedResult(r: { checked: number; refunded: number; unknown: nu
 }
 
 /** Things waiting for the owner, for the Özet tiles and the tab badges. */
-export type Pending = { reports: number; withdrawals: number; payouts: number };
+export type Pending = { reports: number; withdrawals: number; payouts: number; support: number };

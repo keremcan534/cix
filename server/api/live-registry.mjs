@@ -9,10 +9,11 @@
 // hours, test and sandbox flags, TEST_DAILY, pack coins / product ids / TL prices (Play Console owns the price),
 // gift prices (installed apps show the compiled price), the SMS provider and every secret.
 //
-// Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden) is kept in
+// Values: null always means "back to the default". A set (features_off, gifts_hidden, shop_hidden, packs_hidden, rewards_off) is kept in
 // its options' order, and an empty set is stored as null. Money rules: the exchange rate moves at most ±10 % per
 // save, withdrawal limits can only go down from today's values.
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
+import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
@@ -86,8 +87,17 @@ export function defaultsOf(e = process.env) {
     withdraw_weekly_diamonds: WITHDRAW.weeklyDiamonds,
     otp_global_per_hour: perHourOf(e.OTP_GLOBAL_PER_HOUR),
     ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [k, x.default])),
+    // Çantam (backpack.mjs): the demo gives one Kalp as the task reward.
+    backpack_call_task: 1,
+    rewards_off: [],
+    ...Object.fromEntries(Object.entries(REWARD_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Oyun Salonu (casino.mjs): the demo's values, every game on, stakes up to 25.000, 40 top-stake rounds a day.
+    casino_off: [],
+    casino_max_bet: CASINO_TOP,
+    casino_daily_rounds: CASINO_DAILY_ROUNDS,
   };
 }
+const CASINO_TOP = CASINO_STAKES.wide[CASINO_STAKES.wide.length - 1];
 /**
  * 1v1 (one-on-one.mjs): the prices in coins (the earner gets as many diamonds), the free matches and the heart
  * levels that open calls. key → [field, label, default, bounds, unit, sentence].
@@ -127,6 +137,68 @@ const oneOnOneEntries = () =>
       },
     ]),
   );
+
+/** Çantam (backpack.mjs): the gift the call task puts in the backpack, as the demo's "Görev ödülü" (Kalp). */
+export const BACKPACK_TASK_GIFT = 'g2';
+
+/**
+ * Yeni üye ödülleri (referrals.mjs, purchases.mjs): the welcome coins, the invite reward for both people and its daily
+ * cap per inviter, and a switch for each reward (the first-purchase gift's amounts are the packs', catalog.mjs). The
+ * defaults are the demo's. Welcome and invite coins are reward coins ('odul', the shop only), so they never become
+ * diamonds.
+ */
+const REWARDS = 'Yeni üye ödülleri';
+export const REWARD_SWITCHES = ['welcome', 'invite', 'first_purchase'];
+export const REWARD_LABEL = { welcome: 'Hoş geldin jetonu', invite: 'Davet ödülü', first_purchase: 'İlk alım hediyesi' };
+const REWARD_OFF_EFFECT = {
+  welcome: 'Yeni hesaplar hoş geldin jetonu almaz.',
+  invite: 'Yeni davet kodu girilemez ve davet ödülü ödenmez; bekleyen davetler açılınca ilk oda girişinde ödenir.',
+  first_purchase: 'Paketlerde "Hoş geldin paketi" görünmez; ilk alımlar hediyesiz yüklenir.',
+};
+const REWARD_AMOUNTS = {
+  welcome_coins: { field: 'welcomeCoins', label: 'Hoş geldin jetonu', default: 100, bounds: { min: 10, max: 1_000, step: 10 }, unit: ' jeton', help: 'Yeni hesaba bir kez verilen ödül jetonu (yalnız mağazada harcanır). Daha önce başka hesap açılmış telefona verilmez.', text: (a, b) => `Yeni hesaba ${a} → ${b} hoş geldin jetonu.` },
+  invite_coins: { field: 'inviteCoins', label: 'Davet ödülü (kişi başı)', default: 200, bounds: { min: 10, max: 2_000, step: 10 }, unit: ' jeton', help: 'Davet edilen ilk odasına girince ikisine de verilen ödül jetonu (yalnız mağazada harcanır).', text: (a, b) => `Davet ödülü kişi başı ${a} → ${b} jeton.` },
+  invite_daily_cap: { field: 'inviteDailyCap', label: 'Günlük davet ödülü sınırı', default: 10, bounds: { min: 1, max: 100, step: 1 }, unit: '', help: 'Bir kişinin bir günde (Türkiye saati) en çok kaç davetten ödül alacağı. Fazlası ertesi günkü ilk oda girişinde ödenir.', text: (a, b) => `Bir kişi günde en çok ${a} → ${b} davetten ödül alır.` },
+};
+/** The reward keys as registry entries; an amount or a cap that more than doubles needs the second confirmation. */
+const rewardEntries = () => {
+  const switches = { options: REWARD_SWITCHES, labels: REWARD_LABEL, max: REWARD_SWITCHES.length };
+  return {
+    rewards_off: {
+      field: 'rewardsOff',
+      group: REWARDS,
+      label: 'Kapalı ödüller',
+      help: 'Kapatılan ödül sunucuda hemen durur; verilmiş jetonlar geri alınmaz.',
+      type: 'set',
+      bounds: switches,
+      parse: (v) => setOf(v, switches, 'Kapalı ödüller'),
+      big: () => false,
+      impact(before, after) {
+        const off = added(before, after);
+        const on = added(after, before);
+        const out = off.map((k) => REWARD_OFF_EFFECT[k]);
+        if (on.length) out.push(`Yeniden açılır: ${on.map((k) => REWARD_LABEL[k]).join(', ')}.`);
+        return out.join(' ') || 'Görünür bir etkisi yok.';
+      },
+    },
+    ...Object.fromEntries(
+      Object.entries(REWARD_AMOUNTS).map(([k, x]) => [
+        k,
+        {
+          field: x.field,
+          group: REWARDS,
+          label: x.label,
+          help: x.help,
+          type: 'int',
+          bounds: x.bounds,
+          parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+          big: (before, after) => after !== null && after > before * 2,
+          impact: (before, after) => x.text(fmt(before), fmt(after)),
+        },
+      ]),
+    ),
+  };
+};
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -451,6 +523,61 @@ export const REGISTRY = {
     },
   },
   ...oneOnOneEntries(),
+  backpack_call_task: {
+    field: 'backpackCallTask',
+    group: 'Çantam',
+    label: `Görev ödülü: çantaya ${giftName(BACKPACK_TASK_GIFT)}`,
+    help: `Günlük "1 görüntülü arama yap" görevini tamamlayana ödül jetonuyla birlikte çantasına verilen ${giftName(BACKPACK_TASK_GIFT)} (${fmt(GIFTS.get(BACKPACK_TASK_GIFT).price)} jeton değerinde). Çantadan gönderen jeton harcamaz; alanın elması 7 gün kilitli kalır, ajans komisyonu ödenmez. 0: verilmez, çantadakiler yine gönderilebilir.`,
+    type: 'int',
+    bounds: { min: 0, max: 5, step: 1, big: 2 },
+    parse: (v) => wholeOf(v, REGISTRY.backpack_call_task.bounds, 'Çantaya verilen hediye', ' adet'),
+    big: (before, after) => after !== null && after > REGISTRY.backpack_call_task.bounds.big,
+    impact: (before, after) =>
+      after === 0 ? 'Görev ödülüyle çantaya hediye verilmez. Çantada olanlar gönderilebilir.' : `Görev ödülüyle çantaya günde ${fmt(before)} → ${fmt(after)} ${giftName(BACKPACK_TASK_GIFT)} verilir.`,
+  },
+  ...rewardEntries(),
+  // Oyun Salonu (casino.mjs). The odds are not here: the installed app shows them (casino-rules.mjs).
+  casino_off: {
+    field: 'casinoOff',
+    group: 'Oyun Salonu',
+    label: 'Kapalı oyunlar',
+    help: 'Kapatılan oyun Oyun Salonu’ndan çıkar ve sunucu yeni turunu reddeder; oyun bakiyesi ve geçmiş kalır. Rüzgâr Gülü dahil bütün oyunları durdurmak için Acil durum’da Oyunlar’ı kapat.',
+    type: 'set',
+    bounds: { options: CASINO_GAMES.map((g) => g.id), labels: Object.fromEntries(CASINO_GAMES.map((g) => [g.id, g.name])), max: CASINO_GAMES.length },
+    parse: (v) => setOf(v, REGISTRY.casino_off.bounds, 'Kapalı oyunlar'),
+    big: () => false,
+    impact(before, after) {
+      const name = (id) => CASINO_GAMES.find((g) => g.id === id)?.name ?? id;
+      const off = added(before, after);
+      const on = added(after, before);
+      const out = [];
+      if (off.length) out.push(`Kapanır: ${some(off.map(name))}. Yeni tur oynanamaz; oyun bakiyesi ve geçmiş kalır.`);
+      if (on.length) out.push(`Yeniden açılır: ${some(on.map(name))}.`);
+      return out.join(' ') || 'Görünür bir etkisi yok.';
+    },
+  },
+  casino_max_bet: {
+    field: 'casinoMaxBet',
+    group: 'Oyun Salonu',
+    label: 'En yüksek bahis',
+    help: 'Bir turda en çok bu kadar jeton oynanır; her oyunun bahis basamakları bunun üstünde kesilir (en az 250). Bahis tahtasında bir seçeneğe konan en çok jeton da budur.',
+    type: 'int',
+    bounds: { min: 250, max: CASINO_TOP, step: 250 },
+    parse: (v) => wholeOf(v, REGISTRY.casino_max_bet.bounds, 'En yüksek bahis', ' jeton'),
+    big: () => false,
+    impact: (before, after) => `Bir turda en çok ${fmt(before)} → ${fmt(after)} jeton oynanır.`,
+  },
+  casino_daily_rounds: {
+    field: 'casinoDailyRounds',
+    group: 'Oyun Salonu',
+    label: 'Günlük sınır (en yüksek bahisle tur)',
+    help: 'Bir kişinin bir oyunda bir günde oynayabileceği jeton: oyunun en yüksek bahsiyle bu kadar tur. 40 ile Yörünge’de günde 1.000.000 jeton.',
+    type: 'int',
+    bounds: { min: 1, max: 200, step: 1, big: 80 },
+    parse: (v) => wholeOf(v, REGISTRY.casino_daily_rounds.bounds, 'Günlük sınır'),
+    big: (before, after) => after !== null && after > REGISTRY.casino_daily_rounds.bounds.big,
+    impact: (before, after) => `Bir oyunda günde en çok ${fmt(before)} → ${fmt(after)} tur (en yüksek bahisle); Yörünge’de ${fmt(before * CASINO_TOP)} → ${fmt(after * CASINO_TOP)} jeton.`,
+  },
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -501,7 +628,8 @@ const readOnlySet = (xs) => {
  *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
- *     heartVideo, invalid }
+ *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoMaxBet,
+ *     casinoDailyRounds, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -535,6 +663,12 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     withdrawWeekly: val('withdraw_weekly_diamonds'),
     otpPerHour: val('otp_global_per_hour'),
     ...Object.fromEntries(Object.entries(ONE_ON_ONE).map(([k, x]) => [x.field, val(k)])),
+    backpackCallTask: val('backpack_call_task'),
+    rewardsOff: readOnlySet(val('rewards_off')),
+    ...Object.fromEntries(Object.entries(REWARD_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    casinoOff: readOnlySet(val('casino_off')),
+    casinoMaxBet: val('casino_max_bet'),
+    casinoDailyRounds: val('casino_daily_rounds'),
     invalid: Object.freeze([...invalid]),
   });
 }

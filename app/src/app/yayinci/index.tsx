@@ -14,7 +14,8 @@ import { diamondValueTl } from '@/lib/coins-bank';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
 import { IS_DEMO } from '@/lib/build';
-import { callsAvailable, liveMode } from '@/lib/live';
+import { liveMode, oneOnOneOpen } from '@/lib/live';
+import { useLiveCallStats } from '@/lib/live/call-log';
 import { useLiveEarnings } from '@/lib/live/earnings';
 import { RULES, pct, settlement, usd } from '@/data/rules';
 import { useApp } from '@/store';
@@ -28,8 +29,8 @@ const PERKS: { icon: string; art?: ArtName; title: string; text: string }[] = [
   { icon: '📹', art: 'finans-ucretli-aramalar', title: 'Ücretli aramalar', text: 'Görüntülü aramalarda dakika başı kazan.' },
   { icon: '🏦', art: 'finans-haftalik-odeme-banka', title: 'Haftalık ödeme', text: 'Elmaslarını banka hesabına çek.' },
 ];
-/** Calls are not open in this build yet (lib/live callsAvailable), so they are not promised as a way to earn. */
-const perks = () => PERKS.filter((p) => p.art !== 'finans-ucretli-aramalar' || callsAvailable());
+/** Calls are promised as a way to earn only where this build has them (the demo's, or the server's: oneOnOneOpen). */
+const perks = () => PERKS.filter((p) => p.art !== 'finans-ucretli-aramalar' || oneOnOneOpen());
 
 /** The picture for an earning row by its source; other sources keep the emoji. */
 const EARNING_ART: Partial<Record<string, ArtName>> = { Hediye: 'finans-hediyelerden-kazan', Arama: 'finans-ucretli-aramalar' };
@@ -47,7 +48,7 @@ export default function HostCenter() {
           <LinearGradient colors={gradientDeep} style={styles.hero}>
             <Icon3D name="mic" size={64} />
             <Text style={styles.heroTitle}>Yayıncı ol, kazanmaya başla</Text>
-            <Text style={styles.heroText}>{callsAvailable() ? 'Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.' : 'Oda aç, sohbet et, hediyelerden elmas kazan.'}</Text>
+            <Text style={styles.heroText}>{oneOnOneOpen() ? 'Oda aç, sohbet et, hediyeler ve aramalardan elmas kazan.' : 'Oda aç, sohbet et, hediyelerden elmas kazan.'}</Text>
           </LinearGradient>
           {perks().map((p) => (
             <Card key={p.title} style={styles.perk}>
@@ -142,13 +143,11 @@ function Dashboard() {
               <Ionicons name="cash-outline" size={18} color="#fff" />
               <Text style={styles.balanceBtnText}>Para çek</Text>
             </Pressable>
-            {/* Jeton Noktası is still a demo screen: a live build doesn't send anyone there. */}
-            {!live && (
-              <Pressable style={styles.balanceBtn} onPress={exchange}>
-                <Ionicons name="flash-outline" size={18} color="#fff" />
-                <Text style={styles.balanceBtnText}>Anında bozdur</Text>
-              </Pressable>
-            )}
+            {/* Live: /coins-bank is the server's Jeton Noktası, where the diamonds are sold to a bank. */}
+            <Pressable style={styles.balanceBtn} onPress={exchange}>
+              <Ionicons name="flash-outline" size={18} color="#fff" />
+              <Text style={styles.balanceBtnText}>Anında bozdur</Text>
+            </Pressable>
           </View>
         </LinearGradient>
 
@@ -223,7 +222,7 @@ function Dashboard() {
         <Card style={{ gap: 4 }}>
           <Text style={[styles.cardTitle, { marginBottom: 6 }]}>Son kazançlar</Text>
           {earnings.length === 0 ? (
-            <Text style={styles.dim}>{callsAvailable() ? 'Henüz kazanç yok. Bir oda aç veya aramayı bekle — gelen hediyeler burada görünür.' : 'Henüz kazanç yok. Bir oda aç — gelen hediyeler burada görünür.'}</Text>
+            <Text style={styles.dim}>{oneOnOneOpen() ? 'Henüz kazanç yok. Bir oda aç veya aramayı bekle — gelen hediyeler burada görünür.' : 'Henüz kazanç yok. Bir oda aç — gelen hediyeler burada görünür.'}</Text>
           ) : (
             earnings.slice(0, 15).map((e) => (
               <View key={e.id} style={styles.earning}>
@@ -250,10 +249,15 @@ function Analytics() {
   const { colors } = useTheme();
   const styles = useStyles();
   const sum = (src: string) => earnings.filter((e) => e.source === src).reduce((x, e) => x + e.amount, 0);
-  const gifts = sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0);
+  // Live: this week's paid calls and matches from the server (lib/live/call-log). Their diamonds reached this phone
+  // as diamonds like a gift's, so they come out of the gift figure instead of being counted twice.
+  const live = liveMode();
+  const server = useLiveCallStats(live && oneOnOneOpen());
+  const serverCalls = live ? (server?.diamonds ?? 0) : 0;
+  const gifts = Math.max(0, sum('Hediye') + weekly.slice(0, 6).reduce((a, b) => a + b, 0) - serverCalls);
   const ownerBonus = sum('Oda sahibi bonusu');
   const familyBonus = sum('Aile bonusu');
-  const callBonus = sum('Arama bonusu') + sum('Arama');
+  const callBonus = live ? serverCalls : sum('Arama bonusu') + sum('Arama');
   const net = gifts + ownerBonus + familyBonus + callBonus;
   const { commission } = settlement(gifts, !!agencyId);
   // Only figures the app actually records: this week's daily diamonds and the earning rows. Stream time and
@@ -264,14 +268,14 @@ function Analytics() {
   const best = weekly.reduce((bi, v, i) => (v > weekly[bi] ? i : bi), 0);
   const giftRows = earnings.filter((e) => e.source === 'Hediye');
   const senders = new Set(giftRows.map((e) => e.fromId).filter(Boolean)).size;
-  const calls = earnings.filter((e) => e.source === 'Arama').length;
+  const calls = live ? (server?.calls ?? 0) : earnings.filter((e) => e.source === 'Arama').length;
   const metrics = [
     ['Aktif gün', `${activeDays} / 7`],
     ['En iyi gün', weekly[best] > 0 ? `${DAYS[best]} · ${fmt(weekly[best])}` : '—'],
     ['Günlük ortalama', `${fmt(Math.round(weekTotal / 7))} elmas`],
     ['Hediye gönderen', fmt(senders)],
     ['Gelen hediye', fmt(giftRows.reduce((n, e) => n + (e.gift?.count ?? 1), 0))],
-    ...(callsAvailable() ? [['Ücretli arama', fmt(calls)]] : []),
+    ...(oneOnOneOpen() ? [['Ücretli arama', fmt(calls)]] : []),
   ];
   return (
     <Card style={{ gap: 8 }}>
@@ -292,7 +296,7 @@ function Analytics() {
       <Line label="Brüt hediye değeri" value={`💎 ${gifts.toLocaleString('tr-TR')}`} />
       <Line label={`Oda sahibi bonusu (${pct(RULES.roomOwnerBonus)})`} value={`+ ${ownerBonus.toLocaleString('tr-TR')}`} />
       <Line label="Aile bonusu" value={`+ ${familyBonus.toLocaleString('tr-TR')}`} />
-      {callsAvailable() && <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />}
+      {oneOnOneOpen() && <Line label="Arama kazancı / bonusu" value={`+ ${callBonus.toLocaleString('tr-TR')}`} />}
       <Line label="Net hak edişin" value={`💎 ${net.toLocaleString('tr-TR')} · ${usd(net)}`} bold />
       {agencyId && <Line label={`Ajans komisyonu (${pct(RULES.agencyCommission)}, ayrıca ödenir)`} value={`${commission.toLocaleString('tr-TR')} · ${usd(commission)}`} dim />}
       <Text style={styles.dim}>

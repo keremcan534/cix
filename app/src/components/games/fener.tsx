@@ -11,7 +11,8 @@ import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, BetStepper, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import { BRIGHTNESS, CARGO, COLS, ROWS, STORM_SPINS, STORM_TRIGGER, cargoLabel, type FCell, type FSpin } from '@/lib/fener-slot';
-import { casinoAccess, newRequestId, playCasino, useGames, type Entry } from '@/lib/games';
+import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { playRound } from '@/lib/live/casino';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { useApp, useSettings } from '@/store';
 
@@ -144,7 +145,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
   };
 
   const spinOnce = async (): Promise<{ net: number; stop: string | null } | null> => {
-    const r = playCasino('olympus', bet, '', entry, newRequestId());
+    const r = await playRound('olympus', bet, '', entry);
     if (!r.ok) {
       setStatus({ text: r.reason, tone: 'err' });
       errorHaptic();

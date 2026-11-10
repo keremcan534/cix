@@ -15,6 +15,8 @@ import { useEffect, useSyncExternalStore } from 'react';
 import * as api from '@/lib/api';
 import { ROOM_THEMES, roomCoverUrl } from '@/data/catalog';
 import { isServerId, putServerRoom, putServerUser, type Room, type User } from '@/data/mock';
+import { putLevels } from '@/lib/live/levels';
+import { putDistance } from '@/lib/live/distances';
 import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
@@ -217,6 +219,7 @@ export function rememberUser(c: { id: string; name: string; avatarUrl?: string |
 /** A full profile (age, city, interests, follow state) from the server. */
 export async function loadProfile(id: string) {
   const p = await api.userProfile(id);
+  putDistance(p.id, p.distance);
   return putServerUser({
     id: p.id,
     name: p.name,
@@ -247,8 +250,12 @@ const emitPeople = () => peopleListeners.forEach((l) => l());
 export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
   try {
     const rows = await api.discover(list);
-    people[list] = rows.map((p) =>
-      putServerUser({
+    people[list] = rows.map((p) => {
+      // The card's Yankı badge and the list's order (lib/live/levels).
+      putLevels(p.id, p.levels);
+      // The card's "Aynı şehir" or "350 km" (lib/live/distances).
+      putDistance(p.id, p.distance);
+      return putServerUser({
         id: p.id,
         name: p.name,
         ...(p.age ? { age: p.age } : {}),
@@ -259,8 +266,10 @@ export async function reloadDiscoverPeople(list: DiscoverList = 'home') {
         ...(p.gender && { gender: p.gender }),
         ...(p.username && { username: p.username }),
         ...(p.avatarUrl && { avatar: p.avatarUrl }),
-      }),
-    );
+        // No country given stays none (an older server sends no field: what was known stays).
+        ...(p.country !== undefined && { country: p.country ?? undefined }),
+      });
+    });
     peopleState[list] = 'ready';
   } catch {
     peopleState[list] = 'failed';
@@ -290,6 +299,7 @@ const locked = new Set<string>();
 /** A server room that asks for a password before anyone but its staff gets in. */
 export const isLockedRoom = (id: string) => locked.has(id);
 
+const roomChips = new Map<string, NonNullable<Room['serverChips']>>();
 /** A server room as the app's Room (its own cover or none, empty mics: who sits where comes from LiveKit). */
 export function roomOf(r: api.ServerRoom): Room {
   rememberUser(r.owner);
@@ -317,6 +327,15 @@ export function roomOf(r: api.ServerRoom): Room {
     ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
     bossId: r.boss ? r.boss.id : null,
   };
+  // The Odalar chips come with the room lists (server/api/room-social.mjs); a read of the room alone keeps the last.
+  const chips: Room['serverChips'] =
+    r.pk === undefined
+      ? roomChips.get(r.id)
+      : { pk: !!r.pk, ...(r.agency && { agency: r.agency.name }), ...(r.family && { family: r.family.name }), ...(r.weekRank && { weekRank: r.weekRank }) };
+  if (chips) {
+    room.serverChips = chips;
+    roomChips.set(r.id, chips);
+  }
   if (r.boss) rememberUser(r.boss);
   putServerRoom(room);
   return room;
@@ -362,6 +381,8 @@ export function useServerRooms(): Room[] {
   }, [focused]);
   return list;
 }
+/** The open server rooms as last read, without reading them again (a screen that only looks one up). */
+export const useServerRoomList = (): Room[] => useSyncExternalStore(subscribeRooms, () => rooms, () => rooms);
 /** Whether the last read of the room list worked ('failed': the list offers "Tekrar dene"). */
 export const useServerRoomsState = () => useSyncExternalStore(subscribeRooms, () => roomsState, () => roomsState);
 

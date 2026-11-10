@@ -208,9 +208,15 @@ describe('Bildirim bağlantıları (noticeHref)', () => {
     assert.equal(noticeHref('/sohbet/u3', false), '/sohbet/u3');
   });
 
-  test('canlıda demo bölümleri ve örnek kişi/oda açılmaz', () => {
-    for (const href of ['/anlar', '/(tabs)/anlar', '/aile', '/kabile/k1', '/eslesme', '/sohbet/u3', '/kullanici/u12', '/oda/r2', '/arama/u1?mode=sesli']) {
+  test('canlıda arama ekranı ve örnek kişi/oda/aile açılmaz', () => {
+    for (const href of ['/kabile/k1', '/sohbet/u3', '/kullanici/u12', '/oda/r2', '/arama/u1?mode=sesli', '/arama']) {
       assert.equal(noticeHref(href, true), undefined, href);
+    }
+  });
+
+  test('canlıda sunucudaki bölümler açılır: Anlar, Aile, Hemen Tanış', () => {
+    for (const href of ['/anlar', '/(tabs)/anlar', '/aile', '/kabile', '/eslesme']) {
+      assert.equal(noticeHref(href, true), href, href);
     }
   });
 

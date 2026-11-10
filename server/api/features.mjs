@@ -26,6 +26,8 @@ export { FEATURES, OFF_MESSAGE, configOf };
 /** "METHOD /path" → the features that turn it off. */
 export const ROUTES = {
   'POST /api/gifts/send': ['gifts'],
+  // Çantam (backpack.mjs): a free gift is still a gift.
+  'POST /api/backpack/send': ['gifts'],
   'POST /api/wallet/gift': ['gifts'],
   'POST /api/wallet/purchase': ['purchases'],
   'POST /api/wallet/test-topup': ['topup'],
@@ -36,6 +38,8 @@ export const ROUTES = {
   // New requests only: cancelling, the list and the owner's decision stay open, so held diamonds can come back.
   'POST /api/wallet/withdraw': ['withdraw'],
   'POST /api/wheel/spin': ['games'],
+  'POST /api/casino/play': ['games'],
+  'POST /api/rooms/table': ['games'],
   'POST /api/shop/buy': ['shop'],
   'POST /api/wallet/spend': ['shop'],
   'POST /api/messages': ['dm'],

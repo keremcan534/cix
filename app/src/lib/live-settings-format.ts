@@ -2,7 +2,7 @@
 // tests can hold them to the server's rules (server/api/live-registry.mjs): the server checks every value again
 // and its dryRun preview is what the admin confirms; these only keep the panel honest before anyone taps.
 // Times are Istanbul time (UTC+3 all year since 2016), whatever the phone's own time zone.
-import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey } from '@/lib/api';
+import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey, RewardKey } from '@/lib/api';
 import { RULES } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { campaignCoins } from '@/lib/live/catalog-live';
@@ -78,6 +78,10 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       return typeof after === 'number' && typeof before === 'number' && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * 3;
     case 'otp_global_per_hour':
       return typeof after === 'number' && after > 1000;
+    case 'backpack_call_task':
+      return typeof after === 'number' && after > BACKPACK_BIG;
+    case 'casino_daily_rounds':
+      return typeof after === 'number' && after > 80;
     case 'min_version':
       return after !== null;
     case 'dm_price':
@@ -89,10 +93,24 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
     case 'match_video_price':
       // A price that more than doubles or halves.
       return typeof after === 'number' && typeof before === 'number' && (after > before * 2 || after * 2 < before);
+    case 'welcome_coins':
+    case 'invite_coins':
+    case 'invite_daily_cap':
+      // A reward or its cap that more than doubles.
+      return typeof after === 'number' && typeof before === 'number' && after > before * 2;
     default:
       return false;
   }
 }
+
+/** Çantam (server/api/backpack.mjs): above this many gifts a day the change asks twice (live-registry bounds.big). */
+export const BACKPACK_BIG = 2;
+
+/** Oyun Salonu's numbers in the order the admin card shows them, with each one's unit. */
+export const CASINO_NUMBER_KEYS: { key: 'casino_max_bet' | 'casino_daily_rounds'; unit: string }[] = [
+  { key: 'casino_max_bet', unit: ' jeton' },
+  { key: 'casino_daily_rounds', unit: '' },
+];
 
 /** The 1v1 settings in the order the admin card shows them, with each one's unit. */
 export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
@@ -109,6 +127,14 @@ export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
   { key: 'match_free_seconds', unit: ' saniye' },
   { key: 'match_voice_price', unit: ' jeton' },
   { key: 'match_video_price', unit: ' jeton' },
+];
+
+/** Yeni üye ödülleri (server/api/live-registry.mjs): the switches (rewards_off) and the amounts, in card order. */
+export const REWARD_LABEL: Record<string, string> = { welcome: 'Hoş geldin jetonu', invite: 'Davet ödülü', first_purchase: 'İlk alım hediyesi' };
+export const REWARD_KEYS: { key: Exclude<RewardKey, 'rewards_off'>; unit: string }[] = [
+  { key: 'welcome_coins', unit: ' jeton' },
+  { key: 'invite_coins', unit: ' jeton' },
+  { key: 'invite_daily_cap', unit: '' },
 ];
 
 // --- Values as text ------------------------------------------------------------------------------------------
@@ -135,7 +161,7 @@ const some = (xs: string[]) => (xs.length > 4 ? `${xs.slice(0, 4).join(', ')} ve
 const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const isCampaign = (v: LiveValue): v is CatalogCampaign => !!v && typeof v === 'object' && !Array.isArray(v);
 
-export type Names = { gift?: (id: string) => string; pack?: (id: string) => string; shop?: (sku: string) => string };
+export type Names = { gift?: (id: string) => string; pack?: (id: string) => string; shop?: (sku: string) => string; game?: (id: string) => string };
 
 /**
  * A value as the admin reads it. `stored`: a saved value from the history, where null is "Varsayılan"; otherwise
@@ -171,6 +197,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} elmas` : String(v);
     case 'otp_global_per_hour':
       return typeof v === 'number' ? (v === 0 ? 'SMS durdu' : `Saatte ${fmtNum(v)}`) : String(v);
+    case 'backpack_call_task':
+      return typeof v === 'number' ? (v === 0 ? 'Verilmiyor' : `Günde ${v} adet`) : String(v);
     case 'dm_price':
     case 'call_voice_price':
     case 'call_video_price':
@@ -188,6 +216,19 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
     case 'call_free':
     case 'match_free':
       return typeof v === 'number' ? `24 saatte ${v}` : String(v);
+    case 'rewards_off':
+      return Array.isArray(v) && v.length ? `Kapalı: ${v.map((k) => REWARD_LABEL[k] ?? k).join(', ')}` : 'Hepsi açık';
+    case 'welcome_coins':
+    case 'invite_coins':
+      return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
+    case 'invite_daily_cap':
+      return typeof v === 'number' ? `Günde ${fmtNum(v)} davet` : String(v);
+    case 'casino_off':
+      return Array.isArray(v) && v.length ? `Kapalı: ${some(v.map((id) => names.game?.(id) ?? id))}` : 'Hepsi açık';
+    case 'casino_max_bet':
+      return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
+    case 'casino_daily_rounds':
+      return typeof v === 'number' ? `En yüksek bahisle ${fmtNum(v)} tur` : String(v);
     default:
       return String(v);
   }

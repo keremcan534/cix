@@ -12,7 +12,8 @@ import { Art, type ArtName } from '@/components/Art';
 import { CasinoLock } from '@/components/games/casino';
 import { BalancePill, BetStepper, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
-import { casinoAccess, newRequestId, playCasino, useGames, type Entry } from '@/lib/games';
+import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { playRound } from '@/lib/live/casino';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { slotWindow, stripsOf } from '@/lib/line-slot';
 import { SLOT_CONFIGS, SPELL_PRIZES } from '@/lib/slot-configs';
@@ -187,7 +188,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const cell = reels === 3 ? 76 : 50;
 
   const spinOnce = async (): Promise<{ net: number; stop: string | null } | null> => {
-    const r = playCasino(id, bet, '', entry, newRequestId());
+    const r = await playRound(id, bet, '', entry);
     if (!r.ok) {
       setStatus({ text: r.reason, tone: 'err' });
       errorHaptic();

@@ -54,3 +54,57 @@ export function wholesaleQuote(kind: AccountKind, coins: number, r: Rules = RULE
   const priceTl = retailTl * (1 - r.coinsBankWholesaleFee);
   return { ok: true, priceTl, retailTl, feeTl: retailTl - priceTl };
 }
+
+// --- Jeton Noktası on the server (components/coins-bank-live.tsx) ---------------------------------------------
+/** Most coins one sale may move (server/api/jeton.mjs TRANSFER_MAX). */
+export const BANK_SALE_MAX = 100_000_000;
+const tr = (n: number) => n.toLocaleString('tr-TR');
+
+/**
+ * A Jeton Noktası selling coins from its stock: whole coins, at most its stock, and the receipt of the payment it
+ * took outside the app (the server keeps it with the transfer). Null when the server would take it.
+ */
+export function bankSaleError({ to, coins, stock, paymentRef }: { to: string | null; coins: number; stock: number; paymentRef: string }): string | null {
+  if (!to) return 'Jeton göndereceğin kişiyi seç.';
+  if (!Number.isSafeInteger(coins) || coins <= 0) return 'Geçerli bir jeton miktarı gir.';
+  if (coins > BANK_SALE_MAX) return `Tek aktarımda en çok ${tr(BANK_SALE_MAX)} jeton gönderilebilir.`;
+  if (coins > stock) return `Stokta ${tr(stock)} jeton var.`;
+  const ref = paymentRef.trim();
+  if (!ref) return 'Ödemenin dekont veya havale numarasını yaz.';
+  if (ref.length > 100) return 'Dekont numarası en çok 100 karakter olabilir.';
+  return null;
+}
+
+/** A host selling unlocked diamonds to a Jeton Noktası: at least the exchange minimum, at most what is withdrawable. */
+export function diamondSaleError(diamonds: number, withdrawable: number, r: Rules = RULES): string | null {
+  if (!Number.isSafeInteger(diamonds) || diamonds <= 0) return 'Geçerli bir elmas miktarı gir.';
+  if (diamonds < r.exchangeMinDiamonds) return `En az ${tr(r.exchangeMinDiamonds)} elmas bozdurabilirsin.`;
+  if (diamonds > withdrawable) return 'Çekilebilir elmasın yetmiyor. Kilitli elmaslar süresi dolunca eklenir.';
+  return null;
+}
+
+/** A transfer as the server lists it (GET /api/jeton/transfers). */
+export type TransferLike = {
+  kind: 'bank_sale' | 'diamond_sale' | 'wholesale';
+  from: { id: string; name: string | null } | null;
+  to: { id: string; name: string | null };
+  coins: number;
+  diamonds: number | null;
+  valueTl: number | null;
+  paymentRef: string | null;
+};
+
+/** How a transfer reads for me (`me`: my server id): what it was, with whom, and what moved on my side. */
+export function transferLine(t: TransferLike, me: string | null): { title: string; detail: string; amount: string; incoming: boolean } {
+  const mine = (id: string | undefined) => !!me && id === me;
+  const tl = (v: number | null) => (v === null ? '' : ` · ${v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`);
+  const ref = t.paymentRef ? ` · Dekont ${t.paymentRef}` : '';
+  if (t.kind === 'wholesale') return { title: 'Toptan jeton alımı', detail: `Yönetimden${ref}`, amount: `+${tr(t.coins)} jeton`, incoming: true };
+  if (t.kind === 'diamond_sale') {
+    // The host sold diamonds; the bank got coins for them and owes the host their value outside the app.
+    if (mine(t.from?.id)) return { title: 'Elmas bozdurdun', detail: `${t.to.name ?? 'Jeton Noktası'}${tl(t.valueTl)}`, amount: `-${tr(t.diamonds ?? 0)} elmas`, incoming: false };
+    return { title: 'Elmas bozdurma', detail: `${t.from?.name ?? 'Yayıncı'} · ${tr(t.diamonds ?? 0)} elmas${tl(t.valueTl)}`, amount: `+${tr(t.coins)} jeton`, incoming: true };
+  }
+  if (mine(t.from?.id)) return { title: 'Jeton satışı', detail: `${t.to.name ?? 'Alıcı'}${ref}`, amount: `-${tr(t.coins)} jeton`, incoming: false };
+  return { title: 'Jeton Noktası yüklemesi', detail: t.from?.name ?? 'Jeton Noktası', amount: `+${tr(t.coins)} jeton`, incoming: true };
+}

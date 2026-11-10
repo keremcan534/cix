@@ -2,16 +2,19 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlatList, Image, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
-import { CALL_HISTORY, PROFILE_VISITORS, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime, type CallLog } from '@/data/messages-ui';
+import { CALL_HISTORY, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime } from '@/data/messages-ui';
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { liveCallRows, type CallRowData } from '@/lib/call-rows';
+import { friendRows, type Friend } from '@/lib/friend-rows';
+import { callPair } from '@/components/one-on-one-bar';
 import { useApp } from '@/store';
 import { makeStyles, useTheme, type Theme } from '@/theme';
 import { Icon3D, type Icon3DName } from '@/components/Icon3D';
@@ -19,36 +22,40 @@ import { Backdrop, Gloss, PressableScale } from '@/components/fx/surface';
 import { TeamInbox } from '@/components/team-inbox';
 import { teamUnread } from '@/lib/live/team';
 import { messagePreview } from '@/components/ReactionArt';
-import { callsAvailable, liveMode } from '@/lib/live';
+import { liveMode, message, oneOnOneOpen, toLocal, toServer, useServerRoomList } from '@/lib/live';
+import { clearLiveCalls, moreLiveCalls, useLiveCallLog, useLiveHearts } from '@/lib/live/call-log';
+import { useLiveFollowers } from '@/lib/live/friends';
+import { loadPair } from '@/lib/live/one-on-one';
+import { Photo } from '@/components/photo';
+import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
 
-// Aramalar is the simulated call history; a live build has no calls yet (lib/live callsAvailable).
+// Aramalar: the simulated call history in the demo, the server's in a live build with calls (lib/live oneOnOneOpen).
 const TABS: { key: Tab; label: string }[] = [
   { key: 'messages', label: 'Mesajlar' },
   { key: 'friends', label: 'Arkadaşlarım' },
-  ...(callsAvailable() ? [{ key: 'calls' as const, label: 'Aramalar' }] : []),
+  ...(oneOnOneOpen() ? [{ key: 'calls' as const, label: 'Aramalar' }] : []),
 ];
 
-// Yakınlık sorts by the demo's intimacy points; the server has none yet, so a live build leaves the chip out.
+// Yakınlık sorts by intimacy: the demo's sample points, or a live build's heart points (lib/live/call-log).
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Hepsi' },
-  ...(liveMode() ? [] : [{ key: 'intimacy' as const, label: 'Yakınlık' }]),
+  { key: 'intimacy', label: 'Yakınlık' },
   { key: 'online', label: 'Çevrimiçi' },
   { key: 'today', label: 'Bugün' },
 ];
+const NOBODY: ReadonlySet<string> = new Set();
 
 // Fallback cover for the "Canlı Odalar" row when no room was visited yet: the busiest room.
 const POPULAR_ROOM = [...ROOMS].sort((a, b) => b.listeners - a.listeners)[0];
 
-type Friend = { user: User; iFollow: boolean; followsMe: boolean };
-
 export default function MessagesScreen() {
-  const { conversations, blocked, following, recentRooms, vipDays, markRead, myRoom } = useApp();
+  const { conversations, blocked, following, recentRooms, markRead, myRoom } = useApp();
   // Profil › Arkadaşlar opens this tab on Arkadaşlarım (the tab stays mounted, so follow later visits too).
   const params = useLocalSearchParams<{ tab?: string }>();
-  const asked = params.tab === 'friends' || (params.tab === 'calls' && callsAvailable()) ? params.tab : null;
+  const asked = params.tab === 'friends' || (params.tab === 'calls' && oneOnOneOpen()) ? params.tab : null;
   const [tab, setTab] = useState<Tab>(asked ?? 'messages');
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {
@@ -79,38 +86,41 @@ export default function MessagesScreen() {
   const styles = useStyles();
 
   // Conversations (blocked users hidden), then the active chip filter.
+  const live = liveMode();
   const visibleConvs = conversations.filter((c) => !blocked.has(c.userId));
   const lastOf = (c: Conversation) => c.messages[c.messages.length - 1];
+  const hearts = useLiveHearts(live && filter === 'intimacy');
+  const intimacy = (id: string) => (live ? (hearts?.get(id) ?? 0) : intimacyOf(id));
   let convs = visibleConvs;
-  if (filter === 'intimacy') convs = [...visibleConvs].sort((a, b) => intimacyOf(b.userId) - intimacyOf(a.userId));
+  if (filter === 'intimacy') convs = [...visibleConvs].sort((a, b) => intimacy(b.userId) - intimacy(a.userId));
   else if (filter === 'online') convs = visibleConvs.filter((c) => userById(c.userId).online);
   else if (filter === 'today') convs = visibleConvs.filter((c) => lastOf(c) && isTodayTime(lastOf(c)));
   const totalUnread = visibleConvs.reduce((n, c) => n + c.unread, 0);
 
   // Friends: people I follow + people who follow me (mutual first, then online). Who follows me is the demo's
-  // sample list; a live build lists the people I follow on the server (loaded after signing in).
-  const followsMe = (id: string) => !liveMode() && FOLLOWS_ME.has(id);
-  const friendIds = [...new Set([...following, ...(liveMode() ? [] : FOLLOWS_ME)])].filter((id) => !blocked.has(id) && id !== 'me');
-  const friends: Friend[] = friendIds
-    .map((id) => ({
-      user: userById(id),
-      iFollow: following.has(id),
-      followsMe: followsMe(id),
-    }))
-    .sort((a, b) => Number(b.iFollow && b.followsMe) - Number(a.iFollow && a.followsMe) || Number(b.user.online) - Number(a.user.online));
+  // sample list, or my followers on the server, read each time Mesajlar comes to the front (with who is online).
+  const liveFollowers = useLiveFollowers(live);
+  const friends = friendRows(following, live ? (liveFollowers ?? NOBODY) : FOLLOWS_ME, blocked, userById);
 
-  const calls = clearedCalls ? [] : CALL_HISTORY.filter((c) => !blocked.has(c.userId));
-  // Profile visitors are sample data: the server doesn't record visits yet, so a live build shows no visitors row.
-  const visitors = liveMode() ? [] : PROFILE_VISITORS.filter((v) => !blocked.has(v.userId));
+  // Aramalar: the server's history in a live build (null while it is read), the sample one in the demo.
+  const liveLog = useLiveCallLog(live && tab === 'calls');
+  const calls: CallRowData[] = (live ? liveCallRows(liveLog?.calls ?? [], toLocal) : clearedCalls ? [] : CALL_HISTORY).filter((c) => !blocked.has(c.userId));
+  const clearCalls = () => (live ? void clearLiveCalls().catch((e) => showAlert('Arama geçmişi temizlenemedi', message(e))) : setClearedCalls(true));
+  // Profil ziyaretçileri: from the server in a live build (how many for everyone, who only with VIP), the sample
+  // visitors in the demo; the Ben tab shows the same numbers (components/visitors-sheet).
+  const visitors = useProfileVisitors();
+  const visitorCount = visitors.count ?? 0;
 
-  // Last visited room for the "Canlı Odalar" row.
+  // Last visited room for the "Canlı Odalar" row. Live: among the open server rooms (lib/live), with its own cover;
+  // a room that has closed since leads to Odalar instead.
+  const liveRooms = useServerRoomList();
   const lastRoomId = recentRooms[0];
-  const lastRoom = lastRoomId ? ROOMS.find((r) => r.id === lastRoomId) : undefined;
-  const partyCover = lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover);
-  const openParty = () => (lastRoomId ? router.push(`/oda/${lastRoomId}`) : router.push('/(tabs)'));
+  const lastRoom = lastRoomId ? (live ? liveRooms : ROOMS).find((r) => r.id === lastRoomId) : undefined;
+  const partyCover = live ? (lastRoom?.cover ?? '') : (lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover));
+  const openParty = () => (lastRoomId && (!live || lastRoom) ? router.push(`/oda/${lastRoomId}`) : router.push('/(tabs)'));
 
   const openVisitors = () => {
-    if (vipDays > 0) {
+    if (visitors.unlocked) {
       setVisitorsSeen(true);
       setVisitorsOpen(true);
       return;
@@ -139,7 +149,7 @@ export default function MessagesScreen() {
       ? [
           {
             label: 'Arama geçmişini temizle',
-            onPress: () => setClearedCalls(true),
+            onPress: clearCalls,
             destructive: true,
           },
         ]
@@ -147,7 +157,16 @@ export default function MessagesScreen() {
     { label: 'Mesaj ayarları', onPress: () => router.push('/ayarlar') },
   ];
 
-  const callBack = (c: CallLog) =>
+  // Live: the call goes through the server's rules for the two of us (price, heart level, their privacy choice).
+  const callBack = (c: CallRowData) => {
+    if (live) {
+      const peer = toServer(c.userId);
+      if (!peer) return;
+      void loadPair(peer)
+        .then((p) => callPair(c.userId, p, c.kind))
+        .catch((e) => showAlert('Arama başlatılamadı', message(e)));
+      return;
+    }
     router.push({
       pathname: '/arama/[id]',
       params: {
@@ -155,6 +174,7 @@ export default function MessagesScreen() {
         mode: c.kind === 'video' ? 'goruntulu' : 'sesli',
       },
     });
+  };
 
   const messagesHeader = (
     <View>
@@ -176,34 +196,29 @@ export default function MessagesScreen() {
             title="Canlı Odalar"
             subtitle={lastRoom ? `Son girdiğin oda · ${lastRoom.title}` : 'Şu an açık odalara göz at'}
             onPress={openParty}
-            right={<Image source={{ uri: partyCover }} style={styles.roomCover} />}
+            right={live ? <Photo uri={partyCover} kind="cover" seed={lastRoom?.id ?? 'odalar'} style={styles.roomCover} /> : <Image source={{ uri: partyCover }} style={styles.roomCover} />}
           />
-          {/* Aile (families) only exists in the demo: a live build leaves this row out. */}
-          {!liveMode() && (
-            <>
-              <View style={styles.sep} />
-              <SystemRow
-                icon={<Icon3D name="coin" size={30} />}
-                iconColors={['#F59E0B', '#FBBF24']}
-                title="Aileni bul"
-                subtitle="Birlikte konuşacak insanlar seni bekliyor"
-                onPress={() => router.push('/aile')}
-              />
-            </>
-          )}
-          {/* Only shown when there are visitors to list; the count is the same list the sheet shows. */}
-          {visitors.length > 0 && (
+          <View style={styles.sep} />
+          <SystemRow
+            icon={<Icon3D name="coin" size={30} />}
+            iconColors={['#F59E0B', '#FBBF24']}
+            title="Aileni bul"
+            subtitle="Birlikte konuşacak insanlar seni bekliyor"
+            onPress={() => router.push('/aile')}
+          />
+          {/* Only shown when someone came; with VIP the sheet lists them. */}
+          {visitorCount > 0 && (
             <>
               <View style={styles.sep} />
               <SystemRow
                 icon={<Ionicons name="eye" size={22} color="#fff" />}
                 iconColors={['#FF8A97', '#FF6576']}
                 title="Profil ziyaretçilerin"
-                subtitle={`Son 7 günde ${visitors.length} kişi profiline baktı`}
+                subtitle={`Son 7 günde ${visitorCount} kişi profiline baktı`}
                 onPress={openVisitors}
                 right={
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {!visitorsSeen && <CountBadge n={visitors.length} />}
+                    {!visitorsSeen && <CountBadge n={visitorCount} />}
                     <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
                   </View>
                 }
@@ -248,7 +263,7 @@ export default function MessagesScreen() {
               <Text style={styles.empty}>{filter === 'online' ? 'Şu an çevrimiçi sohbet yok.' : filter === 'today' ? 'Bugün mesajlaşmadın.' : 'Henüz sohbet yok.'}</Text>
             )
           }
-          renderItem={({ item }) => <ConversationRow conv={item} showIntimacy={filter === 'intimacy'} />}
+          renderItem={({ item }) => <ConversationRow conv={item} intimacy={filter === 'intimacy' ? intimacy(item.userId) : null} />}
         />
       )}
 
@@ -274,13 +289,14 @@ export default function MessagesScreen() {
           data={calls}
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ paddingBottom: 24 }}
-          ListEmptyComponent={<Text style={styles.empty}>Arama geçmişin boş.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{live && !liveLog ? 'Arama geçmişin yükleniyor…' : 'Arama geçmişin boş.'}</Text>}
+          onEndReached={live ? () => void moreLiveCalls().catch(() => {}) : undefined}
           renderItem={({ item }) => <CallRow call={item} onCallBack={() => callBack(item)} />}
         />
       )}
 
       <ActionSheet visible={menuOpen} options={menuOptions} onClose={() => setMenuOpen(false)} />
-      <VisitorsSheet visible={visitorsOpen} visitors={visitors} onClose={() => setVisitorsOpen(false)} />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
       <TeamInbox visible={teamOpen} onClose={() => setTeamOpen(false)} onUnread={setTeamNew} />
     </SafeAreaView>
   );
@@ -401,7 +417,8 @@ function AvatarWithBadge({ user, size, unread }: { user: User; size: number; unr
   );
 }
 
-function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntimacy: boolean }) {
+/** `intimacy`: the points to show beside the name (the Yakınlık filter), null for none. */
+function ConversationRow({ conv, intimacy }: { conv: Conversation; intimacy: number | null }) {
   const u = userById(conv.userId);
   const last = conv.messages[conv.messages.length - 1];
   const { colors } = useTheme();
@@ -416,10 +433,10 @@ function ConversationRow({ conv, showIntimacy }: { conv: Conversation; showIntim
           </Text>
           {u.verified && <VerifiedBadge />}
           {u.vip && <VipBadge />}
-          {showIntimacy && (
+          {intimacy !== null && (
             <View style={styles.intimacy}>
               <Ionicons name="heart" size={10} color={colors.pink} />
-              <Text style={styles.intimacyText}>{formatIntimacy(intimacyOf(u.id))}</Text>
+              <Text style={styles.intimacyText}>{formatIntimacy(intimacy)}</Text>
             </View>
           )}
         </View>
@@ -460,13 +477,13 @@ function FriendRow({ friend }: { friend: Friend }) {
   );
 }
 
-const callDirOf = ({ colors }: Theme): Record<CallLog['direction'], { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> => ({
+const callDirOf = ({ colors }: Theme): Record<CallRowData['direction'], { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> => ({
   in: { label: 'Gelen', icon: 'arrow-down', color: colors.green },
   out: { label: 'Giden', icon: 'arrow-up', color: colors.primaryText },
   missed: { label: 'Cevapsız', icon: 'close', color: colors.red },
 });
 
-function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }) {
+function CallRow({ call, onCallBack }: { call: CallRowData; onCallBack: () => void }) {
   const u = userById(call.userId);
   const t = useTheme();
   const { colors, gradientDeep } = t;
@@ -486,6 +503,9 @@ function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }
           <Text style={styles.last} numberOfLines={1}>
             {`${dir.label} ${video ? 'görüntülü' : 'sesli'} arama`}
             {call.duration > 0 ? ` · ${formatDuration(call.duration)}` : ''}
+            {/* Live calls only: how an unanswered call ended, and what it cost or earned. */}
+            {call.note ? ` · ${call.note}` : ''}
+            {call.money ? ` · ${call.money}` : ''}
           </Text>
         </View>
       </View>
@@ -498,58 +518,6 @@ function CallRow({ call, onCallBack }: { call: CallLog; onCallBack: () => void }
         </Pressable>
       </View>
     </Pressable>
-  );
-}
-
-function VisitorsSheet({ visible, visitors, onClose }: { visible: boolean; visitors: typeof PROFILE_VISITORS; onClose: () => void }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  // Android draws the modal edge to edge: the last row stays above the navigation bar.
-  const { bottom } = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(34, bottom + 8) }]}>
-        <View style={styles.sheetHandle} />
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={styles.sheetTitle}>Profilimi Kimler Ziyaret Etti</Text>
-          <VipBadge />
-        </View>
-        <Text style={styles.sheetSub}>Son 7 günde {visitors.length} kişi profilini ziyaret etti</Text>
-        <ScrollView>
-          {visitors.map((v) => {
-            const u = userById(v.userId);
-            return (
-              <Pressable
-                key={v.id}
-                style={({ pressed }) => [styles.visitorRow, pressed && { backgroundColor: colors.cardAlt }]}
-                onPress={() => {
-                  onClose();
-                  router.push(`/kullanici/${u.id}`);
-                }}
-              >
-                <Avatar uri={u.avatar} size={44} online={u.online} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.name}>{u.age > 0 ? `${u.name}, ${u.age}` : u.name}</Text>
-                  <Text style={styles.last}>
-                    {v.count} kez ziyaret etti · {u.city}
-                  </Text>
-                </View>
-                <Text style={styles.time}>{v.time}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        {visitors.length === 0 && <Text style={styles.empty}>Henüz ziyaretçin yok.</Text>}
-      </View>
-    </Modal>
   );
 }
 
@@ -702,38 +670,5 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-  },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 12,
-    paddingBottom: 34,
-    maxHeight: '75%',
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: 10,
-  },
-  sheetTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  sheetSub: {
-    color: colors.textDim,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  visitorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderRadius: 14,
   },
 }));

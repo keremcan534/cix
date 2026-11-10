@@ -13,6 +13,7 @@
 // diamonds count in the balance but can't be exchanged, sold or withdrawn; a store refund inside the lock
 // takes them back (jeton.mjs).
 import { HttpError, auth, db, env, move } from './core.mjs';
+import { assertUnderLimit, countSpent } from './spend-limit.mjs';
 
 const lockHoursFrom = (v, days) => {
   const n = Number(v ?? days);
@@ -40,6 +41,8 @@ export const CHANNELS = {
   ugurlu: { label: 'Uğurlu ödülü', lock: 'store' },
   // Coins from someone's Şanslı çanta (lucky-bags.mjs); the store lock, whatever paid for them.
   canta: { label: 'Şanslı çanta', lock: 'store' },
+  // Not a coin lot: a gift sent free from Çantam (backpack.mjs). Its diamonds lock as free coins' do.
+  cantam: { label: 'Çanta hediyesi', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */
@@ -123,15 +126,18 @@ export async function paidCoins(c, userId) {
  * channel, amount, lockHours }). The account row must be locked. A short balance is a 409 and changes nothing.
  * `use`: 'paid' (the default: gifts, bonds, Jeton Noktası, the wheel) never touches reward coins; 'items' (the
  * shop only) spends them first. The check runs before the lot-less shortfall, so reward coins can never pass as
- * 'legacy' coins.
+ * 'legacy' coins. `capped`: the person's daily spending limit holds (spend-limit.mjs, 409 code daily_limit); only a
+ * Jeton Noktası sale passes false.
  */
-export async function spendCoins(c, userId, amount, reason, ref, counterparty = null, { actor = null, detail = {}, use = 'paid' } = {}) {
+export async function spendCoins(c, userId, amount, reason, ref, counterparty = null, { actor = null, detail = {}, use = 'paid', capped = true } = {}) {
   if (use === 'paid' && (await paidCoins(c, userId)) < amount) {
     const all = Number((await c.query('SELECT coins FROM users WHERE id = $1', [userId])).rows[0].coins);
     throw all >= amount
       ? Object.assign(new HttpError(409, 'Ödül jetonları sadece mağazada kullanılır'), { extra: { code: 'reward_coins_only' } })
       : Object.assign(new HttpError(409, 'Yetersiz jeton'), { extra: { code: 'insufficient' } });
   }
+  // Before anything moves, so a refusal changes nothing and the caller's transaction may go on.
+  if (capped) await assertUnderLimit(c, userId, amount);
   const skip = use === 'paid' ? "AND channel <> 'odul'" : '';
   const order = use === 'items' ? `(channel = 'odul') DESC, ${SPEND_ORDER}` : SPEND_ORDER;
   const open = await c.query(`SELECT id, channel, remaining, lock_hours FROM coin_lots WHERE user_id = $1 AND remaining > 0 ${skip} ORDER BY ${order} FOR UPDATE`, [userId]);
@@ -147,6 +153,7 @@ export async function spendCoins(c, userId, amount, reason, ref, counterparty = 
   // Coins with no lot (credited around creditCoins): their source is unknown, so the store lock.
   if (left > 0) parts.push({ lot: null, channel: 'legacy', amount: left, lockHours: LOCK_HOURS.store });
   await move(c, userId, 'coin', -amount, reason, ref, counterparty, { channel: channelOf(parts), actor, detail: { ...detail, lots: parts } });
+  if (capped) await countSpent(c, userId, amount);
   if (left > 0) console.error(`coin lots short for ${userId}: ${left} coins without a lot`);
   return parts;
 }
@@ -186,12 +193,18 @@ export async function giftDiamonds(c, { sender, recipient, parts, total, label, 
  * took back ("İade: …"). Only giftDiamonds credits diamonds with a counterparty.
  */
 export async function charmPoints(c, userId) {
+  return (await charmPointsOf(c, [userId])).get(userId) ?? 0;
+}
+
+/** charmPoints of many people in one query (other people's levels in lists, profiles.mjs): id → points. */
+export async function charmPointsOf(c, ids) {
   const r = await c.query(
-    `SELECT coalesce(sum(amount), 0) AS n FROM ledger
-      WHERE user_id = $1 AND currency = 'diamond' AND counterparty IS NOT NULL AND counterparty <> $1 AND (amount > 0 OR reason ~ '^İade:')`,
-    [userId],
+    `SELECT user_id, coalesce(sum(amount), 0) AS n FROM ledger
+      WHERE user_id = ANY($1::uuid[]) AND currency = 'diamond' AND counterparty IS NOT NULL AND counterparty <> user_id AND (amount > 0 OR reason ~ '^İade:')
+      GROUP BY user_id`,
+    [ids],
   );
-  return Math.max(0, Number(r.rows[0].n));
+  return new Map(r.rows.map((x) => [x.user_id, Math.max(0, Number(x.n))]));
 }
 
 /** An account's diamonds: all of them, those still locked, and those that may leave. */

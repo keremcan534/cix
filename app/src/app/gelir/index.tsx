@@ -110,7 +110,7 @@ export default function IncomeScreen() {
   const info = () =>
     showAlert(
       'Elmasların',
-      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin${live ? '' : ', bozdurabileceğin'} ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
+      `${fmt(RULES.diamondsPerUsd)} elmas = 1 USD. Toplam ${fmt(diamonds)} elmasın yaklaşık ${usd(diamonds)} değerindedir.\n\nÇekilebilir: hemen çekebileceğin, bozdurabileceğin ya da jetona çevirebileceğin elmaslar.\nKilitli: Google Play veya App Store'dan alınan jetonla gelen hediyeler ${RULES.pendingDays} gün, Jeton Noktası jetonuyla gelenler ${RULES.jetonPendingDays} gün kilitli kalır (iade süresi). Süre dolunca kendiliğinden çekilebilir kazanca geçer.\n\nPara çekmek için en az ${fmt(RULES.minWithdrawDiamonds)} elmas (${usd(RULES.minWithdrawDiamonds)}) gerekir.`,
     );
 
   return (
@@ -119,12 +119,10 @@ export default function IncomeScreen() {
         title="Gelir"
         right={
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {/* The invite programme is not on the server yet: in live builds /davet is only the "yakında" screen. */}
-            {!live && (
-              <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
-                <Ionicons name="gift" size={18} color={colors.gold} />
-              </Pressable>
-            )}
+            {/* Arkadaşını Getir: the demo's, or the server's in a live build (server/api/referrals.mjs). */}
+            <Pressable onPress={() => router.push('/davet')} hitSlop={8} style={styles.headIcon} accessibilityLabel="Arkadaşını Getir">
+              <Ionicons name="gift" size={18} color={colors.gold} />
+            </Pressable>
             <Pressable onPress={() => router.push({ pathname: '/destek', params: { kategori: 'Kazanç' } })} hitSlop={8} style={styles.headIcon} accessibilityLabel="Müşteri hizmetleri">
               <Ionicons name="headset" size={18} color={colors.primaryText} />
             </Pressable>
@@ -189,16 +187,15 @@ export default function IncomeScreen() {
 
         {live && <IncomeSources />}
 
-        {!live && (
-          <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">
-            <Art name="finans-haftalik-odeme-banka" size={26} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>Jeton Noktası</Text>
-              <Text style={styles.dim}>Cüzdan, kazançlar, ödemeler ve kurallar</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-          </Pressable>
-        )}
+        {/* Live: the server's Jeton Noktası (the banks, Anında bozdur, transfers); the demo's sample books otherwise. */}
+        <Pressable style={styles.bankLink} onPress={() => router.push('/coins-bank')} accessibilityLabel="Jeton Noktası">
+          <Art name="finans-haftalik-odeme-banka" size={26} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>Jeton Noktası</Text>
+            <Text style={styles.dim}>{live ? 'Jeton Noktaları, anında bozdurma ve işlemlerin' : 'Cüzdan, kazançlar, ödemeler ve kurallar'}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </Pressable>
 
         <View style={styles.sectionHead}>
           <View style={styles.lockBadge}>

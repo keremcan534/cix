@@ -194,9 +194,14 @@ export const syncGoogleRefunds = () => post<{ checked: number; refunded: number;
 export type WalletAudit = {
   user: api.ServerUser & { withdrawable: number; locked: number; coinsInLots: number; role?: string };
   purchases: { id: number; platform: string; product_id: string; coins: number; bonus: number; status: string; created_at: string }[];
-  ledger: { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; created_at: string }[];
+  ledger: { id: number; currency: 'coin' | 'diamond' | 'game'; amount: number; balance: number; reason: string; created_at: string; detail?: { reward?: string; role?: string; revoked?: boolean } }[];
 };
 export const walletAudit = (user: string) => get<WalletAudit>(`/api/admin/wallet/audit${q({ user })}`);
+/** True when this account was paid an invite reward as the invited friend (server/api/referrals.mjs), not taken back. */
+export const paidAsInvitee = (a: WalletAudit) =>
+  a.ledger.some((l) => l.detail?.reward === 'invite' && l.detail.role === 'invitee' && l.amount > 0) && !a.ledger.some((l) => l.detail?.reward === 'invite' && l.detail.revoked);
+/** A fake account's invite: the invite coins both people still have are taken back (Sahte hesapla kazanılan jetonlar geri alınır). */
+export const revokeReferral = (invitee: string, reason: string) => post<{ coins: { inviter: number; invitee: number } }>('/api/admin/referrals/revoke', { invitee, reason });
 
 // --- Sanctions (sanctions.mjs; shapes and wording in lib/sanction-format) ---------------------------------------
 export type SanctionSearchUser = { id: string; name: string; phone: string | null; role: string; deleted: boolean; liveSanctions: number; totalSanctions: number };

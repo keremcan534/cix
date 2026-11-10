@@ -347,7 +347,8 @@ describe('Telefonlu hesabı silme', () => {
     assert.equal(row.phone, null);
     assert.equal((await h.sql.query('SELECT count(*)::int AS n FROM push_tokens WHERE user_id = $1', [p.user.id])).rows[0].n, 0);
     const again = await phoneSignIn(p.phone);
-    assert.deepEqual([again.isNew, again.user.coins], [true, 0]);
+    // Only the new account's welcome coins (another phone: referrals.mjs), nothing of the old balance.
+    assert.deepEqual([again.isNew, again.user.coins], [true, 100]);
     assert.notEqual(again.user.id, p.user.id);
   });
 });

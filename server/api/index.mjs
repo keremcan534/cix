@@ -12,8 +12,15 @@
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
 // Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
-// and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
+// and account deletion: social.mjs (levels, extras, album and Vitrin of a profile: profiles.mjs). Direct messages:
+// messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower invites: room-social.mjs). Staff: admin.mjs.
+// Gizlilik, who may reach me and Arkadaşlarım: privacy.mjs. Call history, heart levels and the call task: call-log.mjs.
+// Support tickets: support.mjs. The data copy (UK GDPR access): my-data.mjs. The daily spending limit: spend-limit.mjs.
+// Arkadaşını Getir, the welcome coins and which packs still carry the first-purchase gift: referrals.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
+// Çantam (free gifts from rewards, sent without coins): backpack.mjs.
+// Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs. Sıralama's Oda XP board: room-xp.mjs.
+// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX): room-games.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".
@@ -31,8 +38,12 @@ import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
+import { backpackRoutes } from './backpack.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { wealthPoints, wheelRoutes } from './wheel.mjs';
+import { casinoRoutes } from './casino.mjs';
+import { roomXpRoutes } from './room-xp.mjs';
+import { roomGameRoutes } from './room-games.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
 import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, userId } from './core.mjs';
@@ -50,21 +61,31 @@ import { luckyBagRoutes, startBagSweep, stopBagSweep } from './lucky-bags.mjs';
 import { messageRoutes } from './messages.mjs';
 import { momentRoutes } from './moments.mjs';
 import { oneOnOneRoutes, startCallSweep, stopCallSweep } from './one-on-one.mjs';
+import { callLogRoutes } from './call-log.mjs';
+import { privacyRoutes } from './privacy.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
+import { crossPkRoutes } from './pk-cross.mjs';
+import { profileRoutes } from './profiles.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
+import { supportRoutes } from './support.mjs';
+import { myDataRoutes } from './my-data.mjs';
+import { spendLimitRoutes } from './spend-limit.mjs';
 import { teamRoutes } from './team.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
+import { roomSocialRoutes } from './room-social.mjs';
+import { roomOwnerRoutes } from './room-owner.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
+import { referralRoutes } from './referrals.mjs';
 
 const PORT = Number(env.API_PORT ?? 7890);
 const TEST_TOPUP = env.ALLOW_TEST_TOPUP === '1';
@@ -221,9 +242,14 @@ const routes = {
   ...whatsappRoutes,
   ...pushRoutes,
   ...giftRoutes,
+  ...backpackRoutes,
   ...pkRoutes,
+  ...crossPkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
+  ...casinoRoutes,
+  ...roomXpRoutes,
+  ...roomGameRoutes,
   ...luckyRoutes,
   ...familyRoutes,
   ...familyMoreRoutes,
@@ -231,14 +257,23 @@ const routes = {
   ...mediaRoutes,
   ...liveRoutes,
   ...socialRoutes,
+  ...profileRoutes,
+  ...supportRoutes,
+  ...myDataRoutes,
+  ...spendLimitRoutes,
+  ...referralRoutes,
   ...messageRoutes,
   ...oneOnOneRoutes,
+  ...privacyRoutes,
+  ...callLogRoutes,
   ...luckyBagRoutes,
   ...momentRoutes,
   ...teamRoutes,
   ...musicRoutes,
   ...roomFxRoutes,
   ...roomEventRoutes,
+  ...roomSocialRoutes,
+  ...roomOwnerRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,

@@ -27,6 +27,8 @@ import { assertMay } from './sanctions.mjs';
 import { SPAM_MESSAGES, checkSpam } from './spam-filter.mjs';
 import { charmPoints } from './wallet.mjs';
 import { removeFiles, verifyUpload } from './media.mjs';
+import { distancesFrom } from './distances.mjs';
+import { hiddenFrom } from './privacy.mjs';
 
 const PAGE = 50;
 /** The topics the app offers (app/src/data/social-ui.ts MOMENT_TOPICS). */
@@ -61,7 +63,7 @@ const hiddenWriter = (a) => `(wu.deleted_at IS NOT NULL
   OR EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = ${a} AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION}))`;
 
 /** A post with its counts, as $1 (the reader) sees it. */
-const POST = `SELECT m.*, wu.name, wu.avatar_url, wu.gender, wu.birth_date,
+const POST = `SELECT m.*, wu.name, wu.avatar_url, CASE WHEN wu.gender_hidden THEN NULL ELSE wu.gender END AS gender, wu.birth_date,
     (SELECT count(*) FROM moment_likes l WHERE l.moment = m.id)::int AS likes,
     (SELECT count(*) FROM moment_comments c JOIN users cu ON cu.id = c.author WHERE c.moment = m.id AND c.deleted_at IS NULL AND cu.deleted_at IS NULL)::int AS comments,
     EXISTS (SELECT 1 FROM moment_likes l WHERE l.moment = m.id AND l.user_id = $1) AS liked
@@ -78,11 +80,16 @@ const writer = (x, looks) => ({
   frame: looks?.frame ?? null,
 });
 
-async function withWriters(rows) {
-  const looks = await looksOf([...new Set(rows.map((x) => x.author))]);
+/** Posts as `me` reads them; each writer with how far they are from me by our two cities (distances.mjs). */
+async function withWriters(rows, me) {
+  const authors = [...new Set(rows.map((x) => x.author))];
+  const looks = await looksOf(authors);
+  const far = await distancesFrom(me, rows.map((x) => x.author));
+  // "Profilim herkese açık" off: someone the writer doesn't follow doesn't get their age (privacy.mjs).
+  const hidden = await hiddenFrom(db, me.id, authors);
   return rows.map((x) => ({
     id: String(x.id),
-    author: writer(x, looks[x.author]),
+    author: { ...writer(x, looks[x.author]), ...(hidden.has(x.author) && { age: null }), distance: far.get(x.author) ?? null },
     text: x.body,
     imageUrl: x.image_url ?? null,
     topic: x.topic ?? null,
@@ -118,7 +125,7 @@ function photoOf(v, me) {
 
 async function comments(me, id) {
   const r = await db.query(
-    `SELECT c.*, wu.name, wu.avatar_url, wu.gender, wu.birth_date,
+    `SELECT c.*, wu.name, wu.avatar_url, CASE WHEN wu.gender_hidden THEN NULL ELSE wu.gender END AS gender, wu.birth_date,
         (SELECT count(*) FROM moment_comment_likes l WHERE l.comment = c.id)::int AS likes,
         EXISTS (SELECT 1 FROM moment_comment_likes l WHERE l.comment = c.id AND l.user_id = $1) AS liked
        FROM moment_comments c JOIN users wu ON wu.id = c.author
@@ -152,7 +159,7 @@ export const momentRoutes = {
       order = 'p.likes + 2 * p.comments DESC, p.id DESC';
     } else if (Number.isSafeInteger(before) && before > 0) where.push(`m.id < $${args.push(before)}`);
     const r = await db.query(`SELECT * FROM (${POST}${where.map((w) => ` AND ${w}`).join('')}) p ORDER BY ${order} LIMIT ${PAGE}`, args);
-    return { moments: await withWriters(r.rows), posting: await posting(me) };
+    return { moments: await withWriters(r.rows, me), posting: await posting(me) };
   },
 
   async 'POST /api/moments'(req) {
@@ -175,7 +182,7 @@ export const momentRoutes = {
     const id = r.rowCount ? r.rows[0].id : (await db.query('SELECT id FROM moments WHERE author = $1 AND ref = $2', [me.id, b.ref])).rows[0].id;
     const row = await db.query(`${POST} AND m.id = $2`, [me.id, id]);
     if (!row.rowCount) throw new HttpError(404, 'Bu an artık yok');
-    return { moment: (await withWriters(row.rows))[0], replay: !r.rowCount };
+    return { moment: (await withWriters(row.rows, me))[0], replay: !r.rowCount };
   },
 
   async 'POST /api/moments/delete'(req) {

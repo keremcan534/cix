@@ -11,7 +11,9 @@
 //    dropped. A paid Hareketli is announced the same way (server/api/room-fx.mjs: 'fx'); the room screen plays a
 //    phone's own 'anim' only when its catalog says that animation is free. The server also says when a PK starts or is cancelled
 //    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does; and when a Şanslı çanta is dropped
-//    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags);
+//    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags); and when a mic invite was sent
+//    or answered, or the room poll changed (server/api/room-social.mjs): "read it again" (lib/live/room-social); and
+//    when the room's game table changed (server/api/room-games.mjs): "read it again" (lib/live/room-table);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
 //    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs),
 //    which LiveKit hands every phone on join and on each change, and a seat the owner or an admin set for me (my
@@ -67,6 +69,11 @@ const roomListeners = new Set<(roomId: string) => void>();
 /** A bag packet: which bag, and whether it is the draw's (the bag was just drawn) rather than a new bag. */
 export type BagNews = { id: number | null; drawn: boolean };
 const bagListeners = new Set<(roomId: string, news: BagNews) => void>();
+/** A mic invite packet: who it is for and from (server user ids; null when several ended at once). */
+export type InviteNews = { to: string | null; from: string | null };
+const inviteListeners = new Set<(roomId: string, news: InviteNews) => void>();
+const pollListeners = new Set<(roomId: string) => void>();
+const tableListeners = new Set<(roomId: string) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 // The same for paid Hareketli (their own ids: a room_animations row, not a gift_events one).
@@ -163,6 +170,16 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
   if (from === null) {
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
     if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
+    // A mic invite was sent or answered, the room poll changed (server/api/room-social.mjs): read it again.
+    if (isServerInvite(raw)) {
+      const p = raw as Record<string, unknown>;
+      const id = (v: unknown) => (typeof v === 'string' && v.length <= 64 ? v : null);
+      const news: InviteNews = { to: id(p.to), from: id(p.from) };
+      return inviteListeners.forEach((l) => l(roomId, news));
+    }
+    if (isServerPoll(raw)) return pollListeners.forEach((l) => l(roomId));
+    // The room's game table changed (server/api/room-games.mjs): read it again (lib/live/room-table).
+    if (isServerTable(raw)) return tableListeners.forEach((l) => l(roomId));
     if (isServerBag(raw)) {
       const p = raw as Record<string, unknown>;
       const news: BagNews = { id: typeof p.id === 'number' && Number.isSafeInteger(p.id) ? p.id : null, drawn: p.drawn === true };
@@ -248,6 +265,13 @@ export const isServerRoom = (raw: unknown) => !!raw && typeof raw === 'object' &
 /** The server's bag packet: someone dropped a Şanslı çanta in the room (server/api/lucky-bags.mjs); read the bags. */
 export const isServerBag = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'bag';
 
+/** The server's mic invite packet (server/api/room-social.mjs): an invite in the room was sent or answered. */
+export const isServerInvite = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'invite';
+/** The server's poll packet (server/api/room-social.mjs): the room's poll started, got votes or ended. */
+export const isServerPoll = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'poll';
+/** The server's table packet (server/api/room-games.mjs): the room's game table opened, changed or closed. */
+export const isServerTable = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'table';
+
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
 
@@ -291,6 +315,24 @@ export function onServerBag(roomId: string, fn: (news: BagNews) => void) {
   const l = (r: string, news: BagNews) => r === roomId && fn(news);
   bagListeners.add(l);
   return () => void bagListeners.delete(l);
+}
+/** The server says a mic invite in this room was sent or answered; returns the unsubscribe. */
+export function onServerInvite(roomId: string, fn: (news: InviteNews) => void) {
+  const l = (r: string, news: InviteNews) => r === roomId && fn(news);
+  inviteListeners.add(l);
+  return () => void inviteListeners.delete(l);
+}
+/** The server says the room's poll changed; returns the unsubscribe. */
+export function onServerPoll(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  pollListeners.add(l);
+  return () => void pollListeners.delete(l);
+}
+/** The server says the room's game table changed; returns the unsubscribe. */
+export function onServerTable(roomId: string, fn: () => void) {
+  const l = (r: string) => r === roomId && fn();
+  tableListeners.add(l);
+  return () => void tableListeners.delete(l);
 }
 /** Shows the other phones which mic I sit on (null = Balkon). Kept across reconnects by the engine. */
 export const publishSeat = (seat: number | null) => link?.setSeat(seat);

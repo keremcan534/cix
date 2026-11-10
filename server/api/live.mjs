@@ -19,6 +19,7 @@
 import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
+import { roomEntered } from './referrals.mjs';
 import { leftVoiceRoom, mayStay, voiceAccess, voiceRoomStarted } from './rooms.mjs';
 import { voiceGrant } from './sanctions.mjs';
 
@@ -101,6 +102,8 @@ async function onEvent(e) {
       }
       // A reconnect keeps the first join time, so the time in the room isn't cut short.
       await db.query('INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, $3) ON CONFLICT (room, identity) DO UPDATE SET sid = EXCLUDED.sid', [room, who, sid]);
+      // Arkadaşını Getir: an invitee's room entry pays their waiting invite (referrals.mjs; never fails the webhook).
+      await roomEntered(who, room);
       break;
     }
     case 'participant_left':

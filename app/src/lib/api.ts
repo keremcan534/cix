@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
+import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
@@ -467,7 +468,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**
@@ -492,8 +493,12 @@ export const liveRooms = () => call<{ rooms: { room: string; listeners: number }
 
 // --- Live mode (lib/live): profile, people, rooms, messages, follows and the Gelir wallet on the server.
 export type ServerProfile = { username: string | null; gender: 'Kadın' | 'Erkek' | null; age: number | null; city: string | null; bio: string; interests: string[]; avatarUrl: string | null };
-export type ServerMe = ServerUser & ServerProfile & { role?: string };
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean };
+/** `genderHidden`: I chose "Gizli" (others don't get my gender; I still do). */
+export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidden?: boolean };
+/** How far someone is from me by our two profile cities (server/api/city-coords.mjs), rounded: never a location.
+ *  Null when either city is unknown or their profile is private to me; an older server sends none. */
+export type CityDistance = { km: number; sameCity: boolean };
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -522,6 +527,12 @@ export type ServerRoom = {
   rules?: RoomRules;
   /** Dümen koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
   boss?: UserCard | null;
+  /** The Odalar row's chips (server/api/room-social.mjs): the owner's agency or family, a running in-room PK, and
+   *  the room's place in this week's gift ranking (1–3, else null). */
+  agency?: { id: string; name: string } | null;
+  family?: { id: string; name: string } | null;
+  pk?: boolean;
+  weekRank?: number | null;
 };
 /** A server room's rules (server/api/room-rules.mjs). */
 export type RoomRules = {
@@ -551,11 +562,16 @@ export type ProfilePatch = { name?: string; gender?: 'Kadın' | 'Erkek'; birthDa
 export const updateProfile = (p: ProfilePatch) => call<{ user: ServerMe }>('PATCH', '/api/me', p).then((r) => r.user);
 /** Someone's agency (an approved one they stream in now) and family, on their profile. */
 export type ProfileTies = { agency: { id: string; name: string } | null; family: { id: string; name: string; role: 'owner' | 'helper' | 'member' } | null };
-export const userProfile = (id: string) =>
-  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+/** `visit`: opened on the profile screen, so it counts as a visit (Profil ziyaretçileri); a person card doesn't. */
+export const userProfile = (id: string, visit = false) =>
+  call<{ user: PublicUser } & Partial<ProfileTies>>('GET', `/api/user?id=${encodeURIComponent(id)}${visit ? '&visit=1' : ''}`).then((r) => ({ ...r.user, agency: r.agency ?? null, family: r.family ?? null }));
+/** Someone who opened my profile in the last 7 days. */
+export type ServerVisitor = { id: string; name: string; avatarUrl: string | null; visits: number; lastAt: string };
+/** Profil ziyaretçileri: how many came (everyone), and who (`visitors`, VIP only: null without it). */
+export const myVisitors = () => call<{ count: number; visitors: ServerVisitor[] | null }>('GET', '/api/me/visitors');
 export const follow = (to: string, on: boolean) => call<{ following: boolean }>('POST', '/api/follow', { to, follow: on }).then((r) => r.following);
-/** Keşfet: real people, most recently active first (no distance on the server: city only). */
-export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean };
+/** Keşfet: real people, most recently active first, with how far each is from me by city (no location). */
+export type DiscoverUser = { id: string; name: string } & ServerProfile & { online: boolean; levels?: Levels; country?: string | null; distance?: CityDistance | null };
 /** Keşfet's lists (server/api/social.mjs): most recently active, newest accounts, or who 1v1 lifts. */
 export type DiscoverList = 'home' | 'new' | 'featured';
 export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverUser[] }>('GET', `/api/discover${list === 'home' ? '' : `?list=${list}`}`).then((r) => r.users);
@@ -704,6 +720,294 @@ export const spend = (amount: number, reason: string, ref = newRef()) => call<{ 
 export const exchange = (diamonds: number, ref = newRef(), usdTry?: number) =>
   call<{ user: ServerUser; replay: boolean; coins: number }>('POST', '/api/wallet/exchange', { diamonds, ref, ...(usdTry === undefined ? {} : { usdTry }) });
 
+// Gizlilik, who may reach me and Arkadaşlarım (server/api/privacy.mjs); call history, heart points, the call figures and
+// the call task (server/api/call-log.mjs).
+export type ServerPrivacy = {
+  profilePublic: boolean;
+  showOnline: boolean;
+  showLastSeen: boolean;
+  showCurrentRoom: boolean;
+  dmFrom: 'everyone' | 'following' | 'mutual';
+  callsFrom: 'everyone' | 'following' | 'nobody';
+  invitesFrom: 'everyone' | 'following' | 'nobody';
+};
+export const myPrivacy = () => call<{ privacy: ServerPrivacy }>('GET', '/api/me/privacy').then((r) => r.privacy);
+/** Changes some settings; the answer is all of them as the server has them now. */
+export const updatePrivacy = (patch: Partial<ServerPrivacy>) => call<{ privacy: ServerPrivacy }>('PATCH', '/api/me/privacy', patch).then((r) => r.privacy);
+/** Someone I follow or who follows me; `online` and `lastSeenAt` only as far as they (and I) show them. */
+export type ServerFriend = UserCard & { iFollow: boolean; followsMe: boolean; online: boolean; lastSeenAt: string | null };
+export const myFriends = () => call<{ friends: ServerFriend[] }>('GET', '/api/me/friends').then((r) => r.friends);
+/** A finished call (status: ended = answered, missed, declined, cancelled by the caller). */
+export type ServerCallLog = {
+  id: number;
+  mode: 'voice' | 'video';
+  outgoing: boolean;
+  status: 'ended' | 'missed' | 'declined' | 'cancelled';
+  seconds: number;
+  coins: number;
+  iPay: boolean;
+  iEarn: boolean;
+  other: UserCard;
+  at: string;
+};
+/** My calls both ways, newest first; `next` is the `before` of the next page (null: no more). */
+export const myCalls = (before?: number) => call<{ calls: ServerCallLog[]; next: number | null }>('GET', `/api/me/calls${before ? `?before=${before}` : ''}`);
+export const clearMyCalls = () => call<{ cleared: boolean }>('POST', '/api/me/calls/clear', {});
+/** Heart points with each person I share any (most first). */
+export const myHearts = () => call<{ hearts: { id: string; points: number; level: number }[] }>('GET', '/api/me/hearts').then((r) => r.hearts);
+/** This week's paid calls and matches I earned from: how many, their paid minutes, the diamonds. */
+export type ServerCallStats = { calls: number; minutes: number; diamonds: number };
+export const myCallStats = () => call<{ week: ServerCallStats }>('GET', '/api/me/call-stats').then((r) => r.week);
+/** Görevler › "1 görüntülü arama yap" today, as the server counts it. */
+export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean };
+export const myCallTask = () => call<{ task: ServerCallTask }>('GET', '/api/me/call-task').then((r) => r.task);
+export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask; backpack?: { giftId: string; count: number } | null }>('POST', '/api/me/call-task/claim', {});
+// Room social (server/api/room-social.mjs): mic invites, the room poll, upcoming events, my rooms, follower invites.
+export type MicInviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'failed' | 'cancelled';
+/** `expiresIn`: ms left to answer by the server's clock (0 once answered); `seat` null: any free mic. */
+export type ServerMicInvite = { id: number; room: string; from: { id: string; name: string }; to: { id: string; name: string }; seat: number | null; status: MicInviteStatus; note: string; expiresIn: number; createdAt: string };
+export const roomMicInvites = (room: string) => call<{ invites: ServerMicInvite[] }>('GET', `/api/rooms/invites?room=${encodeURIComponent(room)}`).then((r) => r.invites);
+export const sendMicInvite = (room: string, user: string, seat?: number) => call<{ invite: ServerMicInvite }>('POST', '/api/rooms/invite', { room, user, ...(seat === undefined ? {} : { seat }) }).then((r) => r.invite);
+export const answerMicInvite = (id: number, accept: boolean, seat?: number) =>
+  call<{ invite: ServerMicInvite }>('POST', '/api/rooms/invite/answer', { id, accept, ...(seat === undefined ? {} : { seat }) }).then((r) => r.invite);
+/** `votes` / `total` are null while the poll hides its results from me (not live, I haven't voted, still open). */
+export type ServerPoll = { id: number; room: string; question: string; options: { text: string; votes: number | null }[]; total: number | null; myVote: number | null; live: boolean; endsIn: number; closed: boolean; by: { id: string; name: string } };
+export const roomPoll = (room: string) => call<{ poll: ServerPoll | null }>('GET', `/api/rooms/poll?room=${encodeURIComponent(room)}`).then((r) => r.poll);
+export const startRoomPoll = (room: string, p: { question: string; options: string[]; seconds: number; live: boolean }) => call<{ poll: ServerPoll }>('POST', '/api/rooms/poll', { room, ...p }).then((r) => r.poll);
+export const voteRoomPoll = (id: number, option: number) => call<{ poll: ServerPoll }>('POST', '/api/rooms/poll/vote', { id, option }).then((r) => r.poll);
+export const closeRoomPoll = (id: number) => call<{ poll: ServerPoll }>('POST', '/api/rooms/poll/close', { id }).then((r) => r.poll);
+export type UpcomingEvent = { id: number; title: string; when: string; type: string; room: { id: string; title: string }; attendees: number; going: boolean; createdAt: string };
+export const upcomingEvents = () => call<{ events: UpcomingEvent[] }>('GET', '/api/rooms/events/upcoming').then((r) => r.events);
+export const joinedRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms/joined').then((r) => r.rooms);
+/** `waitMs`: how long until the room's account may invite its followers again (0: now). */
+export type FollowerInviteInfo = { count: number; lastAt: string | null; waitMs: number };
+export const followerInviteInfo = (room: string) => call<FollowerInviteInfo>('GET', `/api/rooms/invite-followers?room=${encodeURIComponent(room)}`);
+export const inviteFollowers = (room: string) => call<FollowerInviteInfo & { sent: number }>('POST', '/api/rooms/invite-followers', { room });
+export type FollowerRoomInvite = { id: number; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
+export const myRoomInvites = () => call<{ invites: FollowerRoomInvite[] }>('GET', '/api/me/room-invites').then((r) => r.invites);
+// Other people's profiles (server/api/profiles.mjs): levels, personal extras, the album and the Vitrin.
+/** Cömertlik and Yankı levels as the server counts them (it never sends someone else's points); null: a level its
+ *  owner hides ("Seviyeyi Gizle", a VIP right). */
+export type Levels = { wealth: number | null; charm: number | null };
+/** What a person filled in about themselves; null or [] when they didn't. */
+export type ServerExtras = { height: number | null; weight: number | null; job: string | null; languages: string[]; zodiac: string | null; tags: string[]; relationship: string | null; education: string | null; slogan: string | null; country: string | null };
+export type AlbumPhoto = { id: number; url: string };
+/** What GET /api/user also carries for the profile screen (missing from an older server). Friends: people who follow
+ *  each other. `levelsHidden`: on my own profile only, which of my levels others don't see now. */
+export type ProfileMore = {
+  levels: Levels;
+  friends: number;
+  giftsReceived: number;
+  staff: 'admin' | 'moderator' | null;
+  extras: ServerExtras;
+  photos: AlbumPhoto[];
+  levelsHidden?: { wealth: boolean; charm: boolean };
+};
+/** Vitrin: catalog gifts received (by id), the rides and entry effects owned now (shop skus), medals and titles earned. */
+export type Showcase = { gifts: { id: string; count: number }[]; rides: string[]; entries: string[]; medals: string[]; titles: string[] };
+export const showcase = (id: string) => call<Showcase>('GET', `/api/user/showcase?id=${encodeURIComponent(id)}`);
+/** Only the fields sent change; null, '' or [] clears one. Hiding a level needs VIP (403 otherwise). */
+export type ExtrasPatch = Partial<ServerExtras> & { genderHidden?: boolean; hideWealth?: boolean; hideCharm?: boolean };
+export const saveExtras = (p: ExtrasPatch) =>
+  call<{ extras: ServerExtras & { genderHidden: boolean; hideWealth: boolean; hideCharm: boolean } }>('PATCH', '/api/me/extras', p).then((r) => r.extras);
+/** Albüm: a photo already in the storage (kind 'album'); the answer is my album, newest first. */
+export const addAlbumPhoto = (url: string) => call<{ photos: AlbumPhoto[] }>('POST', '/api/me/photos', { url }).then((r) => r.photos);
+export const removeAlbumPhoto = (id: number) => call<{ photos: AlbumPhoto[] }>('POST', '/api/me/photos/remove', { id }).then((r) => r.photos);
+// Destek talepleri (server/api/support.mjs): my tickets and their threads; staff answer them in Yönetim › Destek.
+// Staff lines reach me as 'support', never with a name. Evidence photos go up first (lib/live/profile uploadPhoto 'ticket').
+export type ServerTicketStatus = 'open' | 'answered' | 'reopened' | 'closed';
+export type ServerTicketLine = { id: string; from: 'user' | 'support'; text: string; createdAt: string; by?: { id: string; name: string } };
+export type ServerTicket = {
+  id: string; number: string; category: string; feedback: boolean; text: string; photos: string[]; status: ServerTicketStatus;
+  createdAt: string; updatedAt: string; closedAt: string | null; messages: ServerTicketLine[];
+};
+/** A ticket as staff see it: whose it is, who closed it, and in the queue how many lines and the last one. */
+export type StaffTicket = ServerTicket & {
+  user: { id: string; name: string; username: string | null; since: string }; closedBy: string | null;
+  lines?: number; last?: { from: 'user' | 'support'; text: string; createdAt: string } | null;
+};
+export type StaffQueue = 'waiting' | 'answered' | 'closed';
+export const myTickets = () => call<{ tickets: ServerTicket[]; open: number; maxOpen: number }>('GET', '/api/support/tickets');
+export const openTicket = (t: { category: string; text: string; photos?: string[]; feedback?: boolean }, ref = newRef()) =>
+  call<{ ticket: ServerTicket; replay: boolean }>('POST', '/api/support/tickets', { ...t, ref }).then((r) => r.ticket);
+export const replyTicket = (id: string, text: string) => call<{ ticket: ServerTicket }>('POST', '/api/support/reply', { id, text }).then((r) => r.ticket);
+export const closeTicket = (id: string) => call<{ ticket: ServerTicket }>('POST', '/api/support/close', { id }).then((r) => r.ticket);
+/** Staff only (403 otherwise). */
+export const staffTickets = (status: StaffQueue) => call<{ tickets: StaffTicket[]; waiting: number }>('GET', `/api/admin/support?status=${status}`);
+export const staffTicket = (id: string) => call<{ ticket: StaffTicket }>('GET', `/api/admin/support/ticket?id=${encodeURIComponent(id)}`).then((r) => r.ticket);
+export const staffReply = (id: string, text: string, close = false) => call<{ ticket: StaffTicket }>('POST', '/api/admin/support/reply', { id, text, close }).then((r) => r.ticket);
+export const staffTicketStatus = (id: string, status: 'open' | 'answered' | 'closed') =>
+  call<{ ticket: StaffTicket }>('POST', '/api/admin/support/status', { id, status }).then((r) => r.ticket);
+
+/** Verilerimin kopyası (server/api/my-data.mjs, UK GDPR right of access): once in 24 hours; 429 export_wait (data.nextAt) after that. */
+export const myDataExport = () => call<{ format: string; generatedAt: string } & Record<string, unknown>>('GET', '/api/me/export');
+
+/** Günlük harcama limiti (server/api/spend-limit.mjs). `limit` null: none; `next`: a raise or a lift waiting its hours. */
+export type ServerSpendLimit = { limit: number | null; next: { limit: number | null; at: string } | null; spentToday: number; left: number | null; day: string; resetsAt: string; raiseHours: number };
+export const spendLimit = () => call<ServerSpendLimit>('GET', '/api/me/spend-limit');
+/** 0 lifts it. Lower applies now; higher (or 0) after `raiseHours`. */
+export const setSpendLimit = (limit: number) => call<ServerSpendLimit & { applied: 'now' | 'later' }>('POST', '/api/me/spend-limit', { limit });
+
+/** Çantam (server/api/backpack.mjs): free gifts from rewards. `sources`: what each reward puts in now. */
+export type BackpackItem = { giftId: string; count: number; source: string; label: string };
+export type BackpackSource = { key: string; label: string; giftId: string; count: number };
+export type ServerBackpack = { items: BackpackItem[]; sources: BackpackSource[] };
+export const backpack = () => call<ServerBackpack>('GET', '/api/backpack');
+/** A free gift from my backpack in a server room: no coins; 409 bag_short when there aren't enough. */
+export const backpackSend = (to: string, giftId: string, count: number, room: string, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; total: number; items: BackpackItem[] }>('POST', '/api/backpack/send', { to, giftId, count, room, ref });
+
+/** Jeton Noktası (server/api/jeton.mjs). `mine`: this account is a Jeton Noktası. Blocks either way are left out. */
+export type JetonTransfer = {
+  id: number;
+  kind: 'bank_sale' | 'diamond_sale' | 'wholesale';
+  from: { id: string; name: string | null } | null;
+  to: { id: string; name: string | null };
+  coins: number;
+  diamonds: number | null;
+  valueTl: number | null;
+  paymentRef: string | null;
+  note: string | null;
+  createdAt: string;
+};
+export const jetonBanks = () => call<{ banks: UserCard[]; mine?: boolean }>('GET', '/api/jeton/banks');
+export const jetonTransfers = () => call<{ rows: JetonTransfer[] }>('GET', '/api/jeton/transfers').then((r) => r.rows);
+/** A Jeton Noktası's buyers: who wrote to it lately (blocks either way left out). */
+export const jetonBuyers = () => call<{ buyers: UserCard[] }>('GET', '/api/jeton/buyers').then((r) => r.buyers);
+/** A Jeton Noktası sends coins from its stock to someone who paid it outside the app (paymentRef: the receipt). */
+export const jetonTransfer = (to: string, coins: number, paymentRef: string, note: string, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; transfer: JetonTransfer }>('POST', '/api/jeton/transfer', { to, coins, paymentRef, note, ref });
+/** Where my coins came from (server/api/wallet.mjs): a Jeton Noktası's stock by source. */
+export const walletCoins = () => call<{ coins: number; channels: { channel: string; label: string; remaining: number }[] }>('GET', '/api/wallet/coins');
+/**
+ * Odalar arası PK (server/api/pk-cross.mjs): `red` is the inviting room, `blue` the invited one; `score` each room's
+ * points from its own gifts. 'invite' waits for the blue room's answer until `inviteExpiresAt`; 'active' covers the
+ * countdown (before `startAt`). `reason`: why it ended early ('staff': a room's staff ended or withdrew it).
+ * `pairs` leaves out people I have blocked or who blocked me (the scores still count them).
+ */
+export type ServerCrossPk = {
+  id: string;
+  status: 'invite' | 'active' | 'done' | 'cancelled' | 'declined' | 'expired';
+  reason: 'staff' | 'room_closed' | null;
+  endedRoom: string | null;
+  durationMin: number;
+  createdAt: string;
+  inviteExpiresAt: string;
+  startAt: string | null;
+  endAt: string | null;
+  red: { room: ServerRoom | null; score: number };
+  blue: { room: ServerRoom | null; score: number };
+  pairs: { from: string; to: string; side: 'red' | 'blue'; points: number; gifts: number }[];
+  people: UserCard[];
+};
+export type ServerCrossPkAnswer = { cross: ServerCrossPk | null; now: string };
+/** GET /api/rooms/pk also carries the room's cross-room PK (an older server sends no `cross`). */
+export type ServerPkRead = ServerPkAnswer & { cross?: ServerCrossPk | null };
+/** Rooms my room may invite now (`q`: a room's 8-digit ID or part of its name). Room staff only. */
+export const crossPkRooms = (room: string, q = '') =>
+  call<{ rooms: ServerRoom[] }>('GET', `/api/rooms/pk/cross/rooms?room=${encodeURIComponent(room)}${q ? `&q=${encodeURIComponent(q)}` : ''}`).then((r) => r.rooms);
+export const inviteCrossPk = (body: { room: string; to: string; durationMin: number; ref: string }) => call<ServerCrossPkAnswer>('POST', '/api/rooms/pk/cross', body);
+export const answerCrossPk = (room: string, id: string, accept: boolean) => call<ServerCrossPkAnswer>('POST', '/api/rooms/pk/cross/answer', { room, id, accept });
+/** Either room's staff: withdraws or declines an invite, or ends a running PK early (no winner). */
+export const endCrossPk = (room: string) => call<ServerCrossPkAnswer>('POST', '/api/rooms/pk/cross/end', { room });
+
+/**
+ * Oda Sahibi Merkezi (server/api/room-owner.mjs), the room's owner only. `session`: counted since I came into the
+ * room this time (`minutes` ago); false: the last 24 hours (`minutes` null). Visitors and gifts leave my own out.
+ * `hours`: different people in the room in each of the last 10 hours, the current one last.
+ */
+export type ServerOwnerStats = {
+  session: boolean;
+  since: string;
+  minutes: number | null;
+  listeners: number;
+  peak: number;
+  visitors: number;
+  visits: number;
+  avgStayMin: number;
+  newMembers: number;
+  gifts: { coins: number; count: number; senders: number };
+  level: number;
+  xp: number;
+  levelXp: number;
+  nextXp: number | null;
+  hours: { at: string; people: number }[];
+};
+export const roomOwnerStats = (room: string) => call<ServerOwnerStats>('GET', `/api/rooms/owner-stats?room=${encodeURIComponent(room)}`);
+// Yeni üye ödülleri (server/api/referrals.mjs): the welcome coins I got at sign-up (0: none), the packs whose
+// first-purchase gift is still mine, and Arkadaşını Getir: my code, the code I entered, what my invites brought.
+export type ServerRewards = {
+  welcome: { coins: number; on: boolean; amount: number };
+  firstBonus: { on: boolean; packs: { productId: string; bonus: number }[] };
+  invite: { on: boolean; coins: number; canEnter: boolean };
+};
+export const myRewards = () => call<ServerRewards>('GET', '/api/rewards');
+/** pending: waiting for the friend's first room; refused: no reward (device: their phone had another account). */
+export type InviteStatus = 'pending' | 'paid' | 'refused' | 'revoked';
+export type MyInvite = { by: { id: string; name: string } | null; status: InviteStatus | null; reason: 'device' | 'blocked' | 'staff' | null; coins: number; canEnter: boolean; enterUntil: string };
+export type InviteStats = { invited: number; rewarded: number; waiting: number; earned: number };
+export type ServerInvite = { code: string; on: boolean; coins: number; dailyCap: number; enterDays: number; stats: InviteStats; mine: MyInvite };
+export const myInvite = () => call<ServerInvite>('GET', '/api/invite');
+/** 404 unknown code; 409 with data.code already | invite_off | too_late | newer | device. */
+export const redeemInvite = (code: string) => call<{ mine: MyInvite }>('POST', '/api/invite/redeem', { code }).then((r) => r.mine);
+// Oyun Salonu (server/api/casino.mjs): the server draws and pays; winnings are game coins. `outcome` is the round
+// as lib/casino-odds outcomeOf builds it, for the screen to replay.
+export type ServerCasinoGame = { id: string; name: string; active: boolean; bets: number[]; dailyLimit: number; playedToday: number; jackpot: number | null };
+export type ServerCasinoRound = {
+  id: number;
+  game: string;
+  bet: number;
+  fromGame: number;
+  payout: number;
+  jackpot: number;
+  pick: string | null;
+  bets: Record<string, number> | null;
+  place: 'profile' | 'room';
+  detail: string;
+  at: string;
+  outcome?: Outcome;
+};
+export type ServerCasino = { games: ServerCasinoGame[]; needLevel: number; allowed: boolean; gameCoins: number; mine: ServerCasinoRound[] };
+export type CasinoPlayBody = { game: string; bet?: number; pick?: string; bets?: Record<string, number>; place: 'profile' | 'room' };
+export const casino = () => call<ServerCasino>('GET', '/api/casino');
+export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
+  call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
+/**
+ * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it. `hand` only for my
+ * own cards (Renk Kartları; null when I don't sit there), `counts` everyone's card count; `mySeat` −1 when I watch.
+ */
+export type TableCard = { color: number; value: number | '+2' | 'Atla' };
+export type ServerTable = {
+  room: string;
+  game: 'ludo' | 'cards' | 'xox';
+  name: string;
+  min: number;
+  max: number;
+  status: 'waiting' | 'playing' | 'over';
+  seats: UserCard[];
+  mySeat: number;
+  openedBy: string | null;
+  openedAt: string;
+  turn: number;
+  turnEndsAt: string | null;
+  winner: number | null;
+  log: string;
+  version: number;
+  board?: ('X' | 'O' | null)[];
+  pos?: number[];
+  die?: number | null;
+  top?: TableCard;
+  hand?: TableCard[] | null;
+  counts?: number[];
+};
+export type TableAction = 'open' | 'join' | 'start' | 'move' | 'leave' | 'again' | 'close';
+export const roomTable = (room: string) => call<{ table: ServerTable | null }>('GET', `/api/rooms/table?room=${encodeURIComponent(room)}`).then((r) => r.table);
+export const roomTableAction = (room: string, action: TableAction, extra: { game?: string; move?: { cell?: number; card?: number | null } } = {}) =>
+  call<{ table: ServerTable | null }>('POST', '/api/rooms/table', { room, action, ...extra }).then((r) => r.table);
+/** Sıralama › Oda XP (server/api/room-xp.mjs): open rooms by the room XP their gifts earned in the period. */
+export type RoomXpRow = { rank: number; room: ServerRoom; score: number };
+export const roomXpRankings = (period: 'day' | 'week' | 'month') => call<{ rows: RoomXpRow[] }>('GET', `/api/rankings/room-xp?period=${period}`).then((r) => r.rows);
+
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
 /** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
@@ -743,7 +1047,14 @@ export type LiveKey =
   | 'withdraw_max_diamonds'
   | 'withdraw_weekly_diamonds'
   | 'otp_global_per_hour'
-  | OneOnOneKey;
+  | 'backpack_call_task'
+  | OneOnOneKey
+  | RewardKey
+  | CasinoKey;
+/** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
+export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
+/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */
+export type CasinoKey = 'casino_off' | 'casino_max_bet' | 'casino_daily_rounds';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

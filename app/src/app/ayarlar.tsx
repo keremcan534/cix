@@ -21,6 +21,7 @@ import { openLegal } from '@/lib/legal';
 import { liveMode, message, myServerId } from '@/lib/live';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useStaffRole } from '@/lib/live/admin';
+import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
 import { type CodeKind } from '@/lib/live/account';
 import { useRemoteConfig } from '@/lib/remote-control';
 import { useAppUpdate, versionLabel } from '@/lib/app-update';
@@ -30,6 +31,9 @@ import { VerifiedPill, VerifySheet } from '@/components/verify-sheet';
 import { useLiveSessions } from '@/lib/live/sessions';
 import { openSupportMail } from '@/lib/open-mail';
 import { dataRequestMail } from '@/lib/support-mail';
+import { ApiError } from '@/lib/api';
+import { exportMyData } from '@/lib/live/my-data';
+import { LiveSpendLimit } from '@/components/spend-limit-live';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -38,6 +42,13 @@ type IconName = keyof typeof Ionicons.glyphMap;
 function Toggle({ k, ...row }: { k: BoolKey; title: string; subtitle?: string; icon?: IconName; disabled?: boolean }) {
   const { settings, setSetting } = useApp();
   return <ListSwitch {...row} value={settings[k]} onChange={(v) => setSetting(k, v)} />;
+}
+
+/** A Gizlilik switch: in a live build kept on the server, which enforces it (lib/live/privacy). */
+function PrivacyToggle({ k, ...row }: { k: BoolKey & PrivacyKey; title: string; subtitle?: string; icon?: IconName }) {
+  const { settings } = useApp();
+  const setPrivacy = usePrivacySetter();
+  return <ListSwitch {...row} value={settings[k]} onChange={(v) => setPrivacy(k, v)} />;
 }
 
 const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
@@ -52,19 +63,13 @@ const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
 ];
 const LOCKED_NOTIFY: NotifyType[] = ['payment', 'system'];
 
-// The privacy and contact settings a live build does not offer (giris-4), with the store's defaults. One changed
-// on this phone before still works here (showLastSeen off also hides other people's last seen), so a live build
-// offers to put them back.
-const PRIVACY_DEFAULTS: Pick<Settings, 'profilePublic' | 'showOnline' | 'showLastSeen' | 'showCurrentRoom' | 'luckyAnnounce' | 'invisibleEntry' | 'dmFrom' | 'callsFrom' | 'invitesFrom'> = {
-  profilePublic: true,
-  showOnline: true,
-  showLastSeen: true,
-  showCurrentRoom: true,
+// The two privacy settings a live build does not offer, with the store's defaults: no live room has invisible entry,
+// and no live win is announced with a name (the Uğurlu line names nobody), so neither switch would do anything there.
+// One changed on this phone before still acts on this phone, so a live build offers to put them back. The other
+// privacy and contact choices are kept and enforced on the server (lib/live/privacy).
+const PRIVACY_DEFAULTS: Pick<Settings, 'luckyAnnounce' | 'invisibleEntry'> = {
   luckyAnnounce: true,
   invisibleEntry: false,
-  dmFrom: 'everyone',
-  callsFrom: 'everyone',
-  invitesFrom: 'everyone',
 };
 const PRIVACY_KEYS = Object.keys(PRIVACY_DEFAULTS) as (keyof typeof PRIVACY_DEFAULTS)[];
 const nowMs = () => Date.now();
@@ -136,6 +141,25 @@ function LiveSessions() {
 export default function SettingsScreen() {
   const { nobleTier, me, phone, deletionRequested, requestDeletion, logout, resetAll, blocked, toggleBlock, safetyLog, requestDataExport, settings, setSetting, sessions, endSession, notify } = useApp();
   const [licenses, setLicenses] = useState(false);
+  // Live mode: Verilerimin kopyası (lib/live/my-data). A server without the route yet takes the request by e-mail.
+  const [exporting, setExporting] = useState(false);
+  const askExport = () =>
+    showAlert(
+      'Verilerimin kopyası',
+      'Sunucuda hesabınla ilgili tutulan kişisel veriler bir JSON dosyası olarak hazırlanır; dosyayı kaydedebilir veya paylaşabilirsin. Dosya kişisel verilerini içerir, yalnızca güvendiğin yere kaydet. 24 saatte bir alınabilir.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Hazırla',
+          onPress: () => {
+            setExporting(true);
+            exportMyData()
+              .catch((e: unknown) => (e instanceof ApiError && e.status === 404 ? openSupportMail(dataRequestMail(myServerId(), me.name)) : showAlert('Kopya hazırlanamadı', message(e))))
+              .finally(() => setExporting(false));
+          },
+        },
+      ],
+    );
   // Live mode: the account's e-mail and checked number (the ways the server has on, lib/remote-config).
   const { email, phoneVerified } = useApp();
   const { signIn, verify } = useRemoteConfig();
@@ -153,14 +177,17 @@ export default function SettingsScreen() {
     if (h) showAlert('Bildirimler ertelendi', `${h} saat boyunca bildirim gelmez. Güvenlik ve ödeme bildirimleri ertelenmez.`);
   };
   const snoozedUntil = new Date(settings.snoozeUntil).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  // A live build shows only what the server really does: its sessions, and no privacy, contact or spending
-  // switches until the server keeps and enforces them (giris-4). The demo keeps every prototype setting.
+  // A live build shows only what the server really does: its sessions, the privacy and contact choices it keeps
+  // and enforces, and no spending switches. The demo keeps every prototype setting.
   const live = liveMode();
   const stalePrivacy = live && PRIVACY_KEYS.some((k) => settings[k] !== PRIVACY_DEFAULTS[k]);
   const resetPrivacy = () => {
     for (const k of PRIVACY_KEYS) setSetting(k, PRIVACY_DEFAULTS[k]);
-    showAlert('Gizlilik ayarları sıfırlandı', 'Bu telefondaki gizlilik ve iletişim ayarları varsayılana döndü.');
+    showAlert('Eski ayarlar sıfırlandı', 'Bu telefonda kalan gizli giriş ve kazanç duyurusu ayarları varsayılana döndü.');
   };
+  // Live: Gizlilik and "Kimler ulaşabilir" come from the server and are saved there (lib/live/privacy).
+  useLivePrivacy();
+  const setPrivacy = usePrivacySetter();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -199,7 +226,7 @@ export default function SettingsScreen() {
             <ListRow
               icon="speedometer-outline"
               title="Yönetim"
-              subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar ve itirazlar'}
+              subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar, itirazlar ve destek talepleri'}
               onPress={() => setAdminOpen(true)}
             />
           )}
@@ -237,17 +264,12 @@ export default function SettingsScreen() {
           </ListGroup>
         )}
 
-        {/* The daily limit lives only on this phone. A live build does not offer it, but a limit saved here
-            earlier is still applied to spending, so it stays on screen until it is lifted. */}
-        {(!live || settings.dailySpendLimit > 0) && (
-          <ListGroup
-            label="Harcama"
-            footer={
-              live
-                ? 'Bu limit yalnızca bu telefonda geçerli. Limitsiz seçersen kaldırılır.'
-                : 'Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.'
-            }
-          >
+        {/* A live build keeps the daily limit on the server, which checks every coin spend against it
+            (components/spend-limit-live). The demo keeps it on this phone. */}
+        {live ? (
+          <LiveSpendLimit />
+        ) : (
+          <ListGroup label="Harcama" footer="Limit dolduğunda hediye, mağaza ve oyun harcamaları gece yarısına kadar durdurulur. Limit artışı 24 saat sonra geçerli olur.">
             <ListBlock title="Günlük harcama limiti">
               <ChoiceChips
                 value={settings.dailySpendLimit}
@@ -265,33 +287,34 @@ export default function SettingsScreen() {
 
         {live && (
           <>
-            {/* Only this phone's Keşfet › Yakındaki list: it shows people whose profile city is mine. Nothing is
-                sent to the server, so it does not promise who can find me. */}
+            {/* Only what this phone shows: Keşfet › Yakındaki (people whose profile city is mine) and how far people are
+                by our two cities (lib/live/distances). Nothing is sent to the server, so it does not promise who can
+                find me. */}
             <ListGroup label="Keşfet">
-              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Keşfet'teki Yakındaki sekmesi, profilindeki şehre göre listelenir. Kesin konumun kullanılmaz." />
+              <Toggle k="cityDiscovery" icon="location-outline" title="Yakındakileri göster" subtitle="Keşfet'teki Yakındaki sekmesi ve kişilerin sana uzaklığı, profilindeki şehre göre gösterilir. Kesin konumun kullanılmaz." />
             </ListGroup>
-            {stalePrivacy && (
-              <ListGroup label="Gizlilik" footer="Bu ayarlar sunucuya gönderilmez, yalnızca bu telefonda etkilidir. Örneğin son görülmeni kapattıysan başkalarının son görülmesini de göremezsin.">
-                <ListRow
-                  icon="refresh-outline"
-                  tone="neutral"
-                  title="Eski gizlilik ayarlarını sıfırla"
-                  subtitle="Bu telefonda daha önce değiştirdiğin gizlilik ve iletişim ayarları varsayılana döner."
-                  onPress={resetPrivacy}
-                  chevron={false}
-                />
-              </ListGroup>
-            )}
           </>
         )}
 
-        {!live && (
-          <>
-            <ListGroup label="Gizlilik">
-              <Toggle k="profilePublic" icon="globe-outline" title="Profilim herkese açık" />
-              <Toggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" />
-              <Toggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
-              <Toggle k="showCurrentRoom" icon="mic-outline" title="Bulunduğum odayı profilimde göster" subtitle="Kapalıyken profilinden odana 'Git' ile gelinemez." />
+        {/* Live: kept and enforced on the server, so the words say where each one acts there. Invisible entry and
+            the win announcement stay demo only (PRIVACY_DEFAULTS). */}
+        <ListGroup label="Gizlilik" footer={live ? 'Bu ayarlar hesabında saklanır; başka bir telefondan girişte de geçerlidir.' : undefined}>
+          <PrivacyToggle
+            k="profilePublic"
+            icon="globe-outline"
+            title="Profilim herkese açık"
+            subtitle={live ? 'Kapalıyken yaşını, şehrini, hakkında yazını, ilgi alanlarını ve takip listelerini yalnızca takip ettiğin kişiler görür.' : undefined}
+          />
+          <PrivacyToggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" subtitle={live ? 'Kapalıyken çevrimiçi ve son görülme bilgin kimseye gösterilmez.' : undefined} />
+          <PrivacyToggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />
+          <PrivacyToggle
+            k="showCurrentRoom"
+            icon="mic-outline"
+            title="Bulunduğum odayı profilimde göster"
+            subtitle={live ? 'Kapalıyken bulunduğun oda başkalarına gösterilmez (Aile’deki “Birlikte oynuyor” dahil).' : "Kapalıyken profilinden odana 'Git' ile gelinemez."}
+          />
+          {!live && (
+            <>
               <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Uğurlu hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
               <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
               <Toggle
@@ -301,30 +324,43 @@ export default function SettingsScreen() {
                 subtitle="Rütbe: Albay ve üstü (Gizli oda girişi) · Moderasyon kayıtlarından gizlenmez."
                 disabled={!GATES.invisibleEntry(nobleTier)}
               />
-            </ListGroup>
+            </>
+          )}
+          {stalePrivacy && (
+            <ListRow
+              icon="refresh-outline"
+              tone="neutral"
+              title="Eski ayarları sıfırla"
+              subtitle="Bu telefonda daha önce değiştirdiğin gizli giriş ve kazanç duyurusu ayarları varsayılana döner."
+              onPress={resetPrivacy}
+              chevron={false}
+            />
+          )}
+        </ListGroup>
 
-            <ListGroup label="Kimler ulaşabilir">
-              <ListBlock title="Bana kimler mesaj gönderebilir?">
-                <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setSetting('dmFrom', v)} />
-              </ListBlock>
-              <ListBlock title="Beni kimler arayabilir?">
-                <Text style={styles.blockHint}>Ücretli sesli ve görüntülü aramalar</Text>
-                <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setSetting('callsFrom', v)} />
-              </ListBlock>
-              <ListBlock title="Beni odalara kimler davet edebilir?">
-                <ChoiceChips
-                  value={settings.invitesFrom}
-                  options={[
-                    ['everyone', 'Herkes'],
-                    ['following', 'Takip ettiklerim'],
-                    ['nobody', 'Kimse'],
-                  ]}
-                  onChange={(v) => setSetting('invitesFrom', v)}
-                />
-              </ListBlock>
-            </ListGroup>
-          </>
-        )}
+        <ListGroup
+          label="Kimler ulaşabilir"
+          footer={live ? 'Engellediğin kişiler bu seçimlerden bağımsız olarak sana ulaşamaz. Yazdığın kişi sana cevap yazabilir; son 24 saatte aradığın kişi seni geri arayabilir.' : undefined}
+        >
+          <ListBlock title="Bana kimler mesaj gönderebilir?">
+            <ChoiceChips value={settings.dmFrom} options={Object.entries(DM_FROM_LABEL) as [DmFrom, string][]} onChange={(v) => setPrivacy('dmFrom', v)} />
+          </ListBlock>
+          <ListBlock title="Beni kimler arayabilir?">
+            <Text style={styles.blockHint}>{live ? 'Sesli ve görüntülü aramalar; Hemen Tanış eşleşmeleri etkilenmez' : 'Ücretli sesli ve görüntülü aramalar'}</Text>
+            <ChoiceChips value={settings.callsFrom} options={Object.entries(CALLS_FROM_LABEL) as [CallsFrom, string][]} onChange={(v) => setPrivacy('callsFrom', v)} />
+          </ListBlock>
+          <ListBlock title="Beni odalara kimler davet edebilir?">
+            <ChoiceChips
+              value={settings.invitesFrom}
+              options={[
+                ['everyone', 'Herkes'],
+                ['following', 'Takip ettiklerim'],
+                ['nobody', 'Kimse'],
+              ]}
+              onChange={(v) => setPrivacy('invitesFrom', v)}
+            />
+          </ListBlock>
+        </ListGroup>
 
         <ListGroup label={`Engellenenler · ${blocked.size}`} footer="Engellediğin kişiler sana mesaj atamaz, seni arayamaz, hediye veya oda daveti gönderemez.">
           {blocked.size === 0 ? (
@@ -405,7 +441,7 @@ export default function SettingsScreen() {
         </ListGroup>
 
         <ListGroup label="Destek">
-          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle={live ? 'SSS ve e-posta ile destek' : 'Taleplerin ve yanıtlar'} onPress={() => router.push('/destek')} />
+          <ListRow icon="help-buoy-outline" title="Destek merkezi" subtitle="Taleplerin ve yanıtlar" onPress={() => router.push('/destek')} />
           <ListRow
             icon="scale-outline"
             title="Bir karara itiraz et"
@@ -439,13 +475,13 @@ export default function SettingsScreen() {
           }
         >
           {live ? (
-            // No export route on the server yet: the request goes to support as an e-mail from the person's mail app.
+            // The server puts the copy together at once (lib/live/my-data); the share sheet saves or sends the file.
             <ListRow
               icon="download-outline"
               tone="neutral"
-              title="Verilerimin kopyasını iste"
-              subtitle="UK GDPR veri erişim talebi · destek ekibine e-postayla"
-              onPress={() => openSupportMail(dataRequestMail(myServerId(), me.name))}
+              title={exporting ? 'Verilerin hazırlanıyor…' : 'Verilerimin kopyasını iste'}
+              subtitle="UK GDPR veri erişim hakkı · JSON dosyası olarak kaydet veya paylaş · 24 saatte bir"
+              onPress={exporting ? undefined : askExport}
               chevron={false}
             />
           ) : (

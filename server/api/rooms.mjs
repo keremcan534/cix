@@ -3,7 +3,7 @@
 // in LiveKit and a kick or blacklist removes the person from the call (live.mjs RoomService).
 //
 //   POST /api/rooms        { title, announcement?, roomType?, password? }  → { room }
-//   GET  /api/rooms                                                         → { rooms }   (open, fullest first)
+//   GET  /api/rooms                                                         → { rooms }   (open, fullest first; with room-social.mjs badges)
 //   GET  /api/room?id=                                                      → { room }
 //   POST /api/rooms/close  { id }                                           → { closed }
 //   POST /api/rooms/update { id, title?, announcement?, password?, micCount?, layoutId?, micQueue?, coverId?, theme?, giftEffects? } → { room }
@@ -38,6 +38,10 @@ import { ROOM_COVERS, ROOM_THEMES, vipLevelOf } from './catalog.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { clearRoomMusic, roomMusic } from './music.mjs';
+// room-social.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { withRoomBadges } from './room-social.mjs';
+// pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { endCrossPkOfRoom } from './pk-cross.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -98,6 +102,8 @@ async function withVoiceCounts(rows) {
   if (!n) return rows;
   return rows.map((r) => (n.has(liveKitName(r.id)) ? { ...r, listeners: n.get(liveKitName(r.id)) } : r));
 }
+// Room social (room-social.mjs) lists rooms the same way: Odalarım › Katıl.
+export { out as roomOut, SELECT as ROOM_SELECT, withVoiceCounts };
 
 export async function roomRow(id) {
   if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(400, 'Geçersiz oda');
@@ -359,7 +365,8 @@ export const roomRoutes = {
     );
     const rows = await withVoiceCounts(r.rows);
     rows.sort((a, b) => Number(b.listeners) - Number(a.listeners) || new Date(b.created_at) - new Date(a.created_at));
-    return { rooms: rows.map(out) };
+    // The Odalar rows' agency or family chip, PK pill and weekly TOP place (room-social.mjs).
+    return { rooms: await withRoomBadges(rows.map(out)) };
   },
 
   async 'GET /api/room'(req, url) {
@@ -376,6 +383,8 @@ export const roomRoutes = {
     const room = await roomRow((await readJson(req)).id);
     if (room.owner !== me.id) throw new HttpError(403, 'Odayı yalnızca sahibi kapatabilir');
     await db.query('UPDATE rooms SET closed_at = now() WHERE id = $1 AND closed_at IS NULL', [room.id]);
+    // An Odalar arası PK with this room ends, and the other room hears it (pk-cross.mjs).
+    await endCrossPkOfRoom(room.id);
     // Everyone still in the call leaves now, not when their token runs out.
     await deleteVoiceRoom(liveKitName(room.id));
     return { closed: true };

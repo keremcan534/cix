@@ -19,7 +19,7 @@
 // match the signed-in account.
 //
 // Each store transaction credits once (purchases.UNIQUE(platform, transaction_id)); the first purchase of a
-// pack adds its first-purchase bonus; purchased coins (not the bonus) count as SVIP points. The coins are
+// pack adds its first-purchase bonus (unless switched off live: rewards_off); purchased coins (not the bonus) count as SVIP points. The coins are
 // lots with the store's channel (google / apple / test, and bonus): gifted, they lock the recipient's diamonds
 // for the store lock (wallet.mjs), and a refund (jeton.mjs) can follow them.
 //
@@ -36,7 +36,7 @@ import crypto from 'node:crypto';
 import { HttpError, auth, db, env, readJson, selfUser, sha, tx } from './core.mjs';
 import { PACK_BY_PRODUCT } from './catalog.mjs';
 import { campaignBonus, campaignRef } from './live-registry.mjs';
-import { campaignAt } from './live-settings.mjs';
+import { campaignAt, live } from './live-settings.mjs';
 import { TEST_DAILY, creditCoins, playCoinsToday } from './wallet.mjs';
 
 const TEST = env.ALLOW_TEST_TOPUP === '1';
@@ -173,7 +173,9 @@ async function credit(u, platform, pack, transactionId, play, purchaseTime) {
       return { replay: true, coins: Number(prev.coins), bonus: Number(prev.bonus), campaignBonus: Number(prev.campaign_bonus) };
     }
     const first = !(await c.query('SELECT 1 FROM purchases WHERE user_id = $1 AND product_id = $2', [u.id, pack.productId])).rowCount;
-    const bonus = first ? pack.firstBonus : 0;
+    // The first-purchase gift can be switched off live (rewards_off, referrals.mjs GET /api/rewards tells the app);
+    // the switch as it is when the purchase is verified.
+    const bonus = first && !live().rewardsOff.has('first_purchase') ? pack.firstBonus : 0;
     const sandbox = play && platform !== 'test';
     // The campaign set at the purchase time and running then: one ended since still pays (however late the verify),
     // one set later doesn't. No usable purchase time: no campaign.

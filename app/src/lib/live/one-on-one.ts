@@ -200,6 +200,8 @@ export function endText(c: CallView): string {
   if (c.status === 'cancelled') return c.incoming ? `${c.other.name} aramayı iptal etti` : 'Arama iptal edildi';
   if (c.endReason === 'time') return c.kind === 'match' ? 'Ücretsiz eşleşme süresi doldu' : 'Ücretsiz arama süresi doldu';
   if (c.endReason === 'coins') return c.iPay ? 'Jetonun bittiği için görüşme bitti' : 'Karşı tarafın jetonu bittiği için görüşme bitti';
+  // The payer's daily spending limit (server/api/spend-limit.mjs): private to them, so the other side isn't told why.
+  if (c.endReason === 'limit') return c.iPay ? 'Günlük harcama limitin dolduğu için görüşme bitti' : 'Görüşme bitti';
   if (c.endReason === 'lost') return 'Bağlantı koptuğu için görüşme bitti';
   if (c.endReason === 'deleted') return 'Görüşme sona erdi';
   return 'Görüşme bitti';

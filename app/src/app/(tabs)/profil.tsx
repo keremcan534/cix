@@ -9,7 +9,7 @@ import { Text } from '@/components/text';
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
-import { PROFILE_VISITORS } from '@/data/messages-ui';
+import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 import { FollowListSheet } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
 import { displayId } from '@/data/profile';
@@ -21,7 +21,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
-import { casinoVisible } from '@/lib/games';
+import { casinoVisible, useGames } from '@/lib/games';
 import { liveMode, myServerId, oneOnOneOpen, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
@@ -42,11 +42,11 @@ const GROWTH: Item[] = [
   { icon: 'trophy-outline', img: 'trophy', label: 'Sıralama', onPress: () => router.push('/siralama') },
   ...(oneOnOneOpen() ? [{ icon: 'flash-outline', img: 'bolt', label: 'Hemen Tanış', onPress: () => router.push('/eslesme') } satisfies Item] : []),
   { icon: 'notifications-outline', label: 'Bildirimler', onPress: () => router.push('/bildirimler') },
-  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true },
-  { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true },
-  { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true },
-  { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true },
-  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true },
+  { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true, localOnly: true },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (demo)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true, localOnly: true },
 ];
 const SUPPORT: Item[] = [
@@ -58,10 +58,11 @@ const SUPPORT: Item[] = [
 const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, vipDays, nobleTier, inventory } = useApp();
+  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const isAdmin = useIsAdmin();
+  const { casino } = useGames();
   const specialId = cosmeticById(equipped.specialId);
   const noble = nobleInfo(nobleTier);
   const live = liveMode();
@@ -70,7 +71,7 @@ export default function ProfileScreen() {
   const serverRooms = useServerRooms();
   const ownRoom = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
   // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through. Live:
-  // Mesajlar's friends are the people I follow, and profile visitors are not recorded on the server.
+  // Mesajlar's friends are the people I follow; visitors come from the server (who they are only with VIP).
   const followers = live ? (server.stats?.followers ?? null) : [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
   const followingCount = live ? (server.stats?.following ?? following.size) : following.size;
   const friendCount = live ? [...following].filter((id) => id !== 'me' && !blocked.has(id)).length : new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
@@ -81,7 +82,8 @@ export default function ProfileScreen() {
     const ids = side === 'followers' ? [...FOLLOWS_ME] : [...following];
     return ids.filter((id) => id !== 'me' && !blocked.has(id)).map((id) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
   };
-  const visitorCount = PROFILE_VISITORS.filter((v) => !blocked.has(v.userId)).length;
+  const visitors = useProfileVisitors();
+  const [visitorsOpen, setVisitorsOpen] = useState(false);
   const completion = myCompletion(me, live);
   // My public id: the one others see on my profile (data/profile displayId of my server id); none until known.
   const serverId = server.stats?.serverId ?? myServerId();
@@ -89,7 +91,7 @@ export default function ProfileScreen() {
 
   const main: Item[] = [
     { icon: 'diamond-outline', img: 'diamond', label: 'Gelir', onPress: () => router.push('/gelir') },
-    { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank'), localOnly: true },
+    { icon: 'business-outline', img: 'coin', label: 'Jeton Noktası', onPress: () => router.push('/coins-bank') },
     { icon: 'storefront-outline', img: 'bag', label: 'Çarşı', onPress: () => router.push('/magaza') },
     {
       icon: 'checkmark-circle-outline',
@@ -142,14 +144,23 @@ export default function ProfileScreen() {
           <Stat n={followers} label="Takipçiler" onPress={() => setList('followers')} />
           <Stat n={followingCount} label="Takip" onPress={() => setList('following')} />
           <Stat n={friendCount} label="Arkadaşlar" onPress={() => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } })} />
-          {!live && (
-            <Stat
-              n={visitorCount}
-              label="Ziyaretçiler"
-              dot
-              onPress={() => showAlert('Ziyaretçiler', vipDays > 0 ? `Son 7 günde profilini ${visitorCount} kişi ziyaret etti. (VIP ayrıcalığı)` : 'Ziyaretçileri görmek VIP ayrıcalığıdır.', vipDays > 0 ? undefined : [{ text: 'Kapat', style: 'cancel' }, { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) }])}
-            />
-          )}
+          <Stat
+            n={visitors.count}
+            label="Ziyaretçiler"
+            dot={(visitors.count ?? 0) > 0}
+            onPress={() =>
+              visitors.unlocked
+                ? setVisitorsOpen(true)
+                : showAlert(
+                    'Ziyaretçiler',
+                    `${visitors.count ? `Son 7 günde profiline ${visitors.count} kişi baktı. ` : ''}Kimlerin baktığını görmek VIP ayrıcalığıdır.`,
+                    [
+                      { text: 'Kapat', style: 'cancel' },
+                      { text: "VIP'e bak", onPress: () => router.push({ pathname: '/vip', params: { tab: 'vip' } }) },
+                    ],
+                  )
+            }
+          />
         </View>
 
         <View style={styles.card}>
@@ -172,9 +183,9 @@ export default function ProfileScreen() {
 
         <View style={[styles.card, { flexDirection: 'row' }]}>
           <Shortcut emoji="🎁" label="Jeton Kazan" onPress={() => router.push('/gorevler')} />
-          {/* Aile and invite rewards run only in the demo; the server has neither yet. */}
-          {!live && <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />}
-          {!live && <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />}
+          <Shortcut emoji="⛺" label="Ailem" onPress={() => router.push('/aile')} />
+          {/* Invite rewards: the demo's, or the server's in a live build (server/api/referrals.mjs). */}
+          <Shortcut emoji="✉️" label="Arkadaşını Getir" onPress={() => router.push('/davet')} />
         </View>
 
         {myRoom.profileVisible && live && (
@@ -212,8 +223,8 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* Live: the game hall's games run on this phone only, so the card stays in the demo. */}
-        {!live && casinoVisible(wealthLevel) && (
+        {/* From Cömertlik Lv.2; a live build plays these on the server (lib/live/casino). A game switched off there drops out. */}
+        {casinoVisible(wealthLevel) && (
           <View style={styles.gameCard}>
             <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
               <Icon3D name="wheel" size={30} />
@@ -231,14 +242,16 @@ export default function ProfileScreen() {
                   ['olympus', '🔦', 'Fener Kayalığı'],
                   ['fish', '🐟', 'Mercan Avı'],
                 ] as const
-              ).map(([id, e, l]) => (
-                <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
-                  <GameIcon id={id} emoji={e} size={26} />
-                  <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
-                    {l}
-                  </Text>
-                </Pressable>
-              ))}
+              )
+                .filter(([id]) => casino.find((g) => g.id === id)?.active)
+                .map(([id, e, l]) => (
+                  <Pressable key={id} style={styles.gameTile} onPress={() => router.push({ pathname: '/oyunlar', params: { oyun: id } })} accessibilityLabel={l}>
+                    <GameIcon id={id} emoji={e} size={26} />
+                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
+                      {l}
+                    </Text>
+                  </Pressable>
+                ))}
             </View>
           </View>
         )}
@@ -265,6 +278,7 @@ export default function ProfileScreen() {
         load={() => loadList(list ?? 'followers')}
         onClose={() => setList(null)}
       />
+      <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
     </SafeAreaView>
   );
 }

@@ -28,8 +28,8 @@ import {
   roomAnnouncement,
   roomBadge,
   roomCountry,
-  roomExtra,
   roomTagLabel,
+  rowExtra,
   type CountryId,
   type RoomTab,
 } from '@/data/rooms-ui';
@@ -39,6 +39,7 @@ import { closestRooms, type RoomMatch } from '@/lib/closest';
 import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
 import { isLockedRoom, liveMode, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
+import { useJoinedRooms, useUpcomingEvents } from '@/lib/live/room-social';
 import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { RoomCardSkeleton, Skeletons } from '@/components/fx/skeleton';
@@ -69,6 +70,9 @@ export default function RoomsScreen() {
   const live = liveMode();
   const serverRooms = useServerRooms();
   const roomsState = useServerRoomsState();
+  // Live: Odalarım › Katıl and the calendar from the server (server/api/room-social.mjs); null until read.
+  const joinedLive = useJoinedRooms();
+  const eventsLive = useUpcomingEvents();
   const visible = (live ? serverRooms : ROOMS).filter((r) => !blocked.has(r.hostId));
   // The home screen leads with the open room whose host has the most in common with you (lib/closest); a
   // password room is never offered there.
@@ -107,7 +111,9 @@ export default function RoomsScreen() {
     mineTab === 'recent'
       ? recentRooms.map((id) => visible.find((r) => r.id === id)).filter((r): r is Room => !!r)
       : mineTab === 'joined'
-        ? visible.filter((r) => isMemberRoom(r.id, agencyId, familyId))
+        ? live
+          ? (joinedLive ?? []).filter((r) => !blocked.has(r.hostId))
+          : visible.filter((r) => isMemberRoom(r.id, agencyId, familyId))
         : visible.filter((r) => following.has(r.hostId));
 
   // "Benzerlerin": people online right now, the closest matches first.
@@ -116,7 +122,9 @@ export default function RoomsScreen() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
   const unreadNotices = notifications.filter((n) => !n.read).length;
-  const events = ROOM_EVENTS.filter((e) => visible.some((r) => r.id === e.roomId));
+  const events = live
+    ? (eventsLive ?? []).map((e) => ({ id: String(e.id), roomId: e.room.id, title: e.title, when: e.when }))
+    : ROOM_EVENTS.filter((e) => visible.some((r) => r.id === e.roomId));
 
   const emptyText =
     main === 'rec'
@@ -369,17 +377,14 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
           style={styles.catFade}
         />
       </View>
-      {/* Aile (groups) is local-only: a live build doesn't offer it until the server has it. */}
-      {!liveMode() && (
-        <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Grup oluştur / katıl">
-          <LinearGradient colors={gradientDeep} style={styles.catIcon}>
-            <Ionicons name="people" size={18} color="#fff" />
-            <View style={styles.plusBadge}>
-              <Ionicons name="add" size={10} color={colors.primaryText} />
-            </View>
-          </LinearGradient>
-        </Pressable>
-      )}
+      <Pressable onPress={() => router.push('/aile')} hitSlop={6} accessibilityLabel="Aile kur / katıl">
+        <LinearGradient colors={gradientDeep} style={styles.catIcon}>
+          <Ionicons name="people" size={18} color="#fff" />
+          <View style={styles.plusBadge}>
+            <Ionicons name="add" size={10} color={colors.primaryText} />
+          </View>
+        </LinearGradient>
+      </Pressable>
       <Pressable onPress={onCountry} hitSlop={6} accessibilityLabel="Ülke seç" style={{ marginRight: 16 }}>
         <View style={[styles.catIcon, { backgroundColor: colors.cardAlt }]}>
           {flag ? <Text style={{ fontSize: 18 }}>{flag}</Text> : <Ionicons name="globe" size={20} color={dark ? '#38BDF8' : '#0284C7'} />}
@@ -520,7 +525,7 @@ const TOP_BG = ['#4A3510', '#241A3D'] as const;
 
 function RoomRow({ room, match }: { room: Room; /** How close the host is to you (lib/similarity). */ match: number }) {
   const styles = useStyles();
-  const x = roomExtra(room.id);
+  const x = rowExtra(room);
   // Only the week's top room keeps the lit card; rank badges on every row read as a leaderboard, not a home.
   const top = x.top === 1;
   const content = <RoomRowBody room={room} match={match} pk={x.pk} />;
@@ -542,7 +547,7 @@ function RoomRow({ room, match }: { room: Room; /** How close the host is to you
 function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: boolean }) {
   const { colors } = useTheme();
   const styles = useStyles();
-  const badge = roomBadge(room.id);
+  const badge = roomBadge(room);
   return (
     <>
       <View style={styles.coverFrame}>
@@ -569,7 +574,7 @@ function RoomRowBody({ room, match, pk }: { room: Room; match: number; pk?: bool
           {badge && (
             <LinearGradient colors={badge.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.badgeChip}>
               <Gloss strength={0.3} />
-              <Text style={{ fontSize: 11 }}>{badge.emoji}</Text>
+              {badge.icon ? <Ionicons name={badge.icon} size={11} color="#fff" /> : <Text style={{ fontSize: 11 }}>{badge.emoji}</Text>}
               <Text style={styles.badgeText} numberOfLines={1}>
                 {badge.label}
               </Text>

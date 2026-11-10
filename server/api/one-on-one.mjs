@@ -21,6 +21,8 @@
 // people who aren't streamers the man pays and nobody earns. Non-streamers get match_free free matches in 24
 // hours, each at most match_free_seconds long.
 // Prices are live settings (live-registry.mjs, "Birebir ve eşleşme"); a call keeps the price it started with.
+// Whoever is called decides who may call them (Ayarlar › "Beni kimler arayabilir?", privacy.mjs callRefusal);
+// Eşleşme isn't a call to anyone, so it doesn't ask.
 //
 // A minute is paid when it starts: the first when the call goes live, the next at 60 s, and so on. A payer who
 // can't pay the next minute is cut off. Both phones say they are still there (beat); a call nobody hears from in
@@ -33,9 +35,11 @@ import { HttpError, REF, auth, blockedBetween, db, env, limit, readJson, tx, use
 import { line } from './live-line.mjs';
 import { live } from './live-settings.mjs';
 import { deleteVoiceRoom, liveKitJwt } from './live.mjs';
+import { callRefusal } from './privacy.mjs';
 import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 import { giftDiamonds, paidCoins, spendCoins } from './wallet.mjs';
+import { assertUnderLimit, limitRefusal } from './spend-limit.mjs';
 
 /** Heart points (coins the two spent on each other: gifts, paid messages, paid minutes) needed for each level. */
 export const HEART_LEVELS = [0, 300, 1500, 5000, 15_000, 40_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000];
@@ -110,6 +114,9 @@ export async function pairOf(c, me, other) {
     }
     return { open: level >= need, price: mode === 'voice' ? s.callVoice : s.callVideo, iPay: payer === me, free: null, why: level >= need ? null : `${MODE_TEXT[mode]} arama kalp seviyesi ${need} olunca açılır` };
   };
+  // "Beni kimler arayabilir?" (privacy.mjs): their choice closes both calls, with their reason.
+  const refused = await callRefusal(c, me, other);
+  const closed = (gate) => (refused ? { ...gate, open: false, why: refused } : gate);
   return {
     streamer: x.other_s,
     meStreamer: x.me_s,
@@ -119,7 +126,7 @@ export async function pairOf(c, me, other) {
     iPay: payer === me,
     dmPrice: payer === me && !mutual ? s.dmPrice : 0,
     heart: { points, level, next: HEART_LEVELS[level + 1] ?? null, floor: HEART_LEVELS[level], voiceAt: s.heartVoice, videoAt: s.heartVideo, photoAt: PHOTO_HEART_LEVEL },
-    calls: { voice: call('voice'), video: call('video') },
+    calls: { voice: closed(call('voice')), video: closed(call('video')) },
     // A photo in the chat: with a streamer from the heart level, otherwise between people who follow each other.
     photo: paid
       ? { open: level >= PHOTO_HEART_LEVEL, why: level >= PHOTO_HEART_LEVEL ? null : `Mesajda fotoğraf kalp seviyesi ${PHOTO_HEART_LEVEL} olunca açılır` }
@@ -189,6 +196,13 @@ async function chargeMinute(c, k, n) {
   await c.query('UPDATE calls SET minutes = $2, coins = coins + $3 WHERE id = $1', [k.id, n, k.price]);
 }
 
+/**
+ * Why a minute the payer couldn't pay ends the call: 'coins' (too few, or only reward coins) or 'limit' (their
+ * daily spending limit, spend-limit.mjs); null for any other error. A refusal moved nothing, so the call ends in
+ * the same transaction.
+ */
+const cutBy = (e) => (e.extra?.code === 'insufficient' || e.extra?.code === 'reward_coins_only' ? 'coins' : e.extra?.code === 'daily_limit' ? 'limit' : null);
+
 /** Ends a call (lock held). A ringing call is declined (by the callee), cancelled (by the caller) or missed. */
 async function endCall(c, k, reason, by = null) {
   const status = k.status !== 'ringing' ? 'ended' : by === k.callee ? 'declined' : by === k.caller ? 'cancelled' : 'missed';
@@ -224,8 +238,9 @@ async function settle(id) {
         try {
           await chargeMinute(c, k, n);
         } catch (e) {
-          if (e.extra?.code !== 'insufficient' && e.extra?.code !== 'reward_coins_only') throw e;
-          await endCall(c, k, 'coins');
+          const why = cutBy(e);
+          if (!why) throw e;
+          await endCall(c, k, why);
           ended = true;
           break;
         }
@@ -310,9 +325,11 @@ async function pairUp(me, mode) {
         price = free ? 0 : mode === 'voice' ? s.matchVoice : s.matchVideo;
       }
       await lockUsers(c, [me.id, other.id]);
-      if (price > 0 && (await paidCoins(c, payer)) < price) {
+      // A short balance, or a payer at their daily spending limit (spend-limit.mjs).
+      const short = price > 0 ? ((await paidCoins(c, payer)) < price ? insufficient() : await limitRefusal(c, payer, price)) : null;
+      if (short) {
         // The one waiting can't pay any more: out of the queue (their phone shows it). I can't: refused.
-        if (payer !== other.id) throw insufficient();
+        if (payer !== other.id) throw short;
         await c.query('DELETE FROM match_queue WHERE user_id = $1', [other.id]);
         continue;
       }
@@ -408,6 +425,8 @@ export const oneOnOneRoutes = {
       if (await openCallOf(c, me.id)) throw new HttpError(409, 'Zaten bir görüşmedesin');
       if (await openCallOf(c, to)) throw Object.assign(new HttpError(409, 'Şu an başka bir görüşmede'), { extra: { code: 'busy' } });
       if (gate.iPay && gate.price > 0 && (await paidCoins(c, me.id)) < gate.price) throw insufficient();
+      // The first minute must fit my daily spending limit too, before the call rings.
+      if (gate.iPay && gate.price > 0) await assertUnderLimit(c, me.id, gate.price);
       // A call nobody earns from: one of my free calls (cut at its time), else I pay its minutes. With a streamer:
       // the one who isn't pays, the streamer earns.
       const free = !!gate.free && gate.price === 0;
@@ -465,8 +484,9 @@ export const oneOnOneRoutes = {
       try {
         await chargeMinute(c, k, 1);
       } catch (e) {
-        if (e.extra?.code !== 'insufficient' && e.extra?.code !== 'reward_coins_only') throw e;
-        await endCall(c, { ...k, status: 'live' }, 'coins');
+        const why = cutBy(e);
+        if (!why) throw e;
+        await endCall(c, { ...k, status: 'live' }, why);
         cut = true;
       }
     });
@@ -513,6 +533,7 @@ export const oneOnOneRoutes = {
     // A man who isn't a streamer pays once his free matches are used: refused before he waits if he can't.
     const rights = await rightsOf(db, me);
     if (!rights.streamer && me.gender === 'Erkek' && rights.freeLeft === 0 && (await paidCoins(db, me.id)) < rights.price[mode]) throw insufficient();
+    if (!rights.streamer && me.gender === 'Erkek' && rights.freeLeft === 0) await assertUnderLimit(db, me.id, rights.price[mode]);
     const out = await pairUp(me, mode);
     // The one who was waiting hears of the match at once.
     if (out.state === 'matched' && out.call?.other?.id) line([out.call.other.id], 'call', { call: out.call.id });
