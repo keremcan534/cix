@@ -140,7 +140,7 @@ describe('Kullanılmayan dosyalar depodan silinir', () => {
     Object.assign(process.env, { S3_ENDPOINT: `http://127.0.0.1:${S3_PORT}`, S3_BUCKET: 'media', S3_KEY: 'testkey', S3_SECRET: 'testsecret', S3_PUBLIC_URL: `http://127.0.0.1:${S3_PORT + 1}` });
     try {
       assert.match(await storageCheck(), /^yükleme 200, açık adres 200, silme 204/);
-      assert.ok(![...stored.keys()].some((k) => k.startsWith('check/')), 'deneme dosyası silindi');
+      assert.ok(![...stored.keys()].some((k) => k.includes('depo-denetimi')), 'deneme dosyası silindi');
       process.env.S3_BUCKET = 'yanlis';
       assert.match(await storageCheck(), /^yükleme 404 NoSuchBucket/);
       process.env.S3_BUCKET = 'media';

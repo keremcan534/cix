@@ -8,14 +8,22 @@
 // Settings in the server's .env: S3_ENDPOINT (https://<account>.r2.cloudflarestorage.com), S3_BUCKET,
 // S3_REGION (R2: auto), S3_KEY, S3_SECRET, S3_PUBLIC_URL (the bucket's public https address or CDN domain).
 //
+//   GET /api/media/f/<key>   → the stored file itself (sendFile; no sign-in, as the storage's public address)
+//
+// Phones open a stored file here, not at the storage's public address: that host (r2.dev) can't be reached from
+// some networks. S3_PUBLIC_URL/<key> stays the address kept in the database; what phones see and send is mapped
+// in one place (core.mjs filesOut, filesIn).
+//
 // Files no longer used are deleted (removeFiles, removeUserFiles): an avatar replaced, a moment its author
 // deletes, a track taken out of a library, a removed notice, and every file of a deleted account (UK GDPR
 // erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
 // Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
 // 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one.
 import crypto from 'node:crypto';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
-import { HttpError, auth, db, env, limit, readJson } from './core.mjs';
+import { FILE_PATH, HttpError, auth, db, env, limit, readJson, servedFiles } from './core.mjs';
 
 const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4' };
 // What phones call the usual music files (the app names a file's type from its ending when the phone doesn't).
@@ -107,6 +115,83 @@ export function keyOf(url, owner) {
   const key = url.slice(base.length + 1);
   if (!FILE_KEY.test(key)) return null;
   return owner && key.split('/')[1] !== owner ? null : key;
+}
+
+/** What a stored file is sent as: by its ending (which the upload route chose), never by what its uploader said. */
+const SENT_AS = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', flac: 'audio/flac', wav: 'audio/wav' };
+
+/** Passes on exactly `n` bytes; more or fewer is an error, so an answer never holds other bytes than it announced. */
+const exactly = (n) => {
+  let left = n;
+  return new Transform({
+    transform(chunk, _enc, done) {
+      left -= chunk.length;
+      done(left < 0 ? new Error('longer than announced') : null, chunk);
+    },
+    flush(done) {
+      done(left > 0 ? new Error('shorter than announced') : null);
+    },
+  });
+};
+
+/**
+ * A stored file sent from here (GET or HEAD /api/media/f/<key>): read from the storage with a signed request and
+ * passed on as it comes, so a big track never sits in memory. A `Range` goes through (the music player asks for
+ * parts). A file never changes under its key, so phones may keep it for good. It goes out as the type of its
+ * ending and as nothing a browser would run: the files are people's uploads, and this is the API's own address.
+ * No sign-in, as at the storage's public address: a key can't be guessed (so it is never written to a log).
+ */
+export async function sendFile(req, res, key) {
+  const plain = (code, text) => void res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end(text);
+  if (!storageOn() || !FILE_KEY.test(key)) return plain(404, 'Bulunamadı');
+  const method = req.method === 'HEAD' ? 'HEAD' : 'GET';
+  const headers = {};
+  if (typeof req.headers.range === 'string' && /^bytes=\d*-\d*$/.test(req.headers.range)) headers.range = req.headers.range;
+  // The phone going away stops the read; a storage that doesn't answer in 15 s is given up on.
+  const stop = new AbortController();
+  res.on('close', () => stop.abort());
+  const slow = setTimeout(() => stop.abort(), 15_000);
+  let up;
+  try {
+    up = await fetch(signed(method, key), { method, headers, redirect: 'manual', signal: stop.signal });
+  } catch (e) {
+    if (res.destroyed) return;
+    console.error('file read failed', e?.cause?.code ?? e?.name);
+    return plain(502, 'Dosya şu an açılamıyor');
+  } finally {
+    clearTimeout(slow);
+  }
+  if (up.status !== 200 && up.status !== 206 && up.status !== 416) {
+    await up.body?.cancel().catch(() => {});
+    if (up.status === 404) return plain(404, 'Bulunamadı');
+    console.error('file read', up.status);
+    return plain(502, 'Dosya şu an açılamıyor');
+  }
+  const out = {
+    'Content-Type': SENT_AS[key.split('.').pop()] ?? 'application/octet-stream',
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Accept-Ranges': 'bytes',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+  };
+  // A file stored with an encoding (its uploader may have named one) is read decoded here, so its stored length
+  // isn't the length that goes out: such a file goes out without one.
+  const length = up.headers.get('content-encoding') ? null : up.headers.get('content-length');
+  if (length !== null) out['content-length'] = length;
+  for (const h of ['content-range', 'etag', 'last-modified']) {
+    const v = up.headers.get(h);
+    if (v) out[h] = v;
+  }
+  res.writeHead(up.status, out);
+  if (method === 'HEAD' || !up.body) return void res.end();
+  // The phone leaving mid-file or the storage cutting off ends the answer where it is, connection and all.
+  const body = Readable.fromWeb(up.body);
+  try {
+    await (length === null ? pipeline(body, res) : pipeline(body, exactly(Number(length)), res));
+  } catch {
+    res.destroy();
+  }
 }
 
 async function deleteKeys(keys) {
@@ -215,16 +300,18 @@ export function storageNotes(e = env) {
 
 /**
  * The storage settings checked end to end (run after a deploy, server.yml): a small file put exactly the way the
- * phone puts a photo, read back through the public address, then deleted. The answer holds only status codes, the
- * storage's error code (SignatureDoesNotMatch, NoSuchBucket…) and storageNotes, never a setting's value, so it can
- * go in a log.
+ * phone puts a photo, read back through the storage's public address and through this server (the way phones open
+ * it: "uygulama adresi", when this server's address is known), then deleted. The answer holds only status codes,
+ * the storage's error code (SignatureDoesNotMatch, NoSuchBucket…) and storageNotes, never a setting's value, so it
+ * can go in a log.
  */
 export async function storageCheck() {
   const missing = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_KEY', 'S3_SECRET', 'S3_PUBLIC_URL'].filter((k) => !env[k]);
   if (missing.length) return `kapalı: ${missing.join(', ')} yok`;
   const notes = storageNotes();
   if (notes[0] === 'S3_ENDPOINT bir adres değil') return notes[0];
-  const key = `check/${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.txt`;
+  // A key shaped like a real one (under a person who can't exist), so the phones' way to it can be tried too.
+  const key = `notice/00000000-0000-0000-0000-000000000000/depo-denetimi-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.txt`;
   const body = 'similar storage check';
   const headers = { 'content-type': 'text/plain' };
   const signal = () => AbortSignal.timeout(10_000);
@@ -244,6 +331,16 @@ export async function storageCheck() {
       out.push(`açık adres ${(await fetch(`${env.S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`, { signal: signal() })).status}`);
     } catch (e) {
       out.push(failed('açık adres', e));
+    }
+    // The way phones open it: through this server (the running API on this machine), and the same bytes back.
+    if (servedFiles()) {
+      try {
+        const got = await fetch(`http://127.0.0.1:${Number(env.API_PORT ?? 7890)}${FILE_PATH}${key}`, { signal: signal() });
+        const same = got.ok && (await got.text()) === body;
+        out.push(`uygulama adresi ${got.status}${got.ok && !same ? ' (içerik farklı)' : ''}`);
+      } catch (e) {
+        out.push(failed('uygulama adresi', e));
+      }
     }
     try {
       out.push(`silme ${await codeOf(await fetch(signed('DELETE', key), { method: 'DELETE', signal: signal() }))}`);

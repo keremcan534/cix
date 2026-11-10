@@ -383,6 +383,8 @@ Anlar'daki ve profildeki fotoğraflar için. Telefon fotoğrafı doğrudan R2'ye
 4. **GitHub:** depo → **Settings → Secrets and variables → Actions → Secrets**: `S3_ENDPOINT`, `S3_BUCKET` (`similar-media`), `S3_KEY`, `S3_SECRET`, `S3_PUBLIC_URL`. Beşi de sır; anahtarları sohbete yapıştırmayın.
 5. **Kurulum:** Actions → **Server** → Run workflow. Kurulum dolu olanları `/opt/similar/.env`'e yazar (yalnız adları yazdırır). Uygulamada fotoğraflı bir an paylaşıp deneyin.
 
+**Telefonlar dosyayı sunucudan açar.** Yükleme doğrudan R2'ye gider, ama fotoğraf ve müzik telefonlara `https://<DOMAIN>/api/media/f/…` adresiyle verilir; API dosyayı R2'den okuyup iletir (`media.mjs` `sendFile`). Sebep: `r2.dev` Türkiye'deki bazı internet sağlayıcılarında açılmıyor. Veritabanında R2 adresi durur; çeviri tek yerde yapılır (`core.mjs` `filesOut`/`filesIn`). Kurulum sonundaki depo denetimi bu yolu da dener: satırda `uygulama adresi 200` görünmeli.
+
 Kapatmak için GitHub'daki `S3_PUBLIC_URL`'i tek bir `-` yapın. **UK GDPR:** Cloudflare veri işleyen olur; Cloudflare hesabında veri işleme sözleşmesini (DPA) kabul edin, gizlilik politikasına ekleyin.
 
 ## Sırada

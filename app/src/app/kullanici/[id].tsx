@@ -422,7 +422,7 @@ export default function UserProfile() {
       >
         {/* Cover + header */}
         <View>
-          <Photo uri={user.avatar.replace('200', '800')} kind="face" style={styles.cover} />
+          <Photo uri={user.avatar} kind="face" style={styles.cover} />
           <LinearGradient colors={['rgba(8,15,30,0.55)', 'transparent', 'rgba(8,15,30,0.6)']} style={StyleSheet.absoluteFill} />
           {/* The voice intro ("Kayıt") control comes back once recording one exists. */}
         </View>

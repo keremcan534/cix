@@ -140,7 +140,7 @@ function MatchCall() {
     <View style={s.screen}>
       {/* Remote side: the peer's "video" (prototype: their photo) or a voice avatar. */}
       {video ? (
-        <Photo uri={peer.avatar.replace('200', '800')} kind="face" style={StyleSheet.absoluteFill} />
+        <Photo uri={peer.avatar} kind="face" style={StyleSheet.absoluteFill} />
       ) : (
         <LinearGradient colors={['#0B3B4A', colors.bg]} style={StyleSheet.absoluteFill} />
       )}

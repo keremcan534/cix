@@ -353,8 +353,41 @@ export async function readRaw(req, max = 10_000) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+// --- File addresses ---------------------------------------------------------------------------------------
+// A stored file keeps one address in the database: the storage's own public address (S3_PUBLIC_URL/<key>). Phones
+// never get that one: the storage's public host (Cloudflare's r2.dev) can't be reached from some networks (Turkish
+// providers block it; Cloudflare doesn't mean it for production either). Everything that goes out to a phone names
+// the file at this server instead (<this server>/api/media/f/<key>, sent by media.mjs sendFile), and an address a
+// phone sends back is read as the stored one. Each happens in one place: filesOut on every answer (index.mjs send)
+// and on a room's metadata (rooms.mjs), filesIn on every body (readJson). This server's address is PUBLIC_URL, else
+// https://DOMAIN (.env, as Caddy has it); with neither (most tests), addresses go out as they are stored.
+export const FILE_PATH = '/api/media/f/';
+const noSlash = (v) => String(v ?? '').trim().replace(/\/+$/, '');
+/** Where stored files are kept (ends in "/"), or '' when the storage has no real address. */
+const storedFiles = () => {
+  const base = noSlash(env.S3_PUBLIC_URL);
+  return /^https?:\/\/[^/\s"\\]+/.test(base) ? `${base}/` : '';
+};
+/** Where phones open stored files (ends in "/"), or '' when this server's address isn't known. */
+export const servedFiles = () => {
+  const own = noSlash(env.PUBLIC_URL) || (noSlash(env.DOMAIN) ? `https://${noSlash(env.DOMAIN)}` : '');
+  return own ? `${own}${FILE_PATH}` : '';
+};
+/** JSON text on its way to a phone: stored file addresses become this server's. */
+export function filesOut(text) {
+  const from = storedFiles();
+  const to = servedFiles();
+  return from && to && text.includes(from) ? text.replaceAll(from, to) : text;
+}
+/** JSON text from a phone: this server's file addresses become the stored ones. */
+export function filesIn(text) {
+  const from = servedFiles();
+  const to = storedFiles();
+  return from && to && text.includes(from) ? text.replaceAll(from, to) : text;
+}
+
 export async function readJson(req, max) {
-  const raw = await readRaw(req, max);
+  const raw = filesIn(await readRaw(req, max));
   let v;
   try {
     v = raw ? JSON.parse(raw) : {};

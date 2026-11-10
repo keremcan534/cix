@@ -35,7 +35,7 @@ import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
 import { wealthPoints, wheelRoutes } from './wheel.mjs';
 import { EXCHANGE, exchangeCoins } from './catalog.mjs';
 import { financeSyncRoutes, startFinanceSync, stopFinanceSync } from './finance-sync.mjs';
-import { HttpError, RawText, allow, auth, claimRef, clientIp, db, env, int, migrate, once, readJson, sha, userId } from './core.mjs';
+import { FILE_PATH, HttpError, RawText, allow, auth, claimRef, clientIp, db, env, filesOut, int, migrate, once, readJson, sha, userId } from './core.mjs';
 import { giftRoutes } from './gifts.mjs';
 import { jetonRoutes } from './jeton.mjs';
 import { liveRoutes } from './live.mjs';
@@ -45,7 +45,7 @@ import { familyRoutes } from './families.mjs';
 import { familyMoreRoutes } from './family-more.mjs';
 import { exchangeOk } from './live-registry.mjs';
 import { live, liveSettingsRoutes, refreshLive, startLiveSync, stopLiveSync } from './live-settings.mjs';
-import { mediaRoutes } from './media.mjs';
+import { mediaRoutes, sendFile } from './media.mjs';
 import { luckyBagRoutes, startBagSweep, stopBagSweep } from './lucky-bags.mjs';
 import { messageRoutes } from './messages.mjs';
 import { momentRoutes } from './moments.mjs';
@@ -96,6 +96,8 @@ const EXTRA_ORIGINS = new Set((env.ALLOWED_ORIGINS ?? '').split(',').map((s) => 
 const RATE_AUTH = Number(env.RATE_AUTH ?? 20);
 const RATE_ALL = Number(env.RATE_ALL ?? 120);
 const RATE_IP = Number(env.RATE_IP ?? Math.max(RATE_ALL * 5, 600));
+// Stored files opened from one address in a minute (many phones can share one, and a feed is many photos).
+const RATE_FILES = Number(env.RATE_FILES ?? 3000);
 const LOG = env.LOG_REQUESTS !== '0';
 /** Paths without the limit: LiveKit's signed webhooks and the uptime check. */
 const UNLIMITED = new Set(['/api/livekit/webhook', '/api/health']);
@@ -264,7 +266,8 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   const send = (code, data) => {
     if (!res.headersSent && data instanceof RawText) res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }).end(data.text);
-    else if (!res.headersSent) res.writeHead(code).end(JSON.stringify(data));
+    // Stored files are named at this server's address on the way out (core.mjs filesOut).
+    else if (!res.headersSent) res.writeHead(code).end(filesOut(JSON.stringify(data)));
     // Path only: query strings can hold a room password.
     if (LOG && url.pathname !== '/api/health') console.log(JSON.stringify({ t: new Date().toISOString(), m: req.method, p: url.pathname, s: code, ms: Math.round(performance.now() - t0) }));
   };
@@ -283,6 +286,27 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   if (req.method === 'OPTIONS') return send(204, {});
+
+  // A stored file (a photo, a track) goes out as itself, not as JSON (media.mjs sendFile). Its own limit: a screen
+  // of photos is many requests at once, and they mustn't use up the phone's API calls. Nothing here is logged with
+  // its path: whoever has a file's address can open it.
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith(FILE_PATH)) {
+    if (!allow(`ip-file:${clientIp(req)}`, RATE_FILES)) return void res.writeHead(429).end(JSON.stringify({ error: 'Çok fazla istek, biraz bekle' }));
+    let key = '';
+    try {
+      key = decodeURIComponent(url.pathname.slice(FILE_PATH.length));
+    } catch {
+      // Not a key: answered 404 by sendFile.
+    }
+    try {
+      await sendFile(req, res, key);
+    } catch (e) {
+      console.error('file', e?.code ?? e?.name);
+      if (res.headersSent) res.destroy();
+      else res.writeHead(500).end(JSON.stringify({ error: 'Sunucu hatası' }));
+    }
+    return;
+  }
 
   const route = routes[`${req.method} ${url.pathname}`];
   if (!route) return send(404, { error: 'Bulunamadı' });

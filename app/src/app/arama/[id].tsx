@@ -140,7 +140,7 @@ function CallScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       {/* "Remote video": the other person's photo, blurred while ringing / for voice calls. */}
-      <Photo uri={user.avatar.replace('200', '800')} kind="face" style={StyleSheet.absoluteFill} blurRadius={phase === 'connected' && video ? 0 : 30} />
+      <Photo uri={user.avatar} kind="face" style={StyleSheet.absoluteFill} blurRadius={phase === 'connected' && video ? 0 : 30} />
       <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.75)']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={{ flex: 1 }}>
