@@ -10,6 +10,7 @@ import { useSyncExternalStore } from 'react';
 
 import { beginCall, endCall } from '@/lib/media';
 import { holdForCall } from '@/lib/room-session';
+import { BEAUTY_EFFECT, registerBeauty } from '../../modules/similar-beauty';
 import { ensureWebRtc, holdAudio, playRemote, releaseAudio } from '@/lib/webrtc-globals';
 
 /** What a video view shows (the shape of @livekit/components-react's TrackReference). */
@@ -103,10 +104,26 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
     patch({ status: 'connected' });
     await r.localParticipant.setMicrophoneEnabled(true, CAPTURE).catch(() => room === r && patch({ micOn: false, error: 'Mikrofon izni yok' }));
     if (video) await r.localParticipant.setCameraEnabled(true, { facingMode: 'user' }).catch(() => room === r && patch({ camOn: false, error: 'Kamera izni yok' }));
+    if (video) beautify(r);
     refresh(r);
   } catch (e) {
     if (room !== r) return;
     patch({ status: 'failed', error: e instanceof Error ? e.message : 'Görüşmeye bağlanılamadı' });
+  }
+}
+
+/**
+ * My camera gets the beauty filter (modules/similar-beauty): it runs at the strength the call screen sets, which is
+ * 0 (the frames pass untouched) unless it is mine to use. Again after every new camera track (on, flipped).
+ */
+function beautify(r: Room) {
+  if (room !== r || !registerBeauty()) return;
+  const track = r.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+  const media = track?.mediaStreamTrack as unknown as { _setVideoEffects?: (names: string[]) => void } | undefined;
+  try {
+    media?._setVideoEffects?.([BEAUTY_EFFECT]);
+  } catch {
+    // An older WebRTC build without video effects: the camera goes as it is.
   }
 }
 
@@ -136,7 +153,7 @@ export function setCallCamera(on: boolean) {
   patch({ camOn: on });
   void r.localParticipant
     .setCameraEnabled(on, on ? { facingMode: state.front ? 'user' : 'environment' } : undefined)
-    .then(() => refresh(r))
+    .then(() => (on && beautify(r), refresh(r)))
     .catch(() => room === r && patch({ camOn: !on }));
 }
 /** Front or back camera. */
@@ -148,6 +165,6 @@ export function flipCallCamera() {
   patch({ front });
   void track
     .restartTrack({ facingMode: front ? 'user' : 'environment' })
-    .then(() => refresh(r))
+    .then(() => (beautify(r), refresh(r)))
     .catch(() => room === r && patch({ front: !front }));
 }
