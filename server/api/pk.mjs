@@ -12,9 +12,11 @@
 // The PK's coins and diamonds are the gift's own: PK points never move money. A start or cancel is announced to
 // the room's voice connection ({ type: 'pk' }), and gifts are already announced, so the phones reload the PK.
 // `pk` is the room's running PK, or its last one for RESULT_MS after it ended (the result screen), else null.
-// Cross-room PK has no server side yet.
-import { HttpError, REF, UUID, auth, db, env, int, limit, readJson } from './core.mjs';
+// Odalar arası PK is in pk-cross.mjs: the read here carries it as `cross`, a gift scores for it through
+// scorePkGift, and a room holds one PK at a time of either kind.
+import { HttpError, REF, UUID, auth, db, env, int, limit, readJson, tx } from './core.mjs';
 import { roomService, voiceParticipants } from './live.mjs';
+import { crossBusy, crossForRoom, scoreCrossPkGift } from './pk-cross.mjs';
 
 /** The countdown before gifts score (PK_PREP_MS only for tests). */
 const PREP_MS = Number(env.PK_PREP_MS ?? 5_000);
@@ -116,6 +118,8 @@ export async function scorePkGift(c, { room, eventId, sender, recipient, coins }
       const team = pk.mode === 'team' ? (pk.red.includes(recipient) ? 'red' : 'blue') : null;
       await c.query('INSERT INTO room_pk_gifts (pk_id, gift_event, sender, recipient, team, points) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING', [pk.id, eventId, sender, recipient, team, coins]);
     }
+    // Odalar arası PK: the gift scores for its room (never both: a room has one PK at a time).
+    if (!pk) await scoreCrossPkGift(c, roomId, { eventId, sender, recipient, coins });
     await c.query('RELEASE SAVEPOINT pk_score');
   } catch (e) {
     await c.query('ROLLBACK TO SAVEPOINT pk_score');
@@ -125,12 +129,13 @@ export async function scorePkGift(c, { room, eventId, sender, recipient, coins }
 
 export const pkRoutes = {
   async 'GET /api/rooms/pk'(req, url) {
-    await auth(req);
+    const me = await auth(req);
     const roomId = roomIdOf(url.searchParams.get('room'));
     await closeEnded(roomId);
     const row = (await db.query('SELECT * FROM room_pks WHERE room_id = $1 ORDER BY id DESC LIMIT 1', [roomId])).rows[0];
     const fresh = row && (row.status === 'active' || Date.now() - (row.cancelled_at ?? row.end_at).getTime() < RESULT_MS);
-    return answer(fresh ? row : null);
+    // The room's Odalar arası PK too (pk-cross.mjs), as this viewer may see it.
+    return { ...(await answer(fresh ? row : null)), cross: await crossForRoom(roomId, me.id) };
   },
 
   async 'POST /api/rooms/pk'(req) {
@@ -166,14 +171,18 @@ export const pkRoutes = {
     await closeEnded(roomId);
     let row;
     try {
-      row = (
-        await db.query(
+      // The room's row is locked while no Odalar arası PK is checked (pk-cross.mjs locks it the same way).
+      row = await tx(async (c) => {
+        await c.query('SELECT 1 FROM rooms WHERE id = $1 FOR UPDATE', [roomId]);
+        if (await crossBusy(c, roomId)) throw new HttpError(409, 'Bu odada zaten devam eden bir PK var');
+        const ins = await c.query(
           `INSERT INTO room_pks (room_id, mode, started_by, ref, duration_min, participants, red, blue, start_at, end_at)
            VALUES ($1, $2, $3, $4, $5::int, $6, $7, $8, now() + $9::int * interval '1 millisecond', now() + $9::int * interval '1 millisecond' + $5::int * interval '1 minute')
            RETURNING *`,
           [roomId, mode, me.id, b.ref, duration, participants, red, blue, PREP_MS],
-        )
-      ).rows[0];
+        );
+        return ins.rows[0];
+      });
     } catch (e) {
       if (e.code !== '23505') throw e;
       const same = (await db.query('SELECT * FROM room_pks WHERE started_by = $1 AND ref = $2', [me.id, b.ref])).rows[0];

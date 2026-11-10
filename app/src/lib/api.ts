@@ -878,6 +878,61 @@ export const jetonTransfer = (to: string, coins: number, paymentRef: string, not
   call<{ user: ServerUser; replay: boolean; transfer: JetonTransfer }>('POST', '/api/jeton/transfer', { to, coins, paymentRef, note, ref });
 /** Where my coins came from (server/api/wallet.mjs): a Jeton Noktası's stock by source. */
 export const walletCoins = () => call<{ coins: number; channels: { channel: string; label: string; remaining: number }[] }>('GET', '/api/wallet/coins');
+/**
+ * Odalar arası PK (server/api/pk-cross.mjs): `red` is the inviting room, `blue` the invited one; `score` each room's
+ * points from its own gifts. 'invite' waits for the blue room's answer until `inviteExpiresAt`; 'active' covers the
+ * countdown (before `startAt`). `reason`: why it ended early ('staff': a room's staff ended or withdrew it).
+ * `pairs` leaves out people I have blocked or who blocked me (the scores still count them).
+ */
+export type ServerCrossPk = {
+  id: string;
+  status: 'invite' | 'active' | 'done' | 'cancelled' | 'declined' | 'expired';
+  reason: 'staff' | 'room_closed' | null;
+  endedRoom: string | null;
+  durationMin: number;
+  createdAt: string;
+  inviteExpiresAt: string;
+  startAt: string | null;
+  endAt: string | null;
+  red: { room: ServerRoom | null; score: number };
+  blue: { room: ServerRoom | null; score: number };
+  pairs: { from: string; to: string; side: 'red' | 'blue'; points: number; gifts: number }[];
+  people: UserCard[];
+};
+export type ServerCrossPkAnswer = { cross: ServerCrossPk | null; now: string };
+/** GET /api/rooms/pk also carries the room's cross-room PK (an older server sends no `cross`). */
+export type ServerPkRead = ServerPkAnswer & { cross?: ServerCrossPk | null };
+/** Rooms my room may invite now (`q`: a room's 8-digit ID or part of its name). Room staff only. */
+export const crossPkRooms = (room: string, q = '') =>
+  call<{ rooms: ServerRoom[] }>('GET', `/api/rooms/pk/cross/rooms?room=${encodeURIComponent(room)}${q ? `&q=${encodeURIComponent(q)}` : ''}`).then((r) => r.rooms);
+export const inviteCrossPk = (body: { room: string; to: string; durationMin: number; ref: string }) => call<ServerCrossPkAnswer>('POST', '/api/rooms/pk/cross', body);
+export const answerCrossPk = (room: string, id: string, accept: boolean) => call<ServerCrossPkAnswer>('POST', '/api/rooms/pk/cross/answer', { room, id, accept });
+/** Either room's staff: withdraws or declines an invite, or ends a running PK early (no winner). */
+export const endCrossPk = (room: string) => call<ServerCrossPkAnswer>('POST', '/api/rooms/pk/cross/end', { room });
+
+/**
+ * Oda Sahibi Merkezi (server/api/room-owner.mjs), the room's owner only. `session`: counted since I came into the
+ * room this time (`minutes` ago); false: the last 24 hours (`minutes` null). Visitors and gifts leave my own out.
+ * `hours`: different people in the room in each of the last 10 hours, the current one last.
+ */
+export type ServerOwnerStats = {
+  session: boolean;
+  since: string;
+  minutes: number | null;
+  listeners: number;
+  peak: number;
+  visitors: number;
+  visits: number;
+  avgStayMin: number;
+  newMembers: number;
+  gifts: { coins: number; count: number; senders: number };
+  level: number;
+  xp: number;
+  levelXp: number;
+  nextXp: number | null;
+  hours: { at: string; people: number }[];
+};
+export const roomOwnerStats = (room: string) => call<ServerOwnerStats>('GET', `/api/rooms/owner-stats?room=${encodeURIComponent(room)}`);
 
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };

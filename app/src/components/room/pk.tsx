@@ -9,10 +9,11 @@ import { Text, TextInput } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { useSheetBottom } from '@/components/room/parts';
+import { roomCode } from '@/data/catalog';
 import { roomById, userById } from '@/data/mock';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode } from '@/lib/live';
-import { cancelLivePk, startLivePk } from '@/lib/live/pk';
+import { cancelLivePk, endLiveCrossPk, inviteLiveCrossPk, startLivePk, useCrossPkRooms, type IncomingCrossPk } from '@/lib/live/pk';
 import {
   PK_DURATIONS,
   cancelPk,
@@ -122,18 +123,22 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
       { text: 'Başlat', onPress: go },
     ]);
   };
-  const invite = (opp: string) => {
-    const r = inviteCrossPk(roomId, starterId, opp, duration);
+  const invite = async (opp: string) => {
+    if (busy) return;
+    // Live mode: the server sends the invite and the other room's staff answer it (lib/live/pk).
+    if (live) setBusy(true);
+    const r = live ? await inviteLiveCrossPk(roomId, opp, duration) : inviteCrossPk(roomId, starterId, opp, duration);
+    setBusy(false);
     if (!r.ok) return showAlert('Davet gönderilemedi', r.reason);
     onClose();
   };
-  const rooms = invitableRooms(roomId).filter((r) => !query.trim() || r.id.includes(query.trim()) || r.title.toLocaleLowerCase('tr-TR').includes(query.trim().toLocaleLowerCase('tr-TR')));
+  // Live mode: open rooms from the server (it searches by the room's ID or name), else the demo's rooms.
+  const serverRooms = useCrossPkRooms(roomId, live && visible && tab === 'cross', query);
+  const rooms = live ? (serverRooms.rooms ?? []) : invitableRooms(roomId).filter((r) => !query.trim() || r.id.includes(query.trim()) || r.title.toLocaleLowerCase('tr-TR').includes(query.trim().toLocaleLowerCase('tr-TR')));
   const soloOff = !config.soloPkEnabled;
   const teamOff = !config.roomPkEnabled;
   const modeOff = mode === 'solo' ? soloOff : teamOff;
   const canStart = !offline && !busy && !modeOff && (mode === 'solo' ? micUsers.length >= 2 : method === 'random' ? !!draft && !draftStale : manual.red.length >= config.teamMin && manual.blue.length >= config.teamMin);
-  // Cross-room PK has no server side yet (the rival room's answer and gifts are simulated): only in the demo.
-  const crossOn = !live;
   const paddingBottom = useSheetBottom(16);
 
   return (
@@ -148,20 +153,19 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               <Ionicons name="close" size={22} color={colors.textDim} />
             </Pressable>
           </View>
-          {crossOn && (
-            <View style={st.seg} accessibilityRole="tablist">
-              {(
-                [
-                  ['room', 'Bu oda'],
-                  ['cross', 'Odalar arası'],
-                ] as const
-              ).map(([k, l]) => (
-                <Pressable key={k} onPress={() => setTab(k)} style={[st.segBtn, tab === k && st.segOn]} accessibilityRole="tab" aria-selected={tab === k}>
-                  <Text style={[st.segText, tab === k && { color: semantic.actionInk }]}>{l}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
+          {/* Odalar arası: live mode runs it on the server (server/api/pk-cross.mjs); the demo simulates the rival room. */}
+          <View style={st.seg} accessibilityRole="tablist">
+            {(
+              [
+                ['room', 'Bu oda'],
+                ['cross', 'Odalar arası'],
+              ] as const
+            ).map(([k, l]) => (
+              <Pressable key={k} onPress={() => setTab(k)} style={[st.segBtn, tab === k && st.segOn]} accessibilityRole="tab" aria-selected={tab === k}>
+                <Text style={[st.segText, tab === k && { color: semantic.actionInk }]}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
           <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
             {offline && <Notice icon="cloud-offline-outline" text="Bağlantı yok. PK başlatmak için bağlantının dönmesini bekle." warn />}
             {tab === 'room' && (
@@ -272,9 +276,11 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
               </>
             )}
 
-            {crossOn && tab === 'cross' && (
+            {tab === 'cross' && (
               <>
                 <TextInput value={query} onChangeText={setQuery} placeholder="Oda ID’si veya adı ara" placeholderTextColor={colors.textDim} style={st.input} />
+                {live && serverRooms.rooms === null && <Text style={st.dim}>{serverRooms.failed ? 'Odalar okunamadı. Bağlantını kontrol edip sekmeyi yeniden aç.' : 'Odalar yükleniyor…'}</Text>}
+                {live && serverRooms.rooms?.length === 0 && <Text style={st.dim}>{query.trim() ? 'Bu ID veya adla davet edilebilecek açık oda yok.' : 'Şu an davet edilebilecek açık oda yok.'}</Text>}
                 {rooms.map((r) => (
                   <View key={r.id} style={st.member}>
                     <Photo uri={r.cover} kind="cover" seed={r.id} style={[st.av, { borderRadius: 10 }]} />
@@ -283,10 +289,10 @@ export function PkSetupSheet({ visible, roomId, starterId, micUsers, offline, on
                         {r.title}
                       </Text>
                       <Text style={st.dim}>
-                        ID {r.id} · {r.listeners} kişi · Lv.{r.level ?? 1}
+                        ID {live ? roomCode(r.id) : r.id} · {r.listeners} kişi · Lv.{r.level ?? 1}
                       </Text>
                     </View>
-                    <Pressable style={[st.invite, (offline || !config.crossPkEnabled) && st.disabled]} disabled={offline || !config.crossPkEnabled} onPress={() => invite(r.id)} accessibilityLabel={`${r.title} odasını PK’ya davet et`}>
+                    <Pressable style={[st.invite, (offline || busy || !config.crossPkEnabled) && st.disabled]} disabled={offline || busy || !config.crossPkEnabled} onPress={() => void invite(r.id)} accessibilityLabel={`${r.title} odasını PK’ya davet et`}>
                       <Text style={st.inviteText}>Davet et</Text>
                     </Pressable>
                   </View>
@@ -646,6 +652,11 @@ export function PkDetail({ pk, open, onClose, viewerRoomId, canManage }: { pk: P
                   void cancelLivePk(pk.roomId).then((r) => {
                     if (!r.ok) showAlert('PK iptal edilemedi', r.reason);
                   });
+                // A server cross-room PK: either room's staff end it, for both rooms.
+                else if (pk.id.startsWith('XPK-'))
+                  void endLiveCrossPk(viewerRoomId).then((r) => {
+                    if (!r.ok) showAlert('PK iptal edilemedi', r.reason);
+                  });
                 else cancelPk(pk.id, 'Oda yönetimi PK’yı iptal etti');
                 onClose();
               }}
@@ -657,6 +668,36 @@ export function PkDetail({ pk, open, onClose, viewerRoomId, canManage }: { pk: P
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+/**
+ * Odalar arası PK invite to this room, for its owner and admins (live mode): who invites, how long, the time left to
+ * answer. Gone when the time is up (the server then refuses an answer anyway).
+ */
+export function CrossPkInvitePrompt({ invite, busy, onAnswer }: { invite: IncomingCrossPk; busy: boolean; onAnswer: (accept: boolean) => void }) {
+  const now = useNow(true);
+  const left = Math.max(0, Math.ceil((invite.expiresAt - now) / 1000));
+  const from = roomById(invite.fromRoomId);
+  if (left <= 0) return null;
+  return (
+    <View style={st.prompt} accessibilityLiveRegion="polite" accessibilityLabel={`${roomTitle(invite.fromRoomId)} odası seni ${invite.durationMin} dakikalık PK’ya davet ediyor`}>
+      {from.cover ? <Photo uri={from.cover} kind="cover" seed={from.id} style={[st.av, { borderRadius: 10 }]} /> : <Art name="pk-takim-pk" size={34} />}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={st.memberName} numberOfLines={2}>
+          {roomTitle(invite.fromRoomId)} odanı PK’ya davet ediyor
+        </Text>
+        <Text style={st.dim}>
+          Odalar arası PK · {invite.durationMin} dk · {left} sn
+        </Text>
+      </View>
+      <Pressable style={[st.decline, busy && st.disabled]} disabled={busy} onPress={() => onAnswer(false)} accessibilityLabel="PK davetini reddet">
+        <Text style={st.declineText}>Reddet</Text>
+      </Pressable>
+      <Pressable style={[st.accept, busy && st.disabled]} disabled={busy} onPress={() => onAnswer(true)} accessibilityLabel="PK davetini kabul et">
+        <Text style={st.acceptText}>Kabul</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -732,4 +773,9 @@ const st = StyleSheet.create({
   card: { width: '100%', maxWidth: 420, backgroundColor: colors.card, borderRadius: 22, padding: 18, gap: 10, borderWidth: 1, borderColor: colors.border },
   danger: { backgroundColor: 'rgba(217,58,69,0.18)', borderRadius: 999, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.red },
   dangerText: { color: '#FF7A82', fontWeight: '900' },
+  prompt: { position: 'absolute', left: 12, right: 12, top: 96, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card, borderRadius: 16, padding: 10, borderWidth: 1, borderColor: colors.gold },
+  decline: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 9 },
+  declineText: { color: colors.text, fontWeight: '800', fontSize: 13 },
+  accept: { backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  acceptText: { color: semantic.actionInk, fontWeight: '900', fontSize: 13 },
 });

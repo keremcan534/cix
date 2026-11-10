@@ -47,6 +47,8 @@ export const NOT_EXPORTED = {
   bd_ledger: 'an agency’s own records',
   room_pks: 'a room’s match record; the gifts in it are in gift_events',
   room_pk_gifts: 'the same gifts as gift_events',
+  room_cross_pks: 'two rooms’ match record; the gifts in it are in gift_events',
+  room_cross_pk_gifts: 'the same gifts as gift_events',
   match_queue: 'kept for seconds while waiting for a match',
   room_mic_queue: 'kept while waiting for a seat in a room',
   room_music_queue: 'kept while a track waits to play',

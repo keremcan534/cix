@@ -40,6 +40,8 @@ import { statusOf } from './economy.mjs';
 import { clearRoomMusic, roomMusic } from './music.mjs';
 // room-social.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { withRoomBadges } from './room-social.mjs';
+// pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { endCrossPkOfRoom } from './pk-cross.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -381,6 +383,8 @@ export const roomRoutes = {
     const room = await roomRow((await readJson(req)).id);
     if (room.owner !== me.id) throw new HttpError(403, 'Odayı yalnızca sahibi kapatabilir');
     await db.query('UPDATE rooms SET closed_at = now() WHERE id = $1 AND closed_at IS NULL', [room.id]);
+    // An Odalar arası PK with this room ends, and the other room hears it (pk-cross.mjs).
+    await endCrossPkOfRoom(room.id);
     // Everyone still in the call leaves now, not when their token runs out.
     await deleteVoiceRoom(liveKitName(room.id));
     return { closed: true };

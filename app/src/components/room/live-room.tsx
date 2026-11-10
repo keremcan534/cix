@@ -63,7 +63,7 @@ import { giftShowOf } from '@/data/gift-shows';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import type { CasinoGame } from '@/data/games';
 import { ChatLine, GiftAnimation, MicBtn, REACTION_MS, RoomSoundBtn, RoundBtn, Seat, type ChatMsg, type RoomRole, type SeatReactionData } from '@/components/room/parts';
-import { PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
+import { CrossPkInvitePrompt, PkBoard, PkSetupSheet, SoloBoard, TeamArena, type ArenaSlot } from '@/components/room/pk';
 import { CrownScreen, PkResultScreen } from '@/components/room/pk-result';
 import { BalconyBar, MicInvitePrompt, ParticipantsSheet, type ParticipantActions } from '@/components/room/balcony';
 import { SessionBanner, SessionTestSheet, closeRoomScreen } from '@/components/room/session-ui';
@@ -89,7 +89,8 @@ import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, messag
 import { liveBackpackGift } from '@/lib/live/backpack';
 import { useLiveRoomSync } from '@/lib/live/room';
 import { onServerRoom, sendSignal, useLivePeers, type LuckySignal, type RoomSignal } from '@/lib/live/room-bus';
-import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
+import { answerLiveCrossPk, refreshRoomPkSoon, useIncomingCrossPk, useRoomPkSync } from '@/lib/live/pk';
+import { useOwnerStats } from '@/lib/live/owner-stats';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
 import { roomMusicAction, type MusicAction } from '@/lib/live/music';
@@ -618,6 +619,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const [ownerFamily, setOwnerFamily] = useState<{ id: string; name: string } | null>(null);
   const hostServerId = real ? toServer(hostId) : null;
   const infoOpen = panel === 'info';
+  // Oda Sahibi Merkezi of a server room I own: the server's numbers, read while the card is open.
+  const ownerStats = useOwnerStats(id, real && hostId === 'me' && infoOpen);
   useEffect(() => {
     if (!infoOpen || !hostServerId) return;
     let on = true;
@@ -934,6 +937,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   });
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
+  // Odalar arası PK: another room's invite waits for this room's owner or an admin to answer (lib/live/pk).
+  const incomingPk = useIncomingCrossPk(id);
+  const [pkAnswering, setPkAnswering] = useState(false);
+  const answerIncomingPk = (accept: boolean) => {
+    if (!incomingPk || pkAnswering || offlineBlocked()) return;
+    setPkAnswering(true);
+    void answerLiveCrossPk(id, incomingPk.id, accept).then((r) => {
+      setPkAnswering(false);
+      if (!r.ok) showAlert(accept ? 'PK başlatılamadı' : 'Davet yanıtlanamadı', r.reason);
+    });
+  };
   // Şanslı çanta in a server room (lib/live/lucky-bags): the room's open bags; a new one gets a line in the chat.
   // A bag dropped while I'm in the room (not one that was already there) also gets its show (LuckyBagRain).
   // A bag falls for everyone in the room from the moment it opens until its draw (LuckyBagRain); a tap joins the
@@ -3431,8 +3445,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         cover={cover}
         theme={theme}
         level={level}
-        xp={isOwn ? myRoom.xp : null}
-        owner={isOwn}
+        xp={isOwn ? myRoom.xp : real ? (ownerStats?.xp ?? base!.xp ?? null) : null}
+        // A server room's owner too (the server knows them: the room's owner id is mine).
+        owner={isOwn || (real && hostId === 'me')}
+        ownerStats={real && hostId === 'me' ? ownerStats : undefined}
         clan={clan}
         members={roomMembers}
         memberTotal={memberTotal}
@@ -3777,6 +3793,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       )}
       {showCrowns && pkEnded && <CrownScreen pk={pkEnded} still={settings.reduceMotion || settings.effectsOff} onClose={() => markPkSeen(`${pkEnded.id}:crowns`)} onProfile={openProfileFromPk} />}
       {full && myInvite && !offline && <MicInvitePrompt key={myInvite.id} invite={myInvite} onAnswer={answerMyInvite} />}
+      {full && real && canManage && incomingPk && !myInvite && !offline && <CrossPkInvitePrompt key={incomingPk.id} invite={incomingPk} busy={pkAnswering} onAnswer={answerIncomingPk} />}
       {session && <SessionTestSheet visible={panel === 'session'} session={session} onClose={closePanel} onKickMe={kickMeTest} />}
       <SeatMenu anchor={seatMenu?.anchor ?? null} title={seatMenu?.title} items={seatMenu?.items ?? []} onClose={() => setSeatMenu(null)} />
       {person && (

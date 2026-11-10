@@ -146,6 +146,11 @@ export async function eraseAccount(c, id, phone) {
     await c.query('UPDATE room_polls SET closed_by = NULL WHERE closed_by = $1', [id]);
     await c.query('DELETE FROM room_polls WHERE creator = $1', [id]);
     await c.query('DELETE FROM room_follower_invites WHERE owner_id = $1 OR sent_by = $1', [id]);
+    // Odalar arası PK (pk-cross.mjs): the match stays the rooms' record without who invited, answered or ended it;
+    // an open one of their room ends when the room closes just below.
+    await c.query('UPDATE room_cross_pks SET invited_by = NULL WHERE invited_by = $1', [id]);
+    await c.query('UPDATE room_cross_pks SET answered_by = NULL WHERE answered_by = $1', [id]);
+    await c.query('UPDATE room_cross_pks SET ended_by = NULL WHERE ended_by = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
     // Destek: their tickets and threads (the photos go with removeUserFiles); the data copy's date; the spending limit.
     await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);

@@ -59,6 +59,7 @@ import { callLogRoutes } from './call-log.mjs';
 import { privacyRoutes } from './privacy.mjs';
 import { purchaseRoutes } from './purchases.mjs';
 import { pkRoutes } from './pk.mjs';
+import { crossPkRoutes } from './pk-cross.mjs';
 import { profileRoutes } from './profiles.mjs';
 import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
@@ -72,6 +73,7 @@ import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { roomSocialRoutes } from './room-social.mjs';
+import { roomOwnerRoutes } from './room-owner.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, openLine } from './live-line.mjs';
@@ -235,6 +237,7 @@ const routes = {
   ...giftRoutes,
   ...backpackRoutes,
   ...pkRoutes,
+  ...crossPkRoutes,
   ...bondRoutes,
   ...wheelRoutes,
   ...luckyRoutes,
@@ -259,6 +262,7 @@ const routes = {
   ...roomFxRoutes,
   ...roomEventRoutes,
   ...roomSocialRoutes,
+  ...roomOwnerRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,
