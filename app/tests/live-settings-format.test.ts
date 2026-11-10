@@ -79,6 +79,8 @@ describe('the second confirmation', () => {
     for (const k of ['dm_price', 'call_voice_price', 'call_video_price', 'call_plain_voice_price', 'call_plain_video_price', 'match_voice_price', 'match_video_price'] as LiveKey[])
       for (const a of [0, 100, 119, 120, 240, 480, 481, 2000, null]) cases.push([k, 240, a]);
     for (const k of ['call_free', 'call_free_seconds', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'] as LiveKey[]) cases.push([k, 3, 20], [k, 3, 0], [k, 3, null]);
+    for (const k of ['welcome_coins', 'invite_coins', 'invite_daily_cap'] as LiveKey[]) for (const a of [10, 100, 200, 201, 400, 401, 1000, null]) cases.push([k, 200, a]);
+    cases.push(['rewards_off', [], ['welcome', 'invite', 'first_purchase']], ['rewards_off', ['invite'], null]);
     for (const [k, b, a] of cases) assert.equal(bigChange(k, b, a), isBig(k, b, a), `${k}: ${JSON.stringify(b)} → ${JSON.stringify(a)}`);
   });
 

@@ -844,6 +844,23 @@ export const spendLimit = () => call<ServerSpendLimit>('GET', '/api/me/spend-lim
 /** 0 lifts it. Lower applies now; higher (or 0) after `raiseHours`. */
 export const setSpendLimit = (limit: number) => call<ServerSpendLimit & { applied: 'now' | 'later' }>('POST', '/api/me/spend-limit', { limit });
 
+// Yeni üye ödülleri (server/api/referrals.mjs): the welcome coins I got at sign-up (0: none), the packs whose
+// first-purchase gift is still mine, and Arkadaşını Getir: my code, the code I entered, what my invites brought.
+export type ServerRewards = {
+  welcome: { coins: number; on: boolean; amount: number };
+  firstBonus: { on: boolean; packs: { productId: string; bonus: number }[] };
+  invite: { on: boolean; coins: number; canEnter: boolean };
+};
+export const myRewards = () => call<ServerRewards>('GET', '/api/rewards');
+/** pending: waiting for the friend's first room; refused: no reward (device: their phone had another account). */
+export type InviteStatus = 'pending' | 'paid' | 'refused' | 'revoked';
+export type MyInvite = { by: { id: string; name: string } | null; status: InviteStatus | null; reason: 'device' | 'blocked' | 'staff' | null; coins: number; canEnter: boolean; enterUntil: string };
+export type InviteStats = { invited: number; rewarded: number; waiting: number; earned: number };
+export type ServerInvite = { code: string; on: boolean; coins: number; dailyCap: number; enterDays: number; stats: InviteStats; mine: MyInvite };
+export const myInvite = () => call<ServerInvite>('GET', '/api/invite');
+/** 404 unknown code; 409 with data.code already | invite_off | too_late | newer | device. */
+export const redeemInvite = (code: string) => call<{ mine: MyInvite }>('POST', '/api/invite/redeem', { code }).then((r) => r.mine);
+
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
 /** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
@@ -883,7 +900,10 @@ export type LiveKey =
   | 'withdraw_max_diamonds'
   | 'withdraw_weekly_diamonds'
   | 'otp_global_per_hour'
-  | OneOnOneKey;
+  | OneOnOneKey
+  | RewardKey;
+/** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
+export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

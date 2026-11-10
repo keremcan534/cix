@@ -36,6 +36,15 @@ export function AccountSheet({ id, name, onClose }: { id: string; name: string; 
           () => `${name} ${banPhrase(days)}`,
         ),
     });
+  // A fake account that came with an invite code: the invite coins go back from both people.
+  const revokeInvite = () =>
+    confirmThen(
+      ctx,
+      { title: 'Davet ödülünü geri al', message: `${name} ve onu davet eden kişiden davet jetonlarının harcanmamış kısmı geri alınır.`, confirm: 'Geri al', destructive: true },
+      () => admin.revokeReferral(id, 'Sahte hesap'),
+      (r) => `Davet jetonu geri alındı: ${fmtNum(r.coins.invitee + r.coins.inviter)}`,
+      load.reload,
+    );
   const lift = () =>
     confirmThen(
       ctx,
@@ -100,6 +109,7 @@ export function AccountSheet({ id, name, onClose }: { id: string; name: string; 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
           <Button title="Askıya al" icon="ban-outline" variant="danger" small onPress={suspend} />
           <Button title="Askıyı kaldır" icon="lock-open-outline" variant="ghost" small onPress={lift} />
+          {d && admin.paidAsInvitee(d) && <Button title="Davet ödülünü geri al" icon="arrow-undo-outline" variant="ghost" small onPress={revokeInvite} />}
           <Button title="Kapat" variant="ghost" small onPress={onClose} style={{ marginLeft: 'auto' }} />
         </View>
       </ScrollView>

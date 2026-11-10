@@ -60,10 +60,16 @@ describe('Canlı sürümde demo ekranları', () => {
   });
 
   test('örnek veriyle dolu ekranlar canlıda "yakında" gösterir', () => {
-    for (const route of ['davet', 'coins-bank']) {
+    for (const route of ['coins-bank']) {
       const src = readFileSync(join(APP, `${route}.tsx`), 'utf8');
       assert.match(src, /liveMode\(\)[^\n]*<ComingSoon /, `${route}: canlıda ComingSoon yok`);
     }
+  });
+
+  // Arkadaşını Getir is on the server (server/api/referrals.mjs, lib/live/rewards).
+  test('Arkadaşını Getir canlıda sunucudan', () => {
+    assert.match(readFileSync(join(APP, 'davet.tsx'), 'utf8'), /liveMode\(\) \? <LiveInvite \/> : <DemoInvite \/>/);
+    assert.match(readFileSync(join(APP, '../components/invite-live.tsx'), 'utf8'), /from '@\/lib\/live\/rewards'/);
   });
 
   // Aile is on the server (lib/live/family): its list, my family, the family chat, Görevler and Uyum Köşesi show
