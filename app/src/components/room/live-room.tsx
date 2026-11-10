@@ -74,6 +74,7 @@ import { LayoutPickerSheet } from '@/components/room/layout-picker';
 import { RoomScreen } from '@/components/room/room-screen';
 import { StageBackdrop } from '@/components/room/stage-backdrop';
 import { StageLayout } from '@/components/room/stage-layout';
+import { FitStage } from '@/components/room/fit-stage';
 import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
@@ -147,6 +148,7 @@ import { errorHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
+import { fitGrid, fitLayout, layoutPlan, type Fitted } from '@/lib/seat-fit';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
@@ -2480,6 +2482,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const music$ = {
     toggle: () => (real ? liveMusicAct({ action: nowMusic?.paused ? 'resume' : 'pause' }) : setMusic((m) => ({ ...m, playing: !m.playing }))),
     next: () => (real ? liveMusicAct({ action: 'skip' }) : setMusic((m) => ({ queue: m.queue.slice(1), playing: m.queue.length > 1, position: 0 }))),
+    // Kapat: the music stops for everyone and the bar goes.
+    close: () => (real ? liveMusicAct({ action: 'clear' }) : setMusic({ queue: [], playing: false, position: 0 })),
     add: (t: Track) => {
       setMusic((m) => ({ ...m, queue: [...m.queue, t], playing: m.queue.length === 0 ? true : m.playing }));
       addMsg({ system: true, text: `🎵 Sıraya eklendi: ${t.title}` });
@@ -2848,15 +2852,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // A team PK keeps its arena (the teams need their sides).
   const [seatsSmall, setSeatsSmall] = useState(() => isLargeChat(getChatShare()));
   const strip = seatsSmall && !teamPk;
-  // Classic mics are sized by how many there are: the fewer, the bigger. Up to 3 guest mics go three to a row,
-  // up to 8 four, more five; each takes an equal share of the row and its avatar fills it, up to a size that
-  // shrinks as the mics grow in number (few mics: big, sharp faces; many: all of them still fit).
-  const guestMics = allSeats.length - 1;
-  const seatCols = guestMics <= 3 ? 3 : guestMics <= 8 ? 4 : 5;
-  const seatCap = guestMics <= 4 ? 84 : guestMics <= 8 ? 70 : guestMics <= 12 ? 58 : 50;
-  const seatW = Math.floor((Math.min(win.width, 640) - 16) / seatCols);
-  const gridSlot: ArenaSlot = { width: seatW, size: Math.max(34, Math.min(seatCap, seatW - 20)) };
-  const small = gridSlot.size < 46;
+  // The stage doesn't scroll (components/room/fit-stage): its mics are as big as the height the chat leaves them
+  // allows (lib/seat-fit). Few mics: big faces; many: smaller ones, and all of them still fit. A chosen layout keeps
+  // its rows; the classic grid also picks how many mics go to a row. The mic strip and a team PK keep their sizes.
+  const fitOpts = { boss: bossOn, pk: !!pk && pk.status !== 'invite' };
+  const plan = layout ? layoutPlan(layout.layoutSchema, win.width, theme === 'pk') : null;
+  const stageFit = strip || teamPk ? null : layout && plan ? (h: number) => fitLayout(layout.layoutSchema, plan, h, fitOpts) : (h: number) => fitGrid(allSeats.length - 1, win.width, h, fitOpts);
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
@@ -2871,7 +2872,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         index={i}
         userId={uid}
         host={extra?.slot ? false : (extra?.host ?? i === 0)}
-        small={small}
         vipLevel={uid === 'me' ? vipLevel : (uid ? (lookFor(uid)?.vipLevel ?? 0) : 0)}
         frameId={uid === 'me' ? equipped.frame : uid ? (lookFor(uid)?.frame ?? undefined) : undefined}
         speaking={!!uid && speaking.has(uid)}
@@ -2896,6 +2896,49 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       />
     );
   };
+
+  /** The stage's mics, drawn with the sizes FitStage gives them (`f`: null for the strip and a team PK). */
+  const stageSeats = (f: Fitted | null) =>
+    teamPk ? (
+      <>
+        {bossOn && (
+          <View style={[styles.topRow, { marginTop: 6 }]}>
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+          </View>
+        )}
+        <TeamArena pk={teamPk} seats={allSeats} boss={bossId} width={win.width} canManage={canManage && !offline} renderSeat={(i, slot) => renderSeat(i, { slot })} />
+      </>
+    ) : strip || !f ? (
+      <View style={styles.micStrip}>
+        {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} />}
+        {allSeats.map((_, i) => renderSeat(i, { host: i === 0, grid: stripSlot, mini: true }))}
+      </View>
+    ) : layout ? (
+      <>
+        {bossOn && (
+          <View style={[styles.topRow, { marginTop: 6 }]}>
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+          </View>
+        )}
+        <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
+      </>
+    ) : (
+      <View style={styles.seatGrid}>
+        {/* Seat 0 has a row of its own (beside the Dümen seat when there is one), a little bigger than the rest. */}
+        {bossOn ? (
+          <View style={styles.topRow}>
+            {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+          </View>
+        ) : (
+          <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
+        )}
+        {/* The others wrap `f.cols` to a row (equal widths, no gap). */}
+        {allSeats.map((_, i) =>
+          i === 0 ? null : renderSeat(i, { grid: { width: f.slot, size: f.face }, next: i + 1 < allSeats.length && (i - 1) % f.cols !== f.cols - 1 ? { index: i + 1, gap: 0 } : undefined }),
+        )}
+      </View>
+    );
 
   // The game keeps running while the room is minimized, so it is the one piece rendered in both states.
   // Same root View and a fixed key in both returns, so React keeps the game's state across the switch.
@@ -2985,127 +3028,99 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             </Pressable>
           </View>
 
-          {/* Stage: boards and mics, as tall as they are; the chat below takes the rest (at least the height the person
-              chose), so no empty band opens between the mics and the Balkon. When the stage needs more than the chat
-              leaves it scrolls, and it gives way first (the large shrink), so the chat keeps its chosen height. While
-              typing the mics stay in view: the stage keeps its height and only the chat gives way to the keyboard. */}
-          <ScrollView style={typing || strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }} onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
-            {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onNext={music$.next} />}
-            {session && <SessionBanner session={session} />}
-            {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
-            {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage && !offline} />}
-            {pk?.kind === 'room' && pk.mode === 'team' && pk.status === 'invite' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
-            {callActive && (
-              <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
-                <Ionicons name="call" size={16} color={semantic.successInk} />
-                <Text style={styles.callBannerText} numberOfLines={1}>
-                  {media.call?.kind === 'match' ? 'Hemen Tanış' : 'Bire bir'} görüşmedesin · odada dinleyicisin
-                </Text>
-                <Text style={styles.callBannerGo}>Dön</Text>
-              </Pressable>
-            )}
-            {settings.roomMuted && (
-              <View style={styles.mutedRow}>
-                <ArtText art={ROOM_ICON_ART.soundOff} size={18} style={styles.mutedChip}>
-                  Oda sesi senin için kapalı · Ses ayarlarından açabilirsin
-                </ArtText>
-              </View>
-            )}
-            {myQueuePos !== null && (
-              <View style={[styles.queueChipRow, { backgroundColor: 'rgba(19,217,223,0.35)' }]}>
-                <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={18} />
-                <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
-              </View>
-            )}
-            {roomType === 'event' && shownEvents.filter((e) => !e.cancelled)[0] && (
-              <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
-                <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
-                  📅 {shownEvents.filter((e) => !e.cancelled)[0].title} · {shownEvents.filter((e) => !e.cancelled)[0].when}
-                </Text>
-                <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{shownEvents.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
-              </Pressable>
-            )}
-            {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
-            {poll && (
-              <PollCard
-                poll={poll}
-                canManage={myRole !== 'member'}
-                onVote={(i) => setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p))}
-                onClose={() => {
-                  setPoll((p) => (p ? { ...p, closed: true, endsIn: 0 } : p));
-                  logMod('Anketi kapattı', poll.question);
-                }}
-              />
-            )}
-            {goal && <GoalCard goal={goal} />}
-
-            {layout?.layoutSchema.content && (
-              <RoomScreen
-                roomId={id}
-                playback={stage?.playback ?? null}
-                always={modeById(layout.modeId).content === 'always'}
-                canControl={canStage}
-                denyReason={stageDeny}
-                width={win.width}
-                offline={offline}
-                onChanged={(text) => addMsg({ system: true, text: `${ME.name}: ${text}` })}
-              />
-            )}
-            {teamPk ? (
+          {/* Stage: boards and mics over the Balkon bar and the chat. The stage doesn't scroll: its mics are sized for
+              the height the chat leaves them and the chat takes the rest (components/room/fit-stage). While the emoji
+              panel is open the chat steps aside and the mics take its place (the emoji plays on your mic); a touch on
+              the stage closes the panel (as does the back button). */}
+          <FitStage
+            fit={stageFit}
+            frozen={typing}
+            freeStyle={strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }}
+            guess={Math.round(win.height * 0.34)}
+            onTouchStart={emojiOpen ? () => setEmojiOpen(false) : undefined}
+            top={
               <>
-                {bossOn && (
-                  <View style={[styles.topRow, { marginTop: 6 }]}>
-                    <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+                {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onClose={music$.close} />}
+                {session && <SessionBanner session={session} />}
+                {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
+                {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage && !offline} />}
+                {pk?.kind === 'room' && pk.mode === 'team' && pk.status === 'invite' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
+                {callActive && (
+                  <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
+                    <Ionicons name="call" size={16} color={semantic.successInk} />
+                    <Text style={styles.callBannerText} numberOfLines={1}>
+                      {media.call?.kind === 'match' ? 'Hemen Tanış' : 'Bire bir'} görüşmedesin · odada dinleyicisin
+                    </Text>
+                    <Text style={styles.callBannerGo}>Dön</Text>
+                  </Pressable>
+                )}
+                {settings.roomMuted && (
+                  <View style={styles.mutedRow}>
+                    <ArtText art={ROOM_ICON_ART.soundOff} size={18} style={styles.mutedChip}>
+                      Oda sesi senin için kapalı · Ses ayarlarından açabilirsin
+                    </ArtText>
                   </View>
                 )}
-                <TeamArena pk={teamPk} seats={allSeats} boss={bossId} width={win.width} canManage={canManage && !offline} renderSeat={(i, slot) => renderSeat(i, { slot })} />
-              </>
-            ) : strip ? (
-              <View style={styles.micStrip}>
-                {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} />}
-                {allSeats.map((_, i) => renderSeat(i, { host: i === 0, grid: stripSlot, mini: true }))}
-              </View>
-            ) : layout ? (
-              <>
-                {bossOn && (
-                  <View style={[styles.topRow, { marginTop: 6 }]}>
-                    <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+                {myQueuePos !== null && (
+                  <View style={[styles.queueChipRow, { backgroundColor: 'rgba(19,217,223,0.35)' }]}>
+                    <Art name="oda-konusmaci-kuyrugu-el-kaldir" size={18} />
+                    <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
                   </View>
                 )}
-                <StageLayout layout={layout} width={win.width} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
-              </>
-            ) : (
-              <View style={styles.seatGrid}>
-                {bossOn && (
-                  <View style={styles.topRow}>
-                    {renderSeat(0, { host: true, compact: true })}
-                    <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
-                  </View>
+                {roomType === 'event' && shownEvents.filter((e) => !e.cancelled)[0] && (
+                  <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
+                    <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                      📅 {shownEvents.filter((e) => !e.cancelled)[0].title} · {shownEvents.filter((e) => !e.cancelled)[0].when}
+                    </Text>
+                    <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12 }}>{shownEvents.filter((e) => !e.cancelled)[0].going ? '✓ Katılıyorsun' : 'Katıl →'}</Text>
+                  </Pressable>
                 )}
-                {/* Seat 0 has its own row; the others wrap `seatCols` to a row (equal widths, no gap). */}
-                {allSeats.map((_, i) =>
-                  bossOn && i === 0
-                    ? null
-                    : i === 0
-                      ? renderSeat(0)
-                      : renderSeat(i, { grid: gridSlot, next: i + 1 < allSeats.length && (i - 1) % seatCols !== seatCols - 1 ? { index: i + 1, gap: 0 } : undefined }),
+                {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
+                {poll && (
+                  <PollCard
+                    poll={poll}
+                    canManage={myRole !== 'member'}
+                    onVote={(i) => setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p))}
+                    onClose={() => {
+                      setPoll((p) => (p ? { ...p, closed: true, endsIn: 0 } : p));
+                      logMod('Anketi kapattı', poll.question);
+                    }}
+                  />
                 )}
-              </View>
-            )}
-          </ScrollView>
-          {!typing && (
-            <BalconyBar
-              view={view}
-              stale={offline}
-              onOpen={() => {
-                setInviteSeat(null);
-                setPeopleOpen(true);
-              }}
-            />
-          )}
+                {goal && <GoalCard goal={goal} />}
 
-          {/* A touch on the stage or the chat closes the emoji panel (as does the back button). */}
-          <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
+                {layout?.layoutSchema.content && (
+                  <RoomScreen
+                    roomId={id}
+                    playback={stage?.playback ?? null}
+                    always={modeById(layout.modeId).content === 'always'}
+                    canControl={canStage}
+                    denyReason={stageDeny}
+                    width={win.width}
+                    offline={offline}
+                    onChanged={(text) => addMsg({ system: true, text: `${ME.name}: ${text}` })}
+                  />
+                )}
+              </>
+            }
+            seats={stageSeats}
+            balcony={
+              !typing && (
+                <BalconyBar
+                  view={view}
+                  stale={offline}
+                  onOpen={() => {
+                    setInviteSeat(null);
+                    setPeopleOpen(true);
+                  }}
+                />
+              )
+            }
+            chat={(onBasis) => (
+              <ChatFeed messages={messages} visible={visibleInAll} renderItem={renderChat} screenHeight={win.height} fill={typing} onLarge={setSeatsSmall} onBasis={onBasis} hidden={emojiOpen && !typing} onTouch={emojiOpen ? () => setEmojiOpen(false) : undefined} sideRoom={wheelShown ? WHEEL_ROOM : 0} />
+            )}
+            chatHidden={emojiOpen && !typing}
+          />
           {mentionNote && (
             <View key={mentionNote.n} style={styles.mentionNote} pointerEvents="none" accessibilityLiveRegion="polite">
               <Text style={styles.mentionNoteAt}>@</Text>
@@ -3729,6 +3744,7 @@ const styles = StyleSheet.create({
   topRow: { width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28 },
   topAvatar: { borderWidth: 2, borderRadius: 14 },
   seatGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 8, paddingTop: 8, rowGap: 10 },
+  hostRow: { width: '100%', alignItems: 'center' },
   // Küçült: the mics as one short strip (ten to a row, from the left), the chat takes the rest.
   micStrip: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 2, rowGap: 6 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8 },

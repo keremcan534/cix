@@ -36,7 +36,9 @@ export function ChatFeed({
   screenHeight,
   fill,
   onLarge,
+  onBasis,
   onTouch,
+  hidden,
   sideRoom = 0,
 }: {
   messages: FeedMsg[];
@@ -49,8 +51,12 @@ export function ChatFeed({
   fill: boolean;
   /** The chat became large (the mics go small) or back to normal. */
   onLarge?: (large: boolean) => void;
+  /** The height the person chose for the chat (px), also while dragging: the room's stage leaves it that much. */
+  onBasis?: (px: number) => void;
   /** Any touch on the chat (it is not taken from the list: scrolling still works). */
   onTouch?: () => void;
+  /** Out of sight but kept (its tab and messages stay): the emoji panel is open and the room's mics take its place. */
+  hidden?: boolean;
   /** Room kept free on the right for a floating button over the chat, so no message runs under it. */
   sideRoom?: number;
 }) {
@@ -59,9 +65,16 @@ export function ChatFeed({
   // Large (Küçült): the chat grows into whatever the mic strip leaves; otherwise it keeps its chosen height.
   const [large, setLarge] = useState(() => isLargeChat(height.share));
   const told = useRef(onLarge);
+  const toldBasis = useRef(onBasis);
   useEffect(() => {
     told.current = onLarge;
+    toldBasis.current = onBasis;
   });
+  useEffect(() => {
+    toldBasis.current?.(height.share * height.screenHeight);
+    const id = height.value.addListener(({ value }) => toldBasis.current?.(value));
+    return () => height.value.removeListener(id);
+  }, [height]);
   useEffect(() => {
     const f = () => {
       const l = isLargeChat(height.share);
@@ -80,7 +93,7 @@ export function ChatFeed({
     [messages, visible],
   );
   return (
-    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { flexBasis: height.value, flexGrow: 1, flexShrink: 1, minHeight: 96 }]}>
+    <Animated.View onTouchStart={onTouch} style={[{ marginHorizontal: 12 }, fill ? s.typing : large ? s.grow : { flexBasis: height.value, flexGrow: 1, flexShrink: 1, minHeight: 96 }, hidden && { display: 'none' }]}>
       {!fill && (
         <View>
           <Handle height={height} />

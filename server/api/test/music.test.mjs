@@ -164,6 +164,36 @@ describe('DJ ve oda müziği', () => {
     assert.deepEqual(m, { tracks: [], startedAt: null, pausedAt: null });
   });
 
+  test('Çal: parça hemen baştan çalar, çalanın yerine geçer; Kapat (clear) susturur', async () => {
+    const owner = await signUp('Çal Sahibi');
+    const dj = await signUp('Çal Dj');
+    const member = await signUp('Çal Dinleyici');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Çal ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    await ok(call('POST', '/api/rooms/dj', { room, user: dj.user.id, dj: true }, owner.session), 'dj');
+    const a = await addTrack(owner, 'Sabah', 200);
+    const b = await addTrack(dj, 'Akşam', 200);
+    const play = (who, body) => call('POST', '/api/rooms/music', { room, ...body }, who.session);
+    assert.equal(await status(play(member, { action: 'play', track: a.id })), 403, 'dinleyici çalamaz');
+    assert.equal(await status(play(owner, { action: 'play', track: b.id })), 404, 'başkasının parçası');
+
+    let m = (await ok(play(owner, { action: 'play', track: a.id }), 'çal')).music;
+    assert.deepEqual(m.tracks.map((t) => t.title), ['Sabah']);
+    assert.ok(Math.abs(m.startedAt - Date.now()) < 5000 && m.pausedAt === null);
+    // Paused half way, then another track is played: it starts now, from the start, and nothing waits after it.
+    await h.sql.query("UPDATE rooms SET music_started_at = now() - interval '90 seconds' WHERE id = $1", [room]);
+    await ok(play(owner, { action: 'pause' }), 'durdur');
+    m = (await ok(play(dj, { action: 'play', track: b.id }), 'başka çal')).music;
+    assert.deepEqual(m.tracks.map((t) => t.title), ['Akşam']);
+    assert.equal(m.tracks[0].byName, 'Çal Dj');
+    assert.equal(m.pausedAt, null, 'duraklama kalkar');
+    assert.ok(Date.now() - m.startedAt < 5000, 'baştan başlar');
+    assert.deepEqual(lastMeta(room).music.tracks.map((t) => t.title), ['Akşam'], 'odadaki telefonlar');
+
+    m = (await ok(play(owner, { action: 'clear' }), 'kapat')).music;
+    assert.deepEqual(m, { tracks: [], startedAt: null, pausedAt: null });
+    assert.deepEqual(lastMeta(room).music.tracks, [], 'çubuk herkesin ekranından kalkar');
+  });
+
   test('hesabını silen DJ’in parçaları odadan çıkar; DJ sınırları uygulamadakiyle aynı', async () => {
     const owner = await signUp('Silme Odası');
     const dj = await signUp('Giden Dj');

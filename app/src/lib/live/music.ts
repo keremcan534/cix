@@ -13,7 +13,8 @@ export type { QueueTrack, RoomMusic };
 export type LibraryTrack = { id: string; title: string; url: string; seconds: number; createdAt: string };
 /** A file the picker returned (expo-document-picker asset). */
 export type PickedAudio = { uri: string; name: string; size?: number | null; mimeType?: string | null };
-export type MusicAction = { action: 'add'; track: string } | { action: 'remove'; key: string } | { action: 'skip' | 'pause' | 'resume' | 'clear' };
+/** play: this track now, in place of what plays ("Çal"); clear: the music stops ("Kapat"); pause/resume ("Durdur"). */
+export type MusicAction = { action: 'play' | 'add'; track: string } | { action: 'remove'; key: string } | { action: 'skip' | 'pause' | 'resume' | 'clear' };
 
 /** The server's limits (music.mjs, media.mjs). */
 export const LIBRARY_MAX = 50;

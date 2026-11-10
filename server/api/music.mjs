@@ -7,8 +7,12 @@
 //   POST /api/music { title, url, seconds, size } → { track }           url: one I uploaded (media.mjs kind music)
 //   POST /api/music/remove { id }            → { removed }              also leaves every room's queue
 //   GET  /api/rooms/music?room=              → { music, canPlay, serverNow }
-//   POST /api/rooms/music { room, action: add, track } | { room, action: remove, key }
+//   POST /api/rooms/music { room, action: play|add, track } | { room, action: remove, key }
 //                         | { room, action: skip|pause|resume|clear } → { music, serverNow }   (owner, admin, DJ)
+//
+// play: the track plays now, from the start, in place of whatever played (the app's "Çal"); clear stops the music
+// and empties the queue (the app's "Kapat"); pause and resume ("Durdur"). add (a queue after the playing track) is
+// kept for older apps.
 //   POST /api/rooms/dj { room, user, dj }    → { dj }                   (owner only; DJ_LIMITS by the room's level)
 //
 // music: { tracks: [{ key, title, url, seconds, by, byName }], startedAt, pausedAt } (server ms; null: nothing
@@ -185,11 +189,20 @@ export const musicRoutes = {
     const music = await tx(async (c) => {
       const now = Date.now();
       const s = await settle(c, room.id, now);
-      if (b.action === 'add') {
+      // Only from my own library.
+      const mine = async () => {
         const id = typeof b.track === 'string' && /^\d{1,18}$/.test(b.track) ? b.track : null;
-        // Only from my own library.
         const t = id && (await c.query('SELECT id FROM music_tracks WHERE id = $1 AND owner = $2 AND removed_at IS NULL', [id, me.id])).rows[0];
         if (!t) throw new HttpError(404, 'Parça kütüphanende yok');
+        return t;
+      };
+      if (b.action === 'play') {
+        const t = await mine();
+        await c.query('DELETE FROM room_music_queue WHERE room_id = $1', [room.id]);
+        await c.query('INSERT INTO room_music_queue (room_id, track_id, added_by) VALUES ($1, $2, $3)', [room.id, t.id, me.id]);
+        await setClock(c, room.id, now, null);
+      } else if (b.action === 'add') {
+        const t = await mine();
         if (s.queue.length >= QUEUE_MAX) throw new HttpError(409, `Sırada en fazla ${QUEUE_MAX} parça olabilir`);
         await c.query('INSERT INTO room_music_queue (room_id, track_id, added_by) VALUES ($1, $2, $3)', [room.id, t.id, me.id]);
         if (!s.queue.length) await setClock(c, room.id, now, null);
