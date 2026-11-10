@@ -13,6 +13,7 @@
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
 // Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
 // and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
+// Support tickets: support.mjs. The data copy (UK GDPR access): my-data.mjs. The daily spending limit: spend-limit.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
@@ -56,6 +57,9 @@ import { pushRoutes } from './push.mjs';
 import { roomRoutes } from './rooms.mjs';
 import { sanctionRoutes, startSanctionSweep, stopSanctionSweep } from './sanctions.mjs';
 import { socialRoutes } from './social.mjs';
+import { supportRoutes } from './support.mjs';
+import { myDataRoutes } from './my-data.mjs';
+import { spendLimitRoutes } from './spend-limit.mjs';
 import { teamRoutes } from './team.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
@@ -231,6 +235,9 @@ const routes = {
   ...mediaRoutes,
   ...liveRoutes,
   ...socialRoutes,
+  ...supportRoutes,
+  ...myDataRoutes,
+  ...spendLimitRoutes,
   ...messageRoutes,
   ...oneOnOneRoutes,
   ...luckyBagRoutes,

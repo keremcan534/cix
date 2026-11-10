@@ -18,6 +18,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { IS_DEMO } from '@/lib/build';
 import { liveMode, liveTopup, message, refreshWallet, TEST_PACKS } from '@/lib/live';
 import { LEDGER_PAGE, useLiveLedger } from '@/lib/live/earnings';
+import { useServerSpendLimit } from '@/lib/live/spend-limit';
 import { coinsAddedOn, ledgerTime } from '@/lib/ledger-view';
 import { buyCoins, openShop, useShop } from '@/lib/live/billing';
 import { activeCampaign, campaignCoins, useLiveCatalog } from '@/lib/live/catalog-live';
@@ -97,6 +98,10 @@ export default function WalletScreen() {
   };
   const rows = ledger.filter((r) => r.currency === filter);
   const day = today();
+  // Live mode: today's spending and the limit as the server counts them (server/api/spend-limit.mjs).
+  const serverLimit = useServerSpendLimit();
+  const spent = live && serverLimit ? serverLimit.spentToday : spentToday;
+  const limitShown = live ? (serverLimit?.limit ?? 0) : settings.dailySpendLimit;
   const loadedToday = live ? coinsAddedOn(history.rows) : ledger.filter((r) => r.currency === 'coin' && r.amount > 0 && r.day === day).reduce((x, r) => x + r.amount, 0);
   const serverRows = history.rows.filter((r) => r.currency === filter);
 
@@ -119,8 +124,8 @@ export default function WalletScreen() {
       {tab === 'history' ? (
         <>
           <Text style={[styles.note, { marginBottom: 8 }]}>
-            Bugün: 🪙 {spentToday.toLocaleString('tr-TR')} harcandı · 🪙 {loadedToday.toLocaleString('tr-TR')} eklendi
-            {settings.dailySpendLimit ? ` · Limit ${settings.dailySpendLimit.toLocaleString('tr-TR')}` : ''}
+            Bugün: 🪙 {spent.toLocaleString('tr-TR')} harcandı · 🪙 {loadedToday.toLocaleString('tr-TR')} eklendi
+            {limitShown ? ` · Limit ${limitShown.toLocaleString('tr-TR')}` : ''}
           </Text>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 }}>
             {(

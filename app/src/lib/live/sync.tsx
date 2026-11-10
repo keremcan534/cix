@@ -16,6 +16,7 @@ import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
 import { onLine, startLiveLine } from '@/lib/live/live-line';
 import { pollMessages } from '@/lib/live/messages';
+import { refreshSpendLimit } from '@/lib/live/spend-limit';
 import { settleWithdrawals } from '@/lib/live/withdraw';
 import { startPush } from '@/lib/push';
 import { useApp } from '@/store';
@@ -71,6 +72,8 @@ export function LiveSync() {
             .then((ids) => alive && appRef.current.takeServerSocial({ blocked: ids }))
             .catch(() => {});
           await refreshEarnings();
+          // The daily spending limit, so the store's own check knows it before the first spend (lib/live/spend-limit).
+          void refreshSpendLimit();
         } else {
           // A rejected withdrawal gives diamonds back: known before the balance is read, so it isn't a gift.
           await settleWithdrawals().catch(() => {});

@@ -234,7 +234,7 @@ describe('Profil fotoğrafı sunucuya yüklenir', () => {
     // Small enough to look the same on a phone, well inside the server's caps (media.mjs: 5 MB, 8 MB).
     assert.deepEqual(
       Object.fromEntries(Object.entries(PHOTO_KEEP).map(([k, v]) => [k, v.side])),
-      { avatar: 640, moment: 1280, dm: 1280, notice: 1600 },
+      { avatar: 640, moment: 1280, dm: 1280, notice: 1600, ticket: 1600 },
     );
   });
 });

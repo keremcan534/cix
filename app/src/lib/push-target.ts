@@ -17,6 +17,9 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
       return '/aile';
     case 'withdrawal':
       return '/cuzdan';
+    // A staff reply on a support ticket (server/api/support.mjs): Destek › Taleplerim.
+    case 'support':
+      return '/destek?tab=talepler';
     // A call: the app opens and its incoming call card rings; a missed one shows in the notifications.
     case 'call':
       return data.missed ? '/bildirimler' : null;

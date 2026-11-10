@@ -1,7 +1,7 @@
-// The support address and the e-mails the app prepares for it. A live build has no ticket or data-export route on
-// the server yet, so support requests, data requests (UK GDPR) and help from the ban screen go out as an e-mail
-// the person sends from their own mail app (giris-3, giris-13). Pure, so the node tests load it; lib/open-mail
-// opens the mail app.
+// The support address and the e-mails the app prepares for it. Help from the ban screen goes out as an e-mail the
+// person sends from their own mail app (giris-13); support requests and data requests (UK GDPR) do too when the
+// server has no ticket or data-copy route yet (server/api/support.mjs, my-data.mjs). Pure, so the node tests load
+// it; lib/open-mail opens the mail app.
 
 export const SUPPORT_EMAIL = 'destek@similarclub.app';
 

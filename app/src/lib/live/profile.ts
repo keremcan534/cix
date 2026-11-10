@@ -111,7 +111,7 @@ export function imageType(uri: string, picked?: string | null, file?: string) {
 /** A photo the picker returned (expo-image-picker asset). */
 export type PickedImage = { uri: string; mimeType?: string | null; width?: number; height?: number };
 
-type PhotoKind = 'avatar' | 'moment' | 'dm' | 'notice';
+type PhotoKind = 'avatar' | 'moment' | 'dm' | 'notice' | 'ticket';
 /**
  * How big a photo is kept, by use: its longest side in pixels and the JPEG quality. A phone photo (about 4000 px,
  * 3–8 MB) becomes 150–300 KB at 1280 px and looks the same on a phone screen, so the storage holds 10–20 times
@@ -122,6 +122,8 @@ export const PHOTO_KEEP: Record<PhotoKind, { side: number; quality: number }> = 
   moment: { side: 1280, quality: 0.75 },
   dm: { side: 1280, quality: 0.75 },
   notice: { side: 1600, quality: 0.8 },
+  // A support ticket's evidence (a screenshot): its small print must stay readable.
+  ticket: { side: 1600, quality: 0.8 },
 };
 
 /** The resize that brings a `width`×`height` photo down to `side` on its longest side, or null when it fits. */

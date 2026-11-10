@@ -184,7 +184,7 @@ export const jetonRoutes = {
         [u.id, to, coins, paymentRef, note, ip, b.ref],
       );
       const detail = { transfer, ...(paymentRef && { paymentRef }) };
-      const parts = await spendCoins(c, u.id, coins, 'Jeton Noktası satışı', b.ref, to, { actor: u.id, detail });
+      const parts = await spendCoins(c, u.id, coins, 'Jeton Noktası satışı', b.ref, to, { actor: u.id, detail, capped: false });
       // Each portion keeps the longer lock of where the bank got it (a store purchase stays 7 days).
       const portions = parts.map((p) => ({ channel: 'jeton_noktasi', amount: p.amount, lockHours: p.lockHours, transferId: transfer, sourceLot: p.lot, sourceUser: u.id }));
       await creditCoins(c, to, portions, 'Jeton Noktası yüklemesi', `${b.ref}-in`, u.id, { actor: u.id, detail });

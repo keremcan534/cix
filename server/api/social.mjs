@@ -127,6 +127,10 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM family_invites WHERE user_id = $1', [id]);
     await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
+    // Destek: their tickets and threads (the photos go with removeUserFiles); the data copy's date; the spending limit.
+    await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM data_exports WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM spend_limits WHERE user_id = $1', [id]);
 }
 
 export const socialRoutes = {

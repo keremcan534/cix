@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'notice' | 'music' | 'ticket', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -18,7 +18,8 @@
 // deletes, a track taken out of a library, a removed notice, and every file of a deleted account (UK GDPR
 // erasure). A moment staff take down keeps its photo, as the evidence an appeal is decided on.
 // Without them uploads answer 503. 'notice' (a Similar Ekibi notice's picture, team.mjs) is for admins only;
-// 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one.
+// 'music' (a track for the room music, music.mjs) for people who have a room or run or play in one. 'ticket' (a
+// support ticket's evidence photo, support.mjs) is never deleted while its ticket holds it, whatever asks.
 import crypto from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -36,6 +37,8 @@ const KINDS = {
   // A photo in a chat (messages.mjs; who may send one is checked when the message is sent).
   dm: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   notice: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 5 * 1024 * 1024, admin: true },
+  // Evidence on a support ticket (support.mjs): a screenshot, a receipt.
+  ticket: { types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'], max: 8 * 1024 * 1024 },
   music: { types: Object.keys(AUDIO), max: 20 * 1024 * 1024, may: mayKeepMusic, refused: 'Müzik kütüphanesi oda sahibi, yönetici ve DJ’ler için' },
 };
 const EXPIRES = 10 * 60;
@@ -105,7 +108,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|notice|music)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|notice|music|ticket)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -198,6 +201,8 @@ async function deleteKeys(keys) {
   for (const key of keys) {
     // A file a moderation decision points at stays: an appeal is decided on it.
     if ((await db.query('SELECT 1 FROM moderation_evidence WHERE position($1 in content) > 0 LIMIT 1', [key])).rowCount) continue;
+    // A ticket's evidence stays while the ticket does (support.mjs deletes the ticket first when it goes).
+    if (key.startsWith('ticket/') && (await db.query('SELECT 1 FROM support_tickets t WHERE EXISTS (SELECT 1 FROM unnest(t.photos) p WHERE position($1 in p) > 0) LIMIT 1', [key])).rowCount) continue;
     const res = await fetch(signed('DELETE', key), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
     // 404: already gone, which is what was wanted.
     if (!res.ok && res.status !== 404) console.error('storage delete', res.status);
@@ -266,12 +271,12 @@ export function removeFiles(urls, owner) {
   if (keys.length && storageOn()) later('storage delete failed', () => deleteKeys(keys));
 }
 
-/** Deletes every file a deleted account uploaded (its avatars, moment and chat photos, music). A notice's
- *  picture stays: it is the company's, whoever put it up. */
+/** Deletes every file a deleted account uploaded (its avatars, moment and chat photos, music, ticket evidence). A
+ *  notice's picture stays: it is the company's, whoever put it up. */
 export function removeUserFiles(uid) {
   if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
   later('storage erase failed', async () => {
-    for (const kind of ['avatar', 'moment', 'dm', 'music']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+    for (const kind of ['avatar', 'moment', 'dm', 'music', 'ticket']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
   });
 }
 
