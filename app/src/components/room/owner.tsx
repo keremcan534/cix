@@ -11,6 +11,7 @@ import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
+import { SeatReaction, type SeatReactionData } from '@/components/room/parts';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
 import {
@@ -1134,7 +1135,23 @@ function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen:
 }
 
 // --- Boss seat ("Patron Koltuğu") ---------------------------------------------------------
-export function BossSeat({ userId, speaking, onPress, mini }: { userId: string | null; speaking: boolean; onPress: () => void; /** Küçült: a small gold ring in the mic strip (`size` its avatar, `width` its slot). */ mini?: { size: number; width: number } }) {
+export function BossSeat({
+  userId,
+  speaking,
+  onPress,
+  mini,
+  reaction,
+  still,
+}: {
+  userId: string | null;
+  speaking: boolean;
+  onPress: () => void;
+  /** Küçült: a small gold ring in the mic strip (`size` its avatar, `width` its slot). */
+  mini?: { size: number; width: number };
+  /** The holder's emoji, played over their photo like on any mic. */
+  reaction?: SeatReactionData;
+  still?: boolean;
+}) {
   const u = userId ? userById(userId) : null;
   if (mini) {
     const ring = mini.size + 6;
@@ -1148,6 +1165,7 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
               <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
             </View>
           )}
+          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={mini.size} still={still} />}
         </LinearGradient>
         <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
       </Pressable>
@@ -1163,6 +1181,7 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
+        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={62} still={still} />}
       </LinearGradient>
       <Text style={styles.bossTag}>PATRON</Text>
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>

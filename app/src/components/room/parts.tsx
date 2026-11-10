@@ -255,7 +255,7 @@ export const REACTION_MS = 2600;
  * the photo and stays on it; an animated one (Duygular) plays over and over instead of beating. A plain emoji is
  * smaller and rises as it goes.
  */
-function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
+export function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
   const id = stickerIdOf(emoji);
   const cover = !!id;
   const moving = !!id && isAnimatedSticker(id);

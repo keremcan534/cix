@@ -157,6 +157,7 @@ import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
 import { fitGrid, fitLayout, layoutPlan, type Fitted } from '@/lib/seat-fit';
+import { patronOnSeat } from '@/lib/patron-seat';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
@@ -667,7 +668,10 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const ranking = Object.entries(contrib).sort((a, b) => b[1] - a[1]);
   const topGifter = ranking.find(([uid]) => !bossRemoved.has(uid) && !kicked.has(uid));
   // A server room: the server names the holder (its top gifter of the last 24 hours), so every phone shows the same.
-  const bossId = real ? (bossOn && base!.bossId ? toLocal(base!.bossId) : null) : bossOn && topGifter && topGifter[1] >= BOSS_SEAT_MIN_COINS ? topGifter[0] : null;
+  const bossHolder = real ? (bossOn && base!.bossId ? toLocal(base!.bossId) : null) : bossOn && topGifter && topGifter[1] >= BOSS_SEAT_MIN_COINS ? topGifter[0] : null;
+  // One person, one place: the holder is drawn on the Patron seat only while in the room and on no numbered mic.
+  // On a numbered mic they are drawn there and the Patron seat waits empty for them (a tap takes them back).
+  const bossId = patronOnSeat(bossHolder, allSeats, live.members);
   // The boss seat is a speaking seat: the presence server counts its holder as on a mic (PK, lists, counts).
   useEffect(() => setBoss(id, bossId), [id, bossId]);
   const mySeat = allSeats.indexOf('me');
@@ -1182,19 +1186,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (after > before) addMsg({ system: true, text: `🎉 Oda seviyesi Lv.${after} oldu! Açılan: ${ROOM_LEVEL_REWARDS[after - 1]}` });
   };
 
-  // Announce a new boss once per change (deferred so it isn't a synchronous effect update).
+  // Announce a new holder once per change (deferred so it isn't a synchronous effect update). The mic stays as it
+  // is: winning the seat never switches anyone's mic on.
   const lastBoss = useRef<string | null>(null);
+  // When this room screen first saw the seat (set in the effect: the clock isn't read while drawing).
+  const bossSeenAt = useRef(0);
   useEffect(() => {
-    if (bossId === lastBoss.current) return;
-    lastBoss.current = bossId;
-    if (!bossId) return;
+    if (!bossSeenAt.current) bossSeenAt.current = nowMs();
+    if (bossHolder === lastBoss.current) return;
+    lastBoss.current = bossHolder;
+    if (!bossHolder) return;
     const t = setTimeout(() => {
-      addMsg({ system: true, text: `${bossId === 'me' ? ME.name : userById(bossId).name} patron koltuğuna oturdu!` });
-      if (bossId === 'me') setMicOn(true);
+      const name = bossHolder === 'me' ? ME.name : userById(bossHolder).name;
+      // Read on the way in, it is who holds the seat; later, it just changed hands.
+      addMsg({ system: true, text: nowMs() - bossSeenAt.current < 5_000 ? `👑 Patron koltuğunun sahibi: ${name}` : `👑 ${name} patron koltuğunu kazandı!` });
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bossId]);
+  }, [bossHolder]);
 
   // Recent rooms (personalized discovery) and fan-club points for joining.
   useEffect(() => {
@@ -1667,10 +1676,18 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const removeFromSeat = (userId: string) => leaveSeat(id, userId);
   const sitMe = (index: number) => {
     if (devicesBusy() || offlineBlocked()) return;
+    // From one mic to another (the Patron seat included) the mic stays as it was: off stays off, on stays on.
+    const wasOnMic = amSeated;
     const r = takeSeat(id, 'me', index);
     if (!r.ok) return showAlert('Bu mikrofona geçilemedi', r.reason);
-    setMicOn(true);
+    if (!wasOnMic) setMicOn(true);
     addMsg({ system: true, text: `${ME.name} ${index + 1}. koltuğa geçti` });
+  };
+  /** The holder goes back to the Patron seat: they leave their numbered mic, the mic stays as it was. */
+  const sitOnPatron = () => {
+    if (bossHolder !== 'me' || mySeat < 0 || devicesBusy() || offlineBlocked()) return;
+    leaveSeat(id, 'me');
+    addMsg({ system: true, text: `${ME.name} patron koltuğuna oturdu` });
   };
 
   // Room membership: a server room asks the server (open: at once; apply: the owner or admins answer).
@@ -1696,6 +1713,24 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const onBossPress = () => {
     const mine = contrib.me ?? 0;
     const top = topGifter?.[1] ?? 0;
+    // Mine, and I sit on a numbered mic: the seat waits for me.
+    if (!bossId && bossHolder === 'me') {
+      return setSheet({
+        title: 'Patron Koltuğu senin',
+        options: [
+          { label: 'Patron koltuğuna otur', icon: 'arrow-up-circle-outline', onPress: sitOnPatron },
+          { label: 'Koltuk nasıl kazanılır?', icon: 'information-circle-outline', onPress: () => showAlert('Patron Koltuğu', bossSeatInfo('me', mine, top)) },
+        ],
+      });
+    }
+    // Someone else's, and they are on a numbered mic or not in the room: the seat is empty, their name is said.
+    if (!bossId && bossHolder) {
+      const u = userById(bossHolder);
+      return showAlert('Patron Koltuğu', `Koltuğun sahibi: ${u.name}. ${allSeats.includes(bossHolder) ? 'Şu an başka bir mikrofonda oturuyor.' : 'Şu an odada değil.'}\n\n${bossSeatInfo(null, mine, top)}`, [
+        { text: 'Kapat', style: 'cancel' },
+        { text: 'Hediye gönder', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
+      ]);
+    }
     if (bossId && bossId !== 'me') {
       const u = userById(bossId);
       const options: SheetOption[] = [
@@ -1703,7 +1738,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         { label: 'Hediye gönder', icon: 'gift-outline', onPress: () => (setGiftTo(null), setGiftOpen(true)) },
         { label: `Patron koltuğuna geç: ${Math.max(0, Math.max(BOSS_SEAT_MIN_COINS, top + 1) - mine).toLocaleString('tr-TR')} jeton daha gönder`, icon: 'information-circle-outline', onPress: () => showAlert('Patron Koltuğu', bossSeatInfo(bossId, mine, top)) },
       ];
-      if (myRole === 'owner')
+      // The demo's owner can take the holder off; a server room's holder is the server's (its top gifter).
+      if (myRole === 'owner' && !real)
         options.push({
           label: 'Patron koltuğundan indir',
           icon: 'arrow-down-circle-outline',
@@ -2874,6 +2910,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [onBalcony, id, hostId]);
   const myInvite = live.invites.find((i) => i.toId === 'me' && i.status === 'pending');
   const answerMyInvite = (accept: boolean) => {
+    // Already on a mic (the Patron seat): the invite moves me, and the mic stays as it was.
+    const wasOnMic = amSeated;
     if (!myInvite || offlineBlocked() || (accept && devicesBusy())) return;
     const serverId = real ? serverInviteId(myInvite.id) : null;
     if (serverId !== null) {
@@ -2893,7 +2931,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             .finally(reloadInvites),
         (inv) => {
           if (!accept) return addMsg({ system: true, text: 'Mikrofon davetini reddettin' });
-          if (inv.status === 'accepted') setMicOn(true);
+          if (inv.status === 'accepted' && !wasOnMic) setMicOn(true);
         },
       );
     }
@@ -2901,7 +2939,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!r.ok) return showAlert('Mikrofona geçilemedi', r.reason);
     if (!accept) return addMsg({ system: true, text: 'Mikrofon davetini reddettin' });
     setMyQueuePos(null);
-    setMicOn(true);
+    if (!wasOnMic) setMicOn(true);
     addMsg({ system: true, text: `${ME.name} davetle ${(r.seat ?? 0) + 1}. mikrofona geçti` });
   };
 
@@ -3053,27 +3091,29 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     );
   };
 
+  // The Patron seat plays its holder's emoji like any mic.
+  const bossReaction = bossId && settings.seatReactions ? reactions[bossId] : undefined;
   /** The stage's mics, drawn with the sizes FitStage gives them (`f`: null for the strip and a team PK). */
   const stageSeats = (f: Fitted | null) =>
     teamPk ? (
       <>
         {bossOn && (
           <View style={[styles.topRow, { marginTop: 6 }]}>
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} />
           </View>
         )}
         <TeamArena pk={teamPk} seats={allSeats} boss={bossId} width={win.width} canManage={canManage && !offline} renderSeat={(i, slot) => renderSeat(i, { slot })} />
       </>
     ) : strip || !f ? (
       <View style={styles.micStrip}>
-        {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} />}
+        {bossOn && <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} mini={stripSlot} reaction={bossReaction} still={settings.reduceMotion} />}
         {allSeats.map((_, i) => renderSeat(i, { host: i === 0, grid: stripSlot, mini: true }))}
       </View>
     ) : layout ? (
       <>
         {bossOn && (
           <View style={[styles.topRow, { marginTop: 6 }]}>
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} />
           </View>
         )}
         <StageLayout layout={layout} width={win.width} face={f.face} seats={allSeats} pkRoom={theme === 'pk'} cameraOf={(uid) => uid === 'me' && camOn} renderSeat={(i, slot, next) => renderSeat(i, { slot, next })} />
@@ -3084,7 +3124,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         {bossOn ? (
           <View style={styles.topRow}>
             {renderSeat(0, { host: true, compact: true, grid: { width: 96, size: f.host } })}
-            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} />
+            <BossSeat userId={bossId} speaking={!!bossId && speaking.has(bossId)} onPress={onBossPress} reaction={bossReaction} still={settings.reduceMotion} />
           </View>
         ) : (
           <View style={styles.hostRow}>{renderSeat(0, { grid: { width: Math.max(96, f.host + 28), size: f.host } })}</View>
