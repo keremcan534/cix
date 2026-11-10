@@ -51,11 +51,23 @@ const ROOM_EXTRA: Record<string, RoomExtra> = {
   r7: { agencyId: 'a3', top: 3, pk: true },
 };
 export const roomExtra = (id: string): RoomExtra => ROOM_EXTRA[id] ?? {};
+/**
+ * A row's extras: a server room's from what the server knows (Room.serverChips: the owner's agency or family, a
+ * running PK, this week's place); nothing else of a server room is made up. A demo room's from the table above.
+ */
+export const rowExtra = (room: Room): RoomExtra & { agencyName?: string; familyName?: string } => {
+  const c = room.serverChips;
+  if (!c) return roomExtra(room.id);
+  return { pk: c.pk, ...(c.weekRank && { top: c.weekRank }), ...(c.agency && { agencyName: c.agency }), ...(c.family && { familyName: c.family }) };
+};
 export const roomCountry = (id: string): Exclude<CountryId, 'ALL'> => roomExtra(id).country ?? 'TR';
 
-export type RoomBadge = { emoji: string; label: string; colors: readonly [string, string] };
-export const roomBadge = (id: string): RoomBadge | null => {
-  const x = roomExtra(id);
+/** `icon`: a server room's chip shows an icon instead of the demo's emoji. */
+export type RoomBadge = { emoji: string; label: string; colors: readonly [string, string]; icon?: 'business' | 'people' };
+export const roomBadge = (room: Room): RoomBadge | null => {
+  const x = rowExtra(room);
+  if (x.agencyName) return { emoji: '', icon: 'business', label: x.agencyName, colors: ['#B45309', '#7C2D12'] };
+  if (x.familyName) return { emoji: '', icon: 'people', label: x.familyName, colors: ['#087A80', '#0B3B4A'] };
   const agency = x.agencyId ? AGENCIES.find((a) => a.id === x.agencyId) : undefined;
   if (agency) return { emoji: agency.logo, label: agency.name, colors: ['#B45309', '#7C2D12'] };
   const family = x.familyId ? FAMILIES.find((f) => f.id === x.familyId) : undefined;
@@ -77,7 +89,7 @@ export const roomTagLabel = (room: Room) => (room.theme ? THEME_TAG[room.theme] 
 
 /** Does a room belong under a category tab? (Popüler shows everything.) */
 export const matchesTab = (room: Room, tab: RoomTab) => {
-  const x = roomExtra(room.id);
+  const x = rowExtra(room);
   switch (tab) {
     case 'Popüler':
       return true;
@@ -94,7 +106,7 @@ export const matchesTab = (room: Room, tab: RoomTab) => {
 
 /** Popüler ordering: weekly TOP rooms first, then by listeners. */
 export const popularScore = (room: Room) => {
-  const top = roomExtra(room.id).top;
+  const top = rowExtra(room).top;
   return (top ? 10_000 - top * 1_000 : 0) + room.listeners;
 };
 

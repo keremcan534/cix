@@ -1,5 +1,5 @@
 // Where a tapped push notification opens (lib/push), from the data the server's notify calls send
-// (server/api: messages, gifts, follows, families, withdrawals, calls). Plain logic: the unit tests import it.
+// (server/api: messages, gifts, follows, families, withdrawals, calls, room invites). Plain logic: the unit tests import it.
 import type { Href } from 'expo-router';
 
 /** Where a tapped notification opens (its data from the server's notify calls). */
@@ -17,6 +17,9 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
       return '/aile';
     case 'withdrawal':
       return '/cuzdan';
+    // A room invite from an account I follow (server/api/room-social.mjs): the room.
+    case 'room_invite':
+      return s('room') ? (`/oda/${s('room')}` as Href) : '/bildirimler';
     // A call: the app opens and its incoming call card rings; a missed one shows in the notifications.
     case 'call':
       return data.missed ? '/bildirimler' : null;

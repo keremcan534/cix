@@ -489,10 +489,13 @@ export function ShareRoomSheet({
   onSend,
   onExternal,
   followers,
+  showOnline = true,
 }: {
   visible: boolean;
   onClose: () => void;
   friends: User[];
+  /** False when nobody's online state is known (a server room's friends): no "çevrimiçi / çevrimdışı". */
+  showOnline?: boolean;
   /** Friends this room was already sent to during this visit. */
   sent: Set<string>;
   onSend: (id: string) => void;
@@ -542,9 +545,9 @@ export function ShareRoomSheet({
       {friends.length === 0 && <Text style={styles.dim}>Henüz arkadaşın yok. Keşfet&apos;ten takip etmeye veya mesajlaşmaya başla.</Text>}
       {list.map((u) => (
         <View key={u.id} style={styles.row}>
-          <Avatar uri={u.avatar} size={36} online={u.online} />
+          <Avatar uri={u.avatar} size={36} online={showOnline && u.online} />
           <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
-            {u.name} <Text style={styles.dim}>{u.online ? '· çevrimiçi' : '· çevrimdışı'}</Text>
+            {u.name} {showOnline && <Text style={styles.dim}>{u.online ? '· çevrimiçi' : '· çevrimdışı'}</Text>}
           </Text>
           {sent.has(u.id) ? (
             <Text style={{ color: colors.green, fontWeight: '700', fontSize: 12 }}>✓ Gönderildi</Text>

@@ -79,11 +79,11 @@ import { useRoomBonds } from '@/components/room/room-bonds';
 import { BOND_KINDS, bondTint, bubbleBondOf, jointEntries, micLinkOf, type JointState, type RoomBond } from '@/data/bonds';
 import { Avatar } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
+import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, COSMETICS, MUSIC_CATALOG, STANDARD_EMOJI, STICKER_PACKS, adminCapacity, cosmeticById, djCapacity, memberLimit, micCapacity, roomCode, roomLevel, roomTypeInfo, ROOM_LEVEL_REWARDS, type RoomTheme, type Track } from '@/data/catalog';
 import { FAMILIES, INCOMING_GIFT_POOL, vipTier } from '@/data/economy';
 import { GATES, nobleInfo } from '@/data/status';
 import { LUCKY_RECIPIENT_SHARE, RULES, luckyHostDiamonds, pct } from '@/data/rules';
-import { BOT_LINES, GIFTS, ME, USERS, roomById, userById, type Gift } from '@/data/mock';
+import { BOT_LINES, GIFTS, ME, USERS, isServerId, roomById, userById, type Gift } from '@/data/mock';
 import * as api from '@/lib/api';
 import { isLiveRoom, isLockedRoom, liveGift, liveMode, liveRoomAnimation, message as errorText, myServerId, refreshServerRoom, rememberUser, toLocal, toServer, updateServerRoom } from '@/lib/live';
 import { useLiveRoomSync } from '@/lib/live/room';
@@ -92,6 +92,9 @@ import { refreshRoomPkSoon, useRoomPkSync } from '@/lib/live/pk';
 import { bagResult, grabCode, joinBag, useRoomBags, type Bag } from '@/lib/live/lucky-bags';
 import { banLeft, roomBan, roomQueue, roomSeat, roomSetAdmin, roomSetDj, roomUnban, useRoomStaff, type QueueAction, type SeatAction } from '@/lib/live/room-staff';
 import { roomMusicAction, type MusicAction } from '@/lib/live/music';
+import { useFollowerInvite, useServerMicInvites, useServerPoll } from '@/lib/live/room-social';
+import { followerInviteAt, inviteSeat as pickInviteSeat, roomShareText, serverInviteId } from '@/lib/room-social';
+import { liveDm } from '@/lib/live/messages';
 import { LiveMusicSheet, useRoomMusicPlayer } from '@/components/room/room-music';
 import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
@@ -371,6 +374,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     }),
   );
   const { room: live, offline } = useRoomLive(id);
+  // A server room's mic invites and poll (lib/live/room-social): the server's, the same on every phone, drawn with
+  // the demo's prompt, marks and card.
+  const reloadInvites = useServerMicInvites(id, real && unlocked, canManage);
+  const serverPoll = useServerPoll(id, real && unlocked);
+  // The mic an invite I accepted is putting me on: the server moves me there, and this phone says so as the invite's.
+  const acceptedSeat = useRef<number | null>(null);
   const view = useMemo(() => deriveView(live), [live]);
   // Roles come from the presence server (seeded above), so this reads the real role from the first render on.
   const stageDeny = stagePermission(id, 'me');
@@ -914,7 +923,13 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       const gift = GIFTS.find((g) => g.id === msg.giftId);
       if (gift) showGift(from, to, gift, msg.count);
     },
-    onServerSeat: (seat) => addMsg({ system: true, text: seat === null ? 'Oda yönetimi seni mikrofondan indirdi' : `Oda yönetimi seni ${seat + 1}. mikrofona taşıdı` }),
+    onServerSeat: (seat) => {
+      if (seat !== null && seat === acceptedSeat.current) {
+        acceptedSeat.current = null;
+        return addMsg({ system: true, text: `${ME.name} davetle ${seat + 1}. mikrofona geçti` });
+      }
+      addMsg({ system: true, text: seat === null ? 'Oda yönetimi seni mikrofondan indirdi' : `Oda yönetimi seni ${seat + 1}. mikrofona taşıdı` });
+    },
   });
   // Oda içi PK in a server room: the server's PK, read into lib/pk (start, cancel, score and result are its).
   useRoomPkSync(id, real && unlocked, pk);
@@ -1477,6 +1492,35 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // A server room: the people the server has in its queue, minus anyone already on a mic.
   const queue = real ? serverQueue.filter((uid) => !view.micIds.includes(uid)) : balconyQueue;
 
+  // A server room's poll (server/api/room-social.mjs): one per room, one vote each, the same results on every phone.
+  const shownPoll = real ? serverPoll.poll : poll;
+  const pollAction = (failTitle: string, run: () => Promise<api.ServerPoll>, then?: () => void) => {
+    if (offlineBlocked()) return;
+    staffAction(failTitle, run, (p) => (serverPoll.put(p), then?.()));
+  };
+  const startPoll = (question: string, options: string[], seconds: number, liveResults: boolean) =>
+    pollAction('Anket başlatılamadı', () => api.startRoomPoll(id, { question, options, seconds, live: liveResults }), () => setPanel(null));
+  const votePoll = (option: number) => {
+    const pid = serverPoll.serverId;
+    if (pid !== null) pollAction('Oy verilemedi', () => api.voteRoomPoll(pid, option));
+  };
+  const closePoll = () => {
+    const pid = serverPoll.serverId;
+    const question = shownPoll?.question ?? '';
+    if (pid !== null) pollAction('Anket kapatılamadı', () => api.closeRoomPoll(pid), () => logMod('Anketi kapattı', question));
+  };
+  // Everyone in the room hears of a new poll once (the one already open on entering is just shown).
+  const livePollId = real ? (serverPoll.poll?.id ?? null) : null;
+  const livePollQuestion = serverPoll.poll?.question ?? '';
+  const pollReady = serverPoll.ready;
+  const pollSeen = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!real || !pollReady) return;
+    if (pollSeen.current !== undefined && livePollId && livePollId !== pollSeen.current) sysNote(`📊 Anket başladı: ${livePollQuestion}`);
+    pollSeen.current = livePollId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [real, pollReady, livePollId]);
+
   // Poll clock + simulated votes.
   const pollOpen = !!poll && !poll.closed;
   useEffect(() => {
@@ -1847,10 +1891,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   };
   const sendMicInvite = (uid: string, seat?: number) => {
     if (offlineBlocked()) return false;
-    // A mic invite isn't carried to the other phone in a server room yet: say so instead of a pending invite.
+    // A server room: the server checks the rights (as for moving someone to a mic) and tells the invited phone.
     if (real) {
-      showAlert('Davet gönderilemedi', 'Bu odada mikrofon daveti henüz yok. Davet etmek istediğin kişi boş bir koltuğa dokunarak mikrofona geçebilir.');
-      return false;
+      const target = toServer(uid);
+      if (!target) return false;
+      const name = userById(uid).name;
+      staffAction('Davet gönderilemedi', () => api.sendMicInvite(id, target, seat), () => {
+        reloadInvites();
+        logMod('Mikrofona davet etti', name);
+        addMsg({ system: true, text: `🎙️ ${name} mikrofona davet edildi · yanıtı bekleniyor` });
+      });
+      return true;
     }
     const r = inviteToMic(id, 'me', uid, seat);
     if (!r.ok) {
@@ -2077,21 +2128,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (canManage) {
       const locked = lockedSeats.includes(index);
       const items: SeatMenuItem[] = [
-        // A server room has no mic invites yet (sendMicInvite): the empty seat offers what works.
-        ...(!real
-          ? [
-              {
-                key: 'invite',
-                label: 'Davet et',
-                icon: 'person-add-outline' as const,
-                onPress: () => {
-                  if (locked) toggleLock(index, false);
-                  setInviteSeat(index);
-                  setPeopleOpen(true);
-                },
-              },
-            ]
-          : []),
+        {
+          key: 'invite',
+          label: 'Davet et',
+          icon: 'person-add-outline' as const,
+          onPress: () => {
+            if (locked) toggleLock(index, false);
+            setInviteSeat(index);
+            setPeopleOpen(true);
+          },
+        },
         ...(!locked ? [{ key: 'sit', label: 'Bu koltuğa geç', icon: 'enter-outline' as const, onPress: () => sitMe(index) }] : []),
         { key: 'lock', label: locked ? 'Kilidi aç' : 'Mikrofonu kilitle', icon: locked ? ('lock-open-outline' as const) : ('lock-closed-outline' as const), onPress: () => toggleLock(index, !locked) },
       ];
@@ -2504,8 +2550,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Paylaş: in-app friends (people I follow or message), as a chat card that opens the room.
   const shareRoom = () => setPanel('invite');
   const shareExternal = () => shareLink(`Similar Club'da "${title}" odasına gel! 🎙️ Şu an ${listeners} kişi dinliyor.`, `oda/${id}`);
-  const friends = USERS.filter((u) => (following.has(u.id) || conversations.some((c) => c.userId === u.id)) && !blocked.has(u.id));
+  // A server room: the real people I follow or write to (never sample people); the share goes as a direct message.
+  const friends = real
+    ? [...new Set([...following, ...conversations.map((c) => c.userId)])].filter((uid) => isServerId(uid) && !blocked.has(uid)).map(userById)
+    : USERS.filter((u) => (following.has(u.id) || conversations.some((c) => c.userId === u.id)) && !blocked.has(u.id));
   const sendToFriend = (uid: string) => {
+    if (real) {
+      if (offlineBlocked()) return;
+      // My chat shows the room card; the message itself is the invite line with the room's number (lib/room-social).
+      const ref = api.newRef();
+      const text = roomShareText(title, roomCode(id));
+      sendMessage(uid, text, true, { roomId: id, title, cover }, ref);
+      setSharedTo((s) => new Set(s).add(uid));
+      liveDm(uid, text, ref, (r) => {
+        if (r.ok) return app.markMessageSent(uid, ref, r.message);
+        app.setMessageFailed(uid, ref, r.reason, r.retry);
+        setSharedTo((s) => new Set([...s].filter((x) => x !== uid)));
+        showAlert('Davet gönderilemedi', r.reason);
+      });
+      return;
+    }
     sendMessage(uid, roomInviteText(title), true, { roomId: id, title, cover });
     setSharedTo((s) => new Set(s).add(uid));
     // Some friends come right away (a demo stand-in for them opening the card).
@@ -2513,6 +2577,36 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       if (Math.random() < 0.5 || getRoom(id)?.members.includes(uid)) return;
       if (joinPresence(id, uid, { eventId: `share:${uid}:${msgId()}` }).ok) addMsg({ system: true, text: `📨 ${userById(uid).name} davetinle odaya girdi` });
     }, 2500);
+  };
+  // A server room: the server counts the followers, sends the notices and keeps the 24 hours (server/api/room-social.mjs).
+  const followerInvite = useFollowerInvite(id, real && canManage && panel === 'invite');
+  const inviteFollowersLive = () => {
+    const info = followerInvite.info;
+    if (!info || offlineBlocked()) return;
+    const check = canInviteFollowers(myRole, followerInviteAt(info.waitMs, info.readAt));
+    if (!check.ok) return showAlert('Davet gönderilemedi', check.reason);
+    if (!info.count) return showAlert('Davet edilecek takipçi yok', 'Odanın hesabını takip eden biri olunca davet gönderebilirsin.');
+    const owner = hostId === 'me' ? 'Hesabının' : `${userById(hostId).name} hesabının`;
+    showAlert('Takipçiler davet edilsin mi?', `${owner} ${info.count.toLocaleString('tr-TR')} takipçisine oda daveti bildirimi gider. Bu oda için 24 saatte bir gönderilebilir.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Davet gönder',
+        onPress: () =>
+          staffAction(
+            'Davet gönderilemedi',
+            () =>
+              api.inviteFollowers(id).catch((e: unknown) => {
+                followerInvite.reload();
+                throw e;
+              }),
+            (r) => {
+              followerInvite.take(r);
+              logMod('Takipçilere oda daveti gönderdi', `${r.sent} takipçi`);
+              addMsg({ system: true, text: `📣 Oda daveti ${r.sent.toLocaleString('tr-TR')} takipçiye gönderildi` });
+            },
+          ),
+      },
+    ]);
   };
   // "Odaya davet et" (owner/admins): every follower of the room's account, once every 24 hours per room.
   const inviteFollowers = () => {
@@ -2748,6 +2842,28 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const myInvite = live.invites.find((i) => i.toId === 'me' && i.status === 'pending');
   const answerMyInvite = (accept: boolean) => {
     if (!myInvite || offlineBlocked() || (accept && devicesBusy())) return;
+    const serverId = real ? serverInviteId(myInvite.id) : null;
+    if (serverId !== null) {
+      // The invite's mic, or for an invite to any mic the first free one here; the server checks it is still free.
+      const seat = pickInviteSeat(myInvite.seat, allSeats, lockedSeats);
+      if (accept && seat < 0) return showAlert('Mikrofona geçilemedi', 'Boş mikrofon kalmadı; mikrofona geçilemedi.');
+      if (accept) acceptedSeat.current = seat;
+      return staffAction(
+        'Mikrofona geçilemedi',
+        () =>
+          api
+            .answerMicInvite(serverId, accept, accept && myInvite.seat === undefined ? seat : undefined)
+            .catch((e: unknown) => {
+              acceptedSeat.current = null;
+              throw e;
+            })
+            .finally(reloadInvites),
+        (inv) => {
+          if (!accept) return addMsg({ system: true, text: 'Mikrofon davetini reddettin' });
+          if (inv.status === 'accepted') setMicOn(true);
+        },
+      );
+    }
     const r = answerInvite(id, myInvite.id, 'me', accept);
     if (!r.ok) return showAlert('Mikrofona geçilemedi', r.reason);
     if (!accept) return addMsg({ system: true, text: 'Mikrofon davetini reddettin' });
@@ -3083,14 +3199,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                   </Pressable>
                 )}
                 {questions.find((q) => q.picked) && <Text style={styles.queueChip}>🎤 Seçilen soru: {questions.filter((q) => q.picked).slice(-1)[0].text}</Text>}
-                {poll && (
+                {shownPoll && (
                   <PollCard
-                    poll={poll}
-                    canManage={myRole !== 'member'}
-                    onVote={(i) => setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p))}
+                    poll={shownPoll}
+                    canManage={real ? canFunctions : myRole !== 'member'}
+                    onVote={(i) => (real ? votePoll(i) : setPoll((p) => (p ? { ...p, myVote: i, options: p.options.map((o, j) => (j === i ? { ...o, votes: o.votes + 1 } : o)) } : p)))}
                     onClose={() => {
+                      if (real) return closePoll();
                       setPoll((p) => (p ? { ...p, closed: true, endsIn: 0 } : p));
-                      logMod('Anketi kapattı', poll.question);
+                      logMod('Anketi kapattı', shownPoll.question);
                     }}
                   />
                 )}
@@ -3502,6 +3619,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         visible={panel === 'poll'}
         onClose={closePanel}
         onCreate={(question, opts, seconds, live) => {
+          if (real) return startPoll(question, opts, seconds, live);
           setPoll({ id: msgId(), question, options: opts.map((text) => ({ text, votes: 0 })), myVote: null, endsIn: seconds, live, closed: false });
           setPanel(null);
           addMsg({ system: true, text: `📊 Anket başladı: ${question}` });
@@ -3599,10 +3717,17 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         visible={panel === 'invite'}
         onClose={closePanel}
         friends={friends}
+        showOnline={!real}
         sent={sharedTo}
         onSend={sendToFriend}
         onExternal={shareExternal}
-        followers={canManage && !liveMode() ? { count: followerCount(hostId), lastAt: followerInvites[id], onSend: inviteFollowers } : null}
+        followers={
+          !canManage
+            ? null
+            : real
+              ? followerInvite.info && { count: followerInvite.info.count, lastAt: followerInviteAt(followerInvite.info.waitMs, followerInvite.info.readAt), onSend: inviteFollowersLive }
+              : { count: followerCount(hostId), lastAt: followerInvites[id], onSend: inviteFollowers }
+        }
       />
       <RoomMenuSheet visible={panel === 'menu'} onClose={() => setPanel(null)} sections={menuSections.map((sec) => ({ ...sec, items: sec.items.map((it) => (MENU_TOGGLES.has(it.key) ? it : { ...it, onPress: () => (menuReturn.current.push('menu'), it.onPress()) })) }))} />
       <ActionSheet

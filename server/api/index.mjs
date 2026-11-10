@@ -12,7 +12,8 @@
 // Withdrawals (para çekme): withdraw.mjs. Store refunds read from Google Play: refunds.mjs.
 // Sign-in and sessions: auth.mjs (e-mail codes: mail.mjs; WhatsApp phone check: whatsapp.mjs). Push: push.mjs.
 // Gifts, catalog, rankings: gifts.mjs. Store purchases: purchases.mjs. Uploads: media.mjs. Voice token and presence: live.mjs. Profiles, follows, blocks, reports
-// and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs. Staff: admin.mjs.
+// and account deletion: social.mjs. Direct messages: messages.mjs. Rooms: rooms.mjs (mic invites, polls, follower
+// invites: room-social.mjs). Staff: admin.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
@@ -60,6 +61,7 @@ import { teamRoutes } from './team.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
+import { roomSocialRoutes } from './room-social.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
 import { closeLines, openLine } from './live-line.mjs';
@@ -239,6 +241,7 @@ const routes = {
   ...musicRoutes,
   ...roomFxRoutes,
   ...roomEventRoutes,
+  ...roomSocialRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,

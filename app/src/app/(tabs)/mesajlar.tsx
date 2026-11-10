@@ -19,7 +19,8 @@ import { Backdrop, Gloss, PressableScale } from '@/components/fx/surface';
 import { TeamInbox } from '@/components/team-inbox';
 import { teamUnread } from '@/lib/live/team';
 import { messagePreview } from '@/components/ReactionArt';
-import { callsAvailable, liveMode } from '@/lib/live';
+import { callsAvailable, liveMode, useServerRoomList } from '@/lib/live';
+import { Photo } from '@/components/photo';
 import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 
 type Tab = 'messages' | 'friends' | 'calls';
@@ -106,11 +107,14 @@ export default function MessagesScreen() {
   const visitors = useProfileVisitors();
   const visitorCount = visitors.count ?? 0;
 
-  // Last visited room for the "Canlı Odalar" row.
+  // Last visited room for the "Canlı Odalar" row. Live: among the open server rooms (lib/live), with its own cover;
+  // a room that has closed since leads to Odalar instead.
+  const live = liveMode();
+  const liveRooms = useServerRoomList();
   const lastRoomId = recentRooms[0];
-  const lastRoom = lastRoomId ? ROOMS.find((r) => r.id === lastRoomId) : undefined;
-  const partyCover = lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover);
-  const openParty = () => (lastRoomId ? router.push(`/oda/${lastRoomId}`) : router.push('/(tabs)'));
+  const lastRoom = lastRoomId ? (live ? liveRooms : ROOMS).find((r) => r.id === lastRoomId) : undefined;
+  const partyCover = live ? (lastRoom?.cover ?? '') : (lastRoom?.cover ?? (lastRoomId ? myRoom.cover : POPULAR_ROOM.cover));
+  const openParty = () => (lastRoomId && (!live || lastRoom) ? router.push(`/oda/${lastRoomId}`) : router.push('/(tabs)'));
 
   const openVisitors = () => {
     if (visitors.unlocked) {
@@ -179,7 +183,7 @@ export default function MessagesScreen() {
             title="Canlı Odalar"
             subtitle={lastRoom ? `Son girdiğin oda · ${lastRoom.title}` : 'Şu an açık odalara göz at'}
             onPress={openParty}
-            right={<Image source={{ uri: partyCover }} style={styles.roomCover} />}
+            right={live ? <Photo uri={partyCover} kind="cover" seed={lastRoom?.id ?? 'odalar'} style={styles.roomCover} /> : <Image source={{ uri: partyCover }} style={styles.roomCover} />}
           />
           <View style={styles.sep} />
           <SystemRow

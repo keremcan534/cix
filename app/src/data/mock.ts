@@ -83,6 +83,9 @@ export type Room = {
   micCount?: number;
   /** A server room's locked mics, as the server keeps them (the LiveKit metadata says it sooner). */
   lockedSeats?: number[];
+  /** A server room's Odalar chips as the server knows them (server/api/room-social.mjs): the owner's agency or
+   *  family, a running in-room PK, this week's gift ranking place (1–3). */
+  serverChips?: { agency?: string; family?: string; pk: boolean; weekRank?: number };
 };
 
 export type Moment = {
