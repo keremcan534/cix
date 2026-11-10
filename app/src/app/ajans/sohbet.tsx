@@ -29,7 +29,8 @@ export default function AgencyChat() {
           pinned="📢 Bu hafta: PK turnuvası Cumartesi 21:00 · Aylık 100 saat hedefi"
           lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length]}
           roomId="r2"
-          // The Jeton Noktası and the member network are demo screens; a live build leaves their shortcuts out.
+          // The agency group chat has no server counterpart (it opens only in the demo), so a live build leaves out
+          // its Jeton Noktası and member network shortcuts too.
           quickActions={[
             { key: 'panel', label: 'Ajans paneli', emoji: '📊', onPress: () => router.push('/ajans') },
             ...(liveMode()

@@ -151,6 +151,9 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);
     await c.query('DELETE FROM data_exports WHERE user_id = $1', [id]);
     await c.query('DELETE FROM spend_limits WHERE user_id = $1', [id]);
+    // Çantam (backpack.mjs): what was in it and its moves; the gift events it sent stay as accounting records.
+    await c.query('DELETE FROM backpack_moves WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM backpack_items WHERE user_id = $1', [id]);
 }
 
 export const socialRoutes = {

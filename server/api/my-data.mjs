@@ -4,7 +4,7 @@
 //   GET /api/me/export   → { format, generatedAt, notes, account, … }   (once in 24 hours: 429 with nextAt after that)
 //
 // Every table that holds my personal data is read here, in one read-only snapshot: profile and sign-in, sessions and
-// devices, follows and blocks, the direct messages I sent and received, Anlar, gifts sent and received, the wallet
+// devices, follows and blocks, the direct messages I sent and received, Anlar, gifts sent and received, Çantam, the wallet
 // (ledger, coin lots, diamond locks, purchases, Jeton Noktası transfers, withdrawals, shop items, paid 1v1 minutes),
 // games, rooms, family, bonds, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
 // spending limit and Similar Ekibi notices written to me.
@@ -127,6 +127,19 @@ export async function exportOf(c, uid) {
     received: await all('SELECT g.*, u.name AS other_name FROM gift_events g JOIN users u ON u.id = g.sender WHERE g.recipient = $1 ORDER BY g.id', (x) => ({
       ...gift(x),
       from: person(x.sender, x.other_name),
+    })),
+  };
+
+  // Çantam (backpack.mjs): what is in it, and each gift that came in (with its reward) or went out (its gift event).
+  const backpack = {
+    items: await all('SELECT gift_id, count, updated_at FROM backpack_items WHERE user_id = $1 ORDER BY gift_id', (x) => ({ giftId: x.gift_id, count: x.count, at: x.updated_at })),
+    moves: await all('SELECT id, gift_id, delta, source, gift_event, created_at FROM backpack_moves WHERE user_id = $1 ORDER BY id', (x) => ({
+      id: num(x.id),
+      giftId: x.gift_id,
+      change: x.delta,
+      source: x.source,
+      giftEvent: num(x.gift_event),
+      at: x.created_at,
     })),
   };
 
@@ -508,6 +521,7 @@ export async function exportOf(c, uid) {
     messages,
     moments,
     gifts,
+    backpack,
     wallet,
     calls,
     games,

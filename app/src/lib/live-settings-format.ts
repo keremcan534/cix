@@ -78,6 +78,8 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       return typeof after === 'number' && typeof before === 'number' && Math.abs(cents(after) - cents(before)) * 100 > cents(before) * 3;
     case 'otp_global_per_hour':
       return typeof after === 'number' && after > 1000;
+    case 'backpack_call_task':
+      return typeof after === 'number' && after > BACKPACK_BIG;
     case 'min_version':
       return after !== null;
     case 'dm_price':
@@ -93,6 +95,9 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       return false;
   }
 }
+
+/** Çantam (server/api/backpack.mjs): above this many gifts a day the change asks twice (live-registry bounds.big). */
+export const BACKPACK_BIG = 2;
 
 /** The 1v1 settings in the order the admin card shows them, with each one's unit. */
 export const ONE_ON_ONE_KEYS: { key: OneOnOneKey; unit: string }[] = [
@@ -171,6 +176,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} elmas` : String(v);
     case 'otp_global_per_hour':
       return typeof v === 'number' ? (v === 0 ? 'SMS durdu' : `Saatte ${fmtNum(v)}`) : String(v);
+    case 'backpack_call_task':
+      return typeof v === 'number' ? (v === 0 ? 'Verilmiyor' : `Günde ${v} adet`) : String(v);
     case 'dm_price':
     case 'call_voice_price':
     case 'call_video_price':

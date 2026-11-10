@@ -26,6 +26,8 @@ export { FEATURES, OFF_MESSAGE, configOf };
 /** "METHOD /path" → the features that turn it off. */
 export const ROUTES = {
   'POST /api/gifts/send': ['gifts'],
+  // Çantam (backpack.mjs): a free gift is still a gift.
+  'POST /api/backpack/send': ['gifts'],
   'POST /api/wallet/gift': ['gifts'],
   'POST /api/wallet/purchase': ['purchases'],
   'POST /api/wallet/test-topup': ['topup'],

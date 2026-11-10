@@ -60,10 +60,16 @@ describe('Canlı sürümde demo ekranları', () => {
   });
 
   test('örnek veriyle dolu ekranlar canlıda "yakında" gösterir', () => {
-    for (const route of ['davet', 'coins-bank']) {
+    for (const route of ['davet']) {
       const src = readFileSync(join(APP, `${route}.tsx`), 'utf8');
       assert.match(src, /liveMode\(\)[^\n]*<ComingSoon /, `${route}: canlıda ComingSoon yok`);
     }
+  });
+
+  // Jeton Noktası is on the server (lib/live/jeton): the banks, a host's diamond sale, a bank's stock and coin sales.
+  test('Jeton Noktası canlıda sunucudan', () => {
+    assert.match(readFileSync(join(APP, 'coins-bank.tsx'), 'utf8'), /liveMode\(\) \? <LiveCoinsBank \/> : <DemoCoinsBank \/>/);
+    assert.match(readFileSync(join(APP, '../components/coins-bank-live.tsx'), 'utf8'), /from '@\/lib\/live\/jeton'/);
   });
 
   // Aile is on the server (lib/live/family): its list, my family, the family chat, Görevler and Uyum Köşesi show

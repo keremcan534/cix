@@ -760,7 +760,7 @@ export const myCallStats = () => call<{ week: ServerCallStats }>('GET', '/api/me
 /** Görevler › "1 görüntülü arama yap" today, as the server counts it. */
 export type ServerCallTask = { goal: number; done: number; reward: number; minSeconds: number; claimed: boolean };
 export const myCallTask = () => call<{ task: ServerCallTask }>('GET', '/api/me/call-task').then((r) => r.task);
-export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask }>('POST', '/api/me/call-task/claim', {});
+export const claimCallTask = () => call<{ user: ServerUser; replay: boolean; task: ServerCallTask; backpack?: { giftId: string; count: number } | null }>('POST', '/api/me/call-task/claim', {});
 // Room social (server/api/room-social.mjs): mic invites, the room poll, upcoming events, my rooms, follower invites.
 export type MicInviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'failed' | 'cancelled';
 /** `expiresIn`: ms left to answer by the server's clock (0 once answered); `seat` null: any free mic. */
@@ -847,6 +847,38 @@ export const spendLimit = () => call<ServerSpendLimit>('GET', '/api/me/spend-lim
 /** 0 lifts it. Lower applies now; higher (or 0) after `raiseHours`. */
 export const setSpendLimit = (limit: number) => call<ServerSpendLimit & { applied: 'now' | 'later' }>('POST', '/api/me/spend-limit', { limit });
 
+/** Çantam (server/api/backpack.mjs): free gifts from rewards. `sources`: what each reward puts in now. */
+export type BackpackItem = { giftId: string; count: number; source: string; label: string };
+export type BackpackSource = { key: string; label: string; giftId: string; count: number };
+export type ServerBackpack = { items: BackpackItem[]; sources: BackpackSource[] };
+export const backpack = () => call<ServerBackpack>('GET', '/api/backpack');
+/** A free gift from my backpack in a server room: no coins; 409 bag_short when there aren't enough. */
+export const backpackSend = (to: string, giftId: string, count: number, room: string, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; total: number; items: BackpackItem[] }>('POST', '/api/backpack/send', { to, giftId, count, room, ref });
+
+/** Jeton Noktası (server/api/jeton.mjs). `mine`: this account is a Jeton Noktası. Blocks either way are left out. */
+export type JetonTransfer = {
+  id: number;
+  kind: 'bank_sale' | 'diamond_sale' | 'wholesale';
+  from: { id: string; name: string | null } | null;
+  to: { id: string; name: string | null };
+  coins: number;
+  diamonds: number | null;
+  valueTl: number | null;
+  paymentRef: string | null;
+  note: string | null;
+  createdAt: string;
+};
+export const jetonBanks = () => call<{ banks: UserCard[]; mine?: boolean }>('GET', '/api/jeton/banks');
+export const jetonTransfers = () => call<{ rows: JetonTransfer[] }>('GET', '/api/jeton/transfers').then((r) => r.rows);
+/** A Jeton Noktası's buyers: who wrote to it lately (blocks either way left out). */
+export const jetonBuyers = () => call<{ buyers: UserCard[] }>('GET', '/api/jeton/buyers').then((r) => r.buyers);
+/** A Jeton Noktası sends coins from its stock to someone who paid it outside the app (paymentRef: the receipt). */
+export const jetonTransfer = (to: string, coins: number, paymentRef: string, note: string, ref = newRef()) =>
+  call<{ user: ServerUser; replay: boolean; transfer: JetonTransfer }>('POST', '/api/jeton/transfer', { to, coins, paymentRef, note, ref });
+/** Where my coins came from (server/api/wallet.mjs): a Jeton Noktası's stock by source. */
+export const walletCoins = () => call<{ coins: number; channels: { channel: string; label: string; remaining: number }[] }>('GET', '/api/wallet/coins');
+
 // --- Sanctions (server/api/sanctions.mjs). With an appeal session (after a ban) only these two work.
 export type MyAppeal = { id: number; sanctionId: number; status: 'open' | 'needs_review' | 'upheld' | 'reduced' | 'lifted'; note: string | null; createdAt: string; decidedAt: string | null };
 /** `as`: the appeal session a ban refusal gave (the normal session otherwise). */
@@ -886,6 +918,7 @@ export type LiveKey =
   | 'withdraw_max_diamonds'
   | 'withdraw_weekly_diamonds'
   | 'otp_global_per_hour'
+  | 'backpack_call_task'
   | OneOnOneKey;
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =

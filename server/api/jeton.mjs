@@ -1,9 +1,10 @@
 // Jeton Noktası (coins bank) on the server, store refunds, and the records a dispute needs.
 //
-//   GET  /api/jeton/banks                                                   → { banks }
+//   GET  /api/jeton/banks                                                   → { banks, mine }   (mine: I am one)
 //   POST /api/jeton/transfer       { to, coins, paymentRef?, note?, ref }   (Jeton Noktası) → { user, replay, transfer }
 //   POST /api/jeton/sell-diamonds  { bank, diamonds, ref }                  → { user, replay, transfer }
 //   GET  /api/jeton/transfers                                               → { rows }   (own, sent and received)
+//   GET  /api/jeton/buyers                                                  (Jeton Noktası) → { buyers }
 //   POST /api/admin/jeton/bank      { user, enabled }                       (admin) → { role }
 //   POST /api/admin/jeton/wholesale { bank, coins, paymentRef, note?, ref } (admin) → { user, replay, transfer }
 //   POST /api/admin/purchases/refund { purchase }                           (admin) → { coins, diamonds, unrecoveredDiamonds }
@@ -11,16 +12,17 @@
 //
 // A Jeton Noktası sells coins to people who pay it outside the app (payment_ref: its receipt), buys hosts'
 // unlocked diamonds at their value (it pays the host; it gets coins worth the value plus its fee), and buys
-// its stock from management (wholesale, booked by an admin against management's receipt). Every transfer
-// is a coin_transfers row with who gave, who got, who pressed the button, the receipt, the IP and the time;
-// the ledger rows on both sides say the same. Coins a bank passes on are the buyer's 'jeton_noktasi' lots:
+// its stock from management (wholesale, booked by an admin against management's receipt). People blocked either way
+// don't see or reach each other here: the list leaves them out, a sale or a diamond sale between them is refused.
+// Every transfer is a coin_transfers row with who gave, who got, who pressed the button, the receipt, the IP and the
+// time; the ledger rows on both sides say the same. Coins a bank passes on are the buyer's 'jeton_noktasi' lots:
 // gifted, they lock the recipient's diamonds for 1 day (or longer, if the bank's coins came from a store).
 //
 // A refund (the store refunded a purchase, or a chargeback) takes back the purchase's coins still unspent,
 // wherever a Jeton Noktası passed them, and the diamonds they became that are still locked. Diamonds already
 // unlocked are reported as unrecovered. The agency commission those gifts earned is reversed. Admin only:
 // moderators don't touch money. Google Play refunds also arrive on their own (refunds.mjs).
-import { HttpError, assertClean, auth, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
+import { HttpError, assertClean, auth, blockedBetween, claimRef, clientIp, db, int, move, once, readJson, selfUser, text, tx, userId } from './core.mjs';
 import { EXCHANGE, bankExchangeCoins, diamondValueTl, wholesaleTl } from './catalog.mjs';
 import { CHANNELS, creditCoins, diamondState, spendCoins, spendDiamonds } from './wallet.mjs';
 import { recordIncome } from './agency-lib.mjs';
@@ -153,11 +155,16 @@ export async function refundPurchase(c, id, { actor = null, ip = '', source = 'a
 }
 
 export const jetonRoutes = {
-  /** Jeton Noktası accounts, for the app's bank list and the diamond sale. */
+  /** Jeton Noktası accounts, for the app's bank list and the diamond sale: not myself, nobody blocked either way. */
   async 'GET /api/jeton/banks'(req) {
-    await auth(req);
-    const r = await db.query("SELECT id, name, avatar_url FROM users WHERE role = 'coins_bank' AND deleted_at IS NULL ORDER BY name");
-    return { banks: r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null })) };
+    const u = await auth(req);
+    const r = await db.query(
+      `SELECT id, name, avatar_url FROM users u WHERE role = 'coins_bank' AND deleted_at IS NULL AND id <> $1
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
+        ORDER BY name`,
+      [u.id],
+    );
+    return { banks: r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null })), mine: u.role === 'coins_bank' };
   },
 
   /** A Jeton Noktası sends coins from its stock to someone who paid it. */
@@ -173,6 +180,7 @@ export const jetonRoutes = {
     // (GET /api/jeton/transfers), so it may not share contact details (contact-filter.mjs).
     const paymentRef = optional(b.paymentRef, 100, 'Ödeme referansı');
     const note = await assertClean(optional(b.note, 200, 'Not'), u, 'jeton.transfer', 'note');
+    if (await blockedBetween(u.id, to)) throw new HttpError(403, 'Bu kişiye jeton aktaramazsın');
     const ip = clientIp(req);
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       const rows = await lockUsers(c, [u.id, to]);
@@ -205,6 +213,7 @@ export const jetonRoutes = {
     if (!diamonds) throw new HttpError(400, `En az ${EXCHANGE.minDiamonds} elmas bozdurulabilir`);
     const coins = bankExchangeCoins(diamonds);
     const valueTl = diamondValueTl(diamonds);
+    if (await blockedBetween(u.id, bank)) throw new HttpError(403, 'Bu Jeton Noktası ile işlem yapamazsın');
     const ip = clientIp(req);
     const out = await once(u.id, 'diamond', b.ref, async (c) => {
       const rows = await lockUsers(c, [u.id, bank]);
@@ -222,6 +231,24 @@ export const jetonRoutes = {
       });
     });
     return { ...out, transfer: await findTransfer(u.id, b.ref) };
+  },
+
+  /**
+   * A Jeton Noktası's buyers: the people who wrote to it lately (that is how they reach it), newest first; deleted
+   * accounts and blocks either way left out. Nothing is stored for this: it is read from the messages.
+   */
+  async 'GET /api/jeton/buyers'(req) {
+    const u = await auth(req);
+    if (u.role !== 'coins_bank') throw new HttpError(403, 'Yalnızca Jeton Noktası hesapları');
+    const r = await db.query(
+      `SELECT p.id, p.name, p.avatar_url FROM (SELECT sender, max(id) AS last FROM messages WHERE recipient = $1 GROUP BY sender) m
+         JOIN users p ON p.id = m.sender
+        WHERE p.deleted_at IS NULL AND p.id <> $1
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = p.id) OR (b.blocker = p.id AND b.blocked = $1))
+        ORDER BY m.last DESC LIMIT 30`,
+      [u.id],
+    );
+    return { buyers: r.rows.map((x) => ({ id: x.id, name: x.name, avatarUrl: x.avatar_url ?? null })) };
   },
 
   async 'GET /api/jeton/transfers'(req) {

@@ -5,12 +5,13 @@
 //   POST /api/me/calls/clear            → { cleared }       "Arama geçmişini temizle": for me only
 //   GET  /api/me/call-stats             → { week }          paid call and match minutes I earned this week
 //   GET  /api/me/call-task              → { task }          today's "1 görüntülü arama yap"
-//   POST /api/me/call-task/claim        → { user, replay, task }
+//   POST /api/me/call-task/claim        → { user, replay, task, backpack }   backpack: the gift put in Çantam, or null
 //   GET  /api/me/hearts                 → { hearts }        heart points with each person (Mesajlar › Yakınlık)
 //
 // The history is the calls table itself (kept as accounting records, so it adds nothing to store): calls, not
 // Eşleşme, once they are over. People blocked either way and deleted accounts are left out. Clearing keeps one
 // number per person (call_history_cleared), deleted with the account. Weeks and days are Turkey's.
+import { grantBackpack } from './backpack.mjs';
 import { HttpError, auth, claimRef, db, limit, once } from './core.mjs';
 import { heartLevel } from './one-on-one.mjs';
 import { creditCoins } from './wallet.mjs';
@@ -22,7 +23,8 @@ const NOT_BLOCKED = (me, other) => `NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.
 
 /**
  * Görevler › "1 görüntülü arama yap": a video call I made or answered today that stayed on at least a minute (a call
- * hung up at once doesn't count). The reward is reward coins ('odul', the shop only), once a day.
+ * hung up at once doesn't count). The reward is reward coins ('odul', the shop only), once a day, and the Çantam gift
+ * of the live settings (backpack.mjs grantBackpack, under the same day's ref).
  */
 export const CALL_TASK = Object.freeze({ goal: 1, reward: 25, minSeconds: 60 });
 
@@ -111,14 +113,16 @@ export const callLogRoutes = {
     const me = await auth(req);
     limit(`call-task:${me.id}`, 10);
     const { ref, task } = await callTaskOf(db, me.id);
-    if (task.claimed) return { ...(await once(me.id, 'coin', ref, async () => {})), task };
+    if (task.claimed) return { ...(await once(me.id, 'coin', ref, async () => {})), task, backpack: null };
     if (task.done < task.goal) throw new HttpError(409, 'Görev henüz tamamlanmadı: bugün en az bir dakikalık görüntülü arama yap');
+    let backpack = null;
     const out = await once(me.id, 'coin', ref, async (c) => {
       await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [me.id]);
       await claimRef(c, me.id, 'coin', ref);
       await creditCoins(c, me.id, [{ channel: 'odul', amount: CALL_TASK.reward }], 'Görev ödülü: 1 görüntülü arama yap', ref, null, { detail: { task: 'calls' } });
+      backpack = await grantBackpack(c, me.id, 'call_task', ref);
     });
-    return { ...out, task: { ...task, claimed: true } };
+    return { ...out, task: { ...task, claimed: true }, backpack: out.replay ? null : backpack };
   },
 
   /**

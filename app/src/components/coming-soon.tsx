@@ -1,4 +1,4 @@
-// Shown instead of a screen that only has demo data so far (Anlar, Aile, Arkadaşını Getir, Jeton Noktası) in a
+// Shown instead of a screen that only has demo data so far (Anlar, Aile, Arkadaşını Getir) in a
 // live build: the server has no such feature yet, so a real user must not see sample people, sample money or a
 // button that takes real coins. An old link or a notification can still open the route; it lands here.
 import { View } from 'react-native';
