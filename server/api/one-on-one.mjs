@@ -27,6 +27,7 @@ import crypto from 'node:crypto';
 
 import { recordIncome } from './agency-lib.mjs';
 import { HttpError, REF, auth, blockedBetween, db, env, limit, readJson, tx, userId } from './core.mjs';
+import { line } from './live-line.mjs';
 import { live } from './live-settings.mjs';
 import { deleteVoiceRoom, liveKitJwt } from './live.mjs';
 import { notify } from './push.mjs';
@@ -204,7 +205,10 @@ async function settle(id) {
     }
     return callById(c, id);
   });
-  if (ended) closeRoom(id);
+  if (ended) {
+    closeRoom(id);
+    line([k.caller, k.callee], 'call', { call: Number(id) });
+  }
   return k;
 }
 
@@ -311,10 +315,13 @@ export async function sweepCalls() {
   const missed = await db.query(
     `UPDATE calls k SET status = 'missed', end_reason = 'timeout', ended_at = now() FROM users a
       WHERE a.id = k.caller AND k.status = 'ringing' AND (k.created_at < now() - make_interval(secs => $1) OR k.caller_seen < now() - make_interval(secs => $2))
-      RETURNING k.id, k.callee, k.mode, a.name`,
+      RETURNING k.id, k.caller, k.callee, k.mode, a.name`,
     [RING_S, LOST_S],
   );
-  for (const m of missed.rows) notify([m.callee], { title: m.name, body: `Cevapsız ${MODE_TEXT[m.mode].toLowerCase()} arama`, data: { type: 'call', call: Number(m.id), missed: true } });
+  for (const m of missed.rows) {
+    notify([m.callee], { title: m.name, body: `Cevapsız ${MODE_TEXT[m.mode].toLowerCase()} arama`, data: { type: 'call', call: Number(m.id), missed: true } });
+    line([m.caller], 'call', { call: Number(m.id) });
+  }
   const open = await db.query("SELECT id FROM calls WHERE status = 'live'");
   for (const { id } of open.rows) await settle(id).catch((e) => console.error('call settle', id, e.message));
   await db.query('DELETE FROM match_queue WHERE seen_at < now() - make_interval(secs => $1)', [QUEUE_S]);
@@ -430,6 +437,7 @@ export const oneOnOneRoutes = {
       }
     });
     const k = await callById(db, id);
+    line([k.caller, k.callee], 'call', { call: Number(id) });
     if (cut) return { call: view(k, me.id), token: null };
     return { call: view(k, me.id), token: tokenFor(k, me) };
   },
@@ -455,6 +463,7 @@ export const oneOnOneRoutes = {
       });
     }
     if (ended) closeRoom(id);
+    line([peek.caller, peek.callee], 'call', { call: Number(id) });
     return { call: view(await callById(db, id), me.id) };
   },
 
@@ -471,6 +480,8 @@ export const oneOnOneRoutes = {
     const rights = await rightsOf(db, me);
     if (!rights.streamer && me.gender === 'Erkek' && rights.freeLeft === 0 && (await paidCoins(db, me.id)) < rights.price[mode]) throw insufficient();
     const out = await pairUp(me, mode);
+    // The one who was waiting hears of the match at once.
+    if (out.state === 'matched' && out.call?.other?.id) line([out.call.other.id], 'call', { call: out.call.id });
     return { ...out, rights: await rightsOf(db, me) };
   },
 

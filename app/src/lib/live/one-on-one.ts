@@ -11,6 +11,7 @@ import { AppState } from 'react-native';
 
 import * as api from '@/lib/api';
 import { liveCalls, once, refreshWallet, rememberUser, toLocal } from '@/lib/live';
+import { onLine } from '@/lib/live/live-line';
 
 export type CallMode = 'voice' | 'video';
 export type CallStatus = 'ringing' | 'live' | 'ended' | 'missed' | 'declined' | 'cancelled';
@@ -96,8 +97,14 @@ function schedule() {
   if (!watching) return;
   timer = setTimeout(tick, isOpen(current) ? BEAT_MS : IDLE_MS);
 }
+/** A tick asked for while one was running: run again right after it (the live line's news can't wait 6 s). */
+let again = false;
 async function tick() {
-  if (busy || !watching) return schedule();
+  if (busy) {
+    again = true;
+    return;
+  }
+  if (!watching) return schedule();
   // In the background nothing rings on screen; an open call keeps beating so it isn't ended as lost.
   if (AppState.currentState !== 'active' && !isOpen(current)) return schedule();
   busy = true;
@@ -112,7 +119,10 @@ async function tick() {
     // No connection: the next tick asks again.
   } finally {
     busy = false;
-    schedule();
+    if (again) {
+      again = false;
+      void tick();
+    } else schedule();
   }
 }
 /** Starts reading the open call (components/incoming-call, once signed in). Returns the stop. */
@@ -121,10 +131,15 @@ export function watchCalls() {
   void tick();
   // Back in the app (a push about a call opened it): ask at once.
   const sub = AppState.addEventListener('change', (s) => s === 'active' && void tick());
+  // The live line: a call ringing for me, answered, declined or ended shows within a second.
+  const off = onLine((e) => {
+    if (e.type === 'call' || e.type === 'reconnected') void tick();
+  });
   return () => {
     watching = false;
     clearTimeout(timer);
     sub.remove();
+    off();
   };
 }
 /** Reads the open call now (a screen that just opened). */

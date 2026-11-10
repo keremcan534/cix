@@ -14,6 +14,7 @@ import { liveMode, liveSignIn, message, refreshEarnings, refreshWallet } from '@
 import { resumePurchases } from '@/lib/live/billing';
 import { loadBlocks, loadFollowing } from '@/lib/live/blocks';
 import { checkNewFollowers } from '@/lib/live/follows';
+import { onLine, startLiveLine } from '@/lib/live/live-line';
 import { pollMessages } from '@/lib/live/messages';
 import { settleWithdrawals } from '@/lib/live/withdraw';
 import { startPush } from '@/lib/push';
@@ -45,9 +46,14 @@ export function LiveSync() {
     // The timer and a return to the foreground can fire together: two runs at once would read the same
     // "last seen" message id and add the same messages twice.
     let running = false;
+    let again = false;
     let resumed = false;
     const run = async () => {
-      if (running) return;
+      // A nudge from the live line while a run is going: one more run right after it, so nothing waits a tick.
+      if (running) {
+        again = true;
+        return;
+      }
       running = true;
       try {
         if (!signedIn) {
@@ -93,9 +99,21 @@ export function LiveSync() {
         running = false;
       }
       tick++;
+      if (again && alive) {
+        again = false;
+        void run();
+      }
     };
     void run();
     const t = setInterval(() => void run(), TICK_MS);
+    // The live line (lib/live/live-line): a message, follow, gift, bond, family or team note for me is read now.
+    // Calls and an open chat listen for their own events (lib/live/one-on-one, useLiveThread).
+    const stopLine = startLiveLine();
+    const offLine = onLine((e) => {
+      if (e.type === 'call' || e.type === 'message_read') return;
+      if (e.type === 'follow' || e.type === 'reconnected') resumed = true;
+      void run();
+    });
     const sub = AppState.addEventListener('change', (s) => {
       if (s !== 'active') return;
       resumed = true;
@@ -105,6 +123,8 @@ export function LiveSync() {
       alive = false;
       clearInterval(t);
       sub.remove();
+      offLine();
+      stopLine();
     };
     // Signing in uses the name once; a later rename goes through the profile screen (saveProfile).
     // eslint-disable-next-line react-hooks/exhaustive-deps

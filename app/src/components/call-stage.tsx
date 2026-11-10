@@ -14,6 +14,7 @@ import { useReport } from '@/components/report-sheet';
 import { Text } from '@/components/text';
 import { userById } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { applyBeautyStrength, BEAUTY_LEVELS, nextBeautyLevel, useBeautyLevel } from '@/lib/beauty';
 import { flipCallCamera, setCallCamera, setCallMic, useCallMedia } from '@/lib/call-media';
 import { liveSeconds, MODE_NAME, otherId, type CallView } from '@/lib/live/one-on-one';
 import { useApp } from '@/store';
@@ -84,6 +85,18 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
   const safety = useSafetyMenu(peer, call.other.name, onEnd);
   const left = call.free && call.maxSeconds ? Math.max(0, call.maxSeconds - seconds) : null;
   const avatar = call.other.avatarUrl ?? user.avatar;
+  // Güzellik filtresi: women's own camera in a video call, at the level they chose (one tap: the next level).
+  const me = useApp().me;
+  const beautyMine = video && me.gender === 'Kadın';
+  const beauty = useBeautyLevel();
+  useEffect(() => applyBeautyStrength(beautyMine, beauty), [beautyMine, beauty]);
+  const [beautyNote, setBeautyNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!beautyNote) return;
+    const t = setTimeout(() => setBeautyNote(null), 1500);
+    return () => clearTimeout(t);
+  }, [beautyNote]);
+  const changeBeauty = () => setBeautyNote(`Güzellik: ${BEAUTY_LEVELS[nextBeautyLevel()].name}`);
 
   return (
     <View style={styles.root}>
@@ -144,11 +157,17 @@ export function CallStage({ call, onEnd, extra, banner }: { call: CallView; onEn
           )}
         </View>
         {banner}
+        {beautyNote && (
+          <View style={styles.beautyNote} pointerEvents="none">
+            <Text style={styles.beautyNoteText}>{beautyNote}</Text>
+          </View>
+        )}
 
         <View style={styles.controls}>
           <Ctrl icon={media.micOn ? 'mic' : 'mic-off'} active={!media.micOn} label={media.micOn ? 'Mikrofonu kapat' : 'Mikrofonu aç'} onPress={() => setCallMic(!media.micOn)} />
           {video && <Ctrl icon={media.camOn ? 'videocam' : 'videocam-off'} active={!media.camOn} label={media.camOn ? 'Kamerayı kapat' : 'Kamerayı aç'} onPress={() => setCallCamera(!media.camOn)} />}
           {video && <Ctrl icon="camera-reverse" label="Kamerayı çevir" onPress={flipCallCamera} />}
+          {beautyMine && <Ctrl icon="sparkles" active={beauty > 0} label={`Güzellik: ${BEAUTY_LEVELS[beauty].name}. Değiştirmek için dokun`} onPress={changeBeauty} />}
           {extra}
           <Pressable style={[styles.ctrl, styles.hang]} onPress={onEnd} accessibilityLabel="Görüşmeyi bitir">
             <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
@@ -191,5 +210,7 @@ const styles = StyleSheet.create({
   meterText: { color: colors.gold, fontWeight: '700', fontSize: 12 },
   controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 14, paddingBottom: 24 },
   ctrl: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  beautyNote: { alignSelf: 'center', marginBottom: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  beautyNoteText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   hang: { backgroundColor: colors.red, width: 64, height: 64, borderRadius: 32 },
 });

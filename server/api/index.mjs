@@ -62,6 +62,7 @@ import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
+import { closeLines, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 
@@ -203,7 +204,11 @@ const walletRoutes = {
   },
 };
 
+// The live line (live-line.mjs) streams instead of answering once: the handler below opens it itself; this entry
+// only lets the path through the router, the limiter and FEATURES_OFF.
+const LIVE_LINE = '/api/live';
 const routes = {
+  [`GET ${LIVE_LINE}`]: () => null,
   ...walletRoutes,
   ...walletInfoRoutes,
   ...economyRoutes,
@@ -289,6 +294,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // A feature switched off in .env (FEATURES_OFF) is refused before its route runs.
     gate(req.method, url.pathname);
+    if (url.pathname === LIVE_LINE) return await openLine(req, res);
     send(200, await route(req, url));
   } catch (err) {
     // A malformed value that only Postgres caught is the request's fault: 400, not a server error. An id that
@@ -315,6 +321,8 @@ process.on('unhandledRejection', (e) => console.error('unhandled rejection', e))
 /** docker compose stop / deploy: finish the requests in flight (up to 10 s), then close the pool. */
 function shutdown(signal) {
   console.log(`${signal}: shutting down`);
+  // Open live lines would hold the shutdown up; the phones reconnect to the next process.
+  closeLines();
   stopFinanceSync();
   stopRefundSync();
   stopBondSweep();

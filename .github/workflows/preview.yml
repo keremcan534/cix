@@ -8,6 +8,10 @@ on:
     # canli-test only builds the APK (below), so testers get the live-mode app before a merge.
     branches: [ccr-0c79d9d5-0hfb46, main, canli-test]
     paths: ['app/**', '.github/workflows/preview.yml']
+  # A pull request that changes the phone's own code (native modules, config plugins, packages) is built first as a
+  # check: the Android build runs, nothing is published.
+  pull_request:
+    paths: ['app/modules/**', 'app/plugins/**', 'app/package.json', 'app/package-lock.json', 'app/app.json', '.github/workflows/preview.yml']
   workflow_dispatch:
 
 defaults:
@@ -16,7 +20,7 @@ defaults:
 
 jobs:
   web:
-    if: github.ref_name != 'canli-test'
+    if: github.ref_name != 'canli-test' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,9 +68,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Only the newest push publishes; parallel runs raced on creating the "latest" release.
+    # Only the newest push publishes; parallel runs raced on creating the "latest" release. A pull request's check
+    # runs on its own (it never cancels a release build).
     concurrency:
-      group: android-release
+      group: ${{ github.event_name == 'pull_request' && format('android-check-{0}', github.ref) || 'android-release' }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
@@ -115,8 +120,10 @@ jobs:
           # "Google ile devam et": the web client id from Google Cloud, kept as a repository variable
           # (Settings → Secrets and variables → Actions → Variables). Empty → the APK keeps the device sign-in.
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
-      - run: cp android/app/build/outputs/apk/release/app-release.apk similar-club.apk
-      - uses: softprops/action-gh-release@v2
+      - if: github.event_name != 'pull_request'
+        run: cp android/app/build/outputs/apk/release/app-release.apk similar-club.apk
+      - if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: preview-${{ github.run_number }}
           name: Android önizleme #${{ github.run_number }}

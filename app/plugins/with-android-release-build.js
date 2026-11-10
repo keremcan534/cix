@@ -1,7 +1,9 @@
 // Release-build settings the Expo template doesn't cover (applied on `expo prebuild`).
 // - R8 keep rules: LiveKit's bundled WebRTC loads livekit.org.jni_zero / livekit.org.webrtc
 //   classes from native code, so R8 must not strip or rename them (it failed with
-//   "Missing class livekit.org.jni_zero.JniZeroJni").
+//   "Missing class livekit.org.jni_zero.JniZeroJni"). The AI denoise (modules/similar-denoise)
+//   reaches LiveKit's audio processing by reflection, and the beauty filter (modules/similar-beauty) the
+//   WebRTC library's video effects: kept too.
 // - More Gradle memory: the release build ran out of JVM metaspace on CI.
 const { withDangerousMod, withGradleProperties } = require('expo/config-plugins');
 const fs = require('fs');
@@ -16,6 +18,11 @@ ${MARKER}
 -dontwarn livekit.org.webrtc.**
 -keep class io.sentry.** { *; }
 -dontwarn io.sentry.**
+-keep class com.livekit.reactnative.LiveKitReactNative { *; }
+-keep class com.livekit.reactnative.audio.processing.** { *; }
+-keep class expo.modules.similardenoise.** { *; }
+-keep class expo.modules.similarbeauty.** { *; }
+-keep class com.oney.WebRTCModule.videoEffects.** { *; }
 `;
 
 const JVM_ARGS = '-Xmx4096m -XX:MaxMetaspaceSize=1024m';

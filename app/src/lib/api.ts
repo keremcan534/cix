@@ -229,6 +229,17 @@ export async function retrySignIn(): Promise<boolean> {
 /** Any route of the API with this session (the agency panels go through lib/agency-net). */
 export const apiRequest = <T>(method: 'GET' | 'POST', path: string, body?: object) => call<T>(method, path, body);
 
+/**
+ * Opens my live line (lib/live/live-line): a request that stays open while the server writes events into it.
+ * Null when there is no server or no session yet. Not compressed, so each event comes through as it is written.
+ */
+export async function openLiveLine(signal: AbortSignal): Promise<Response | null> {
+  if (!BASE) return null;
+  await restoreSession();
+  if (!session) return null;
+  return fetch(`${BASE}/api/live`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
+}
+
 /** Signs in with this device (creating the account with `name` the first time). */
 export async function signIn(name: string): Promise<ServerUser> {
   lastName = name;

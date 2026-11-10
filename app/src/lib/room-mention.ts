@@ -52,3 +52,24 @@ export function mentions(text: string, name: string): boolean {
   }
   return false;
 }
+
+/**
+ * The line cut where it names someone in `names` ("@Name", longest names first, as stripMentions reads them), so
+ * the feed can draw those names in their own color. Each piece keeps its text; a mention also says whose name.
+ */
+export function mentionRuns(text: string, names: readonly string[]): { text: string; name?: string }[] {
+  const list = [...new Set(names.map((n) => n.trim()).filter((n) => n.length > 0))].sort((a, b) => b.length - a.length);
+  if (!list.length || !text.includes('@')) return [{ text }];
+  const re = new RegExp(`@\\s*(${list.map(escape).join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
+  const out: { text: string; name?: string }[] = [];
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    const i = m.index ?? 0;
+    if (i > at) out.push({ text: text.slice(at, i) });
+    const name = list.find((n) => lower(n) === lower(m[1])) ?? m[1];
+    out.push({ text: m[0], name });
+    at = i + m[0].length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out.length ? out : [{ text }];
+}

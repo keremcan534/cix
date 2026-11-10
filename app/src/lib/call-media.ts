@@ -1,6 +1,7 @@
 // The voice and video of one 1v1 call (lib/live/one-on-one): a LiveKit room `call-<id>` with only the two people
 // in it, joined with the token the server gives for that call. Separate from the voice room engine
-// (livekit-engine): a call that starts ends the voice room this phone is in, so two rooms never play at once.
+// (livekit-engine): a call that starts holds the voice room this phone is in (room-session holdForCall: I stay in
+// it on the Balkon and its voices go quiet), so the two never play at once; when the call ends the room plays again.
 //
 // One call at a time, held in a module-level store (useCallMedia). Every async step checks the room is still
 // the current one, so hanging up mid-join never leaves a connection open.
@@ -8,7 +9,8 @@ import { ConnectionState, Room, RoomEvent, Track, type LocalVideoTrack, type Par
 import { useSyncExternalStore } from 'react';
 
 import { beginCall, endCall } from '@/lib/media';
-import { endRoom, getSession } from '@/lib/room-session';
+import { holdForCall } from '@/lib/room-session';
+import { BEAUTY_EFFECT, registerBeauty } from '../../modules/similar-beauty';
 import { ensureWebRtc, holdAudio, playRemote, releaseAudio } from '@/lib/webrtc-globals';
 
 /** What a video view shows (the shape of @livekit/components-react's TrackReference). */
@@ -67,9 +69,8 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
   if (room && state.callId === callId) return;
   leaveCallMedia();
   if (!URL) return patch({ ...IDLE, callId, status: 'failed', error: 'Arama sunucusu ayarlı değil' });
-  // A voice room would play over the call: the call wins.
-  const s = getSession().session;
-  if (s && s.status !== 'ended') endRoom('left');
+  // A voice room I'm in stays: I go to its Balkon and its voices go quiet until the call ends (room-session).
+  holdForCall(true);
   ensureWebRtc();
   endCall();
   beginCall({ kind: 'direct', mode: video ? 'video' : 'voice', peerId: peer });
@@ -103,10 +104,26 @@ export async function joinCallMedia(callId: number, token: string, video: boolea
     patch({ status: 'connected' });
     await r.localParticipant.setMicrophoneEnabled(true, CAPTURE).catch(() => room === r && patch({ micOn: false, error: 'Mikrofon izni yok' }));
     if (video) await r.localParticipant.setCameraEnabled(true, { facingMode: 'user' }).catch(() => room === r && patch({ camOn: false, error: 'Kamera izni yok' }));
+    if (video) beautify(r);
     refresh(r);
   } catch (e) {
     if (room !== r) return;
     patch({ status: 'failed', error: e instanceof Error ? e.message : 'Görüşmeye bağlanılamadı' });
+  }
+}
+
+/**
+ * My camera gets the beauty filter (modules/similar-beauty): it runs at the strength the call screen sets, which is
+ * 0 (the frames pass untouched) unless it is mine to use. Again after every new camera track (on, flipped).
+ */
+function beautify(r: Room) {
+  if (room !== r || !registerBeauty()) return;
+  const track = r.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+  const media = track?.mediaStreamTrack as unknown as { _setVideoEffects?: (names: string[]) => void } | undefined;
+  try {
+    media?._setVideoEffects?.([BEAUTY_EFFECT]);
+  } catch {
+    // An older WebRTC build without video effects: the camera goes as it is.
   }
 }
 
@@ -115,6 +132,8 @@ export function leaveCallMedia() {
   const r = room;
   if (!r) return;
   room = null;
+  // The room I stayed in plays again.
+  holdForCall(false);
   playing.forEach((stop) => stop());
   playing.clear();
   void r.disconnect().finally(() => void releaseAudio('call'));
@@ -134,7 +153,7 @@ export function setCallCamera(on: boolean) {
   patch({ camOn: on });
   void r.localParticipant
     .setCameraEnabled(on, on ? { facingMode: state.front ? 'user' : 'environment' } : undefined)
-    .then(() => refresh(r))
+    .then(() => (on && beautify(r), refresh(r)))
     .catch(() => room === r && patch({ camOn: !on }));
 }
 /** Front or back camera. */
@@ -146,6 +165,6 @@ export function flipCallCamera() {
   patch({ front });
   void track
     .restartTrack({ facingMode: front ? 'user' : 'environment' })
-    .then(() => refresh(r))
+    .then(() => (beautify(r), refresh(r)))
     .catch(() => room === r && patch({ front: !front }));
 }

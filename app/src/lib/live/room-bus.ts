@@ -64,7 +64,9 @@ const signalListeners = new Set<(roomId: string, from: string, msg: RoomSignal) 
 const seatListeners = new Set<(roomId: string, seat: number | null) => void>();
 const pkListeners = new Set<(roomId: string) => void>();
 const roomListeners = new Set<(roomId: string) => void>();
-const bagListeners = new Set<(roomId: string) => void>();
+/** A bag packet: which bag, and whether it is the draw's (the bag was just drawn) rather than a new bag. */
+export type BagNews = { id: number | null; drawn: boolean };
+const bagListeners = new Set<(roomId: string, news: BagNews) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 // The same for paid Hareketli (their own ids: a room_animations row, not a gift_events one).
@@ -161,7 +163,11 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
   if (from === null) {
     if (isServerPk(raw)) return pkListeners.forEach((l) => l(roomId));
     if (isServerRoom(raw)) return roomListeners.forEach((l) => l(roomId));
-    if (isServerBag(raw)) return bagListeners.forEach((l) => l(roomId));
+    if (isServerBag(raw)) {
+      const p = raw as Record<string, unknown>;
+      const news: BagNews = { id: typeof p.id === 'number' && Number.isSafeInteger(p.id) ? p.id : null, drawn: p.drawn === true };
+      return bagListeners.forEach((l) => l(roomId, news));
+    }
     const fx = parseServerFx(raw);
     if (fx) {
       if (seenFx.includes(fx.msg.eventId)) return;
@@ -280,9 +286,9 @@ export function onServerRoom(roomId: string, fn: () => void) {
   roomListeners.add(l);
   return () => void roomListeners.delete(l);
 }
-/** The server says a bag was dropped in this room; returns the unsubscribe. */
-export function onServerBag(roomId: string, fn: () => void) {
-  const l = (r: string) => r === roomId && fn();
+/** The server says a bag was dropped in this room, or drawn (news.drawn); returns the unsubscribe. */
+export function onServerBag(roomId: string, fn: (news: BagNews) => void) {
+  const l = (r: string, news: BagNews) => r === roomId && fn(news);
   bagListeners.add(l);
   return () => void bagListeners.delete(l);
 }

@@ -14,7 +14,8 @@ import { messagePreview } from '@/components/ReactionArt';
 import { Avatar, VerifiedBadge } from '@/components/ui';
 import { messageTime } from '@/data/messages-ui';
 import { userById } from '@/data/mock';
-import { loadProfile } from '@/lib/live';
+import { CallButtons } from '@/components/one-on-one-bar';
+import { callsAvailable, liveCalls, loadProfile } from '@/lib/live';
 import { isLiveUser } from '@/lib/live/messages';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
@@ -54,15 +55,22 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (openId ? setOpenId(null) : close())}>
       <KeyboardAvoid style={[s.root, { paddingTop: top + 8 }]}>
         <Pressable style={s.backdrop} onPress={close} accessibilityLabel="Kapat" />
-        <View style={s.sheet}>
+        <View style={[s.sheet, user && s.threadSheet]}>
           <View style={s.handle} />
           {user ? (
             <ChatThread
               key={user.id}
               user={user}
               compact
+              // In the room only the newest 5 show, so the sheet stays low and the room in view; the rest open
+              // the whole chat.
+              last={5}
+              onMore={() => {
+                close();
+                router.push({ pathname: '/sohbet/[id]', params: { id: user.id } });
+              }}
               avoidKeyboard={false}
-              header={(typing) => (
+              header={(typing, pair) => (
                 <View style={s.head}>
                   <Pressable onPress={() => setOpenId(null)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Mesajlara dön">
                     <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -77,7 +85,20 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
                     </View>
                     <Text style={s.dim}>{typing ? 'yazıyor...' : user.online ? 'Çevrimiçi' : user.city}</Text>
                   </View>
-                  <Pressable onPress={close} hitSlop={10} accessibilityLabel="Kapat">
+                  {/* Call shortcuts, by the close button: the same calls as the chat screen's. */}
+                  {!callsAvailable() ? (
+                    liveCalls() && pair && !blocked.has(user.id) && <CallButtons userId={user.id} pair={pair} />
+                  ) : (
+                    <>
+                      <Pressable onPress={() => (close(), router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'sesli' } }))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sesli ara">
+                        <Ionicons name="call-outline" size={22} color="#fff" />
+                      </Pressable>
+                      <Pressable onPress={() => (close(), router.push({ pathname: '/arama/[id]', params: { id: user.id, mode: 'goruntulu' } }))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Görüntülü ara">
+                        <Ionicons name="videocam-outline" size={24} color="#fff" />
+                      </Pressable>
+                    </>
+                  )}
+                  <Pressable onPress={close} hitSlop={10} style={{ marginLeft: 4 }} accessibilityLabel="Kapat">
                     <Ionicons name="close" size={24} color={colors.textDim} />
                   </Pressable>
                 </View>
@@ -159,6 +180,8 @@ const s = StyleSheet.create({
     boxShadow: '0 -10px 30px rgba(0,0,0,0.45)',
     overflow: 'hidden',
   },
+  // A chat holds the newest 5 messages: a lower sheet, the room stays in view above it.
+  threadSheet: { height: '60%' },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 6 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   name: { color: '#fff', fontWeight: '700', fontSize: 15 },

@@ -8,7 +8,8 @@ export const BAG_RULES = {
   giftCounts: [10, 30, 99],
   giftPackets: [5, 10, 15],
   delays: [0, 120, 300],
-  windowSeconds: 180,
+  // How long a bag falls once it opens: whoever taps it then joins, and the draw is when it ends.
+  windowSeconds: 30,
 };
 
 /**
@@ -42,4 +43,25 @@ export function takeParts(parts, amount) {
   }
   if (left > 0) throw new Error('lucky bag: kept coins short');
   return [taken, kept];
+}
+
+/**
+ * The bag's shares dealt among the people who joined, at random: with as many people as shares or more, a random
+ * `shares.length` of them get one share each (not everyone wins); with fewer, everyone gets one and each share
+ * left goes to someone among them at random, so the whole bag is always given out. [userId, units][], one per
+ * winner, units summed.
+ */
+export function deal(shares, entrants, randInt = (n) => crypto.randomInt(n)) {
+  if (!entrants.length) return [];
+  const people = [...entrants];
+  for (let i = people.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [people[i], people[j]] = [people[j], people[i]];
+  }
+  const won = new Map();
+  shares.forEach((units, i) => {
+    const who = i < people.length ? people[i] : people[randInt(people.length)];
+    won.set(who, (won.get(who) ?? 0) + units);
+  });
+  return [...won];
 }

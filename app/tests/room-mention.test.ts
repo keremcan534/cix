@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { checkText } from '@/lib/contact-filter';
-import { insertMention, mentionPicks, mentionQuery, mentions, stripMentions } from '@/lib/room-mention';
+import { insertMention, mentionPicks, mentionQuery, mentionRuns, mentions, stripMentions } from '@/lib/room-mention';
 
 describe('@bahset', () => {
   test('yazılan "@…" bulunur; e-posta gibi bitişik "@" sayılmaz', () => {
@@ -49,5 +49,22 @@ describe('@bahset', () => {
     assert.equal(ok('@ayse.insta takip et'), false, 'odada olmayan bir @hesap');
     assert.equal(ok('@Ayşeinsta'), false, 'adın devamı başka bir hesap');
     assert.equal(ok('@Ayşe beni 0532 123 45 67 ara'), false, 'bahsetme telefonu geçirmez');
+  });
+});
+
+describe('@bahset: satırda adlar renkli', () => {
+  const names = ['Ayşe', 'Ayşe Yılmaz', 'Mert'];
+  test('odadaki birinin adı ayrı parça olur, en uzun ad önce', () => {
+    assert.deepEqual(mentionRuns('@Ayşe Yılmaz selam @mert nasılsın', names), [
+      { text: '@Ayşe Yılmaz', name: 'Ayşe Yılmaz' },
+      { text: ' selam ' },
+      { text: '@mert', name: 'Mert' },
+      { text: ' nasılsın' },
+    ]);
+  });
+  test('adın devamı varsa ya da kimse değilse düz yazı kalır', () => {
+    assert.deepEqual(mentionRuns('@Mertcan ve @kimse', names), [{ text: '@Mertcan ve @kimse' }]);
+    assert.deepEqual(mentionRuns('selam', names), [{ text: 'selam' }]);
+    assert.deepEqual(mentionRuns('@Ayşe', []), [{ text: '@Ayşe' }]);
   });
 });
