@@ -4,8 +4,8 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { STICKER_PACKS } from '@/data/catalog';
-import { parseSignal } from '@/lib/live/room-bus';
-import { RPS, isMovePick, moveLine, moveOfPick, needsMic, parseMove, sideTarget } from '@/lib/room-moves';
+import { decodeSignal, encodeSignal, parseSignal } from '@/lib/live/room-bus';
+import { MIRRORED_ART, MOVE_ART, RPS, diceFace, isMovePick, moveArt, moveLine, moveOfPick, moveShuffle, needsMic, parseMove, sideTarget, type Move } from '@/lib/room-moves';
 
 describe('Hamle: seçim ve sonuç', () => {
   test('Hamle sekmesindeki her seçim bir hamle yapar; başka çıkartma yapmaz', () => {
@@ -62,6 +62,57 @@ describe('Hamle: başka telefondan gelen', () => {
     assert.deepEqual(parseSignal({ t: 'act', a: 'punch', d: 'r' }), { t: 'act', a: 'punch', d: 'r' });
     assert.equal(parseSignal({ t: 'act', a: 'dice', n: 9 }), null);
     assert.equal(parseSignal({ t: 'act' }), null);
+  });
+});
+
+describe('Hamle: mikrofonda görünen', () => {
+  test('mikrofon, paneldeki seçimin görselini gösterir: sola öpücük sola, sağa öpücük sağa bakar', () => {
+    assert.equal(moveArt({ a: 'kiss', d: 'l' }), 'hamle-opucuk-sol');
+    assert.equal(moveArt({ a: 'kiss', d: 'r' }), 'hamle-opucuk-sag');
+    assert.equal(moveArt({ a: 'punch', d: 'l' }), 'hamle-yumruk-sol');
+    assert.equal(moveArt({ a: 'punch', d: 'r' }), 'hamle-yumruk-sag');
+    // The two kisses share one animation; only the left one is turned round, in the panel and on the mic alike.
+    assert.equal(MIRRORED_ART.has('hamle-opucuk-sol'), true);
+    assert.equal(MIRRORED_ART.has('hamle-opucuk-sag'), false);
+    // Every pick of the tab draws itself on the mic (what the panel shows is what the room sees).
+    const picks = STICKER_PACKS.find((p) => p.id === 'hamle')!.stickers.map((x) => x.id);
+    for (const id of picks.filter((x) => /-(sol|sag)$/.test(x))) assert.equal(moveArt(moveOfPick(id)!), id);
+  });
+
+  test('zar: mikrofonda atılan yüz durur (hep 1 değil); dönerken o yüz görünmez', () => {
+    for (let n = 1; n <= 6; n++) {
+      const m: Move = { a: 'dice', n };
+      assert.equal(moveArt(m), diceFace(n));
+      assert.equal(moveArt(m), `hamle-zar-${n}`);
+      assert.ok(MOVE_ART[moveArt(m)], `zar ${n}: adı ve yedek emojisi`);
+      const tumble = moveShuffle(m);
+      assert.ok(tumble.length >= 6, `zar ${n}: dönüş`);
+      assert.ok(!tumble.includes(diceFace(n)), `zar ${n}: sonuç erken görünmez`);
+      tumble.forEach((f, i) => assert.notEqual(f, tumble[i - 1], `zar ${n}: aynı yüz üst üste`));
+      for (const f of tumble) assert.match(f, /^hamle-zar-[1-6]$/);
+    }
+  });
+
+  test('Taş Kağıt Makas: çıkan el durur; eller karışırken her telefonda aynı sırayla', () => {
+    for (let n = 0; n < 3; n++) {
+      assert.equal(moveArt({ a: 'rps', n }), RPS[n].id);
+      assert.deepEqual(moveShuffle({ a: 'rps', n }), ['hamle-tas', 'hamle-kagit', 'hamle-makas', 'hamle-tas', 'hamle-kagit', 'hamle-makas']);
+    }
+    assert.deepEqual(moveShuffle({ a: 'kiss', d: 'l' }), []);
+  });
+
+  test('sonuç bir kez, atanın telefonunda çekilir ve mesajla gider: odadaki herkes aynı yüzü görür', () => {
+    for (const x of [0, 0.2, 0.4, 0.6, 0.8, 0.99]) {
+      for (const pick of ['hamle-zar', 'hamle-tkm']) {
+        const mine = moveOfPick(pick, () => x)!;
+        // The other phone gets the packet as it travels (room-bus wire format) and draws from it, without a new draw.
+        const theirs = parseSignal(decodeSignal(encodeSignal({ t: 'act', ...mine })));
+        assert.ok(theirs && theirs.t === 'act', pick);
+        const { t: _t, ...move } = theirs;
+        assert.equal(moveArt(move as Move), moveArt(mine), `${pick} ${x}`);
+        assert.equal(moveLine('Ece', move as Move), moveLine('Ece', mine));
+      }
+    }
   });
 });
 

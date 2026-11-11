@@ -60,7 +60,10 @@ export const cosmeticById = (id?: string | null) => COSMETICS.find((c) => c.id =
 // as a Unicode emoji, so typing 🦊 does not draw the paid fox sticker.
 
 const list = (emojis: string) => emojis.split(' ');
-/** Free standard Unicode emoji, grouped for the picker. The device keyboard offers the rest. */
+/**
+ * Free standard Unicode emoji, grouped. The emoji panel no longer has a tab of them (the phone's keyboard offers them):
+ * a room still shows one over a seat when an older app sends it (components/room/live-room).
+ */
 export const STANDARD_EMOJI: { id: string; name: string; emojis: string[] }[] = [
   {
     id: 'faces',
@@ -116,13 +119,18 @@ export type StickerPack = {
   animated?: boolean;
   /** Only in a room's emoji panel (Hamle: its picks act on the mics), never in a chat's panel or the shop. */
   roomOnly?: boolean;
+  /** No longer offered (neither the emoji panel nor the shop shows it); kept so stickers already sent still draw. */
+  retired?: boolean;
 };
 const st = (id: string, name: string, emoji: string): Sticker => ({ id, name, emoji });
 export const STICKER_PACKS: StickerPack[] = [
   {
+    // Taken out of the emoji panel (Güncelleme 4): the Emoji tab's animated faces say the same. Free, so nobody loses
+    // a purchase; old messages and seat reactions with these stickers still draw.
     id: 'basic',
     name: 'Temel',
     price: 0,
+    retired: true,
     stickers: [
       st('temel-gulumseme', 'Gülümseme', '😀'),
       st('temel-kahkaha', 'Kahkaha', '😂'),
@@ -141,8 +149,9 @@ export const STICKER_PACKS: StickerPack[] = [
     ],
   },
   {
-    // Animated faces (Google's Animated Noto Emoji, CC BY 4.0: data/art-licenses), free for everyone. On a mic a
-    // pick covers the photo and plays (components/room/parts SeatReaction); in a chat it is a sticker that plays once.
+    // Animated faces (Google's Animated Noto Emoji, CC BY 4.0: data/art-licenses), free for everyone: the emoji
+    // panel's first tab, named "Emoji" there (lib/emoji-panel), with Müzik and Hamle under them. On a mic a pick covers
+    // the photo and plays (components/room/parts SeatReaction); in a chat it is a sticker that plays once.
     id: 'duygu',
     name: 'Duygular',
     price: 0,
@@ -182,7 +191,8 @@ export const STICKER_PACKS: StickerPack[] = [
     ],
   },
   {
-    // Dance and music, for when the room's music plays: the same animated set as Duygular, free for everyone.
+    // Dance and music, for when the room's music plays: the same animated set as Duygular, free for everyone; in the
+    // emoji panel's Emoji tab.
     id: 'muzik',
     name: 'Müzik',
     price: 0,
@@ -203,14 +213,15 @@ export const STICKER_PACKS: StickerPack[] = [
   },
   {
     // Hamle (lib/room-moves): each pick does something on the mics. A kiss or a punch flies to the mic on my left
-    // or right; the dice and Taş Kağıt Makas show a result the whole room sees. Room only, free for everyone.
+    // or right; the dice and Taş Kağıt Makas show a result the whole room sees. Room only, free for everyone; in the
+    // emoji panel's Emoji tab.
     id: 'hamle',
     name: 'Hamle',
     price: 0,
     roomOnly: true,
     stickers: [
-      st('hamle-opucuk-sol', 'Sola öpücük', '💋'),
-      st('hamle-opucuk-sag', 'Sağa öpücük', '💋'),
+      st('hamle-opucuk-sol', 'Sola öpücük', '😘'),
+      st('hamle-opucuk-sag', 'Sağa öpücük', '😘'),
       st('hamle-yumruk-sol', 'Sola yumruk', '🤛'),
       st('hamle-yumruk-sag', 'Sağa yumruk', '🤜'),
       st('hamle-zar', 'Zar at', '🎲'),

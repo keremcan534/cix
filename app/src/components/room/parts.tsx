@@ -24,6 +24,8 @@ import { nameLine, nameSize } from '@/lib/seat-fit';
 import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
+import { AssetView } from '@/components/fx/anim-player';
+import type { Asset } from '@/data/animations';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -185,7 +187,7 @@ export function Seat({
               <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
             </View>
           )}
-          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
+          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
           // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
@@ -248,21 +250,22 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
 }
 
 /**
- * `pre`: pictures that flash by before `emoji` settles (Taş Kağıt Makas shuffling its hands). `badge`: a short
- * result under the picture (the dice's number, the hand's name), shown `badgeAt` ms in. `ms`: how long it all stays.
+ * `pre`: pictures that flash by before `emoji` settles (the die tumbling, Taş Kağıt Makas shuffling its hands). `badge`:
+ * a short result under the picture (the dice's number, the hand's name), shown `badgeAt` ms in. `ms`: how long it all
+ * stays. `art`: a Hareketli item's picture (lib/animations), drawn instead of `emoji` (then its name).
  */
-export type SeatReactionData = { emoji: string; key: number; pre?: string[]; badge?: string; badgeAt?: number; ms?: number };
+export type SeatReactionData = { emoji: string; key: number; art?: Asset; pre?: string[]; badge?: string; badgeAt?: number; ms?: number };
 export const REACTION_MS = 2600;
 /** A Hamle with a result (lib/room-moves) stays long enough to be read. */
 export const RESULT_MS = 4400;
 const SHUFFLE_STEP_MS = 170;
 
 /**
- * An emoji over a seated person's avatar (seat reaction): it pops in, beats a few times, then fades. A sticker covers
- * the photo and stays on it; an animated one (Duygular) plays over and over instead of beating. A plain emoji is
- * smaller and rises as it goes.
+ * An emoji over a seated person's avatar (seat reaction): it pops in, beats a few times, then fades. A sticker or a
+ * Hareketli picture covers the photo and stays on it; an animated sticker (the Emoji tab) plays over and over instead
+ * of beating. A plain emoji is smaller and rises as it goes.
  */
-export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms = REACTION_MS }: { emoji: string; size: number; still?: boolean } & Pick<SeatReactionData, 'pre' | 'badge' | 'badgeAt' | 'ms'>) {
+export function SeatReaction({ emoji, art, size, still, pre, badge, badgeAt = 0, ms = REACTION_MS }: { emoji: string; size: number; still?: boolean } & Pick<SeatReactionData, 'art' | 'pre' | 'badge' | 'badgeAt' | 'ms'>) {
   // The shuffle before the result: one picture after another, then `emoji` (reduced motion shows the result at once).
   const shuffle = still ? 0 : (pre?.length ?? 0);
   const [step, setStep] = useState(0);
@@ -278,8 +281,9 @@ export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms =
     const t = setTimeout(() => setBadgeOn(true), still ? 0 : Math.max(badgeAt, shuffle * SHUFFLE_STEP_MS));
     return () => clearTimeout(t);
   }, [badge, badgeAt, shuffle, still]);
-  const id = stickerIdOf(emoji);
-  const cover = !!id;
+  // The result decides how it moves (a shuffle's pictures only flash by).
+  const id = art ? null : stickerIdOf(emoji);
+  const cover = !!art || !!id;
   const moving = !!id && isAnimatedSticker(id);
   const [v] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {
@@ -324,7 +328,12 @@ export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms =
         ],
       }}
     >
-      <ReactionArt emoji={shown} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
+      {art ? (
+        <AssetView asset={art} size={size * 1.12} />
+      ) : (
+        // A new picture is a new player (each step of a shuffle, then the result), so the result always draws and plays.
+        <ReactionArt key={shown} emoji={shown} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
+      )}
       {badge && badgeOn && (
         <View style={[styles.resultBadge, { bottom: -size * 0.06 }]} accessibilityLabel={`Sonuç: ${badge}`}>
           <Text style={[styles.resultText, { fontSize: Math.round(Math.max(11, Math.min(18, size * 0.26))) }]} numberOfLines={1}>

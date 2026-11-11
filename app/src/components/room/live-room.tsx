@@ -104,7 +104,7 @@ import { roomUnmute } from '@/lib/api';
 import { showAlert } from '@/lib/alert';
 import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
-import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
+import { animById, getAnimations, isLive, isSentAnim, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend, subscribeRoom } from '@/lib/animations';
 import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
 import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { refreshCasino } from '@/lib/live/casino';
@@ -161,7 +161,7 @@ import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
 import { fitGrid, fitLayout, layoutPlan, type FitOpts, type Fitted } from '@/lib/seat-fit';
 import { patronOnSeat } from '@/lib/patron-seat';
-import { RPS, isMovePick, moveLine, moveOfPick, needsMic, sideTarget, type Move, type Rect as MicRect } from '@/lib/room-moves';
+import { RPS, isMovePick, moveArt, moveLine, moveOfPick, moveShuffle, needsMic, sideTarget, type Move, type Rect as MicRect } from '@/lib/room-moves';
 import { colors, fonts, gradient, semantic } from '@/theme';
 import { MuteBanner, useStopped } from '@/components/sanction-screen';
 import { refreshSanctions, showSanction } from '@/lib/sanctions';
@@ -194,8 +194,8 @@ const offlineBlocked = () => {
   return true;
 };
 
-// Bots mix free Temel stickers with standard emoji.
-const BOT_REACTIONS = [stickerToken('temel-kahkaha'), stickerToken('temel-asik'), stickerToken('oda-alkis'), '🔥', '😎', '🥳', '❤️', stickerToken('temel-begendim'), stickerToken('oda-saskin'), '🤣'];
+// Bots send what the emoji panel's Emoji tab has (the animated faces).
+const BOT_REACTIONS = ['duygu-kahkaha', 'duygu-asik', 'duygu-alkis', 'duygu-alev', 'duygu-havali', 'duygu-parti', 'duygu-kalbim', 'duygu-super', 'duygu-afalladim', 'duygu-yerlere-yattim'].map(stickerToken);
 const BOT_ENTRY_FX: EntryFx[] = ['sparkle', 'thunder', 'comet', 'dragon', 'vip'];
 const NO_BONDS: RoomBond[] = [];
 /** Someone's entry show in a server room, from their shop look (entry effect, ride, noble rank); null: none. */
@@ -208,7 +208,8 @@ function entryShowOf(look: Look | undefined, name: string, avatar: string): Entr
   const tier = vipTier(look.vipLevel);
   return { name, avatar, fx: (entryItem?.fx as EntryFx | undefined) ?? 'vip', ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge: noble?.emoji };
 }
-// What another phone may put over its seat: the emoji panel's own emoji and stickers (no free text, no unknown art).
+// What another phone may put over its seat: a sticker of a known pack, or a standard emoji an older app's panel had
+// (no free text, no unknown art).
 const SEAT_EMOJI = new Set(STANDARD_EMOJI.flatMap((g) => g.emojis));
 const STICKER_IDS = new Set(STICKER_PACKS.flatMap((p) => p.stickers.map((x) => x.id)));
 const seatEmojiOk = (e: string) => {
@@ -1338,11 +1339,26 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [speaking]);
 
   // Seat emoji: plays over the sender's avatar, then clears itself (unless replaced by a newer one).
-  const react = (uid: string, emoji: string, more?: Pick<SeatReactionData, 'pre' | 'badge' | 'badgeAt' | 'ms'>) => {
+  const react = (uid: string, emoji: string, more?: Pick<SeatReactionData, 'art' | 'pre' | 'badge' | 'badgeAt' | 'ms'>) => {
     const key = reactionKey();
     setReactions((r) => ({ ...r, [uid]: { emoji, key, ...more } }));
     setTimeout(() => setReactions((r) => (r[uid]?.key === key ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== uid)) : r)), more?.ms ?? REACTION_MS);
   };
+  // Hareketli on the mic: whatever the panel's Hareketli tabs send (a reaction, an effect gift, a full-screen effect)
+  // also covers the sender's photo on their mic, as an Emoji-tab sticker does, on every phone, from the moment its
+  // effect starts. Each send comes through lib/animations' room bus: mine, another phone's free one (room-bus 'anim'),
+  // a paid one the server announced ('fx') and a sample room's. The effect layer alone (fx/anim-layer) only drew
+  // pictures that leave the seat or fly to the middle, so nothing stayed on the mic. Others' mic effects come this
+  // way too, but they aren't sent (isSentAnim) and keep to their ring around the seat.
+  useEffect(
+    () =>
+      subscribeRoom(id, (e) => {
+        const a = animById(e.animationId);
+        if (!a || !isSentAnim(a)) return;
+        setTimeout(() => react(e.fromUserId, a.name, { art: a.preview_asset, ms: Math.max(REACTION_MS, a.duration_ms) }), Math.max(0, e.startAt - Date.now()));
+      }),
+    [id],
+  );
   // --- Hamle (lib/room-moves): a kiss or a punch to the mic beside mine, the dice, Taş Kağıt Makas ---------------
   const lastMoveFrom = useRef(new Map<string, number>());
   const measured = (v: HostInstance) => new Promise<MicRect | null>((done) => v.measureInWindow((x, y, w, h) => done(w ? { x, y, w, h } : null)));
@@ -1372,12 +1388,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // A result is also a chat line, so it can be read after the picture is gone (and from the Balkon, where no mic shows it).
     if (line) addMsg({ system: true, text: line });
     if (!settings.seatReactions) return;
-    if (move.a === 'dice') return react(uid, stickerToken('hamle-zar'), { badge: String(move.n), badgeAt: 1_100, ms: RESULT_MS });
-    if (move.a === 'rps') {
-      const hands = RPS.map((h) => stickerToken(h.id));
-      return react(uid, hands[move.n], { pre: [...hands, ...hands], badge: RPS[move.n].name, ms: RESULT_MS });
-    }
-    react(uid, stickerToken(move.a === 'kiss' ? 'duygu-opucuk' : move.d === 'l' ? 'hamle-yumruk-sol' : 'hamle-yumruk-sag'));
+    // The mic shows what the pick shows in the panel (a kiss to the left faces left), and a result as it came in the
+    // move: the face the sender's die landed on, the hand that came out (lib/room-moves moveArt), the same on every phone.
+    const art = stickerToken(moveArt(move));
+    if (move.a === 'dice' || move.a === 'rps') return react(uid, art, { pre: moveShuffle(move).map(stickerToken), badge: move.a === 'dice' ? String(move.n) : RPS[move.n].name, ms: RESULT_MS });
+    react(uid, art);
     if (visibleRef.current && !settings.effectsOff && !settings.reduceMotion) void flyMove(uid, move);
   };
   /** My own pick in the Hamle tab: drawn here, and sent to the other phones of a server room. */
