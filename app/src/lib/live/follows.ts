@@ -1,21 +1,25 @@
-// Live mode (lib/live): the Takipçiler / Takip lists from the server, and the "Yeni takipçi" notice. Push
-// notifications are not set up yet, so a new follower is noticed by this phone itself: LiveSync reads my
-// followers now and then and tells me about the ones newer than the last time it looked.
+// Live mode (lib/live): my Takip ettiklerim, Takipçilerim and Arkadaşlar from the server, and the "Yeni takipçi"
+// notice. Only my own lists exist: the server refuses anyone else's. Push notifications are not set up yet, so a new
+// follower is noticed by this phone itself: LiveSync reads my followers now and then and tells me about the ones
+// newer than the last time it looked.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as api from '@/lib/api';
 import { followNotices } from '@/lib/follow-notices';
+import { splitTies, type TieSide } from '@/lib/follow-ties';
 import { myServerId, rememberUser, toLocal } from '@/lib/live';
 import type { Notice } from '@/store';
 
-export type FollowSide = 'followers' | 'following';
 export type FollowPerson = { id: string; name: string; avatarUrl: string | null };
 
-/** One list of `userId` (a server id; default me). The ids come back as this app's own (mine is 'me'). */
-export async function loadFollowList(side: FollowSide, userId?: string): Promise<FollowPerson[]> {
-  const users = await api.followList(side, userId);
-  users.forEach(rememberUser);
-  return users.map((u) => ({ id: toLocal(u.id), name: u.name, avatarUrl: u.avatarUrl }));
+/**
+ * One of my three lists (lib/follow-ties), read now from my follows both ways (GET /api/me/friends): someone who
+ * follows me back is only under Arkadaşlar. The ids come back as this app's own.
+ */
+export async function loadMyList(side: TieSide): Promise<FollowPerson[]> {
+  const list = (await api.myFriends()).filter((f) => f.id !== myServerId());
+  list.forEach(rememberUser);
+  return splitTies(list)[side].map((u) => ({ id: toLocal(u.id), name: u.name, avatarUrl: u.avatarUrl }));
 }
 
 const seenKey = (me: string) => `canli:takipci-son:${me}`;

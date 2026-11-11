@@ -32,9 +32,10 @@ export const useTies = (serverId: string | null) => useSyncExternalStore(subscri
 
 /**
  * `blockedByMe`: whether the server already has my block, so a read sent right after a block can be told apart.
- * The rest (levels, friends, received gifts, staff role, extras, album) is missing from an older server.
+ * `followers` / `following` are totals, `oneWay` the profile's Takipçi and Takip (lib/follow-ties tieCounts). The rest
+ * (one-way counts, levels, friends, received gifts, staff role, extras, album) is missing from an older server.
  */
-export type SocialCounts = { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<api.ProfileMore>;
+export type SocialCounts = { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<api.ProfileMore>;
 
 /** My profile as the server keeps it. Empty fields stay empty, so no demo value (a handle, a city) survives. */
 export function meFromServer(u: api.ServerMe): Partial<User> {
@@ -88,6 +89,7 @@ export async function loadPublicProfile(serverId: string, mine = false, visit = 
   return {
     followers: p.followers,
     following: p.following,
+    ...(p.oneWay && { oneWay: p.oneWay }),
     isFollowing: p.isFollowing,
     blockedByMe: !!p.blockedByMe,
     ...(p.levels && { levels: p.levels }),

@@ -156,8 +156,8 @@ Kim yükledi, kim aldı, kim aktardı, kimin adına, hangi IP'den, hangi dekontl
 |---|---|
 | `PATCH /api/me` | Ad, kullanıcı adı (benzersiz, küçük harf), cinsiyet, doğum tarihi (18 yaş altı reddedilir; bir kez girilir), şehir, hakkında, ilgi alanları (uygulamadaki listeden, en fazla 5), fotoğraf adresi (https) |
 | `DELETE /api/me` | Hesap silme (uygulamada Ayarlar → Hesabı sil, iki kez sorulur): kişisel alanlar, telefon numarası, giriş anahtarı, Google ve e-posta bağlantısı, bekleyen kodlar, WhatsApp doğrulama denemeleri, oturumlar, bildirim anahtarları, takipler, engeller, mesajlar, iletişim filtresi sayaçları, kendi odaları ve giydikleri gider; mağaza ürünleri geri alınır (özel numara boşa çıkar); hesap kimliği, işlem kaydı, hediye, satın alma ve ürün kayıtları (mali kayıt) saklanır. Aynı cihaz, numara, e-posta veya Google hesabı yeniden girerse yeni, boş bir hesap açılır. |
-| `GET /api/user?id=` | Herkese açık profil (bakiye, doğum tarihi ve rol yok; yalnız yaş), takipçi/takip sayısı, takip ediyor muyum, engelledim mi. Seni engelleyen kişi için 404. |
-| `POST /api/follow` `{to, follow}` · `GET /api/following` | Takip et / bırak; engel varsa takip edilemez; yeni takipte bildirim |
+| `GET /api/user?id=` | Herkese açık profil (bakiye, doğum tarihi ve rol yok; yalnız yaş), takipçi/takip sayısı (toplam; `oneWay`: profilde görünen tek yönlü Takipçi ve Takip, karşılıklı takipleşenler yalnız `friends` içinde), takip ediyor muyum, engelledim mi. Seni engelleyen kişi için 404. |
+| `POST /api/follow` `{to, follow}` · `GET /api/following` · `GET /api/followers` | Takip et / bırak; engel varsa takip edilemez; yeni takipte bildirim. Listeler yalnız hesabın sahibine: `?user=` başka biri ise 403 (`lists_private`), gizlilik ayarı ne olursa olsun |
 | `POST /api/block` `{to, block}` · `GET /api/blocks` | Engelle / kaldır; engel iki yöndeki takipleri bitirir |
 | `POST /api/report` `{type, id, reason, note}` | Şikâyet (kullanıcı, oda, mesaj, an); aynı kişinin aynı hedefe ikinci şikâyeti tek sayılır. Uygulamada profil, sohbet ve oda menüsündeki **Şikâyet et** sebep sordurup buraya gönderir (sohbette mesaj, odada oda adı not olarak eklenir). |
 

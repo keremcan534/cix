@@ -2,11 +2,11 @@
 //
 //   PATCH  /api/me      { name?, username?, gender?, birthDate?, city?, bio?, interests?, avatarUrl? } → { user }
 //   DELETE /api/me                                        → { deleted: true }
-//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts + relation; visit=1 from the profile screen records a visit;
+//   GET    /api/user?id=&visit=1                          → { user }  (public profile + counts (oneWay: Takipçi / Takip without friends) + relation; visit=1 from the profile screen records a visit;
 //                                                                       levels, friends, gifts, staff, extras and album: profiles.mjs)
 //   GET    /api/me/visitors                               → { count, visitors }  (last 7 days; visitors only with VIP)
 //   POST   /api/follow  { to, follow }                    → { following }
-//   GET    /api/following                                 → { users }
+//   GET    /api/following · GET /api/followers            → { users }  (mine only; ?user= naming anyone else: 403)
 //   POST   /api/block   { to, block }                     → { blocked }
 //   GET    /api/blocks                                    → { users }
 //   POST   /api/report  { type, id, reason, note? }       → { reported: true, updated }
@@ -21,7 +21,7 @@ import { svipLevel, vipLevelOf } from './catalog.mjs';
 import { familyOf, leaveFamily } from './families.mjs';
 import { dropFromQueues } from './music.mjs';
 import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
-import { listsHidden, shownToViewer } from './privacy.mjs';
+import { shownToViewer } from './privacy.mjs';
 import { cardsMore, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
 import { eraseDecor } from './room-decor.mjs';
@@ -39,23 +39,22 @@ const APP_PLACE = /^(?:dm|profile|room|moment|tayfa|agency)(?:\.[a-z_]{2,20}){0,
 /** A public profile row for lists. */
 const card = (u) => ({ id: u.id, name: u.name, avatarUrl: u.avatar_url ?? null });
 
-/** One side of the follows table for the Takipçiler / Takip lists. */
+/**
+ * One side of my follows (the app splits them into Takipçilerim, Takip ettiklerim and Arkadaşlar; the "Yeni takipçi"
+ * notice reads the followers). Only ever my own: who follows someone, whom they follow and who their friends are is
+ * theirs alone, whatever their Gizlilik says, so `user` naming anyone else is a 403 (an older app shows "Liste
+ * yüklenemedi" for it). The moderators' tools read accounts through their own admin routes, not this one.
+ */
 async function followList(me, url, side) {
   const raw = url?.searchParams?.get('user');
-  const id = raw ? userId(raw) : me.id;
-  if (id !== me.id) {
-    await liveUser(id);
-    if (await blockedBetween(me.id, id)) throw new HttpError(403, 'Bu listeyi göremezsin');
-    // "Profilim herkese açık" off: only people they follow see their lists (privacy.mjs).
-    if (await listsHidden(db, me.id, id)) throw new HttpError(403, 'Bu kişinin takip listeleri gizli');
-  }
+  if (raw && userId(raw) !== me.id) throw Object.assign(new HttpError(403, 'Takip listelerini yalnızca hesabın sahibi görebilir'), { extra: { code: 'lists_private' } });
   const [mine, other] = side === 'followers' ? ['followee', 'follower'] : ['follower', 'followee'];
   const r = await db.query(
     `SELECT u.*, f.created_at AS followed_at FROM follows f JOIN users u ON u.id = f.${other}
       WHERE f.${mine} = $1 AND u.deleted_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $2 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $2))
+        AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = $1 AND b.blocked = u.id) OR (b.blocker = u.id AND b.blocked = $1))
       ORDER BY f.created_at DESC LIMIT 500`,
-    [id, me.id],
+    [me.id],
   );
   return { users: r.rows.map((u) => ({ ...card(u), followedAt: u.followed_at })) };
 }
@@ -259,6 +258,10 @@ export const socialRoutes = {
     const r = await db.query(
       `SELECT (SELECT count(*) FROM follows WHERE followee = $1) AS followers,
               (SELECT count(*) FROM follows WHERE follower = $1) AS following,
+              (SELECT count(*) FROM follows f JOIN users p ON p.id = f.follower AND p.deleted_at IS NULL
+                WHERE f.followee = $1 AND NOT EXISTS (SELECT 1 FROM follows r WHERE r.follower = $1 AND r.followee = f.follower)) AS followers_one_way,
+              (SELECT count(*) FROM follows f JOIN users p ON p.id = f.followee AND p.deleted_at IS NULL
+                WHERE f.follower = $1 AND NOT EXISTS (SELECT 1 FROM follows r WHERE r.follower = f.followee AND r.followee = $1)) AS following_one_way,
               EXISTS (SELECT 1 FROM follows WHERE follower = $2 AND followee = $1) AS is_following,
               EXISTS (SELECT 1 FROM blocks WHERE blocker = $2 AND blocked = $1) AS blocked_by_me`,
       [id, me.id],
@@ -279,6 +282,10 @@ export const socialRoutes = {
         ...shown,
         followers: Number(x.followers),
         following: Number(x.following),
+        // Takipçi and Takip as the profile shows them: one-way only, since someone who follows back is a friend
+        // (`friends`, profiles.mjs) and counted there alone; the owner's three lists are the same people (GET
+        // /api/me/friends, split by the app). The totals above stay for older apps.
+        oneWay: { followers: Number(x.followers_one_way), following: Number(x.following_one_way) },
         isFollowing: x.is_following,
         blockedByMe: x.blocked_by_me,
         // How far they are from me by our two cities (city-coords.mjs): none for me, for a city either of us didn't

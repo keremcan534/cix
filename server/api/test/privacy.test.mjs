@@ -1,6 +1,6 @@
 // Gizlilik and "Kimler ulaşabilir" (privacy.mjs) against a real Postgres: the settings are kept per person, and
 // each one is enforced where it applies: messages, calls, invites, online and last seen in people lists, the
-// profile details and follow lists, Aile's "Birlikte oynuyor". Arkadaşlarım lists follows both ways.
+// profile details, Aile's "Birlikte oynuyor". Follow lists are only ever the owner's. Arkadaşlarım lists follows both ways.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -182,7 +182,7 @@ describe('Çevrimiçi, son görülme ve profil', () => {
     assert.equal((await friends(me.session)).find((f) => f.id === fan.user.id).lastSeenAt, null, 'kendi son görülmemi kapatınca başkasınınkini görmem');
   });
 
-  test('Keşfet: çevrimiçi gizlenir; kapalı profilin ayrıntıları ve listeleri yalnızca takip ettiklerine açık', async () => {
+  test('Keşfet: çevrimiçi gizlenir; kapalı profilin ayrıntıları yalnızca takip ettiklerine açık, takip listeleri hiç kimseye', async () => {
     const owner = await signUp('Kapalı Kumsal');
     const friend = await signUp('Arkadaş Aslı');
     const stranger = await signUp('Yabancı Yiğit');
@@ -202,8 +202,12 @@ describe('Çevrimiçi, son görülme ve profil', () => {
     assert.equal((await profile(stranger.session)).bio, '');
     assert.equal((await profile(friend.session)).bio, 'Deniz ve kitap', 'takip ettiği görür');
     assert.equal((await profile(owner.session)).bio, 'Deniz ve kitap', 'kendisi görür');
+    // The follow lists are the owner's alone, whether the profile is public or not and whoever they follow.
     assert.equal((await call('GET', `/api/followers?user=${owner.user.id}`, null, stranger.session))[0], 403);
-    await ok(call('GET', `/api/followers?user=${owner.user.id}`, null, friend.session), 'takip ettiği listeyi görür');
+    assert.equal((await call('GET', `/api/following?user=${owner.user.id}`, null, friend.session))[0], 403, 'takip ettiği de göremez');
+    await setPrivacy(owner.session, { profilePublic: true });
+    assert.equal((await call('GET', `/api/followers?user=${owner.user.id}`, null, stranger.session))[0], 403, 'açık profilde de kapalı');
+    assert.equal((await ok(call('GET', '/api/following', null, owner.session), 'kendi listesi')).users[0].id, friend.user.id);
   });
 
   test('Aile: çevrimiçi ve bulunduğu oda gizlenebilir', async () => {
