@@ -151,7 +151,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
    * Replays one spin: the old ships sink, the new board comes down column by column, the beam sweeps the rows,
    * slows and settles, and the lit ships sail to the harbour one by one while its total counts up.
    */
-  const replay = async (s: FSpin, fast: boolean, total: { coins: number }, stormy: boolean) => {
+  const replay = async (s: FSpin, fast: boolean, total: { coins: number; plain: boolean }, stormy: boolean) => {
     beat.current?.stop();
     pulse.setValue(0);
     setLit(null);
@@ -225,7 +225,9 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
     // The ships nearest the harbour go first.
     for (const x of ships) {
       if (!alive.current) return;
-      playSfx('coin', 0.6);
+      // A round that pays back no more than it cost is not a win: its ships come home without the ring of coins.
+      if (total.plain) playSfx('tick', 0.5);
+      else playSfx('coin', 0.6);
       total.coins += (x.tenths * s.brightness * bet) / 10;
       setHarbour(Math.floor(total.coins));
       // With "Animasyonları azalt" the ships stay in the light with what they brought written on them.
@@ -248,7 +250,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
       return null;
     }
     const round = r.outcome.fener!;
-    const total = { coins: 0 };
+    const total = { coins: 0, plain: r.row.payout <= bet };
     setStorm(null);
     setHarbour(0);
     dark.setValue(0);
@@ -291,7 +293,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
     setHeld(null);
     setHarbour(payout);
     if (payout > 0) {
-      setStatus({ text: `Limana dönen yük +${fmt(payout)}${round.capped ? ' · en yüksek kazanç' : ''}`, tone: 'win' });
+      setStatus({ text: `Limana dönen yük +${fmt(payout)}${round.capped ? ' · en yüksek kazanç' : ''}`, tone: payout > bet ? 'win' : undefined });
       const seen = win.celebrate({ amount: payout, bet });
       // Turbo doesn't stand still for a small win; everything bigger is watched to the end.
       if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
