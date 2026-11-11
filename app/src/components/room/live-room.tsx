@@ -2790,7 +2790,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     setGame({ kind: 'room', id: g.id });
     setGameMin(false);
     // A server room's table opens on the server; the room hears of it from there (useTableNews).
-    if (!real) addMsg({ system: true, text: `🎮 ${ME.name} ${g.name} masası açtı · ${g.minPlayers}–${g.maxPlayers} oyuncu` });
+    if (!real) addMsg({ system: true, text: `🎮 ${ME.name} ${g.name} masası açtı · ${g.minPlayers === g.maxPlayers ? g.minPlayers : `${g.minPlayers}–${g.maxPlayers}`} oyuncu` });
   };
   const openCasino = (gid: CasinoGame['id']) => {
     const g = gameCatalog.casino.find((x) => x.id === gid);
