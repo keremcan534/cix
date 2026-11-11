@@ -16,7 +16,7 @@ import { charmRankBoost } from '@/data/charm';
 import { wealthCharmOf } from '@/data/profile';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
-import { fonts, makeStyles, useTheme } from '@/theme';
+import { SCRIM, fonts, makeStyles, useTheme } from '@/theme';
 import { firstName, greetingFor } from '@/lib/greeting';
 import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 import { EmojiIcon } from '@/components/Icon3D';
@@ -420,7 +420,7 @@ function FilterSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
+const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge }) => ({
   greet: { color: colors.textDim, fontSize: 20, fontFamily: fonts.displayBold, letterSpacing: -0.3, paddingHorizontal: 16, paddingTop: 12 },
   greetName: { color: colors.text },
   shortcuts: { gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
@@ -471,8 +471,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   promoAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: colors.pink, backgroundColor: colors.cardAlt },
   goBtn: { alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7 },
   goText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10 },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10, ...edge.sheet },
   sheetTitle: { color: colors.text, fontWeight: '800', fontSize: 17, textAlign: 'center' },
   sheetLabel: { color: colors.textDim, fontWeight: '700', fontSize: 12, marginTop: 4 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

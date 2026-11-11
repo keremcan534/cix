@@ -12,7 +12,7 @@ import { showAlert } from '@/lib/alert';
 import { SEEK_STEP_S, expectedPosition, pauseVideo, playVideo, reportPlayer, seekVideo, setVideo, stopVideo, type PlaybackState } from '@/lib/room-modes';
 import type { Result } from '@/lib/room-presence';
 import { thumbnailUrl, watchUrl, ytErrorText } from '@/lib/youtube';
-import { colors, radius, semantic, space } from '@/theme';
+import { SCRIM, colors, edge, radius, semantic, space } from '@/theme';
 
 const fmt = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -274,8 +274,8 @@ const st = StyleSheet.create({
   primaryText: { color: semantic.actionInk, fontWeight: '800' },
   small: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 10, alignItems: 'center' },
   smallText: { color: colors.text, fontWeight: '700' },
-  backdrop: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
-  dialog: { marginTop: 'auto', marginBottom: 'auto', marginHorizontal: space.lg, backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, gap: space.sm, maxWidth: 520, alignSelf: 'center', width: '92%' },
+  backdrop: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: SCRIM },
+  dialog: { marginTop: 'auto', marginBottom: 'auto', marginHorizontal: space.lg, backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, gap: space.sm, maxWidth: 520, alignSelf: 'center', width: '92%', ...edge.card },
   dialogTitle: { color: colors.text, fontWeight: '800', fontSize: 16 },
   input: { backgroundColor: colors.bg, color: colors.text, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: space.md, paddingVertical: 10, fontSize: 14 },
   err: { color: semantic.danger, fontSize: 13 },

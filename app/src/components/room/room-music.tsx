@@ -27,7 +27,7 @@ import {
   type NowPlaying,
   type RoomMusic,
 } from '@/lib/live/music';
-import { colors } from '@/theme';
+import { SCRIM, colors } from '@/theme';
 
 const ACCENT = '#13D9DF';
 export const MUSIC_VOLUMES = [
@@ -403,7 +403,7 @@ export function LiveMusicSheet({ visible, onClose, room, music, np, canPlay, ena
 }
 
 const s = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  scrim: { flex: 1, backgroundColor: SCRIM },
   sheet: { maxHeight: '88%' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   title: { color: '#fff', fontSize: 17, fontWeight: '800' },

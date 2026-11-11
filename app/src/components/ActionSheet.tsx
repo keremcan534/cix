@@ -3,7 +3,7 @@ import { Image, Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 /** `icon` is an Ionicons glyph. When any option has one, the sheet becomes a left-aligned list with an icon column. */
@@ -53,9 +53,10 @@ export function ActionSheet({ visible, title, titleArt, options, onClose }: { vi
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 12, paddingBottom: 34 },
+// No veil over the screen behind (SCRIM): the sheet stands out by its own edge.
+const useStyles = makeStyles(({ colors, edge }) => ({
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 12, paddingBottom: 34, ...edge.sheet },
   title: { color: colors.textDim, textAlign: 'center', paddingVertical: 10, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   option: { paddingVertical: 15, alignItems: 'center', borderRadius: 14 },

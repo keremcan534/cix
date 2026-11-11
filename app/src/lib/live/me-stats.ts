@@ -1,17 +1,20 @@
 // Live mode (lib/live): my own numbers on the "Ben" tab and my agency on the profile pill, read from the server.
-// Followers and following come from my public profile (GET /api/user?id=<my server id>), my agency from the
-// same answer the /ajans hub shows (GET /api/agency/me). The Ben tab reads both again each time it comes to the
-// front; other screens only read what is there. Without a server address nothing here runs.
+// Takipçi, Takip and Arkadaş come from my public profile (GET /api/user?id=<my server id>), counted as my three
+// lists are (lib/follow-ties tieCounts: one-way follows, friends apart), my agency from the same answer the /ajans
+// hub shows (GET /api/agency/me). The Ben tab reads both again each time it comes to the front; other screens only
+// read what is there. Without a server address nothing here runs.
 import { useIsFocused } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 import { agencyNet } from '@/lib/agency-net';
+import { tieCounts } from '@/lib/follow-ties';
 import { liveMode, myServerId } from '@/lib/live';
 import { putTies } from '@/lib/live/profile';
 import { agencyLinkOf, type AgencyLink } from '@/lib/me-view';
 
-export type MeStats = { serverId: string; followers: number; following: number };
+/** `friends` null: an older server that doesn't count them. */
+export type MeStats = { serverId: string; followers: number; following: number; friends: number | null };
 /** `agency` undefined: not read yet (or the read failed); null: I have no agency. `owner`: whose numbers these are. */
 type Snap = { owner: string | null; stats: MeStats | null; agency: AgencyLink | null | undefined };
 
@@ -39,7 +42,7 @@ export function refreshMeStats(): Promise<void> {
     if (snap.owner !== id) return;
     if (profile.status === 'fulfilled') putTies(id, profile.value);
     put({
-      ...(profile.status === 'fulfilled' && { stats: { serverId: id, followers: profile.value.followers, following: profile.value.following } }),
+      ...(profile.status === 'fulfilled' && { stats: { serverId: id, ...tieCounts(profile.value) } }),
       ...(agency.status === 'fulfilled' && { agency: agencyLinkOf(agency.value) }),
     });
   })().finally(() => (reading = null));

@@ -12,7 +12,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { ROLE_RANK, useSheetBottom, type RoomRole } from '@/components/room/parts';
 import { userById } from '@/data/mock';
 import type { MicInvite, RoomLive, RoomView } from '@/lib/room-presence';
-import { colors, semantic } from '@/theme';
+import { SCRIM, colors, edge, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -276,8 +276,8 @@ const s = StyleSheet.create({
   total: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 12, minHeight: 40, minWidth: 56, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', boxShadow: '0 4px 14px rgba(19,217,223,0.45)' },
   totalText: { color: semantic.actionInk, fontWeight: '900', fontSize: 14, fontVariant: ['tabular-nums'] },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.55)' },
-  sheet: { height: '78%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 -10px 30px rgba(0,0,0,0.45)' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { height: '78%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 10, ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { color: colors.text, fontWeight: '900', fontSize: 18 },

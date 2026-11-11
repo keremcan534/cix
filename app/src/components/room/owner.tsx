@@ -42,7 +42,7 @@ import type { JoinMode, Membership } from '@/lib/room-follow';
 import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
-import { colors, gradient } from '@/theme';
+import { SCRIM, colors, edge, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
@@ -1181,8 +1181,8 @@ export const bossSeatInfo = (current: string | null, myContribution: number, top
 };
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%', ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17, marginBottom: 4 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   tiny: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: 70 },

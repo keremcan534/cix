@@ -11,7 +11,7 @@ import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Text, TextInput } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { agencyNet, errorText, findInvitees, runAction, type Invitee } from '@/lib/agency-net';
-import { colors, fonts, radius, semantic, space } from '@/theme';
+import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 const MIN = 2;
 const AGENCY_TEXT = { this: 'Zaten ajansında', other: 'Başka bir ajansa bağlı; ancak kendi transfer talebiyle geçebilir' } as const;
@@ -134,8 +134,8 @@ export function InviteSheet({ agencyId, onClose, onSent }: { agencyId: string; o
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(4,8,18,0.6)' },
-  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl },
+  wrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: SCRIM },
+  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, ...edge.card },
   title: { color: '#fff', fontSize: 19, fontFamily: fonts.display },
   msg: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
   label: { color: colors.textDim, fontSize: 12, fontWeight: '700' },

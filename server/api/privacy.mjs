@@ -1,15 +1,19 @@
 // Gizlilik and "Kimler ulaşabilir" (Ayarlar): what each person shows others and who may reach them, kept here and
-// enforced where it applies. Also Mesajlar › Arkadaşlarım: my follows both ways, with what each person shows.
+// enforced where it applies. Also my follows both ways, with what each person shows: the app splits them into
+// Takip ettiklerim, Takipçilerim and Arkadaşlar (Mesajlar › Arkadaşlarım), people who follow each other only in the last.
 //
 //   GET   /api/me/privacy                → { privacy }
 //   PATCH /api/me/privacy { some keys }  → { privacy }
 //   GET   /api/me/friends                → { friends }   people I follow and people who follow me
 //
+// Nobody else's follower, following or friends list is ever shown, whatever these settings say (social.mjs
+// followList: mine only; only the numbers are on a profile).
+//
 // The keys: profilePublic, showOnline, showLastSeen, showCurrentRoom (true or false), dmFrom (everyone | following |
 // mutual), callsFrom and invitesFrom (everyone | following | nobody). "following" means people the owner follows.
 // Where each one bites:
 //   - profilePublic off: someone I don't follow sees my name, photo and username, not my age, city, bio or interests
-//     (GET /api/user, Keşfet: shownToViewer), and can't open my follower and following lists (listsHidden).
+//     (GET /api/user, Keşfet: shownToViewer).
 //   - showOnline off: nobody sees me online, nor when I was last on (presenceOf: Keşfet, Arkadaşlarım, Aile).
 //   - showLastSeen off: nobody sees when I was last on, and I don't see anyone's.
 //   - showCurrentRoom off: the room I'm in isn't shown (Aile's "Birlikte oynuyor").
@@ -157,9 +161,6 @@ export async function hiddenFrom(q, viewer, ids) {
   );
   return new Set(r.rows.map((x) => x.user_id));
 }
-
-/** True when `owner`'s follower and following lists are closed to `viewer` (profilePublic off, not followed). */
-export const listsHidden = async (q, viewer, owner) => (await hiddenFrom(q, viewer, [owner])).has(owner);
 
 /**
  * People (profileOf shapes, with `online` where a list has it) as `viewer` may see them: a profile that isn't public

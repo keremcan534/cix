@@ -304,7 +304,7 @@ export default function SettingsScreen() {
             k="profilePublic"
             icon="globe-outline"
             title="Profilim herkese açık"
-            subtitle={live ? 'Kapalıyken yaşını, şehrini, hakkında yazını, ilgi alanlarını ve takip listelerini yalnızca takip ettiğin kişiler görür.' : undefined}
+            subtitle={live ? 'Kapalıyken yaşını, şehrini, hakkında yazını ve ilgi alanlarını yalnızca takip ettiğin kişiler görür. Takip listelerini her zaman yalnızca sen görürsün.' : undefined}
           />
           <PrivacyToggle k="showOnline" icon="radio-button-on-outline" title="Çevrimiçi durumumu göster" subtitle={live ? 'Kapalıyken çevrimiçi ve son görülme bilgin kimseye gösterilmez.' : undefined} />
           <PrivacyToggle k="showLastSeen" icon="time-outline" title="Son görülme bilgimi göster" subtitle="Kapatırsan başkalarının son görülmesini de göremezsin." />

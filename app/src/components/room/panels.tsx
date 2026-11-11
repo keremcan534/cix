@@ -23,7 +23,7 @@ function Sheet({ visible, onClose, title, art, children, tall }: { visible: bool
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
       <KeyboardAvoid style={{ flex: 1 }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
+        <Pressable style={roomStyles.scrim} onPress={onClose} />
         <View style={[roomStyles.sheet, { maxHeight: tall ? '85%' : '70%', paddingBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}

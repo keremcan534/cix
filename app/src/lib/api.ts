@@ -512,7 +512,9 @@ export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidde
 /** How far someone is from me by our two profile cities (server/api/city-coords.mjs), rounded: never a location.
  *  Null when either city is unknown or their profile is private to me; an older server sends none. */
 export type CityDistance = { km: number; sameCity: boolean };
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
+/** `followers` / `following`: totals; `oneWay`: the same without the people who follow each other (friends), as the
+ *  profile shows them (lib/follow-ties tieCounts; an older server sends none). */
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -601,9 +603,8 @@ export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverU
 export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('POST', '/api/block', { to, block: on }).then((r) => r.blocked);
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
 export type FollowCard = UserCard & { followedAt: string };
-/** Takipçiler / Takip of `user` (a server id; default me), newest first. */
-export const followList = (side: 'followers' | 'following', user?: string) =>
-  call<{ users: FollowCard[] }>('GET', `/api/${side}${user ? `?user=${encodeURIComponent(user)}` : ''}`).then((r) => r.users);
+/** Who follows me / whom I follow, newest first, both ways counted (the server refuses anyone else's lists). */
+export const followList = (side: 'followers' | 'following') => call<{ users: FollowCard[] }>('GET', `/api/${side}`).then((r) => r.users);
 
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
 
