@@ -1,6 +1,7 @@
 // A server room's rules, members and Patron koltuğu (rooms.mjs, room-rules.mjs) against a real Postgres and a fake
 // LiveKit: who may change which rule and at what level, the Sahne room's mic queue, members in open, apply and closed
-// rooms, private rooms and the people limit at the voice token, mics for members only, and the top gifter's seat.
+// rooms, private rooms and the people limit at the voice token, mics for members only, and the Patron koltuğu's
+// switch and mode (who sits: boss-seat.test.mjs).
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -8,7 +9,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, LIMIT_OPTIONS, MIC_PERMISSION_MIN_LEVEL, ROOM_MEMBER_CAPS, applyRules, memberCap, rulesOf } from '../room-rules.mjs';
+import { BOSS_SEAT_MIN_LEVEL, LIMIT_OPTIONS, MIC_PERMISSION_MIN_LEVEL, ROOM_MEMBER_CAPS, applyRules, memberCap, rulesOf } from '../room-rules.mjs';
 import { rnd, startApi } from './harness.mjs';
 
 const lkCalls = [];
@@ -65,7 +66,6 @@ describe('Oda kuralları: okuma ve doğrulama', () => {
     assert.deepEqual(members, ROOM_MEMBER_CAPS);
     assert.equal(num('MIC_PERMISSION_MIN_LEVEL'), MIC_PERMISSION_MIN_LEVEL);
     assert.equal(num('BOSS_SEAT_MIN_LEVEL'), BOSS_SEAT_MIN_LEVEL);
-    assert.equal(num('BOSS_SEAT_MIN_COINS'), BOSS_SEAT_MIN_COINS);
     const owner = fs.readFileSync(path.join(app, 'components', 'room', 'owner.tsx'), 'utf8');
     const limits = /options=\{\[([0-9_, ]+)\]\.map\(\(n\) => \(\{ value: n, label: `\$\{n\.toLocaleString\('tr-TR'\)\} kişi`/.exec(owner)[1];
     assert.deepEqual(limits.split(',').map((x) => Number(x.trim().replace(/_/g, ''))), LIMIT_OPTIONS);
@@ -207,27 +207,25 @@ describe('Oda üyeleri', () => {
 });
 
 describe('Patron koltuğu', () => {
-  test('son 24 saatin en çok hediye göndereni oturur (1.000 jetondan sonra); koltuk kapanınca kalkar', async () => {
+  test('Lv.3 odada açılır; mod yalnızca sahibin, açılınca otomatik ve boş başlar; kapanınca okunmaz', async () => {
     const owner = await signUp('Patron Sahibi');
-    const big = await signUp('Büyük Gönderen');
-    const small = await signUp('Küçük Gönderen');
+    const admin = await signUp('Patron Yöneticisi');
     const room = await roomOf(owner);
+    await ok(call('POST', '/api/rooms/admin', { room, user: admin.user.id }, owner.session), 'yönetici');
     assert.equal((await update(owner.session, { id: room, rules: { bossSeat: true } }))[0], 403, 'Lv.3 gerekir');
     await setLevelXp(owner, 300); // Lv.3
-    await ok(update(owner.session, { id: room, rules: { bossSeat: true } }), 'patron koltuğu');
-    for (const s of [big, small]) await ok(call('POST', '/api/wallet/test-topup', { amount: 10_000, ref: rnd(6) }, s.session), 'yükleme');
-    const gift = (s, giftId, count) => ok(call('POST', '/api/gifts/send', { to: owner.user.id, giftId, count, room, ref: rnd(6) }, s.session), 'hediye');
-    const catalog = (await ok(call('GET', '/api/catalog'), 'katalog')).gifts;
-    const cheap = catalog.filter((g) => !g.minSvip).sort((a, b) => a.price - b.price)[0];
-    await gift(small, cheap.id, 1);
-    assert.equal((await ok(call('GET', `/api/room?id=${room}`, null, owner.session), 'oda')).room.boss, null, '1.000 jetonun altında kimse oturmaz');
-    const pricey = catalog.filter((g) => !g.minSvip && g.price >= 1_000 && g.price <= 5_000).sort((a, b) => a.price - b.price)[0];
     const from = lkCalls.length;
-    await gift(big, pricey.id, 1);
-    const seen = (await ok(call('GET', `/api/room?id=${room}`, null, small.session), 'oda')).room;
-    assert.equal(seen.boss?.id, big.user.id);
+    let j = await ok(update(owner.session, { id: room, rules: { bossSeat: true } }), 'patron koltuğu');
+    assert.equal(j.room.rules.bossMode, 'auto');
+    assert.equal(j.room.boss, null);
+    assert.deepEqual([j.room.bossSeat.mode, j.room.bossSeat.holder, j.room.bossSeat.minCoins, j.room.bossSeat.minutes], ['auto', null, 25_000, 10]);
     assert.ok(await until(() => roomPackets(from).length >= 1), 'odadaki telefonlar yeniden okur');
+    assert.equal((await update(admin.session, { id: room, rules: { bossMode: 'invite' } }))[0], 403, 'modu yalnızca sahip değiştirir');
+    assert.equal((await update(owner.session, { id: room, rules: { bossMode: 'herkes' } }))[0], 400);
+    j = await ok(update(owner.session, { id: room, rules: { bossMode: 'invite' } }), 'davet modu');
+    assert.equal(j.room.bossSeat.mode, 'invite');
     await ok(update(owner.session, { id: room, rules: { bossSeat: false } }), 'kapat');
-    assert.equal((await ok(call('GET', `/api/room?id=${room}`, null, owner.session), 'oda')).room.boss, null);
+    j = await ok(call('GET', `/api/room?id=${room}`, null, owner.session), 'oda');
+    assert.deepEqual([j.room.boss, j.room.bossSeat], [null, null]);
   });
 });

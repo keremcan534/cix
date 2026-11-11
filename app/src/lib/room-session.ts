@@ -26,6 +26,8 @@ export type RoomSession = {
   endReason?: EndReason;
   /** The server's own words for an ended session (ör. "Oda kapandı", "Oda şifresi yanlış"). */
   endText?: string;
+  /** The server's own explanation under them, when it gave one (a room closed for lack of staff). */
+  endBody?: string;
   /** Opened again after the app was closed: the mic starts off. */
   recovered: boolean;
   /** Membership confirmed by the room (presence join succeeded). */
@@ -228,7 +230,7 @@ export const cancelSwitch = () => emit({ switchTo: null });
  * session (the room screen unmounts and leaves the presence membership). Ending for a reason the user
  * didn't choose (kicked, server) keeps an "ended" session so the mini card can say what happened.
  */
-export function endRoom(reason: EndReason, endText?: string) {
+export function endRoom(reason: EndReason, endText?: string, endBody?: string) {
   const s = state.session;
   if (!s || s.status === 'ended') return;
   stopTimers();
@@ -238,17 +240,17 @@ export function endRoom(reason: EndReason, endText?: string) {
   persist(null);
   // Ended by the room (kicked, closed by the server): keep an "ended" session so the UI can say why.
   const shown = reason === 'kicked' || reason === 'server';
-  emit({ session: shown ? { ...s, micWant: false, status: 'ended', endReason: reason, endText } : null, leaveDialog: false });
+  emit({ session: shown ? { ...s, micWant: false, status: 'ended', endReason: reason, endText, endBody } : null, leaveDialog: false });
 }
 /**
  * What an ended session says. The title is the server's own words when it gave any ("Oda şifresi yanlış",
  * "Bu odaya giremezsin", "Oda kapandı"); "Odadan çıkarıldın" only for a removal that came without words.
  * Someone who never got in is not told that their mic and voice connection were closed.
  */
-export function endedText(s: Pick<RoomSession, 'endReason' | 'endText' | 'everConnected' | 'title'>): { title: string; body: string } {
+export function endedText(s: Pick<RoomSession, 'endReason' | 'endText' | 'endBody' | 'everConnected' | 'title'>): { title: string; body: string } {
   const own = s.endText?.trim().replace(/\.$/, '');
   const closed = 'Mikrofonun ve ses bağlantın kapatıldı.';
-  if (own) return { title: own, body: s.everConnected ? closed : `“${s.title}” odasına girilemedi.` };
+  if (own) return { title: own, body: s.endBody?.trim() || (s.everConnected ? closed : `“${s.title}” odasına girilemedi.`) };
   if (s.endReason === 'server') return { title: 'Oda sona erdi', body: `“${s.title}” odası sunucu tarafından kapatıldı. ${closed}` };
   return { title: 'Odadan çıkarıldın', body: `Oda yönetimi seni “${s.title}” odasından çıkardı. ${closed}` };
 }
@@ -397,8 +399,8 @@ export type EngineEvent =
   | { type: 'mic_denied' }
   /** What the server lets us do in this room (voice token / a live change): mic, and chat over data. */
   | { type: 'grant'; canPublish: boolean; canChat: boolean }
-  /** The room removed us (kick) or was deleted on the voice server. */
-  | { type: 'removed'; reason: 'kicked' | 'server' };
+  /** The room removed us (kick) or was deleted on the voice server; `title` and `body`: the server's reason, if it said. */
+  | { type: 'removed'; reason: 'kicked' | 'server'; title?: string; body?: string };
 export function engineEvent(roomId: string, e: EngineEvent) {
   const s = state.session;
   if (!s || s.roomId !== roomId || s.status === 'ended') return;
@@ -430,7 +432,7 @@ export function engineEvent(roomId: string, e: EngineEvent) {
       return;
     }
     case 'removed':
-      return endRoom(e.reason);
+      return endRoom(e.reason, e.title, e.body);
   }
 }
 

@@ -36,6 +36,7 @@ export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor'
 export type RoomRulesLike = {
   micPermission: 'everyone' | 'members';
   bossSeat: boolean;
+  bossMode?: 'auto' | 'invite';
   joinMode: 'open' | 'apply' | 'closed';
   manageMembers: 'owner' | 'admins';
   manageFunctions: 'owner' | 'admins';
@@ -78,6 +79,11 @@ export type Room = {
   /** A server room: its rules (Oda ayarları, Moderasyon) and its Patron koltuğu holder (server id). */
   rules?: RoomRulesLike;
   bossId?: string | null;
+  /**
+   * A server room's Patron koltuğu while it is on (server/api/boss-seat.mjs): its mode, when the sitting ends on this
+   * phone's clock (null: no end), the holder's coins in it and the numbers its sheet shows.
+   */
+  bossInfo?: { mode: 'auto' | 'invite'; until: number | null; spent: number; minCoins: number; minutes: number; holdSeconds: number } | null;
   /** The rules' forbidden words, one per line (plain text, so the room screen can hand it to the voice handlers). */
   wordsText?: string;
   micPermission?: 'everyone' | 'members';

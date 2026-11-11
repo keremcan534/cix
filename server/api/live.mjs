@@ -209,6 +209,20 @@ export async function voiceCounts() {
   return counts.map;
 }
 
+/**
+ * The voice rooms LiveKit has open now, each with how many people are in it; null when LIVEKIT_API_URL isn't set or
+ * LiveKit can't be reached (not known, which is not the same as none).
+ */
+export async function voiceRoomsNow() {
+  if (!env.LIVEKIT_API_URL) return null;
+  try {
+    return await listVoiceRooms(3_000);
+  } catch (e) {
+    console.error('livekit ListRooms now', String(e).slice(0, 200));
+    return null;
+  }
+}
+
 /** Names of the voice rooms LiveKit has open now; none when it isn't set up or can't be reached. */
 export async function openVoiceRooms() {
   if (!env.LIVEKIT_API_URL) return [];
@@ -219,6 +233,15 @@ export async function openVoiceRooms() {
     return [];
   }
 }
+
+/**
+ * One packet from the server to every phone in a voice room (sent with no participant, so the phones know no phone
+ * wrote it: app lib/live/room-bus reportSignal). Never fails the caller: false when it didn't go out.
+ */
+export const roomPacket = (room, packet) =>
+  roomService('SendData', { room, data: Buffer.from(JSON.stringify(packet)).toString('base64'), kind: 'RELIABLE' }, { roomAdmin: true, room }).catch(
+    (e) => (console.error('livekit SendData', packet?.type, room, String(e).slice(0, 200)), false),
+  );
 
 /** Tells the phones in a server room to read the room again (level, mic count, layout). Best effort. */
 export function announceRoom(room) {

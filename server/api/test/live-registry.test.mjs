@@ -71,6 +71,9 @@ describe('defaults are today', () => {
       room_decor_off: [],
       room_bg_custom_price: 5_000,
       room_bg_custom_days: 30,
+      room_staff_away_minutes: 5,
+      boss_seat_coins: 25_000,
+      boss_seat_minutes: 10,
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -122,6 +125,9 @@ describe('defaults are today', () => {
       'room_decor_off',
       'room_bg_custom_price',
       'room_bg_custom_days',
+      'room_staff_away_minutes',
+      'boss_seat_coins',
+      'boss_seat_minutes',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);
@@ -318,6 +324,27 @@ describe('Oda süslemesi', () => {
     const s = snapshotOf([{ key: 'room_decor_off', value: ['paid'] }, { key: 'room_bg_custom_price', value: 6_000 }, { key: 'room_bg_custom_days', value: 500 }]);
     assert.deepEqual([[...s.roomDecorOff], s.roomBgCustomPrice, s.roomBgCustomDays, s.invalid], [['paid'], 6_000, 30, ['room_bg_custom_days']]);
     assert.deepEqual([[...snapshotOf().roomDecorOff], snapshotOf().roomBgCustomPrice, snapshotOf().roomBgCustomDays], [[], 5_000, 30]);
+  });
+});
+
+describe('Odalar', () => {
+  test('yetkilisiz oda 1–60 dakika; patron koltuğu binlik jeton ve 1–60 dakika', () => {
+    for (const k of ['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes']) assert.equal(REGISTRY[k].group, 'Odalar', k);
+    assert.equal(validate('room_staff_away_minutes', 1), 1);
+    for (const v of [0, 61, 2.5, '5']) refused(() => validate('room_staff_away_minutes', v), /Yetkilisiz oda/);
+    assert.equal(validate('boss_seat_coins', 50_000), 50_000);
+    for (const v of [999, 25_500, 1_001_000]) refused(() => validate('boss_seat_coins', v), /Patron koltuğu: tek seferde en az 1\.000–1\.000\.000 jeton arasında, 1\.000'in katı/);
+    assert.equal(validate('boss_seat_minutes', 60), 60);
+    refused(() => validate('boss_seat_minutes', 0), /Patron koltuğu süresi/);
+    // Closing sooner than 3 minutes, or a seat price that more than doubles or halves, asks again.
+    assert.deepEqual([isBig('room_staff_away_minutes', 5, 3), isBig('room_staff_away_minutes', 5, 2), isBig('room_staff_away_minutes', 5, null)], [false, true, false]);
+    assert.deepEqual([isBig('boss_seat_coins', 25_000, 50_000), isBig('boss_seat_coins', 25_000, 51_000), isBig('boss_seat_coins', 25_000, 12_000)], [false, true, true]);
+    assert.equal(isBig('boss_seat_minutes', 10, 1), false);
+    assert.equal(impactOf('room_staff_away_minutes', 5, 10), 'Yetkilisiz kalan oda 5 → 10 dakika sonra kapanır.');
+    assert.equal(impactOf('boss_seat_coins', 25_000, 30_000), 'Boş koltuğa oturmak için tek seferde 25.000 → 30.000 jeton.');
+    assert.equal(impactOf('boss_seat_minutes', 10, 15), 'Patron koltuğunda oturma ve uzatma 10 → 15 dakika.');
+    const s = snapshotOf([{ key: 'boss_seat_coins', value: 40_000 }, { key: 'room_staff_away_minutes', value: 90 }]);
+    assert.deepEqual([s.bossSeatCoins, s.bossSeatMinutes, s.roomStaffAwayMinutes, s.invalid], [40_000, 10, 5, ['room_staff_away_minutes']]);
   });
 });
 

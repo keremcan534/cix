@@ -13,13 +13,17 @@
 //    (server/api/pk.mjs): only "read the PK again", which lib/live/pk does; and when a Şanslı çanta is dropped
 //    (server/api/lucky-bags.mjs): "read the room's bags again" (lib/live/lucky-bags); and when a mic invite was sent
 //    or answered, or the room poll changed (server/api/room-social.mjs): "read it again" (lib/live/room-social); and
-//    when the room's game table changed (server/api/room-games.mjs): "read it again" (lib/live/room-table);
+//    when the room's game table changed (server/api/room-games.mjs): "read it again" (lib/live/room-table); what
+//    happened to the Patron koltuğu (server/api/boss-seat.mjs: who sat, took it, whose time ended), for the chat;
+//    and that the room closed for lack of staff (server/api/room-autoclose.mjs: parseServerClosed, which the voice
+//    engine turns into the session's end with its reason);
 //  - the room's state the server keeps on LiveKit: the room metadata (server/api/rooms.mjs pushRoomMeta: locked
 //    mics, the layout, the mic count, the mic queue and who waits in it, the room's music: server/api/music.mjs),
 //    which LiveKit hands every phone on join and on each change, and a seat the owner or an admin set for me (my
 //    own `seat` attribute changed by the server).
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
+import type { BossNews } from '@/lib/patron-seat';
 import { parseMove, type Move } from '@/lib/room-moves';
 
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
@@ -78,6 +82,7 @@ export type InviteNews = { to: string | null; from: string | null };
 const inviteListeners = new Set<(roomId: string, news: InviteNews) => void>();
 const pollListeners = new Set<(roomId: string) => void>();
 const tableListeners = new Set<(roomId: string) => void>();
+const bossListeners = new Set<(roomId: string, news: BossNews) => void>();
 // Gift announcements already shown (a reliable packet can come twice around a reconnect).
 const seenGifts: number[] = [];
 // The same for paid Hareketli (their own ids: a room_animations row, not a gift_events one).
@@ -184,6 +189,9 @@ export function reportSignal(roomId: string, from: string | null, raw: unknown) 
     if (isServerPoll(raw)) return pollListeners.forEach((l) => l(roomId));
     // The room's game table changed (server/api/room-games.mjs): read it again (lib/live/room-table).
     if (isServerTable(raw)) return tableListeners.forEach((l) => l(roomId));
+    // The Patron koltuğu changed hands (server/api/boss-seat.mjs): a chat line; the room read follows its 'room' packet.
+    const boss = parseServerBoss(raw);
+    if (boss) return bossListeners.forEach((l) => l(roomId, boss));
     if (isServerBag(raw)) {
       const p = raw as Record<string, unknown>;
       const news: BagNews = { id: typeof p.id === 'number' && Number.isSafeInteger(p.id) ? p.id : null, drawn: p.drawn === true };
@@ -280,6 +288,32 @@ export const isServerPoll = (raw: unknown) => !!raw && typeof raw === 'object' &
 /** The server's table packet (server/api/room-games.mjs): the room's game table opened, changed or closed. */
 export const isServerTable = (raw: unknown) => !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).type === 'table';
 
+const BOSS_EVENTS: readonly BossNews['event'][] = ['sat', 'took', 'expired', 'left', 'removed', 'mode'];
+/** The server's Patron koltuğu packet: `{ type: 'boss', event, user, name, mode? }` (server/api/boss-seat.mjs). */
+export function parseServerBoss(raw: unknown): BossNews | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (m.type !== 'boss' || !BOSS_EVENTS.includes(m.event as BossNews['event'])) return null;
+  const str = (v: unknown, max: number) => (typeof v === 'string' && v && v.length <= max ? v : null);
+  const mode = m.mode === 'auto' || m.mode === 'invite' || m.mode === 'off' ? m.mode : null;
+  return { event: m.event as BossNews['event'], user: str(m.user, 64), name: str(m.name, 80), mode };
+}
+
+/**
+ * The server's notice that the room closed because its owner and admins were away (server/api/room-autoclose.mjs:
+ * `{ type: 'closed', reason: 'no_staff', minutes }`), as the words the ended session shows; null for anything else.
+ */
+export function parseServerClosed(raw: unknown): { title: string; body: string } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (m.type !== 'closed' || m.reason !== 'no_staff') return null;
+  const minutes = Number.isInteger(m.minutes) && (m.minutes as number) > 0 && (m.minutes as number) <= 600 ? (m.minutes as number) : null;
+  return {
+    title: 'Oda kapandı',
+    body: `Odada ${minutes ? `${minutes} dakikadır ` : ''}oda sahibi ya da yönetici yoktu, bu yüzden oda kapandı. Yetkilisi gelince oda yeniden açılır.`,
+  };
+}
+
 /** "3" → 3; anything else (no attribute, "") → not on a mic. */
 export const parseSeat = (v: string | undefined) => (v && /^\d{1,2}$/.test(v) ? Number(v) : null);
 
@@ -335,6 +369,20 @@ export function onServerPoll(roomId: string, fn: () => void) {
   const l = (r: string) => r === roomId && fn();
   pollListeners.add(l);
   return () => void pollListeners.delete(l);
+}
+/** The server says what happened to the room's Patron koltuğu; returns the unsubscribe. */
+export function onServerBoss(roomId: string, fn: (news: BossNews) => void) {
+  const l = (r: string, news: BossNews) => r === roomId && fn(news);
+  bossListeners.add(l);
+  return () => void bossListeners.delete(l);
+}
+/** What the server says happened to the room's Patron koltuğu, while `on` (the room screen's chat line). */
+export function useBossNews(roomId: string, on: boolean, fn: (news: BossNews) => void) {
+  const cb = useRef(fn);
+  useEffect(() => {
+    cb.current = fn;
+  });
+  useEffect(() => (on ? onServerBoss(roomId, (news) => cb.current(news)) : undefined), [roomId, on]);
 }
 /** The server says the room's game table changed; returns the unsubscribe. */
 export function onServerTable(roomId: string, fn: () => void) {

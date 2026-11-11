@@ -26,7 +26,8 @@ import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { DEFAULT_CONFIG, MIN_AGE, ODDS_TOTAL, SHARE, checkConfig, drawMult, maxMult } from './lucky-rules.mjs';
 import { announceRoom } from './live.mjs';
 import { scorePkGift } from './pk.mjs';
-import { refreshBoss, roomLevel } from './rooms.mjs';
+import { roomLevel } from './rooms.mjs';
+import { announceBoss, bossGift } from './boss-seat.mjs';
 import { audit } from './sanctions.mjs';
 import { creditCoins, giftCoins, spendCoins } from './wallet.mjs';
 import { NEED_LEVEL, NEED_POINTS, wealthPoints } from './wheel.mjs';
@@ -120,6 +121,7 @@ export const luckyRoutes = {
     let row;
     let levelUp = false;
     let events = [];
+    let boss = [];
     let announceFrom = DEFAULT_CONFIG.announceFrom;
     let gift;
     try {
@@ -165,6 +167,8 @@ export const luckyRoutes = {
           // The same source ref as a plain gift, so the agency job's backfill from gift_events never counts it twice.
           await recordIncome(c, rid, 'lucky_gift', `gift:${eventId}`, share);
         }
+        // Patron koltuğu (boss-seat.mjs): the whole send counts, every recipient together.
+        boss = await bossGift(c, { roomId, sender: me.id, coins: cost });
         const rest = cost - share * to.length;
         const many = to.length > 1 ? ` → ${to.length} kişi` : '';
         if (rest > 0) await spendCoins(c, me.id, rest, `Uygulama içi: Şanslı hediye ${label}${many}`, `${lref}-p`);
@@ -204,8 +208,8 @@ export const luckyRoutes = {
         bigWin: best >= announceFrom ? best * Number(row.unit_price) : 0,
       });
       if (levelUp) announceRoom(lkRoom);
-      // Patron koltuğu: Şanslı gifts count like any gift in the room.
-      await refreshBoss(lkRoom.slice(4));
+      // Patron koltuğu: a Şanslı send counts like any gift in the room.
+      await announceBoss(lkRoom.slice(4), boss);
     }
     return answer(row, false);
   },

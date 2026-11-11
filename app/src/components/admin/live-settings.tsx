@@ -1,7 +1,7 @@
 // Yönetim › Canlı ayarlar (admin only; server/api/live-settings.mjs): what the owner may change without a new
 // APK. Acil durum (a switch per feature, 'Para işlemlerini durdur', the notice) always on top, then Kampanya,
 // Hediyeler ve paketler, Çevirme kuru, Para çekme sınırları, Birebir ve eşleşme, Çantam, Yeni üye ödülleri, Oyun Salonu,
-// SMS, Zorunlu sürüm and Geçmiş. Every change opens the same sheet (live-change-sheet): the server's preview, a reason,
+// Oda süslemesi, Odalar, SMS, Zorunlu sürüm and Geçmiş. Every change opens the same sheet (live-change-sheet): the server's preview, a reason,
 // Uygula, and a second confirmation for a big change. The server checks every value again; the local checks here only
 // say early what it will refuse. Safe mode on the server (LIVE_SAFE_MODE) shows a red banner and nothing can be changed.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -44,6 +44,7 @@ import {
   rateWindow,
   REWARD_KEYS,
   REWARD_LABEL,
+  ROOM_NUMBER_KEYS,
   valueText,
   versionError,
   wholeError,
@@ -211,6 +212,7 @@ function Body({
             {kit.get('rewards_off') && <RewardsCard kit={kit} />}
             {kit.get('casino_off') && <CasinoCard kit={kit} />}
             {kit.get('room_decor_off') && <DecorCard kit={kit} />}
+            {kit.get('room_staff_away_minutes') && <RoomsCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -993,6 +995,58 @@ function DecorCard({ kit }: { kit: Kit }) {
           style={{ flex: 1 }}
         />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Özel süsleme ücreti ve süresi değişsin', () => changes)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Odalar ----------------------------------------------------------------------------------------------------
+/**
+ * Odalar (server/api/room-autoclose.mjs, boss-seat.mjs): how many minutes a room may be without its owner and admins
+ * before it closes, and the Patron koltuğu's coins for one send and its minutes. Numbers only, like the cards above.
+ */
+function RoomsCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const rows = ROOM_NUMBER_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
+  const changes: LiveChanges = {};
+  const errors: Record<string, string | null> = {};
+  for (const r of rows) {
+    const v = parseWhole(texts[r.key] ?? '');
+    const changed = v !== r.x.effective;
+    errors[r.key] = changed ? wholeError(v, r.x.bounds as IntBounds, r.x.label, r.unit) : null;
+    if (changed && v !== null) changes[r.key] = v;
+  }
+  const dirty = Object.keys(changes).length > 0;
+  const bad = rows.some((r) => errors[r.key]);
+  const reset: LiveChanges = {};
+  for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
+  return (
+    <Card title="Odalar" footer={lastChange(...rows.map((r) => r.x))} pill={<InvalidPill x={rows.find((r) => r.x.invalid)?.x} />}>
+      <Text style={s.hint}>Sunucu uygular ve değişiklik hemen geçerli olur. Patron koltuğunda oturanın süresi değişmez; yeni tutar ve süre sonraki oturuşlarda geçerlidir.</Text>
+      {rows.map((r) => (
+        <View key={r.key}>
+          <Field
+            label={r.x.label}
+            value={texts[r.key] ?? ''}
+            onChange={(t) => setTexts((m) => ({ ...m, [r.key]: t }))}
+            keyboard="numeric"
+            max={9}
+            hint={`Şu an ${valueText(r.key, r.x.effective)} · ${r.x.help}`}
+          />
+          <Problem text={errors[r.key] ?? null} />
+        </View>
+      ))}
+      <View style={s.row}>
+        <Button
+          title="Varsayılana dön"
+          variant="ghost"
+          small
+          disabled={kit.locked || Object.keys(reset).length === 0}
+          onPress={() => kit.open('Oda ayarları varsayılana dönsün', () => reset, 'Geri dönüş')}
+          style={{ flex: 1 }}
+        />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Oda ayarları değişsin', () => changes)} style={{ flex: 1 }} />
       </View>
     </Card>
   );

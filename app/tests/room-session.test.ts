@@ -448,4 +448,16 @@ describe('Bitiş başlığı sunucunun sözünü kullanır', () => {
     engineEvent('r1', { type: 'failed', final: true, reason: 'kicked', message: 'Bu odadan geçici olarak çıkarıldın' });
     assert.deepEqual(endedText(s()), { title: 'Bu odadan geçici olarak çıkarıldın', body: 'Mikrofonun ve ses bağlantın kapatıldı.' });
   });
+
+  test('yetkilisiz kalan oda kapanınca sunucunun nedeni başlık ve gövde olur', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    engineEvent('r1', { type: 'removed', reason: 'server', title: 'Oda kapandı', body: 'Odada 5 dakikadır oda sahibi ya da yönetici yoktu.' });
+    assert.equal(s().status, 'ended');
+    assert.deepEqual(endedText(s()), { title: 'Oda kapandı', body: 'Odada 5 dakikadır oda sahibi ya da yönetici yoktu.' });
+    // The voice room ending right after it changes nothing: the session already says why.
+    engineEvent('r1', { type: 'removed', reason: 'server' });
+    assert.equal(endedText(s()).title, 'Oda kapandı');
+  });
 });
