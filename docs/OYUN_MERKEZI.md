@@ -21,6 +21,8 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 | `src/components/games/wheel.tsx` | **Rüzgâr Gülü**: 3 alanlı, JACKPOT fonlu çark. Sonuç sunucuda belirlenir, kazanç oyun jetonudur. Ayrıntılar: `docs/RUZGAR_GULU.md`. |
 | `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |
 | `src/lib/fortune-slot.ts` | Altın Kasa matematiği: makara şeritleri, ödeme tablosu, 10 çizgi, tam beklenen geri ödeme hesabı. |
+| `src/components/games/bilye.tsx`, `src/lib/bilye/` | **Bilye Şelalesi** (özgün bilye/çivi oyunu): tahta (`board.ts`), fizik (`physics.ts`), olasılık tablosu (`table.ts`, `scripts/bilye-table.ts` üretir), kurallar (`rules.ts`, sunucuda `server/api/casino-bilye.mjs`), ekrandaki yol (`path.ts`). Ayrıntılar aşağıda. |
+| `src/components/admin/casino-report.tsx` | Yönetim › **Oyun Salonu** raporu (`GET /api/admin/casino/report`, yalnız yönetici): kasa defteri, JACKPOT fonları, dönem ve oyun oyun oynanan, ödenen, kasa payı. |
 | `src/app/oyunlar.tsx` | Profildeki **Oyun Merkezi**: Oyun Salonu · Oda oyunları · Geçmiş. |
 | `src/app/oyun-yonetimi.tsx` | Yönetim paneli (`games.manage` yetkisi). |
 
@@ -61,6 +63,18 @@ Görsellerin çoğu yer tutucudur (emoji, düz şekiller, Ionicons); çizilecekl
 3. `server/api/Dockerfile` `room-games` klasörünü kopyalar; klasör dışına dosya konursa o da eklenmelidir.
 
 Eski uygulama sürümleri yeni masaları çizemez: oda oyunlarında sunucu ve uygulama birlikte yayınlanır.
+
+## Bilye Şelalesi
+
+Şartname: `docs/PACHINKO_SARTNAME.md`. Bu sürüm 1. aşamadır (tek tahta, fizik, cepler, ödül, mobil arayüz) ve 2. aşamanın kayıt ve rapor kısmını mevcut Oyun Salonu altyapısıyla karşılar.
+
+- **Tahta:** 10 sıra çivi, 9 alt cep (0, 0,2, 0,5 ve 1 kat), 3 kupa: Zümrüt 2 kat, Yakut 5 kat, Altın 20 kat. Sağdaki kanaldan fırlatılan bilye üst raydan tahtaya girer. Atış gücü üç: Hafif, Orta, Güçlü (bilyenin tahtaya girdiği yeri değiştirir). Telefon eğme, sallama ya da başka bir sensörle kontrol yoktur.
+- **Fizik:** yerçekimi, yuvarlak bilye ve çiviler, duvarlar ve kupa ağızları. Hesap yalnızca dört işlem ve karekökle yapılır; aynı atış her telefonda aynı yolu çizer.
+- **Sonuç sunucuda:** tur, diğer oyunlar gibi `POST /api/casino/play` ile oynanır (`game: 'bilye'`, `pick`: atış gücü). Sunucu bilyenin düşeceği hedefi çeker; ekran o hedefe giden, simülasyonda gerçekten oraya düşmüş bir uçuşu oynatır. Telefon sonucu belirlemez.
+- **Olasılık:** her atış gücü için 400.000 atış simüle edildi ve bilyenin gerçekten nereye düştüğü sayıldı. Ödeyen hedeflerin payları, beklenen geri ödeme %40'ı geçmeyecek biçimde ölçeklendi (Hafif %39,98, Orta %39,99, Güçlü %40,00); kalan pay ödemesiz ceplere gider. Altın kupa her atış gücünde %1'in altındadır. Tahta ya da fizik değişirse `node --experimental-strip-types --no-warnings --import ./tests/register.mjs scripts/bilye-table.ts` yeniden çalıştırılır; testler eski tablo kalırsa kırılır.
+- **Ekonomi:** ayrı bir sistem kurulmadı. Bahis önce oyun bakiyesinden düşer; kazanç oyun bakiyesine yazılır (hediye edilemez, paraya çevrilemez). Bahsin %60'ı kasaya, %40'ı ödül havuzuna; kazanç yalnızca havuzdan ödenir, havuz en yüksek ödülü karşılayamıyorsa tur reddedilir. Günlük sınır, en yüksek bahis ve oyunu kapatma Canlı ayarlar › Oyun Salonu'ndan.
+- **Rapor:** Yönetim › Oyun Salonu (yalnız yönetici). Turlar 180 gün saklanır; kasa defteri başlangıçtan bu yanadır.
+- **Henüz yok (sonraki aşamalar, karar gerektirir):** oyuncu oranının panelden değiştirilmesi (60/40 kuralını değiştirir), Bilye'ye özel Jackpot ve Fever modu, ikinci tahta, oda içi skor tablosu, düello ve turnuvalar.
 
 ## En kritik kural: sesli sohbet kesintisiz
 
@@ -184,5 +198,6 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 | `dragon` | Ejder ile Kaplan |
 | oda menüsü `c2` | Meyve Bahçesi |
 | `wheel` (oda menüsü `cg-ruzgar`) | Rüzgâr Gülü |
+| `bilye` | Bilye Şelalesi |
 
 Yayından önce bu adlar için TÜRKPATENT'te marka taraması yapılmalı.

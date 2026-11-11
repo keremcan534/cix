@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`, Temel ücretsiz). Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 608 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16–18'in öncelikleri kendi tablolarında yazılı.
+**Toplam 616 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16–19'un öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -35,6 +35,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 16. Oyun Salonu: çark ve tahta oyunları | 9 |
 | 17. Oyun Salonu: Yörünge, Mercan Avı, Fener Kayalığı | 22 |
 | 18. Oda oyunları: Renk Kartları, XOX, Dört Taş | 21 |
+| 19. Oyun Salonu: Bilye Şelalesi | 8 |
 
 ## ChatGPT ile üretim
 
@@ -794,3 +795,19 @@ Renk Kartları (`app/src/components/games/room/cards.tsx`, kart yüzleri `card-f
 | 10 | `dort-tas-hucre.png` | Tahta hücresi | kodla çizilen, ortası delik mavi kare | Dört Taş tahtasının tek hücresi: gece mavisi parlak plastik kare, ortasında **şeffaf** yuvarlak delik, deliğin kenarında ince iç gölge; kenarlar yan yana döşenince ek yeri görünmemeli; 192 px | P2 | Yeni (oyun yenileme) · uygulama 7 × 6 döşer; taş deliğin arkasından düşerken görünür, bu yüzden delik tam şeffaf olmalı |
 
 Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → kart yüzleri ve arkası `room/card-face.tsx` içinde (`CardFace`, `CardBack`, `CARD_COLORS`), masa `room/cards.tsx` içinde, taş ve hücre `room/four.tsx` içinde (`Disc` ve tahtanın ön yüzü), kapak `components/GameArt.tsx` `COVER` listesinde değişir. Süre halkası, kazanan çizgi, uçan kartlar ve konfeti kodla çizilmeye devam eder (hareket ettikleri için).
+
+## 19. Oyun Salonu: Bilye Şelalesi (8)
+
+Oyun şimdilik kodla çizilen şekillerle duruyor (altın noktalar çivi, renkli kaplar kupa, gri bilye). Stil: diğer oyun görselleriyle aynı 3D cam/jöle yüzey; tahta gece moru ve lacivert, altın detaylar. Şeffaf arka plan, 512 px PNG.
+
+| # | Görsel | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 1 | Oyun kapağı | Mor-lacivert bir şelalenin içinden dökülen parlak gümüş bilyeler, altın çivilerden sekerek; üstte boş alan (yazı yok) | `oyun-bilye-selalesi.png` | P1 |
+| 2 | Bilye | Tek parlak gümüş bilye, beyaz ışık yansıması, hafif gölge (küçük boyda da okunur) | `bilye-top.png` | P1 |
+| 3 | Çivi | Küçük altın pirinç çivi başı, üstten bakış, parlak | `bilye-civi.png` | P2 |
+| 4 | Altın kupa | Ağzı yukarı küçük altın kupa, içi koyu, "20x" yazmadan | `bilye-kupa-altin.png` | P1 |
+| 5 | Yakut kupa | Aynı biçimde kırmızı yakut kupa | `bilye-kupa-yakut.png` | P2 |
+| 6 | Zümrüt kupa | Aynı biçimde yeşil zümrüt kupa | `bilye-kupa-zumrut.png` | P2 |
+| 7 | Tahta arka planı | Dikey 320×440 oranında, mor-lacivert derin bir şelale dokusu, kenarlarda ince altın çerçeve; çivi ve kupa çizilmeden | `bilye-tahta.png` | P2 |
+| 8 | Fırlatma kanalı | Sağda dikey, cam bir boru; altta küçük bir yay/piston | `bilye-kanal.png` | P3 |
+

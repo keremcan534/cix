@@ -4,6 +4,7 @@
 //
 //   GET  /api/casino                                                → { games, needLevel, allowed, gameCoins, mine }
 //   POST /api/casino/play { game, bet, pick?, bets?, place?, ref }  → { round, user, replay, fund }
+//   GET  /api/admin/casino/report                                   → { book, jackpots, periods } (admin role)
 //
 // One request is one round. A board game (Gece Yarısı Çarkı, Liman Pazarı, Sihir Destesi) sends `bets` (option →
 // coins) instead of `bet`; Mercan Avı's pick is the fish, Yörünge's the cash-out target. The stake comes from game
@@ -113,7 +114,54 @@ function prune() {
   );
 }
 
+/** The report's periods: since the start of today (Istanbul), the last 7 and 30 days, and everything still kept. */
+const PERIODS = [
+  ['today', DAY_START],
+  ['week', "now() - interval '7 days'"],
+  ['month', "now() - interval '30 days'"],
+  ['kept', `now() - make_interval(days => ${RETENTION_DAYS})`],
+];
+
 export const casinoRoutes = {
+  /**
+   * Yönetim › Oyun Salonu raporu (admin role): the house book (everything played, the house's 60 %, the payout pool,
+   * what it paid and its opening advance), each slot's JACKPOT fund, and per period and per game the rounds,
+   * players, coins played, winnings paid and the house's part. Rounds are kept 180 days; the book is since the start.
+   */
+  async 'GET /api/admin/casino/report'(req) {
+    const me = await auth(req);
+    if (me.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
+    await db.query('INSERT INTO casino_bank (id, pool, seed) VALUES (1, $1, $1) ON CONFLICT DO NOTHING', [POOL_SEED]);
+    const [book, funds, ...periods] = await Promise.all([
+      db.query('SELECT wagered, house, pool, paid, seed FROM casino_bank WHERE id = 1'),
+      jackpots(db),
+      ...PERIODS.map(([, since]) =>
+        db.query(
+          `SELECT game, count(*) AS rounds, count(DISTINCT user_id) AS players, coalesce(sum(bet), 0) AS wagered, coalesce(sum(payout), 0) AS paid
+             FROM casino_rounds WHERE created_at >= ${since} GROUP BY game`,
+        ),
+      ),
+    ]);
+    const b = book.rows[0];
+    const num = (x) => Number(x ?? 0);
+    return {
+      book: { wagered: num(b.wagered), house: num(b.house), pool: num(b.pool), paid: num(b.paid), seed: num(b.seed) },
+      jackpots: funds,
+      periods: Object.fromEntries(
+        PERIODS.map(([key], i) => {
+          const rows = new Map(periods[i].rows.map((r) => [r.game, r]));
+          const games = GAMES.map((g) => {
+            const r = rows.get(g.id);
+            const wagered = num(r?.wagered);
+            return { id: g.id, name: g.name, rounds: num(r?.rounds), players: num(r?.players), wagered, paid: num(r?.paid), house: houseShare(wagered) };
+          });
+          const sum = (k) => games.reduce((a, g) => a + g[k], 0);
+          return [key, { rounds: sum('rounds'), wagered: sum('wagered'), paid: sum('paid'), house: sum('house'), games }];
+        }),
+      ),
+    };
+  },
+
   async 'GET /api/casino'(req) {
     const me = await auth(req);
     const s = live();

@@ -50,8 +50,8 @@ const HOOK: Partial<Record<CasinoGame['id'], string>> = {
   magiccard: '8 kart · 100 kat',
   rocket: 'Çarpanı seç, fırlat',
   fish: 'Dokun, ateş et, yakala',
-  olympus: 'Fenerin ışığı kimi bulacak?',
-  bilye: 'Fırlat, çivilerden sek, kupaya düş',
+  olympus: 'Işık kimi bulacak?',
+  bilye: 'Fırlat · 20 kat kupa',
 };
 
 export default function GameCenter() {

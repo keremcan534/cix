@@ -85,3 +85,25 @@ describe('Bilye Şelalesi sunucuda', () => {
     assert.equal(hall.mine.filter((r) => r.game === 'bilye').length, 40);
   });
 });
+
+describe('Oyun Salonu raporu', () => {
+  test('yalnız yönetici; oyun oyun oynanan, ödenen, kasa payı; defterle aynı', async () => {
+    const p = await player(5_000);
+    assert.equal((await call('GET', '/api/admin/casino/report', null, p.session))[0], 403);
+    for (let i = 0; i < 4; i++) assert.equal((await launch(p.session, 'orta', 500))[0], 200);
+    const admin = await h.account('Rapor yöneticisi', 'admin');
+    const [st, r] = await call('GET', '/api/admin/casino/report', null, admin.session);
+    assert.equal(st, 200, r.error);
+    const today = r.periods.today;
+    const b = today.games.find((g) => g.id === 'bilye');
+    assert.ok(b.rounds >= 4 && b.players >= 1);
+    assert.ok(b.wagered >= 2000);
+    assert.equal(b.house, b.wagered * 0.6);
+    for (const k of ['week', 'month', 'kept']) assert.ok(r.periods[k].wagered >= today.wagered, k);
+    // The book holds every round ever played; the rounds kept are part of it.
+    assert.ok(r.book.wagered >= r.periods.kept.wagered);
+    assert.equal(r.book.house, r.book.wagered * 0.6);
+    assert.ok(r.book.pool >= 0 && r.book.seed > 0);
+    assert.equal(typeof r.jackpots.jackpot, 'number');
+  });
+});
