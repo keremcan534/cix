@@ -842,6 +842,9 @@ function CasinoCard({ kit }: { kit: Kit }) {
   const x = kit.get('casino_off');
   const options = (x.bounds.options as string[] | undefined) ?? [];
   const off = listOf(x.effective);
+  // Who the coin games are for (an older server has no such key: the row is left out).
+  const audience = kit.get('casino_open');
+  const everyone = !!audience && listOf(audience.effective).includes('everyone');
   const rows = CASINO_NUMBER_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
   const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
   const changes: LiveChanges = {};
@@ -857,8 +860,21 @@ function CasinoCard({ kit }: { kit: Kit }) {
   const reset: LiveChanges = {};
   for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
   return (
-    <Card title="Oyun Salonu" footer={lastChange(x, ...rows.map((r) => r.x))} pill={<InvalidPill x={x.invalid ? x : rows.find((r) => r.x.invalid)?.x} />}>
+    <Card title="Oyun Salonu" footer={lastChange(x, ...(audience ? [audience] : []), ...rows.map((r) => r.x))} pill={<InvalidPill x={x.invalid ? x : audience?.invalid ? audience : rows.find((r) => r.x.invalid)?.x} />}>
       <Text style={s.hint}>Turları sunucu oynar; oranlar uygulamada yazdığı gibidir ve buradan değişmez. Kapatılan oyunun yeni turu reddedilir, oyun bakiyesi kalır.</Text>
+      {audience && (
+        <ListGroup>
+          <ListSwitch
+            icon={everyone ? 'people-outline' : 'shield-checkmark-outline'}
+            tone={everyone ? 'success' : 'neutral'}
+            title="Jetonlu oyunlar herkese açık"
+            subtitle={everyone ? 'Cömertlik Lv.2 ve üstü herkes görür ve oynar' : 'Kapalı: Oyun Salonu ve Rüzgâr Gülü yalnız yönetici hesaplarında görünür'}
+            value={everyone}
+            disabled={kit.locked}
+            onChange={(v) => kit.open(v ? 'Jetonlu oyunlar herkese açılsın' : 'Jetonlu oyunlar yalnız yöneticilere açık olsun', () => ({ casino_open: v ? ['everyone'] : null }), v ? undefined : 'Geri dönüş')}
+          />
+        </ListGroup>
+      )}
       <ListGroup>
         {options.map((id) => {
           const on = !off.includes(id);

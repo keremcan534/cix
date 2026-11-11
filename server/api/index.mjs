@@ -41,7 +41,7 @@ import { recordIncome } from './agency-lib.mjs';
 import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
 import { backpackRoutes } from './backpack.mjs';
 import { bondRoutes, startBondSweep, stopBondSweep } from './bonds.mjs';
-import { wealthPoints, wheelRoutes } from './wheel.mjs';
+import { paidGamesOpen, wealthPoints, wheelRoutes } from './wheel.mjs';
 import { casinoRoutes } from './casino.mjs';
 import { roomXpRoutes } from './room-xp.mjs';
 import { roomGameRoutes } from './room-games.mjs';
@@ -142,11 +142,12 @@ const walletRoutes = {
 
   /**
    * wealthXp: the Cömertlik points the server counts (wheel.mjs wealthPoints), so the app gates games with the same
-   * value; charmXp: the Yankı points (wallet.mjs charmPoints), which open posting in Anlar.
+   * value; charmXp: the Yankı points (wallet.mjs charmPoints), which open posting in Anlar. paidGames: whether the
+   * coin games are open to this account (wheel.mjs paidGamesOpen); the app hides them when it says false.
    */
   async 'GET /api/me'(req) {
     const u = await auth(req);
-    return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id), charmXp: await charmPoints(db, u.id) } };
+    return { user: { ...(await withSignIn(u)), wealthXp: await wealthPoints(db, u.id), charmXp: await charmPoints(db, u.id), paidGames: paidGamesOpen(u) } };
   },
 
   async 'GET /api/ledger'(req) {

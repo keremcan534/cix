@@ -105,6 +105,15 @@ Bütün jetonlu oyunlarda (Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile 
 
 Uğurlu hediye bu kurala dahil değildir; ayrı bir modüldür (`lib/lucky.ts`, beklenen geri ödeme %65).
 
+## Erişim kuralı: şimdilik yalnız yöneticiler
+
+Ürün kararıyla (11.11) jetonlu oyunlar (Oyun Salonu ve Rüzgâr Gülü) **şimdilik yalnızca yönetici hesaplarına** (`users.role = 'admin'`, Actions › "Yetki ver") açıktır. Diğer herkeste sekme, kartlar, oda menüsündeki bölüm ve odadaki çark kısayolu görünmez; sunucu turu da reddeder (`wheel.mjs paidGamesOpen`). Oda oyunları (Ludo, Renk Kartları, Dört Taş, XOX, Okey) herkese açık kalır; Uğurlu hediyeler bu kuraldan etkilenmez.
+
+- Herkese açmak için yeni sürüm gerekmez: Yönetim › Canlı ayarlar › Oyun Salonu › **Jetonlu oyunlar herkese açık** (canlı ayar `casino_open`). Açınca aşağıdaki seviye kuralı herkes için geçerli olur; kapatınca yeniden yalnız yöneticiler görür.
+- Yönetici de seviye kuralına tabidir (Cömertlik Lv.2).
+- Uygulama, hesabın durumunu `GET /api/me` cevabındaki `paidGames` alanından öğrenir; alan gelene kadar oyunları gizli tutar.
+- Testler: `server/api/test/paid-games.test.mjs`, `app/tests/casino-visibility.test.ts`.
+
 ## Erişim kuralı: Cömertlik Seviyesi 2
 
 Ürün kararıyla (26.10) Oyun Salonu erişimi **VIP2 yerine Cömertlik Seviyesi 2 ve üzeri** oldu. Cömertlik seviyesi geçerli jeton harcamasından gelir ve kalıcıdır (bkz. `docs/SEVIYELER.md`). Oyun Salonu ve zar düellosu bahisleri cömertlik puanı kazandırmaz; yani oyun oynayarak seviye yükseltilemez. Yönetim panelinde oyun başına eşik Cömertlik Lv.1 / 2 / 3 / 5 / 10 olarak seçilebilir.

@@ -58,7 +58,7 @@ const SUPPORT: Item[] = [
 const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory } = useApp();
+  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const isAdmin = useIsAdmin();
@@ -224,7 +224,7 @@ export default function ProfileScreen() {
         )}
 
         {/* From Cömertlik Lv.2; a live build plays these on the server (lib/live/casino). A game switched off there drops out. */}
-        {casinoVisible(wealthLevel) && (
+        {casinoVisible(wealthLevel, paidGames) && (
           <View style={styles.gameCard}>
             <Pressable style={styles.gameHead} onPress={() => router.push('/oyunlar')} accessibilityLabel="Oyun Salonu">
               <Icon3D name="wheel" size={30} />

@@ -17,6 +17,8 @@ export type Snapshot = {
   gameCoins?: number;
   spentTotal: number;
   wealthXp?: number;
+  /** Whether the server opens the coin games to this account, as last heard (store paidGames). */
+  paidGames?: boolean;
   ledger: LedgerRow[];
   spentDay: { date: string; amount: number };
   inventory: string[];
@@ -74,7 +76,7 @@ const FAMILY_ROLES = ['owner', 'helper', 'member'] as const;
 
 /** The kind of value each saved field must hold (lib/saved-state); anything else is dropped on load. */
 const SNAPSHOT_SPEC: Record<keyof Snapshot, Kind> = {
-  loggedIn: 'boolean', me: 'object', coins: 'number', gameCoins: 'number', spentTotal: 'number', wealthXp: 'number', ledger: 'objects',
+  loggedIn: 'boolean', me: 'object', coins: 'number', gameCoins: 'number', spentTotal: 'number', wealthXp: 'number', paidGames: 'boolean', ledger: 'objects',
   spentDay: 'object', inventory: 'strings', equipped: 'object', emojiPacks: 'strings', recentEmojis: 'strings', settings: 'object',
   notifications: 'objects', myRoom: 'object', isHost: 'boolean', diamonds: 'number', totalDiamonds: 'number', charmXp: 'number',
   weekly: 'numbers', earnings: 'objects', diamondLocks: 'objects', withdrawals: 'objects', stats: 'object', giftWall: 'object', claimedTasks: 'strings',

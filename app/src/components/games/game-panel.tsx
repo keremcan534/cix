@@ -29,7 +29,7 @@ import { XoxPractice } from '@/components/games/room/xox';
 import { LiveTable, isTableGame } from '@/components/games/room-tables';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
-import { casinoVisible, gamblingLevelOk, isPracticeBot, useGames, type Entry } from '@/lib/games';
+import { casinoVisible, isPracticeBot, useGames, type Entry } from '@/lib/games';
 import { playSfx, setGameVolume } from '@/lib/game-sound';
 import { isLiveRoom } from '@/lib/live';
 import { refreshCasino } from '@/lib/live/casino';
@@ -94,7 +94,7 @@ export function GamePanel({
   /** A live room: I may open the room's game table (the room's staff; the server checks it again). */
   canOpenTable?: boolean;
 }) {
-  const { settings, setSetting, wealthLevel } = useApp();
+  const { settings, setSetting, wealthLevel, paidGames } = useApp();
   const { roomGames, casino } = useGames();
   // The other games and the sound level stay behind two buttons in the header: the game has the screen to itself.
   const [tools, setTools] = useState<'games' | 'sound' | null>(null);
@@ -108,8 +108,8 @@ export function GamePanel({
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable && (!tables || isTableGame(g.id))).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
     // Rüzgâr Gülü and, in a live build, every other casino game are played on the server; the level gates them all.
-    ...(gamblingLevelOk(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
-    ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
+    ...(casinoVisible(wealthLevel, paidGames) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
+    ...casino.filter((g) => casinoVisible(wealthLevel, paidGames) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = keyOf(open);
   const openId = open.kind === 'wheel' ? 'wheel' : open.id;
@@ -223,8 +223,8 @@ export function GamePanel({
           ) : (
             <Text style={p.dim}>Bu oyun yakında geliyor.</Text>
           ))}
-        {casinoGame && casinoVisible(wealthLevel) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
-        {wheel && gamblingLevelOk(wealthLevel) && <WheelPlayer entry={entry} />}
+        {casinoGame && casinoVisible(wealthLevel, paidGames) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
+        {wheel && casinoVisible(wealthLevel, paidGames) && <WheelPlayer entry={entry} />}
       </ScrollView>
     </View>
   );

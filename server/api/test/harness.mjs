@@ -44,6 +44,9 @@ export function startApi(extraEnv = {}) {
       ALLOW_DEV_AUTH: '1',
       // The storage is a stand-in address in most tests: an uploaded file isn't looked up there (media.mjs).
       UPLOAD_VERIFY: '0',
+      // The coin games are for admin accounts only by default (live-registry casino_open); the tests' players are
+      // ordinary accounts, so the API runs with them open. test/paid-games.test.mjs runs the default.
+      CASINO_OPEN: 'everyone',
       ...extraEnv,
     };
     // PUBLIC_URL 'self': the address phones open stored files at is this API's own (core.mjs servedFiles).

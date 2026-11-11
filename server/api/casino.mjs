@@ -14,7 +14,8 @@
 // pool, winnings are paid only from the pool, and a round whose top prize the pool can't cover is refused before
 // anything is taken. A slot's JACKPOT share moves from the pool into its fund; a line of wilds wins bet / top stake
 // of the fund.
-// Open from Cömertlik Lv.2 (wheel.mjs NEED_POINTS), checked on every round. Per person: a daily ceiling per game
+// Open from Cömertlik Lv.2 (wheel.mjs NEED_POINTS), checked on every round; to admin accounts only until the live
+// setting casino_open opens the coin games to everyone (wheel.mjs paidGamesOpen). Per person: a daily ceiling per game
 // (live setting casino_daily_rounds × the game's top stake) and a rate limit. Live settings also switch single games
 // off (casino_off) and cap the stake (casino_max_bet); Acil durum's Oyunlar stops them all (features.mjs).
 // Kept: the rounds, 180 days (the history and the daily limit), deleted with the account (social.mjs eraseAccount).
@@ -23,7 +24,7 @@ import crypto from 'node:crypto';
 import { HttpError, REF, auth, db, limit, move, readJson, selfUser, tx } from './core.mjs';
 import { live } from './live-settings.mjs';
 import { spendCoins } from './wallet.mjs';
-import { NEED_LEVEL, NEED_POINTS, wealthPoints } from './wheel.mjs';
+import { NEED_LEVEL, NEED_POINTS, needPaidGames, paidGamesOpen, wealthPoints } from './wheel.mjs';
 import {
   BOARDS,
   GAMES,
@@ -123,18 +124,20 @@ export const casinoRoutes = {
       jackpots(db),
     ]);
     const played = new Map(today.rows.map((x) => [x.game, Number(x.n)]));
+    // Not open to this account (wheel.mjs paidGamesOpen): every game reads as off, so an installed app hides them.
+    const open = paidGamesOpen(me, s);
     return {
       games: GAMES.map((g) => ({
         id: g.id,
         name: g.name,
-        active: isOn(g, s),
+        active: open && isOn(g, s),
         bets: betsUpTo(g, s.casinoMaxBet),
         dailyLimit: dailyOf(g, s),
         playedToday: played.get(g.id) ?? 0,
         jackpot: funds[g.id] ?? null,
       })),
       needLevel: NEED_LEVEL,
-      allowed: points >= NEED_POINTS,
+      allowed: open && points >= NEED_POINTS,
       gameCoins: Number(me.game_coins),
       mine: mine.rows.map((r) => roundOut(r)),
     };
@@ -165,6 +168,7 @@ export const casinoRoutes = {
     if (before) return answer(before, true);
     const s = live();
     if (!isOn(g, s)) throw new HttpError(409, `${g.name} şu an kapalı`);
+    needPaidGames(me, s);
     const place = b.place === 'room' ? 'room' : 'profile';
     const board = isBoard(g.id) ? BOARDS[g.id] : null;
     let bet;

@@ -17,11 +17,11 @@ const HOLD_MS = 3400;
 
 export function WinBanner({ top = 96, still }: { top?: number; /** reduce motion: no sweep or sparkle */ still?: boolean }) {
   const queue = useWinNews();
-  const { wealthLevel } = useApp();
+  const { wealthLevel, paidGames } = useApp();
   const news = queue[0];
   // Wins of chance are not news for someone below the gambling level (Cömertlik Lv.2), and Oyun Salonu wins
   // not for someone who cannot see Oyun Salonu: skipped, never shown.
-  const hidden = !!news && winNewsHidden(news, wealthLevel);
+  const hidden = !!news && winNewsHidden(news, wealthLevel, paidGames);
   useEffect(() => {
     if (news && hidden) shiftWinNews(news.id);
   }, [news, hidden]);

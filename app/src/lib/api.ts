@@ -29,7 +29,7 @@ import type { XoxMove, XoxState } from '@/lib/room-games/xox';
  * wealthPoints and wallet.mjs charmPoints).
  */
 export type ServerUser = {
-  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number;
+  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number; paidGames?: boolean;
   // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
   email?: string | null; identities?: string[]; phoneVerified?: boolean;
 };
@@ -1133,8 +1133,8 @@ export type LiveKey =
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
-/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */
-export type CasinoKey = 'casino_off' | 'casino_max_bet' | 'casino_daily_rounds';
+/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, who the coin games are open to, the top stake, the daily limit. */
+export type CasinoKey = 'casino_off' | 'casino_open' | 'casino_max_bet' | 'casino_daily_rounds';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

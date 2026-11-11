@@ -20,7 +20,7 @@ import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
 import type { CasinoGame } from '@/data/games';
 import { ME, USERS } from '@/data/mock';
-import { casinoAccess, casinoVisible, gamblingLevelOk, practiceBots, useGames } from '@/lib/games';
+import { casinoAccess, casinoVisible, practiceBots, useGames } from '@/lib/games';
 import { liveMode } from '@/lib/live';
 import { useLiveCasino } from '@/lib/live/casino';
 import { useApp } from '@/store';
@@ -55,7 +55,7 @@ const HOOK: Partial<Record<CasinoGame['id'], string>> = {
 
 export default function GameCenter() {
   const { oyun } = useLocalSearchParams<{ oyun?: CasinoGame['id'] | 'ruzgar' }>();
-  const { wealthLevel, me } = useApp();
+  const { wealthLevel, paidGames, me } = useApp();
   const { casino, roomGames, history, bank } = useGames();
   const t = useTheme();
   const narrow = useWindowDimensions().width < 380;
@@ -63,8 +63,8 @@ export default function GameCenter() {
   // Below Cömertlik Lv.2 Oyun Salonu is not shown at all: no tab, and an old link to one of its games opens nothing.
   // A live build reads the server's catalog (switches, stakes, history) each time the screen comes to the front.
   useLiveCasino();
-  const showSalon = gamblingLevelOk(wealthLevel);
-  const showCasino = casinoVisible(wealthLevel);
+  const showSalon = casinoVisible(wealthLevel, paidGames);
+  const showCasino = showSalon;
   // Until a tab is picked the screen opens on Oyun Salonu for whoever may see it. A live build learns the level
   // from the server a moment after the screen opens, so the choice can't be made once at the start.
   const [picked, setTab] = useState<Tab | null>(null);

@@ -95,6 +95,9 @@ export function defaultsOf(e = process.env) {
     casino_off: [],
     casino_max_bet: CASINO_TOP,
     casino_daily_rounds: CASINO_DAILY_ROUNDS,
+    // The coin games (Oyun Salonu, Rüzgâr Gülü) are for admin accounts only until they are opened to everyone
+    // (the owner's decision). CASINO_OPEN=everyone in .env opens them without a row (the tests' API runs so).
+    casino_open: e.CASINO_OPEN === 'everyone' ? ['everyone'] : [],
     // Oda süslemesi (room-decor.mjs): both paid parts on, Özel süsleme 5.000 jeton for 30 days.
     room_decor_off: [],
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [k, x.default])),
@@ -614,6 +617,23 @@ export const REGISTRY = {
       return out.join(' ') || 'Görünür bir etkisi yok.';
     },
   },
+  casino_open: {
+    field: 'casinoOpen',
+    group: 'Oyun Salonu',
+    label: 'Jetonlu oyunlar herkese açık',
+    help: 'Kapalıyken Oyun Salonu ve Rüzgâr Gülü yalnızca yönetici hesaplarına görünür ve yalnızca onlar oynayabilir; diğer herkeste gizlidir ve sunucu turu reddeder. Açınca Cömertlik Lv.2 ve üstü herkes görür.',
+    type: 'set',
+    bounds: { options: ['everyone'], labels: { everyone: 'Herkese açık' }, max: 1 },
+    parse: (v) => setOf(v, REGISTRY.casino_open.bounds, 'Jetonlu oyunlar'),
+    // Opening the coin games to every member is confirmed twice.
+    big: (before, after) => (after ?? []).includes('everyone') && !before.includes('everyone'),
+    impact: (before, after) =>
+      after.includes('everyone') === before.includes('everyone')
+        ? 'Görünür bir etkisi yok.'
+        : after.includes('everyone')
+          ? 'Oyun Salonu ve Rüzgâr Gülü, Cömertlik Lv.2 ve üstü herkese açılır.'
+          : 'Oyun Salonu ve Rüzgâr Gülü yalnızca yönetici hesaplarına görünür; diğer herkeste gizlenir ve yeni tur reddedilir. Oyun bakiyeleri ve geçmiş kalır.',
+  },
   casino_max_bet: {
     field: 'casinoMaxBet',
     group: 'Oyun Salonu',
@@ -687,7 +707,7 @@ const readOnlySet = (xs) => {
  *   { v, featuresOff: Set, notice, minVersion, giftsHidden: Set, shopHidden: Set, packsHidden: Set, campaign, usdTry, withdrawMax,
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
- *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoMaxBet,
+ *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
  *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
@@ -726,6 +746,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     rewardsOff: readOnlySet(val('rewards_off')),
     ...Object.fromEntries(Object.entries(REWARD_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     casinoOff: readOnlySet(val('casino_off')),
+    casinoOpen: readOnlySet(val('casino_open')),
     casinoMaxBet: val('casino_max_bet'),
     casinoDailyRounds: val('casino_daily_rounds'),
     roomDecorOff: readOnlySet(val('room_decor_off')),

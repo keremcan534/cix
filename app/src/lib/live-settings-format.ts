@@ -236,6 +236,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `Günde ${fmtNum(v)} davet` : String(v);
     case 'casino_off':
       return Array.isArray(v) && v.length ? `Kapalı: ${some(v.map((id) => names.game?.(id) ?? id))}` : 'Hepsi açık';
+    case 'casino_open':
+      return Array.isArray(v) && v.includes('everyone') ? 'Herkese açık' : 'Yalnız yöneticiler';
     case 'casino_max_bet':
       return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
     case 'casino_daily_rounds':

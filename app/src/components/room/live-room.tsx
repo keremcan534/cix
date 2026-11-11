@@ -106,7 +106,7 @@ import { checkText, messageRefusal, noteSent, refusalTitle } from '@/lib/contact
 import { ContactNote } from '@/components/contact-note';
 import { animById, getAnimations, isLive, newAnimRequestId, playRoomAnim, sendAnimation, simulateRemoteSend } from '@/lib/animations';
 import { loadLooks, lookOf, useLooks, type Look } from '@/lib/live/looks';
-import { casinoAccess, casinoVisible, gamblingLevelOk, playDuel, useGames } from '@/lib/games';
+import { casinoAccess, casinoVisible, playDuel, useGames } from '@/lib/games';
 import { refreshCasino } from '@/lib/live/casino';
 import { useTableNews } from '@/lib/live/room-table';
 import { isTableGame } from '@/components/games/room-tables';
@@ -535,7 +535,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   }, [setPerson]);
   const [moving, setMoving] = useState<string | null>(null);
   // The Rüzgâr Gülü shortcut floats over the chat's right side; while it shows, the chat keeps that side free.
-  const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && gamblingLevelOk(app.wealthLevel);
+  const wheelShown = full && !game && !combo && !moving && !emojiOpen && !typing && !chatRefused && casinoVisible(app.wealthLevel, app.paidGames);
   const [inviteSeat, setInviteSeat] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ title: string; options: SheetOption[] } | null>(null);
   const [msgFilter, setMsgFilter] = useState({ joins: true, gifts: true, bot: true });
@@ -2834,7 +2834,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       : []),
     // Oyun Salonu only exists for Cömertlik Lv.2 and up; below that the room menu has no trace of it. A live build
     // plays every one of its games on the server (lib/live/casino); a game the server switched off isn't listed.
-    ...(gamblingLevelOk(app.wealthLevel)
+    ...(casinoVisible(app.wealthLevel, app.paidGames)
       ? [
           {
             title: 'Oyun Salonu',
@@ -2844,7 +2844,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               // Rüzgâr Gülü: the server plays it (components/games/wheel); Oyun Salonu is only shown from Lv.2.
               { key: 'cg-ruzgar', label: 'Rüzgâr Gülü', icon: 'compass' as const, hue: '#F6BD60', badge: 'NEW' as const, onPress: () => (setPanel(null), setGame({ kind: 'wheel' }), setGameMin(false)) },
               ...gameCatalog.casino
-                .filter((g) => casinoVisible(app.wealthLevel) && g.active && g.fromRoom)
+                .filter((g) => g.active && g.fromRoom)
                 .map((g) => ({ key: `cg-${g.id}`, label: g.name, emoji: g.emoji, art: gameArtOf(g.id), hue: gameHueOf(g.id), onPress: () => openCasino(g.id) })),
             ],
           } satisfies MenuSection,

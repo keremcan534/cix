@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 
 import { HttpError, REF, auth, db, env, limit, move, readJson, selfUser, tx } from './core.mjs';
+import { live } from './live-settings.mjs';
 import { spendCoins } from './wallet.mjs';
 import { COUNTS, SLICES, TIERS, WEIGHT_TOTAL, jackpotSeed, playSpins } from './wheel-rules.mjs';
 
@@ -21,6 +22,16 @@ export { COUNTS, SLICES, TIERS };
 /** Cömertlik Lv.2 starts at 35 points (app/src/data/wealth.ts WEALTH_XP). */
 export const NEED_LEVEL = 2;
 export const NEED_POINTS = 35;
+/**
+ * Who the coin games (this wheel and Oyun Salonu) are for right now: admin accounts only, until the live setting
+ * casino_open says everyone. Read on every call, like the level; the level still applies to whoever it lets in.
+ */
+export const paidGamesOpen = (user, s = live()) => s.casinoOpen.has('everyone') || user.role === 'admin';
+const STAFF_ONLY = 'Jetonlu oyunlar şu an yalnızca yöneticilere açık';
+/** Refuses a round for someone the coin games are not open to. */
+export function needPaidGames(user, s = live()) {
+  if (!paidGamesOpen(user, s)) throw new HttpError(403, STAFF_ONLY);
+}
 export const DAILY = (() => {
   const n = Number(env.WHEEL_DAILY ?? 1_000_000);
   return Number.isSafeInteger(n) && n > 0 ? n : 1_000_000;
@@ -103,7 +114,7 @@ export const wheelRoutes = {
       dailyLimit: DAILY,
       playedToday: played,
       needLevel: NEED_LEVEL,
-      allowed: points >= NEED_POINTS,
+      allowed: paidGamesOpen(me) && points >= NEED_POINTS,
       gameCoins: Number(me.game_coins),
       winners: winners.rows.map((r) => ({ ...person(r), tier: r.tier, payout: Number(r.payout), jackpot: Number(r.jackpot), best: r.best_milli, at: r.created_at })),
       board: board.rows.map((r) => ({ ...person(r), total: Number(r.total) })),
@@ -129,6 +140,7 @@ export const wheelRoutes = {
 
     const before = await seen();
     if (before) return answer(before, true);
+    needPaidGames(me);
     if ((await wealthPoints(db, me.id)) < NEED_POINTS) throw new HttpError(403, `Rüzgâr Gülü Cömertlik Lv.${NEED_LEVEL} ve üstü için`);
     const t = TIERS[tier];
     const cost = t.price * count;
