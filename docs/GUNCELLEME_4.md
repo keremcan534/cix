@@ -2,6 +2,8 @@
 
 Sahibin gönderdiği "güncelleme 4" belgesinin maddeleri ve durumu. Sahibin kararları: önce hatalar ve küçük düzeltmeler, sonra ekranlar ve kurallar; oda, son yetkili ayrıldıktan 5 dakika sonra kapanır; patron koltuğunun rakamları Canlı ayarlar'dan değişir (varsayılan 25.000 jeton, 10 dakika). Belgedeki örnek ekranlar başka uygulamalardan; yalnızca işleyiş için kullanılır, ad, metin ve görünüm SimilarClub'ın kendisinin olur.
 
+**Durum:** Dalga 1 (2–11, 15, 18) yapıldı. Dalga 2 (1, 12, 13, 14, 16) ve Dalga 3 (17, 19) sırada.
+
 | # | Madde | Dalga |
 |---|---|---|
 | 1 | Odada oda sahibi ya da yöneticisi yoksa oda 5 dakika sonra kapanır, herkes çıkarılır | 2 |
