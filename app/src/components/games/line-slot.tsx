@@ -1,21 +1,30 @@
 // Screen for every payline slot (lib/line-slot + lib/slot-configs): Hazine Kulesi, Kızıl Yedi, Vahşi Patika, Konfeti Kutusu,
 // Kayıp Parşömen, Neon Bulvar. Each game only brings its theme below. playCasino (lib/games) settles the round before
-// the reels move; the reels only replay outcome.slot. Oto is repeated rounds from this screen and stops at the
-// JACKPOT, a big win, the loss limit or any refusal (daily limit, balance, pool).
+// the reels come to rest; the reels (components/games/fx/reel) only replay outcome.slot: they run while the round is
+// asked for, stop one after another, wait on the last ones when a scatter or the JACKPOT is one symbol away, and the
+// win is shown by win-fx. Oto is repeated rounds from this screen and stops at the JACKPOT, a big win, the loss limit
+// or any refusal (daily limit, balance, pool).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
+import { RollingNumber } from '@/components/fx/rolling-number';
 import { CasinoLock } from '@/components/games/casino';
-import { BalancePill, BetStepper, GameBalanceNote, fmt, sleep } from '@/components/games/slot-kit';
+import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { Reel, type ReelHandle } from '@/components/games/fx/reel';
+import { useWinFx } from '@/components/games/fx/win-fx';
+import { BalancePill, BetStepper, fmt, sleep } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
+import { playSfx, warmSfx } from '@/lib/game-sound';
 import { playRound } from '@/lib/live/casino';
-import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
+import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { slotWindow, stripsOf } from '@/lib/line-slot';
+import { REEL_PACE, reelRun, teasedReels } from '@/lib/reel-plan';
+import { winTierOf } from '@/lib/win-tier';
 import { SLOT_CONFIGS, SPELL_PRIZES } from '@/lib/slot-configs';
 import { useApp } from '@/store';
 
@@ -146,87 +155,150 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const c = SLOT_CONFIGS[id];
   const theme = THEMES[id];
   const reels = c.counts.length;
-  const { wealthLevel, settings, setSetting } = useApp();
+  const { wealthLevel, settings, setSetting, coins, gameCoins } = useApp();
   const { casino, bank } = useGames();
   const game = casino.find((g) => g.id === id)!;
+  const still = settings.reduceMotion;
   const [bet, setBet] = useState(game.bets[Math.min(2, game.bets.length - 1)]);
-  const [grid, setGrid] = useState<string[][]>(() => slotWindow(c, c.counts.map((_, r) => r * 4)));
-  const [spinning, setSpinning] = useState<boolean[]>(Array(reels).fill(false));
-  const [tick, setTick] = useState(0);
+  // The window the machine opens with; after that each reel keeps its own (components/games/fx/reel).
+  const [opening] = useState(() => slotWindow(c, c.counts.map((_, r) => r * 4)));
   const [lit, setLit] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<{ text: string; tone?: 'win' | 'err' | 'jackpot' }>({ text: theme.status });
   const [busy, setBusy] = useState(false);
   const [turbo, setTurbo] = useState(false);
   const [auto, setAuto] = useState<number | null>(null);
-  const [showPays, setShowPays] = useState(false);
+  const [info, setInfo] = useState(false);
+  // Reels still being waited for (the border glows on them), and the reels box's width (cells are sized from it).
+  const [waiting, setWaiting] = useState<boolean[]>([]);
+  const [width, setWidth] = useState(0);
+  // While the reels run the pill shows the balance with the stake taken; the win joins it when it is seen.
+  const [held, setHeld] = useState<number | null>(null);
+  const handles = useRef<(ReelHandle | null)[]>([]);
+  // What the reels show at rest (the reels keep their own columns; this is for a refused round and screen readers).
+  const [grid, setGrid] = useState(opening);
+  const balance = useRef(coins + gameCoins);
   const alive = useRef(true);
   const stopAuto = useRef(false);
-  const anySpin = spinning.some(Boolean);
+  const [pulse] = useState(() => new Animated.Value(0));
+  const [turn] = useState(() => new Animated.Value(0));
+  const beat = useRef<Animated.CompositeAnimation | null>(null);
+  const win = useWinFx();
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    balance.current = coins + gameCoins;
+  });
+  useEffect(() => {
+    warmSfx(['spin', 'stop', 'win', 'coin', 'tick']);
+    return () => {
       alive.current = false;
       stopAuto.current = true;
-    },
-    [],
-  );
+      beat.current?.stop();
+    };
+  }, []);
+  // The spin button's arrows turn while a round runs.
   useEffect(() => {
-    if (!anySpin) return;
-    const t = setInterval(() => setTick((n) => n + 1), 70);
-    return () => clearInterval(t);
-  }, [anySpin]);
+    if (!busy || still) return;
+    const a = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }));
+    a.start();
+    return () => {
+      a.stop();
+      turn.setValue(0);
+    };
+  }, [busy, still, turn]);
 
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
   const strips = stripsOf(c);
-  const blur = (reel: number, row: number) => {
-    const n = strips[reel].length;
-    return strips[reel][(((reel * 5 - tick + row) % n) + n) % n];
-  };
   const fund = bank.jackpots[id];
-  const cell = reels === 3 ? 76 : 50;
+  // A reel's width in the box (border, padding, gaps taken off); a symbol's cell is a little taller than wide.
+  const cellW = width ? Math.floor((width - 16 - (reels - 1) * GAP) / reels) - 6 : 0;
+  const cellH = Math.round(cellW / 0.9);
+  const symSize = Math.min(reels === 3 ? 78 : 52, Math.round(cellW * 0.88));
 
   const spinOnce = async (): Promise<{ net: number; stop: string | null } | null> => {
-    const r = await playRound(id, bet, '', entry);
+    const pace = REEL_PACE[turbo ? 'turbo' : 'normal'];
+    beat.current?.stop();
+    pulse.setValue(0);
+    setLit(new Set());
+    setWaiting([]);
+    setStatus({ text: theme.status });
+    setHeld(balance.current - bet);
+    pressHaptic();
+    playSfx('spin', 0.7);
+    let answered = false;
+    const asked = playRound(id, bet, '', entry).then((r) => {
+      answered = true;
+      return r;
+    });
+    // The demo answers at once; a server needs a moment, and the reels run meanwhile instead of standing still.
+    await sleep(30);
+    if (!alive.current) return null;
+    if (!answered && !still) handles.current.forEach((h) => h?.spin(pace));
+    const r = await asked;
+    if (!alive.current) return null;
     if (!r.ok) {
+      // Refused (limit, balance, pool): the reels come back to where they stood.
+      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, cellH + GAP, c.rows, REEL_PACE.turbo), REEL_PACE.turbo, still)));
+      if (!alive.current) return null;
+      setHeld(null);
       setStatus({ text: r.reason, tone: 'err' });
       errorHaptic();
       return null;
     }
-    pressHaptic();
     const sp = r.outcome.slot!;
-    setLit(new Set());
-    setStatus({ text: theme.status });
-    setSpinning(Array(reels).fill(true));
-    await sleep(turbo ? 250 : 650);
-    for (let reel = 0; reel < reels; reel++) {
-      if (!alive.current) return null;
-      setGrid((g) => g.map((col, i) => (i === reel ? sp.grid[reel] : col)));
-      setSpinning((v) => v.map((x, i) => (i === reel ? false : x)));
-      await sleep(turbo ? 60 : 180);
-    }
+    // One symbol from a scatter prize or the JACKPOT: the remaining reels are waited for (never in turbo).
+    const waits = turbo || still ? sp.grid.map(() => 0) : teasedReels(sp.grid, { scatter: c.scatter, wild: c.wild, wildLine: !!c.jackpotShare });
+    setWaiting(waits.map((w) => w > 0));
+    await Promise.all(
+      sp.grid.map((col, i) =>
+        handles.current[i]?.land(col, reelRun(i, cellH + GAP, c.rows, pace, waits[i]), pace, still).then(() => {
+          if (!alive.current) return;
+          playSfx('stop', 0.75);
+          tapHaptic();
+          setWaiting((w) => w.map((x, k) => (k === i ? false : x)));
+          if (waits[i + 1] && !waits[i]) playSfx('tease', 0.6);
+        }),
+      ),
+    );
+    if (!alive.current) return null;
+    setGrid(sp.grid);
+    setWaiting([]);
     const cells = new Set<string>();
     sp.wins.forEach((w) => c.lines[w.line].slice(0, w.count).forEach((row, reel) => cells.add(`${reel}-${row}`)));
     if (c.jackpotShare) sp.jackpotLines.forEach((l) => c.lines[l].forEach((row, reel) => cells.add(`${reel}-${row}`)));
     if (sp.scatters >= 3) sp.grid.forEach((col, reel) => col.forEach((x, row) => x === c.scatter && cells.add(`${reel}-${row}`)));
     setLit(cells);
+    if (cells.size && !still) {
+      beat.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, { toValue: 1, duration: 360, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(pulse, { toValue: 0, duration: 360, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        ]),
+      );
+      beat.current.start();
+    }
     const payout = r.row.payout;
+    // Now the balance may show the win: it rolls up while the celebration runs.
+    setHeld(null);
     if (c.jackpotShare && sp.jackpotLines.length) {
-      setStatus({ text: `🎉 ${id === 'spellbook' ? 'GRAND' : 'JACKPOT'}! +${fmt(payout)} jeton`, tone: 'jackpot' });
-      successHaptic();
+      const name = id === 'spellbook' ? 'GRAND' : 'JACKPOT';
+      setStatus({ text: `${name}! +${fmt(payout)}`, tone: 'jackpot' });
+      await win.celebrate({ amount: payout, bet, jackpot: true, title: name });
       return { net: payout - bet, stop: 'JACKPOT kazandın' };
     }
     if (payout > 0) {
       const prize = id === 'spellbook' && sp.scatters >= 3 ? ` · ${sp.scatters >= 5 ? 'MAJOR' : sp.scatters === 4 ? 'MINOR' : 'MINI'}` : '';
       setStatus({ text: `KAZANÇ +${fmt(payout)}${prize}`, tone: 'win' });
-      successHaptic();
+      const seen = win.celebrate({ amount: payout, bet });
+      // Turbo doesn't stand still for a small win; everything bigger is watched to the end.
+      if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
     } else setStatus({ text: theme.status });
     return { net: payout - bet, stop: payout >= bet * BIG_WIN ? 'büyük kazanç' : null };
   };
 
   const play = async () => {
-    if (busy) return;
+    if (busy || !cellW) return;
     setBusy(true);
     await spinOnce();
     if (alive.current) setBusy(false);
@@ -236,7 +308,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       stopAuto.current = true;
       return;
     }
-    if (busy) return;
+    if (busy || !cellW) return;
     setBusy(true);
     stopAuto.current = false;
     let net = 0;
@@ -270,27 +342,24 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   };
   const muted = settings.gameVolume === 0;
   const paySyms = Object.keys(c.paytable).reverse();
+  const jackpotName = id === 'spellbook' ? 'GRAND' : 'JACKPOT';
 
   return (
     <View style={{ gap: 10 }}>
       <LinearGradient colors={theme.colors} style={s.stage}>
         <View style={s.iconRow}>
-          <Pressable style={[s.icon, { borderColor: theme.frame }]} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
+          <Pressable style={[s.icon, { borderColor: theme.frame }]} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
+            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
           </Pressable>
-          <Pressable style={[s.icon, { borderColor: theme.frame }]} onPress={() => setShowPays((v) => !v)} accessibilityLabel="Ödeme tablosu">
-            <Ionicons name="help" size={18} color="#fff" />
-          </Pressable>
+          <InfoButton onPress={() => setInfo(true)} tint={theme.frame} />
         </View>
         <Text style={[s.title, { color: theme.ink, textShadowColor: theme.accent }, theme.title.length > 10 && { fontSize: 23 }]} accessibilityRole="header">
           {theme.title}
         </Text>
         {fund !== undefined && (
-          <LinearGradient colors={['#EF4444', '#991B1B']} style={[s.jpBox, { borderColor: theme.frame }]}>
-            <Text style={s.jpLabel}>{id === 'spellbook' ? 'GRAND' : 'JACKPOT'}</Text>
-            <Text style={s.jpValue} accessibilityLabel={`JACKPOT ${Math.floor(fund)} jeton`}>
-              {fmt(fund)}
-            </Text>
+          <LinearGradient colors={['#EF4444', '#991B1B']} style={[s.jpBox, { borderColor: theme.frame }]} accessibilityLabel={`${jackpotName} ${Math.floor(fund)} jeton`}>
+            <Text style={s.jpLabel}>{jackpotName}</Text>
+            <RollingNumber value={Math.floor(fund)} style={s.jpValue} duration={900} />
           </LinearGradient>
         )}
         {id === 'spellbook' && (
@@ -303,33 +372,51 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
             ))}
           </View>
         )}
-        <View style={[s.reels, { backgroundColor: theme.reels, borderColor: theme.frame }]} accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((x) => c.symbols[x].name).join(', ')).join(' | ')}`}>
-          {grid.map((col, reel) => (
-            <View key={reel} style={[s.reel, { backgroundColor: theme.reel }]}>
-              {col.map((sym, row) => {
-                const shown = spinning[reel] ? blur(reel, row) : sym;
-                return (
-                  <View key={row} style={[s.cell, lit.has(`${reel}-${row}`) && s.cellOn]}>
-                    <Symbol label={c.symbols[shown].label} sym={shown} theme={theme} dim={spinning[reel]} size={cell} />
-                  </View>
-                );
-              })}
-            </View>
-          ))}
+        <View
+          style={[s.reels, { backgroundColor: theme.reels, borderColor: theme.frame }]}
+          onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
+          accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((x) => c.symbols[x].name).join(', ')).join(' | ')}`}
+        >
+          {cellW > 0 &&
+            opening.map((col, reel) => (
+              <View key={reel} style={[s.reel, { backgroundColor: theme.reel }, waiting[reel] && s.reelWait]}>
+                <Reel
+                  ref={(h) => {
+                    handles.current[reel] = h;
+                  }}
+                  symbols={col}
+                  strip={strips[reel]}
+                  cell={cellH}
+                  gap={GAP}
+                  pulse={pulse}
+                  dim={lit.size > 0}
+                  lit={col.map((_, row) => lit.has(`${reel}-${row}`))}
+                  render={(sym) => <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />}
+                />
+              </View>
+            ))}
+          {!cellW && <View style={{ height: 200 }} />}
         </View>
         <View style={[s.status, { borderColor: theme.frame, backgroundColor: theme.accent }, status.tone === 'win' && s.statusWin, status.tone === 'jackpot' && s.statusJp]} accessibilityLiveRegion="polite">
           <Text style={[s.statusText, { color: theme.ink }, status.tone === 'err' && { fontSize: 13, letterSpacing: 0 }]} numberOfLines={2}>
             {status.text}
           </Text>
         </View>
+        {win.layer}
       </LinearGradient>
 
       <View style={s.controls}>
-        <BalancePill tint="#2A0F3D" />
-        <Pressable onPress={play} disabled={busy} style={[busy && { opacity: 0.6 }]} accessibilityLabel={`Çevir, ${bet} jeton`}>
+        <BalancePill tint="#2A0F3D" shown={held} />
+        <Pressable onPress={auto !== null ? toggleAuto : play} disabled={busy && auto === null} style={[busy && auto === null && { opacity: 0.75 }]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`}>
           <LinearGradient colors={theme.spin} style={s.spinRing}>
             <View style={[s.spinCore, { backgroundColor: theme.accent }]}>
-              <Ionicons name="sync" size={34} color={theme.ink} />
+              {auto !== null ? (
+                <Text style={[s.autoLeft, { color: theme.ink }]}>{auto}</Text>
+              ) : (
+                <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+                  <Ionicons name="sync" size={34} color={theme.ink} />
+                </Animated.View>
+              )}
             </View>
           </LinearGradient>
         </Pressable>
@@ -340,25 +427,29 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
               setTurbo((t) => !t);
             }}
             style={[s.side, turbo && s.sideOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: turbo }}
             accessibilityLabel={turbo ? 'Turbo kapat' : 'Turbo aç'}
           >
             <Text style={s.sideText}>⚡ TURBO</Text>
           </Pressable>
-          <Pressable onPress={toggleAuto} disabled={busy && auto === null} style={[s.side, auto !== null && s.sideOn]} accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `${AUTO_SPINS} kez otomatik çevir`}>
-            <Text style={s.sideText}>{auto !== null ? `Dur · ${auto}` : 'OTO'}</Text>
+          <Pressable onPress={toggleAuto} disabled={busy && auto === null} style={[s.side, auto !== null && s.sideOn]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `${AUTO_SPINS} kez otomatik çevir`}>
+            <Text style={s.sideText}>{auto !== null ? 'DUR' : 'OTO'}</Text>
           </Pressable>
         </View>
       </View>
-      <View style={{ alignItems: 'center' }}>
+      <View style={s.betRow}>
         <BetStepper bets={game.bets} bet={bet} onChange={setBet} disabled={busy} tint="#3B0F4F" />
+        <Text style={s.dim}>
+          {c.lines.length} çizgi × {fmt(bet / c.lines.length)}
+        </Text>
       </View>
-      <Text style={s.dim}>
-        {c.lines.length} çizgi × {fmt(bet / c.lines.length)} · Oto {AUTO_SPINS} tur; {c.jackpotShare ? 'JACKPOT, ' : ''}
-        {BIG_WIN}x kazanç veya {AUTO_LOSS} bahislik kayıpta durur.
-      </Text>
-      {showPays && (
+
+      <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={s.pays}>
-          <Text style={s.paysHead}>Bir çizgideki kazanç (jeton) · {reels === 3 ? '3 aynı' : '3 / 4 / 5 aynı'}</Text>
+          <Text style={s.paysHead}>
+            Bir çizgideki kazanç · {fmt(bet)} jeton bahiste · {reels === 3 ? '3 aynı' : '3 / 4 / 5 aynı'}
+          </Text>
           {paySyms.map((x) => (
             <View key={x} style={s.payRow}>
               <View style={{ width: 52, alignItems: 'center' }}>
@@ -368,29 +459,39 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
               <Text style={s.payVals}>{c.paytable[x].map((p) => fmt((p * bet) / c.lines.length)).join(' / ')}</Text>
             </View>
           ))}
-          {c.wild && <Text style={s.dim}>{c.symbols[c.wild].label} her sembolün yerine geçer{c.jackpotShare ? `; bir çizgide beşi JACKPOT’un bahis / ${fmt(Math.max(...game.bets))} kadarını kazandırır.` : '.'}</Text>}
+          {c.wild && (
+            <Text style={s.paysNote}>
+              {c.symbols[c.wild].name} her sembolün yerine geçer{c.jackpotShare ? `; bir çizgide beşi ${jackpotName} fonunun bahis / ${fmt(Math.max(...game.bets))} kadarını kazandırır.` : '.'}
+            </Text>
+          )}
+          <Text style={s.paysNote}>
+            Oto {AUTO_SPINS} tur çevirir; {c.jackpotShare ? `${jackpotName}, ` : ''}
+            {BIG_WIN} kat kazanç veya {AUTO_LOSS} bahislik kayıpta kendiliğinden durur.
+          </Text>
         </View>
-      )}
-      <GameBalanceNote rules={game.rules} />
+      </GameInfoSheet>
     </View>
   );
 }
 
+/** Between two symbols of a reel, and between two reels (px). */
+const GAP = 4;
+
 const s = StyleSheet.create({
-  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center' },
+  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
   iconRow: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6, zIndex: 2 },
-  icon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 30, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1, marginTop: 4, marginRight: 70, alignSelf: 'flex-start', marginLeft: 6 },
+  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 30, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1, marginTop: 4, marginRight: 76, alignSelf: 'flex-start', marginLeft: 6 },
   jpBox: { alignSelf: 'stretch', marginHorizontal: 18, borderRadius: 999, borderWidth: 3, paddingVertical: 3, alignItems: 'center' },
   jpLabel: { color: '#FEF3C7', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
-  jpValue: { color: '#FDE68A', fontSize: 28, fontWeight: '900', letterSpacing: 2, marginTop: -2 },
+  jpValue: { color: '#FDE68A', fontSize: 28, fontWeight: '900', letterSpacing: 2, marginTop: -2, fontVariant: ['tabular-nums'] },
   prize: { flex: 1, alignItems: 'center', borderRadius: 10, backgroundColor: '#1D4ED8', paddingVertical: 4, borderWidth: 1.5, borderColor: '#FDE68A' },
   prizeName: { color: '#FDE68A', fontSize: 11, fontWeight: '900' },
   prizeVal: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  reels: { flexDirection: 'row', gap: 4, alignSelf: 'stretch', borderRadius: 16, padding: 5, borderWidth: 3 },
-  reel: { flex: 1, minWidth: 0, gap: 4, borderRadius: 10, padding: 3 },
-  cell: { aspectRatio: 0.9, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  cellOn: { borderColor: '#FACC15', backgroundColor: 'rgba(250,204,21,0.25)' },
+  reels: { flexDirection: 'row', gap: GAP, alignSelf: 'stretch', borderRadius: 16, padding: 5, borderWidth: 3 },
+  reel: { flex: 1, minWidth: 0, borderRadius: 10, padding: 1, borderWidth: 2, borderColor: 'transparent' },
+  // A reel being waited for: its frame lights up until it stops.
+  reelWait: { borderColor: '#FDE047', shadowColor: '#FDE047', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 6 },
   barWrap: { gap: 2, alignItems: 'center' },
   bar: { color: '#7C2D12', backgroundColor: '#FBBF24', fontWeight: '900', fontSize: 13, paddingHorizontal: 4, borderRadius: 3, borderWidth: 1.5, borderColor: '#7C2D12', overflow: 'hidden' },
   letter: { fontWeight: '900', fontStyle: 'italic', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 1 },
@@ -401,13 +502,16 @@ const s = StyleSheet.create({
   controls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   spinRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
   spinCore: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
+  autoLeft: { fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
   side: { borderRadius: 14, borderWidth: 2, borderColor: '#F0ABFC', backgroundColor: '#7C3AED', paddingVertical: 9, alignItems: 'center' },
   sideOn: { backgroundColor: '#DB2777', borderColor: '#FACC15' },
   sideText: { color: '#FDE68A', fontWeight: '900', fontSize: 14 },
-  dim: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17, textAlign: 'center' },
-  pays: { backgroundColor: '#2A0F3D', borderRadius: 14, padding: 12, gap: 6 },
-  paysHead: { color: '#fff', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  betRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  dim: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17 },
+  pays: { gap: 8 },
+  paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   payRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   payName: { color: '#fff', fontWeight: '700', flex: 1 },
-  payVals: { color: '#FDE68A', fontWeight: '800' },
+  payVals: { color: '#FDE68A', fontWeight: '800', fontVariant: ['tabular-nums'] },
+  paysNote: { color: 'rgba(255,255,255,0.75)', fontSize: 13, lineHeight: 19 },
 });

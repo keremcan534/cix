@@ -25,9 +25,10 @@ export const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 const compact = (n: number) => (n >= 1_000_000 ? `${(Math.floor(n / 100_000) / 10).toLocaleString('tr-TR')}M` : n >= 100_000 ? `${Math.floor(n / 1_000)}K` : fmt(n));
 
 /** Avatar, coins you can play with (wallet + game balance) and a + that opens the wallet. */
-export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
+export function BalancePill({ tint = '#2A0F3D', shown }: { tint?: string; /** Shown instead of the balance while a round's result is still on its way to the screen (the stake taken, the win not yet seen). */ shown?: number | null }) {
   const { me, coins, gameCoins } = useApp();
   const go = useGameNav();
+  const value = shown ?? coins + gameCoins;
   return (
     <View style={[k.pill, { backgroundColor: tint }]} accessibilityLabel={`Bakiye ${coins + gameCoins} jeton`}>
       <Photo uri={me.avatar} kind="face" style={k.avatar} />
@@ -36,7 +37,7 @@ export function BalancePill({ tint = '#2A0F3D' }: { tint?: string }) {
           {me.name}
         </Text>
         {/* Rolls to the new balance after a round, so a win is seen arriving. */}
-        <RollingNumber value={coins + gameCoins} format={(n) => `🪙 ${compact(n)}`} duration={900} style={k.coins} numberOfLines={1} />
+        <RollingNumber value={value} format={(n) => `🪙 ${compact(n)}`} duration={900} style={k.coins} numberOfLines={1} />
       </View>
       <Pressable onPress={() => go('/cuzdan')} hitSlop={8} accessibilityLabel="Jeton yükle">
         <Ionicons name="add-circle" size={24} color="#FACC15" />
