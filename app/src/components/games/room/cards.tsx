@@ -352,7 +352,8 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
               ? 'Sıra sende: parlayan kartlardan birini at'
               : 'Uyan kartın yok: desteden çek'
           : `${firstName(turnSeat?.name ?? '')} oynuyor…`;
-  const stageH = handY + (me >= 0 ? handH : 0);
+  // No cards yet (a table still waiting): the fan takes no room.
+  const stageH = handY + (me >= 0 && hand.length ? handH : 0);
 
   return (
     <View style={{ gap: 10 }}>
@@ -405,6 +406,15 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
                   <Text style={s.dirText}>{view.dir === 1 ? 'Saat yönü' : 'Ters yön'}</Text>
                 </View>
               </>
+            )}
+            {top === null && (
+              <View style={{ position: 'absolute', left: cx - 27, top: cy - cardHeight(54) / 2 }}>
+                {[-16, -5, 6, 17].map((turn, i) => (
+                  <View key={turn} style={{ position: 'absolute', left: (i - 1.5) * 22, top: Math.abs(i - 1.5) * 5, transform: [{ rotate: `${turn}deg` }] }}>
+                    <CardBack w={54} />
+                  </View>
+                ))}
+              </View>
             )}
             <Text style={[s.log, { top: feltY + FELT_H - 24 }]} numberOfLines={1}>
               {status === 'playing' ? view.log : status === 'waiting' ? `${n}/${META.max} oyuncu · en az ${META.min}` : ''}

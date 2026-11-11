@@ -9,10 +9,14 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 | `src/data/games.ts` | İki bağımsız katalog: **Oda oyunları** (ücretsiz, VIP yok) ve **Oyun Salonu** (oyun başına minimum Cömertlik Seviyesi, varsayılan Cömertlik Lv.2). |
 | `src/lib/games.ts` | Ortak oyun platformu. Tek cüzdan (uygulamanın jeton bakiyesi), tek geçmiş. Oyun Salonu turları sunucu mantığıyla işlenir. |
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
-| `src/components/games/room-games.tsx` | Renk Kartları, XOX (deneme sürümleri). |
+| `src/components/games/room/cards.tsx`, `card-face.tsx` | **Renk Kartları**: bizim destemiz (102 kart, dört renk ve amblemleri, Atla, Yön, +2, Joker, Joker +4), yelpaze el, elden desteye uçan kart, renk ve yön göstergesi, Joker için renk seçimi, SON KART duyurusu. Deneme oyunu ve canlı masa aynı sahneyi kullanır. |
+| `src/components/games/room/xox.tsx` | **XOX**: çizilerek gelen işaretler, üstü çizilen ve atan üçlü, iki oyuncunun skoru ve sıra halkası. |
+| `src/components/games/room/four.tsx` | **Dört Taş**: 7 × 6 delikli tahta, sütununa düşüp seken taş, atan dörtlü; ilk taş her elde el değiştirir. |
+| `src/components/games/room/table-kit.tsx` | Bu üç oyunun ortak parçaları: süre halkalı oyuncu yüzü, iki kişilik oyunların başlığı ve skoru, el sonu kartı, deneme masası (rakipler kendi oynar, sıramda masanın 30 saniyesi işler). |
+| `src/lib/room-games/cards.ts`, `xox.ts`, `four.ts`, `seam.ts` | Bu üç oyunun kurallarının uygulamadaki kopyası ve deneme rakipleri (sunucudaki `server/api/room-games/*.mjs` ve `room-games-rules.mjs` ile aynı; `tests/cards.test.ts`, `xox.test.ts`, `four.test.ts` iki tarafı adım adım karşılaştırır). |
 | `src/components/games/room/ludo.tsx`, `ludo-board.tsx` | **Ludo**: gerçek tahta (15 × 15 haç, dört yuva, yıldızlı güvenli kareler, ev üçgenleri), zar ve taş animasyonları. Deneme oyunu ve canlı masa aynı sahneyi kullanır. |
 | `src/lib/room-games/ludo.ts`, `ludo-board.ts` | Ludo kurallarının uygulamadaki kopyası (sunucudaki `server/api/room-games/ludo.mjs` ile aynı; `tests/ludo.test.ts` ikisini adım adım karşılaştırır) ve tahta geometrisi. |
-| `src/components/games/room-tables.tsx` | Canlı odada sunucudaki masa (`server/api/room-games.mjs`): masa açma, oturma, başlatma, kalkma her oyunda ortak; kendi ekranı olan oyun (Ludo) masasını ve bu düğmeleri alır. |
+| `src/components/games/room-tables.tsx` | Canlı odada sunucudaki masa (`server/api/room-games.mjs`): masa açma, oturma, başlatma, kalkma her oyunda ortak; her oyunun kendi ekranı (Ludo, Renk Kartları, XOX, Dört Taş) masasını ve bu düğmeleri alır. |
 | `src/components/games/casino.tsx` | Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan. |
 | `src/components/games/wheel.tsx` | **Rüzgâr Gülü**: 3 alanlı, JACKPOT fonlu çark. Sonuç sunucuda belirlenir, kazanç oyun jetonudur. Ayrıntılar: `docs/RUZGAR_GULU.md`. |
 | `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |
