@@ -215,7 +215,7 @@ export default function GameCenter() {
                               {g.name}
                             </Text>
                             <Text style={s.dim}>
-                              {g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers}–${g.maxPlayers} oyuncu${ready ? (live ? ' · botlarla dene' : '') : ' · pasif'}`}
+                              {g.active && !ready ? 'Bu oyun yakında geliyor.' : `${g.minPlayers === g.maxPlayers ? g.minPlayers : `${g.minPlayers}–${g.maxPlayers}`} oyuncu${ready ? (live ? ' · botlarla dene' : '') : ' · pasif'}`}
                             </Text>
                             {ready && <GlossButton label="Dene" tone="action" small />}
                           </BreakoutCard>
