@@ -166,12 +166,12 @@ export const StormSky = memo(function StormSky({ dark, bolt, rain, height, still
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: dark }]}>
-        <LinearGradient colors={['rgba(8,10,24,0.82)', 'rgba(10,16,34,0.5)', 'rgba(4,6,16,0.72)']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['rgba(8,10,24,0.66)', 'rgba(10,16,34,0.24)', 'rgba(4,6,16,0.5)']} style={StyleSheet.absoluteFill} />
         {!still && drops.map((d, i) => <Animated.View key={i} style={[st.rain, { left: `${d.x * 100}%`, height: d.len, transform: [{ translateY: d.y }, { rotate: '14deg' }] }]} />)}
       </Animated.View>
       {!still && (
         <>
-          <Animated.View style={[StyleSheet.absoluteFill, st.flash, { opacity: bolt.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }) }]} />
+          <Animated.View style={[StyleSheet.absoluteFill, st.flash, { opacity: bolt.interpolate({ inputRange: [0, 1], outputRange: [0, 0.3] }) }]} />
           <Animated.View style={[st.boltAt, { opacity: bolt }]}>
             {BOLT.map((b, i) => (
               <View key={i} style={[st.boltBar, { left: b.x, top: b.y, height: b.len, transform: [{ rotate: `${b.deg}deg` }] }]} />
