@@ -111,6 +111,8 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
   const [busy, setBusy] = useState(false);
   // Between the result coming back and the wheel or the light coming to rest.
   const [running, setRunning] = useState(false);
+  // From the result being on the board until the round is over (the win is paid and celebrated).
+  const [paying, setPaying] = useState(false);
   // While a round plays the pill shows the balance with the stake taken; the win joins it when its coins land.
   const [held, setHeld] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>({ text: look.hint });
@@ -289,6 +291,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     // The result is on the board now.
     const mine = r.pays.filter((o) => placed[o] > 0);
     setRunning(false);
+    setPaying(true);
     setLight(null);
     setShown({ result: r, pays: r.pays });
     setLast(placed);
@@ -333,6 +336,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     if (!alive.current) return;
     setBets({});
     sweep.setValue(0);
+    setPaying(false);
     setBusy(false);
     calm.current = setTimeout(settle, 2200);
   };
@@ -475,7 +479,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
         <LinearGradient colors={['#FDE68A', '#F59E0B']} style={s.playRing}>
           <LinearGradient colors={look.play} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.play}>
             {busy ? (
-              <Text style={s.playText}>{running ? look.running : 'Tur başlıyor…'}</Text>
+              <Text style={s.playText}>{running ? look.running : paying ? look.verb : 'Tur başlıyor…'}</Text>
             ) : total ? (
               <>
                 <Ionicons name={id === 'magiccard' ? 'sparkles' : 'sync'} size={20} color="#FDE68A" />
