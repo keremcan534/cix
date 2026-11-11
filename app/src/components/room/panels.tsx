@@ -100,8 +100,8 @@ export function MusicBar({ music, canControl, onOpen, onToggle, onClose }: { mus
   const track = music.queue[0];
   if (!track) return null;
   return (
-    // Everyone sees what plays; only the room's staff and DJs open the music (they choose it).
-    <Pressable style={styles.musicBar} onPress={canControl ? onOpen : undefined} disabled={!canControl} accessibilityLabel={`Çalan parça: ${track.title}`}>
+    // Everyone opens the music: the list and their own volume; only the room's staff and DJs change what plays.
+    <Pressable style={styles.musicBar} onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Çalan parça: ${track.title}. Müziği aç`}>
       <Text style={{ fontSize: 16 }}>🎵</Text>
       <View style={{ flex: 1 }}>
         <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>

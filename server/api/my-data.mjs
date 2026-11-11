@@ -362,8 +362,9 @@ export async function exportOf(c, uid) {
       at: x.created_at,
     })),
     eventsGoing: await all('SELECT event_id, created_at FROM room_event_going WHERE user_id = $1', (x) => ({ event: num(x.event_id), at: x.created_at })),
-    music: await all('SELECT title, url, seconds, size, created_at, removed_at FROM music_tracks WHERE owner = $1 ORDER BY id', (x) => ({
+    music: await all('SELECT title, artist, url, seconds, size, created_at, removed_at FROM music_tracks WHERE owner = $1 ORDER BY id', (x) => ({
       title: x.title,
+      artist: x.artist,
       url: x.url,
       seconds: x.seconds,
       size: x.size,
