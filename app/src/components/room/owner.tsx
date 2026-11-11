@@ -251,7 +251,6 @@ export function RoomInfoSheet({
   onInvite,
   live = false,
   ownerStats,
-  details = [],
   actions = [],
 }: {
   visible: boolean;
@@ -300,8 +299,6 @@ export function RoomInfoSheet({
   live?: boolean;
   /** A server room's owner: Oda Sahibi Merkezi's numbers from the server (null while they load). */
   ownerStats?: ServerOwnerStats | null;
-  /** The room at a glance (owner, my rank, listeners, mics, queue, lock…). */
-  details?: { label: string; value: string }[];
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
   actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
@@ -341,19 +338,6 @@ export function RoomInfoSheet({
               <Ionicons name="settings-outline" size={26} color="#fff" />
             </Pressable>
           </View>
-
-          {details.length > 0 && (
-            <View style={styles.details}>
-              {details.map((d) => (
-                <View key={d.label} style={styles.detailRow}>
-                  <Text style={styles.dim}>{d.label}</Text>
-                  <Text style={styles.detailValue} numberOfLines={1}>
-                    {d.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
 
           {actions.length > 0 && (
             <View style={styles.actions}>
@@ -1215,9 +1199,6 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
   bigBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 13 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
-  details: { borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 14, paddingVertical: 6 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 7 },
-  detailValue: { color: '#fff', fontWeight: '700', flexShrink: 1, textAlign: 'right' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   action: { width: '25%', alignItems: 'center', gap: 6 },
   actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },

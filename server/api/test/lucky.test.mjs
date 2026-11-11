@@ -1,4 +1,4 @@
-// Uğurlu hediyeler (lucky.mjs) against a real Postgres: Cömertlik Lv.2 and 18 years, one charge per request,
+// Şanslı hediyeler (lucky.mjs) against a real Postgres: Cömertlik Lv.2 and 18 years, one charge per request,
 // the recipient's 20 % as diamonds and the rest a coin_spend, rewards as coins that never count for Cömertlik,
 // replays, the daily
 // limit and the admins' settings (checked, versioned, audited).
@@ -42,7 +42,7 @@ const sure2 = [
   { mult: 2, weight: ODDS_TOTAL },
 ];
 
-describe('Uğurlu kuralları', () => {
+describe('Şanslı kuralları', () => {
   test('hazır paketler geçerli, çekiliş doğru çarpana düşer', () => {
     assert.deepEqual(checkConfig(DEFAULT_CONFIG).gifts.map((g) => g.id), ['lk1', 'lk2', 'lk3', 'lk4']);
     const t = DEFAULT_CONFIG.gifts[0].tiers;
@@ -65,7 +65,7 @@ describe('Uğurlu kuralları', () => {
   });
 });
 
-describe('Uğurlu hediyeler sunucuda', () => {
+describe('Şanslı hediyeler sunucuda', () => {
   test('Cömertlik Lv.2 ve 18 yaş şartı', async () => {
     const b = await signUp('B');
     const a = await signUp('A');
@@ -104,8 +104,8 @@ describe('Uğurlu hediyeler sunucuda', () => {
       spend.map((r) => Number(r.amount)),
       [-100, -400, ...(j.send.payout ? [j.send.payout] : [])],
     );
-    assert.match(spend[1].reason, /^Uygulama içi: Uğurlu hediye/);
-    if (j.send.payout) assert.deepEqual([spend[2].channel, spend[2].reason.startsWith('Uğurlu ödülü')], ['ugurlu', true]);
+    assert.match(spend[1].reason, /^Uygulama içi: Şanslı hediye/);
+    if (j.send.payout) assert.deepEqual([spend[2].channel, spend[2].reason.startsWith('Şanslı ödülü')], ['ugurlu', true]);
     const income = (await h.sql.query("SELECT source_type, diamonds FROM income_events WHERE streamer_id = $1", [b.user.id])).rows;
     assert.deepEqual(income, [{ source_type: 'lucky_gift', diamonds: '100' }]);
 

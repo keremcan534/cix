@@ -103,7 +103,7 @@ export const gamblingLevelOk = (wealthLevel: number) => wealthLevel >= CASINO_MI
  *  this phone (playCasino, playBoard). */
 export const casinoVisible = (wealthLevel: number, paidGames = true) => paidGames && gamblingLevelOk(wealthLevel);
 /** A win banner that is not news for this user, skipped and never shown: an Oyun Salonu win for someone who cannot
- *  see Oyun Salonu, and any other win of chance (Uğurlu) below the gambling level. */
+ *  see Oyun Salonu, and any other win of chance (Şanslı) below the gambling level. */
 export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number, paidGames = true) =>
   isCasinoWin(n) ? !casinoVisible(wealthLevel, paidGames) : isChanceWin(n) && !gamblingLevelOk(wealthLevel);
 const CASINO_OFF = 'Bu oyun şu an kapalı.';

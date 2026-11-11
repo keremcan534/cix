@@ -1,4 +1,4 @@
-// Uğurlu hediyeler in live mode: the server (server/api/lucky.mjs) keeps the packages and odds, takes the price,
+// Şanslı hediyeler in live mode: the server (server/api/lucky.mjs) keeps the packages and odds, takes the price,
 // gives each recipient their 20 % as diamonds, draws and pays the rewards in coins. This phone reads the
 // packages into lib/lucky (applyServerLucky), sends, and shows what the server answered.
 import * as api from '@/lib/api';
@@ -19,7 +19,7 @@ function records(s: api.ServerLuckySend, gifts: Map<string, api.ServerLuckyGift>
     userId: 'me',
     roomId: s.room ?? '',
     giftId: s.giftId,
-    giftName: g?.name ?? 'Uğurlu hediye',
+    giftName: g?.name ?? 'Şanslı hediye',
     emoji: g?.emoji ?? '🎁',
     toId: toLocal(s.to[Math.floor(k / s.count)] ?? ''),
     price: s.price,
@@ -54,15 +54,15 @@ export async function refreshLucky() {
  */
 export async function liveLuckySend(giftId: string, toIds: string[], count: number, roomId: string) {
   const to = toIds.map(toServer);
-  if (to.some((x) => !x)) throw new Error('Bu kişiye Uğurlu hediye gönderilemez.');
+  if (to.some((x) => !x)) throw new Error('Bu kişiye Şanslı hediye gönderilemez.');
   const ids = to as string[];
   const g = known.get(giftId);
   const r = await once(`lucky:${giftId}:${ids.join(',')}:${count}:${roomId}`, (ref) => api.luckySend(giftId, ids, count, roomId, ref));
   // Two rows, the price and the reward, so the whole price counts as spending (store SERVER_TAKES).
   const won = r.send.payout;
   const what = `${g?.name ?? giftId} ×${count * ids.length}`;
-  if (won > 0) applyServerUser({ user: { ...r.user, coins: r.user.coins - won } }, `Uğurlu hediye: ${what}`);
-  applyServerUser(r, won > 0 ? `Uğurlu ödülü: ${what}` : `Uğurlu hediye: ${what}`);
+  if (won > 0) applyServerUser({ user: { ...r.user, coins: r.user.coins - won } }, `Şanslı hediye: ${what}`);
+  applyServerUser(r, won > 0 ? `Şanslı ödülü: ${what}` : `Şanslı hediye: ${what}`);
   const list = records(r.send, known, Date.now());
   addServerRecords(list);
   return { records: list, replay: r.replay, send: r.send };

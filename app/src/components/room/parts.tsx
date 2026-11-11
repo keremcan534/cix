@@ -384,13 +384,24 @@ export function ChatLine({
               <Text style={{ color: colors.textDim }}> → </Text>
               <Text style={styles.giftName}>{to}</Text>
               {giftArtOf(g.giftId) ? `  ${g.name}` : `  ${g.emoji} ${g.name}`}
-              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Uğurlu' : ''}`}
+              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Şanslı' : ''}`}
             </Text>
             {giftArtOf(g.giftId) && <GiftArt giftId={g.giftId} emoji={g.emoji} size={24} />}
           </>
         ) : (
           <Text style={styles.giftText}>{msg.text}</Text>
         )}
+      </View>
+    );
+  }
+  if (msg.system && msg.notice) {
+    return (
+      <View style={styles.noticeMsg} accessibilityRole="text" accessibilityLabel={`Sistem bildirimi: ${msg.text}`}>
+        <View style={styles.noticeHead}>
+          <Ionicons name="shield-checkmark" size={14} color={colors.gold} />
+          <Text style={styles.noticeTag}>SimilarClub</Text>
+        </View>
+        <Text style={styles.noticeText}>{msg.text}</Text>
       </View>
     );
   }
@@ -648,6 +659,11 @@ const styles = StyleSheet.create({
   // Room events stay in the background of the conversation: no box shouting over people's messages.
   systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, maxWidth: '92%' },
   systemText: { color: '#B9C7DE', fontSize: 12 },
+  // The community rules on entering a room: SimilarClub's own notice, set apart from people's lines and room notes.
+  noticeMsg: { alignSelf: 'stretch', gap: 4, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: 'rgba(246,189,96,0.08)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)' },
+  noticeHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  noticeTag: { color: colors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  noticeText: { color: '#DCE4F2', fontSize: 12, lineHeight: 17 },
   botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.1)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
   botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },

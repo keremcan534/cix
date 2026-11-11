@@ -1,4 +1,4 @@
-// Uğurlu hediyeler: the packages, their odds and the draw (lucky.mjs plays them; no database or LiveKit here,
+// Şanslı hediyeler: the packages, their odds and the draw (lucky.mjs plays them; no database or LiveKit here,
 // so the tests can load it on its own). The app shows the same tables (app/src/lib/lucky.ts).
 import { HttpError, int, text } from './core.mjs';
 

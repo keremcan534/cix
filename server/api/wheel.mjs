@@ -43,7 +43,7 @@ const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT T
 /**
  * Spending that counts for Cömertlik (as the app's countsForWealth): not coin games, not coins handed on, not a
  * Jeton Noktası selling coins on (jeton.mjs) and not coins taken back for a refunded purchase ("İade: …"). The
- * part of a spend paid with reward coins ('odul'), Uğurlu hediye rewards ('ugurlu') or coins of a refunded
+ * part of a spend paid with reward coins ('odul'), Şanslı hediye rewards ('ugurlu') or coins of a refunded
  * purchase (coin_lots.refunded_by, read now, so a refund drops the points the moment it lands) never counts either.
  */
 export async function wealthPoints(c, userId) {

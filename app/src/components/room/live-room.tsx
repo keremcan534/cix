@@ -181,6 +181,9 @@ const reactionKey = () => Date.now() + Math.random();
 const SLOW_MS = 10_000;
 /** Room the chat leaves on its right for the Rüzgâr Gülü shortcut (styles.wheelBtn: 46 wide disc, 10 from the edge). */
 const WHEEL_ROOM = 62;
+/** SimilarClub's own community rules, the first line of the chat on every entry (my screen only). */
+const ROOM_RULES_NOTICE =
+  "SimilarClub'a hoş geldin! Müstehcen, şiddet içeren, kumar ya da yasa dışı ticaretle ilgili içerik ve 18 yaş altına yönelik her türlü zararlı paylaşım yasaktır. Kurala aykırı bir şey görürsen kişinin kartından şikâyet et; ekibimiz en kısa sürede inceler. İyi sohbetler!";
 /** Arrival time of a room event (called from handlers and effects, never while rendering). */
 const stamp = () => Date.now();
 const QUESTIONS = ['Türkiye\'nin en kalabalık şehri?', 'En sevdiğiniz film hangisi?', 'Yarın etkinlik var mı?', 'Hangi şarkıyı çalalım?', 'Nasıl yönetici olunur?'];
@@ -473,7 +476,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // Entry effects on screen: mine when I join, then other people's (one at a time).
   const [entry, setEntry] = useState<EntryShow | null>(() => (invisible || !entryOn || !entryInfo ? null : entryInfo.show));
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
-    { id: 'w', system: true, text: 'Odaya hoş geldin! Saygılı ol, iyi eğlenceler.' },
+    // Every entry, on my own screen only: the community rules first.
+    { id: 'w', system: true, notice: true, text: ROOM_RULES_NOTICE },
     ...(announcement ? [{ id: 'ann', system: true, text: `📢 ${announcement}` }] : []),
     ...(botOn ? [{ id: 'bot0', bot: true, text: `Merhaba ${ME.name}! ${BOT_TIPS[0]}` }] : []),
     ...(entryInfo && !invisible ? [{ id: 'vip', system: true, text: entryInfo.text }] : []),
@@ -1527,7 +1531,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         addContrib(from.id, lk.price);
         logGift(from.id, 'me', { id: lk.id, name: lk.name, emoji: lk.emoji, price: lk.price }, 1);
         flyGift(lk.emoji, 1, ['me'], { x: 36, y: win.height * 0.72 }, lk.id);
-        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Uğurlu) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
+        addMsg({ id: `gift:${tx}`, system: true, text: `🍀 ${from.name} sana ${lk.emoji} ${lk.name} (Şanslı) gönderdi! (+${earned} 💎 · değerin ${pct(LUCKY_RECIPIENT_SHARE)}’si)`, gift: { fromId: from.id, toIds: ['me'], emoji: lk.emoji, name: lk.name, count: 1, lucky: true, giftId: lk.id } });
         scorePk(tx, from.id, 'me', lk.id, luckyPkPoints(lk));
         return;
       }
@@ -2507,11 +2511,11 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     addMsg({
       id: `gift:${s.eventId}`,
       system: true,
-      text: `🍀 ${fromName}, ${toText} ${s.emoji} ${s.name}${s.count > 1 ? ` x${s.count}` : ''} (Uğurlu) gönderdi`,
+      text: `🍀 ${fromName}, ${toText} ${s.emoji} ${s.name}${s.count > 1 ? ` x${s.count}` : ''} (Şanslı) gönderdi`,
       gift: { fromId: from, toIds, emoji: s.emoji, name: s.name, count: s.count, lucky: true, giftId: s.giftId },
     });
     // The sender may hide their name on wins (Ayarlar), and the server doesn't know it: the line names no one.
-    if (s.bigWin > 0) addMsg({ system: true, kind: 'gift', text: `🎉 Uğurlu hediyeden ×${s.best.toLocaleString('tr-TR')} kazanıldı!` });
+    if (s.bigWin > 0) addMsg({ system: true, kind: 'gift', text: `🎉 Şanslı hediyeden ×${s.best.toLocaleString('tr-TR')} kazanıldı!` });
   };
   /** A gift line, the seat flight and the big effect (mine or one another phone announced). */
   const showGift = (from: string, toIds: string[], gift: Gift, count: number) => {
@@ -2534,14 +2538,14 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     // Live mode: a sample room's people are not real, and real coins never go to them.
     if (liveMode() && !real) {
       setCombo(null);
-      return showAlert('Uğurlu hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
+      return showAlert('Şanslı hediye gönderilemedi', 'Bu örnek odada hediye gönderilemez. Hediyeleri gerçek odalarda gönderebilirsin.');
     }
     // The combo wheel repeats a stored list: drop anyone who has left the room since (never charge for them).
     const inRoom = new Set([...seatedOthers, ...audience.map((u) => u.id)]);
     const toIds = picked.filter((t) => inRoom.has(t));
     if (!toIds.length) {
       setCombo(null);
-      return showAlert('Uğurlu hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
+      return showAlert('Şanslı hediye gönderilemedi', 'Seçtiğin kişiler artık odada değil.');
     }
     if (real) return void deliverLiveLucky(giftId, toIds, count);
     // One wallet charge (and at most one reward and one refund row) for the whole send; each gift still draws apart.
@@ -2552,7 +2556,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (!records.length) {
       errorHaptic();
       setCombo(null);
-      return showAlert('Uğurlu hediye gönderilemedi', error ?? 'Gönderilemedi.');
+      return showAlert('Şanslı hediye gönderilemedi', error ?? 'Gönderilemedi.');
     }
     // PK scores the recipient's 20 % share of the gift value, never the reward (the server does it in a server room).
     records.forEach((r) => scorePk(r.txId, 'me', r.toId, r.giftId, luckyPkPoints(r)));
@@ -2567,7 +2571,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     if (limited && limited !== 'Yetersiz bakiye.') {
       errorHaptic();
       setCombo(null);
-      return showAlert('Uğurlu hediye gönderilemedi', limited);
+      return showAlert('Şanslı hediye gönderilemedi', limited);
     }
     try {
       const { records } = await liveLuckySend(giftId, toIds, count, id);
@@ -2576,7 +2580,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       errorHaptic();
       setCombo(null);
       const text = errorText(e);
-      showAlert('Uğurlu hediye gönderilemedi', text, /Yetersiz/i.test(text) ? [{ text: 'Tamam', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }] : undefined);
+      showAlert('Şanslı hediye gönderilemedi', text, /Yetersiz/i.test(text) ? [{ text: 'Tamam', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }] : undefined);
       // A closed package or the day's limit: the sheet shows it from now on.
       void refreshLucky().catch(() => {});
     }
@@ -2604,20 +2608,20 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
       addMsg({
         id: `gift:${first.txId}`,
         system: true,
-        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Uğurlu) gönderdi`,
+        text: `🍀 ${ME.name}, ${sentTo.length > 1 ? `${sentTo.length} kişiye` : `${userById(sentTo[0]).name} kişisine`} ${first.emoji} ${first.giftName}${count > 1 ? ` x${count}` : ''} (Şanslı) gönderdi`,
         gift: { fromId: 'me', toIds: sentTo, emoji: first.emoji, name: first.giftName, count, lucky: true, giftId: first.giftId },
       });
-    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Uğurlu hediye gönderilemedi (jetonu iade edildi): ${error}` });
+    if (error) addMsg({ system: true, text: `🍀 ${toIds.length * count - records.length} Şanslı hediye gönderilemedi (jetonu iade edildi): ${error}` });
     // Every win is announced in all rooms (banner); the user can hide their name in Ayarlar.
     if (reward > 0) {
       const wins = records.filter((r) => r.reward > 0).length;
-      announceWin({ userName: ME.name, avatar: app.me.avatar, source: `Uğurlu › ${first.giftName}`, roomTitle: roomTitleOf(id), mult: best.mult, amount: reward, wins: wins > 1 ? wins : undefined }, { mine: true });
+      announceWin({ userName: ME.name, avatar: app.me.avatar, source: `Şanslı › ${first.giftName}`, roomTitle: roomTitleOf(id), mult: best.mult, amount: reward, wins: wins > 1 ? wins : undefined }, { mine: true });
     }
     if (best.mult >= cfg.announceFrom)
       addMsg({
         system: true,
         kind: 'gift',
-        text: settings.luckyAnnounce ? `🎉 ${ME.name} Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Uğurlu hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
+        text: settings.luckyAnnounce ? `🎉 ${ME.name} Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı! +${reward.toLocaleString('tr-TR')} jeton` : `🎉 Bir kullanıcı Şanslı hediyeden ×${best.mult.toLocaleString('tr-TR')} kazandı!`,
       });
     setLuckyFx(records);
     // Restarts the combo wheel's timer: the time of this send's last draw.
@@ -2899,17 +2903,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     },
   ];
 
-  // Oda kartı: the room at a glance and shortcuts to its sheets; a sheet opened from the card comes back to it.
-  const roomLocked = real ? isLockedRoom(id) : isOwn ? myRoom.locked : !!base?.password;
-  const cardDetails = [
-    { label: 'Oda sahibi', value: hostId === 'me' ? 'Sen' : userById(hostId).name },
-    { label: 'Senin yetkin', value: rankLabel('me') },
-    { label: 'Odadakiler', value: `${listeners.toLocaleString('tr-TR')} kişi` },
-    { label: 'Yayına katılma', value: layout ? `${modeById(layout.modeId).name} · ${layout.name}` : `Klasik · ${classicCapacity} mikrofon` },
-    { label: 'Mikrofon kuyruğu', value: micQueue ? `Açık${queue.length ? ` · ${queue.length} kişi bekliyor` : ''}` : 'Kapalı' },
-    { label: 'Yöneticiler', value: String(real ? staff.admins.length : adminIds.length) },
-    { label: 'Oda kilidi', value: roomLocked ? 'Şifreli' : 'Herkese açık' },
-  ];
+  // Oda kartı: shortcuts to the room's sheets; a sheet opened from the card comes back to it.
   const fromCard = (open: () => void) => () => (menuReturn.current.push('info'), open());
   const cardActions = [
     { key: 'settings', label: 'Oda ayarları', icon: 'settings-outline' as const, onPress: fromCard(() => setPanel('settings')) },
@@ -3587,7 +3581,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         key={panel === 'info' ? 'info-open' : 'info-closed'}
         visible={panel === 'info'}
         onClose={closePanel}
-        details={cardDetails}
         actions={cardActions}
         roomId={id}
         title={title}

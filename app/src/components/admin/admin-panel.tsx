@@ -3,7 +3,7 @@
 // and Yaptırımlar on the server's admin routes. Moderators get Destek and Yaptırımlar. Every money or account action asks first, then shows a short result and reloads
 // its list. Yaptırımlar shows only when the sanctions meta answers (sanction.view; a 403 hides it); one person's
 // sanctions open over the tabs, and custom sheets (apply, appeal decision, policy editor) over everything.
-// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it); Uğurlu hediyeler
+// Canlı ayarlar shows only for admins whose GET /api/admin/live-settings answers (a 403 hides it); Şanslı hediyeler
 // (packages, odds, limits, sends) only for admins.
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
@@ -37,7 +37,7 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ozet', label: 'Özet' },
   { key: 'kullanici', label: 'Kullanıcılar' },
   { key: 'ayarlar', label: 'Canlı ayarlar' },
-  { key: 'ugurlu', label: 'Uğurlu hediyeler' },
+  { key: 'ugurlu', label: 'Şanslı hediyeler' },
   { key: 'oyun', label: 'Oyun Salonu' },
   { key: 'duyuru', label: 'Duyurular' },
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
