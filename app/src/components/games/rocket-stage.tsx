@@ -78,11 +78,16 @@ export const Space = memo(function Space({ geo, flight, still, breathe }: { geo:
       <LinearGradient colors={['#04051A', '#0D0F3A', '#1D1554', '#2A1B5E']} locations={[0, 0.45, 0.85, 1]} style={StyleSheet.absoluteFill} />
       <Image source={GLOW} style={[st.nebula, { width: geo.w * 1.2, height: geo.w * 1.2, right: -geo.w * 0.45, top: -geo.w * 0.5, tintColor: '#7C3AED', opacity: 0.42 }]} />
       <Image source={GLOW} style={[st.nebula, { width: geo.w * 0.9, height: geo.w * 0.9, left: -geo.w * 0.4, top: geo.h * 0.1, tintColor: '#2563EB', opacity: 0.3 }]} />
+      {/* A far moon, so the sky has a place in it. */}
+      <View style={[st.moon, { left: geo.w * 0.8, top: geo.h * 0.66 }]}>
+        <LinearGradient colors={['#E0E7FF', '#A5B4FC', '#4F46E5']} start={{ x: 0.2, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
+        <View style={[st.crater, { left: 7, top: 8, width: 8, height: 8 }]} />
+        <View style={[st.crater, { left: 17, top: 17, width: 5, height: 5 }]} />
+      </View>
       {fields.map((f, li) => {
-        const from = (flight && !still ? 0 : (flight?.from[li] ?? 0)) / period;
         const d = drift[li];
         return (
-          <Animated.View key={li} style={[StyleSheet.absoluteFill, { transform: d ? [{ translateX: d.x }, { translateY: d.y }] : [{ translateX: -from * SLANT * period }, { translateY: from * period }] }]}>
+          <Animated.View key={li} style={[StyleSheet.absoluteFill, d && { transform: [{ translateX: d.x }, { translateY: d.y }] }]}>
             {[-1, 0].map((j) =>
               f.stars.map((s, i) => {
                 const style = { left: s.x - j * SLANT * period, top: s.y + j * period, width: s.size, height: s.size, borderRadius: s.size, opacity: s.alpha };
@@ -232,6 +237,7 @@ const trailColor = (t: number) => {
 /** One flight on the stage: the trail lighting up behind the rocket, the rocket on its path, and how it ends. */
 export const FlightLayer = memo(function FlightLayer({ geo, flight, flick }: { geo: Geo; flight: Flight; flick: Animated.Value }) {
   const pts = useMemo(() => pathSamples(geo, TRAIL), [geo]);
+  const marks = useMemo(() => routeMarks(flight.plan.target).map((m) => ({ ...m, ...pathAt(geo, m.u) })), [geo, flight.plan.target]);
   const half = ROCKET_SIZE / 2;
   const { u, fx } = flight;
   const escape = flight.end === 'escape';
@@ -264,6 +270,12 @@ export const FlightLayer = memo(function FlightLayer({ geo, flight, flick }: { g
         })}
       </Animated.View>
 
+      {marks.map((m) => (
+        <Animated.View key={m.m} style={[st.mark, st.markOn, { left: m.x + 10, top: m.y + 6, opacity: u.interpolate({ inputRange: [m.u - 0.02, m.u], outputRange: [0, 1], ...clamp }) }]}>
+          <Text style={[st.markText, { color: '#FDE68A' }]}>{m.m.toLocaleString('tr-TR')}×</Text>
+        </Animated.View>
+      ))}
+
       {escape ? <Escape geo={geo} fx={fx} /> : <Explosion x={end.x} y={end.y} fx={fx} />}
 
       <Animated.View style={[st.rocketBox, { transform: [{ translateX: pos.x }, { translateY: pos.y }, { rotate: pos.rotate }] }]}>
@@ -289,14 +301,15 @@ function Explosion({ x, y, fx }: { x: number; y: number; fx: Animated.Value }) {
   return (
     <View style={{ position: 'absolute', left: x, top: y }}>
       {[0, 1, 2].map((i) => (
-        <Animated.View
+        <Animated.Image
           key={`s${i}`}
+          source={GLOW}
           style={[
             st.smoke,
             {
-              left: -22 + (i - 1) * 16,
-              top: -22 - i * 5,
-              opacity: fx.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.5, 0] }),
+              left: -40 + (i - 1) * 20,
+              top: -40 - i * 6,
+              opacity: fx.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.7, 0] }),
               transform: [{ translateY: fx.interpolate({ inputRange: [0, 1], outputRange: [0, -22 - i * 9] }) }, { scale: fx.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5 + i * 0.2] }) }],
             },
           ]}
@@ -311,7 +324,7 @@ function Explosion({ x, y, fx }: { x: number; y: number; fx: Animated.Value }) {
           <Animated.View
             style={[
               st.spark,
-              { width: s.size, height: s.size * 3, borderRadius: s.size, opacity: fx.interpolate({ inputRange: [0, 0.05, 0.6, 0.85], outputRange: [0, 1, 0.8, 0], ...clamp }), transform: [{ translateY: fx.interpolate({ inputRange: [0, 0.3, 0.85], outputRange: [0, -s.far * 0.7, -s.far], ...clamp }) }] },
+              { left: -s.size / 2, top: -s.size * 1.5, width: s.size, height: s.size * 3, borderRadius: s.size, opacity: fx.interpolate({ inputRange: [0, 0.05, 0.6, 0.85], outputRange: [0, 1, 0.8, 0], ...clamp }), transform: [{ translateY: fx.interpolate({ inputRange: [0, 0.3, 0.85], outputRange: [0, -s.far * 0.7, -s.far], ...clamp }) }] },
             ]}
           />
         </View>
@@ -353,6 +366,8 @@ export function EndMark({ geo, flight }: { geo: Geo; flight: Flight }) {
 
 const st = StyleSheet.create({
   nebula: { position: 'absolute' },
+  moon: { position: 'absolute', width: 30, height: 30, borderRadius: 15, overflow: 'hidden', opacity: 0.8 },
+  crater: { position: 'absolute', borderRadius: 5, backgroundColor: 'rgba(49,46,129,0.35)' },
   star: { position: 'absolute', backgroundColor: '#fff' },
   line: { position: 'absolute', width: 1.5, borderRadius: 1, backgroundColor: 'rgba(224,231,255,0.75)' },
   leg: { position: 'absolute', width: 5, borderRadius: 2, backgroundColor: '#475569' },
@@ -364,6 +379,7 @@ const st = StyleSheet.create({
   orbitWon: { borderStyle: 'solid', borderWidth: 2.5, borderColor: '#86EFAC' },
   dot: { position: 'absolute', width: 3, height: 3, borderRadius: 2, backgroundColor: '#C7D2FE' },
   mark: { position: 'absolute', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1, backgroundColor: 'rgba(4,5,26,0.55)' },
+  markOn: { backgroundColor: 'rgba(4,5,26,0.85)', borderWidth: 1, borderColor: 'rgba(253,230,138,0.6)', marginLeft: -1, marginTop: -1 },
   markText: { color: 'rgba(199,210,254,0.85)', fontSize: 10, fontWeight: '800', fontVariant: ['tabular-nums'] },
   tagWrap: { position: 'absolute', width: 120, height: 26, alignItems: 'center', justifyContent: 'center' },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 13, height: 26, paddingHorizontal: 10, backgroundColor: '#0A0C2C', borderWidth: 1.5, borderColor: ORBIT },
@@ -375,12 +391,12 @@ const st = StyleSheet.create({
   puff: { position: 'absolute', left: ROCKET_SIZE / 2 - 11, top: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(226,232,240,0.7)' },
   trail: { position: 'absolute', justifyContent: 'center' },
   trailGlow: { ...StyleSheet.absoluteFill, opacity: 0.2 },
-  smoke: { position: 'absolute', width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(100,116,139,0.6)' },
+  smoke: { position: 'absolute', width: 80, height: 80, tintColor: '#94A3B8' },
   blast: { position: 'absolute', left: -90, top: -90, width: 180, height: 180 },
   ring: { position: 'absolute', left: -45, top: -45, width: 90, height: 90, borderRadius: 45, borderWidth: 3 },
-  sparkArm: { position: 'absolute', left: 0, top: 0, width: 0, height: 0, alignItems: 'center' },
+  sparkArm: { position: 'absolute', left: 0, top: 0, width: 0, height: 0 },
   spark: { position: 'absolute', backgroundColor: '#FDE68A' },
-  streak: { position: 'absolute', bottom: 0, width: 5, height: 190, borderRadius: 3, overflow: 'hidden' },
+  streak: { position: 'absolute', left: -2.5, bottom: 0, width: 5, height: 190, borderRadius: 3, overflow: 'hidden' },
   endMark: { position: 'absolute', width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(4,5,26,0.6)' },
   endText: { fontSize: 15, fontWeight: '900' },
 });
