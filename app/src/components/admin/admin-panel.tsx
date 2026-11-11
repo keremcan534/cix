@@ -28,6 +28,7 @@ import { ReportsSection } from './reports';
 import { SanctionUserScreen } from './sanction-user';
 import { SanctionsSection } from './sanctions';
 import { CasinoReportSection } from './casino-report';
+import { EventsAdminSection } from './events-admin';
 import { SupportSection } from './support';
 import { TeamSection } from './team-notices';
 import { UsersSection } from './users';
@@ -39,6 +40,7 @@ const TABS: { key: Tab; label: string; count?: keyof Pending }[] = [
   { key: 'ayarlar', label: 'Canlı ayarlar' },
   { key: 'ugurlu', label: 'Uğurlu hediyeler' },
   { key: 'oyun', label: 'Oyun Salonu' },
+  { key: 'etkinlik', label: 'Etkinlikler' },
   { key: 'duyuru', label: 'Duyurular' },
   { key: 'cekim', label: 'Para çekme', count: 'withdrawals' },
   { key: 'ajans', label: 'Ajans ödemeleri', count: 'payouts' },
@@ -156,7 +158,7 @@ function PanelBody({
   const showLive = isAdmin && !moderator && (!!live.data?.view || !!live.error);
   const tabs = moderator
     ? TABS.filter((t) => t.key === 'yaptirim' || t.key === 'destek')
-    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin) && (t.key !== 'oyun' || isAdmin) && (t.key !== 'duyuru' || isAdmin));
+    : TABS.filter((t) => (t.key !== 'yaptirim' || showSanctions) && (t.key !== 'ayarlar' || showLive) && (t.key !== 'ugurlu' || isAdmin) && (t.key !== 'oyun' || isAdmin) && (t.key !== 'etkinlik' || isAdmin) && (t.key !== 'duyuru' || isAdmin));
 
   const ctx: AdminCtx = {
     toast: (text) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 })),
@@ -217,6 +219,7 @@ function PanelBody({
             {tab === 'ayarlar' && <LiveSettingsSection load={live} />}
             {tab === 'ugurlu' && <LuckySection />}
             {tab === 'oyun' && <CasinoReportSection />}
+            {tab === 'etkinlik' && <EventsAdminSection />}
             {tab === 'duyuru' && <TeamSection />}
             {tab === 'ozet' && <OverviewSection pending={pending.data} onPending={pending.reload} goTo={setTab} />}
             {tab === 'kullanici' && <UsersSection />}

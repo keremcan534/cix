@@ -1237,7 +1237,10 @@ export type LiveKey =
   | OneOnOneKey
   | RewardKey
   | CasinoKey
-  | DecorKey;
+  | DecorKey
+  | EventKey;
+/** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */
+export type EventKey = 'event_min_room_level' | 'event_min_lead_minutes' | 'event_max_minutes' | 'event_max_capacity' | 'event_grace_minutes' | 'event_strike_limit' | 'event_block_days';
 /** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */

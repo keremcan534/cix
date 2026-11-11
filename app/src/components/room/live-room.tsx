@@ -41,6 +41,7 @@ import {
   type Question,
   type RoomEvent,
 } from '@/components/room/community';
+import { EventRoomBanner, EventThemeLayer, RoomEventsSheet, type RoomEvents } from '@/components/events/room-events';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
 import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
@@ -275,10 +276,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
 
   const base = isOwn ? null : roomById(id);
   const [, setRoomEdits] = useState(0);
-  // A server room's activities (server/api/room-events.mjs): read on entry and whenever the server says the room
-  // changed; reminders are this phone's own.
-  const [serverEvents, setServerEvents] = useState<api.ServerRoomEvent[] | null>(null);
-  const [reminders, setReminders] = useState<number[]>([]);
+  // Etkinlik Merkezi (server/api/events.mjs): the room's running, coming and recent events; replaces the old
+  // activities above in a server room.
+  const [centreEvents, setCentreEvents] = useState<RoomEvents | null>(null);
   const hostId = isOwn ? 'me' : base!.hostId;
   const title = isOwn ? myRoom.title : base!.title;
   const cover = isOwn ? myRoom.cover : base!.cover;
@@ -409,7 +409,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   useEffect(() => {
     if (!real) return;
     const sync = () => {
-      api.roomEvents(id).then((list) => setServerEvents(list), () => {});
+      api.eventsOfRoom(id).then(setCentreEvents, () => {});
       return syncServerStage(id)
         .then(() => setRoomEdits((n) => n + 1))
         .catch(() => {});
@@ -547,11 +547,15 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   );
   const [questions, setQuestions] = useState<Question[]>([]);
   const loadEvents = () => {
-    if (real) api.roomEvents(id).then((list) => setServerEvents(list), () => {});
+    if (real) api.eventsOfRoom(id).then(setCentreEvents, () => {});
   };
-  const shownEvents: RoomEvent[] = real
-    ? (serverEvents ?? []).map((e) => ({ id: String(e.id), title: e.title, desc: e.desc, when: e.when, type: e.type, by: toLocal(e.by.id), going: e.going, reminder: reminders.includes(e.id), attendees: e.attendees, cancelled: e.cancelled }))
-    : events;
+  // A server room's events are Etkinlik Merkezi's (centreEvents); the old activities stay for the demo rooms.
+  const shownEvents: RoomEvent[] = real ? [] : events;
+  // In the room while its event runs: I count as come (the server checks I am in the voice room).
+  const runningEventId = real && full ? (centreEvents?.running?.id ?? null) : null;
+  useEffect(() => {
+    if (runningEventId !== null) api.eventHere(runningEventId).catch(() => {});
+  }, [runningEventId]);
   const [modLog, setModLog] = useState<ModLog[]>([]);
   const [slowMode, setSlowMode] = useState(false);
   const [words, setWords] = useState<string[]>(['spam', 'reklam']);
@@ -3247,6 +3251,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StageBackdrop theme={theme} background={look.stage} freeId={look.freeId} />
+      {real && <EventThemeLayer event={centreEvents?.running ?? null} />}
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoid style={{ flex: 1 }}>
@@ -3354,7 +3359,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
                     <Text style={styles.queueChipText}>Konuşmacı kuyruğundasın · sıran: {myQueuePos + 1}{freeSeatIndex < 0 ? ' · mikrofonlar dolu, bekleme listesindesin' : ''}</Text>
                   </View>
                 )}
-                {roomType === 'event' && shownEvents.filter((e) => !e.cancelled)[0] && (
+                {real && <EventRoomBanner data={centreEvents} rank={myRank} onChanged={loadEvents} />}
+                {!real && roomType === 'event' && shownEvents.filter((e) => !e.cancelled)[0] && (
                   <Pressable style={styles.eventBanner} onPress={() => setPanel('events')}>
                     <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>
                       📅 {shownEvents.filter((e) => !e.cancelled)[0].title} · {shownEvents.filter((e) => !e.cancelled)[0].when}
@@ -3811,8 +3817,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
           addMsg({ system: true, text: `🎯 Topluluk hedefi: ${g.title} (10 dk)` });
         }}
       />
+      {real && panel === 'events' && <RoomEventsSheet visible onClose={closePanel} data={centreEvents} roomId={id} isOwner={myRank === 3} />}
       <EventsSheet
-        visible={panel === 'events'}
+        visible={panel === 'events' && !real}
         onClose={closePanel}
         events={shownEvents}
         // Server room: activities are for the owner and Süper Yönetici.
@@ -3838,8 +3845,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         }}
         onToggleReminder={(eid) => {
           const e = shownEvents.find((x) => x.id === eid);
-          if (real) setReminders((l) => (l.includes(Number(eid)) ? l.filter((x) => x !== Number(eid)) : [...l, Number(eid)]));
-          else setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
+          setEvents((l) => l.map((x) => (x.id === eid ? { ...x, reminder: !x.reminder } : x)));
           // One reminder per event (no duplicates); respects the user's notification choices.
           if (e && !e.reminder) notify({ kind: 'social', icon: 'alarm', title: `Hatırlatma kuruldu: ${e.title}`, body: `${e.when} · ${title}`, href: `/oda/${id}` });
         }}
