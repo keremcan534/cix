@@ -210,7 +210,7 @@ export function GamePanel({
               {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
               {!tables && openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
               <Text style={p.dim}>
-                {roomGame.minPlayers}–{roomGame.maxPlayers} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
+                {roomGame.minPlayers === roomGame.maxPlayers ? roomGame.minPlayers : `${roomGame.minPlayers}–${roomGame.maxPlayers}`} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
                 {roomGame.note ? ` · ${roomGame.note}` : ''}
               </Text>
               {onInvite && !tables && (
