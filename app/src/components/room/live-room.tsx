@@ -14,7 +14,6 @@ import { useReport } from '@/components/report-sheet';
 import { useRoomMute } from '@/components/room/room-mute';
 import { EmojiPanel } from '@/components/EmojiPanel';
 import {
-  ContributionModal,
   DiceModal,
   EnvelopeDrop,
   EnvelopeSendModal,
@@ -42,6 +41,7 @@ import {
   type RoomEvent,
 } from '@/components/room/community';
 import { RoomMenuSheet, type MenuSection } from '@/components/room/menu';
+import { ContribBoard } from '@/components/room/contrib-board';
 import { RoomFollowHeart } from '@/components/room/members';
 import { BossSeat, RoomInfoSheet, RoomSettingsScreen, bossSeatInfo, type GiftLogRow, type SettingsSection } from '@/components/room/owner';
 import { GiftSheet } from '@/components/room/gift-sheet';
@@ -3773,7 +3773,16 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
         />
       )}
       <DiceModal visible={panel === 'dice'} onClose={closePanel} onPlay={playDice} playsLeft={dicePlays} />
-      <ContributionModal visible={panel === 'contrib'} onClose={closePanel} data={contrib} locked={isOwn && level < 3} />
+      <ContribBoard
+        visible={panel === 'contrib'}
+        onClose={closePanel}
+        roomId={id}
+        real={real}
+        sent={contrib}
+        giftLog={giftLog}
+        locked={isOwn && level < 3}
+        onPerson={(uid) => (setPanel(null), openPerson(uid))}
+      />
       <RequestsModal
         visible={panel === 'requests'}
         onClose={closePanel}

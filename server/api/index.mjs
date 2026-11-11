@@ -20,6 +20,7 @@
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Çantam (free gifts from rewards, sent without coins): backpack.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs. Sıralama's Oda XP board: room-xp.mjs.
+// A room's Katkı sıralaması (Cömertlik and Yankı by hour, day, week): room-contrib.mjs.
 // Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX, Dört Taş): room-games.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
@@ -83,6 +84,7 @@ import { roomSocialRoutes } from './room-social.mjs';
 import { roomFollowRoutes } from './room-follow.mjs';
 import { roomMemberRoutes } from './room-members.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
+import { roomContribRoutes } from './room-contrib.mjs';
 import { roomDecorRoutes, startDecorSweep, stopDecorSweep } from './room-decor.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
@@ -282,6 +284,7 @@ const routes = {
   ...roomFollowRoutes,
   ...roomMemberRoutes,
   ...roomOwnerRoutes,
+  ...roomContribRoutes,
   ...roomDecorRoutes,
   ...roomRoutes,
   ...adminRoutes,

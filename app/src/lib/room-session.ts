@@ -288,6 +288,15 @@ export function continueLeave(): boolean {
   go?.();
   return !!go;
 }
+/**
+ * A room picked under "Şu an popüler" in the leave sheet: this room ends as a switch does (mic off first, voice
+ * closed, membership left), the sheet closes and the blocked back navigation runs once. The caller then opens the
+ * picked room's route, which starts its session without asking again (there is none left to switch from).
+ */
+export function leaveForRoom(): boolean {
+  endRoom('switched');
+  return continueLeave();
+}
 export function setLeaving(leaving: boolean) {
   if (state.leaving !== leaving) emit({ leaving });
 }

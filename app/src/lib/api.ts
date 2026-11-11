@@ -1010,6 +1010,14 @@ export type ServerOwnerStats = {
   hours: { at: string; people: number }[];
 };
 export const roomOwnerStats = (room: string) => call<ServerOwnerStats>('GET', `/api/rooms/owner-stats?room=${encodeURIComponent(room)}`);
+/**
+ * Oda katkı sıralaması (server/api/room-contrib.mjs): Cömertlik (`sent`) or Yankı (`received`) in a server room this
+ * hour, day or week on Turkey's clock, 1 coin = 1 point. The top 50, my own place (rank null: not on the list) and
+ * when the period began.
+ */
+export type RoomContribBody = { rows: RankingRow[]; me: { rank: number | null; score: number }; since: string };
+export const roomContrib = (room: string, side: 'sent' | 'received', period: 'hour' | 'day' | 'week') =>
+  call<RoomContribBody>('GET', `/api/rooms/contrib?room=${encodeURIComponent(room)}&side=${side}&period=${period}`);
 // Yeni üye ödülleri (server/api/referrals.mjs): the welcome coins I got at sign-up (0: none), the packs whose
 // first-purchase gift is still mine, and Arkadaşını Getir: my code, the code I entered, what my invites brought.
 export type ServerRewards = {
