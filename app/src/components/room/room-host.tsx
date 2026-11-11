@@ -8,7 +8,8 @@ import { useEffect } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 
 import { LiveRoom } from '@/components/room/live-room';
-import { EndedDialog, LeaveSheet, MiniRoom, RecoveryCard, SessionToast, SwitchDialog } from '@/components/room/session-ui';
+import { LeaveSheet } from '@/components/room/leave-sheet';
+import { EndedDialog, MiniRoom, RecoveryCard, SessionToast, SwitchDialog } from '@/components/room/session-ui';
 import { useOnline } from '@/lib/room-presence';
 import { endRoom, getSession, onAppState, onNetwork, setPersist, setRecovery, useRoomSession } from '@/lib/room-session';
 import { loadSavedRoom, saveRoom } from '@/lib/room-session-persist';
