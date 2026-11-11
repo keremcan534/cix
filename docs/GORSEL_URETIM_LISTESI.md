@@ -32,6 +32,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 13. Güncelleme 2: Odalar bannerları ve Mesajlar | 7 |
 | 14. Güncelleme 3: Ücretli oda süslemeleri | 6 |
 | 15. Oda oyunları: Ludo | 7 |
+| 16. Oyun Salonu: çark ve tahta oyunları | 9 |
 
 ## ChatGPT ile üretim
 
@@ -734,3 +735,21 @@ Ludo artık gerçek bir tahtada oynanıyor (`app/src/components/games/room/ludo-
 | 7 | `ludo-kupa.png` | Ludo kupası | Ionicons `trophy` | Altın kupa, iki kulplu, kaidesinde küçük yıldız; 192 px | P3 | Yeni (oyun yenileme) · kazanan bandında ve tahtanın ortasında (küçük) |
 
 Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir (zar yüzleri gibi) → `ludo-board.tsx` ve `ludo.tsx` içinde ilgili çizim `<Art name=…>` ile değiştirilir. Taşların dördü birden gelmeden bağlanmamalı: yarısı görsel, yarısı kodla çizilmiş taş aynı tahtada yan yana durur.
+
+## 16. Oyun Salonu: çark ve tahta oyunları (9)
+
+Gece Yarısı Çarkı, Liman Pazarı, Sihir Destesi (`app/src/components/games/board.tsx`) ve Rüzgâr Gülü (`components/games/wheel.tsx`) şu an düz görünümlerle, emojiyle ve Ionicons simgeleriyle çiziliyor; hareket, ses ve kazanç anı hazır. Aşağıdaki görseller gelince yalnız çizim değişir, oyun aynı kalır. Hepsi **şeffaf arka planlı PNG, üstünde yazı ve rakam yok** (çarpanları ve tutarları uygulama yazar); mor-pembe yalnız tahta oyunlarının kendi sahnesinde, Rüzgâr Gülü'nde yok.
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `cark-ibre.png` | Çark ibresi | kodla çizilen üçgen ve pim | Aşağıyı gösteren, damla biçimli parlak ibre (mercan gövde, altın pim üst ortada); tam karşıdan, 192 px. Pim görselin tam ortasında olmalı (ibre pimin etrafında sallanır) | P2 | Yeni (oyun yenileme) · iki çarkta da (`fx/wheel-stage.tsx` `WheelPointer`) |
+| 2 | `gece-carki-gobek.png` | Gece Yarısı Çarkı göbeği | Ionicons `moon` + yıldız noktaları | Yuvarlak gece göğü: lacivert-mor zemin, hilal ve birkaç yıldız, altın ince kenar; tam karşıdan, 512 px | P2 | Yeni (oyun yenileme) · çarkın dönmeyen ortası |
+| 3 | `meyve-karpuz.png` `meyve-elma.png` `meyve-limon.png` `meyve-uzum.png` `meyve-77.png` | Çark meyveleri (5) | emoji ve "77" yazısı | Aynı kalıpta beş parlak 3D simge: karpuz dilimi, kırmızı elma, limon, üzüm salkımı, altın "77" plakası; 192 px. Dilimde 20 px, seçenek kartında 28 px çizilir | P1 | Yeni (oyun yenileme) · `slot-limon`/`slot-uzum` taslaklarının yerine; beşi birden gelmeden bağlanmaz |
+| 4 | `liman-tabak.png` | Liman Pazarı tabağı | Ionicons `restaurant` | Üstten görünen beyaz porselen servis tabağı, altın ince kenar, yanında çatal-bıçak; boş (üstüne gelen yemeği uygulama koyar); 512 px | P2 | Yeni (oyun yenileme) · halkanın ortası |
+| 5 | `liman-yengec.png` … `liman-lahana.png`, `liman-salata.png`, `liman-pizza.png`, `liman-bos-tabak.png` | Liman yemekleri (11) | emoji | Aynı kalıpta 3D yemek simgeleri: yengeç, balık, karides, et, domates, balkabağı, mantar, lahana; ayrıca salata kasesi, pizza dilimi ve boş tabak; 192 px | P2 | Yeni (oyun yenileme) · sebzeler yeşil, et ve deniz ürünleri mercan çerçeveli kartta durur |
+| 6 | `sihir-kart-arkasi.png` | Sihir Destesi kart arkası | kodla çizilen mor kart + Ionicons `sparkles` | Dikey oyun kartı arkası (2:3): koyu mor zemin, altın ince çerçeve, ortada sekiz köşeli yıldız ve ince yıldız tozu deseni; 384 × 576 px, köşeler yuvarlak | P1 | Yeni (oyun yenileme) · destede ve kart çevrilirken |
+| 7 | `sihir-burc-kova.png` … (8) ve `sihir-joker.png` | Burç kartı simgeleri (9) | yazı karakteri (♒ …) ve 🃏 | Sekiz burcun altın çizgi simgesi (Kova, Başak, Boğa, Yengeç, Balık, Aslan, Yay, Akrep), aynı çizgi kalınlığında; ayrıca joker (şapkalı soytarı başı, altın-mor); 192 px | P2 | Yeni (oyun yenileme) · karakter her telefonda aynı görünmüyor |
+| 8 | `fis-250.png` … `fis-25000.png` | Bahis fişleri (6) | kodla çizilen fiş | Üstten görünen casino fişi, kenarında sekiz açık renk çentik, ortası boş (tutarı uygulama yazar): mavi, yeşil, kırmızı, mor, turuncu, siyah-altın; 192 px | P3 | Yeni (oyun yenileme) · `fx/chips.tsx` `ChipFace`; kodla çizilen hali yeterince iyi, acele yok |
+| 9 | `ruzgar-ozet-rozet.png` | Çoklu tur özeti rozeti | yok (düz başlık) | Küçük altın pusula gülü rozeti, altında kurdele (yazısız); 192 px | P3 | Yeni (oyun yenileme) · ×10 / ×50 özet kartının başlığında; `docs/RUZGAR_GULU.md` listesindeki `ruzgar-merkez.png` ve `ruzgar-ok.png` de hâlâ bekleniyor |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → ilgili çizim `<Art name=…>` ile değiştirilir (çark dilimleri ve seçenek kartlarında `board.tsx`, ibre için `fx/wheel-stage.tsx`). Çarkın dilimleri, çerçevesi ve ampulleri kodla çizilmeye devam eder (dönerken net kalsın ve her ekran boyuna uysun diye).

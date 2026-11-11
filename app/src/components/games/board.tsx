@@ -297,7 +297,9 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     setLast(placed);
     setTrail((t) => pushTrail(t, { key: res.row.txId, label: r.label, tone: payout > 0 ? 'win' : isHotResult(board, r) ? 'hot' : undefined }));
     setSession((x) => ({ rounds: x.rounds + 1, staked: x.staked + stake, won: x.won + payout }));
-    setStatus(payout > 0 ? { text: `${r.label} ${r.name} · +${fmt(payout)} jeton`, tone: 'win' } : { text: `${r.label} ${r.name} · bu tur kazanç yok` });
+    // "77" is its own picture: said once.
+    const came = r.label === r.name ? r.name : `${r.label} ${r.name}`;
+    setStatus(payout > 0 ? { text: `${came} · +${fmt(payout)} jeton`, tone: 'win' } : { text: `${came} · bu tur kazanç yok` });
     if (!still) {
       Animated.spring(middle, { toValue: 1, friction: 6, tension: 90, useNativeDriver: true }).start();
       // Chips on options the result doesn't pay leave the board; the paid options beat and the others dim.
@@ -607,7 +609,7 @@ function OptionCard({
 }
 
 /** The fruit wheel's disc: twenty slices, a peg between every two. Drawn once; only its parent turns. */
-const FruitDisc = memo(function FruitDisc({ size }: { size: number }) {
+const FruitDisc = memo(function FruitDisc({ size, small }: { size: number; small: boolean }) {
   const r = size / 2;
   const half = Math.ceil(r * Math.tan(((SLICE / 2) * Math.PI) / 180)) + 1;
   const results = BOARDS.slot.results;
@@ -618,8 +620,8 @@ const FruitDisc = memo(function FruitDisc({ size }: { size: number }) {
         return (
           <View key={i} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${i * SLICE}deg` }] }]} pointerEvents="none">
             <View style={[f.wedge, { left: r - half, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: r, borderTopColor: SLICE_FILL[x][i % 2] }]} />
-            <View style={[f.label, { left: r - 18 }]}>
-              <Text style={x === 'seven' ? f.seven : f.fruit}>{res.label}</Text>
+            <View style={[f.label, { left: r - 18 }, small && { top: 5 }]}>
+              <Text style={[x === 'seven' ? f.seven : f.fruit, small && { fontSize: x === 'seven' ? 12 : 15, lineHeight: 19 }]}>{res.label}</Text>
             </View>
           </View>
         );
@@ -637,7 +639,10 @@ function FruitWheel({ size, spin, halo, slice, result }: { size: number; spin: W
   const disc = size - 26;
   const r = disc / 2;
   const half = Math.ceil(r * Math.tan(((SLICE / 2) * Math.PI) / 180)) + 1;
-  const sky = disc - 84;
+  // A small wheel (a room's sheet on a small phone) keeps its ring of fruit: the middle gives way.
+  const band = Math.round(Math.min(42, disc * 0.2));
+  const sky = disc - band * 2;
+  const hub = Math.round(Math.min(62, sky * 0.5));
   return (
     <View style={{ width: size, height: size + 12, alignItems: 'center' }} accessibilityLabel={result ? `Meyve çarkı, ${result.name} geldi` : 'Meyve çarkı'}>
       <Image source={GLOW} style={{ position: 'absolute', left: -size * 0.22, top: 12 - size * 0.22, width: size * 1.44, height: size * 1.44, opacity: 0.55, tintColor: halo }} />
@@ -645,23 +650,23 @@ function FruitWheel({ size, spin, halo, slice, result }: { size: number; spin: W
         <RimBulbs spin={spin} size={size} count={20} bulb={6} inset={3} />
         <View style={{ width: disc, height: disc, borderRadius: r, overflow: 'hidden', backgroundColor: '#172554' }}>
           <Animated.View style={{ width: disc, height: disc, transform: [{ rotate: spin.rotate }] }}>
-            <FruitDisc size={disc} />
+            <FruitDisc size={disc} small={band < 38} />
             {slice !== null && (
               <Animated.View style={[StyleSheet.absoluteFill, { opacity: spin.shine, transform: [{ rotate: `${slice * SLICE}deg` }] }]} pointerEvents="none">
                 <View style={[f.wedge, { left: r - half, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: r, borderTopColor: 'rgba(255,255,255,0.4)' }]} />
               </Animated.View>
             )}
           </Animated.View>
-          <SpinBlur spin={spin} size={disc} band={40} tint="rgba(30,27,75,0.5)" />
+          <SpinBlur spin={spin} size={disc} band={band - 2} tint="rgba(30,27,75,0.5)" />
           {/* The night sky in the middle doesn't turn: the fruit ring runs round it. */}
-          <LinearGradient colors={['#312E81', '#0F0A2E']} style={[f.sky, { left: 42, top: 42, width: sky, height: sky, borderRadius: sky / 2 }]}>
+          <LinearGradient colors={['#312E81', '#0F0A2E']} style={[f.sky, { left: band, top: band, width: sky, height: sky, borderRadius: sky / 2 }]}>
             {STARS.map(([x, y, d], i) => (
               <View key={i} style={{ position: 'absolute', left: x * sky, top: y * sky, width: d, height: d, borderRadius: d / 2, backgroundColor: 'rgba(255,255,255,0.75)' }} />
             ))}
           </LinearGradient>
         </View>
-        <View style={[f.hub, { left: size / 2 - 31, top: size / 2 - 31 }]}>
-          {result ? <Text style={result.label === '77' ? f.hubSeven : f.hubFruit}>{result.label}</Text> : <Ionicons name="moon" size={28} color="#FDE68A" />}
+        <View style={[f.hub, { left: size / 2 - hub / 2, top: size / 2 - hub / 2, width: hub, height: hub, borderRadius: hub / 2 }]}>
+          {result ? <Text style={result.label === '77' ? [f.hubSeven, { fontSize: hub * 0.39 }] : { fontSize: hub * 0.48 }}>{result.label}</Text> : <Ionicons name="moon" size={Math.round(hub * 0.45)} color="#FDE68A" />}
         </View>
       </LinearGradient>
       <View style={{ position: 'absolute', top: -14, left: size / 2 - 14 }}>
@@ -825,9 +830,8 @@ const f = StyleSheet.create({
   pegArm: { position: 'absolute', top: 0, width: 8, alignItems: 'center' },
   peg: { width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: '#FEF3C7' },
   sky: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(253,230,138,0.55)' },
-  hub: { position: 'absolute', width: 62, height: 62, borderRadius: 31, backgroundColor: '#1E1B4B', borderWidth: 3, borderColor: '#FACC15', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(0,0,0,0.5)' },
-  hubFruit: { fontSize: 30, lineHeight: 38 },
-  hubSeven: { fontSize: 24, fontWeight: '900', fontStyle: 'italic', color: '#FDE68A' },
+  hub: { position: 'absolute', backgroundColor: '#1E1B4B', borderWidth: 3, borderColor: '#FACC15', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(0,0,0,0.5)' },
+  hubSeven: { fontWeight: '900', fontStyle: 'italic', color: '#FDE68A' },
 });
 
 const p = StyleSheet.create({
