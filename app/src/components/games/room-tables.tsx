@@ -3,27 +3,29 @@
 // and plays a turn that ran out; this screen only shows the table and sends my taps. The room staff open a table;
 // anyone in the room may sit while it waits, the others watch. Never touches the room's seats or microphones.
 //
-// What every game shares is here: reading the table, opening it, sitting down, starting, leaving. A game with a
-// screen of its own (components/games/room/: Ludo) is handed its table and those buttons; Renk Kartları and XOX are
-// still drawn here.
-import { useEffect, useState } from 'react';
+// What every game shares is here: reading the table, opening it, sitting down, starting, leaving. Each game has a
+// screen of its own (components/games/room/: Ludo, Renk Kartları, XOX, Dört Taş), which is handed its table and
+// those buttons.
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { CardView, playable, roomGameStyles as g, winnerOf } from '@/components/games/room-games';
+import { roomGameStyles as g } from '@/components/games/room-games';
+import { CardsLive } from '@/components/games/room/cards';
+import { FourLive } from '@/components/games/room/four';
 import { LudoLive, LudoModePicker } from '@/components/games/room/ludo';
-import { Photo } from '@/components/photo';
+import { XoxLive } from '@/components/games/room/xox';
 import { Text } from '@/components/text';
 import type { ServerTable, TableAction } from '@/lib/api';
 import { errorHaptic, tapHaptic } from '@/lib/haptics';
 import { myServerId } from '@/lib/live';
 import { useRoomTable } from '@/lib/live/room-table';
 import type { LudoMode } from '@/lib/room-games/ludo';
-import { colors, semantic } from '@/theme';
+import { colors } from '@/theme';
 
 export type TableGame = ServerTable['game'];
-export const TABLE_GAMES: TableGame[] = ['ludo', 'cards', 'xox'];
+export const TABLE_GAMES: TableGame[] = ['ludo', 'cards', 'xox', 'four'];
 export const isTableGame = (id: string): id is TableGame => (TABLE_GAMES as string[]).includes(id);
-const NAMES: Record<TableGame, string> = { ludo: 'Ludo', cards: 'Renk Kartları', xox: 'XOX' };
+const NAMES: Record<TableGame, string> = { ludo: 'Ludo', cards: 'Renk Kartları', xox: 'XOX', four: 'Dört Taş' };
 
 function Btn({ label, onPress, disabled, ghost }: { label: string; onPress: () => void; disabled?: boolean; ghost?: boolean }) {
   return (
@@ -33,24 +35,12 @@ function Btn({ label, onPress, disabled, ghost }: { label: string; onPress: () =
   );
 }
 
-/** Seconds left in the turn, ticking. */
-function useSecondsLeft(ends: string | null) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!ends) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [ends]);
-  return ends ? Math.max(0, Math.ceil((Date.parse(ends) - now) / 1000)) : null;
-}
-
 export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: TableGame; canOpen: boolean }) {
   const { table, state, error, act, reload } = useRoomTable(roomId);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Ludo's opener picks the short game or the long one.
   const [mode, setMode] = useState<LudoMode>('quick');
-  const left = useSecondsLeft(table?.status === 'playing' ? table.turnEndsAt : null);
   /** `quiet`: the game's own screen already answered the tap (a sound, a tick). */
   const run = async (action: TableAction, extra?: Parameters<typeof act>[1], quiet = false) => {
     if (busy) return;
@@ -92,25 +82,8 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
       </View>
     );
 
-  const me = table.mySeat;
-  const seated = me >= 0;
-  const myTurn = table.status === 'playing' && table.turn === me;
-  const turnName = table.seats[table.turn]?.name ?? '';
+  const seated = table.mySeat >= 0;
   const full = table.seats.length >= table.max;
-
-  const seatsRow = (
-    <View style={g.rowWrap}>
-      {table.seats.map((p, i) => (
-        <View key={p.id} style={[g.opp, table.status === 'playing' && table.turn === i && { borderColor: semantic.action }]}>
-          <Photo uri={p.avatarUrl ?? ''} kind="face" style={g.avSmall} />
-          <Text style={g.small}>
-            {i === me ? 'Sen' : p.name}
-            {table.game === 'cards' && table.status !== 'waiting' && table.counts ? ` · ${table.counts[i]} kart` : ''}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
 
   const over = table.status === 'over';
   // The table's buttons, the same for every game: while it waits, and during and after a hand.
@@ -139,65 +112,23 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
       </LudoLive>
     );
 
-  if (table.status === 'waiting')
+  // The table's buttons as each game's own screen places them.
+  const buttons = table.status === 'waiting' ? waitingButtons : handButtons;
+  if (table.game === 'cards')
     return (
-      <View style={{ gap: 10 }}>
-        {seatsRow}
-        <Text style={g.log}>
-          {table.seats.length}/{table.max} oyuncu · en az {table.min} · {table.log}
-        </Text>
-        {waitingButtons}
-      </View>
+      <CardsLive table={table} busy={busy} onMove={(move) => run('move', { move }, true)}>
+        {buttons}
+      </CardsLive>
     );
-
-  const status = over ? (table.winner !== null && table.winner === me ? '🏆 Kazandın!' : table.log) : `${table.log}${left !== null ? ` · ${myTurn ? 'senin sıran' : turnName} ${left} sn` : ''}`;
+  if (table.game === 'four')
+    return (
+      <FourLive table={table} busy={busy} onMove={(move) => run('move', { move }, true)}>
+        {buttons}
+      </FourLive>
+    );
   return (
-    <View style={{ gap: 10 }}>
-      {seatsRow}
-      {table.game === 'cards' && table.top && (
-        <>
-          <View style={{ alignItems: 'center' }}>
-            <CardView card={table.top} big />
-          </View>
-          <Text style={g.log}>{status}</Text>
-          {table.hand && (
-            <View style={g.rowWrap}>
-              {table.hand.map((c, i) => (
-                <Pressable
-                  key={i}
-                  disabled={!myTurn || busy || !playable(c, table.top!)}
-                  onPress={() => run('move', { move: { card: i } })}
-                  style={{ opacity: myTurn && playable(c, table.top!) ? 1 : 0.45 }}
-                  accessibilityLabel={`Kart ${c.value}`}
-                >
-                  <CardView card={c} />
-                </Pressable>
-              ))}
-            </View>
-          )}
-          {!over && seated && <Btn label={myTurn ? 'Kart çek' : `${turnName} oynuyor…`} disabled={!myTurn || busy} onPress={() => run('move', { move: { card: null } })} />}
-        </>
-      )}
-      {table.game === 'xox' && table.board && (
-        <View style={{ gap: 10, alignItems: 'center' }}>
-          <Text style={g.log}>{over ? status : myTurn ? `Sıra sende (${me === 0 ? 'X' : 'O'})${left !== null ? ` · ${left} sn` : ''}` : `${turnName} düşünüyor…`}</Text>
-          <View style={g.xox}>
-            {table.board.map((v, i) => (
-              <Pressable
-                key={i}
-                style={[g.xoxCell, winnerOf(table.board!)?.includes(i) && { backgroundColor: 'rgba(19,217,223,0.25)' }]}
-                disabled={!!v || !myTurn || busy}
-                onPress={() => run('move', { move: { cell: i } })}
-                accessibilityLabel={`Kare ${i + 1}`}
-              >
-                <Text style={[g.xoxText, { color: v === 'X' ? semantic.action : colors.pink }]}>{v ?? ''}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-      {!seated && !over && <Text style={g.log}>Masayı izliyorsun; el bitince boş koltuğa oturabilirsin.</Text>}
-      {handButtons}
-    </View>
+    <XoxLive table={table} busy={busy} onMove={(move) => run('move', { move }, true)}>
+      {buttons}
+    </XoxLive>
   );
 }

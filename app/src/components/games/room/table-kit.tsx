@@ -23,9 +23,14 @@ export function useSecondsLeft(endsAt: number | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (endsAt === null) return;
-    setNow(Date.now());
-    const t = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(t);
+    const tick = () => setNow(Date.now());
+    // At once too: the clock read when nothing was running is an old one.
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 500);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
   }, [endsAt]);
   return endsAt === null ? null : Math.max(0, Math.ceil((endsAt - now) / 1000));
 }
@@ -62,6 +67,16 @@ export function TurnRing({ size, width = 3, color, endsAt, total = TURN_MS }: { 
       <View style={{ position: 'absolute', left: 0, top: 0, width: size, height: size, borderRadius: size / 2, borderWidth: width, borderColor: 'rgba(255,255,255,0.12)' }} />
       <HalfRing size={size} width={width} color={color} side="right" turn={gone.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['180deg', '360deg', '360deg'] })} />
       <HalfRing size={size} width={width} color={color} side="left" turn={gone.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '0deg', '180deg'] })} />
+    </View>
+  );
+}
+
+/** A ring drawn clockwise from the top as `t` goes 0 → 1 (XOX's O). */
+export function DrawnRing({ size, width, color, t }: { size: number; width: number; color: string; t: Animated.Value }) {
+  return (
+    <View style={{ width: size, height: size }}>
+      <HalfRing size={size} width={width} color={color} side="right" turn={t.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '180deg', '180deg'] })} />
+      <HalfRing size={size} width={width} color={color} side="left" turn={t.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['180deg', '180deg', '360deg'] })} />
     </View>
   );
 }
@@ -113,6 +128,73 @@ export function SeatFace({
   );
 }
 
+/**
+ * The two players of a game for two, face to face over the score: each with what they play (`token`: a mark, a
+ * disc), the one on turn lit with the turn's clock. A seat nobody has taken yet shows as free.
+ */
+export function DuelHeader({
+  seats,
+  me,
+  turn,
+  playing,
+  endsAt,
+  wins,
+  winner,
+  tints,
+  token,
+}: {
+  seats: Seat[];
+  me: number;
+  turn: number;
+  playing: boolean;
+  endsAt: number | null;
+  wins: number[];
+  winner: number | null;
+  /** Each seat's colour. */
+  tints: string[];
+  token: (seat: number) => ReactNode;
+}) {
+  const plate = (seat: number) => {
+    const who = seats[seat];
+    const right = seat === 1;
+    if (!who)
+      return (
+        <View style={[k.plate, right && k.plateRight]}>
+          <View style={k.free}>
+            <Ionicons name="add" size={20} color={colors.textDim} />
+          </View>
+          <Text style={k.plateHint}>Boş koltuk</Text>
+        </View>
+      );
+    const active = playing && turn === seat;
+    return (
+      <View style={[k.plate, right && k.plateRight, active && { borderColor: tints[seat], backgroundColor: 'rgba(255,255,255,0.06)' }]} accessibilityLabel={`${seat === me ? 'Sen' : who.name}, ${wins[seat] ?? 0} el${active ? ', sıra onda' : ''}`}>
+        <SeatFace seat={who} size={48} color={tints[seat]} active={active} endsAt={endsAt} winner={!playing && winner === seat} badge={token(seat)} />
+        <View style={{ flex: 1, alignItems: right ? 'flex-end' : 'flex-start' }}>
+          <Text style={[k.plateName, active && { color: colors.text }]} numberOfLines={1}>
+            {seat === me ? 'Sen' : firstName(who.name)}
+          </Text>
+          <Text style={[k.plateHint, active && { color: tints[seat] }]} numberOfLines={1}>
+            {!playing ? (winner === seat ? 'Kazandı' : ' ') : active ? (seat === me ? 'Sıra sende' : 'Oynuyor…') : 'Bekliyor'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+  return (
+    <View style={k.duel}>
+      {plate(0)}
+      <View style={k.score} accessibilityLabel={`Skor ${wins[0] ?? 0} - ${wins[1] ?? 0}`}>
+        <Text style={k.scoreText}>
+          {wins[0] ?? 0} : {wins[1] ?? 0}
+        </Text>
+        <Text style={k.scoreLabel}>SKOR</Text>
+      </View>
+      {plate(1)}
+    </View>
+  );
+}
+
 /** The table's main button, and its quiet one. */
 export function ActionButton({ label, onPress, disabled, ghost, icon, small }: { label: string; onPress: () => void; disabled?: boolean; ghost?: boolean; icon?: keyof typeof Ionicons.glyphMap; small?: boolean }) {
   if (ghost)
@@ -142,27 +224,29 @@ const CONFETTI = Array.from({ length: 28 }, (_, i) => {
 const CONFETTI_COLORS = ['#13D9DF', '#FF6576', '#F6BD60', '#22C55E'];
 
 /**
- * The card over the board when a hand ends: `tone` 'win' (mine: confetti and a trophy), 'lose' (someone else's) or
- * 'draw'. `children`: what to do next ("Tekrar oyna").
+ * The card that says how a hand ended: `tone` 'win' (mine: confetti and a trophy), 'lose' (someone else's) or
+ * 'draw'. Over the table by default; `inline` puts it in the flow under a board whose last move should stay in
+ * sight (the winning line), a moment after that move. `children`: what to do next ("Tekrar oyna").
  */
-export function EndCard({ tone, title, sub, size, still, children }: { tone: 'win' | 'lose' | 'draw'; title: string; sub?: string; size: number; still: boolean; children?: ReactNode }) {
+export function EndCard({ tone, title, sub, size, still, inline, children }: { tone: 'win' | 'lose' | 'draw'; title: string; sub?: string; size: number; still: boolean; inline?: boolean; children?: ReactNode }) {
   const [t] = useState(() => new Animated.Value(still ? 1 : 0));
   const [fly] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (still) return;
-    const a = Animated.parallel([
-      Animated.spring(t, { toValue: 1, speed: 10, bounciness: 12, useNativeDriver: true }),
-      Animated.timing(fly, { toValue: 1, duration: 1600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    const a = Animated.sequence([
+      Animated.delay(inline ? 450 : 0),
+      Animated.parallel([
+        Animated.spring(t, { toValue: 1, speed: 10, bounciness: 12, useNativeDriver: true }),
+        Animated.timing(fly, { toValue: 1, duration: 1600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]),
     ]);
     a.start();
     return () => a.stop();
-  }, [still, t, fly]);
+  }, [still, inline, t, fly]);
   const edge = tone === 'win' ? semantic.money : tone === 'draw' ? colors.textDim : semantic.action;
-  return (
-    <View style={[StyleSheet.absoluteFill, k.veil]} accessibilityLiveRegion="polite">
-      {!still &&
-        tone === 'win' &&
-        CONFETTI.map((f, i) => (
+  const confetti =
+    !still && tone === 'win'
+      ? CONFETTI.map((f, i) => (
           <Animated.View
             key={i}
             pointerEvents="none"
@@ -172,7 +256,7 @@ export function EndCard({ tone, title, sub, size, still, children }: { tone: 'wi
               height: f.w * 1.6,
               borderRadius: 1.5,
               backgroundColor: CONFETTI_COLORS[f.color],
-              opacity: fly.interpolate({ inputRange: [0, 0.75, 1], outputRange: [1, 1, 0] }),
+              opacity: fly.interpolate({ inputRange: [0, 0.01, 0.75, 1], outputRange: [0, 1, 1, 0] }),
               transform: [
                 { translateX: fly.interpolate({ inputRange: [0, 1], outputRange: [0, f.dx * size] }) },
                 { translateY: fly.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, f.dy * size, f.dy * size + size * 0.22] }) },
@@ -180,12 +264,41 @@ export function EndCard({ tone, title, sub, size, still, children }: { tone: 'wi
               ],
             }}
           />
-        ))}
-      <Animated.View style={{ opacity: t.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }), transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
-        <LinearGradient colors={['#1C2E4A', '#101C33']} style={[k.endCard, { borderColor: edge, boxShadow: `0 0 26px ${edge}` }]}>
-          <LinearGradient colors={tone === 'win' ? ['#FFE08A', '#F2A93B'] : tone === 'draw' ? ['#B8C4DE', '#7C8BAD'] : ['#6FF1F5', '#0FB8BE']} style={k.cup}>
-            <Ionicons name={tone === 'win' ? 'trophy' : tone === 'draw' ? 'hand-left' : 'ribbon'} size={26} color={semantic.moneyInk} />
+        ))
+      : null;
+  const cup = (
+    <LinearGradient colors={tone === 'win' ? ['#FFE08A', '#F2A93B'] : tone === 'draw' ? ['#B8C4DE', '#7C8BAD'] : ['#6FF1F5', '#0FB8BE']} style={[k.cup, inline && k.cupSmall]}>
+      <Ionicons name={tone === 'win' ? 'trophy' : tone === 'draw' ? 'hand-left' : 'ribbon'} size={inline ? 22 : 26} color={semantic.moneyInk} />
+    </LinearGradient>
+  );
+  const pop = { opacity: t.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }), transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] };
+  if (inline)
+    return (
+      <View accessibilityLiveRegion="polite">
+        {/* The confetti bursts over the board above. */}
+        <View pointerEvents="none" style={{ position: 'absolute', left: '50%', top: -size * 0.45, zIndex: 5 }}>
+          {confetti}
+        </View>
+        <Animated.View style={pop}>
+          <LinearGradient colors={['#1C2E4A', '#101C33']} style={[k.endRow, { borderColor: edge, boxShadow: `0 0 16px ${edge}66` }]}>
+            <View style={k.endHead}>
+              {cup}
+              <View style={{ flex: 1 }}>
+                <Text style={k.endTitleInline}>{title}</Text>
+                {sub ? <Text style={[k.endSub, { textAlign: 'left' }]}>{sub}</Text> : null}
+              </View>
+            </View>
+            {children ? <View style={[k.endActions, { marginTop: 2 }]}>{children}</View> : null}
           </LinearGradient>
+        </Animated.View>
+      </View>
+    );
+  return (
+    <View style={[StyleSheet.absoluteFill, k.veil]} accessibilityLiveRegion="polite">
+      {confetti}
+      <Animated.View style={pop}>
+        <LinearGradient colors={['#1C2E4A', '#101C33']} style={[k.endCard, { borderColor: edge, boxShadow: `0 0 26px ${edge}` }]}>
+          {cup}
           <Text style={k.endTitle}>{title}</Text>
           {sub ? <Text style={k.endSub}>{sub}</Text> : null}
           {children ? <View style={k.endActions}>{children}</View> : null}
@@ -202,35 +315,29 @@ export function endSound(tone: 'win' | 'lose' | 'draw') {
 
 type Playing = { status: 'waiting' | 'playing' | 'over'; turn: number };
 /**
- * A practice table on this phone. I sit on the first seat; the others play by themselves a moment after their turn
- * comes (`bot`), and my own turn has the table's clock: when it runs out the table does what the room's would
- * (`ranOut`). `table` null: no game yet. Returns the table, a way to change it and when my turn ends.
+ * A practice table on this phone, starting as `first` makes it. I sit on the first seat; the others play by
+ * themselves a moment after their turn comes (`bot`), and my own turn has the table's clock: when it runs out the
+ * table does what the room's would (`ranOut`). Returns the table, a way to change it and when my turn ends.
  */
-export function usePracticeTable<T extends Playing>(play: { bot: (t: T) => T; ranOut: (t: T) => T; think?: [number, number] }) {
-  // `step` counts the changes: the turn alone can stay where it was (a card that skips the only other player).
-  const [state, setState] = useState<{ table: T | null; step: number }>({ table: null, step: 0 });
-  const [endsAt, setEndsAt] = useState<number | null>(null);
+export function usePracticeTable<T extends Playing>(first: () => T, play: { bot: (t: T) => T; ranOut: (t: T) => T; think?: [number, number] }) {
+  // `step` counts the changes (the turn alone can stay where it was: a card that skips the only other player) and
+  // `since` is when the last one was made: my turn's clock starts there.
+  const [state, setState] = useState(() => ({ table: first(), step: 0, since: Date.now() }));
   const fns = useRef(play);
   useEffect(() => {
     fns.current = play;
   });
-  const set = useCallback((next: T | null | ((t: T) => T)) => setState((s) => ({ table: typeof next === 'function' ? (s.table ? next(s.table) : s.table) : next, step: s.step + 1 })), []);
-  const { table, step } = state;
-  const playing = table?.status === 'playing';
-  const turn = table?.turn;
+  const set = useCallback((next: T | ((t: T) => T)) => setState((s) => ({ table: typeof next === 'function' ? next(s.table) : next, step: s.step + 1, since: Date.now() })), []);
+  const { table, step, since } = state;
+  const playing = table.status === 'playing';
+  const mine = table.turn === 0;
   useEffect(() => {
-    if (!playing) return setEndsAt(null);
-    if (turn !== 0) {
-      setEndsAt(null);
-      const [min, more] = fns.current.think ?? [750, 650];
-      const t = setTimeout(() => set((x) => fns.current.bot(x)), min + rnd(more));
-      return () => clearTimeout(t);
-    }
-    setEndsAt(Date.now() + TURN_MS);
-    const t = setTimeout(() => set((x) => fns.current.ranOut(x)), TURN_MS);
+    if (!playing) return;
+    const [min, more] = fns.current.think ?? [750, 650];
+    const t = mine ? setTimeout(() => set((x) => fns.current.ranOut(x)), Math.max(0, since + TURN_MS - Date.now())) : setTimeout(() => set((x) => fns.current.bot(x)), min + rnd(more));
     return () => clearTimeout(t);
-  }, [playing, turn, step, set]);
-  return { table, set, endsAt };
+  }, [playing, mine, step, since, set]);
+  return { table, set, endsAt: playing && mine ? since + TURN_MS : null };
 }
 
 const k = StyleSheet.create({
@@ -248,6 +355,19 @@ const k = StyleSheet.create({
   endCard: { alignItems: 'center', gap: 4, paddingHorizontal: 22, paddingTop: 14, paddingBottom: 14, borderRadius: 22, borderWidth: 1.5, minWidth: 200 },
   cup: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   endTitle: { color: colors.text, fontFamily: fonts.display, fontSize: 21, lineHeight: 27, textAlign: 'center' },
+  endRow: { gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5 },
+  endHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  endTitleInline: { color: colors.text, fontFamily: fonts.display, fontSize: 18, lineHeight: 24 },
+  cupSmall: { width: 42, height: 42, borderRadius: 21, marginBottom: 0 },
   endSub: { color: colors.textDim, fontSize: 12, lineHeight: 16, textAlign: 'center' },
   endActions: { alignSelf: 'stretch', marginTop: 8, gap: 6 },
+  duel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  plate: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 60, borderRadius: 18, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 7, paddingVertical: 5 },
+  plateRight: { flexDirection: 'row-reverse' },
+  plateName: { color: colors.textDim, fontSize: 14, lineHeight: 19, fontWeight: '800' },
+  plateHint: { color: colors.textDim, fontSize: 11, lineHeight: 15, fontWeight: '700' },
+  free: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  score: { alignItems: 'center', minWidth: 52 },
+  scoreText: { color: colors.text, fontFamily: fonts.display, fontSize: 20, lineHeight: 26 },
+  scoreLabel: { color: colors.textDim, fontSize: 9, lineHeight: 12, fontWeight: '800', letterSpacing: 1 },
 });

@@ -21,8 +21,11 @@ import { RocketPlayer } from '@/components/games/rocket';
 import { OkeyTable } from '@/components/games/okey';
 import { WheelPlayer } from '@/components/games/wheel';
 import { GameNav } from '@/components/games/slot-kit';
-import { ColorCards, Xox, type Player } from '@/components/games/room-games';
+import type { Player } from '@/components/games/room-games';
+import { CardsPractice } from '@/components/games/room/cards';
+import { FourPractice } from '@/components/games/room/four';
 import { LudoPractice } from '@/components/games/room/ludo';
+import { XoxPractice } from '@/components/games/room/xox';
 import { LiveTable, isTableGame } from '@/components/games/room-tables';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
@@ -53,8 +56,8 @@ function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
   const Screen = CASINO_SCREENS[id];
   return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
 }
-/** Games that need most of the screen in a room (Okey, Ludo's board and every casino game with its own screen); the top row of seats stays visible. */
-const isTall = (id: string) => id === 'wheel' || id === 'okey' || id === 'ludo' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
+/** Games that need most of the screen in a room (Okey, the room games with a table or a board of their own and every casino game with its own screen); the top row of seats stays visible. */
+const isTall = (id: string) => id === 'wheel' || id === 'okey' || id === 'ludo' || id === 'cards' || id === 'xox' || id === 'four' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
 
 const VOLUMES: [number, string][] = [
   [0, 'Kapalı'],
@@ -202,8 +205,9 @@ export function GamePanel({
             <>
               {tables && entry.from === 'room' && isTableGame(openId) && <LiveTable key={openId} roomId={entry.roomId} game={openId} canOpen={!!canOpenTable} />}
               {!tables && openId === 'ludo' && <LudoPractice players={players.slice(0, roomGame.maxPlayers)} fit={inRoom} />}
-              {!tables && openId === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
-              {!tables && openId === 'xox' && <Xox players={players.slice(0, 2)} />}
+              {!tables && openId === 'cards' && <CardsPractice players={players.slice(0, roomGame.maxPlayers)} />}
+              {!tables && openId === 'xox' && <XoxPractice players={players.slice(0, 2)} />}
+              {!tables && openId === 'four' && <FourPractice players={players.slice(0, 2)} />}
               {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
               {!tables && openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
               <Text style={p.dim}>

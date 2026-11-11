@@ -19,7 +19,10 @@ import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
+import type { CardsMove, CardsSeen } from '@/lib/room-games/cards';
+import type { FourMove, FourState } from '@/lib/room-games/four';
 import type { LudoMode, LudoMove, LudoState } from '@/lib/room-games/ludo';
+import type { XoxMove, XoxState } from '@/lib/room-games/xox';
 
 /**
  * wealthXp: Cömertlik points, charmXp: Yankı points, only in GET /api/me (the server's counts, server/api/wheel.mjs
@@ -1040,7 +1043,6 @@ export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
  * room-games/<game>.mjs keeps them, and `game` tells them apart: narrow on it before reading a game's fields. A new
  * game adds its own type to `ServerTable` and its move to `TableMove`.
  */
-export type TableCard = { color: number; value: number | '+2' | 'Atla' };
 type TableCommon = {
   room: string;
   name: string;
@@ -1059,12 +1061,21 @@ type TableCommon = {
 };
 /** Ludo (lib/room-games/ludo): its fields come with the first hand; a table still waiting has only `mode`. */
 export type LudoServerTable = TableCommon & { game: 'ludo' } & Partial<LudoState>;
-/** Renk Kartları: `hand` only for my own cards (null when I don't sit there), `counts` everyone's card count. */
-export type CardsServerTable = TableCommon & { game: 'cards'; top?: TableCard; hand?: TableCard[] | null; counts?: number[] };
-export type XoxServerTable = TableCommon & { game: 'xox'; board?: ('X' | 'O' | null)[] };
-export type ServerTable = LudoServerTable | CardsServerTable | XoxServerTable;
-/** A move as each game takes it: XOX { cell }, Renk Kartları { card } (null draws one), Ludo { roll: true } then { token }. */
-export type TableMove = { cell: number } | { card: number | null } | LudoMove;
+/**
+ * Renk Kartları (lib/room-games/cards): `mine` only for my own cards (null when I don't sit there), `counts` everyone's
+ * card count, the top of the two piles; a card is its number in the deck. Its fields come with the first hand.
+ */
+export type CardsServerTable = TableCommon & { game: 'cards' } & Partial<CardsSeen>;
+/** XOX (lib/room-games/xox): the board with each seat's mark and hands won. */
+export type XoxServerTable = TableCommon & { game: 'xox' } & Partial<XoxState>;
+/** Dört Taş (lib/room-games/four): the board with each seat's colour and hands won. */
+export type FourServerTable = TableCommon & { game: 'four' } & Partial<FourState>;
+export type ServerTable = LudoServerTable | CardsServerTable | XoxServerTable | FourServerTable;
+/**
+ * A move as each game takes it: XOX { cell }, Dört Taş { col }, Renk Kartları { card, color? }, { draw: true } or
+ * { pass: true }, Ludo { roll: true } then { token }.
+ */
+export type TableMove = XoxMove | FourMove | CardsMove | LudoMove;
 export type TableAction = 'open' | 'join' | 'start' | 'move' | 'leave' | 'again' | 'close';
 export const roomTable = (room: string) => call<{ table: ServerTable | null }>('GET', `/api/rooms/table?room=${encodeURIComponent(room)}`).then((r) => r.table);
 /** `options`: the opener's choices with `open` (Ludo: Hızlı or Klasik). */
