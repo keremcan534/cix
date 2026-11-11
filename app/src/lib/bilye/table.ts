@@ -10,6 +10,15 @@ export const COUNTS: Record<Lane, readonly number[]> = {
   orta: [37291, 38218, 40446, 51729, 36033, 50286, 39545, 38566, 37776, 10270, 1898, 17942],
   guclu: [84597, 68844, 63069, 59406, 32208, 32838, 19784, 15044, 11507, 8394, 1010, 3299],
 };
+/**
+ * The odds of each launch strength, out of 100000 (lib/bilye/rules BILYE_TOTAL): the paying targets' share of the
+ * launches scaled to pay back 40 % at most, the empty pockets taking the rest.
+ */
+export const WEIGHTS: Record<Lane, readonly number[]> = {
+  hafif: [2913, 4020, 5324, 8831, 8022, 14711, 14259, 16602, 16699, 503, 562, 7554],
+  orta: [8184, 8388, 8877, 15847, 7908, 15404, 8679, 11814, 8291, 2254, 416, 3938],
+  guclu: [22536, 18340, 16801, 12196, 8580, 6741, 5270, 3088, 3065, 2236, 269, 878],
+};
 /** Seeds whose flight ends in each target. */
 export const SEEDS: Record<Lane, readonly (readonly number[])[]> = {
   hafif: [
