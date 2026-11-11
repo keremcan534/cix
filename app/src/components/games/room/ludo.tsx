@@ -53,24 +53,26 @@ function tokensOf(v: LudoView, undo?: LudoEvent): BoardToken[] {
 }
 
 const nameOf = (v: LudoView, color: number) => first(v.seats[v.colors.indexOf(color)]?.name ?? '');
-/** One short line about the event that made `v`. */
-function lineOf(v: LudoView) {
+/** One short line about the event that made `v`; what I did myself is said to me ("3 attın"). */
+function lineOf(v: LudoView, me: number) {
   const e = v.last;
   if (v.status === 'waiting') return v.seats.length < META.min ? 'Oyuncular bekleniyor' : 'Masa hazır';
   if (!e) return 'Zar at · 6 gelince taşın yola çıkar';
+  const mine = me >= 0 && v.colors[me] === e.color;
   const who = nameOf(v, e.color);
   if (e.note === 'left') return 'Bir oyuncu masadan kalktı';
-  if (e.note === 'sixes') return `${who} üçüncü 6’yı attı · sıra geçti`;
-  if (e.note === 'none') return `${who} ${e.die} attı · oynayacak taşı yok`;
-  if (e.token === null) return `${who} ${e.die} attı`;
-  if (e.captured.length) return `${who} ${e.captured.length > 1 ? `${e.captured.length} taş` : 'taş'} kırdı!`;
-  if (e.to === HOME) return `${who} bir taşını eve soktu`;
-  if (e.from === BASE) return `${who} 6 attı · taşı yola çıktı`;
-  return `${who} ${e.die} attı`;
+  if (e.note === 'sixes') return mine ? 'Üçüncü 6’yı attın · sıra geçti' : `${who} üçüncü 6’yı attı · sıra geçti`;
+  if (e.note === 'none') return mine ? `${e.die} attın · oynayacak taşın yok` : `${who} ${e.die} attı · oynayacak taşı yok`;
+  if (e.token === null) return thrown(who, mine, e.die);
+  if (e.captured.length) return `${mine ? '' : `${who} `}${e.captured.length > 1 ? `${e.captured.length} taş` : mine ? 'Taş' : 'taş'} ${mine ? 'kırdın' : 'kırdı'}!`;
+  if (e.to === HOME) return mine ? 'Bir taşın evde!' : `${who} bir taşını eve soktu`;
+  if (e.from === BASE) return mine ? '6 attın · taşın yola çıktı' : `${who} 6 attı · taşı yola çıktı`;
+  return thrown(who, mine, e.die);
 }
+const thrown = (who: string, mine: boolean, die: number | null) => (mine ? `${die} attın` : `${who} ${die} attı`);
 
 type Frame = { view: LudoView; tokens: BoardToken[]; playing: boolean; line: string };
-const frameOf = (view: LudoView): Frame => ({ view, tokens: tokensOf(view), playing: false, line: lineOf(view) });
+const frameOf = (view: LudoView, me: number): Frame => ({ view, tokens: tokensOf(view), playing: false, line: lineOf(view, me) });
 type DieFace = { face: number | null; spinning: boolean; color: number | null };
 
 function LudoStage({
@@ -84,6 +86,8 @@ function LudoStage({
   fit,
   free,
   onShown,
+  cover,
+  onAgain,
 }: {
   view: LudoView;
   /** My seat; −1 when I only watch. */
@@ -102,11 +106,15 @@ function LudoStage({
   free?: boolean;
   /** The screen has finished playing the state (hand, n): the next move may come. */
   onShown?: (hand: number, n: number) => void;
+  /** Drawn over the board, which waits dimmed behind it: a practice game's settings before it starts. */
+  cover?: ReactNode;
+  /** After a hand: another one, from the winner's banner. */
+  onAgain?: () => void;
 }) {
   const { reduceMotion: still } = useSettings();
   const win = useWindowDimensions();
   const [width, setWidth] = useState(0);
-  const [frame, setFrame] = useState(() => frameOf(view));
+  const [frame, setFrame] = useState(() => frameOf(view, me));
   const [die, setDie] = useState<DieFace>({ face: view.die, spinning: false, color: null });
   const board = useRef<BoardHandle>(null);
   const queue = useRef<LudoView[]>([]);
@@ -135,14 +143,15 @@ function LudoStage({
     shown.current = { hand: v.hand, n: v.n };
     const settle = () => {
       spinAt.current = null;
-      setFrame(frameOf(v));
+      setFrame(frameOf(v, mine));
       setDie({ face: v.die, spinning: false, color: e?.color ?? null });
       latest.current.onShown?.(v.hand, v.n);
     };
     if (!e || v.status === 'waiting' || v.hand !== before.hand || e.n !== v.n || v.n <= before.n || e.note === 'left') return settle();
     const who = nameOf(v, e.color);
     const myColor = mine >= 0 ? v.colors[mine] : -1;
-    setFrame({ view: v, tokens: tokensOf(v, e), playing: true, line: e.rolled ? `${who} zar atıyor…` : `${who} ${e.die} attı` });
+    const own = e.color === myColor;
+    setFrame({ view: v, tokens: tokensOf(v, e), playing: true, line: e.rolled ? (own ? 'Zar atıyorsun…' : `${who} zar atıyor…`) : thrown(who, own, e.die) });
     if (e.rolled) {
       // A throw of my own has been tumbling since the tap; anybody else's starts now.
       const since = spinAt.current ?? Date.now();
@@ -152,7 +161,7 @@ function LudoStage({
       await sleep(flat ? 0 : Math.max(220, ROLL_MS - (Date.now() - since)));
       if (!alive.current) return;
       setDie({ face: e.die, spinning: false, color: e.color });
-      setFrame((f) => ({ ...f, line: e.note === 'none' || e.note === 'sixes' ? lineOf(v) : `${who} ${e.die} attı` }));
+      setFrame((f) => ({ ...f, line: e.note === 'none' || e.note === 'sixes' ? lineOf(v, mine) : thrown(who, own, e.die) }));
       // Long enough to read the die: longer when nothing else is going to move.
       await sleep(flat ? 0 : e.token === null ? 560 : 260);
     } else await sleep(flat ? 0 : 30);
@@ -281,7 +290,8 @@ function LudoStage({
           </View>
           <View>
             <LudoBoard ref={board} size={size} turns={turns} count={count} colors={v.colors} tokens={frame.tokens} active={active} movable={canPick ? { color: myColor, indexes: v.movable } : null} onPick={pick} still={still} />
-            {won && <WinBanner name={v.winner === me ? null : first(won.name)} color={v.colors[v.winner!] ?? 0} size={size} still={still} />}
+            {cover && <View style={[StyleSheet.absoluteFill, w.veil, w.cover]}>{cover}</View>}
+            {won && <WinBanner name={v.winner === me ? null : first(won.name)} color={v.colors[v.winner!] ?? 0} size={size} still={still} onAgain={onAgain && !busy ? onAgain : undefined} />}
           </View>
           <View style={s.row}>
             {chip(3)}
@@ -466,7 +476,7 @@ const CONFETTI = Array.from({ length: 26 }, (_, i) => {
 });
 
 /** Over the board when the hand is won. `name` null: it is me. */
-function WinBanner({ name, color, size, still }: { name: string | null; color: number; size: number; still: boolean }) {
+function WinBanner({ name, color, size, still, onAgain }: { name: string | null; color: number; size: number; still: boolean; onAgain?: () => void }) {
   const [t] = useState(() => new Animated.Value(still ? 1 : 0));
   const [fly] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -507,6 +517,11 @@ function WinBanner({ name, color, size, still }: { name: string | null; color: n
           </LinearGradient>
           <Text style={w.title}>{name === null ? 'Kazandın!' : `${name} kazandı`}</Text>
           <Text style={w.sub}>{name === null ? 'Bütün taşların evde' : 'El bitti'}</Text>
+          {onAgain && (
+            <View style={w.again}>
+              <ActionButton label="Yeniden oyna" onPress={onAgain} />
+            </View>
+          )}
         </LinearGradient>
       </Animated.View>
     </View>
@@ -611,17 +626,27 @@ export function LudoPractice({ players, fit }: { players: LudoSeat[]; fit?: bool
 
   const view = useMemo<LudoView>(() => (game ? { ...game.table, seats: game.seats } : idleView(lineup, mode)), [game, lineup, mode]);
   const over = game?.table.status === 'over';
+  // Before a game the settings lie over the board, so the button that starts it is in sight in a room's sheet too.
+  const setup = (
+    <View style={s.setup}>
+      <LudoModePicker mode={mode} onChange={setMode} />
+      <Choice label="Oyuncu" value={size} onChange={setSize} options={[2, 3, 4].map((n) => [n, `${n} kişi`])} />
+      <ActionButton label="Oyunu başlat" onPress={start} />
+    </View>
+  );
   return (
     <View style={{ gap: 10 }}>
-      <LudoStage view={view} me={0} fit={fit} onRoll={() => act(0, { roll: true })} onPick={(token) => act(0, { token })} onShown={(hand, n) => setShown({ hand, n })} />
-      {(!game || over) && (
-        <View style={s.setup}>
-          <LudoModePicker mode={mode} onChange={setMode} />
-          <Choice label="Oyuncu" value={size} onChange={setSize} options={[2, 3, 4].map((n) => [n, `${n} kişi`])} />
-          <ActionButton label={over ? 'Yeniden oyna' : 'Oyunu başlat'} onPress={start} />
-        </View>
-      )}
-      {game && !over && <ActionButton ghost label="Oyunu bırak" onPress={() => setGame(null)} />}
+      <LudoStage
+        view={view}
+        me={0}
+        fit={fit}
+        cover={game ? undefined : setup}
+        onAgain={over ? start : undefined}
+        onRoll={() => act(0, { roll: true })}
+        onPick={(token) => act(0, { token })}
+        onShown={(hand, n) => setShown({ hand, n })}
+      />
+      {game && <ActionButton ghost label={over ? 'Oyun ayarları' : 'Oyunu bırak'} onPress={() => setGame(null)} />}
     </View>
   );
 }
@@ -659,7 +684,7 @@ function liveView(table: LudoServerTable): LudoView | null {
  * everyone in the room, the die and the tokens for whoever is on turn. `children`: the table's buttons (sit, start,
  * leave), which are the same for every game.
  */
-export function LudoLive({ table, busy, onMove, children }: { table: LudoServerTable; busy: boolean; onMove: (move: LudoMove) => void; children?: ReactNode }) {
+export function LudoLive({ table, busy, onMove, onAgain, children }: { table: LudoServerTable; busy: boolean; onMove: (move: LudoMove) => void; /** I sit at a finished hand that can be played again. */ onAgain?: () => void; children?: ReactNode }) {
   const view = useMemo(() => liveView(table), [table]);
   if (!view)
     return (
@@ -678,6 +703,7 @@ export function LudoLive({ table, busy, onMove, children }: { table: LudoServerT
         free={waiting && table.seats.length < table.max}
         busy={busy}
         turnEndsAt={table.turnEndsAt ? Date.parse(table.turnEndsAt) : null}
+        onAgain={onAgain}
         onRoll={() => onMove({ roll: true })}
         onPick={(token) => onMove({ token })}
       />
@@ -695,7 +721,7 @@ const s = StyleSheet.create({
   line: { flex: 1, color: colors.textDim, fontSize: 12, lineHeight: 16, textAlign: 'center', paddingHorizontal: 4 },
   dieBlock: { width: DIE_BLOCK, alignItems: 'center', gap: 2 },
   hint: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '800', maxWidth: DIE_BLOCK },
-  setup: { gap: 10, backgroundColor: colors.cardAlt, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  setup: { alignSelf: 'stretch', gap: 10, backgroundColor: colors.card, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 10px 24px rgba(0,0,0,0.5)' },
   choice: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   choiceLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700', width: 54 },
   option: { flex: 1, minHeight: 36, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
@@ -727,6 +753,8 @@ const p = StyleSheet.create({
 });
 const w = StyleSheet.create({
   veil: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 16 },
+  cover: { padding: 14 },
+  again: { alignSelf: 'stretch', minWidth: 170, marginTop: 8 },
   card: { alignItems: 'center', gap: 4, paddingHorizontal: 26, paddingTop: 16, paddingBottom: 14, borderRadius: 22, borderWidth: 1.5 },
   cup: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   title: { color: colors.text, fontFamily: fonts.display, fontSize: 22, lineHeight: 28 },

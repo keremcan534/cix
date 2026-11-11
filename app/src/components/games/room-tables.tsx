@@ -134,7 +134,7 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
   );
   if (table.game === 'ludo')
     return (
-      <LudoLive table={table} busy={busy} onMove={(move) => run('move', { move }, true)}>
+      <LudoLive table={table} busy={busy} onMove={(move) => run('move', { move }, true)} onAgain={over && seated && table.seats.length >= table.min ? () => run('again') : undefined}>
         {table.status === 'waiting' ? waitingButtons : handButtons}
       </LudoLive>
     );

@@ -46,7 +46,7 @@ export type CasinoGame = {
 };
 
 export const ROOM_GAMES: RoomGame[] = [
-  { id: 'ludo', name: 'Ludo', emoji: '🎲', provider: 'Sağlayıcı (araştırılıyor)', version: '0.1-demo', active: true, phase: 1, minPlayers: 2, maxPlayers: 4, startBy: 'anyone', joinAfterStart: false, roundSeconds: 600, vipRequired: false, playable: true, leaderboard: true },
+  { id: 'ludo', name: 'Ludo', emoji: '🎲', provider: 'Yerleşik', version: '1.0', active: true, phase: 1, minPlayers: 2, maxPlayers: 4, startBy: 'anyone', joinAfterStart: false, roundSeconds: 600, vipRequired: false, playable: true, leaderboard: true },
   {
     id: 'cards',
     name: 'Renk Kartları',
