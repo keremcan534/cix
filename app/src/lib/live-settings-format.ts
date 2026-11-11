@@ -2,7 +2,7 @@
 // tests can hold them to the server's rules (server/api/live-registry.mjs): the server checks every value again
 // and its dryRun preview is what the admin confirms; these only keep the panel honest before anyone taps.
 // Times are Istanbul time (UTC+3 all year since 2016), whatever the phone's own time zone.
-import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey, RewardKey } from '@/lib/api';
+import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey, RewardKey, RoomKey } from '@/lib/api';
 import { RULES } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { campaignCoins } from '@/lib/live/catalog-live';
@@ -99,8 +99,12 @@ export function bigChange(key: LiveKey, before: LiveValue, after: LiveValue): bo
       // A reward or its cap that more than doubles.
       return typeof after === 'number' && typeof before === 'number' && after > before * 2;
     case 'room_bg_custom_price':
-      // Özel süsleme's price when it more than doubles or halves.
+    case 'boss_seat_coins':
+      // Özel süsleme's price, the Patron koltuğu's coins: when it more than doubles or halves.
       return typeof after === 'number' && typeof before === 'number' && (after > before * 2 || after * 2 < before);
+    case 'room_staff_away_minutes':
+      // A room without its staff closing sooner than 3 minutes (a short drop could close it).
+      return typeof after === 'number' && after < 3;
     default:
       return false;
   }
@@ -115,6 +119,14 @@ export const DECOR_LABEL: Record<string, string> = { custom: 'Özel süsleme (ke
 export const DECOR_NUMBER_KEYS: { key: 'room_bg_custom_price' | 'room_bg_custom_days'; unit: string }[] = [
   { key: 'room_bg_custom_price', unit: ' jeton' },
   { key: 'room_bg_custom_days', unit: ' gün' },
+];
+
+/** Odalar (server/api/live-registry.mjs): when a room without its staff closes, the Patron koltuğu's coins and
+ *  minutes, in card order. */
+export const ROOM_NUMBER_KEYS: { key: RoomKey; unit: string }[] = [
+  { key: 'room_staff_away_minutes', unit: ' dakika' },
+  { key: 'boss_seat_coins', unit: ' jeton' },
+  { key: 'boss_seat_minutes', unit: ' dakika' },
 ];
 
 /** Oyun Salonu's numbers in the order the admin card shows them, with each one's unit. */
@@ -248,6 +260,12 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `${fmtNum(v)} jeton` : String(v);
     case 'room_bg_custom_days':
       return typeof v === 'number' ? `${fmtNum(v)} gün` : String(v);
+    case 'room_staff_away_minutes':
+      return typeof v === 'number' ? `${fmtNum(v)} dakika sonra kapanır` : String(v);
+    case 'boss_seat_coins':
+      return typeof v === 'number' ? `Tek seferde ${fmtNum(v)} jeton` : String(v);
+    case 'boss_seat_minutes':
+      return typeof v === 'number' ? `${fmtNum(v)} dakika` : String(v);
     default:
       return String(v);
   }

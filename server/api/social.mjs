@@ -130,6 +130,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM moments WHERE author = $1', [id]);
     await c.query('DELETE FROM contact_refusals WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_admins WHERE user_id = $1', [id]);
+    // Off any Patron koltuğu they sit on (boss-seat.mjs); the rooms read it empty.
+    await c.query('UPDATE rooms SET boss_id = NULL, boss_since = NULL, boss_until = NULL, boss_spent = 0 WHERE boss_id = $1', [id]);
     // Room music: no longer a DJ; their library goes, and with it what they had queued in rooms.
     await c.query('DELETE FROM room_djs WHERE user_id = $1', [id]);
     await c.query('UPDATE music_tracks SET removed_at = now() WHERE owner = $1 AND removed_at IS NULL', [id]);

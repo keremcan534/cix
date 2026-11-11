@@ -107,6 +107,7 @@ describe('nothing saved', () => {
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
         ...['casino_off', 'casino_open', 'casino_max_bet', 'casino_daily_rounds'],
         ...['room_decor_off', 'room_bg_custom_price', 'room_bg_custom_days'],
+        ...['room_staff_away_minutes', 'boss_seat_coins', 'boss_seat_minutes'],
       ],
     );
     const by = Object.fromEntries(j.settings.map((x) => [x.key, x]));
