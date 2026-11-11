@@ -26,6 +26,8 @@ import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
 const METHOD_TEXT: Record<string, string> = { code: 'Davet kodu', link: 'Davet bağlantısı', invite: 'Davet', application: 'Başvuru', admin: 'Merkez ataması' };
+/** The agency's group chat (app/ajans/sohbet): its streamers, its owner and its staff. */
+export const openChat = (id: string) => router.push({ pathname: '/ajans/sohbet', params: { id } } as unknown as Href);
 export const openOffice = (id: string) => router.push({ pathname: '/ajans/ofis', params: { id } } as unknown as Href);
 
 export function NetworkHub() {
@@ -109,6 +111,12 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
               </DepthCard>
             </Pressable>
           ))}
+          {/* The agency's own group chat (server/api/agency-chat.mjs): its owner and staff are in it, with its streamers. */}
+          {d.agencies
+            .filter((a) => a.status === 'approved' && (a.viewer === 'owner' || a.viewer === 'staff'))
+            .map((a) => (
+              <Button key={`chat-${a.id}`} title={d.agencies.length > 1 ? `${a.name} · Sohbet grubu` : 'Ajans sohbet grubu'} icon="chatbubbles" variant="tonal" onPress={() => openChat(a.id)} />
+            ))}
         </Section>
       )}
 
@@ -183,6 +191,7 @@ function Membership({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload:
           {fmtDate(m.joinedAt)} tarihinden beri · {METHOD_TEXT[m.method] ?? m.method}
         </Text>
         <Text style={st.note}>Ajans komisyonu senin elmasından kesilmez; platform tarafından ayrıca ödenir.</Text>
+        <Button title="Ajans sohbet grubu" icon="chatbubbles" variant="tonal" onPress={() => openChat(m.agency.id)} />
         {d.transfer ? (
           <TransferCard t={d.transfer} />
         ) : (

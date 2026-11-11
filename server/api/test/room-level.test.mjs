@@ -189,8 +189,11 @@ describe('Odanın görünümü: kapak, tema, hediye efektleri', () => {
     assert.equal(st0, 200, j0.error);
     const room = j0.room.id;
     assert.deepEqual([j0.room.coverId, j0.room.theme, j0.room.giftEffects], [null, 'chat', true]);
+    const named = lkCalls.length;
     assert.equal((await call('POST', '/api/rooms/admin', { room, user: superAdmin.user.id, super: true }, owner.session))[0], 200);
     assert.equal((await call('POST', '/api/rooms/admin', { room, user: plainAdmin.user.id }, owner.session))[0], 200);
+    // Naming an admin tells the room as well (sent without waiting): both land before the packets below are counted.
+    assert.ok(await until(() => packets(named, 'room').length === 2), 'yönetici atanınca da haber gider');
 
     let from = lkCalls.length;
     let [st, j] = await call('POST', '/api/rooms/update', { id: room, coverId: 'bg1' }, superAdmin.session);

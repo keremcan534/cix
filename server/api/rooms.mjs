@@ -484,6 +484,8 @@ export const roomRoutes = {
     if (target === me.id) throw new HttpError(400, 'Oda sahibi zaten yetkili');
     if (b.admin === false) {
       await db.query('DELETE FROM room_admins WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+      // Every phone in the room reads who runs it again, so the rank is gone at once (not at their next read).
+      announceRoom(liveKitName(room.id));
       return { admin: false, super: false };
     }
     if (b.super !== undefined && typeof b.super !== 'boolean') throw new HttpError(400, 'Süper Yönetici açık ya da kapalı olmalı');
@@ -496,6 +498,7 @@ export const roomRoutes = {
     );
     // An admin plays music anyway: no DJ seat kept for them.
     await db.query('DELETE FROM room_djs WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+    announceRoom(liveKitName(room.id));
     return { admin: true, super: r.rows[0].super };
   },
 
@@ -518,6 +521,7 @@ export const roomRoutes = {
     );
     await removeFromVoice(liveKitName(room.id), target);
     await audit(db, { actor: me.id, role: roleOfRank(rank), action: 'room_kick', target, detail: { room: room.id, minutes } });
+    announceRoom(liveKitName(room.id));
     return { until: r.rows[0].until };
   },
 
@@ -529,6 +533,7 @@ export const roomRoutes = {
     const target = userId(b.user);
     const r = await db.query('DELETE FROM room_bans WHERE room_id = $1 AND user_id = $2', [room.id, target]);
     if (r.rowCount) await audit(db, { actor: me.id, role: room.owner === me.id ? 'room_owner' : 'room_admin', action: 'room_unkick', target, detail: { room: room.id } });
+    announceRoom(liveKitName(room.id));
     return { banned: false };
   },
 
@@ -564,6 +569,7 @@ export const roomRoutes = {
         source: 'manual',
       },
     );
+    announceRoom(liveKitName(room.id));
     return { sanction: sanctionView(s) };
   },
 
@@ -580,6 +586,7 @@ export const roomRoutes = {
     if (!['room_admin', 'room_owner'].includes(s.created_role)) throw new HttpError(403, 'Platform susturmasını oda yetkilisi kaldıramaz');
     const why = b.reason === undefined || b.reason === '' ? 'Oda yetkilisi kaldırdı' : text(b.reason, 3, 300, 'Gerekçe');
     await liftSanction({ id: me.id, role: owner ? 'room_owner' : 'room_admin' }, s, why);
+    announceRoom(liveKitName(room.id));
     return { lifted: true };
   },
 

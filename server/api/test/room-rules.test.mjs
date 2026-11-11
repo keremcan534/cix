@@ -101,7 +101,10 @@ describe('Oda kuralları sunucuda', () => {
     const admin = await signUp('Kural Yöneticisi');
     const guest = await signUp('Misafir');
     const room = await roomOf(owner);
+    const named = lkCalls.length;
     await ok(call('POST', '/api/rooms/admin', { room, user: admin.user.id }, owner.session), 'yönetici');
+    // Naming an admin tells the room as well (sent without waiting): it lands before the packets below are counted.
+    assert.ok(await until(() => roomPackets(named).length === 1), 'yönetici atanınca da haber gider');
     const from = lkCalls.length;
     let j = await ok(update(owner.session, { id: room, rules: { bot: true, joinMode: 'apply', words: ['Spam', 'reklam'] } }), 'kural');
     assert.equal(j.room.rules.bot, true);

@@ -36,6 +36,7 @@ import { alertRoutes, warningCodes } from './alerts.mjs';
 import { CONFIG_CACHE, configRoutes, gate } from './features.mjs';
 import { agencyRoutes } from './agency.mjs';
 import { agencyAdminRoutes } from './agency-admin.mjs';
+import { agencyChatRoutes } from './agency-chat.mjs';
 import { recordIncome } from './agency-lib.mjs';
 import { authRoutes, startOtpSweep, stopOtpSweep, withSignIn } from './auth.mjs';
 import { backpackRoutes } from './backpack.mjs';
@@ -286,6 +287,7 @@ const routes = {
   ...financeSyncRoutes,
   ...agencyRoutes,
   ...agencyAdminRoutes,
+  ...agencyChatRoutes,
   ...configRoutes,
   ...alertRoutes,
   ...sanctionRoutes,

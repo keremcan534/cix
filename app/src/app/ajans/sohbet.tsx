@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { GroupChat } from '@/components/GroupChat';
+import { LiveAgencyChat } from '@/components/agency-chat-live';
 import { GradientButton, Header, StateIcon } from '@/components/ui';
 import { AGENCIES } from '@/data/agency';
 import { USERS } from '@/data/mock';
@@ -13,7 +14,12 @@ import { colors } from '@/theme';
 
 const LAST_ACTIVE = ['12 dk önce', '1 sa önce', 'Dün 22:40', '2 gün önce', '3 gün önce'];
 
+/** The agency's group chat: the server's in a live build (components/agency-chat-live), the sample one in the demo. */
 export default function AgencyChat() {
+  return liveMode() ? <LiveAgencyChat /> : <DemoAgencyChat />;
+}
+
+function DemoAgencyChat() {
   const { agencyId, agencyChat, sendAgencyMessage, ownedAgency } = useApp();
   const name = agencyId === 'own' ? ownedAgency?.name : AGENCIES.find((a) => a.id === agencyId)?.name;
 
@@ -29,16 +35,10 @@ export default function AgencyChat() {
           pinned="📢 Bu hafta: PK turnuvası Cumartesi 21:00 · Aylık 100 saat hedefi"
           lastActive={(u) => LAST_ACTIVE[Number(u.id.slice(1)) % LAST_ACTIVE.length]}
           roomId="r2"
-          // The agency group chat has no server counterpart (it opens only in the demo), so a live build leaves out
-          // its Jeton Noktası and member network shortcuts too.
           quickActions={[
             { key: 'panel', label: 'Ajans paneli', emoji: '📊', onPress: () => router.push('/ajans') },
-            ...(liveMode()
-              ? []
-              : [
-                  { key: 'bank', label: 'Jeton Noktası', emoji: '🏦', onPress: () => router.push('/coins-bank') },
-                  { key: 'net', label: 'Üye ağı', emoji: '🌐', onPress: () => router.push('/ajans/ag') },
-                ]),
+            { key: 'bank', label: 'Jeton Noktası', emoji: '🏦', onPress: () => router.push('/coins-bank') },
+            { key: 'net', label: 'Üye ağı', emoji: '🌐', onPress: () => router.push('/ajans/ag') },
           ]}
         />
       ) : (
