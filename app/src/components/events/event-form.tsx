@@ -260,7 +260,7 @@ export function EventFormView({ meta, room: roomId, edit, onClose, onSaved }: Pr
             </View>
           </ScrollView>
           <View style={[styles.bar, { paddingBottom: insets.bottom + 12 }]}>
-            {(!edit || edit.state === 'draft') && <Button title="Taslak kaydet" variant="ghost" small onPress={() => save(true)} disabled={busy} style={{ flex: 1 }} />}
+            {(!edit || edit.state === 'draft') && <Button title="Taslak" icon="document-outline" variant="ghost" small onPress={() => save(true)} disabled={busy} style={{ flex: 1 }} />}
             <Button title={busy ? 'Gönderiliyor…' : 'İncelemeye gönder'} icon="send" onPress={() => save(false)} disabled={busy} style={{ flex: 2 }} />
           </View>
         </View>
