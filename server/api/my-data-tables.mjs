@@ -14,12 +14,14 @@ export const EXPORTED = [
   'profile_extras', 'profile_photos', 'privacy_settings', 'call_history_cleared', 'room_mic_invites', 'room_polls',
   'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
+  'events', 'event_reservations', 'event_participants',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */
 export const NOT_EXPORTED = {
   admin_permissions: 'staff access settings',
   audit_events: 'staff action log (who on the staff did what)',
+  event_log: 'an event’s change log (staff review decisions); the person’s own events are in events',
   sanction_audit_logs: 'staff action log of sanctions',
   moderation_evidence: 'staff evidence for a decision',
   device_bans: 'device recognition for bans',

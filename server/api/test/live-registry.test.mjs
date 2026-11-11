@@ -71,6 +71,13 @@ describe('defaults are today', () => {
       room_decor_off: [],
       room_bg_custom_price: 5_000,
       room_bg_custom_days: 30,
+      event_min_room_level: 1,
+      event_min_lead_minutes: 30,
+      event_max_minutes: 180,
+      event_max_capacity: 500,
+      event_grace_minutes: 15,
+      event_strike_limit: 3,
+      event_block_days: 14,
     });
     assert.equal(EXCHANGE.usdTry, 49.8);
     assert.equal(WITHDRAW.maxDiamonds, 5_000_000);
@@ -122,6 +129,13 @@ describe('defaults are today', () => {
       'room_decor_off',
       'room_bg_custom_price',
       'room_bg_custom_days',
+      'event_min_room_level',
+      'event_min_lead_minutes',
+      'event_max_minutes',
+      'event_max_capacity',
+      'event_grace_minutes',
+      'event_strike_limit',
+      'event_block_days',
     ]);
     for (const k of ['need_level', 'need_points', 'min_age', 'lucky_min_age', 'diamonds_per_usd', 'coin_diamond_ratio', 'lock_hours', 'test_daily', 'allow_test_topup', 'gift_prices', 'pack_prices', 'pack_coins', 'product_ids', 'sms_provider', '__proto__', 'constructor', 'toString']) {
       assert.ok(!Object.hasOwn(REGISTRY, k), k);

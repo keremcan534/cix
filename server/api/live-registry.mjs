@@ -101,6 +101,8 @@ export function defaultsOf(e = process.env) {
     // Oda süslemesi (room-decor.mjs): both paid parts on, Özel süsleme 5.000 jeton for 30 days.
     room_decor_off: [],
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Etkinlik Merkezi (events.mjs): every room owner may apply; 30 minutes ahead at least, 3 hours, 500 places.
+    ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
   };
 }
 const CASINO_TOP = CASINO_STAKES.wide[CASINO_STAKES.wide.length - 1];
@@ -221,6 +223,35 @@ const DECOR_AMOUNTS = {
   room_bg_custom_price: { field: 'roomBgCustomPrice', label: 'Özel süsleme ücreti', default: 5_000, bounds: { min: 100, max: 100_000, step: 100, money: true }, unit: ' jeton', help: 'Oda sahibinin kendi görselini odasının arka planı yapmak için ödediği jeton. Yalnız yeni alımlarda geçerli olur.', text: (a, b) => `Özel süsleme ${a} → ${b} jeton.` },
   room_bg_custom_days: { field: 'roomBgCustomDays', label: 'Özel süsleme süresi (gün)', default: 30, bounds: { min: 1, max: 90, step: 1 }, unit: ' gün', help: 'Ödenen özel süslemenin kaç gün odada kalacağı. Süren süslemelerin bitiş günü değişmez.', text: (a, b) => `Yeni alınan özel süsleme ${a} → ${b} gün kalır.` },
 };
+// Etkinlik Merkezi (events.mjs): who may apply, how long and how big an event may be, the start's grace and the
+// limit for events left unstarted. key → [field, label, default, bounds, unit, sentence].
+const EVENTS = 'Etkinlikler';
+const EVENT_RULES = {
+  event_min_room_level: { field: 'eventMinRoomLevel', label: 'Başvuru için oda seviyesi', default: 1, bounds: { min: 1, max: 15, step: 1 }, unit: '', help: 'Bu seviyedeki ve üstündeki odaların sahipleri etkinlik başvurusu yapabilir. 1: her oda sahibi.', text: (a, b) => `Etkinlik başvurusu Lv.${a} → Lv.${b} odadan itibaren.` },
+  event_min_lead_minutes: { field: 'eventMinLead', label: 'En erken başlangıç (dakika sonra)', default: 30, bounds: { min: 0, max: 4320, step: 5 }, unit: ' dakika', help: 'Başvurudan en az bu kadar sonrası için etkinlik planlanabilir; incelemeye zaman kalsın.', text: (a, b) => `Etkinlik en erken ${a} → ${b} dakika sonrası için planlanır.` },
+  event_max_minutes: { field: 'eventMaxMinutes', label: 'En uzun etkinlik (dakika)', default: 180, bounds: { min: 30, max: 720, step: 15 }, unit: ' dakika', help: 'Bir etkinlik en çok bu kadar sürer; süresi dolunca kendiliğinden biter.', text: (a, b) => `Bir etkinlik en çok ${a} → ${b} dakika sürer.` },
+  event_max_capacity: { field: 'eventMaxCapacity', label: 'En fazla katılımcı', default: 500, bounds: { min: 10, max: 10_000, step: 10 }, unit: ' kişi', help: 'Bir etkinliğe en çok bu kadar yer ayrılabilir.', text: (a, b) => `Bir etkinliğe en çok ${a} → ${b} kişi yer ayırtabilir.` },
+  event_grace_minutes: { field: 'eventGrace', label: 'Başlatma toleransı (dakika)', default: 15, bounds: { min: 5, max: 120, step: 5 }, unit: ' dakika', help: 'Başlangıç saatinden sonra bu süre içinde başlatılmayan etkinlik sona erer ve düzenleyene ihlal yazılır.', text: (a, b) => `Başlangıçtan ${a} → ${b} dakika sonra başlatılmayan etkinlik sona erer.` },
+  event_strike_limit: { field: 'eventStrikeLimit', label: 'İhlal sınırı (30 günde)', default: 3, bounds: { min: 1, max: 10, step: 1 }, unit: '', help: '30 gün içinde bu kadar etkinliği zamanında başlatmayan oda sahibi bir süre yeni başvuru yapamaz.', text: (a, b) => `30 günde ${a} → ${b} ihlalde başvuru durur.` },
+  event_block_days: { field: 'eventBlockDays', label: 'Başvuru kısıtı (gün)', default: 14, bounds: { min: 1, max: 90, step: 1 }, unit: ' gün', help: 'İhlal sınırına ulaşan oda sahibi son ihlalden sonra bu kadar gün başvuru yapamaz.', text: (a, b) => `İhlal sınırında başvuru ${a} → ${b} gün durur.` },
+};
+const eventEntries = () =>
+  Object.fromEntries(
+    Object.entries(EVENT_RULES).map(([k, x]) => [
+      k,
+      {
+        field: x.field,
+        group: EVENTS,
+        label: x.label,
+        help: x.help,
+        type: 'int',
+        bounds: x.bounds,
+        parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+        big: () => false,
+        impact: (before, after) => x.text(fmt(before), fmt(after)),
+      },
+    ]),
+  );
 /** The decoration keys as registry entries; a price that more than doubles or halves needs the second confirmation. */
 const decorEntries = () => {
   const switches = { options: DECOR_SWITCHES, labels: DECOR_LABEL, max: DECOR_SWITCHES.length };
@@ -657,6 +688,7 @@ export const REGISTRY = {
     impact: (before, after) => `Bir oyunda günde en çok ${fmt(before)} → ${fmt(after)} tur (en yüksek bahisle); Yörünge’de ${fmt(before * CASINO_TOP)} → ${fmt(after * CASINO_TOP)} jeton.`,
   },
   ...decorEntries(),
+  ...eventEntries(),
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
 freezeDeep(REGISTRY);
@@ -708,7 +740,8 @@ const readOnlySet = (xs) => {
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
- *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, invalid }
+ *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, eventMinRoomLevel, eventMinLead, eventMaxMinutes,
+ *     eventMaxCapacity, eventGrace, eventStrikeLimit, eventBlockDays, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -751,6 +784,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     casinoDailyRounds: val('casino_daily_rounds'),
     roomDecorOff: readOnlySet(val('room_decor_off')),
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     invalid: Object.freeze([...invalid]),
   });
 }

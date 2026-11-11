@@ -107,6 +107,7 @@ describe('nothing saved', () => {
         ...['rewards_off', 'welcome_coins', 'invite_coins', 'invite_daily_cap'],
         ...['casino_off', 'casino_open', 'casino_max_bet', 'casino_daily_rounds'],
         ...['room_decor_off', 'room_bg_custom_price', 'room_bg_custom_days'],
+        ...['event_min_room_level', 'event_min_lead_minutes', 'event_max_minutes', 'event_max_capacity', 'event_grace_minutes', 'event_strike_limit', 'event_block_days'],
       ],
     );
     const by = Object.fromEntries(j.settings.map((x) => [x.key, x]));

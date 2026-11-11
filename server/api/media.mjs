@@ -1,7 +1,7 @@
 // Photo and video uploads go straight from the phone to S3-compatible storage (Cloudflare R2, Backblaze B2,
 // AWS S3…); the API only hands out a short-lived signed address, so big files never pass through it.
 //
-//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
+//   POST /api/media/upload-url { kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover', contentType, size } → { uploadUrl, headers, publicUrl, expiresIn }
 //
 // The app PUTs the file to uploadUrl with exactly `headers` (type and size are signed, so a different file
 // is refused by the storage), then saves publicUrl (e.g. PATCH /api/me { avatarUrl }).
@@ -50,6 +50,8 @@ const KINDS = {
   // room's card picture (800 × 800).
   roombg: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 4 * 1024 * 1024, may: hasOpenRoom, refused: 'Özel süsleme açık bir odası olan oda sahipleri için' },
   roomcover: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 2 * 1024 * 1024, may: mayChangeCover, refused: 'Oda kapağını oda sahibi veya Süper Yönetici değiştirebilir' },
+  // An event's cover (events.mjs), cut to 1280 × 720 on the phone: for owners of an open room, who apply for events.
+  eventcover: { types: ['image/jpeg', 'image/png', 'image/webp'], max: 2 * 1024 * 1024, may: hasOpenRoom, refused: 'Etkinlik kapağını açık bir odası olan oda sahibi yükler' },
 };
 const EXPIRES = 10 * 60;
 
@@ -128,7 +130,7 @@ const signed = (method, key, query = {}) =>
     expires: 60,
     query,
   });
-const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
+const FILE_KEY = /^(avatar|moment|dm|album|notice|music|ticket|roombg|roomcover|eventcover)\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,80}$/;
 
 /** The storage key of one of our files from its public address (kind/<uploader>/<name>), else null. With
  *  `owner`, only a file that person uploaded. */
@@ -301,7 +303,7 @@ export function removeFiles(urls, owner) {
 export function removeUserFiles(uid) {
   if (!storageOn() || !/^[0-9a-f-]{36}$/.test(String(uid))) return;
   later('storage erase failed', async () => {
-    for (const kind of ['avatar', 'moment', 'dm', 'album', 'music', 'ticket', 'roombg', 'roomcover']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
+    for (const kind of ['avatar', 'moment', 'dm', 'album', 'music', 'ticket', 'roombg', 'roomcover', 'eventcover']) await deleteKeys(await listKeys(`${kind}/${uid}/`));
   });
 }
 

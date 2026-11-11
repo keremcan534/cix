@@ -44,6 +44,7 @@ import { withRoomBadges } from './room-social.mjs';
 import { roomFollowOf, roomOpened } from './room-follow.mjs';
 // pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { endCrossPkOfRoom } from './pk-cross.mjs';
+import { closeRoomEvents, roomEventBrief } from './events.mjs';
 // room-decor.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { shownBackground } from './room-decor.mjs';
 
@@ -391,7 +392,8 @@ export const roomRoutes = {
     if (typeof id === 'string' && UUID.test(id)) await refreshBoss(id);
     const [room] = await withVoiceCounts([await roomRow(id)]);
     // Following the room (room-follow.mjs): how many follow it, and whether I do.
-    return { room: { ...out(room), ...(await roomFollowOf(room.owner, me.id)) } };
+    // The running event, else the next one within a day (events.mjs): the room's banner and theme.
+    return { room: { ...out(room), ...(await roomFollowOf(room.owner, me.id)), event: await roomEventBrief(room.id) } };
   },
 
   async 'POST /api/rooms/close'(req) {
@@ -401,6 +403,8 @@ export const roomRoutes = {
     await db.query('UPDATE rooms SET closed_at = now() WHERE id = $1 AND closed_at IS NULL', [room.id]);
     // An Odalar arası PK with this room ends, and the other room hears it (pk-cross.mjs).
     await endCrossPkOfRoom(room.id);
+    // Its running event ends and the ones still to come are cancelled (events.mjs).
+    await closeRoomEvents(room.id, me.id);
     // Everyone still in the call leaves now, not when their token runs out.
     await deleteVoiceRoom(liveKitName(room.id));
     return { closed: true };
