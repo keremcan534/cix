@@ -9,7 +9,10 @@ Kaynak: *Similarclup – Oyun Merkezi, Casino Tarzı Oyunlar ve Oda İçi Aktivi
 | `src/data/games.ts` | İki bağımsız katalog: **Oda oyunları** (ücretsiz, VIP yok) ve **Oyun Salonu** (oyun başına minimum Cömertlik Seviyesi, varsayılan Cömertlik Lv.2). |
 | `src/lib/games.ts` | Ortak oyun platformu. Tek cüzdan (uygulamanın jeton bakiyesi), tek geçmiş. Oyun Salonu turları sunucu mantığıyla işlenir. |
 | `src/components/games/game-panel.tsx` | Oyun yüzeyi. Odada koltukların altında açılan bir panel, profilde tam ekran. |
-| `src/components/games/room-games.tsx` | Ludo (hızlı sürüm), Renk Kartları, XOX. |
+| `src/components/games/room-games.tsx` | Renk Kartları, XOX (deneme sürümleri). |
+| `src/components/games/room/ludo.tsx`, `ludo-board.tsx` | **Ludo**: gerçek tahta (15 × 15 haç, dört yuva, yıldızlı güvenli kareler, ev üçgenleri), zar ve taş animasyonları. Deneme oyunu ve canlı masa aynı sahneyi kullanır. |
+| `src/lib/room-games/ludo.ts`, `ludo-board.ts` | Ludo kurallarının uygulamadaki kopyası (sunucudaki `server/api/room-games/ludo.mjs` ile aynı; `tests/ludo.test.ts` ikisini adım adım karşılaştırır) ve tahta geometrisi. |
+| `src/components/games/room-tables.tsx` | Canlı odada sunucudaki masa (`server/api/room-games.mjs`): masa açma, oturma, başlatma, kalkma her oyunda ortak; kendi ekranı olan oyun (Ludo) masasını ve bu düğmeleri alır. |
 | `src/components/games/casino.tsx` | Şans Çarkı, Zar, Gece Yarısı Çarkı, Ejder ile Kaplan. |
 | `src/components/games/wheel.tsx` | **Rüzgâr Gülü**: 3 alanlı, JACKPOT fonlu çark. Sonuç sunucuda belirlenir, kazanç oyun jetonudur. Ayrıntılar: `docs/RUZGAR_GULU.md`. |
 | `src/components/games/fortune.tsx` | Altın Kasa (5×3 slot): makaralar, kazanan çizgiler, bedava dönüş, büyük kazanç ekranı, otomatik çevirme. |

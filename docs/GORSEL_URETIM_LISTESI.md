@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`, Temel ücretsiz). Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 549 görsel.** Öncelik: P1 143 (çok görünen, para kazandıran) · P2 187 · P3 158 · P4 61 (küçük arayüz simgeleri).
+**Toplam 556 görsel.** Öncelik: P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri).
 
 | Bölüm | Adet |
 |---|---|
@@ -31,6 +31,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 12. Arayüz durum ve işlem simgeleri | 57 |
 | 13. Güncelleme 2: Odalar bannerları ve Mesajlar | 7 |
 | 14. Güncelleme 3: Ücretli oda süslemeleri | 6 |
+| 15. Oda oyunları: Ludo | 7 |
 
 ## ChatGPT ile üretim
 
@@ -709,3 +710,27 @@ Oda Ayarları › **Oda Süslemesi › Ücretli** rafındaki arka planlar. Kod, 
 | 6 | `oda-susleme-altin-salon.png` | Altın Salon | "Yakında" kutusu | Yüksek tavanlı, altın ışıklı görkemli salon: avize ışıltısı, mermer zemin yansıması, lacivert gölgeler | P1 | Yeni (güncelleme 3) · 2.000 jeton / 30 gün · kimlik `rb-salon` |
 
 Teslimden sonra (her görsel için): dosya `app/assets/room/` içine konur → `app/src/components/room/stage-backdrop.tsx` içindeki `ROOM_BG_ART`'a kimliğiyle eklenir → `server/api/catalog.mjs` `ROOM_BG_ROWS`'ta o satırın sonundaki `false` `true` yapılır (satışa açılır). Uygulama sürümü yayımlanmadan sunucuda satışa açılmamalı: görseli olmayan eski sürüm o süslemeyi çizemez (ücretsiz süslemeyi gösterir). Yeni bir süsleme eklemek aynı üç adım artı iki katalog satırıdır.
+
+
+## 15. Oda oyunları: Ludo (7)
+
+Ludo artık gerçek bir tahtada oynanıyor (`app/src/components/games/room/ludo-board.tsx`, `ludo.tsx`): 15 × 15 haç tahta, dört renkli yuva, yıldızlı güvenli kareler, ortada ev üçgenleri. **Şu an hiçbir görsel dosyası kullanmıyor**: tahta, taşlar ve kupa kodla (düz renk, degrade, Ionicons) çiziliyor; yalnız zar mevcut `zar-zar-yuzu-1..6.png` görsellerini kullanıyor (yeni zar gerekmiyor). Aşağıdakiler gelirse oyun çizilmiş bir masa oyunu gibi görünür; gelmezse bugünkü hali kalır, hiçbir şey bozulmaz.
+
+Ölçü ve stil (hepsi için aynı):
+
+- Mevcut 3D cam stil (`zar-zar-yuzu-*.png`, `oyun-ludo.png` ile aynı aile), **şeffaf zemin**, PNG.
+- Renkler uygulamanın paleti: turkuaz `#13D9DF`, mercan `#FF6576`, altın `#F6BD60`, yeşil `#22C55E`; zemin gece laciverti. Mor yok.
+- Taşlar tahtada **yaklaşık 20 px** çizilir (yuvada 26 px): ayrıntı az, siluet net, üstten bakış. Dört taş aynı kalıptan, yalnız rengi farklı olmalı.
+- Yazı, logo, marka yok. Başka Ludo oyunlarının taşı ya da tahtası kopyalanmamalı (`docs/SANAT_LISTESI_OZGUNLUK.md`).
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `ludo-tas-turkuaz.png` | Ludo taşı · Turkuaz | kodla çizilen parlak pul | Üstten görünen yuvarlak, parlak oyun taşı (piyon başı gibi kubbeli), turkuaz; beyaz ince kenar, üstte ışık yansıması; 192 px | P2 | Yeni (oyun yenileme) · şu an degrade daire; gelince `ludo-board.tsx` içindeki `Token` gövdesi görsele döner |
+| 2 | `ludo-tas-mercan.png` | Ludo taşı · Mercan | kodla çizilen parlak pul | 1 ile aynı kalıp, mercan | P2 | Yeni (oyun yenileme) · 1 ile aynı |
+| 3 | `ludo-tas-altin.png` | Ludo taşı · Altın | kodla çizilen parlak pul | 1 ile aynı kalıp, altın | P2 | Yeni (oyun yenileme) · 1 ile aynı |
+| 4 | `ludo-tas-yesil.png` | Ludo taşı · Yeşil | kodla çizilen parlak pul | 1 ile aynı kalıp, yeşil | P2 | Yeni (oyun yenileme) · 1 ile aynı |
+| 5 | `ludo-tahta-zemin.png` | Ludo tahta zemini | düz lacivert `#0A1426` | Kare, **1080 × 1080 px, şeffaf değil**: gece laciverti oyun masası dokusu (hafif keçe ya da cilalı ahşap), köşelere doğru çok hafif koyulaşan; üstüne kareler ve yuvalar kodla çizilecek, bu yüzden desen sade ve düşük kontrastlı | P2 | Yeni (oyun yenileme) · gelince `ludo-board.tsx` `felt` zeminine konur |
+| 6 | `ludo-yildiz.png` | Güvenli kare yıldızı | Ionicons `star` | Küçük, dolgun beş köşeli yıldız, açık gümüş-beyaz, hafif kabartma; 96 px, 14 px çizilecek | P3 | Yeni (oyun yenileme) · dört yıldızlı güvenli karede |
+| 7 | `ludo-kupa.png` | Ludo kupası | Ionicons `trophy` | Altın kupa, iki kulplu, kaidesinde küçük yıldız; 192 px | P3 | Yeni (oyun yenileme) · kazanan bandında ve tahtanın ortasında (küçük) |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir (zar yüzleri gibi) → `ludo-board.tsx` ve `ludo.tsx` içinde ilgili çizim `<Art name=…>` ile değiştirilir. Taşların dördü birden gelmeden bağlanmamalı: yarısı görsel, yarısı kodla çizilmiş taş aynı tahtada yan yana durur.
