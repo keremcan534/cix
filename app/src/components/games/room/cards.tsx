@@ -53,6 +53,9 @@ const FELT_H = 172;
 const LIFT = 14;
 const FLY_MS = 340;
 
+/** True when `b` is the state `a` already showed, read again. */
+const sameStep = (a: CardsView, b: CardsView) => a.deal === b.deal && a.n === b.n && a.status === b.status && a.me === b.me;
+
 /** My cards in the order they are held: by colour, numbers first, the Jokers last. */
 const sorted = (ids: number[]) =>
   [...ids].sort((a, b) => {
@@ -239,9 +242,11 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
   const { reduceMotion: still } = useSettings();
   const [width, setWidth] = useState(0);
   // The state shown before this one: what changed between the two is what the screen plays.
+  // The same step read again (the room's packet after my own move, a turn's end) keeps what it is compared with, so
+  // whatever is being played isn't cut short.
   const [pair, setPair] = useState<{ cur: CardsView; before: CardsView | null }>({ cur: view, before: null });
-  if (pair.cur !== view) setPair({ cur: view, before: pair.cur });
-  const before = pair.cur === view ? pair.before : pair.cur;
+  const before = pair.cur === view || sameStep(pair.cur, view) ? pair.before : pair.cur;
+  if (pair.cur !== view) setPair({ cur: view, before });
   const [picking, setPicking] = useState<number | null>(null);
   useEffect(() => warmSfx(['card', 'turn', 'tick', 'fanfare', 'lose', 'capture']), []);
 
