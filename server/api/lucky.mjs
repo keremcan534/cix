@@ -204,7 +204,7 @@ export const luckyRoutes = {
         bigWin: best >= announceFrom ? best * Number(row.unit_price) : 0,
       });
       if (levelUp) announceRoom(lkRoom);
-      // Dümen koltuğu: Uğurlu gifts count like any gift in the room.
+      // Patron koltuğu: Uğurlu gifts count like any gift in the room.
       await refreshBoss(lkRoom.slice(4));
     }
     return answer(row, false);

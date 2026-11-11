@@ -1,4 +1,4 @@
-import type { RoomTheme, RoomType } from '@/data/catalog';
+import type { RoomBackground, RoomTheme, RoomType } from '@/data/catalog';
 import { IS_DEMO } from '@/lib/build';
 
 export type User = {
@@ -69,7 +69,13 @@ export type Room = {
   bossSeat?: boolean;
   /** A server room: the owner turned gift effects off for everyone in it (undefined/true: on). */
   giftEffects?: boolean;
-  /** A server room: its rules (Oda ayarları, Moderasyon) and its Dümen koltuğu holder (server id). */
+  /** A server room's Oda süslemesi: what every phone draws behind the stage (absent: the theme's stage), and
+   *  the free background under it (a paid one this app has no picture for falls back to it). */
+  background?: RoomBackground;
+  bgId?: string | null;
+  /** A server room's uploaded card picture (Oda Kapağı); null: `cover` is what the lists fall back to. */
+  coverUrl?: string | null;
+  /** A server room: its rules (Oda ayarları, Moderasyon) and its Patron koltuğu holder (server id). */
   rules?: RoomRulesLike;
   bossId?: string | null;
   /** The rules' forbidden words, one per line (plain text, so the room screen can hand it to the voice handlers). */

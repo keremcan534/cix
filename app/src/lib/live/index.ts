@@ -19,6 +19,7 @@ import { putLevels } from '@/lib/live/levels';
 import { putDistance } from '@/lib/live/distances';
 import { liveRules, noteLiveRate, rateChangedMessage, refreshLiveCatalog } from '@/lib/live/catalog-live';
 import { forgetRoomPasswords } from '@/lib/live/room-password';
+import { forgetRoomFollows, putRoomFollow } from '@/lib/room-follow';
 import { replyOrder, unsureRefs } from '@/lib/live/requests';
 
 export const liveMode = api.apiEnabled;
@@ -196,6 +197,7 @@ export function forgetLiveAccount() {
   }
   locked.clear();
   forgetRoomPasswords();
+  forgetRoomFollows();
   roomsState = 'loading';
   setRooms([]);
 }
@@ -309,7 +311,8 @@ export function roomOf(r: api.ServerRoom): Room {
     id: r.id,
     title: r.title,
     category: 'Sohbet',
-    cover: roomCoverUrl(r.coverId),
+    // Oda kapağı: the uploaded card picture, else what the lists showed before it existed.
+    cover: r.coverUrl || roomCoverUrl(r.coverId),
     hostId: toLocal(r.owner.id),
     listeners: r.listeners,
     seatUserIds: Array(9).fill(null),
@@ -324,6 +327,7 @@ export function roomOf(r: api.ServerRoom): Room {
     micQueue: !!r.micQueue,
     theme: ROOM_THEMES.find((t) => t.id === r.theme)?.id ?? 'chat',
     giftEffects: r.giftEffects !== false,
+    ...(r.background && { background: r.background, bgId: r.bgId ?? null, coverUrl: r.coverUrl ?? null }),
     ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
     bossId: r.boss ? r.boss.id : null,
   };
@@ -337,6 +341,8 @@ export function roomOf(r: api.ServerRoom): Room {
     roomChips.set(r.id, chips);
   }
   if (r.boss) rememberUser(r.boss);
+  // The read of one room says whether I follow it and how many do (the heart in its header, lib/room-follow).
+  if (r.following !== undefined) putRoomFollow(r.id, { following: r.following, followers: r.followers ?? 0 });
   putServerRoom(room);
   return room;
 }
@@ -369,14 +375,14 @@ const subscribeRooms = (l: () => void) => {
   roomListeners.add(l);
   return () => roomListeners.delete(l);
 };
-/** The open server rooms, re-read every 15 seconds while the screen is in front (once more when it comes back). */
+/** The open server rooms, re-read every 6 seconds while the screen is in front (once more when it comes back). */
 export function useServerRooms(): Room[] {
   const list = useSyncExternalStore(subscribeRooms, () => rooms, () => rooms);
   const focused = useIsFocused();
   useEffect(() => {
     if (!liveMode() || !focused) return;
     reloadServerRooms();
-    const t = setInterval(reloadServerRooms, 15_000);
+    const t = setInterval(reloadServerRooms, 6_000);
     return () => clearInterval(t);
   }, [focused]);
   return list;
@@ -411,6 +417,13 @@ export const isMyServerRoom = (id: string) => liveMode() && isServerId(id) && ro
  *  the open room show it right away, and the server tells the phones in the room. */
 export async function updateServerRoom(id: string, patch: api.RoomPatch) {
   const r = roomOf(await api.updateRoom(id, patch));
+  setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
+  return r;
+}
+/** A room as the server just answered it (Oda süslemesi, Oda kapağı: lib/live/room-decor): the lists and the open
+ *  room show it right away. */
+export function putRoomAnswer(answer: api.ServerRoom) {
+  const r = roomOf(answer);
   setRooms(rooms.map((x) => (x.id === r.id ? r : x)));
   return r;
 }

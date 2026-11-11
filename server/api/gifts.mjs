@@ -168,7 +168,7 @@ export const giftRoutes = {
     if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
     // A new room level: the room's phones read the room again (more mics from Lv.8 on).
     if (!out.replay && levelUp && lkRoom) announceRoom(lkRoom);
-    // Dümen koltuğu: a new top gifter of the room takes it.
+    // Patron koltuğu: a new top gifter of the room takes it.
     if (!out.replay && lkRoom) await refreshBoss(lkRoom.slice(4));
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     if (!out.replay) return { ...out, total };

@@ -34,7 +34,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 - **Geri tuşu:** Oda menüsünde iki adım geri doğru çalışıyor. Menüden başka ekrana gidip dönünce menü yeniden açılıyor.
 - **Oda ayarları artık sunucuda, odadaki herkes için aynı:**
   - yavaş mod, yasaklı kelimeler, bot (girişte hoş geldin ve kurallar)
-  - oda tipi, mikrofon izni (Lv.4), Dümen koltuğu (Lv.3)
+  - oda tipi, mikrofon izni (Lv.4), Patron koltuğu (Lv.3)
   - oda üyeleri (katıl, başvur, onayla, çıkar), kara liste
   - özel oda, kişi sınırı, odayı profilde göster, ekran görüntüsü engeli
 - **Etkinlikler ve soru-cevap:** Sunucuda, odadaki herkes görüyor.
@@ -106,7 +106,7 @@ Son güncelleme: preview-96 sonrası (Küçült, çanta yağmuru, @bahset düzel
 | 12 | Anlar'da paylaşım ve hediye | Seviyeyle açılır | Paylaşım Yankı Lv.5'te açılır. Fotoğraf yükleme açık (R2 kuruldu). Hediye çalışıyor |
 | 13 | Oda menüsünde geri tuşu | Telefonda denenmeli | İki adım geri ve menüye dönüş Paket 2'de geldi |
 | 14 | Oda kartında tüm ayrıntılar | Çalışıyor | Kapak, oda üyeleri ve oda sahibinin ailesi var |
-| 15 | Oda ayarlarında her şey | Çalışıyor | Hepsi sunucuda. Mikrofon izni Lv.4, Dümen koltuğu Lv.3 odada açılır |
+| 15 | Oda ayarlarında her şey | Çalışıyor | Hepsi sunucuda. Mikrofon izni Lv.4, Patron koltuğu Lv.3 odada açılır |
 | 16 | "Odayı şikâyet et" gizlensin | Çalışıyor | |
 | 17 | Efekt ayarları | Çalışıyor | Başkalarının giriş efekti, çerçevesi ve sohbet balonu da görünüyor |
 | 18 | Emoji: ücretsiz/ücretli | Çalışıyor | Konuşurken çıkan mikrofon efekti de herkese görünüyor |

@@ -202,7 +202,12 @@ export async function uploadAvatar(img: PickedImage): Promise<Partial<User>> {
  *  its type and size, then its bytes PUT there); resolves with its public address. Throws when a step fails, e.g. 503 while
  *  storage isn't set up. */
 export async function uploadPhoto(kind: PhotoKind, picked: PickedImage): Promise<string> {
-  const img = await shrinkPhoto(kind, picked);
+  return putPhoto(kind, await shrinkPhoto(kind, picked));
+}
+
+/** A photo already the size it is kept at (uploadPhoto's own, or a room picture cut to its shape: lib/room-picture)
+ *  put in the app's storage for `kind`; resolves with its public address. */
+export async function putPhoto(kind: PhotoKind | 'roombg' | 'roomcover', img: PickedImage): Promise<string> {
   let file: { data: ArrayBuffer; type: string };
   try {
     file = await api.readFile(img.uri);

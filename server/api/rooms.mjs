@@ -40,8 +40,12 @@ import { statusOf } from './economy.mjs';
 import { clearRoomMusic, roomMusic } from './music.mjs';
 // room-social.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { withRoomBadges } from './room-social.mjs';
+// room-follow.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { roomFollowOf, roomOpened } from './room-follow.mjs';
 // pk-cross.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { endCrossPkOfRoom } from './pk-cross.mjs';
+// room-decor.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { shownBackground } from './room-decor.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -86,15 +90,24 @@ const out = (r) => ({
   coverId: r.cover_id ?? null,
   theme: r.theme ?? 'chat',
   giftEffects: r.gift_effects !== false,
-  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Dümen koltuğu holder, if any.
+  // Oda süslemesi and Oda kapağı (room-decor.mjs): the free background chosen (null: the theme's stage), what
+  // every phone draws behind the stage now (a paid or the owner's own picture while its term runs, else the free
+  // one), and the uploaded card picture (null: the lists show what they did before, coverId's picture or none).
+  bgId: r.bg_id ?? null,
+  background: shownBackground(r),
+  coverUrl: r.cover_url ?? null,
+  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Patron koltuğu holder, if any.
   rules: rulesOf(r.rules),
   boss: r.boss_id && rulesOf(r.rules).bossSeat ? { id: r.boss_id, name: r.boss_name ?? 'Üye', avatarUrl: r.boss_avatar ?? null } : null,
 });
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
 const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
                        b.name AS boss_name, b.avatar_url AS boss_avatar,
-                       (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners
-                  FROM rooms r JOIN users u ON u.id = r.owner LEFT JOIN users b ON b.id = r.boss_id`;
+                       (SELECT count(*) FROM room_presence p WHERE p.room = 'oda-' || r.id::text) AS listeners,
+                       d.pick AS bg_pick, d.custom_url AS bg_custom_url, d.custom_until AS bg_custom_until, d.custom_until > now() AS bg_custom_live,
+                       (SELECT max(e.ends_at) FROM entitlements e WHERE e.user_id = r.owner AND e.kind = 'roombg' AND e.sku = d.pick
+                           AND e.revoked_at IS NULL AND e.starts_at <= now() AND e.ends_at > now()) AS bg_paid_until
+                  FROM rooms r JOIN users u ON u.id = r.owner LEFT JOIN users b ON b.id = r.boss_id LEFT JOIN room_decor d ON d.owner = r.owner`;
 
 /** Puts LiveKit's people count on the rows of rooms it has open now (rooms it doesn't have keep room_presence's). */
 async function withVoiceCounts(rows) {
@@ -240,10 +253,12 @@ export async function voiceAccess(name, u, password) {
     if (here >= cap) throw new HttpError(403, `Oda dolu (en fazla ${cap.toLocaleString('tr-TR')} kişi)`);
   }
   if (member) await db.query('UPDATE room_members SET seen_at = now() WHERE room_id = $1 AND user_id = $2', [room.id, u.id]);
+  // The owner comes into their room: its followers hear that it opened (room-follow.mjs, at most every 6 hours).
+  if (room.owner === u.id && !already) void roomOpened(room.id, room.owner);
 }
 
 /**
- * Dümen koltuğu: the room's top gifter of the last 24 hours (once past BOSS_SEAT_MIN_COINS) sits on it while the
+ * Patron koltuğu: the room's top gifter of the last 24 hours (once past BOSS_SEAT_MIN_COINS) sits on it while the
  * owner keeps it on and the room is Lv.3 or more; anyone banned from the room is left out. When the holder changes,
  * the room's phones are told to read the room again. Never throws.
  */
@@ -281,7 +296,7 @@ async function purgeMembers(room) {
   );
 }
 /** Whether `rank` may answer and remove the room's members (rules.manageMembers). */
-const mayManageMembers = (rules, rank) => rank === OWNER || (rules.manageMembers === 'admins' && rank >= 1);
+export const mayManageMembers = (rules, rank) => rank === OWNER || (rules.manageMembers === 'admins' && rank >= 1);
 /** Everyone in the room's voice gets their mic right again (the mic permission or their membership changed). */
 async function refreshRoomVoices(roomId, only = null) {
   const name = liveKitName(roomId);
@@ -370,12 +385,13 @@ export const roomRoutes = {
   },
 
   async 'GET /api/room'(req, url) {
-    await auth(req);
-    // The Dümen koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
+    const me = await auth(req);
+    // The Patron koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
     const id = url.searchParams.get('id');
     if (typeof id === 'string' && UUID.test(id)) await refreshBoss(id);
     const [room] = await withVoiceCounts([await roomRow(id)]);
-    return { room: out(room) };
+    // Following the room (room-follow.mjs): how many follow it, and whether I do.
+    return { room: { ...out(room), ...(await roomFollowOf(room.owner, me.id)) } };
   },
 
   async 'POST /api/rooms/close'(req) {

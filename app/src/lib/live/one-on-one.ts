@@ -11,7 +11,7 @@ import { AppState } from 'react-native';
 
 import * as api from '@/lib/api';
 import { liveCalls, once, refreshWallet, rememberUser, toLocal } from '@/lib/live';
-import { onLine } from '@/lib/live/live-line';
+import { lineOpen, onLine } from '@/lib/live/live-line';
 
 export type CallMode = 'voice' | 'video';
 export type CallStatus = 'ringing' | 'live' | 'ended' | 'missed' | 'declined' | 'cancelled';
@@ -99,7 +99,8 @@ const IDLE_MS = 6_000;
 function schedule() {
   clearTimeout(timer);
   if (!watching) return;
-  timer = setTimeout(tick, isOpen(current) ? BEAT_MS : IDLE_MS);
+  // Without the live line a ringing call is only found by this read: then it runs as often as an open call's.
+  timer = setTimeout(tick, isOpen(current) || !lineOpen() ? BEAT_MS : IDLE_MS);
 }
 /** A tick asked for while one was running: run again right after it (the live line's news can't wait 6 s). */
 let again = false;

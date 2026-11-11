@@ -185,7 +185,7 @@ export function Seat({
               <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
             </View>
           )}
-          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} size={size} still={still} />}
+          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
           // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
@@ -247,40 +247,65 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
   );
 }
 
-export type SeatReactionData = { emoji: string; key: number };
+/**
+ * `pre`: pictures that flash by before `emoji` settles (Taş Kağıt Makas shuffling its hands). `badge`: a short
+ * result under the picture (the dice's number, the hand's name), shown `badgeAt` ms in. `ms`: how long it all stays.
+ */
+export type SeatReactionData = { emoji: string; key: number; pre?: string[]; badge?: string; badgeAt?: number; ms?: number };
 export const REACTION_MS = 2600;
+/** A Hamle with a result (lib/room-moves) stays long enough to be read. */
+export const RESULT_MS = 4400;
+const SHUFFLE_STEP_MS = 170;
 
 /**
  * An emoji over a seated person's avatar (seat reaction): it pops in, beats a few times, then fades. A sticker covers
  * the photo and stays on it; an animated one (Duygular) plays over and over instead of beating. A plain emoji is
  * smaller and rises as it goes.
  */
-function SeatReaction({ emoji, size, still }: { emoji: string; size: number; still?: boolean }) {
+export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms = REACTION_MS }: { emoji: string; size: number; still?: boolean } & Pick<SeatReactionData, 'pre' | 'badge' | 'badgeAt' | 'ms'>) {
+  // The shuffle before the result: one picture after another, then `emoji` (reduced motion shows the result at once).
+  const shuffle = still ? 0 : (pre?.length ?? 0);
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (step >= shuffle) return;
+    const t = setTimeout(() => setStep((n) => n + 1), SHUFFLE_STEP_MS);
+    return () => clearTimeout(t);
+  }, [step, shuffle]);
+  const shown = step < shuffle ? pre![step] : emoji;
+  const [badgeOn, setBadgeOn] = useState(false);
+  useEffect(() => {
+    if (!badge) return;
+    const t = setTimeout(() => setBadgeOn(true), still ? 0 : Math.max(badgeAt, shuffle * SHUFFLE_STEP_MS));
+    return () => clearTimeout(t);
+  }, [badge, badgeAt, shuffle, still]);
   const id = stickerIdOf(emoji);
   const cover = !!id;
   const moving = !!id && isAnimatedSticker(id);
   const [v] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {
     if (still) {
-      Animated.sequence([Animated.delay(REACTION_MS - 400), Animated.timing(v, { toValue: 2, duration: 300, useNativeDriver: true })]).start();
+      Animated.sequence([Animated.delay(ms - 400), Animated.timing(v, { toValue: 2, duration: 300, useNativeDriver: true })]).start();
       return;
     }
     Animated.sequence([
       Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
       // An animation moves by itself: it just stays; a picture or a plain emoji beats three times.
       moving
-        ? Animated.delay(REACTION_MS - 900)
-        : Animated.loop(
-            Animated.sequence([
-              Animated.timing(v, { toValue: 1.15, duration: 220, useNativeDriver: true }),
-              Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: true }),
-            ]),
-            { iterations: 3 },
-          ),
+        ? Animated.delay(ms - 900)
+        : Animated.sequence([
+            Animated.loop(
+              Animated.sequence([
+                Animated.timing(v, { toValue: 1.15, duration: 220, useNativeDriver: true }),
+                Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: true }),
+              ]),
+              { iterations: 3 },
+            ),
+            Animated.delay(Math.max(0, ms - REACTION_MS)),
+          ]),
       Animated.delay(250),
       Animated.timing(v, { toValue: 2, duration: 320, useNativeDriver: true }),
     ]).start();
-  }, [v, still, moving]);
+  }, [v, still, moving, ms]);
   return (
     <Animated.View
       pointerEvents="none"
@@ -299,7 +324,14 @@ function SeatReaction({ emoji, size, still }: { emoji: string; size: number; sti
         ],
       }}
     >
-      <ReactionArt emoji={emoji} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
+      <ReactionArt emoji={shown} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
+      {badge && badgeOn && (
+        <View style={[styles.resultBadge, { bottom: -size * 0.06 }]} accessibilityLabel={`Sonuç: ${badge}`}>
+          <Text style={[styles.resultText, { fontSize: Math.round(Math.max(11, Math.min(18, size * 0.26))) }]} numberOfLines={1}>
+            {badge}
+          </Text>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -594,6 +626,9 @@ const styles = StyleSheet.create({
   },
   teamRing: { position: 'absolute', borderWidth: 3 },
   camBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.live, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, borderWidth: 1.5, borderColor: colors.bg },
+  // A Hamle's result under its picture: the dice's number, the hand's name.
+  resultBadge: { position: 'absolute', alignSelf: 'center', minWidth: 26, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.gold, borderWidth: 2, borderColor: '#1B1405', alignItems: 'center' },
+  resultText: { color: '#1B1405', fontFamily: fonts.displayBold },
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },

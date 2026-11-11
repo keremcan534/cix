@@ -79,10 +79,13 @@ import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
 import { roomSocialRoutes } from './room-social.mjs';
+import { roomFollowRoutes } from './room-follow.mjs';
+import { roomMemberRoutes } from './room-members.mjs';
 import { roomOwnerRoutes } from './room-owner.mjs';
+import { roomDecorRoutes, startDecorSweep, stopDecorSweep } from './room-decor.mjs';
 import { TEST_DAILY, charmPoints, creditCoins, giftCoins, playCoinsToday, spendDiamonds, walletRoutes as walletInfoRoutes } from './wallet.mjs';
 import { whatsappRoutes } from './whatsapp.mjs';
-import { closeLines, openLine } from './live-line.mjs';
+import { closeLines, lineRoutes, openLine } from './live-line.mjs';
 import { withdrawRoutes } from './withdraw.mjs';
 import { refundSyncRoutes, startRefundSync, stopRefundSync } from './refunds.mjs';
 import { referralRoutes } from './referrals.mjs';
@@ -232,6 +235,7 @@ const walletRoutes = {
 const LIVE_LINE = '/api/live';
 const routes = {
   [`GET ${LIVE_LINE}`]: () => null,
+  ...lineRoutes,
   ...walletRoutes,
   ...walletInfoRoutes,
   ...economyRoutes,
@@ -273,7 +277,10 @@ const routes = {
   ...roomFxRoutes,
   ...roomEventRoutes,
   ...roomSocialRoutes,
+  ...roomFollowRoutes,
+  ...roomMemberRoutes,
   ...roomOwnerRoutes,
+  ...roomDecorRoutes,
   ...roomRoutes,
   ...adminRoutes,
   ...financeSyncRoutes,
@@ -390,6 +397,7 @@ function shutdown(signal) {
   stopOtpSweep();
   stopCallSweep();
   stopBagSweep();
+  stopDecorSweep();
   server.close();
   const started = Date.now();
   const wait = setInterval(async () => {
@@ -413,3 +421,4 @@ startLiveSync();
 startOtpSweep();
 startCallSweep();
 startBagSweep();
+startDecorSweep();

@@ -19,6 +19,7 @@ import { makeStyles, useTheme, type Appearance } from '@/theme';
 import { IS_DEMO } from '@/lib/build';
 import { openLegal } from '@/lib/legal';
 import { liveMode, message, myServerId } from '@/lib/live';
+import { testLine, useLineState } from '@/lib/live/live-line';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useStaffRole } from '@/lib/live/admin';
 import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
@@ -463,6 +464,7 @@ export default function SettingsScreen() {
           ) : (
             <ListRow icon="information-circle-outline" tone="neutral" title="Uygulama sürümü" value={versionLabel(APP_VERSION)} />
           )}
+          {liveMode() && <LineTestRow />}
         </ListGroup>
 
         <ListGroup
@@ -562,3 +564,33 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   // White on the turquoise fill in both schemes.
   chipTextOn: { color: '#fff' },
 }));
+
+/**
+ * Bağlantı testi: whether the live line (lib/live/live-line) is open on this phone and how fast a ping comes back
+ * on it, so a slow "someone wrote / called / followed" can be told apart from a phone that never gets the line.
+ */
+function LineTestRow() {
+  const line = useLineState();
+  const [busy, setBusy] = useState(false);
+  const state =
+    line.status === 'open' ? 'Anlık bağlantı açık' : line.status === 'connecting' ? 'Bağlanıyor…' : 'Anlık bağlantı kapalı · yedek yoklama 3 sn';
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await testLine();
+      const how = r.state.way === 'xhr' ? 'yol 2' : 'yol 1';
+      showAlert(
+        'Bağlantı testi',
+        r.ms !== null
+          ? `Anlık bağlantı çalışıyor: ${(r.ms / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} sn (${how}).`
+          : `Anlık bağlantı cevap vermedi (${how}, sunucuda açık hat: ${r.serverLines}${r.state.error ? `, ${r.state.error}` : ''}). Güncellemeler 3 sn'de bir yoklanıyor.`,
+      );
+    } catch (e) {
+      showAlert('Bağlantı testi', message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <ListRow icon="pulse-outline" tone="neutral" title="Bağlantı testi" subtitle={busy ? 'Ölçülüyor…' : state} onPress={() => void run()} />;
+}

@@ -24,6 +24,7 @@ import { removeFiles, removeUserFiles, verifyUpload } from './media.mjs';
 import { listsHidden, shownToViewer } from './privacy.mjs';
 import { cardsMore, privateMore, profileMore } from './profiles.mjs';
 import { cityDistance } from './city-coords.mjs';
+import { eraseDecor } from './room-decor.mjs';
 
 /** The interests the app offers (app/src/data/mock.ts INTERESTS). */
 export const INTERESTS = ['🎤 Karaoke', '🎮 Oyun', '💬 Sohbet', '⚽ Spor', '✈️ Seyahat', '🎬 Film', '💃 Dans', '📚 Kitap', '🎧 Müzik', '☕ Kahve'];
@@ -146,12 +147,18 @@ export async function eraseAccount(c, id, phone) {
     await c.query('UPDATE room_polls SET closed_by = NULL WHERE closed_by = $1', [id]);
     await c.query('DELETE FROM room_polls WHERE creator = $1', [id]);
     await c.query('DELETE FROM room_follower_invites WHERE owner_id = $1 OR sent_by = $1', [id]);
+    // Following rooms (room-follow.mjs): the rooms they follow, who follows theirs, and their "room opened" notices.
+    await c.query('DELETE FROM room_follows WHERE owner_id = $1 OR user_id = $1', [id]);
+    await c.query('DELETE FROM room_open_notices WHERE owner_id = $1', [id]);
     // Odalar arası PK (pk-cross.mjs): the match stays the rooms' record without who invited, answered or ended it;
     // an open one of their room ends when the room closes just below.
     await c.query('UPDATE room_cross_pks SET invited_by = NULL WHERE invited_by = $1', [id]);
     await c.query('UPDATE room_cross_pks SET answered_by = NULL WHERE answered_by = $1', [id]);
     await c.query('UPDATE room_cross_pks SET ended_by = NULL WHERE ended_by = $1', [id]);
     await c.query('UPDATE rooms SET closed_at = now() WHERE owner = $1 AND closed_at IS NULL', [id]);
+    // Oda süslemesi and Oda kapağı (room-decor.mjs): their own picture and its term, and the covers they uploaded
+    // (the files go with removeUserFiles).
+    await eraseDecor(c, id);
     // Destek: their tickets and threads (the photos go with removeUserFiles); the data copy's date; the spending limit.
     await c.query('DELETE FROM support_tickets WHERE user_id = $1', [id]);
     await c.query('DELETE FROM data_exports WHERE user_id = $1', [id]);
@@ -394,6 +401,8 @@ export const socialRoutes = {
     await tx(async (c) => {
       await c.query('INSERT INTO blocks (blocker, blocked) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, to]);
       await c.query('DELETE FROM follows WHERE (follower = $1 AND followee = $2) OR (follower = $2 AND followee = $1)', [me.id, to]);
+      // Following each other's room ends with it too (room-follow.mjs).
+      await c.query('DELETE FROM room_follows WHERE (owner_id = $1 AND user_id = $2) OR (owner_id = $2 AND user_id = $1)', [me.id, to]);
     });
     return { blocked: true };
   },

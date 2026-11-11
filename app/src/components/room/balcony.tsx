@@ -175,7 +175,7 @@ export function ParticipantsSheet({
             const onMic = seat >= 0 || onBoss;
             const me = uid === 'me';
             const status = [
-              onBoss ? 'Dümen koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Balkon',
+              onBoss ? 'Patron koltuğu' : onMic ? `${seat + 1}. mikrofon` : 'Balkon',
               onMic && room.micMuted.includes(uid) ? 'mikrofonu kapatıldı' : '',
               pending.has(uid) ? 'davet bekliyor' : '',
               blocked.has(uid) ? 'engelledin' : '',

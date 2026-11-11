@@ -85,7 +85,12 @@ export function roomInviteNotices(invites: readonly FollowerRoomInvite[], seen: 
     // Oldest first, so the newest ends up on top of the list.
     .reverse();
   return {
-    notices: fresh.map((i) => ({ kind: 'social', icon: 'mic', title: 'Oda daveti', body: `${i.host.name} seni "${i.room.title}" odasına davet ediyor`, href: `/oda/${i.room.id}` })),
+    notices: fresh.map((i) =>
+      // A room I follow opened (server/api/room-follow.mjs): told the same way, with its own words.
+      i.kind === 'open'
+        ? { kind: 'social', icon: 'mic', title: 'Takip ettiğin oda açıldı', body: `"${i.room.title}" odası şimdi açık`, href: `/oda/${i.room.id}` }
+        : { kind: 'social', icon: 'mic', title: 'Oda daveti', body: `${i.host.name} seni "${i.room.title}" odasına davet ediyor`, href: `/oda/${i.room.id}` },
+    ),
     mark,
   };
 }

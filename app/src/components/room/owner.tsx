@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, type HostInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
@@ -11,6 +11,9 @@ import { Art, type ArtName } from '@/components/Art';
 import { GiftArt } from '@/components/GiftArt';
 import { ArtText, ROOM_ICON_ART, ROOM_THEME_ART, ROOM_TYPE_ART, roomLevelArt } from '@/components/RoomArt';
 import type { ModLog } from '@/components/room/community';
+import type { RoomLook } from '@/components/room/decor';
+import { RoomMembersSection } from '@/components/room/members';
+import { SeatReaction, type SeatReactionData } from '@/components/room/parts';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
 import {
@@ -19,7 +22,6 @@ import {
   LOCK_MIN_LEVEL,
   MIC_COUNT_OPTIONS,
   MIC_PERMISSION_MIN_LEVEL,
-  ROOM_BACKGROUNDS,
   ROOM_LEVEL_REWARDS,
   ROOM_LIMITS,
   ROOM_THEMES,
@@ -28,7 +30,6 @@ import {
   adminCapacity,
   memberLimit,
   roomCode,
-  roomCoverUrl,
   roomThemeInfo,
   type RoomTheme,
 } from '@/data/catalog';
@@ -37,10 +38,11 @@ import { RULES, pct } from '@/data/rules';
 import { showAlert } from '@/lib/alert';
 import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import type { ServerOwnerStats } from '@/lib/api';
+import type { JoinMode, Membership } from '@/lib/room-follow';
 import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
-import { colors, gradient, semantic } from '@/theme';
+import { colors, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
@@ -48,8 +50,6 @@ type Opt<T> = { value: T; label: string; sub?: string; disabled?: boolean; art?:
 
 const fmtMinutes = (m: number) => (m < 60 ? `${m} dk` : `${Math.floor(m / 60)} sa ${m % 60} dk`);
 const compact = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}m` : n >= 10_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString('tr-TR'));
-/** Mock "last entered the room" in days, for auto-removal previews. */
-export const lastSeenDays = (id: string) => (Number(id.replace(/\D/g, '') || 0) * 5) % 40;
 
 // --- Generic sheets -------------------------------------------------------------
 // The modal is edge to edge on Android: the sheet rises above the keyboard as a whole and keeps its last row
@@ -230,7 +230,13 @@ export function RoomInfoSheet({
   canManageMembers,
   autoRemoveDays,
   membership,
+  joinMode = 'open',
+  memberStaff = [],
+  memberRank = () => 0,
+  inRoom = [],
+  membersKey,
   onJoin,
+  onLeave,
   onApprove,
   onReject,
   onRemoveMember,
@@ -238,7 +244,7 @@ export function RoomInfoSheet({
   giftLog,
   announcement,
   canEditText = false,
-  coverEdit,
+  look,
   onSave,
   onSettings,
   onShare,
@@ -263,19 +269,30 @@ export function RoomInfoSheet({
   applications: string[];
   canManageMembers: boolean;
   autoRemoveDays: number;
-  membership: 'owner' | 'none' | 'pending' | 'member';
+  membership: Membership;
+  /** How the room takes members: at once, by application, or not at all. */
+  joinMode?: JoinMode;
+  /** The room's staff, the owner first, and everyone's rank (3 owner … 0 anyone else): they lead the member list. */
+  memberStaff?: string[];
+  memberRank?: (id: string) => number;
+  /** Who is in the room now (the demo's "Odada"; a server room asks the server). */
+  inRoom?: string[];
+  /** Changes whenever a server room's members were read again. */
+  membersKey?: unknown;
   onJoin: () => void;
+  /** Leaves the room's members, or takes the application back. */
+  onLeave: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onRemoveMember: (id: string) => void;
   stats: { coins: number; peak: number; minutes: number };
   giftLog: GiftLogRow[];
   announcement: string;
-  /** May change the cover (default: the owner). A server room: its owner and Süper Yöneticiler. */
-  coverEdit?: boolean;
+  /** Oda Süslemesi and Oda Kapağı (components/room/decor): two lines here for those who may change them. */
+  look?: RoomLook;
   /** Name and bulletin can be edited without the other owner tools (my live-mode server room). */
   canEditText?: boolean;
-  onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement' | 'cover'>> & { coverId?: string }) => void;
+  onSave: (p: Partial<Pick<MyRoom, 'title' | 'announcement'>>) => void;
   onSettings: () => void;
   onShare: () => void;
   onInvite: () => void;
@@ -288,11 +305,11 @@ export function RoomInfoSheet({
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
   actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
-  const [sub, setSub] = useState<null | 'level' | 'members' | 'traffic' | 'gifts' | 'decor' | 'title' | 'bulletin'>(null);
+  const [sub, setSub] = useState<null | 'level' | 'traffic' | 'gifts' | 'decor' | 'cover' | 'title' | 'bulletin'>(null);
   const [draft, setDraft] = useState('');
   const th = roomThemeInfo(theme);
   const textEditor = owner || canEditText;
-  const coverEditor = coverEdit ?? owner;
+  const lookEditor = !!look?.available && look.canEdit;
   const paddingBottom = useSheetBottom();
   const editText = (which: 'title' | 'bulletin') => {
     setDraft(which === 'title' ? title : announcement);
@@ -305,9 +322,9 @@ export function RoomInfoSheet({
       <View style={[styles.sheet, { maxHeight: '82%', paddingTop: 18, paddingBottom }]}>
         <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <Pressable onPress={() => coverEditor && setSub('decor')} accessibilityLabel="Kapak seç">
-              <Photo uri={cover} kind="cover" style={styles.cover} />
-              {coverEditor && <Text style={styles.coverLabel}>Kapak Seç</Text>}
+            <Pressable onPress={() => lookEditor && setSub('cover')} accessibilityLabel="Oda kapağı">
+              <Photo uri={cover} kind="cover" seed={roomId} style={styles.cover} />
+              {lookEditor && <Text style={styles.coverLabel}>Kapak Seç</Text>}
             </Pressable>
             <View style={{ flex: 1, gap: 6 }}>
               <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={() => textEditor && editText('title')} accessibilityLabel="Oda adını düzenle">
@@ -379,42 +396,31 @@ export function RoomInfoSheet({
             </Pressable>
           </View>
 
-          {(
-            <>
-              <Pressable onPress={() => setSub('members')} accessibilityLabel="Oda üyeleri">
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={[styles.h2, { flex: 1 }]}>
-                    Oda üyesi ({memberTotal.toLocaleString('tr-TR')}/{memberLimit(level).toLocaleString('tr-TR')})
-                  </Text>
-                  {canManageMembers && applications.length > 0 && (
-                    <View style={styles.bell}>
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>🔔 {applications.length}</Text>
-                    </View>
-                  )}
-                  <Ionicons name="chevron-forward" size={20} color="#fff" />
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                  {members.slice(0, 12).map((id) => (
-                    <View key={id} style={{ alignItems: 'center', width: 58 }}>
-                      <Avatar uri={userById(id).avatar} size={52} />
-                      <Text style={styles.tiny} numberOfLines={1}>
-                        {id === 'me' ? '🏠 Sen' : userById(id).name}
-                      </Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </Pressable>
-              {membership === 'none' && (
-                <Pressable style={styles.joinBtn} onPress={onJoin}>
-                  <ArtText art={ROOM_ICON_ART.join} size={24} style={{ color: '#fff', fontWeight: '800' }}>
-                    Oda üyesi ol
-                  </ArtText>
-                </Pressable>
-              )}
-              {membership === 'pending' && <Text style={[styles.dim, { textAlign: 'center' }]}>⏳ Üyelik başvurun oda sahibi/yöneticilerin onayını bekliyor</Text>}
-              {membership === 'member' && <Text style={[styles.dim, { textAlign: 'center', color: colors.green }]}>✓ Bu odanın üyesisin</Text>}
-            </>
-          )}
+          {/* The room's members, the membership button and following the room (components/room/members). */}
+          <RoomMembersSection
+            roomId={roomId}
+            title={title}
+            live={live}
+            level={level}
+            owner={owner}
+            membership={membership}
+            joinMode={joinMode}
+            members={members}
+            memberTotal={memberTotal}
+            applications={applications}
+            canManage={canManageMembers}
+            autoRemoveDays={autoRemoveDays}
+            staffIds={memberStaff}
+            rankOf={memberRank}
+            inRoomIds={inRoom}
+            refreshKey={membersKey}
+            onJoin={onJoin}
+            onLeave={onLeave}
+            onApprove={onApprove}
+            onReject={onReject}
+            onRemove={onRemoveMember}
+            onNavigate={onClose}
+          />
 
           {owner && (
             <View style={{ gap: 10 }}>
@@ -451,7 +457,9 @@ export function RoomInfoSheet({
             </View>
           )}
 
-          {coverEditor && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Photo uri={cover} kind="cover" style={{ width: 34, height: 44, borderRadius: 6 }} />} />}
+          {lookEditor && <Line label="Oda Süslemesi" onPress={() => setSub('decor')} right={<Image source={look.thumb} style={{ width: 27, height: 48, borderRadius: 6 }} />} />}
+          {/* The cover is its own thing (the picture on the room's card in lists), so it has its own line too. */}
+          {lookEditor && <Line label="Oda Kapağı" onPress={() => setSub('cover')} right={<Photo uri={cover} kind="cover" seed={roomId} style={{ width: 44, height: 44, borderRadius: 8 }} />} />}
           <Line label="Oda hediye kaydı" onPress={() => setSub('gifts')} />
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -481,47 +489,6 @@ export function RoomInfoSheet({
         <LevelTable xp={xp ?? ROOM_XP_THRESHOLDS[level - 1]} level={level} />
       </BottomSheet>
 
-      <BottomSheet visible={sub === 'members'} onClose={() => setSub(null)} title={`Oda üyeleri (${memberTotal.toLocaleString('tr-TR')})`}>
-        {canManageMembers && applications.length > 0 && (
-          <>
-            <Text style={styles.h3}>Katılma başvuruları ({applications.length})</Text>
-            {applications.map((id) => (
-              <View key={id} style={styles.listRow}>
-                <Avatar uri={userById(id).avatar} size={36} />
-                <Text style={{ color: '#fff', flex: 1 }}>{userById(id).name}</Text>
-                <Pressable style={[styles.pill, { backgroundColor: semantic.successFill }]} onPress={() => onApprove(id)}>
-                  <Text style={styles.pillText}>Onayla</Text>
-                </Pressable>
-                <Pressable style={[styles.pill, { backgroundColor: colors.cardAlt }]} onPress={() => onReject(id)}>
-                  <Text style={styles.pillText}>Reddet</Text>
-                </Pressable>
-              </View>
-            ))}
-          </>
-        )}
-        <Text style={styles.h3}>Üyeler</Text>
-        {members.map((id) => {
-          const days = lastSeenDays(id);
-          // The demo's "last seen" is made up: a server room doesn't show it.
-          const due = owner && !live && autoRemoveDays > 0 && id !== 'me' && days >= autoRemoveDays;
-          return (
-            <View key={id} style={styles.listRow}>
-              <Avatar uri={userById(id).avatar} size={36} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#fff' }}>{id === 'me' ? 'Sen (oda sahibi)' : userById(id).name}</Text>
-                {owner && !live && id !== 'me' && <Text style={[styles.dim, due && { color: colors.gold }]}>{due ? `${days} gündür girmedi · bu gece otomatik çıkarılacak` : `Son giriş: ${days === 0 ? 'bugün' : `${days} gün önce`}`}</Text>}
-              </View>
-              {canManageMembers && id !== 'me' && (
-                <Pressable onPress={() => onRemoveMember(id)} hitSlop={6}>
-                  <Text style={{ color: colors.red, fontWeight: '700' }}>Çıkar</Text>
-                </Pressable>
-              )}
-            </View>
-          );
-        })}
-        {memberTotal > members.length && <Text style={styles.dim}>+{(memberTotal - members.length).toLocaleString('tr-TR')} üye daha</Text>}
-      </BottomSheet>
-
       <BottomSheet visible={sub === 'traffic'} onClose={() => setSub(null)} title="Trafik paneli">
         {live ? <LiveTraffic stats={ownerStats ?? null} /> : <Traffic peak={stats.peak} minutes={stats.minutes} />}
       </BottomSheet>
@@ -547,24 +514,7 @@ export function RoomInfoSheet({
         )}
       </BottomSheet>
 
-      <BottomSheet visible={sub === 'decor'} onClose={() => setSub(null)} title="Oda süslemesi">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {ROOM_BACKGROUNDS.map((b) => {
-            const open = level >= b.minLevel;
-            const uri = roomCoverUrl(b.id);
-            return (
-              <Pressable key={b.id} disabled={!open} onPress={() => onSave({ cover: uri, coverId: b.id })} style={[styles.decor, cover === uri && { borderColor: colors.primaryText }, !open && { opacity: 0.4 }]}>
-                <Image source={{ uri }} style={{ width: '100%', height: 70, borderRadius: 8 }} />
-                <Text style={styles.tiny}>
-                  {open ? '' : '🔒 '}
-                  {b.name}
-                  {open ? '' : ` Lv.${b.minLevel}`}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </BottomSheet>
+      {look?.render(sub === 'decor' || sub === 'cover' ? sub : null, () => setSub(null))}
 
       <BottomSheet visible={sub === 'title' || sub === 'bulletin'} onClose={() => setSub(null)} title={sub === 'title' ? 'Oda adı' : 'Bülten'}>
         <TextInput value={draft} onChangeText={setDraft} style={[styles.input, sub === 'bulletin' && { minHeight: 70 }]} multiline={sub === 'bulletin'} maxLength={sub === 'title' ? 30 : 120} />
@@ -718,6 +668,8 @@ function LiveTraffic({ stats }: { stats: ServerOwnerStats | null }) {
 // --- Full-screen "Oda Ayarları" ---------------------------------------------------------
 type Picker =
   | null
+  | 'decor'
+  | 'cover'
   | 'type'
   | 'theme'
   | 'mics'
@@ -752,6 +704,7 @@ export function RoomSettingsScreen({
   live,
   standard = true,
   sections = [],
+  look,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -778,6 +731,8 @@ export function RoomSettingsScreen({
   standard?: boolean;
   /** Extra sections after the room's own: room tools for staff, then my own settings (effects, sound…). */
   sections?: SettingsSection[];
+  /** Oda Süslemesi and Oda Kapağı (components/room/decor), their screens opened on top of this one. */
+  look?: RoomLook;
 }) {
   const [picker, setPicker] = useState<Picker>(null);
   const close = () => setPicker(null);
@@ -834,6 +789,26 @@ export function RoomSettingsScreen({
           <Row label="Oda Günlüğü" hint="Susturma, indirme, çıkarma ve ayar değişiklikleri (bu oturum)" onPress={() => setPicker('log')} />
           <Row label={`Oda seviyesi`} value={`Lv.${level}`} valueArt={roomLevelArt(level)} onPress={() => setPicker('level')} />
 
+          {look?.available && (
+            <>
+              <Section title="Görünüm" />
+              <Row
+                label="Oda Süslemesi"
+                hint="Odanın arka planı: ücretsiz, ücretli ya da kendi görselin"
+                value={look.decorLabel}
+                onPress={() => setPicker('decor')}
+                locked={look.canEdit ? undefined : 'Oda süslemesini oda sahibi veya Süper Yönetici değiştirir.'}
+              />
+              <Row
+                label="Oda Kapağı"
+                hint="Oda listelerinde ve oda kartında görünen resim"
+                value={look.coverLabel}
+                onPress={() => setPicker('cover')}
+                locked={look.canEdit ? undefined : 'Oda kapağını oda sahibi veya Süper Yönetici değiştirir.'}
+              />
+            </>
+          )}
+
           <Section title="Mikrofon pozisyonu" />
           <Row label="Sahne Düzeni" value={layoutLabel} onPress={() => setPicker('layouts')} />
           {classicActive && <Row label="Klasik düzen mikrofon sayısı" value={`${Math.min(room.micCount, maxMics)} mikrofon`} onPress={() => setPicker('mics')} />}
@@ -850,10 +825,10 @@ export function RoomSettingsScreen({
             locked={ownerLock ?? (micPermOpen ? undefined : `Mikrofon izni Lv.${MIC_PERMISSION_MIN_LEVEL} odada açılır.`)}
           />
           <Row
-            label="Dümen Koltuğu"
+            label="Patron Koltuğu"
             hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · ${live ? 'son 24 saatte odada en çok hediye gönderen kişi oturur' : 'oturumun en çok hediye gönderen kişisi oturur'}`}
             toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
-            locked={ownerLock ?? (bossOpen ? undefined : `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
+            locked={ownerLock ?? (bossOpen ? undefined : `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
           />
 
           <Section title="Oda üyeleri" />
@@ -888,7 +863,7 @@ export function RoomSettingsScreen({
           <Text style={[styles.dim, { paddingHorizontal: 16, paddingTop: 12 }]}>
             {live
               ? 'Bu ayarlar sunucuda saklanır ve odadaki herkeste aynı anda geçerli olur. Yeni şifre, odaya bir sonraki girişte sorulur.'
-              : 'Ayarlar anında uygulanır. Kilit, mikrofon izni ve dümen koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.'}
+              : 'Ayarlar anında uygulanır. Kilit, mikrofon izni ve patron koltuğu gibi haklar canlıda sunucu tarafında kontrol edilir.'}
           </Text>
             </>
           )}
@@ -994,6 +969,7 @@ export function RoomSettingsScreen({
       />
 
       {renderLayouts(picker === 'layouts', close)}
+      {look?.render(picker === 'decor' || picker === 'cover' ? picker : null, close)}
 
       <BottomSheet visible={picker === 'blacklist'} onClose={close} title={`Oda kara listesi (${blacklist.length})`}>
         {blacklist.length === 0 && <Text style={styles.dim}>Kara listede kimse yok.</Text>}
@@ -1133,13 +1109,33 @@ function LiveLock({ live, lockOpen, level }: { live: LiveRoomSettings; lockOpen:
   );
 }
 
-// --- Boss seat ("Dümen Koltuğu") ---------------------------------------------------------
-export function BossSeat({ userId, speaking, onPress, mini }: { userId: string | null; speaking: boolean; onPress: () => void; /** Küçült: a small gold ring in the mic strip (`size` its avatar, `width` its slot). */ mini?: { size: number; width: number } }) {
+// --- Boss seat ("Patron Koltuğu") ---------------------------------------------------------
+export function BossSeat({
+  userId,
+  speaking,
+  onPress,
+  mini,
+  reaction,
+  still,
+  anchor,
+}: {
+  userId: string | null;
+  speaking: boolean;
+  onPress: () => void;
+  /** Küçült: a small gold ring in the mic strip (`size` its avatar, `width` its slot). */
+  mini?: { size: number; width: number };
+  /** The holder's emoji, played over their photo like on any mic. */
+  reaction?: SeatReactionData;
+  still?: boolean;
+  /** The ring's view, for what flies to or from this seat (measured like the numbered mics). */
+  anchor?: (v: HostInstance | null) => void;
+}) {
   const u = userId ? userById(userId) : null;
   if (mini) {
     const ring = mini.size + 6;
     return (
-      <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: mini.width }} accessibilityLabel={u ? `Dümen koltuğu: ${userId === 'me' ? 'sen' : u.name}` : 'Dümen koltuğu, boş'}>
+      <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: mini.width }} accessibilityLabel={u ? `Patron koltuğu: ${userId === 'me' ? 'sen' : u.name}` : 'Patron koltuğu, boş'}>
+        <View ref={anchor} collapsable={false}>
         <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={{ width: ring, height: ring, borderRadius: ring / 2, alignItems: 'center', justifyContent: 'center' }}>
           {u ? (
             <Photo uri={u.avatar} kind="face" style={{ width: mini.size, height: mini.size, borderRadius: mini.size / 2 }} />
@@ -1148,13 +1144,16 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
               <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
             </View>
           )}
+          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
         </LinearGradient>
-        <Text style={[styles.bossTag, { fontSize: 9 }]}>DÜMEN</Text>
+        </View>
+        <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
       </Pressable>
     );
   }
   return (
-    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Dümen koltuğu">
+    <Pressable onPress={onPress} style={{ alignItems: 'center', gap: 4, width: 96 }} accessibilityLabel="Patron koltuğu">
+      <View ref={anchor} collapsable={false}>
       <LinearGradient colors={speaking ? ['#FDE68A', '#FF6576'] : ['#FDE68A', '#B45309']} style={styles.bossRing}>
         {u ? (
           <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
@@ -1163,10 +1162,12 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
+        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
       </LinearGradient>
-      <Text style={styles.bossTag}>DÜMEN</Text>
+      </View>
+      <Text style={styles.bossTag}>PATRON</Text>
       <Text style={{ color: '#fff', fontSize: 12, maxWidth: 90 }} numberOfLines={1}>
-        {u ? (userId === 'me' ? 'Sen' : u.name) : 'Dümen Koltuğu'}
+        {u ? (userId === 'me' ? 'Sen' : u.name) : 'Patron Koltuğu'}
       </Text>
     </Pressable>
   );
@@ -1175,8 +1176,8 @@ export function BossSeat({ userId, speaking, onPress, mini }: { userId: string |
 export const bossSeatInfo = (current: string | null, myContribution: number, top: number) => {
   const need = Math.max(BOSS_SEAT_MIN_COINS, top + 1) - myContribution;
   return current === 'me'
-    ? 'Dümen koltuğundasın. Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
-    : `Dümen koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
+    ? 'Patron koltuğundasın. Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
+    : `Patron koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
 };
 
 const styles = StyleSheet.create({
@@ -1223,7 +1224,6 @@ const styles = StyleSheet.create({
   actionText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', paddingHorizontal: 2 },
   pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   pillText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  decor: { width: '47%', borderWidth: 2, borderColor: 'transparent', borderRadius: 10, padding: 3 },
   bossRing: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },
   bossEmpty: { width: 62, height: 62, borderRadius: 31, backgroundColor: 'rgba(30,20,10,0.85)', alignItems: 'center', justifyContent: 'center' },
   bossTag: { color: '#1C1B22', backgroundColor: '#FBBF24', fontSize: 9, fontWeight: '900', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, marginTop: -10, overflow: 'hidden' },

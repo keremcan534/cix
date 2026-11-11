@@ -4,7 +4,7 @@
 // BOSS_SEAT_MIN_LEVEL, BOSS_SEAT_MIN_COINS; store MyRoom); app tests/server-catalog.test.ts fails when they drift.
 //
 //   micPermission  'everyone' | 'members'   who may take a mic (members: the room's members and staff; Lv.4)
-//   bossSeat       boolean                  Dümen koltuğu: the room's top gifter of the last 24 hours sits on it (Lv.3)
+//   bossSeat       boolean                  Patron koltuğu: the room's top gifter of the last 24 hours sits on it (Lv.3)
 //   joinMode       'open' | 'apply' | 'closed'   how someone becomes a room member
 //   manageMembers  'owner' | 'admins'       who answers and removes members
 //   manageFunctions 'owner' | 'admins'      who uses the room's tools (yavaş mod, kelime filtresi, oyunlar)
@@ -92,7 +92,7 @@ export function applyRules(now, patch, { rank, level }) {
       next[k] = v;
     } else if (BOOLS.includes(k)) {
       if (typeof v !== 'boolean') throw new HttpError(400, 'Geçersiz oda ayarı');
-      if (k === 'bossSeat' && v && level < BOSS_SEAT_MIN_LEVEL) throw new HttpError(403, `Dümen koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır`);
+      if (k === 'bossSeat' && v && level < BOSS_SEAT_MIN_LEVEL) throw new HttpError(403, `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır`);
       next[k] = v;
     } else if (k === 'limit') {
       if (v !== null && !LIMIT_OPTIONS.includes(v)) throw new HttpError(400, 'Geçersiz katılımcı limiti');

@@ -90,7 +90,7 @@ export const STANDARD_EMOJI: { id: string; name: string; emojis: string[] }[] = 
   {
     id: 'activity',
     name: 'Etkinlik',
-    emojis: list('⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🥊 🎮 🕹️ 🎲 🧩 ♟️ 🎯 🎳 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎬 🎨 🎭 🎉 🎊 🎈 🎁 🎆 🎇 ✨ 🏆 🥇 🥈 🥉 🏅 🎖️'),
+    emojis: list('⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🥊 🎮 🕹️ 🎲 🧩 ♟️ 🎯 🎳 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🪇 💃 🎬 🎨 🎭 🎉 🎊 🎈 🎁 🎆 🎇 ✨ 🏆 🥇 🥈 🥉 🏅 🎖️'),
   },
   {
     id: 'objects',
@@ -107,7 +107,16 @@ export const STANDARD_EMOJI: { id: string; name: string; emojis: string[] }[] = 
 /** A custom-drawn sticker; `emoji` is the closest Unicode emoji, used only as a text fallback. */
 export type Sticker = { id: string; name: string; emoji: string };
 /** A sticker pack. Pack ids are the ids users bought before (the store keeps them as `emojiPacks`). */
-export type StickerPack = { id: string; name: string; stickers: Sticker[]; price: number; minVip?: number; animated?: boolean };
+export type StickerPack = {
+  id: string;
+  name: string;
+  stickers: Sticker[];
+  price: number;
+  minVip?: number;
+  animated?: boolean;
+  /** Only in a room's emoji panel (Hamle: its picks act on the mics), never in a chat's panel or the shop. */
+  roomOnly?: boolean;
+};
 const st = (id: string, name: string, emoji: string): Sticker => ({ id, name, emoji });
 export const STICKER_PACKS: StickerPack[] = [
   {
@@ -170,6 +179,42 @@ export const STICKER_PACKS: StickerPack[] = [
       st('duygu-deli-dolu', 'Deli dolu', '🤪'),
       st('duygu-kikirdama', 'Kıkır kıkır', '🤭'),
       st('duygu-yuz-numara', 'Tam puan', '💯'),
+    ],
+  },
+  {
+    // Dance and music, for when the room's music plays: the same animated set as Duygular, free for everyone.
+    id: 'muzik',
+    name: 'Müzik',
+    price: 0,
+    stickers: [
+      st('muzik-dans', 'Dans', '💃'),
+      st('muzik-disko', 'Disko topu', '🪩'),
+      st('muzik-eller-havaya', 'Eller havaya', '🙌'),
+      st('muzik-rock', 'Rock', '🤘'),
+      st('muzik-notalar', 'Notalar', '🎶'),
+      st('muzik-konfeti', 'Konfeti', '🎉'),
+      st('muzik-davul', 'Davul', '🥁'),
+      st('muzik-gitar', 'Gitar', '🎸'),
+      st('muzik-marakas', 'Marakas', '🪇'),
+      st('muzik-trompet', 'Trompet', '🎺'),
+      st('muzik-saksafon', 'Saksafon', '🎷'),
+      st('muzik-keman', 'Keman', '🎻'),
+    ],
+  },
+  {
+    // Hamle (lib/room-moves): each pick does something on the mics. A kiss or a punch flies to the mic on my left
+    // or right; the dice and Taş Kağıt Makas show a result the whole room sees. Room only, free for everyone.
+    id: 'hamle',
+    name: 'Hamle',
+    price: 0,
+    roomOnly: true,
+    stickers: [
+      st('hamle-opucuk-sol', 'Sola öpücük', '💋'),
+      st('hamle-opucuk-sag', 'Sağa öpücük', '💋'),
+      st('hamle-yumruk-sol', 'Sola yumruk', '🤛'),
+      st('hamle-yumruk-sag', 'Sağa yumruk', '🤜'),
+      st('hamle-zar', 'Zar at', '🎲'),
+      st('hamle-tkm', 'Taş Kağıt Makas', '✊'),
     ],
   },
   {
@@ -286,7 +331,7 @@ export const ROOM_LEVEL_REWARDS = [
   '9 yöneticiye kadar, yeni oda arka planları ve özel mikrofon düzenleri',
   '1.200 kişilik üye sınırı, 12 yöneticiye kadar, üst seviye oda simgesi, +2 mikrofon',
   '1.350 kişilik üye sınırı, ek tema ve hediye animasyonları',
-  '1.500 kişilik üye sınırı, 15 yöneticiye kadar, özel yönetici yeri (Dümen koltuğu)',
+  '1.500 kişilik üye sınırı, 15 yöneticiye kadar, özel yönetici yeri (Patron koltuğu)',
   '1.750 kişilik üye sınırı, 17 yöneticiye kadar, yeni oda teması',
   '2.000 kişilik üye sınırı, 20 yöneticiye kadar, özel hediye paketi',
   '2.500 kişilik üye sınırı, 23 yöneticiye kadar, gelişmiş mikrofon düzeni',
@@ -338,17 +383,40 @@ export const MIC_COUNT_OPTIONS = [5, 8, 10, 12, 15];
 /** Stable public room number shown as "ID". */
 export const roomCode = (id: string) => String(10_000_000 + ([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9_000_000, 7)));
 
+// Oda Süslemesi › Ücretsiz: the backgrounds drawn behind a room's stage, each opened by the room's level (the server
+// checks it: server/api/catalog.mjs ROOM_COVERS). The pictures are the app's own sea scenes
+// (components/room/stage-backdrop ROOM_BG_ART); `seed` is only the card picture older apps chose with the same id.
 export const ROOM_BACKGROUNDS = [
-  { id: 'bg1', name: 'Gece', seed: 'night', minLevel: 1 },
-  { id: 'bg2', name: 'Neon', seed: 'neon', minLevel: 2 },
-  { id: 'bg3', name: 'Deniz', seed: 'sea', minLevel: 4 },
-  { id: 'bg4', name: 'Galaksi', seed: 'galaxy', minLevel: 7 },
+  { id: 'bg1', name: 'Gün Batımı', seed: 'night', minLevel: 1 },
+  { id: 'bg2', name: 'Deniz Feneri', seed: 'neon', minLevel: 2 },
+  { id: 'bg3', name: 'Deniz Altı', seed: 'sea', minLevel: 4 },
+  { id: 'bg4', name: 'Turkuaz Koy', seed: 'galaxy', minLevel: 7 },
 ];
-/** A room background's picture ('' for none or an unknown id). A server room keeps only the id (server/api/catalog.mjs ROOM_COVERS). */
+/** The card picture an older app chose for a server room ('' for none or an unknown id): the lists fall back to it
+ *  while the room has no uploaded cover (Oda Kapağı). */
 export function roomCoverUrl(id: string | null | undefined) {
   const b = ROOM_BACKGROUNDS.find((x) => x.id === id);
   return b ? `https://picsum.photos/seed/${b.seed}/600/400` : '';
 }
+// Oda Süslemesi › Ücretli: backgrounds bought for a term, in step with the server (server/api/catalog.mjs ROOM_BGS;
+// tests/server-catalog.test.ts). Each can be bought once its picture is in the app (stage-backdrop ROOM_BG_ART) and
+// the server has it on sale; until then the shelf shows it as "yakında" (docs/GORSEL_URETIM_LISTESI.md §14).
+export const ROOM_BG_PAID = [
+  { id: 'rb-yildiz', name: 'Yıldızlı Gece', price: 600, days: 30 },
+  { id: 'rb-neon', name: 'Neon Sokak', price: 900, days: 30 },
+  { id: 'rb-konser', name: 'Konser Sahnesi', price: 900, days: 30 },
+  { id: 'rb-teras', name: 'Teras Partisi', price: 1_200, days: 30 },
+  { id: 'rb-galaksi', name: 'Galaksi', price: 1_200, days: 30 },
+  { id: 'rb-salon', name: 'Altın Salon', price: 2_000, days: 30 },
+];
+/** Oda Süslemesi › Özel in the demo (a server room takes the live price and days from the server). */
+export const ROOM_BG_CUSTOM = { price: 5_000, days: 30, changesPerDay: 10 };
+/** The sizes a room picture is cut to before it is uploaded: the stage's portrait shape, the lists' square. */
+export const ROOM_BG_SIZE = { width: 1080, height: 1920 };
+export const ROOM_COVER_SIZE = { width: 800, height: 800 };
+/** What a room draws behind its stage: a free or paid background by id (null: the theme's stage) or a picture.
+ *  `until`: when a paid or own picture's term ends; only the room's settings get it, not everyone who reads the room. */
+export type RoomBackground = { kind: 'free' | 'paid' | 'custom'; id: string | null; url: string | null; until?: string | null };
 
 // --- Room music (licensed in-app catalog; mock) -------------------------------
 export type Track = { id: string; title: string; artist: string; seconds: number };

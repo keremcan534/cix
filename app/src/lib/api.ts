@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomBytes } from 'expo-crypto';
 
+import type { RoomBackground } from '@/data/catalog';
 import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
@@ -240,6 +241,15 @@ export async function openLiveLine(signal: AbortSignal): Promise<Response | null
   if (!session) return null;
   return fetch(`${BASE}/api/live`, { headers: { Authorization: `Bearer ${session}`, Accept: 'text/event-stream', 'Accept-Encoding': 'identity' }, signal });
 }
+
+/** The live line's address and my session, for the line's second way of reading it (XMLHttpRequest). */
+export async function liveLineTarget(): Promise<{ url: string; token: string } | null> {
+  if (!BASE) return null;
+  await restoreSession();
+  return session ? { url: `${BASE}/api/live`, token: session } : null;
+}
+/** Ayarlar › Bağlantı testi: the server sends a ping on my line; `open` is how many lines it has from me. */
+export const pingLiveLine = () => call<{ open: number }>('POST', '/api/live/ping', {});
 
 /** Signs in with this device (creating the account with `name` the first time). */
 export async function signIn(name: string): Promise<ServerUser> {
@@ -468,7 +478,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**
@@ -523,9 +533,14 @@ export type ServerRoom = {
   coverId?: string | null;
   theme?: string;
   giftEffects?: boolean;
+  /** Oda süslemesi and Oda kapağı (server/api/room-decor.mjs): the free background chosen (null: the theme's
+   *  stage), what every phone draws behind the stage now, and the uploaded card picture. An older server sends none. */
+  bgId?: string | null;
+  background?: RoomBackground;
+  coverUrl?: string | null;
   /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
   rules?: RoomRules;
-  /** Dümen koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
+  /** Patron koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
   boss?: UserCard | null;
   /** The Odalar row's chips (server/api/room-social.mjs): the owner's agency or family, a running in-room PK, and
    *  the room's place in this week's gift ranking (1–3, else null). */
@@ -533,6 +548,9 @@ export type ServerRoom = {
   family?: { id: string; name: string } | null;
   pk?: boolean;
   weekRank?: number | null;
+  /** Following the room (server/api/room-follow.mjs), on the read of one room: how many follow it, and whether I do. */
+  followers?: number;
+  following?: boolean;
 };
 /** A server room's rules (server/api/room-rules.mjs). */
 export type RoomRules = {
@@ -629,12 +647,54 @@ export type RoomPatch = {
   rules?: Partial<RoomRules>;
 };
 export const updateRoom = (id: string, patch: RoomPatch) => call<{ room: ServerRoom }>('POST', '/api/rooms/update', { id, ...patch }).then((r) => r.room);
+/**
+ * Oda Süslemesi and Oda Kapağı as the room's settings show them (server/api/room-decor.mjs; the demo builds the same
+ * from its own state, lib/room-decor). `pick`: what is chosen over the free background ('custom', a paid sku or
+ * null); `showing`: what the room draws now. `paid.items[].until`: owned until then; `custom.until`: the paid term.
+ */
+export type RoomDecor = {
+  level: number;
+  canEdit: boolean;
+  owner: boolean;
+  bgId: string | null;
+  pick: string | null;
+  showing: RoomBackground;
+  free: { id: string; minLevel: number; open: boolean }[];
+  paid: { on: boolean; items: { sku: string; name: string; price: number; days: number; onSale: boolean; until: string | null }[] };
+  custom: { on: boolean; price: number; days: number; until: string | null; url: string | null; changesLeft: number; removed: boolean };
+  cover: { url: string | null };
+};
+type DecorAnswer = { room: ServerRoom; decor: RoomDecor };
+export const roomDecor = (room: string) => call<{ decor: RoomDecor }>('GET', `/api/rooms/decor?room=${encodeURIComponent(room)}`).then((r) => r.decor);
+/** A free background (`bgId` null: the theme's stage), or one of what the owner has: 'custom' or a paid sku. */
+export const pickRoomBackground = (room: string, pick: { pick: 'free'; bgId: string | null } | { pick: string }) => call<DecorAnswer>('POST', '/api/rooms/decor/pick', { room, ...pick });
+export const buyRoomBackground = (room: string, sku: string, price: number, ref: string) =>
+  call<DecorAnswer & { user: ServerUser; replay: boolean }>('POST', '/api/rooms/decor/buy', { room, sku, price, ref });
+/** The owner's own picture (already uploaded, kind 'roombg'): a purchase outside a term (`charged`), a free change inside one. */
+export const setRoomCustomBackground = (room: string, url: string, price: number, ref: string) =>
+  call<DecorAnswer & { user?: ServerUser; replay?: boolean; charged: boolean }>('POST', '/api/rooms/decor/custom', { room, url, price, ref });
+export const removeRoomCustomBackground = (room: string) => call<DecorAnswer>('POST', '/api/rooms/decor/custom/remove', { room });
+/** Oda Kapağı: an uploaded picture (kind 'roomcover') as the room's card picture; null takes it off. */
+export const setRoomCover = (room: string, url: string | null) => call<{ room: ServerRoom }>('POST', '/api/rooms/cover', { room, url }).then((r) => r.room);
 /** Oda üyeleri (server/api/rooms.mjs): the list, my membership and, for those who answer them, the requests. */
 export const roomMembers = (room: string) => call<RoomMembers>('GET', `/api/rooms/members?room=${encodeURIComponent(room)}`);
 export const joinRoomMembers = (room: string) => call<{ status: 'member' | 'pending' }>('POST', '/api/rooms/members/join', { room });
 export const leaveRoomMembers = (room: string) => call<{ status: null }>('POST', '/api/rooms/members/leave', { room });
 export const answerRoomMember = (room: string, user: string, accept: boolean) => call<{ status: 'member' | null }>('POST', '/api/rooms/members/answer', { room, user, accept });
 export const removeRoomMember = (room: string, user: string) => call<{ status: null }>('POST', '/api/rooms/members/remove', { room, user });
+/** The room card's member list (server/api/room-members.mjs): staff first, then members, a page at a time.
+ *  `seenAt`: when they were last in the room (null: not known, or they don't show it). */
+export type RoomMemberFilter = 'all' | 'in' | 'out' | 'pending';
+export type RoomMemberRow = UserCard & { role: 'owner' | 'super' | 'admin' | 'member' | 'pending'; since: string | null; seenAt: string | null; inRoom: boolean };
+export type RoomMemberPage = { rows: RoomMemberRow[]; counts: Record<RoomMemberFilter, number>; nextOffset: number | null; canManage: boolean };
+export const roomMemberList = (room: string, filter: RoomMemberFilter, offset = 0) =>
+  call<RoomMemberPage>('GET', `/api/rooms/members/list?room=${encodeURIComponent(room)}&filter=${filter}&offset=${offset}`);
+/** Following a room (server/api/room-follow.mjs): the follow is on the room's account, so it stays when the room
+ *  closes and opens again. `followedRooms`: open ones first, then the closed ones (`closed`). */
+export type RoomFollowAnswer = { following: boolean; followers: number };
+export const followRoom = (room: string) => call<RoomFollowAnswer>('POST', '/api/rooms/follow', { room });
+export const unfollowRoom = (room: string) => call<RoomFollowAnswer>('POST', '/api/rooms/unfollow', { room });
+export const followedRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms/followed').then((r) => r.rooms);
 /** Oda etkinlikleri (server/api/room-events.mjs). */
 export type ServerRoomEvent = { id: number; title: string; desc: string; when: string; type: string; by: { id: string; name: string }; going: boolean; attendees: number; cancelled: boolean; createdAt: string; mine: boolean };
 export const roomEvents = (room: string) => call<{ events: ServerRoomEvent[] }>('GET', `/api/rooms/events?room=${encodeURIComponent(room)}`).then((r) => r.events);
@@ -783,7 +843,8 @@ export const joinedRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/room
 export type FollowerInviteInfo = { count: number; lastAt: string | null; waitMs: number };
 export const followerInviteInfo = (room: string) => call<FollowerInviteInfo>('GET', `/api/rooms/invite-followers?room=${encodeURIComponent(room)}`);
 export const inviteFollowers = (room: string) => call<FollowerInviteInfo & { sent: number }>('POST', '/api/rooms/invite-followers', { room });
-export type FollowerRoomInvite = { id: number; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
+/** `kind: 'open'`: not an invite, a room I follow that opened (server/api/room-follow.mjs). */
+export type FollowerRoomInvite = { id: number; kind?: 'open'; room: { id: string; title: string }; host: { id: string; name: string }; at: string };
 export const myRoomInvites = () => call<{ invites: FollowerRoomInvite[] }>('GET', '/api/me/room-invites').then((r) => r.invites);
 // Other people's profiles (server/api/profiles.mjs): levels, personal extras, the album and the Vitrin.
 /** Cömertlik and Yankı levels as the server counts them (it never sends someone else's points); null: a level its
@@ -1050,7 +1111,10 @@ export type LiveKey =
   | 'backpack_call_task'
   | OneOnOneKey
   | RewardKey
-  | CasinoKey;
+  | CasinoKey
+  | DecorKey;
+/** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */
+export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
 /** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */

@@ -5,8 +5,8 @@
 //    attribute: set by their phone, or by the server when the owner or an admin moves them), whether their mic
 //    is on (their LiveKit microphone track, muted when they switch it off) and whether they are talking right now;
 //  - signals: small messages inside the room. They are not stored anywhere: whoever is in the room sees them, a
-//    later joiner doesn't. The phones send each other chat lines, the emoji over their own seat and the free
-//    Hareketli reactions. A gift is announced by the server after it is paid (server/api/gifts.mjs, LiveKit
+//    later joiner doesn't. The phones send each other chat lines, the emoji over their own seat, a Hamle
+//    (lib/room-moves: a kiss or a punch to the next mic, the dice, Taş Kağıt Makas) and the free Hareketli reactions. A gift is announced by the server after it is paid (server/api/gifts.mjs, LiveKit
 //    SendData: a packet with no sending participant), so no phone can fake one; a gift packet from a phone is
 //    dropped. A paid Hareketli is announced the same way (server/api/room-fx.mjs: 'fx'); the room screen plays a
 //    phone's own 'anim' only when its catalog says that animation is free. The server also says when a PK starts or is cancelled
@@ -20,11 +20,15 @@
 //    own `seat` attribute changed by the server).
 import { useSyncExternalStore } from 'react';
 
+import { parseMove, type Move } from '@/lib/room-moves';
+
 export type LivePeer = { identity: string; name: string; seat: number | null; speaking: boolean; micOn: boolean };
 /** What one phone may send the others: a chat line, an emoji or sticker over its own seat, a free Hareketli. */
 export type PeerSignal =
   | { t: 'chat'; text: string }
   | { t: 'react'; emoji: string }
+  /** A Hamle (lib/room-moves): a kiss or a punch to the mic beside the sender's, the dice, Taş Kağıt Makas. */
+  | ({ t: 'act' } & Move)
   | { t: 'anim'; animationId: string }
   /** Soru-cevap: a listener's question, and the staff's pick (the room screen takes a pick only from its staff). */
   | { t: 'q'; id: string; text: string }
@@ -215,6 +219,10 @@ export function parseSignal(raw: unknown): PeerSignal | null {
   if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) return { t: 'chat', text: m.text.slice(0, 300) };
   if (m.t === 'react' && typeof m.emoji === 'string' && m.emoji.trim() && m.emoji.length <= 40) return { t: 'react', emoji: m.emoji };
   if (m.t === 'anim' && typeof m.animationId === 'string' && /^[a-z0-9-]{1,40}$/.test(m.animationId)) return { t: 'anim', animationId: m.animationId };
+  if (m.t === 'act') {
+    const move = parseMove(m);
+    return move ? { t: 'act', ...move } : null;
+  }
   const qid = typeof m.id === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(m.id) ? m.id : null;
   if (m.t === 'q' && qid && typeof m.text === 'string' && m.text.trim()) return { t: 'q', id: qid, text: m.text.slice(0, 200) };
   if (m.t === 'qpick' && qid) return { t: 'qpick', id: qid };
