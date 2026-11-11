@@ -312,31 +312,6 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
   );
 }
 
-// --- Contribution ranking ---------------------------------------------------------
-export function ContributionModal({ visible, onClose, data, locked }: { visible: boolean; onClose: () => void; data: Record<string, number>; locked: boolean }) {
-  const rows = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  return (
-    <Sheet visible={visible} onClose={onClose} title="🏆 Oda katkı sıralaması">
-      {locked ? (
-        <Text style={styles.dim}>Katkı sıralaması oda seviyesi 3&apos;te açılır.</Text>
-      ) : rows.length === 0 ? (
-        <Text style={styles.dim}>Bu oturumda henüz hediye gönderilmedi.</Text>
-      ) : (
-        <ScrollView>
-          {rows.map(([id, v], i) => (
-            <View key={id} style={styles.row}>
-              <Text style={{ color: i < 3 ? colors.gold : colors.textDim, width: 22, fontWeight: '800' }}>{i + 1}</Text>
-              <Avatar uri={userById(id).avatar} size={34} />
-              <Text style={{ color: '#fff', flex: 1 }}>{id === 'me' ? 'Sen' : userById(id).name}</Text>
-              <Text style={{ color: colors.gold, fontWeight: '700' }}>🪙 {v.toLocaleString('tr-TR')}</Text>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-    </Sheet>
-  );
-}
-
 // --- Speak requests -----------------------------------------------------------------
 export function RequestsModal({ visible, onClose, requests, onAccept, onReject, freeSeats }: { visible: boolean; onClose: () => void; requests: string[]; onAccept: (id: string) => void; onReject: (id: string) => void; freeSeats: number }) {
   return (
