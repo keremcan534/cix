@@ -64,7 +64,10 @@ export default function GameCenter() {
   useLiveCasino();
   const showSalon = gamblingLevelOk(wealthLevel);
   const showCasino = casinoVisible(wealthLevel);
-  const [tab, setTab] = useState<Tab>(showSalon ? 'casino' : 'room');
+  // Until a tab is picked the screen opens on Oyun Salonu for whoever may see it. A live build learns the level
+  // from the server a moment after the screen opens, so the choice can't be made once at the start.
+  const [picked, setTab] = useState<Tab | null>(null);
+  const tab: Tab = picked && (picked !== 'casino' || showSalon) ? picked : showSalon ? 'casino' : 'room';
   const [open, setOpen] = useState<OpenGame | null>(oyun === 'ruzgar' ? (showSalon ? { kind: 'wheel' } : null) : oyun && showCasino ? { kind: 'casino', id: oyun } : null);
   // Room games from the profile: the demo fills the table with sample online players. A live build has no
   // matchmaking here, so they are tried against bots, named as bots.
