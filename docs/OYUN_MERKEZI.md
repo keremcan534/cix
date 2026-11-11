@@ -30,6 +30,38 @@ Erişim noktaları:
 
 İki giriş noktası aynı platformu, aynı bakiyeyi ve aynı geçmişi kullanır.
 
+## Sunum katmanı: oyunların görünüşü ve sesi
+
+Tur her zaman önce çözülür (canlıda sunucuda, denemede `lib/games.ts` içinde); ekran yalnızca çözülmüş sonucu oynatır. Bu katman hiçbir oranı, bahsi, ödemeyi ya da havuz kuralını değiştirmez.
+
+| Dosya | Görevi |
+|---|---|
+| `src/lib/game-sound.ts`, `assets/sfx/*.wav` | 22 kısa oyun sesi (`playSfx('coin')`). Düzeyi oyun sesi ayarından gelir; odanın sesiyle karışır, onu kısmaz ve hata vermez. Sesler `scripts/make-sfx.py` ile kodla üretilmiş **yer tutuculardır**; lisanslı bir ses paketi aynı dosya adlarıyla konursa başka değişiklik gerekmez. |
+| `src/lib/win-tier.ts` | Kazanç basamakları: bahsin 5, 15 ve 40 katı ile JACKPOT. **Bahsi geçmeyen ödeme kazanç sayılmaz.** |
+| `src/components/games/fx/win-fx.tsx`, `coins.tsx` | `useWinFx()`: basamağa göre kazanç kutlaması (başlık, sayan tutar, jeton fıskiyesi ya da yağmuru). |
+| `src/components/games/fx/reel.tsx`, `src/lib/reel-plan.ts` | Makara: sunucu cevabı beklenirken döner, soldan sağa sırayla durur, büyük ödül ihtimalinde son makaralar bekletir. |
+| `src/components/games/fx/spin-plan.ts`, `wheel-stage.tsx`, `chips.tsx`, `flights.tsx` | Çarkın dönüş planı ve sahnesi, bahis fişleri, uçan fiş ve jetonlar. |
+| `src/components/games/fx/info-sheet.tsx` | Her oyunun "?" sayfası: nasıl oynanır, ödeme tablosu, oyun bakiyesi notu. Ekranda uzun açıklama durmaz. |
+| `src/components/games/fx/result-trail.tsx` | Son sonuçların şeridi. |
+| `src/components/games/slot-kit.tsx` | Bakiye kutusu (`BalancePill`), bahis seçici (`BetStepper`) ve makaralı oyunların ortak düğme bloğu (`SpinControls`). |
+
+Her oyunun uyduğu kurallar:
+- **Bahsin altında kalan ödeme kutlanmaz.** "ÖDEME 100" diye sade yazılır; jeton yağmaz, zafer sesi çalmaz, satır yeşile dönmez.
+- **Bakiye sonuçtan önce değişmez.** Tur sürerken kutu bahsi düşülmüş tutarı gösterir; kazanç, ekranda görüldüğü anda eklenir.
+- **Hareketi azalt** ayarı açıkken uçuşlar, parlamalar ve jeton yağmuru atlanır; sonuç yine gösterilir.
+- **Tek ses düğmesi** panel başlığındadır; sahnelerde ikinci bir düğme yoktur.
+- **360 × 780 ekranda** her oyun kaydırmadan sığar ve hiçbir yazı kesilmez (Playwright taramasıyla denetlenir).
+
+Görsellerin çoğu yer tutucudur (emoji, düz şekiller, Ionicons); çizilecekler `docs/GORSEL_URETIM_LISTESI.md` bölüm 15–18'de listelidir.
+
+### Yeni oda oyunu eklemek
+
+1. Sunucu: `server/api/room-games/<kimlik>.mjs` (`meta`, `start`, `move`, `view` ve süre dolunca çalışan `auto` ya da `timeout`), `room-games-rules.mjs` içine kayıt, `room_tables.game` denetimine kimliği ekleyen göç dosyası.
+2. Uygulama: kuralların kopyası `src/lib/room-games/<kimlik>.ts` ve iki tarafı adım adım karşılaştıran test; deneme ve canlı masayı aynı sahnede çizen `src/components/games/room/<kimlik>.tsx`; `lib/api.ts` içindeki masa ve hamle türleri; `room-tables.tsx` ve `game-panel.tsx` bağlantısı.
+3. `server/api/Dockerfile` `room-games` klasörünü kopyalar; klasör dışına dosya konursa o da eklenmelidir.
+
+Eski uygulama sürümleri yeni masaları çizemez: oda oyunlarında sunucu ve uygulama birlikte yayınlanır.
+
 ## En kritik kural: sesli sohbet kesintisiz
 
 - `lib/games.ts` ve oyun bileşenleri odaya, koltuğa, mikrofona ve görüşmeye **hiç dokunmaz**. Medya yöneticisi (`lib/media`) içe aktarılmaz.
@@ -122,7 +154,7 @@ Bu belgede **hiçbir sağlayıcı adı doğrulanmış değildir**. Kataloğun "s
 ## Sonraki adımlar
 
 1. Sağlayıcı araştırması ve lisanslar (§7).
-2. Ludo'nun gerçek sağlayıcı entegrasyonu ve gerçek cihazda mikrofon sürekliliği testi.
+2. Oda oyunlarının (Ludo, Renk Kartları, XOX, Dört Taş) gerçek cihazlarda, birden fazla kişiyle ve mikrofon açıkken denenmesi; oyun seslerinin telefonda dinlenmesi.
 3. Sunucu: `game_sessions`, `game_rounds` (benzersiz `request_id`), `wallet_transactions` bağlantısı, sağlayıcı geri çağrısının imza doğrulaması.
 4. Oyun geçmişinin kalıcı hâle getirilmesi (şu an oturum boyunca tutuluyor; jeton hareketleri cüzdanda kalıcı).
 

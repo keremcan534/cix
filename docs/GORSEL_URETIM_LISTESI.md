@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`, Temel ücretsiz). Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 556 görsel.** Öncelik: P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri).
+**Toplam 608 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16–18'in öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -33,6 +33,8 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 14. Güncelleme 3: Ücretli oda süslemeleri | 6 |
 | 15. Oda oyunları: Ludo | 7 |
 | 16. Oyun Salonu: çark ve tahta oyunları | 9 |
+| 17. Oyun Salonu: Yörünge, Mercan Avı, Fener Kayalığı | 22 |
+| 18. Oda oyunları: Renk Kartları, XOX, Dört Taş | 21 |
 
 ## ChatGPT ile üretim
 
