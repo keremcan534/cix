@@ -140,9 +140,9 @@ const paidToday = () => (state.day === today() ? state.paidToday : 0);
 
 /** Why a package can't take new sends right now (null = it can). Checked before any coin moves. */
 export function unavailable(g: LuckyGift): string | null {
-  if (!g.enabled) return 'Bu Uğurlu hediye şu an kapalı.';
+  if (!g.enabled) return 'Bu Şanslı hediye şu an kapalı.';
   const bad = validate(g);
-  if (bad) return `Bu Uğurlu hediye yapılandırması geçersiz: ${bad}`;
+  if (bad) return `Bu Şanslı hediye yapılandırması geçersiz: ${bad}`;
   // Live: the server keeps the reward limit and says per package; it checks again on every send.
   if (state.server) return state.server.open[g.id] === false ? 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır.' : null;
   const top = g.price * maxMult(g);
@@ -192,19 +192,19 @@ export function sendLucky(
   }
   const g = luckyGift(req.giftId);
   if (!g) return { ok: false, reason: 'Hediye bulunamadı.' };
-  if (req.userAge < LUCKY_MIN_AGE) return { ok: false, reason: `Uğurlu hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` };
-  if (req.toId === req.userId) return { ok: false, reason: 'Kendine Uğurlu hediye gönderemezsin.' };
+  if (req.userAge < LUCKY_MIN_AGE) return { ok: false, reason: `Şanslı hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` };
+  if (req.toId === req.userId) return { ok: false, reason: 'Kendine Şanslı hediye gönderemezsin.' };
   const closed = unavailable(g);
   if (closed) return { ok: false, reason: closed };
   if (state.day !== today()) emit({ day: today(), paidToday: 0 });
   const blocked = wallet.blocked?.(g.price);
   if (blocked) return { ok: false, reason: blocked };
-  if (!wallet.spend(g.price, `Uğurlu hediye: ${g.name} → ${req.toName}`)) return { ok: false, reason: 'Yetersiz bakiye.' };
+  if (!wallet.spend(g.price, `Şanslı hediye: ${g.name} → ${req.toName}`)) return { ok: false, reason: 'Yetersiz bakiye.' };
 
   const odds = g.tiers.map((t) => ({ ...t }));
   const mult = draw(odds);
   const reward = g.price * mult;
-  if (reward > 0) (wallet.reward ?? wallet.credit)(reward, `Uğurlu ödülü: ${g.name} ×${fmt(mult)}`);
+  if (reward > 0) (wallet.reward ?? wallet.credit)(reward, `Şanslı ödülü: ${g.name} ×${fmt(mult)}`);
   const record: LuckyRecord = {
     txId: req.txId,
     at: clock(),
@@ -252,10 +252,10 @@ export function sendLuckyBatch(
   if (blocked) return { records: [], error: blocked };
   // Checks that don't depend on the wallet (age, self, closed package) fail before anything is charged.
   const first = req.to[0];
-  if (req.userAge < LUCKY_MIN_AGE) return { records: [], error: `Uğurlu hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` };
+  if (req.userAge < LUCKY_MIN_AGE) return { records: [], error: `Şanslı hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` };
   const closed = unavailable(g);
   if (closed) return { records: [], error: closed };
-  if (!wallet.spend(g.price * n, `Uğurlu hediye: ${label}${req.to.length === 1 ? ` → ${first.name}` : ` → ${req.to.length} kişi`}`)) return { records: [], error: 'Yetersiz bakiye.' };
+  if (!wallet.spend(g.price * n, `Şanslı hediye: ${label}${req.to.length === 1 ? ` → ${first.name}` : ` → ${req.to.length} kişi`}`)) return { records: [], error: 'Yetersiz bakiye.' };
 
   let prepaid = n;
   let won = 0;
@@ -271,8 +271,8 @@ export function sendLuckyBatch(
     records.push(r.record);
   }
   const unsent = n - records.length;
-  if (unsent) wallet.credit(g.price * unsent, `Uğurlu iade: ${g.name} x${fmt(unsent)} gönderilemedi`);
-  if (won) (wallet.reward ?? wallet.credit)(won, `Uğurlu ödülü: ${label}`);
+  if (unsent) wallet.credit(g.price * unsent, `Şanslı iade: ${g.name} x${fmt(unsent)} gönderilemedi`);
+  if (won) (wallet.reward ?? wallet.credit)(won, `Şanslı ödülü: ${label}`);
   return { records, error };
 }
 
@@ -308,7 +308,7 @@ export function saveGift(next: LuckyGift, actor = ADMIN): string | null {
   return null;
 }
 export function newGiftDraft(): LuckyGift {
-  return { id: `lk${Date.now().toString(36)}`, name: 'Yeni Uğurlu hediye', emoji: '🎁', price: 50, enabled: false, tiers: STANDARD.map((t) => ({ ...t })) };
+  return { id: `lk${Date.now().toString(36)}`, name: 'Yeni Şanslı hediye', emoji: '🎁', price: 50, enabled: false, tiers: STANDARD.map((t) => ({ ...t })) };
 }
 export function topUpPool(n: number, actor = ADMIN) {
   emit({ pool: state.pool + n });

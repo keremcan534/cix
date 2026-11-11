@@ -38,7 +38,7 @@ import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 /** Coins the server takes without a local spend (the answer's balance shows it): count them as today's spending. */
-const SERVER_TAKES = /^(Hediye gönderildi|Rüzgâr Gülü|Uğurlu hediye|Animasyon|Oyun Salonu)/;
+const SERVER_TAKES = /^(Hediye gönderildi|Rüzgâr Gülü|Şanslı hediye|Animasyon|Oyun Salonu)/;
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
 /** The gift behind a gift earning, stored with it (a price can belong to several gifts; Lucky pays a share). */

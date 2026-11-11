@@ -248,7 +248,7 @@ const GUIDE: Record<Kind, { title: string; art?: ArtName; icon?: keyof typeof Io
   wealth: [
     { title: 'Cömertlik seviyesi nedir?', art: 'seviye-servet-seviyesi', body: ['Similar Club’da yaptığın geçerli jeton harcamalarının toplamını gösteren kalıcı seviyedir. Harcadıkça cömertlik puanın birikir; eşik geçildiğinde seviyen yükselir ve düşmez.'] },
     { title: 'Ne işe yarar?', icon: 'gift-outline', body: ['Seviyen adının yanında rozet olarak görünür. Yükseldikçe listelerde öne çıkarsın; seviye hediyesi, giriş efekti, madalya ve çerçeve açılır. Lv.10’dan sonra seviye atlaman bulunduğun odada, Lv.33’ten sonra tüm platformda duyurulur.'] },
-    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Uğurlu hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, aile kurma ve aile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
+    { title: 'Puan nasıl kazanılır?', icon: 'trending-up', body: ['Harcanan her 1 jeton 1 cömertlik puanıdır. Sayılanlar: odada ve sohbette hediye, Şanslı hediye (yalnızca harcadığın jeton; kazandığın ödül sayılmaz), ücretli mesaj ve aramalar, mağaza alışverişi, aile kurma ve aile hediyeleri, oda etkinlikleri ve animasyonlar.'] },
     { title: 'Sayılmayanlar', icon: 'alert-circle-outline', body: ['• Jetonla oynanan oyunlar.', '• Jeton dağıtma: oda zarfı, jeton transferi.', '• İade edilen işlemler ve kural dışı bulunan hareketler; şüpheli işlemlerde puan verilmez.'] },
   ],
   charm: [

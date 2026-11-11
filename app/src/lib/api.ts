@@ -734,7 +734,7 @@ export type ServerWheel = {
 export const wheel = () => call<ServerWheel>('GET', '/api/wheel');
 export const wheelSpin = (tier: string, count: number, ref = newRef()) => call<{ spin: ServerWheelSpin; user: ServerUser; replay: boolean }>('POST', '/api/wheel/spin', { tier, count, ref });
 
-// Uğurlu hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
+// Şanslı hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
 // their share as diamonds. `draws`: one multiplier per gift, recipient by recipient (`count` each).
 export type ServerLuckyTier = { mult: number; weight: number };
 export type ServerLuckyGift = { id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean };

@@ -1,6 +1,6 @@
 /// <reference types="node" />
 // Win banners: the made-up "other rooms" feed exists only in the offline demo, and wins of chance are never news
-// for someone below Cömertlik Lv.2 (Uğurlu included), nor Oyun Salonu wins for someone who cannot see it.
+// for someone below Cömertlik Lv.2 (Şanslı included), nor Oyun Salonu wins for someone who cannot see it.
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -40,13 +40,13 @@ describe('Uydurma kazanç akışı', () => {
 });
 
 describe('Kazanç bandı kime gösterilmez', () => {
-  const lucky = { source: 'Uğurlu › Şans Yoncası' };
+  const lucky = { source: 'Şanslı › Şans Yoncası' };
   const salon = { source: 'Oyun Merkezi › Şans Çarkı', casino: true };
   const unflagged = { source: 'Oyun Merkezi › Ejder ile Kaplan' };
   const other = { source: 'Oda yarışması' };
   afterEach(() => live(false));
 
-  test('Cömertlik Lv.2 altında Uğurlu ve Oyun Salonu kazançları gösterilmez; şans dışı haber gösterilir', () => {
+  test('Cömertlik Lv.2 altında Şanslı ve Oyun Salonu kazançları gösterilmez; şans dışı haber gösterilir', () => {
     for (const lv of [0, 1]) {
       assert.equal(winNewsHidden(lucky, lv), true);
       assert.equal(winNewsHidden(salon, lv), true);
@@ -60,7 +60,7 @@ describe('Kazanç bandı kime gösterilmez', () => {
     assert.equal(winNewsHidden(salon, 2), false);
   });
 
-  test('jetonlu oyunlar hesaba kapalıysa Oyun Salonu kazancı gösterilmez; Uğurlu seviyeye bakar', () => {
+  test('jetonlu oyunlar hesaba kapalıysa Oyun Salonu kazancı gösterilmez; Şanslı seviyeye bakar', () => {
     assert.equal(winNewsHidden(salon, 9, false), true);
     assert.equal(winNewsHidden(unflagged, 9, false), true);
     assert.equal(winNewsHidden(lucky, 9, false), false);

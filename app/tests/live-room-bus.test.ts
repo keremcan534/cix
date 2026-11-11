@@ -150,7 +150,7 @@ test('sinyaller yalnızca kendi odasının dinleyicisine gider', () => {
   reportPeers(null, []);
 });
 
-test('sunucunun Uğurlu paketi: doğru biçim okunur, bozuk olan bırakılır, aynı gönderim bir kez', () => {
+test('sunucunun Şanslı paketi: doğru biçim okunur, bozuk olan bırakılır, aynı gönderim bir kez', () => {
   const ok = { type: 'lucky', giftId: 'lk2', name: 'Uğur Böceği', emoji: '🐞', count: 5, from: 'u-a', to: ['u-b', 'u-c'], eventIds: [7, 8], best: 50, bigWin: 5000 };
   assert.deepEqual(parseServerLucky(ok), {
     from: 'u-a',

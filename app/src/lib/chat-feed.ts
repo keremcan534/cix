@@ -12,6 +12,8 @@ export type FeedMsg = {
   userId?: string;
   text: string;
   system?: boolean;
+  /** A note from SimilarClub itself (the community rules shown on entering a room): drawn as a notice, not a line. */
+  notice?: boolean;
   bot?: boolean;
   gift?: GiftEvent;
   /** My message could not be sent (no connection); kept locally with a retry. */

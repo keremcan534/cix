@@ -65,7 +65,7 @@ const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
 const LOCKED_NOTIFY: NotifyType[] = ['payment', 'system'];
 
 // The two privacy settings a live build does not offer, with the store's defaults: no live room has invisible entry,
-// and no live win is announced with a name (the Uğurlu line names nobody), so neither switch would do anything there.
+// and no live win is announced with a name (the Şanslı line names nobody), so neither switch would do anything there.
 // One changed on this phone before still acts on this phone, so a live build offers to put them back. The other
 // privacy and contact choices are kept and enforced on the server (lib/live/privacy).
 const PRIVACY_DEFAULTS: Pick<Settings, 'luckyAnnounce' | 'invisibleEntry'> = {
@@ -316,7 +316,7 @@ export default function SettingsScreen() {
           />
           {!live && (
             <>
-              <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Uğurlu hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
+              <Toggle k="luckyAnnounce" icon="megaphone-outline" title="Kazançlarımda adım görünsün" subtitle="Şanslı hediye ve oyun kazançları tüm odalarda duyurulur. Kapalıyken “Bir kullanıcı kazandı” yazar." />
               <Toggle k="cityDiscovery" icon="location-outline" title="Aynı şehirde keşfedilebilir ol" subtitle="Varsayılan kapalı. Kesin konum yerine sadece şehir kullanılır." />
               <Toggle
                 k="invisibleEntry"

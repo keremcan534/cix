@@ -4,7 +4,7 @@
 // The server takes the coins, draws the shares and pays; this only shows its answers.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ import * as api from '@/lib/api';
 import { message } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { bagResult, dropBag, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
+import { tapHaptic } from '@/lib/haptics';
 import { SCRIM, colors } from '@/theme';
 import { RollingNumber } from '@/components/fx/rolling-number';
 
@@ -189,17 +190,115 @@ export function LuckyBagSheet({ visible, room, rules, coins, svipLevel, onClose,
 /** One falling bag: where it starts across the screen, when it first falls, how long a fall takes, its sway, size. */
 type Drop = { x: number; delay: number; duration: number; sway: number; size: number };
 /** A new set of falling bags across `width`, spread so they don't bunch up (impure: once per show). Slow enough to
- *  catch: a bag takes 4 to 5.6 s from top to bottom, and they keep coming for as long as the bag falls. */
+ *  catch: a bag takes about 3.6 to 5.1 s from top to bottom (10 % faster than the 4 to 5.6 s before), and they keep
+ *  coming for as long as the bag falls. */
 function makeDrops(count: number, width: number): Drop[] {
   return Array.from({ length: count }, (_, i) => ({
     x: Math.round(((i + Math.random() * 0.8) / count) * Math.max(0, width - 72)),
     delay: Math.round(Math.random() * 2800),
-    duration: 4000 + Math.round(Math.random() * 1600),
+    duration: Math.round((4000 + Math.random() * 1600) / 1.1),
     sway: Math.round((Math.random() - 0.5) * 60),
     size: 50 + Math.round(Math.random() * 18),
   }));
 }
 const RAIN_DROPS = 10;
+/** Room around a falling bag that still counts as a tap on it (its touch box is the picture plus this). */
+const DROP_PAD = 12;
+/** A collected bag comes back at the top after this long (ms), plus a little chance. */
+const RESPAWN_MS = 450;
+
+/**
+ * One falling bag. It takes the finger the moment it lands (the responder grant, not a press): react-native-web
+ * holds a Pressable's press-in back 50 ms and drops it for a quick tap when there is no onPress, and a press
+ * measures the bag where it was laid out (above the screen) because its fall is drawn on the native side. A grant
+ * has neither: the touch goes to the view under the finger, wherever its fall has moved it.
+ */
+const FallingBag = memo(function FallingBag({ drop, fall, height, label, onGrab }: { drop: Drop; fall: Animated.Value; height: number; label: string; onGrab: (x?: number, y?: number) => void }) {
+  // Built once: a new interpolation on every render would tie the bag's fall to new animated nodes again and again.
+  const [transform] = useState(() => [
+    { translateY: fall.interpolate({ inputRange: [0, 1], outputRange: [0, height + 160] }) },
+    { translateX: fall.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, drop.sway, 0, -drop.sway, 0] }) },
+    { rotate: fall.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-12deg', '12deg', '-8deg'] }) },
+  ]);
+  return (
+    <Animated.View
+      style={[s.drop, { left: drop.x - DROP_PAD, top: -(drop.size + DROP_PAD * 2 + 12), padding: DROP_PAD, transform }]}
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={(e) => onGrab(e.nativeEvent.pageX, e.nativeEvent.pageY)}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityActions={[{ name: 'activate' }]}
+      onAccessibilityAction={(e) => e.nativeEvent.actionName === 'activate' && onGrab()}
+    >
+      <Image source={ROOM_ICON_ART.envelope} style={{ width: drop.size, height: drop.size }} />
+    </Animated.View>
+  );
+});
+
+/** The bags' falls, each on its own, so one can be taken and sent back to the top without stopping the others. */
+class Falls {
+  values: Animated.Value[];
+  private drops: Drop[];
+  private runs: (Animated.CompositeAnimation | null)[] = [];
+  private timers: (ReturnType<typeof setTimeout> | null)[] = [];
+  constructor(drops: Drop[]) {
+    this.drops = drops;
+    this.values = drops.map(() => new Animated.Value(0));
+  }
+  /** Bag `i` comes down from the top after `wait` ms, again and again. */
+  private fall(i: number, wait: number) {
+    const t = this.timers[i];
+    if (t) clearTimeout(t);
+    this.timers[i] = setTimeout(() => {
+      this.timers[i] = null;
+      this.values[i].setValue(0);
+      const run = Animated.loop(Animated.timing(this.values[i], { toValue: 1, duration: this.drops[i].duration, easing: Easing.linear, useNativeDriver: true }), { iterations: -1, resetBeforeIteration: true });
+      this.runs[i] = run;
+      run.start();
+    }, wait);
+  }
+  startAll() {
+    this.drops.forEach((d, i) => this.fall(i, d.delay));
+  }
+  /** Bag `i` was taken: gone at once (back above the screen), and a new one falls a moment later. */
+  take(i: number) {
+    this.runs[i]?.stop();
+    this.runs[i] = null;
+    this.values[i].setValue(0);
+    this.fall(i, RESPAWN_MS + Math.round(Math.random() * 500));
+  }
+  stopAll() {
+    this.timers.forEach((t) => t && clearTimeout(t));
+    this.timers = [];
+    this.runs.forEach((r) => r?.stop());
+    this.runs = [];
+  }
+}
+
+/** The little show where a bag was taken: the bag lifts and fades, a gold ring opens around it. */
+function CollectBurst({ x, y, size, onDone }: { x: number; y: number; size: number; onDone: () => void }) {
+  const [t] = useState(() => new Animated.Value(0));
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  useEffect(() => {
+    const a = Animated.timing(t, { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true });
+    a.start(() => done.current());
+    return () => a.stop();
+  }, [t]);
+  const box = size * 1.6;
+  return (
+    <View pointerEvents="none" style={[s.burst, { left: x - box / 2, top: y - box / 2, width: box, height: box }]}>
+      <Animated.View style={[s.burstRing, { borderRadius: box / 2, opacity: t.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.15] }) }] }]} />
+      <Animated.Image
+        source={ROOM_ICON_ART.envelope}
+        style={{ width: size, height: size, opacity: t.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 0.7, 0] }), transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) }, { scale: t.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }] }}
+      />
+    </View>
+  );
+}
 
 /** A soft, endless pulse (0 → 1 → 0) for things that should catch the eye; still when reduce motion is on. */
 function usePulse(on: boolean, ms = 1100) {
@@ -223,31 +322,51 @@ function usePulse(on: boolean, ms = 1100) {
 
 /**
  * A bag is falling in the room (from the moment it opens until its draw): the room dims a little and bags keep
- * coming down from the top, slowly. A tap on any of them (or on the top card) joins the draw; the card says so and
- * counts down to the draw, with how many have joined. Never blocks the room (only the bags and the card take
- * touches). Reduce motion: the card alone. The room shows it while the bag falls; at the draw it goes.
+ * coming down from the top. A tap on any falling bag takes it: it is gone at once (a small gold flash where it was)
+ * and a new one comes down from the top a moment later; the first bag I take joins the draw (the server's rule:
+ * one entry each, more taps change nothing). A tap on the top card joins too, or opens the bag's card once I'm in.
+ * The card says so and counts down to the draw, with how many have joined. Never blocks the room (only the bags
+ * and the card take touches). My own bag can't be taken: a tap on it opens its card. Reduce motion: the card
+ * alone. The room shows it while the bag falls; at the draw it goes.
  */
 export function LuckyBagRain({ bag, now, width, height, still, onJoin, onOpen }: { bag: Bag; now: number; width: number; height: number; still?: boolean; onJoin: (b: Bag) => void; onOpen: (b: Bag) => void }) {
   const { top } = useSafeAreaInsets();
   const [intro] = useState(() => new Animated.Value(0));
   const [dim] = useState(() => new Animated.Value(0));
   const [drops] = useState(() => makeDrops(still ? 0 : RAIN_DROPS, width));
-  const [falls] = useState(() => drops.map(() => new Animated.Value(0)));
+  const [falls] = useState(() => new Falls(drops));
   const left = Date.parse(bag.closesAt) - now;
   useEffect(() => {
-    const show = Animated.parallel([
-      Animated.spring(intro, { toValue: 1, useNativeDriver: true, bounciness: 10, speed: 9 }),
-      Animated.timing(dim, { toValue: 1, duration: 380, useNativeDriver: true }),
-      ...falls.map((v, i) =>
-        Animated.sequence([
-          Animated.delay(drops[i].delay),
-          Animated.loop(Animated.timing(v, { toValue: 1, duration: drops[i].duration, easing: Easing.linear, useNativeDriver: true }), { iterations: -1, resetBeforeIteration: true }),
-        ]),
-      ),
-    ]);
+    const show = Animated.parallel([Animated.spring(intro, { toValue: 1, useNativeDriver: true, bounciness: 10, speed: 9 }), Animated.timing(dim, { toValue: 1, duration: 380, useNativeDriver: true })]);
     show.start();
-    return () => show.stop();
-  }, [intro, dim, falls, drops]);
+    falls.startAll();
+    return () => {
+      show.stop();
+      falls.stopAll();
+    };
+  }, [intro, dim, falls]);
+  // Bags taken, each shown where it was taken until its flash is over.
+  const [bursts, setBursts] = useState<{ key: number; x: number; y: number; size: number }[]>([]);
+  const burstKey = useRef(0);
+  // The latest bag and callbacks for the bags' touch (the bags themselves are drawn once).
+  const latest = useRef({ bag, onJoin, onOpen });
+  useEffect(() => {
+    latest.current = { bag, onJoin, onOpen };
+  });
+  const [grabs] = useState(() =>
+    drops.map((d, i) => (x?: number, y?: number) => {
+      const { bag: b, onJoin: join, onOpen: open } = latest.current;
+      if (b.mine) return open(b);
+      falls.take(i);
+      if (x !== undefined && y !== undefined && Number.isFinite(x) && Number.isFinite(y)) {
+        const key = ++burstKey.current;
+        setBursts((list) => [...list.slice(-5), { key, x, y, size: d.size }]);
+      }
+      tapHaptic();
+      // The first one I take joins the draw (live-room sends it once; again changes nothing on the server).
+      if (!b.joined) join(b);
+    }),
+  );
   // A short bounce on the card when I join.
   const [pop] = useState(() => new Animated.Value(1));
   const wasJoined = useRef(bag.joined);
@@ -263,32 +382,16 @@ export function LuckyBagRain({ bag, now, width, height, still, onJoin, onOpen }:
   };
   const title = bag.mine ? 'Çantan düşüyor' : bag.joined ? 'Çekilişe katıldın' : `${bag.from.name} Şanslı çanta attı`;
   const sub = bag.mine || bag.joined ? `${bag.entrants} kişi katıldı · çekiliş ${mmss(left)}` : `${bagWhat(bag)} · dokun, çekilişe katıl`;
+  const dropLabel = bag.mine ? 'Senin çantan, kartını aç' : bag.joined ? 'Çantayı topla' : 'Çantayı topla, çekilişe katıl';
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.rainDim, { opacity: dim }]} />
       {drops.map((d, i) => (
-          <Animated.View
-            key={i}
-            style={[
-              s.drop,
-              {
-                left: d.x,
-                transform: [
-                  { translateY: falls[i].interpolate({ inputRange: [0, 1], outputRange: [0, height + 160] }) },
-                  { translateX: falls[i].interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, d.sway, 0, -d.sway, 0] }) },
-                  { rotate: falls[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-12deg', '12deg', '-8deg'] }) },
-                ],
-              },
-            ]}
-          >
-            {/* A falling bag counts the moment the finger lands (onPressIn): its fall is drawn on the native side, so
-                the press area React Native measures is where the bag was laid out (above the screen), and a release
-                would always be read as "moved off it" and dropped. */}
-            <Pressable onPressIn={tap} hitSlop={18} accessibilityRole="button" accessibilityLabel={bag.joined ? 'Çekilişe katıldın' : 'Çantaya dokun, çekilişe katıl'}>
-              <Image source={ROOM_ICON_ART.envelope} style={{ width: d.size, height: d.size }} />
-            </Pressable>
-          </Animated.View>
-        ))}
+        <FallingBag key={i} drop={d} fall={falls.values[i]} height={height} label={dropLabel} onGrab={grabs[i]} />
+      ))}
+      {bursts.map((b) => (
+        <CollectBurst key={b.key} x={b.x} y={b.y} size={b.size} onDone={() => setBursts((list) => list.filter((x) => x.key !== b.key))} />
+      ))}
       <Animated.View
         style={[
           s.rainCard,
@@ -558,7 +661,9 @@ const s = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   // The drop show: a warm dark veil, bags falling from above the screen, and the card at the top.
   rainDim: { backgroundColor: 'rgba(6,4,14,0.46)' },
-  drop: { position: 'absolute', top: -80 },
+  drop: { position: 'absolute' },
+  burst: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  burstRing: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 3, borderColor: GOLD, boxShadow: '0 0 14px rgba(246,189,96,0.7)' },
   rainCard: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   rainInner: { width: '88%', maxWidth: 380, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 22, backgroundColor: '#1A1208', borderWidth: 1.5, borderColor: GOLD, boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 22px rgba(246,189,96,0.35)' },
   rainTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
