@@ -24,6 +24,7 @@ import { validAnyIban } from '@/lib/withdraw-rules';
 import { DEMO_DECOR, DEMO_ROOM_COVER, demoDecorOf, type DemoDecor } from '@/lib/room-decor';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
+import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
@@ -521,6 +522,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   useEffect(() => {
     settingsRef.current = settings;
     setHapticsEnabled(settings.haptics);
+    setGameVolume(settings.gameVolume);
   }, [settings]);
   // The demo starts with three sample notices about sample people and rooms. A live build starts empty, and
   // drops the samples once from a save made before (their ids are only ever used by these samples).
