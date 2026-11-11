@@ -140,6 +140,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM family_requests WHERE user_id = $1', [id]);
     await c.query('DELETE FROM family_invites WHERE user_id = $1', [id]);
     await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
+    // Their lines in agency groups (agency-chat.mjs).
+    await c.query('DELETE FROM agency_messages WHERE author = $1', [id]);
     // Room social (room-social.mjs): their mic invites, poll votes and polls, and the follower invites they sent or
     // that were for their account.
     await c.query('DELETE FROM room_mic_invites WHERE from_user = $1 OR to_user = $1', [id]);

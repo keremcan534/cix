@@ -425,6 +425,8 @@ export async function exportOf(c, uid) {
       'SELECT a.id, a.name, s.method, s.contract, s.joined_at, s.ended_at, s.end_reason FROM agency_streamers s JOIN agencies a ON a.id = s.agency_id WHERE s.streamer_id = $1 ORDER BY s.id',
       (x) => ({ agency: { id: x.id, name: x.name }, method: x.method, contract: x.contract, joinedAt: x.joined_at, endedAt: x.ended_at, endReason: x.end_reason ?? null }),
     ),
+    // What I wrote in agency groups (agency-chat.mjs).
+    messages: await all('SELECT a.name, m.body, m.created_at FROM agency_messages m JOIN agencies a ON a.id = m.agency_id WHERE m.author = $1 ORDER BY m.id', (x) => ({ agency: x.name, text: x.body, at: x.created_at })),
     requests: await all('SELECT r.kind, r.method, r.note, r.status, r.created_at, r.decided_at, a.name FROM agency_requests r JOIN agencies a ON a.id = r.agency_id WHERE r.user_id = $1 ORDER BY r.id', (x) => ({
       agency: x.name,
       kind: x.kind,

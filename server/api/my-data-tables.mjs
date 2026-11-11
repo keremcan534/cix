@@ -9,7 +9,7 @@ export const EXPORTED = [
   'rooms', 'room_admins', 'room_djs', 'room_members', 'room_bans', 'presence_log', 'room_animations', 'room_events',
   'room_event_going', 'music_tracks', 'families', 'family_members', 'family_requests', 'family_invites',
   'family_messages', 'family_checkins', 'family_chest_claims', 'bonds', 'agencies', 'agency_streamers',
-  'agency_requests', 'agency_transfers', 'profile_visits', 'reports', 'user_sanctions', 'sanction_appeals',
+  'agency_requests', 'agency_transfers', 'agency_messages', 'profile_visits', 'reports', 'user_sanctions', 'sanction_appeals',
   'contact_refusals', 'team_notices', 'team_notice_seen', 'support_tickets', 'support_messages', 'data_exports',
   'profile_extras', 'profile_photos', 'privacy_settings', 'call_history_cleared', 'room_mic_invites', 'room_polls',
   'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
