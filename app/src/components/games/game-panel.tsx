@@ -18,6 +18,7 @@ import { BoardPlayer } from '@/components/games/board';
 import { LineSlotPlayer } from '@/components/games/line-slot';
 import { FenerPlayer } from '@/components/games/fener';
 import { RocketPlayer } from '@/components/games/rocket';
+import { BilyePlayer } from '@/components/games/bilye';
 import { OkeyTable } from '@/components/games/okey';
 import { WheelPlayer } from '@/components/games/wheel';
 import { GameNav } from '@/components/games/slot-kit';
@@ -49,6 +50,7 @@ const CASINO_SCREENS: Partial<Record<CasinoGame['id'], (p: { entry: Entry }) => 
   fish: FishPlayer,
   rocket: RocketPlayer,
   goldtree: GoldTreePlayer,
+  bilye: BilyePlayer,
 };
 function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
   if (isLineSlot(id)) return <LineSlotPlayer id={id} entry={entry} />;

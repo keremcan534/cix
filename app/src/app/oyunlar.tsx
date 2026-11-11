@@ -34,7 +34,7 @@ const PROFILE = { from: 'profile' } as const;
 const SHELVES: { title: string; ids: CasinoGame['id'][] }[] = [
   { title: 'Slot makineleri', ids: ['jackpot', 'super777', 'jungle', 'pinata', 'spellbook', 'neon', 'goldtree'] },
   { title: 'Çark ve masa', ids: ['slot', 'foodwheel', 'magiccard'] },
-  { title: 'Aksiyon', ids: ['rocket', 'fish', 'olympus'] },
+  { title: 'Aksiyon', ids: ['rocket', 'fish', 'olympus', 'bilye'] },
 ];
 /** One line under a game's name: what it is, said shortly (the rules are in the game's "?" sheet). */
 const HOOK: Partial<Record<CasinoGame['id'], string>> = {
@@ -51,6 +51,7 @@ const HOOK: Partial<Record<CasinoGame['id'], string>> = {
   rocket: 'Çarpanı seç, fırlat',
   fish: 'Dokun, ateş et, yakala',
   olympus: 'Fenerin ışığı kimi bulacak?',
+  bilye: 'Fırlat, çivilerden sek, kupaya düş',
 };
 
 export default function GameCenter() {

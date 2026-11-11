@@ -1,4 +1,5 @@
-// Oyun Salonu on the server (casino.mjs): the catalog of the games the server plays, their stakes, and every game's
+// Oyun Salonu on the server (casino.mjs): the catalog of the games the server plays (Bilye Şelalesi's rules are in
+// casino-bilye.mjs), their stakes, and every game's
 // round as pure functions. The same rules as the app's demo engines (app/src/lib/casino-odds.ts, board-games.ts,
 // fish-hunt.ts, crash-rocket.ts, gold-tree.ts and data/games.ts); the app's test tests/casino-server.test.ts keeps
 // them equal, draw for draw, so a screen replays exactly the round the server decided. The reel games are in
@@ -9,6 +10,7 @@
 // 60 % of each stake to the house at once and pays winnings only from the other 40 %, so the share holds exactly.
 // The odds are fixed here, not live settings: the installed app shows these multipliers, paytables and rules, and a
 // server-side change would promise prizes the server no longer pays (as gift prices, live-registry.mjs).
+import { BILYE_MAX, BILYE_PICKS, bilyeDetail, bilyeReturn, playBilye } from './casino-bilye.mjs';
 import { FENER_MAX, SLOT_CONFIGS, fenerReturn, playFener, playSlot, slotMax, slotReturn } from './casino-slots.mjs';
 
 export const HOUSE_SHARE = 0.6;
@@ -45,6 +47,7 @@ export const GAMES = [
   { id: 'pinata', name: 'Konfeti Kutusu', bets: STAKES.mid },
   { id: 'spellbook', name: 'Kayıp Parşömen', bets: STAKES.mid },
   { id: 'neon', name: 'Neon Bulvar', bets: STAKES.high },
+  { id: 'bilye', name: 'Bilye Şelalesi', bets: STAKES.wide },
 ];
 export const GAME_IDS = GAMES.map((g) => g.id);
 export const gameById = (id) => (typeof id === 'string' ? GAMES.find((g) => g.id === id) : undefined);
@@ -242,7 +245,10 @@ export const isLineSlot = (id) => Object.hasOwn(SLOT_CONFIGS, id);
 export const isBoard = (id) => Object.hasOwn(BOARDS, id);
 /** The picks a game takes ('' for the ones without a choice); a board's options are bet on in `bets` instead. */
 export const PICKS = Object.fromEntries(
-  GAME_IDS.map((id) => [id, id === 'fish' ? FISH.map((f) => f.id) : id === 'rocket' ? ROCKET_TARGETS.map(String) : isBoard(id) ? BOARDS[id].options.map((o) => o.id) : ['']]),
+  GAME_IDS.map((id) => [
+    id,
+    id === 'fish' ? FISH.map((f) => f.id) : id === 'rocket' ? ROCKET_TARGETS.map(String) : id === 'bilye' ? [...BILYE_PICKS] : isBoard(id) ? BOARDS[id].options.map((o) => o.id) : [''],
+  ]),
 );
 
 /**
@@ -288,6 +294,11 @@ export function outcomeOf(game, pick, rnd) {
     ];
     return { display: round.base.grid.flat().map((c) => (c.kind === 'ship' ? `ship${c.cargo}` : c.kind)), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), fener: round };
   }
+  if (game === 'bilye') {
+    const r = playBilye(pick, rnd);
+    const bilye = { lane: r.lane, target: r.target, variant: r.variant };
+    return { display: [String(r.target)], multiplier: r.multiplier, detail: bilyeDetail(bilye), bilye };
+  }
   if (game === 'fish') {
     const f = fishById(pick);
     const shot = shootFish(f, rnd(fishDraw(f)));
@@ -304,6 +315,7 @@ export function expectedReturn(game, pick = '') {
   if (isBoard(game)) return optionReturn(BOARDS[game], pick);
   if (game === 'olympus') return fenerReturn().total;
   if (game === 'fish') return fishReturn(fishById(pick));
+  if (game === 'bilye') return bilyeReturn(pick);
   throw new Error(`unknown game ${game}`);
 }
 
@@ -315,6 +327,7 @@ export function maxMultiplier(game, pick = '') {
   if (isBoard(game)) return optionOf(BOARDS[game], pick).mult;
   if (game === 'olympus') return FENER_MAX;
   if (game === 'fish') return fishById(pick).mult;
+  if (game === 'bilye') return BILYE_MAX;
   throw new Error(`unknown game ${game}`);
 }
 
