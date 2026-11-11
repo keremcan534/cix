@@ -16,7 +16,12 @@ import { TREE_PAYS, TREE_STRIPS } from '@/lib/gold-tree';
 import { stripsOf } from '@/lib/line-slot';
 import { bigChange, valueText } from '@/lib/live-settings-format';
 import { SLOT_CONFIGS } from '@/lib/slot-configs';
+import { LANES, LANE_NAME, TARGETS } from '@/lib/bilye/board';
+import { BILYE_MAX, BILYE_TENTHS, BILYE_TOTAL, BILYE_VARIANTS } from '@/lib/bilye/rules';
+import { WEIGHTS } from '@/lib/bilye/table';
 // Plain JavaScript modules of the server; TypeScript reads them through allowJs.
+import * as bilye from '../../server/api/casino-bilye.mjs';
+import * as bilyeTable from '../../server/api/bilye-table.mjs';
 import * as rules from '../../server/api/casino-rules.mjs';
 import * as slots from '../../server/api/casino-slots.mjs';
 import * as registry from '../../server/api/live-registry.mjs';
@@ -66,6 +71,15 @@ describe('Oyun Salonu kataloğu sunucuyla aynı', () => {
     assert.deepEqual(rules.BOARDS, BOARDS);
     assert.deepEqual([slots.CELL_WEIGHTS, slots.CARGO, slots.BRIGHTNESS, slots.ROW_PAIRS], [CELL_WEIGHTS, CARGO, BRIGHTNESS, ROW_PAIRS]);
     assert.deepEqual([slots.STORM_TRIGGER, slots.STORM_SPINS, slots.FENER_MAX], [STORM_TRIGGER, STORM_SPINS, FENER_MAX]);
+  });
+
+  test('Bilye Şelalesi: sunucunun tablosu uygulamanın tahtasından (scripts/bilye-table.ts yeniden çalıştırılmalı)', () => {
+    assert.deepEqual(bilyeTable.LANES, [...LANES]);
+    assert.deepEqual(bilyeTable.LANE_NAME, LANE_NAME);
+    assert.deepEqual(bilyeTable.TARGET_NAMES, TARGETS.map((t) => t.name));
+    assert.deepEqual(bilyeTable.TENTHS, [...BILYE_TENTHS]);
+    assert.deepEqual(bilyeTable.WEIGHTS, WEIGHTS);
+    assert.deepEqual([bilye.BILYE_TOTAL, bilye.BILYE_VARIANTS, bilye.BILYE_MAX], [BILYE_TOTAL, BILYE_VARIANTS, BILYE_MAX]);
   });
 });
 

@@ -86,7 +86,7 @@ describe('Oyun Salonu oranları', () => {
         assert.ok(o.detail.length > 0 && o.detail.length <= 200);
         if (isLineSlot(g.id)) assert.ok(o.slot);
         else if (isBoard(g.id)) assert.ok(o.board);
-        else assert.ok(o.tree || o.rocket || o.fener || typeof o.caught === 'boolean', g.id);
+        else assert.ok(o.tree || o.rocket || o.fener || o.bilye || typeof o.caught === 'boolean', g.id);
       }
     }
   });

@@ -13,6 +13,7 @@ import { DRAW as ROCKET_DRAW, ROCKET_TARGETS, crashPoint, rocketMultiplier, rock
 import { TREE_MAX, TREE_LABEL, playTree, treeReturn, type TreeSpin } from '@/lib/gold-tree';
 import { playSlot, slotMax, slotReturn, type SlotSpin } from '@/lib/line-slot';
 import { FENER_MAX, fenerReturn, playFener, type FenerRound } from '@/lib/fener-slot';
+import { BILYE_MAX, BILYE_PICKS, bilyeDetail, bilyeReturn, isLane, playBilye, type BilyeRound } from '@/lib/bilye/rules';
 import { SLOT_CONFIGS } from '@/lib/slot-configs';
 
 export const CASINO_HOUSE_SHARE = 0.6;
@@ -21,9 +22,9 @@ export const CASINO_RETURN_SHARE = 0.4;
 /** Payline slots (lib/slot-configs), bet boards (lib/board-games) and the games with an engine of their own. */
 export type LineSlotId = 'jackpot' | 'super777' | 'jungle' | 'pinata' | 'spellbook' | 'neon';
 export type BoardId = 'slot' | 'foodwheel' | 'magiccard';
-export type CasinoId = 'wheel' | 'dice' | 'dragon' | 'fortune' | 'olympus' | 'fish' | 'rocket' | 'goldtree' | LineSlotId | BoardId;
+export type CasinoId = 'wheel' | 'dice' | 'dragon' | 'fortune' | 'olympus' | 'fish' | 'rocket' | 'goldtree' | 'bilye' | LineSlotId | BoardId;
 /** Games whose round has its own engine instead of a list of uniform draws. */
-type EngineId = 'fortune' | 'olympus' | 'fish' | 'rocket' | 'goldtree' | LineSlotId | BoardId;
+type EngineId = 'fortune' | 'olympus' | 'fish' | 'rocket' | 'goldtree' | 'bilye' | LineSlotId | BoardId;
 export const isLineSlot = (id: string): id is LineSlotId => id in SLOT_CONFIGS;
 export const isBoard = (id: string): id is BoardId => id in BOARDS;
 /**
@@ -42,6 +43,7 @@ export type Outcome = {
   rocket?: { crash: number; target: number };
   tree?: TreeSpin;
   board?: BoardResult;
+  bilye?: BilyeRound;
 };
 
 /** Wheel slices (in drawing order) and their weights out of 1000: expected return 400 / 1000. */
@@ -81,6 +83,7 @@ export const PICKS: Record<CasinoId, string[]> = {
   fish: FISH.map((f) => f.id),
   rocket: ROCKET_TARGETS.map(String),
   goldtree: [''],
+  bilye: [...BILYE_PICKS],
   ...(Object.fromEntries(Object.keys(SLOT_CONFIGS).map((id) => [id, ['']])) as Record<LineSlotId, string[]>),
   ...(Object.fromEntries(Object.values(BOARDS).map((b) => [b.id, b.options.map((o) => o.id)])) as Record<BoardId, string[]>),
 };
@@ -135,6 +138,12 @@ export function outcomeOf(game: CasinoId, pick: string, rnd: (n: number) => numb
       `${Math.round(round.multiplier * 10) / 10}x`,
     ];
     return { display: round.base.grid.flat().map((c) => (c.kind === 'ship' ? `ship${c.cargo}` : c.kind)), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), fener: round };
+  }
+  if (game === 'bilye') {
+    if (!isLane(pick)) throw new Error(`unknown launch ${pick}`);
+    const r = playBilye(pick, rnd);
+    const bilye: BilyeRound = { lane: r.lane, target: r.target, variant: r.variant };
+    return { display: [String(r.target)], multiplier: r.multiplier, detail: bilyeDetail(bilye), bilye };
   }
   if (game === 'fish') {
     const f = fishById(pick)!;
@@ -194,6 +203,7 @@ export function expectedReturn(game: CasinoId | 'duel', pick = ''): number {
   if (isBoard(game)) return optionReturn(BOARDS[game], pick);
   if (game === 'olympus') return fenerReturn().total;
   if (game === 'fish') return fishReturn(fishById(pick)!);
+  if (game === 'bilye') return isLane(pick) ? bilyeReturn(pick) : 0;
   let sum = 0;
   let n = 0;
   for (const d of combos(DRAWS[game])) {
@@ -212,6 +222,7 @@ export function maxMultiplier(game: CasinoId | 'duel', pick = ''): number {
   if (isBoard(game)) return optionOf(BOARDS[game], pick)!.mult;
   if (game === 'olympus') return FENER_MAX;
   if (game === 'fish') return fishById(pick)!.mult;
+  if (game === 'bilye') return BILYE_MAX;
   let max = 0;
   for (const d of combos(DRAWS[game])) max = Math.max(max, evaluate(game, pick, d).multiplier);
   return max;

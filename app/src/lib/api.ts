@@ -757,6 +757,16 @@ export type ServerLuckyAdmin = {
 };
 /** Admins only (403 otherwise). A save on an older version answers 409: read again and retry. */
 export const luckyAdmin = () => call<ServerLuckyAdmin>('GET', '/api/admin/lucky');
+/** Yönetim › Oyun Salonu raporu (server/api/casino.mjs, admin role). */
+export type CasinoReportGame = { id: string; name: string; rounds: number; players: number; wagered: number; paid: number; house: number };
+export type CasinoReportPeriod = { rounds: number; wagered: number; paid: number; house: number; games: CasinoReportGame[] };
+export type CasinoReport = {
+  /** The house book since the start: coins played, the house's 60 %, the payout pool now, what it paid, its opening advance. */
+  book: { wagered: number; house: number; pool: number; paid: number; seed: number };
+  jackpots: Record<string, number>;
+  periods: Record<'today' | 'week' | 'month' | 'kept', CasinoReportPeriod>;
+};
+export const casinoReport = () => call<CasinoReport>('GET', '/api/admin/casino/report');
 export const saveLuckyConfig = (config: ServerLuckyConfig, version: number) =>
   call<{ config: ServerLuckyConfig; version: number; updatedAt: string }>('POST', '/api/admin/lucky/config', { config, version });
 
