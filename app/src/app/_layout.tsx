@@ -17,6 +17,7 @@ import { ScreenEnter } from '@/components/fx/screen-enter';
 import { GamesBridge } from '@/components/games/bridge';
 import { MatchLayer } from '@/components/match-layer';
 import { IncomingCall } from '@/components/incoming-call';
+import { EventCenterHost } from '@/components/events/event-center';
 import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
 import { SanctionLayer } from '@/components/sanction-screen';
@@ -164,6 +165,8 @@ function RootStack() {
       {loggedIn && <MatchLayer />}
       {loggedIn && <IncomingCall />}
       {loggedIn && <GamesBridge />}
+      {/* Etkinlik Merkezi, opened from the Odalar calendar, a room or a notice (components/events/open). */}
+      {loggedIn && <EventCenterHost />}
       {/* Over everything, signed in or not: a ban refusal can come from the sign-in screen itself. */}
       <SanctionLayer signedIn={loggedIn} />
       {/* The server's notice and required update, signed in or not. */}
