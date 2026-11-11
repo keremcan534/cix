@@ -10,7 +10,7 @@ import { expectedReturn, maxMultiplier, outcomeOf } from '@/lib/casino-odds';
 import { DRAW, ROCKET_MAX, ROCKET_TARGETS, crashPoint, rocketReturn } from '@/lib/crash-rocket';
 import { FISH, FISH_HIT, fishDraw, fishReturn, shootFish } from '@/lib/fish-hunt';
 import { JACKPOT_SEEDS, getGames, playBoard, playCasino, resetGames, setGameDeps } from '@/lib/games';
-import { TREE_PAYS, treePay, treeReturn } from '@/lib/gold-tree';
+import { TREE_OPENING, TREE_PAYS, treePay, treeReturn, treeWindow } from '@/lib/gold-tree';
 import { linePay, playSlot, slotMax, slotReturn, slotSpin, stripsOf, type SlotConfig } from '@/lib/line-slot';
 import { CELLS, COLS, FENER_MAX, ROWS, STORM_SPINS, STORM_TRIGGER, cargoLabel, evaluateBoard, fenerReturn, playFener, type FCell } from '@/lib/fener-slot';
 import { MEGA, SLOT_CONFIGS, SPELLBOOK, SUPER777 } from '@/lib/slot-configs';
@@ -250,6 +250,15 @@ describe('Bereket Ağacı', () => {
     assert.equal(TREE_PAYS.length, 6);
     const r = treeReturn();
     assert.ok(r <= 0.4 + 1e-12 && r >= 0.395, `${r}`);
+  });
+
+  test('açılış görüntüsü: her makarada sembol var, orta çizgi kazanç göstermez', () => {
+    const grid = treeWindow(TREE_OPENING);
+    for (const col of grid) assert.ok(col.some((x) => x !== 'blank'), 'boş makara');
+    const middle = grid.map((col) => col[1]);
+    assert.equal(treePay(middle), null);
+    // Not a jackpot tease either: no tree in view.
+    assert.ok(!grid.flat().includes('tree'));
   });
 });
 

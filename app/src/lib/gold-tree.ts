@@ -34,6 +34,11 @@ export const TREE_STRIPS: TreeSym[][] = [
 
 /** The visible column of each reel: the stop is the middle (paying) row. */
 export const treeWindow = (stops: number[]) => stops.map((s, r) => [-1, 0, 1].map((k) => TREE_STRIPS[r][(s + k + TREE_STRIPS[r].length) % TREE_STRIPS[r].length]));
+/**
+ * The stops the reels show before the first spin: every reel has symbols in view and the middle row pays nothing
+ * (the outer reels rest between symbols). Only a picture; a spin never starts from it.
+ */
+export const TREE_OPENING = [4, 3, 6];
 export function treePay(middle: TreeSym[]) {
   const hit = TREE_PAYS.find((p) => p.test(middle));
   return hit ? { name: hit.name, pay: hit.pay } : null;

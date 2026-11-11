@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY *.mjs version.txt ./
+COPY room-games ./room-games
 COPY migrations ./migrations
 USER node
 CMD ["node", "index.mjs"]

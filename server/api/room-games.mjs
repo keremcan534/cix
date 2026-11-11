@@ -1,16 +1,20 @@
-// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX; rules: room-games-rules.mjs): free games the people in
-// a room play together. The server keeps the one table a room has, rolls every die and deals every card, checks
-// each move (seat, turn) and tells the room after every change (LiveKit packet 'table': "read the table again",
-// app lib/live/room-bus), so every phone shows the same table. A player's cards go only to that player.
+// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX, Dört Taş; rules: room-games-rules.mjs and
+// room-games/): free games the people in a room play together. The server keeps the one table a room has, rolls
+// every die and deals every card, checks each move (seat, turn) and tells the room after every change (LiveKit
+// packet 'table': "read the table again", app lib/live/room-bus), so every phone shows the same table. A player's
+// cards go only to that player.
 //
-//   GET  /api/rooms/table?room=                        → { table }   (null: no table in the room)
-//   POST /api/rooms/table { room, action, game?, move? } → { table }
-//     action: open { game } (room staff), join, start (whoever opened it, or staff; the first seat once the opener
-//             left), move { move }, leave, again (a seated player, after a hand), close (as start)
+//   GET  /api/rooms/table?room=                                  → { table }   (null: no table in the room)
+//   POST /api/rooms/table { room, action, game?, options?, move? } → { table }
+//     action: open { game, options? } (room staff; Ludo's options: { mode: 'quick' | 'classic' }), join, start
+//             (whoever opened it, or staff; the first seat once the opener left), move { move }, leave, again (a
+//             seated player, after a hand), close (as start)
+//     move:   XOX { cell } · Dört Taş { col } · Renk Kartları { card, color? } (a Joker names its colour),
+//             { draw: true } or { pass: true } · Ludo { roll: true }, then { token } when there is a choice
 //
-// A turn has TURN_MS; when it runs out the table plays for that seat (Ludo rolls, Renk Kartları plays its first
-// card that fits or draws) and after MISSES such turns in a row the seat leaves. In XOX the one whose time ran out
-// loses. This is applied whenever someone reads or acts on the table, so no clock runs here.
+// A turn has TURN_MS; when it runs out the table plays for that seat (Ludo throws and moves, Renk Kartları plays a
+// card that fits or draws, Dört Taş drops a disc) and after MISSES such turns in a row the seat leaves. In XOX the one
+// whose time ran out loses. This is applied whenever someone reads or acts on the table, so no clock runs here.
 // People who block each other (either way) don't sit at one table. Someone banned from the room can't play in it.
 // Kept: the table while it is played; one nobody touched for a day goes when a new table opens, and a deleted
 // account's tables go with it (social.mjs eraseAccount). Nothing here is money.
@@ -19,7 +23,7 @@ import crypto from 'node:crypto';
 import { HttpError, auth, db, limit, readJson, tx } from './core.mjs';
 import { liveKitName, rankOf, roomRow } from './rooms.mjs';
 import { roomService } from './live.mjs';
-import { MISSES, TABLE_GAMES, TURN_MS, autoMove, leaveTable, moveTable, openTable, startTable, viewOf } from './room-games-rules.mjs';
+import { TABLE_GAMES, TURN_MS, leaveTable, moveTable, openTable, staleTable, startTable, tableOptions, timeoutTable, viewOf } from './room-games-rules.mjs';
 
 const rnd = (n) => crypto.randomInt(0, n);
 
@@ -72,14 +76,7 @@ async function settle(c, row) {
   let at = new Date(row.turn_at).getTime();
   let changed = false;
   for (let i = 0; i < 40 && t.status === 'playing' && at + TURN_MS <= Date.now(); i++) {
-    const names = (await namesOf(c, t.seats)).map((x) => x.name);
-    const seat = t.turn;
-    if (t.game === 'xox') t = { ...t, status: 'over', winner: 1 - seat, log: `${names[seat]} için süre doldu · 🏆 ${names[1 - seat]} kazandı!` };
-    else if (t.misses[seat] + 1 >= MISSES) t = leaveTable(t, seat, names);
-    else {
-      const r = moveTable(t, seat, autoMove(t), names, rnd);
-      t = { ...r.table, misses: r.table.misses.map((m, k) => (k === seat ? t.misses[seat] + 1 : m)) };
-    }
+    t = timeoutTable(t, (await namesOf(c, t.seats)).map((x) => x.name), rnd);
     at += TURN_MS;
     changed = true;
   }
@@ -95,6 +92,12 @@ async function save(c, row, state, turnAt = Date.now()) {
   return r.rows[0];
 }
 
+/** The room's table row. One an older version left in a state its game can't play on counts as none: the next table opened replaces it. */
+async function tableRow(c, roomId, lock = '') {
+  const row = (await c.query(`SELECT * FROM room_tables WHERE room_id = $1 ${lock}`, [roomId])).rows[0];
+  return row && !staleTable(row.state) ? row : undefined;
+}
+
 /** True when `uid` and anyone at the table block each other (either way). */
 async function blockedWith(c, uid, seats) {
   if (!seats.length) return false;
@@ -106,10 +109,13 @@ export const roomGameRoutes = {
   async 'GET /api/rooms/table'(req, url) {
     const me = await auth(req);
     const room = await openRoom(url.searchParams.get('room'), me.id);
-    let row = (await db.query('SELECT * FROM room_tables WHERE room_id = $1', [room.id])).rows[0];
+    let row = await tableRow(db, room.id);
     if (row?.state.status === 'playing' && new Date(row.turn_at).getTime() + TURN_MS <= Date.now()) {
       const before = row.version;
-      row = await tx(async (c) => settle(c, (await c.query('SELECT * FROM room_tables WHERE room_id = $1 FOR UPDATE', [room.id])).rows[0]));
+      row = await tx(async (c) => {
+        const locked = await tableRow(c, room.id, 'FOR UPDATE');
+        return locked && settle(c, locked);
+      });
       if (row && row.version !== before) announce(room.id, row.version);
     }
     return { table: await view(db, row, me.id) };
@@ -124,17 +130,18 @@ export const roomGameRoutes = {
     if (!['open', 'join', 'start', 'move', 'leave', 'again', 'close'].includes(action)) throw new HttpError(400, 'Geçersiz işlem');
     const staff = (await rankOf(room, me.id)) > 0;
     if (action === 'open') {
-      if (!Object.hasOwn(TABLE_GAMES, b.game ?? '')) throw new HttpError(400, 'Geçersiz oyun');
+      if (typeof b.game !== 'string' || !Object.hasOwn(TABLE_GAMES, b.game)) throw new HttpError(400, 'Geçersiz oyun');
       if (!staff) throw new HttpError(403, 'Masayı oda sahibi veya yöneticiler açar');
+      if (!tableOptions(b.game, b.options)) throw new HttpError(400, 'Geçersiz oyun ayarı');
     }
     const out = await tx(async (c) => {
-      let row = (await c.query('SELECT * FROM room_tables WHERE room_id = $1 FOR UPDATE', [room.id])).rows[0];
+      let row = await tableRow(c, room.id, 'FOR UPDATE');
       if (row) row = await settle(c, row);
       if (action === 'open') {
         if (row && row.state.status !== 'over' && row.state.seats.length) throw new HttpError(409, `Odada açık bir ${TABLE_GAMES[row.game].name} masası var`);
         // Tables nobody touched for a day go (every room's, a few at a time).
         await c.query("DELETE FROM room_tables WHERE room_id IN (SELECT room_id FROM room_tables WHERE updated_at < now() - interval '1 day' LIMIT 100)");
-        const state = openTable(b.game, me.id);
+        const state = openTable(b.game, me.id, b.options);
         const r = await c.query(
           `INSERT INTO room_tables (room_id, game, opened_by, seats, state) VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (room_id) DO UPDATE SET game = $2, opened_by = $3, seats = $4, state = $5, version = room_tables.version + 1, turn_at = now(), created_at = now(), updated_at = now()
@@ -162,7 +169,7 @@ export const roomGameRoutes = {
         if (await blockedWith(c, me.id, t.seats)) throw new HttpError(403, 'Bu masaya oturamazsın');
         let next = { ...t, seats: [...t.seats, me.id], misses: [...t.misses, 0] };
         // XOX starts as soon as its second player sits.
-        if (row.game === 'xox' && next.seats.length === rules.max) next = startTable(next, rnd);
+        if (rules.autoStart && next.seats.length === rules.max) next = startTable(next, rnd);
         return save(c, row, next);
       }
       if (action === 'start' || action === 'again') {

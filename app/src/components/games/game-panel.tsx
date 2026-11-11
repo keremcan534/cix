@@ -4,7 +4,7 @@
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,11 +21,16 @@ import { RocketPlayer } from '@/components/games/rocket';
 import { OkeyTable } from '@/components/games/okey';
 import { WheelPlayer } from '@/components/games/wheel';
 import { GameNav } from '@/components/games/slot-kit';
-import { ColorCards, Ludo, Xox, type Player } from '@/components/games/room-games';
+import type { Player } from '@/components/games/room-games';
+import { CardsPractice } from '@/components/games/room/cards';
+import { FourPractice } from '@/components/games/room/four';
+import { LudoPractice } from '@/components/games/room/ludo';
+import { XoxPractice } from '@/components/games/room/xox';
 import { LiveTable, isTableGame } from '@/components/games/room-tables';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
-import { casinoVisible, gamblingLevelOk, isPracticeBot, useGames, type Entry } from '@/lib/games';
+import { casinoVisible, isPracticeBot, useGames, type Entry } from '@/lib/games';
+import { playSfx, setGameVolume } from '@/lib/game-sound';
 import { isLiveRoom } from '@/lib/live';
 import { refreshCasino } from '@/lib/live/casino';
 import { useApp } from '@/store';
@@ -51,8 +56,8 @@ function CasinoScreen({ id, entry }: { id: CasinoGame['id']; entry: Entry }) {
   const Screen = CASINO_SCREENS[id];
   return Screen ? <Screen entry={entry} /> : <CasinoPlayer gameId={id} entry={entry} />;
 }
-/** Games that need most of the screen in a room (Okey and every casino game with its own screen); the top row of seats stays visible. */
-const isTall = (id: string) => id === 'wheel' || id === 'okey' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
+/** Games that need most of the screen in a room (Okey, the room games with a table or a board of their own and every casino game with its own screen); the top row of seats stays visible. */
+const isTall = (id: string) => id === 'wheel' || id === 'okey' || id === 'ludo' || id === 'cards' || id === 'xox' || id === 'four' || isLineSlot(id) || isBoard(id) || id in CASINO_SCREENS;
 
 const VOLUMES: [number, string][] = [
   [0, 'Kapalı'],
@@ -89,8 +94,10 @@ export function GamePanel({
   /** A live room: I may open the room's game table (the room's staff; the server checks it again). */
   canOpenTable?: boolean;
 }) {
-  const { settings, setSetting, wealthLevel } = useApp();
+  const { settings, setSetting, wealthLevel, paidGames } = useApp();
   const { roomGames, casino } = useGames();
+  // The other games and the sound level stay behind two buttons in the header: the game has the screen to itself.
+  const [tools, setTools] = useState<'games' | 'sound' | null>(null);
   const inRoom = entry.from === 'room';
   // A server room plays its free games at the server's table (Ludo, Renk Kartları, XOX); Okey stays out of it there.
   const tables = entry.from === 'room' && isLiveRoom(entry.roomId);
@@ -101,8 +108,8 @@ export function GamePanel({
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable && (!tables || isTableGame(g.id))).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
     // Rüzgâr Gülü and, in a live build, every other casino game are played on the server; the level gates them all.
-    ...(gamblingLevelOk(wealthLevel) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
-    ...casino.filter((g) => casinoVisible(wealthLevel) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
+    ...(casinoVisible(wealthLevel, paidGames) ? [{ key: 'w', name: WHEEL_NAME, emoji: '', art: undefined, go: { kind: 'wheel' } as OpenGame }] : []),
+    ...casino.filter((g) => casinoVisible(wealthLevel, paidGames) && g.active && (inRoom ? g.fromRoom : g.fromProfile)).map((g) => ({ key: `c:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'casino', id: g.id } as OpenGame })),
   ];
   const current = keyOf(open);
   const openId = open.kind === 'wheel' ? 'wheel' : open.id;
@@ -119,8 +126,13 @@ export function GamePanel({
         <Text style={p.title} numberOfLines={1}>
           {titleArt || wheel ? '' : `${titleEmoji} `}
           {title}
-          {casinoGame || wheel ? <Text style={p.badge}> Cömertlik Lv.{casinoGame?.minWealth ?? 2}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
+        <Pressable onPress={() => setTools((t) => (t === 'games' ? null : 'games'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Başka oyuna geç" accessibilityState={{ expanded: tools === 'games' }}>
+          <Ionicons name="grid-outline" size={21} color={tools === 'games' ? semantic.action : colors.textDim} />
+        </Pressable>
+        <Pressable onPress={() => setTools((t) => (t === 'sound' ? null : 'sound'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Oyun sesi" accessibilityState={{ expanded: tools === 'sound' }}>
+          <Ionicons name={settings.gameVolume === 0 ? 'volume-mute-outline' : 'volume-medium-outline'} size={23} color={tools === 'sound' ? semantic.action : colors.textDim} />
+        </Pressable>
         {onMinimize && (
           <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">
             <Ionicons name="chevron-down" size={24} color={colors.textDim} />
@@ -145,28 +157,60 @@ export function GamePanel({
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-        {switchable.map((s) => (
-          <Pressable key={s.key} onPress={() => onSwitch(s.go)} style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]} accessibilityLabel={`${s.name} oyununa geç`}>
-            {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
-            {s.key === 'w' && <Ionicons name="compass" size={15} color={colors.gold} />}
-            <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      {tools === 'games' && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+          {switchable.map((s) => (
+            <Pressable
+              key={s.key}
+              onPress={() => {
+                setTools(null);
+                onSwitch(s.go);
+              }}
+              style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]}
+              accessibilityLabel={`${s.name} oyununa geç`}
+            >
+              {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
+              {s.key === 'w' && <Ionicons name="compass" size={15} color={colors.gold} />}
+              <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      {tools === 'sound' && (
+        <View style={p.volume}>
+          <Text style={p.dim}>Oyun sesi</Text>
+          {VOLUMES.map(([v, l]) => (
+            <Pressable
+              key={l}
+              onPress={() => {
+                setSetting('gameVolume', v);
+                // Heard at the level just picked.
+                setGameVolume(v);
+                playSfx('coin');
+              }}
+              style={[p.vol, settings.gameVolume === v && p.chipOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: settings.gameVolume === v }}
+            >
+              <Text style={p.volText}>{l}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={{ paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
         {roomGame &&
           (roomGame.playable ? (
             <>
               {tables && entry.from === 'room' && isTableGame(openId) && <LiveTable key={openId} roomId={entry.roomId} game={openId} canOpen={!!canOpenTable} />}
-              {!tables && openId === 'ludo' && <Ludo players={players.slice(0, roomGame.maxPlayers)} />}
-              {!tables && openId === 'cards' && <ColorCards players={players.slice(0, roomGame.maxPlayers)} />}
-              {!tables && openId === 'xox' && <Xox players={players.slice(0, 2)} />}
+              {!tables && openId === 'ludo' && <LudoPractice players={players.slice(0, roomGame.maxPlayers)} fit={inRoom} />}
+              {!tables && openId === 'cards' && <CardsPractice players={players.slice(0, roomGame.maxPlayers)} />}
+              {!tables && openId === 'xox' && <XoxPractice players={players.slice(0, 2)} />}
+              {!tables && openId === 'four' && <FourPractice players={players.slice(0, 2)} />}
               {/* Okey seats its own bots; practice bots (a live Oyun Merkezi) don't come to watch. */}
               {!tables && openId === 'okey' && <OkeyTable roomId={inRoom ? entry.roomId : 'profil'} me={players[0]} crowd={players.slice(1).filter((x) => !isPracticeBot(x.id))} />}
               <Text style={p.dim}>
-                {roomGame.minPlayers}–{roomGame.maxPlayers} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
+                {roomGame.minPlayers === roomGame.maxPlayers ? roomGame.minPlayers : `${roomGame.minPlayers}–${roomGame.maxPlayers}`} oyuncu · ücretsiz, VIP gerekmez · oyundan çıkmak seni odadan çıkarmaz
                 {roomGame.note ? ` · ${roomGame.note}` : ''}
               </Text>
               {onInvite && !tables && (
@@ -179,17 +223,8 @@ export function GamePanel({
           ) : (
             <Text style={p.dim}>Bu oyun yakında geliyor.</Text>
           ))}
-        {casinoGame && casinoVisible(wealthLevel) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
-        {wheel && gamblingLevelOk(wealthLevel) && <WheelPlayer entry={entry} />}
-        <View style={p.volume}>
-          <Text style={p.dim}>Oyun sesi</Text>
-          {VOLUMES.map(([v, l]) => (
-            <Pressable key={l} onPress={() => setSetting('gameVolume', v)} style={[p.vol, settings.gameVolume === v && p.chipOn]}>
-              <Text style={p.volText}>{l}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={p.dim}>Oyun sesleri sohbet sesini kısmaz; ses seviyeleri ayrı ayarlanır.</Text>
+        {casinoGame && casinoVisible(wealthLevel, paidGames) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
+        {wheel && casinoVisible(wealthLevel, paidGames) && <WheelPlayer entry={entry} />}
       </ScrollView>
     </View>
   );
@@ -208,8 +243,6 @@ const p = StyleSheet.create({
   full: { flex: 1, backgroundColor: colors.bg },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: colors.text, fontWeight: '900', fontSize: 17, flex: 1 },
-  badge: { color: colors.gold, fontSize: 12, fontWeight: '900' },
-  free: { color: semantic.live, fontSize: 12, fontWeight: '800' },
   voice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(19,217,223,0.10)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
   voiceText: { color: colors.text, fontSize: 12, fontWeight: '700', flex: 1 },
   mic: { width: 30, height: 30, borderRadius: 15, backgroundColor: semantic.live, alignItems: 'center', justifyContent: 'center' },
@@ -218,7 +251,7 @@ const p = StyleSheet.create({
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },
   invite: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.cardAlt, borderRadius: 999, paddingVertical: 10 },
-  volume: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
+  volume: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   vol: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 4 },
   volText: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
 });

@@ -19,6 +19,15 @@ describe('Oyun Salonu görünürlüğü', () => {
     assert.equal(casinoVisible(9), true);
   });
 
+  test('sunucu hesaba açmadıysa (yalnız yöneticiler) seviye ne olursa olsun görünmez', () => {
+    assert.equal(casinoVisible(2, false), false);
+    assert.equal(casinoVisible(50, false), false);
+    assert.equal(casinoVisible(2, true), true);
+    assert.equal(casinoVisible(1, true), false, 'açık olsa da seviye kuralı sürer');
+    // The lucky gifts keep their own rule: only the level.
+    assert.equal(gamblingLevelOk(2), true);
+  });
+
   test('oyunun kendi seviyesi 1 olsa bile Lv.1 oynayamaz', () => {
     const access = casinoAccess({ ...game, minWealth: 1 }, { from: 'profile' }, 1);
     assert.equal(access.ok, false);

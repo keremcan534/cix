@@ -24,6 +24,7 @@ import { validAnyIban } from '@/lib/withdraw-rules';
 import { DEMO_DECOR, DEMO_ROOM_COVER, demoDecorOf, type DemoDecor } from '@/lib/room-decor';
 import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
+import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
@@ -149,6 +150,12 @@ type AppState = {
   /** Cömertlik puanı (wealth): qualifying spending only (data/wealth). */
   wealthXp: number;
   wealthLevel: number;
+  /**
+   * Whether the coin games (Oyun Salonu, Rüzgâr Gülü) are open to this account: the server's answer in a live build
+   * (GET /api/me; admin accounts only until they are opened to everyone), always true in the demo. Screens pass it
+   * to casinoVisible; the server refuses the rounds either way.
+   */
+  paidGames: boolean;
   ledger: LedgerRow[];
   // cosmetics & emoji
   inventory: Set<string>;
@@ -438,6 +445,8 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // Older saves have no wealth points yet; start them from total spending.
   const [wealthXp, setWealthXp] = useState(s.wealthXp ?? s.spentTotal ?? 0);
   const wealthRef = useRef(wealthXp);
+  // A live build keeps the coin games hidden until the server has said they are open to this account.
+  const [paidGames, setPaidGames] = useState(s.paidGames ?? !liveMode());
   const [ledger, setLedger] = useState<LedgerRow[]>(s.ledger ?? []);
   const log = (currency: LedgerRow['currency'], amount: number, reason: string, status: LedgerRow['status'] = 'Başarılı') =>
     setLedger((l) => [{ id: uid(), ref: `TX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, currency, amount, reason, time: now(), day: today(), status }, ...l].slice(0, 200));
@@ -521,6 +530,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   useEffect(() => {
     settingsRef.current = settings;
     setHapticsEnabled(settings.haptics);
+    setGameVolume(settings.gameVolume);
   }, [settings]);
   // The demo starts with three sample notices about sample people and rooms. A live build starts empty, and
   // drops the samples once from a save made before (their ids are only ever used by these samples).
@@ -631,7 +641,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
   // Save after every change (debounced in lib/persist). Pending demo timers (withdrawal approval etc.)
   // are not resumed after a restart; their records keep the last saved status.
   const snapshot: Snapshot = {
-    loggedIn, me, coins, gameCoins, spentTotal, wealthXp, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
+    loggedIn, me, coins, gameCoins, spentTotal, wealthXp, paidGames, ledger: ledger.slice(0, 100), spentDay: { date: today(), amount: spentToday },
     inventory: [...inventory], equipped, emojiPacks: [...emojiPacks], recentEmojis, settings, notifications: notifications.slice(0, 50),
     myRoom, isHost, diamonds, diamondLocks, totalDiamonds, charmXp, weekly, earnings: earnings.slice(0, 50), withdrawals, stats, giftWall,
     claimedTasks: [...claimedTasks], checkInDay, checkInDate, svipXp, firstBuys: [...firstBuys], nobleTier, nobleDays, vipDays,
@@ -763,6 +773,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       wealthRef.current = u.wealthXp;
       setWealthXp(u.wealthXp);
     }
+    if (typeof u.paidGames === 'boolean') setPaidGames(u.paidGames);
     // Yankı as the server counts it (diamonds received in gifts): posting in Anlar opens on the same value.
     if (isFiniteNumber(u.charmXp)) {
       charmRef.current = u.charmXp;
@@ -881,6 +892,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     spentTotal,
     wealthXp,
     wealthLevel: wealthLevelOf(wealthXp),
+    paidGames,
     ledger,
 
     inventory,

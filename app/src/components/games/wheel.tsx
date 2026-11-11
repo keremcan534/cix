@@ -1,17 +1,28 @@
 // Rüzgâr Gülü (docs/RUZGAR_GULU.md): three tiers, 1 / 10 / 50 spins, a JACKPOT fund per tier, the winners' list,
 // today's board and my own spins. The result comes from lib/wheel (the server in live mode); the wheel only turns to
-// where it already landed. Drawn with plain views (no SVG): each slice is a border triangle from the hub, the disc
-// clips them round.
+// where it already landed (fx/wheel-stage: pulled back, let go, a tick for every peg, the slice it stops on lit).
+// A request of ten or fifty spins is one turn of the wheel: its results count up while it runs, it stops on the
+// best of them and a summary says what the whole request did. Every slice pays something, so a spin is only
+// celebrated when it paid more than it cost (or won the JACKPOT); the rest lands quietly. Drawn with plain views
+// (no SVG): each slice is a border triangle from the hub, the disc clips them round.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { memo, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
+import { RollingNumber } from '@/components/fx/rolling-number';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { CasinoLock } from '@/components/games/casino';
+import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { ResultTrail, type TrailItem } from '@/components/games/fx/result-trail';
+import { tally } from '@/components/games/fx/spin-plan';
+import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin as SpinHandle } from '@/components/games/fx/wheel-stage';
+import { useWinFx } from '@/components/games/fx/win-fx';
+import { BalancePill } from '@/components/games/slot-kit';
 import { userById } from '@/data/mock';
 import {
+  WHEEL_BIG_MILLI,
   WHEEL_COUNTS,
   WHEEL_NEED_LEVEL,
   WHEEL_SLICES,
@@ -24,20 +35,18 @@ import {
   type WheelCount,
   type WheelTierId,
 } from '@/data/wheel';
-import { errorHaptic, successHaptic } from '@/lib/haptics';
+import { playSfx, warmSfx } from '@/lib/game-sound';
+import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import type { Entry } from '@/lib/games';
-import { loadWheel, playWheel, wheelCost, type WheelPlay, type WheelSpin, type WheelView } from '@/lib/wheel';
+import { loadWheel, playWheel, wheelCost, type WheelSpin, type WheelView } from '@/lib/wheel';
 import { useApp } from '@/store';
 import { colors, semantic } from '@/theme';
 
-const SIZE = 272;
-const R = SIZE / 2;
 const STEP = 360 / WHEEL_SLICES.length;
-/** Inside the gold rim (rim width SIZE + 28, border 3). */
-const INNER = SIZE + 22;
-/** Half the base of a slice triangle whose height is the radius (the disc clips the corners round). */
-const HALF = Math.ceil(R * Math.tan(((STEP / 2) * Math.PI) / 180)) + 1;
 const n = (x: number) => x.toLocaleString('tr-TR');
+const IDLE = 'Alanını seç, çarkı çevir';
+/** How long the wheel turns for a request of that many spins (ms): a longer request counts its results meanwhile. */
+const TURN_MS: Record<WheelCount, number> = { 1: 4400, 10: 4800, 50: 5600 };
 
 /** Slice colors by prize: deep navy for the small ones, sea teal for the middle, gold for the big ones. */
 function sliceLook(i: number): { fill: string; ink: string } {
@@ -49,8 +58,13 @@ function sliceLook(i: number): { fill: string; ink: string } {
   if (m >= 800) return { fill: '#0E5C78', ink: '#FFFFFF' };
   return { fill: i % 2 ? '#16253C' : '#1F3050', ink: '#C7D2E5' };
 }
+/** JACKPOT first, then the biggest prize. */
+const rank = (s: number) => (isJackpotSlice(s) ? Infinity : (WHEEL_SLICES[s].milli ?? 0));
+/** A slice among the last results: marked when it is rare and high, or paid more than the spin cost. */
+const trailTone = (s: number): TrailItem['tone'] => (rank(s) >= WHEEL_BIG_MILLI ? 'hot' : rank(s) > 1000 ? 'win' : undefined);
 
 type Tab = 'winners' | 'board' | 'mine';
+type Status = { text: string; tone?: 'win' | 'err' };
 const ago = (at: string) => {
   const m = Math.max(0, Math.round((Date.now() - Date.parse(at)) / 60_000));
   return m < 1 ? 'şimdi' : m < 60 ? `${m} dk önce` : m < 1440 ? `${Math.floor(m / 60)} sa önce` : `${Math.floor(m / 1440)} gün önce`;
@@ -59,17 +73,38 @@ const ago = (at: string) => {
 export function WheelPlayer({ entry }: { entry: Entry }) {
   const app = useApp();
   const { wealthLevel, coins, gameCoins, settings } = app;
+  const still = settings.reduceMotion;
+  const dims = useWindowDimensions();
   const [tier, setTier] = useState<WheelTierId>('kiyi');
   const [view, setView] = useState<WheelView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState<WheelCount | null>(null);
-  const [result, setResult] = useState<WheelPlay | null>(null);
+  const [status, setStatus] = useState<Status>({ text: IDLE });
+  // A request of several spins while the wheel turns: its results count up in the status bar.
+  const [counting, setCounting] = useState<{ spin: WheelSpin; ms: number } | null>(null);
+  const [landed, setLanded] = useState<number | null>(null);
+  const [summary, setSummary] = useState<WheelSpin | null>(null);
+  const [trail, setTrail] = useState<TrailItem[]>([]);
+  // While the wheel turns the pill shows the balance with the price taken; the prize joins it when the wheel rests.
+  const [held, setHeld] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('winners');
-  const [rules, setRules] = useState(false);
-  const [turn] = useState(() => new Animated.Value(0));
-  const [angle, setAngle] = useState(0);
+  const [info, setInfo] = useState(false);
+  const [width, setWidth] = useState(0);
+  const balance = useRef(coins + gameCoins);
+  const alive = useRef(true);
+  const spin = useWheelSpin(WHEEL_SLICES.length);
+  const win = useWinFx();
 
+  useEffect(() => {
+    balance.current = coins + gameCoins;
+  });
+  useEffect(() => {
+    warmSfx(['spin', 'tick', 'stop', 'coin', 'win']);
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   useEffect(() => {
     let on = true;
     loadWheel(wealthLevel).then(
@@ -97,97 +132,146 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
     );
   }
 
-  const playGame = view.serverGameCoins ?? gameCoins;
   const left = Math.max(0, view.dailyLimit - view.playedToday);
+  // The wheel takes what the stage's other rows and the controls leave of the phone's height (in a room the panel
+  // is a sheet over the lower part), within the stage's width.
+  const inner = (width || dims.width - 28) - 20;
+  const room = Math.round(entry.from === 'room' ? dims.height * 0.78 - 112 : dims.height - 140);
+  const size = Math.max(208, Math.min(272, inner - 48, room - 372));
 
-  const spin = async (count: WheelCount) => {
+  const play = async (count: WheelCount) => {
     if (busy) return;
     setBusy(count);
-    setResult(null);
+    setSummary(null);
+    setStatus({ text: 'Tur başlıyor…' });
+    pressHaptic();
+    setHeld(Math.max(0, balance.current - wheelCost(tier, count)));
     const r = await playWheel(tier, count, view, { wealthLevel, gameCoins, spendGameCoins: app.spendGameCoins, spendCoins: app.spendCoins, spendBlock: app.spendBlock, addGameCoins: app.addGameCoins });
+    if (!alive.current) return;
     if (!r.ok) {
       errorHaptic();
-      setResult(r);
+      setHeld(null);
+      setStatus({ text: r.reason, tone: 'err' });
       setBusy(null);
       return;
     }
+    const sp = r.spin;
     // Stop on the JACKPOT if it came, else on the best slice of the request.
-    const land = r.spin.slices.reduce((best, s) => (rank(s) > rank(best) ? s : best), r.spin.slices[0]);
-    const target = angle + 360 * (settings.reduceMotion || r.replay ? 1 : 5) + ((((360 - land * STEP - angle) % 360) + 360) % 360);
-    Animated.timing(turn, { toValue: target, duration: settings.reduceMotion || r.replay ? 300 : 3600, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => {
-      setAngle(target);
-      setResult(r);
-      setBusy(null);
-      if (r.spin.payout >= r.spin.cost) successHaptic();
-      setReload((x) => x + 1);
-    });
+    const best = sp.slices.reduce((a, b) => (rank(b) > rank(a) ? b : a), sp.slices[0]);
+    // The same request answered again (nothing was taken twice) is shown at once, without the long turn.
+    const ms = r.replay ? 900 : TURN_MS[count];
+    setLanded(null);
+    if (sp.count > 1 && !still && !r.replay) setCounting({ spin: sp, ms });
+    else setStatus({ text: 'Çark dönüyor…' });
+    await spin.spinTo(best, { ms, turns: r.replay ? 1 : count === 1 ? 4 : 5 });
+    if (!alive.current) return;
+
+    setCounting(null);
+    setLanded(best);
+    setHeld(null);
+    setTrail((t) => [...sp.slices.map((s, i) => ({ key: `${sp.id}-${i}`, label: sliceLabel(s), tone: trailTone(s) })).reverse(), ...t].slice(0, 14));
+    const again = r.replay ? ' · aynı istek, ikinci kez düşülmedi' : '';
+    const gain = sp.payout > sp.cost;
+    if (sp.jackpot > 0) setStatus({ text: `JACKPOT! +${n(sp.jackpot)} oyun jetonu${again}`, tone: 'win' });
+    else if (sp.count > 1) setStatus({ text: `${sp.count} tur · +${n(sp.payout)} oyun jetonu${again}`, tone: gain ? 'win' : undefined });
+    else setStatus({ text: `${sliceLabel(best)} · +${n(sp.payout)} oyun jetonu${again}`, tone: gain ? 'win' : undefined });
+    if (sp.jackpot > 0) await win.celebrate({ amount: sp.payout, bet: sp.cost, jackpot: true });
+    else if (gain) await win.celebrate({ amount: sp.payout, bet: sp.cost });
+    else if (sp.payout === sp.cost) playSfx('coin', 0.6);
+    if (!alive.current) return;
+    if (sp.count > 1) setSummary(sp);
+    setBusy(null);
+    // The fund, the lists and my spins as they are now.
+    setReload((x) => x + 1);
   };
 
   return (
     <View style={{ gap: 14 }}>
-      <View style={w.tiers} accessibilityRole="tablist">
-        {WHEEL_TIER_IDS.map((t) => (
-          <Pressable
-            key={t}
-            onPress={() => !busy && (setTier(t), setResult(null))}
-            style={[w.tier, tier === t && w.tierOn]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tier === t }}
-            accessibilityLabel={`${WHEEL_TIERS[t].label}, tur başı ${n(WHEEL_TIERS[t].price)} jeton`}
-          >
-            <Text style={[w.tierName, tier === t && { color: semantic.moneyInk }]}>{WHEEL_TIERS[t].label}</Text>
-            <Text style={[w.tierPrice, tier === t && { color: semantic.moneyInk }]}>{n(WHEEL_TIERS[t].price)}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <View style={{ gap: 10 }} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+        <LinearGradient colors={['#14294A', '#0C3247', '#0A1528']} style={w.stage}>
+          <View style={w.head}>
+            <LinearGradient colors={['#4A1426', '#1B2B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={w.jackpot} accessibilityLabel={`JACKPOT ${WHEEL_TIERS[tier].label}, ${n(view.funds[tier])} jeton`}>
+              <Ionicons name="trophy" size={20} color={colors.gold} />
+              <View style={{ flex: 1 }}>
+                <Text style={w.jackpotLabel} numberOfLines={1}>
+                  JACKPOT · {WHEEL_TIERS[tier].label}
+                </Text>
+                <RollingNumber value={view.funds[tier]} style={w.jackpotValue} duration={900} numberOfLines={1} />
+              </View>
+            </LinearGradient>
+            <InfoButton onPress={() => setInfo(true)} tint={colors.gold} />
+          </View>
 
-      <LinearGradient colors={['#3B1020', '#16253C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={w.jackpot}>
-        <Text style={w.jackpotLabel}>JACKPOT · {WHEEL_TIERS[tier].label}</Text>
-        <Text style={w.jackpotValue} accessibilityLabel={`JACKPOT ${n(view.funds[tier])} jeton`}>
-          {n(view.funds[tier])}
-        </Text>
-        <Text style={w.jackpotNote}>{"Her turun %1,5'i fona eklenir. JACKPOT dilimine gelen fonun tamamını alır."}</Text>
-      </LinearGradient>
+          <Wheel tier={tier} size={size} spin={spin} landed={landed} />
 
-      <Wheel tier={tier} turn={turn} />
+          <View style={[w.status, status.tone === 'win' && w.statusWin]} accessibilityLiveRegion="polite">
+            {counting ? (
+              <Counting spin={counting.spin} ms={counting.ms} />
+            ) : (
+              <Text style={[w.statusText, status.tone === 'err' && w.statusErr]} numberOfLines={2}>
+                {status.text}
+              </Text>
+            )}
+          </View>
+          <View style={{ alignSelf: 'stretch' }}>
+            <ResultTrail items={trail} />
+          </View>
+          {summary && <Summary spin={summary} onClose={() => setSummary(null)} />}
+          {win.layer}
+        </LinearGradient>
 
-      <View style={w.counts}>
-        {WHEEL_COUNTS.map((c) => {
-          const cost = wheelCost(tier, c);
-          const on = busy === c;
-          return (
+        <View style={w.tiers} accessibilityRole="tablist">
+          {WHEEL_TIER_IDS.map((t) => (
             <Pressable
-              key={c}
-              onPress={() => spin(c)}
-              disabled={!!busy}
-              style={({ pressed }) => [w.countWrap, (pressed || on) && { transform: [{ scale: 0.97 }] }, busy && !on && { opacity: 0.5 }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${c} kez çevir, ${n(cost)} jeton`}
+              key={t}
+              onPress={() => {
+                if (busy || t === tier) return;
+                tapHaptic();
+                playSfx('tap', 0.6);
+                setTier(t);
+                setSummary(null);
+                setStatus({ text: IDLE });
+              }}
+              style={[w.tier, tier === t && w.tierOn]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tier === t }}
+              accessibilityLabel={`${WHEEL_TIERS[t].label}, tur başı ${n(WHEEL_TIERS[t].price)} jeton`}
             >
-              <LinearGradient colors={c === 1 ? ['#6FF1F5', '#0FB8BE'] : c === 10 ? ['#FFD98A', '#F2A93B'] : ['#FF8E9A', '#C93C4F']} style={w.count}>
-                <Text style={[w.countX, { color: c === 50 ? '#FFFFFF' : c === 1 ? semantic.actionInk : semantic.moneyInk }]}>{on ? 'Dönüyor…' : `×${c}`}</Text>
-                <Text style={[w.countCost, { color: c === 50 ? '#FFFFFF' : c === 1 ? semantic.actionInk : semantic.moneyInk }]}>{n(cost)}</Text>
-              </LinearGradient>
+              <Text style={[w.tierName, tier === t && { color: semantic.moneyInk }]}>{WHEEL_TIERS[t].label}</Text>
+              <Text style={[w.tierPrice, tier === t && { color: semantic.moneyInk }]}>{n(WHEEL_TIERS[t].price)}</Text>
             </Pressable>
-          );
-        })}
+          ))}
+        </View>
+        <View style={w.counts}>
+          {WHEEL_COUNTS.map((c) => {
+            const cost = wheelCost(tier, c);
+            const on = busy === c;
+            const ink = c === 50 ? '#FFFFFF' : c === 1 ? semantic.actionInk : semantic.moneyInk;
+            return (
+              <Pressable
+                key={c}
+                onPress={() => play(c)}
+                disabled={!!busy}
+                style={({ pressed }) => [w.countWrap, (pressed || on) && { transform: [{ scale: 0.97 }] }, busy && !on && { opacity: 0.5 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${c} kez çevir, ${n(cost)} jeton`}
+              >
+                <LinearGradient colors={c === 1 ? ['#6FF1F5', '#0FB8BE'] : c === 10 ? ['#FFD98A', '#F2A93B'] : ['#FF8E9A', '#C93C4F']} style={w.count}>
+                  <Text style={[w.countX, { color: ink }]}>{on ? 'Dönüyor…' : `Çevir ×${c}`}</Text>
+                  <Text style={[w.countCost, { color: ink }]}>{n(cost)}</Text>
+                </LinearGradient>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={w.wallet}>
+          <BalancePill tint="#10233D" shown={held} />
+          <Text style={w.left}>
+            Bugün kalan{'\n'}
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{n(left)}</Text>
+          </Text>
+        </View>
       </View>
-
-      <View style={w.wallet}>
-        <Text style={w.walletText}>
-          <Text style={{ color: colors.gold, fontWeight: '900' }}>{n(coins)}</Text> jeton · <Text style={{ color: semantic.actionText, fontWeight: '900' }}>{n(playGame)}</Text> oyun jetonu
-        </Text>
-        <Text style={w.dim}>Tur ücreti önce oyun jetonundan düşer. Bugün oynayabileceğin: {n(left)} jeton.</Text>
-      </View>
-
-      {result && <ResultCard result={result} />}
-
-      <Pressable onPress={() => setRules((x) => !x)} style={w.rulesHead} accessibilityRole="button" accessibilityState={{ expanded: rules }}>
-        <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
-        <Text style={w.rulesHeadText}>Kurallar ve oranlar</Text>
-        <Ionicons name={rules ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textDim} />
-      </Pressable>
-      {rules && <Rules tier={tier} />}
 
       <View style={w.tabs} accessibilityRole="tablist">
         {(
@@ -205,113 +289,172 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
       {tab === 'winners' && <Winners view={view} />}
       {tab === 'board' && <Board view={view} />}
       {tab === 'mine' && <Mine spins={view.mine} />}
-      <Text style={w.dim}>
-        {entry.from === 'room' ? 'Oyun açıkken mikrofonun ve koltuğun aynen kalır. ' : ''}Oyun jetonu yalnızca oyunlarda kullanılır; hediye edilemez, elmasa ya da paraya çevrilemez.
-      </Text>
+
+      <GameInfoSheet
+        visible={info}
+        onClose={() => setInfo(false)}
+        title="Rüzgâr Gülü"
+        rules={`Bir alan seç (Kıyı, Açık Deniz, Derin Okyanus) ve çarkı 1, 10 ya da 50 kez çevir. Çarkta 12 dilim var ve her dilim bir şey öder; dilimler aynı boyda çizilir ama şansları farklıdır. 10 ve 50 turda çark bir kez döner, en iyi dilimde durur ve bütün turların özeti gösterilir. Sonucu sunucu belirler, çark yalnızca sonucu gösterir.`}
+      >
+        <Odds tier={tier} />
+        <View style={{ gap: 5 }}>
+          <Text style={r.head}>JACKPOT ve sınırlar</Text>
+          <Text style={r.note}>
+            {"Her turun %1,5'i o alanın fonuna eklenir; JACKPOT dilimine gelen fonun tamamını alır. Oynanan her 100 jetonun ortalama 40'ı kazanç olarak döner. Tur ücreti önce oyun jetonundan düşer."} Cömertlik Lv.{WHEEL_NEED_LEVEL} ve üstü için açıktır; günlük üst sınır {n(view.dailyLimit)} jeton, bugün kalan {n(left)}.
+            {entry.from === 'room' ? ' Oyun açıkken mikrofonun ve koltuğun aynen kalır.' : ''}
+          </Text>
+        </View>
+      </GameInfoSheet>
     </View>
   );
 }
 
-/** JACKPOT first, then the biggest prize. */
-const rank = (s: number) => (isJackpotSlice(s) ? Infinity : (WHEEL_SLICES[s].milli ?? 0));
-
-function Wheel({ tier, turn }: { tier: WheelTierId; turn: Animated.Value }) {
-  const rotate = turn.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] });
+/** The disc's slices for a tier. Drawn once per tier and size; only its parent turns. */
+const Disc = memo(function Disc({ tier, size }: { tier: WheelTierId; size: number }) {
+  const r = size / 2;
+  // Half the base of a slice triangle whose height is the radius (the disc clips the corners round).
+  const half = Math.ceil(r * Math.tan(((STEP / 2) * Math.PI) / 180)) + 1;
   return (
-    <View style={w.stage} accessibilityLabel="Rüzgâr Gülü çarkı">
-      <View style={w.rim}>
-        {Array.from({ length: 24 }, (_, i) => (
-          <View key={i} style={[w.bulbArm, { transform: [{ rotate: `${i * 15}deg` }] }]}>
-            <View style={[w.bulb, i % 2 ? w.bulbDim : null]} />
+    <>
+      {WHEEL_SLICES.map((_, i) => {
+        const look = sliceLook(i);
+        const prize = prizeOf(tier, i);
+        return (
+          <View key={i} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${i * STEP}deg` }] }]} pointerEvents="none">
+            <View style={[w.wedge, { left: r - half, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: r, borderTopColor: look.fill }]} />
+            <View style={[w.labelBox, { left: r - 34 }]}>
+              {isJackpotSlice(i) ? (
+                <Ionicons name="trophy" size={18} color={look.ink} />
+              ) : (
+                <Text style={[w.sliceText, { color: look.ink }, prize >= 100_000 && { fontSize: 10.5 }]} numberOfLines={1}>
+                  {n(prize)}
+                </Text>
+              )}
+              <Text style={[w.sliceSub, { color: look.ink }]} numberOfLines={1}>
+                {sliceLabel(i)}
+              </Text>
+            </View>
           </View>
-        ))}
-        <Animated.View style={[w.disc, { transform: [{ rotate }] }]}>
-          {WHEEL_SLICES.map((_, i) => {
-            const look = sliceLook(i);
-            return (
-              <View key={i} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${i * STEP}deg` }] }]} pointerEvents="none">
-                <View style={[w.wedge, { borderTopColor: look.fill }]} />
-                <View style={w.labelBox}>
-                  {isJackpotSlice(i) ? (
-                    <Ionicons name="trophy" size={18} color={look.ink} />
-                  ) : (
-                    <Text style={[w.sliceText, { color: look.ink }]} numberOfLines={1}>
-                      {n(prizeOf(tier, i))}
-                    </Text>
-                  )}
-                  <Text style={[w.sliceSub, { color: look.ink }]} numberOfLines={1}>
-                    {sliceLabel(i)}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </Animated.View>
-        <LinearGradient colors={['#1F3050', '#080F1E']} style={w.hub}>
+        );
+      })}
+      {WHEEL_SLICES.map((_, i) => (
+        <View key={i} style={[w.pegArm, { left: r - 4, height: size, transform: [{ rotate: `${(i + 0.5) * STEP}deg` }] }]} pointerEvents="none">
+          <View style={w.peg} />
+        </View>
+      ))}
+    </>
+  );
+});
+
+function Wheel({ tier, size, spin, landed }: { tier: WheelTierId; size: number; spin: SpinHandle; /** The slice the wheel rests on, lit. */ landed: number | null }) {
+  const rim = size + 28;
+  const r = size / 2;
+  const half = Math.ceil(r * Math.tan(((STEP / 2) * Math.PI) / 180)) + 1;
+  return (
+    <View style={{ width: rim, height: rim + 12, alignItems: 'center' }} accessibilityLabel={landed === null ? 'Rüzgâr Gülü çarkı' : `Rüzgâr Gülü çarkı, ${sliceLabel(landed)} diliminde`}>
+      <View style={[w.rim, { marginTop: 12, width: rim, height: rim, borderRadius: rim / 2 }]}>
+        <RimBulbs spin={spin} size={rim - 6} count={24} />
+        <View style={{ width: size, height: size, borderRadius: r, overflow: 'hidden', backgroundColor: '#16253C' }}>
+          <Animated.View style={{ width: size, height: size, transform: [{ rotate: spin.rotate }] }}>
+            <Disc tier={tier} size={size} />
+            {landed !== null && (
+              <Animated.View style={[StyleSheet.absoluteFill, { opacity: spin.shine, transform: [{ rotate: `${landed * STEP}deg` }] }]} pointerEvents="none">
+                <View style={[w.wedge, { left: r - half, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: r, borderTopColor: 'rgba(255,255,255,0.38)' }]} />
+              </Animated.View>
+            )}
+          </Animated.View>
+          <SpinBlur spin={spin} size={size} band={46} tint="rgba(22,37,60,0.5)" />
+        </View>
+        <LinearGradient colors={['#1F3050', '#080F1E']} style={[w.hub, { left: (rim - 6) / 2 - 33, top: (rim - 6) / 2 - 33 }]}>
           <Ionicons name="compass" size={34} color={colors.gold} />
         </LinearGradient>
       </View>
-      <View style={w.pointerRow} pointerEvents="none">
-        <View style={w.pointer} />
+      <View style={{ position: 'absolute', top: -14, left: rim / 2 - 15 }}>
+        <WheelPointer spin={spin} size={30} />
       </View>
     </View>
   );
 }
 
-function ResultCard({ result }: { result: WheelPlay }) {
-  if (!result.ok) {
-    return (
-      <View style={[w.result, { borderColor: colors.gold }]} accessibilityLiveRegion="polite">
-        <Text style={w.err}>{result.reason}</Text>
-      </View>
-    );
-  }
-  const s = result.spin;
-  // How many times each slice came up, biggest prize first.
-  const tally = [...new Set(s.slices)].sort((a, b) => rank(b) - rank(a)).map((i) => [i, s.slices.filter((x) => x === i).length] as const);
-  const net = s.payout - s.cost;
+/** A request of several spins while the wheel turns: its spins and what they have paid so far, counting up. */
+function Counting({ spin, ms }: { spin: WheelSpin; ms: number }) {
+  const [seen, setSeen] = useState(0);
+  useEffect(() => {
+    const count = spin.slices.length;
+    // The results come in between the launch and the last slow turn, evenly.
+    const every = Math.max(40, (ms * 0.7) / count);
+    const t0 = Date.now() + ms * 0.1;
+    let last = 0;
+    const t = setInterval(() => {
+      const k = Math.max(0, Math.min(count, Math.floor((Date.now() - t0) / every)));
+      if (k === last) return;
+      // A spin that paid more than it cost is heard as it comes in.
+      if (spin.slices.slice(last, k).some((s) => rank(s) >= 2000)) playSfx('coin', 0.45);
+      last = k;
+      setSeen(k);
+      if (k >= count) clearInterval(t);
+    }, every);
+    return () => clearInterval(t);
+  }, [spin, ms]);
+  const sum = spin.wins.slice(0, seen).reduce((a, b) => a + b, 0);
   return (
-    <View style={[w.result, (s.jackpot > 0 || net > 0) && { borderColor: semantic.money }]} accessibilityLiveRegion="polite">
-      {s.jackpot > 0 && <Text style={w.resultJackpot}>JACKPOT! +{n(s.jackpot)}</Text>}
-      <Text style={w.resultMain}>+{n(s.payout)} oyun jetonu</Text>
-      <Text style={w.dim}>
-        {s.count} tur · {n(s.cost)} jeton{s.fromGame ? ` (${n(s.fromGame)} oyun jetonundan)` : ''}
-        {result.replay ? ' · aynı istek tekrar geldi, ikinci kez düşülmedi' : ''}
+    <Text style={w.statusText} numberOfLines={1}>
+      Tur {seen}/{spin.slices.length} · +{n(sum)}
+    </Text>
+  );
+}
+
+/** What a request of several spins did: what it paid against what it cost, and how often each slice came. */
+function Summary({ spin, onClose }: { spin: WheelSpin; onClose: () => void }) {
+  const net = spin.payout - spin.cost;
+  const rows = tally(spin.slices, rank);
+  return (
+    <Pressable style={w.summary} onPress={onClose} accessibilityRole="button" accessibilityLabel={`${spin.count} tur özeti: ${spin.payout} oyun jetonu kazanıldı, ${spin.cost} jeton harcandı. Kapatmak için dokun`}>
+      <View style={w.summaryHead}>
+        <Text style={w.summaryTitle}>
+          {spin.count} TUR ÖZETİ · {WHEEL_TIERS[spin.tier].label}
+        </Text>
+        <Ionicons name="close" size={18} color="rgba(255,255,255,0.7)" />
+      </View>
+      <Text style={[w.summaryMain, net > 0 && { color: '#86EFAC' }]}>+{n(spin.payout)}</Text>
+      <Text style={w.summarySub}>
+        Harcanan {n(spin.cost)} · Net {net > 0 ? '+' : ''}
+        {n(net)}
+        {spin.jackpot > 0 ? ` · JACKPOT ${n(spin.jackpot)}` : ''}
       </Text>
       <View style={w.tally}>
-        {tally.map(([i, k]) => (
-          <View key={i} style={[w.tallyChip, { backgroundColor: sliceLook(i).fill }]}>
-            <Text style={[w.tallyText, { color: sliceLook(i).ink }]}>
-              {sliceLabel(i)}
-              {k > 1 ? `  ×${k}` : ''}
+        {rows.map(({ item, times }) => (
+          <View key={item} style={[w.tallyChip, { backgroundColor: sliceLook(item).fill }]}>
+            <Text style={[w.tallyText, { color: sliceLook(item).ink }]}>
+              {sliceLabel(item)}
+              {times > 1 ? ` · ${times}` : ''}
             </Text>
           </View>
         ))}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function Rules({ tier }: { tier: WheelTierId }) {
-  const order = WHEEL_SLICES.map((_, i) => i).sort((a, b) => rank(a) - rank(b));
+/** The "?" sheet's table: what each slice pays in this tier and how often it comes. */
+function Odds({ tier }: { tier: WheelTierId }) {
+  const order = WHEEL_SLICES.map((_, i) => i).sort((a, b) => rank(b) - rank(a));
   return (
-    <View style={w.rules}>
-      <Text style={w.rulesText}>
-        Çarkta 12 dilim var ve her dilim bir şey öder; dilimler aynı boyda çizilir ama şansları farklıdır. Oynanan her 100 jetonun ortalama 40{"'"}ı kazanç olarak döner. Kazanç oyun jetonudur. Sonucu sunucu belirler, çark yalnızca sonucu gösterir. Cömertlik Lv.{WHEEL_NEED_LEVEL} ve üstü için açıktır, günlük üst sınırı vardır.
-      </Text>
-      <View style={w.oddsHead}>
-        <Text style={[w.oddsCell, w.oddsHeadText]}>Dilim</Text>
-        <Text style={[w.oddsCell, w.oddsHeadText, { textAlign: 'right' }]}>Kazanç ({WHEEL_TIERS[tier].label})</Text>
-        <Text style={[w.oddsCell, w.oddsHeadText, { textAlign: 'right' }]}>Şans</Text>
+    <View style={{ gap: 4 }}>
+      <Text style={r.head}>Dilimler · {WHEEL_TIERS[tier].label}</Text>
+      <View style={r.row}>
+        <Text style={[r.cell, r.dim]}>Dilim</Text>
+        <Text style={[r.cell, r.dim, r.right]}>Kazanç</Text>
+        <Text style={[r.cell, r.dim, r.right]}>Şans</Text>
       </View>
       {order.map((i) => (
-        <View key={i} style={w.oddsRow}>
-          <View style={[w.oddsCell, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-            <View style={[w.dot, { backgroundColor: sliceLook(i).fill }]} />
-            <Text style={w.oddsText}>{sliceLabel(i)}</Text>
+        <View key={i} style={r.row}>
+          <View style={[r.cell, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+            <View style={[r.dot, { backgroundColor: sliceLook(i).fill }]} />
+            <Text style={r.text}>{sliceLabel(i)}</Text>
           </View>
-          <Text style={[w.oddsCell, w.oddsText, { textAlign: 'right' }]}>{isJackpotSlice(i) ? 'Fonun tamamı' : n(prizeOf(tier, i))}</Text>
-          <Text style={[w.oddsCell, w.oddsText, { textAlign: 'right' }]}>{sliceChance(i)}</Text>
+          <Text style={[r.cell, r.text, r.right]}>{isJackpotSlice(i) ? 'Fonun tamamı' : n(prizeOf(tier, i))}</Text>
+          <Text style={[r.cell, r.text, r.right]}>{sliceChance(i)}</Text>
         </View>
       ))}
     </View>
@@ -386,58 +529,47 @@ const w = StyleSheet.create({
   ghost: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 8 },
   ghostText: { color: colors.text, fontWeight: '800', fontSize: 13 },
 
+  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
+  head: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 6 },
+  jackpot: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1.5, borderColor: 'rgba(255,101,118,0.55)' },
+  jackpotLabel: { color: '#FFB3BC', fontWeight: '900', fontSize: 11, letterSpacing: 1.4 },
+  jackpotValue: { color: colors.gold, fontWeight: '900', fontSize: 24, lineHeight: 28, letterSpacing: 0.5 },
+
+  rim: { backgroundColor: '#3B2300', borderWidth: 3, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.45), 0 0 24px rgba(246,189,96,0.25)' },
+  wedge: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
+  labelBox: { position: 'absolute', top: 12, width: 68, alignItems: 'center' },
+  sliceText: { fontWeight: '900', fontSize: 12, fontVariant: ['tabular-nums'] },
+  sliceSub: { fontWeight: '700', fontSize: 9, opacity: 0.85 },
+  pegArm: { position: 'absolute', top: 0, width: 8, alignItems: 'center' },
+  peg: { width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: '#FFE7B0' },
+  hub: { position: 'absolute', width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.gold, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' },
+
+  status: { alignSelf: 'stretch', borderRadius: 10, borderWidth: 2, borderColor: 'rgba(246,189,96,0.65)', backgroundColor: '#0A1528', paddingVertical: 5, paddingHorizontal: 8, minHeight: 32, justifyContent: 'center' },
+  statusWin: { backgroundColor: '#15803D' },
+  statusText: { color: '#FFE7B0', fontWeight: '900', fontSize: 14, textAlign: 'center', letterSpacing: 0.3, fontVariant: ['tabular-nums'] },
+  statusErr: { fontSize: 12, fontWeight: '700', letterSpacing: 0, color: '#FFFFFF' },
+
+  summary: { position: 'absolute', left: 10, right: 10, bottom: 10, borderRadius: 16, padding: 12, gap: 2, backgroundColor: 'rgba(8,15,30,0.96)', borderWidth: 1.5, borderColor: colors.gold, alignItems: 'center', boxShadow: '0 -6px 24px rgba(0,0,0,0.5)' },
+  summaryHead: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', justifyContent: 'space-between' },
+  summaryTitle: { color: '#FFE7B0', fontWeight: '900', fontSize: 12, letterSpacing: 1.2 },
+  summaryMain: { color: colors.text, fontWeight: '900', fontSize: 30, lineHeight: 36, fontVariant: ['tabular-nums'] },
+  summarySub: { color: colors.textDim, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  tally: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center', marginTop: 6 },
+  tallyChip: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
+  tallyText: { fontWeight: '800', fontSize: 12, fontVariant: ['tabular-nums'] },
+
   tiers: { flexDirection: 'row', gap: 6, backgroundColor: colors.bg, borderRadius: 16, padding: 4, borderWidth: 1, borderColor: colors.border },
-  tier: { flex: 1, borderRadius: 12, paddingVertical: 8, alignItems: 'center', gap: 1 },
+  tier: { flex: 1, borderRadius: 12, paddingVertical: 6, alignItems: 'center', gap: 1 },
   tierOn: { backgroundColor: semantic.money },
   tierName: { color: colors.text, fontWeight: '900', fontSize: 13 },
   tierPrice: { color: colors.textDim, fontWeight: '800', fontSize: 11 },
-
-  jackpot: { borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,101,118,0.45)' },
-  jackpotLabel: { color: '#FFB3BC', fontWeight: '900', fontSize: 12, letterSpacing: 1.5 },
-  jackpotValue: { color: colors.gold, fontWeight: '900', fontSize: 34, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
-  jackpotNote: { color: colors.textDim, fontSize: 11, textAlign: 'center' },
-
-  stage: { alignItems: 'center', justifyContent: 'center', paddingTop: 10 },
-  rim: { width: SIZE + 28, height: SIZE + 28, borderRadius: (SIZE + 28) / 2, backgroundColor: '#3B2300', borderWidth: 3, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.45), 0 0 24px rgba(246,189,96,0.25)' },
-  bulbArm: { position: 'absolute', top: 0, left: INNER / 2 - 5, height: INNER, width: 10, alignItems: 'center' },
-  bulb: { width: 7, height: 7, borderRadius: 4, marginTop: 4, backgroundColor: '#FFE7B0', boxShadow: '0 0 6px rgba(255,231,176,0.9)' },
-  bulbDim: { backgroundColor: '#B7832E', boxShadow: 'none' },
-  disc: { width: SIZE, height: SIZE, borderRadius: R, overflow: 'hidden', backgroundColor: '#16253C' },
-  wedge: { position: 'absolute', left: R - HALF, top: 0, width: 0, height: 0, borderLeftWidth: HALF, borderRightWidth: HALF, borderTopWidth: R, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
-  labelBox: { position: 'absolute', top: 12, left: R - 34, width: 68, alignItems: 'center' },
-  sliceText: { fontWeight: '900', fontSize: 12, fontVariant: ['tabular-nums'] },
-  sliceSub: { fontWeight: '700', fontSize: 9, opacity: 0.85 },
-  hub: { position: 'absolute', left: INNER / 2 - 33, top: INNER / 2 - 33, width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.gold, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' },
-  pointerRow: { position: 'absolute', top: 2, left: 0, right: 0, alignItems: 'center' },
-  pointer: { width: 0, height: 0, borderLeftWidth: 13, borderRightWidth: 13, borderTopWidth: 26, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FF6576' },
-
   counts: { flexDirection: 'row', gap: 8 },
   countWrap: { flex: 1 },
-  count: { borderRadius: 16, paddingVertical: 10, alignItems: 'center' },
-  countX: { fontWeight: '900', fontSize: 18 },
-  countCost: { fontWeight: '800', fontSize: 12 },
-
-  wallet: { gap: 2, alignItems: 'center' },
-  walletText: { color: colors.text, fontSize: 13 },
-
-  result: { backgroundColor: colors.cardAlt, borderRadius: 16, padding: 12, gap: 4, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  resultJackpot: { color: '#FF8E9A', fontWeight: '900', fontSize: 20, letterSpacing: 1 },
-  resultMain: { color: colors.text, fontWeight: '900', fontSize: 20 },
-  err: { color: colors.gold, textAlign: 'center', fontWeight: '700' },
-  tally: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 4 },
-  tallyChip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  tallyText: { fontWeight: '800', fontSize: 12 },
-
-  rulesHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 },
-  rulesHeadText: { color: colors.textDim, fontWeight: '800', fontSize: 13 },
-  rules: { backgroundColor: colors.bg, borderRadius: 16, padding: 12, gap: 6, borderWidth: 1, borderColor: colors.border },
-  rulesText: { color: colors.textDim, fontSize: 12, lineHeight: 18 },
-  oddsHead: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 4, marginTop: 4 },
-  oddsHeadText: { color: colors.textDim, fontSize: 11, fontWeight: '800' },
-  oddsRow: { flexDirection: 'row', paddingVertical: 3 },
-  oddsCell: { flex: 1 },
-  oddsText: { color: colors.text, fontSize: 12, fontVariant: ['tabular-nums'] },
-  dot: { width: 10, height: 10, borderRadius: 5 },
+  count: { borderRadius: 16, paddingVertical: 8, alignItems: 'center' },
+  countX: { fontWeight: '900', fontSize: 16 },
+  countCost: { fontWeight: '800', fontSize: 12, fontVariant: ['tabular-nums'] },
+  wallet: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  left: { color: colors.textDim, fontSize: 11, lineHeight: 15, textAlign: 'right', fontVariant: ['tabular-nums'] },
 
   tabs: { flexDirection: 'row', gap: 6 },
   tab: { flex: 1, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingVertical: 7, alignItems: 'center' },
@@ -449,4 +581,15 @@ const w = StyleSheet.create({
   personName: { color: colors.text, fontWeight: '800', fontSize: 13 },
   personSub: { color: colors.textDim, fontSize: 11 },
   personRight: { color: colors.gold, fontWeight: '900', fontSize: 14, fontVariant: ['tabular-nums'] },
+});
+
+const r = StyleSheet.create({
+  head: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 24 },
+  cell: { flex: 1 },
+  right: { textAlign: 'right' },
+  dim: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '800' },
+  text: { color: '#fff', fontSize: 13, fontVariant: ['tabular-nums'] },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  note: { color: 'rgba(255,255,255,0.84)', fontSize: 14, lineHeight: 21 },
 });

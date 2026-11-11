@@ -60,6 +60,13 @@ describe('Kazanç bandı kime gösterilmez', () => {
     assert.equal(winNewsHidden(salon, 2), false);
   });
 
+  test('jetonlu oyunlar hesaba kapalıysa Oyun Salonu kazancı gösterilmez; Uğurlu seviyeye bakar', () => {
+    assert.equal(winNewsHidden(salon, 9, false), true);
+    assert.equal(winNewsHidden(unflagged, 9, false), true);
+    assert.equal(winNewsHidden(lucky, 9, false), false);
+    assert.equal(winNewsHidden(other, 9, false), false);
+  });
+
   test('canlı modda Oyun Salonu sunucuda: kazancı demodaki gibi Lv.2’den görünür', () => {
     live(true);
     assert.equal(winNewsHidden(salon, 9), false);

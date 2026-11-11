@@ -19,13 +19,17 @@ import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
+import type { CardsMove, CardsSeen } from '@/lib/room-games/cards';
+import type { FourMove, FourState } from '@/lib/room-games/four';
+import type { LudoMode, LudoMove, LudoState } from '@/lib/room-games/ludo';
+import type { XoxMove, XoxState } from '@/lib/room-games/xox';
 
 /**
  * wealthXp: Cömertlik points, charmXp: Yankı points, only in GET /api/me (the server's counts, server/api/wheel.mjs
  * wealthPoints and wallet.mjs charmPoints).
  */
 export type ServerUser = {
-  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number;
+  id: string; name: string; coins: number; diamonds: number; gameCoins: number; createdAt: string; phone?: string | null; svipXp?: number; wealthXp?: number; charmXp?: number; paidGames?: boolean;
   // Only in GET/PATCH /api/me and the sign-in and add-address answers; wallet answers leave them out.
   email?: string | null; identities?: string[]; phoneVerified?: boolean;
 };
@@ -1034,13 +1038,13 @@ export const casino = () => call<ServerCasino>('GET', '/api/casino');
 export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
   call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
 /**
- * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it. `hand` only for my
- * own cards (Renk Kartları; null when I don't sit there), `counts` everyone's card count; `mySeat` −1 when I watch.
+ * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it; `mySeat` −1 when I
+ * watch. `TableCommon` is what every table carries. Each game adds its own fields, as the server's
+ * room-games/<game>.mjs keeps them, and `game` tells them apart: narrow on it before reading a game's fields. A new
+ * game adds its own type to `ServerTable` and its move to `TableMove`.
  */
-export type TableCard = { color: number; value: number | '+2' | 'Atla' };
-export type ServerTable = {
+type TableCommon = {
   room: string;
-  game: 'ludo' | 'cards' | 'xox';
   name: string;
   min: number;
   max: number;
@@ -1054,16 +1058,28 @@ export type ServerTable = {
   winner: number | null;
   log: string;
   version: number;
-  board?: ('X' | 'O' | null)[];
-  pos?: number[];
-  die?: number | null;
-  top?: TableCard;
-  hand?: TableCard[] | null;
-  counts?: number[];
 };
+/** Ludo (lib/room-games/ludo): its fields come with the first hand; a table still waiting has only `mode`. */
+export type LudoServerTable = TableCommon & { game: 'ludo' } & Partial<LudoState>;
+/**
+ * Renk Kartları (lib/room-games/cards): `mine` only for my own cards (null when I don't sit there), `counts` everyone's
+ * card count, the top of the two piles; a card is its number in the deck. Its fields come with the first hand.
+ */
+export type CardsServerTable = TableCommon & { game: 'cards' } & Partial<CardsSeen>;
+/** XOX (lib/room-games/xox): the board with each seat's mark and hands won. */
+export type XoxServerTable = TableCommon & { game: 'xox' } & Partial<XoxState>;
+/** Dört Taş (lib/room-games/four): the board with each seat's colour and hands won. */
+export type FourServerTable = TableCommon & { game: 'four' } & Partial<FourState>;
+export type ServerTable = LudoServerTable | CardsServerTable | XoxServerTable | FourServerTable;
+/**
+ * A move as each game takes it: XOX { cell }, Dört Taş { col }, Renk Kartları { card, color? }, { draw: true } or
+ * { pass: true }, Ludo { roll: true } then { token }.
+ */
+export type TableMove = XoxMove | FourMove | CardsMove | LudoMove;
 export type TableAction = 'open' | 'join' | 'start' | 'move' | 'leave' | 'again' | 'close';
 export const roomTable = (room: string) => call<{ table: ServerTable | null }>('GET', `/api/rooms/table?room=${encodeURIComponent(room)}`).then((r) => r.table);
-export const roomTableAction = (room: string, action: TableAction, extra: { game?: string; move?: { cell?: number; card?: number | null } } = {}) =>
+/** `options`: the opener's choices with `open` (Ludo: Hızlı or Klasik). */
+export const roomTableAction = (room: string, action: TableAction, extra: { game?: ServerTable['game']; options?: { mode?: LudoMode }; move?: TableMove } = {}) =>
   call<{ table: ServerTable | null }>('POST', '/api/rooms/table', { room, action, ...extra }).then((r) => r.table);
 /** Sıralama › Oda XP (server/api/room-xp.mjs): open rooms by the room XP their gifts earned in the period. */
 export type RoomXpRow = { rank: number; room: ServerRoom; score: number };
@@ -1117,8 +1133,8 @@ export type LiveKey =
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */
 export type RewardKey = 'rewards_off' | 'welcome_coins' | 'invite_coins' | 'invite_daily_cap';
-/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, the top stake, the daily limit. */
-export type CasinoKey = 'casino_off' | 'casino_max_bet' | 'casino_daily_rounds';
+/** Oyun Salonu (server/api/live-registry.mjs, "Oyun Salonu"): games switched off, who the coin games are open to, the top stake, the daily limit. */
+export type CasinoKey = 'casino_off' | 'casino_open' | 'casino_max_bet' | 'casino_daily_rounds';
 /** 1v1 and Eşleşme (server/api/live-registry.mjs, "Birebir ve eşleşme"): whole numbers. */
 export type OneOnOneKey =
   | 'dm_price'

@@ -97,12 +97,15 @@ export const updateCasino = (id: string, patch: Partial<CasinoGame>) => emit({ c
 export const CASINO_MIN_WEALTH = 2;
 /** The gambling level itself: below it no game of chance exists for the user. Rüzgâr Gülü is gated by this alone. */
 export const gamblingLevelOk = (wealthLevel: number) => wealthLevel >= CASINO_MIN_WEALTH;
-/** Oyun Salonu from Cömertlik Lv.2. A live build plays every round on the server (lib/live/casino, server/api/
- *  casino.mjs), which checks the level again; the demo decides them on this phone (playCasino, playBoard). */
-export const casinoVisible = (wealthLevel: number) => gamblingLevelOk(wealthLevel);
+/** The coin games (Oyun Salonu and Rüzgâr Gülü) from Cömertlik Lv.2, for an account the server opens them to
+ *  (`paidGames`, the store's: admin accounts only until the games are opened to everyone). A live build plays every
+ *  round on the server (lib/live/casino, server/api/casino.mjs), which checks both again; the demo decides them on
+ *  this phone (playCasino, playBoard). */
+export const casinoVisible = (wealthLevel: number, paidGames = true) => paidGames && gamblingLevelOk(wealthLevel);
 /** A win banner that is not news for this user, skipped and never shown: an Oyun Salonu win for someone who cannot
  *  see Oyun Salonu, and any other win of chance (Uğurlu) below the gambling level. */
-export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number) => (isCasinoWin(n) ? !casinoVisible(wealthLevel) : isChanceWin(n) && !gamblingLevelOk(wealthLevel));
+export const winNewsHidden = (n: Pick<WinNews, 'casino' | 'source'>, wealthLevel: number, paidGames = true) =>
+  isCasinoWin(n) ? !casinoVisible(wealthLevel, paidGames) : isChanceWin(n) && !gamblingLevelOk(wealthLevel);
 const CASINO_OFF = 'Bu oyun şu an kapalı.';
 export type Access = { ok: true } | { ok: false; reason: string; needWealth?: number };
 /** Same check the server runs on every launch and every round; the UI only uses it to explain. */

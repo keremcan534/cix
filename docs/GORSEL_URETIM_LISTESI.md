@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`, Temel ücretsiz). Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 549 görsel.** Öncelik: P1 143 (çok görünen, para kazandıran) · P2 187 · P3 158 · P4 61 (küçük arayüz simgeleri).
+**Toplam 608 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16–18'in öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -31,6 +31,10 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 12. Arayüz durum ve işlem simgeleri | 57 |
 | 13. Güncelleme 2: Odalar bannerları ve Mesajlar | 7 |
 | 14. Güncelleme 3: Ücretli oda süslemeleri | 6 |
+| 15. Oda oyunları: Ludo | 7 |
+| 16. Oyun Salonu: çark ve tahta oyunları | 9 |
+| 17. Oyun Salonu: Yörünge, Mercan Avı, Fener Kayalığı | 22 |
+| 18. Oda oyunları: Renk Kartları, XOX, Dört Taş | 21 |
 
 ## ChatGPT ile üretim
 
@@ -709,3 +713,84 @@ Oda Ayarları › **Oda Süslemesi › Ücretli** rafındaki arka planlar. Kod, 
 | 6 | `oda-susleme-altin-salon.png` | Altın Salon | "Yakında" kutusu | Yüksek tavanlı, altın ışıklı görkemli salon: avize ışıltısı, mermer zemin yansıması, lacivert gölgeler | P1 | Yeni (güncelleme 3) · 2.000 jeton / 30 gün · kimlik `rb-salon` |
 
 Teslimden sonra (her görsel için): dosya `app/assets/room/` içine konur → `app/src/components/room/stage-backdrop.tsx` içindeki `ROOM_BG_ART`'a kimliğiyle eklenir → `server/api/catalog.mjs` `ROOM_BG_ROWS`'ta o satırın sonundaki `false` `true` yapılır (satışa açılır). Uygulama sürümü yayımlanmadan sunucuda satışa açılmamalı: görseli olmayan eski sürüm o süslemeyi çizemez (ücretsiz süslemeyi gösterir). Yeni bir süsleme eklemek aynı üç adım artı iki katalog satırıdır.
+
+
+## 15. Oda oyunları: Ludo (7)
+
+Ludo artık gerçek bir tahtada oynanıyor (`app/src/components/games/room/ludo-board.tsx`, `ludo.tsx`): 15 × 15 haç tahta, dört renkli yuva, yıldızlı güvenli kareler, ortada ev üçgenleri. **Şu an hiçbir görsel dosyası kullanmıyor**: tahta, taşlar ve kupa kodla (düz renk, degrade, Ionicons) çiziliyor; yalnız zar mevcut `zar-zar-yuzu-1..6.png` görsellerini kullanıyor (yeni zar gerekmiyor). Aşağıdakiler gelirse oyun çizilmiş bir masa oyunu gibi görünür; gelmezse bugünkü hali kalır, hiçbir şey bozulmaz.
+
+Ölçü ve stil (hepsi için aynı):
+
+- Mevcut 3D cam stil (`zar-zar-yuzu-*.png`, `oyun-ludo.png` ile aynı aile), **şeffaf zemin**, PNG.
+- Renkler uygulamanın paleti: turkuaz `#13D9DF`, mercan `#FF6576`, altın `#F6BD60`, yeşil `#22C55E`; zemin gece laciverti. Mor yok.
+- Taşlar tahtada **yaklaşık 20 px** çizilir (yuvada 26 px): ayrıntı az, siluet net, üstten bakış. Dört taş aynı kalıptan, yalnız rengi farklı olmalı.
+- Yazı, logo, marka yok. Başka Ludo oyunlarının taşı ya da tahtası kopyalanmamalı (`docs/SANAT_LISTESI_OZGUNLUK.md`).
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `ludo-tas-turkuaz.png` | Ludo taşı · Turkuaz | kodla çizilen parlak pul | Üstten görünen yuvarlak, parlak oyun taşı (piyon başı gibi kubbeli), turkuaz; beyaz ince kenar, üstte ışık yansıması; 192 px | P2 | Yeni (oyun yenileme) · şu an degrade daire; gelince `ludo-board.tsx` içindeki `Token` gövdesi görsele döner |
+| 2 | `ludo-tas-mercan.png` | Ludo taşı · Mercan | kodla çizilen parlak pul | 1 ile aynı kalıp, mercan | P2 | Yeni (oyun yenileme) · 1 ile aynı |
+| 3 | `ludo-tas-altin.png` | Ludo taşı · Altın | kodla çizilen parlak pul | 1 ile aynı kalıp, altın | P2 | Yeni (oyun yenileme) · 1 ile aynı |
+| 4 | `ludo-tas-yesil.png` | Ludo taşı · Yeşil | kodla çizilen parlak pul | 1 ile aynı kalıp, yeşil | P2 | Yeni (oyun yenileme) · 1 ile aynı |
+| 5 | `ludo-tahta-zemin.png` | Ludo tahta zemini | düz lacivert `#0A1426` | Kare, **1080 × 1080 px, şeffaf değil**: gece laciverti oyun masası dokusu (hafif keçe ya da cilalı ahşap), köşelere doğru çok hafif koyulaşan; üstüne kareler ve yuvalar kodla çizilecek, bu yüzden desen sade ve düşük kontrastlı | P2 | Yeni (oyun yenileme) · gelince `ludo-board.tsx` `felt` zeminine konur |
+| 6 | `ludo-yildiz.png` | Güvenli kare yıldızı | Ionicons `star` | Küçük, dolgun beş köşeli yıldız, açık gümüş-beyaz, hafif kabartma; 96 px, 14 px çizilecek | P3 | Yeni (oyun yenileme) · dört yıldızlı güvenli karede |
+| 7 | `ludo-kupa.png` | Ludo kupası | Ionicons `trophy` | Altın kupa, iki kulplu, kaidesinde küçük yıldız; 192 px | P3 | Yeni (oyun yenileme) · kazanan bandında ve tahtanın ortasında (küçük) |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir (zar yüzleri gibi) → `ludo-board.tsx` ve `ludo.tsx` içinde ilgili çizim `<Art name=…>` ile değiştirilir. Taşların dördü birden gelmeden bağlanmamalı: yarısı görsel, yarısı kodla çizilmiş taş aynı tahtada yan yana durur.
+
+## 16. Oyun Salonu: çark ve tahta oyunları (9)
+
+Gece Yarısı Çarkı, Liman Pazarı, Sihir Destesi (`app/src/components/games/board.tsx`) ve Rüzgâr Gülü (`components/games/wheel.tsx`) şu an düz görünümlerle, emojiyle ve Ionicons simgeleriyle çiziliyor; hareket, ses ve kazanç anı hazır. Aşağıdaki görseller gelince yalnız çizim değişir, oyun aynı kalır. Hepsi **şeffaf arka planlı PNG, üstünde yazı ve rakam yok** (çarpanları ve tutarları uygulama yazar); mor-pembe yalnız tahta oyunlarının kendi sahnesinde, Rüzgâr Gülü'nde yok.
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `cark-ibre.png` | Çark ibresi | kodla çizilen üçgen ve pim | Aşağıyı gösteren, damla biçimli parlak ibre (mercan gövde, altın pim üst ortada); tam karşıdan, 192 px. Pim görselin tam ortasında olmalı (ibre pimin etrafında sallanır) | P2 | Yeni (oyun yenileme) · iki çarkta da (`fx/wheel-stage.tsx` `WheelPointer`) |
+| 2 | `gece-carki-gobek.png` | Gece Yarısı Çarkı göbeği | Ionicons `moon` + yıldız noktaları | Yuvarlak gece göğü: lacivert-mor zemin, hilal ve birkaç yıldız, altın ince kenar; tam karşıdan, 512 px | P2 | Yeni (oyun yenileme) · çarkın dönmeyen ortası |
+| 3 | `meyve-karpuz.png` `meyve-elma.png` `meyve-limon.png` `meyve-uzum.png` `meyve-77.png` | Çark meyveleri (5) | emoji ve "77" yazısı | Aynı kalıpta beş parlak 3D simge: karpuz dilimi, kırmızı elma, limon, üzüm salkımı, altın "77" plakası; 192 px. Dilimde 20 px, seçenek kartında 28 px çizilir | P1 | Yeni (oyun yenileme) · `slot-limon`/`slot-uzum` taslaklarının yerine; beşi birden gelmeden bağlanmaz |
+| 4 | `liman-tabak.png` | Liman Pazarı tabağı | Ionicons `restaurant` | Üstten görünen beyaz porselen servis tabağı, altın ince kenar, yanında çatal-bıçak; boş (üstüne gelen yemeği uygulama koyar); 512 px | P2 | Yeni (oyun yenileme) · halkanın ortası |
+| 5 | `liman-yengec.png` … `liman-lahana.png`, `liman-salata.png`, `liman-pizza.png`, `liman-bos-tabak.png` | Liman yemekleri (11) | emoji | Aynı kalıpta 3D yemek simgeleri: yengeç, balık, karides, et, domates, balkabağı, mantar, lahana; ayrıca salata kasesi, pizza dilimi ve boş tabak; 192 px | P2 | Yeni (oyun yenileme) · sebzeler yeşil, et ve deniz ürünleri mercan çerçeveli kartta durur |
+| 6 | `sihir-kart-arkasi.png` | Sihir Destesi kart arkası | kodla çizilen mor kart + Ionicons `sparkles` | Dikey oyun kartı arkası (2:3): koyu mor zemin, altın ince çerçeve, ortada sekiz köşeli yıldız ve ince yıldız tozu deseni; 384 × 576 px, köşeler yuvarlak | P1 | Yeni (oyun yenileme) · destede ve kart çevrilirken |
+| 7 | `sihir-burc-kova.png` … (8) ve `sihir-joker.png` | Burç kartı simgeleri (9) | yazı karakteri (♒ …) ve 🃏 | Sekiz burcun altın çizgi simgesi (Kova, Başak, Boğa, Yengeç, Balık, Aslan, Yay, Akrep), aynı çizgi kalınlığında; ayrıca joker (şapkalı soytarı başı, altın-mor); 192 px | P2 | Yeni (oyun yenileme) · karakter her telefonda aynı görünmüyor |
+| 8 | `fis-250.png` … `fis-25000.png` | Bahis fişleri (6) | kodla çizilen fiş | Üstten görünen casino fişi, kenarında sekiz açık renk çentik, ortası boş (tutarı uygulama yazar): mavi, yeşil, kırmızı, mor, turuncu, siyah-altın; 192 px | P3 | Yeni (oyun yenileme) · `fx/chips.tsx` `ChipFace`; kodla çizilen hali yeterince iyi, acele yok |
+| 9 | `ruzgar-ozet-rozet.png` | Çoklu tur özeti rozeti | yok (düz başlık) | Küçük altın pusula gülü rozeti, altında kurdele (yazısız); 192 px | P3 | Yeni (oyun yenileme) · ×10 / ×50 özet kartının başlığında; `docs/RUZGAR_GULU.md` listesindeki `ruzgar-merkez.png` ve `ruzgar-ok.png` de hâlâ bekleniyor |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → ilgili çizim `<Art name=…>` ile değiştirilir (çark dilimleri ve seçenek kartlarında `board.tsx`, ibre için `fx/wheel-stage.tsx`). Çarkın dilimleri, çerçevesi ve ampulleri kodla çizilmeye devam eder (dönerken net kalsın ve her ekran boyuna uysun diye).
+
+
+## 17. Oyun Salonu: Yörünge, Mercan Avı, Fener Kayalığı (22)
+
+Yörünge (`app/src/components/games/rocket-stage.tsx`), Mercan Avı (`fish-stage.tsx`) ve Fener Kayalığı (`fener-stage.tsx`) sahneleri şu an kodla çizilen biçimlerle, telefonun emojileriyle ve mevcut `oyun-roket` kapak görseliyle duruyor; hareket, ses ve kazanç anı hazır. Aşağıdaki görseller gelince yalnız çizim değişir, oyun aynı kalır. Hepsi **şeffaf arka planlı PNG, üstünde yazı ve rakam yok** (çarpanları ve tutarları uygulama yazar).
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `yorunge-roket.png` | Yörünge roketi | `oyun-roket.png` (kapak simgesi) | Burnu tam yukarı bakan, tam karşıdan roket: kırmızı-gümüş gövde, turkuaz pencere, **alevsiz** (alevi uygulama çizer ve oynatır); roketin ekseni görselin tam ortasında; 384 px | P1 | Yeni (oyun yenileme) · sahnede 58 px çizilir ve yol boyunca döndürülür |
+| 2 | `yorunge-gezegen.png` | Kalkış gezegeni | kodla çizilen turuncu daire | Büyük bir gezegenin yalnız üst yayı: kehribar-turuncu yüzey, birkaç krater, ince atmosfer ışığı; alt kenar düz; 1024 × 256 px | P2 | Yeni (oyun yenileme) · sahnenin altında durur, üstüne son sonuçlar şeridi gelir |
+| 3 | `yorunge-rampa.png` | Fırlatma rampası | kodla çizilen ray ve iki ayak | Yandan görünen çelik kafes rampa, hafif yukarı eğimli (yaklaşık 15°), iki ayaklı; 384 × 192 px | P3 | Yeni (oyun yenileme) · kodla çizilen hali yeterli, acele yok |
+| 4 | `mercan-palyaco.png`, `mercan-sari.png`, `mercan-balon.png`, `mercan-kalamar.png`, `mercan-ahtapot.png`, `mercan-kaplumbaga.png`, `mercan-yunus.png`, `mercan-kopekbaligi.png`, `mercan-balina.png`, `mercan-ejderha.png` | Mercan Avı canlıları (10) | emoji (🐠 🐟 🐡 🦑 🐙 🐢 🐬 🦈 🐳 🐉) | Aynı kalıpta on 3D deniz canlısı: Palyaço Balığı, Sarı Balık, Balon Balığı, Kalamar, Ahtapot, Kaplumbağa, Yunus, Köpekbalığı, Balina, Altın Ejderha. Hepsi yandan ve **sola bakar** (sağa yüzeni uygulama çevirir); ödemesi yüksek olan daha gösterişli; 256 px | P1 | Yeni (oyun yenileme) · emoji her telefonda farklı görünüyor; onu birden gelmeden bağlanmaz |
+| 5 | `mercan-top-namlu.png`, `mercan-top-kaide.png` | Top (2) | kodla çizilen namlu ve kubbe | Namlu: tam yukarı bakan metal namlu, altın bilezikli, dönme noktası alt ortada (192 × 384 px). Kaide: yarım kubbe, altın kenarlı, ortasında turkuaz göbek (384 × 192 px) | P2 | Yeni (oyun yenileme) · namlu dokunulan balığa döner ve geri teper |
+| 6 | `mercan-deniz-dibi.png` | Deniz dibi şeridi | kodla çizilen kayalar ve mercan dalları | Yatay şerit: kum, koyu kayalar, renkli mercanlar (pembe, turuncu, mor); üst kenarı şeffafa açılır; 1080 × 360 px | P2 | Yeni (oyun yenileme) · yosunlar ve kabarcıklar kodla oynamaya devam eder |
+| 7 | `fener-gemi-kucuk.png`, `fener-gemi-orta.png`, `fener-gemi-buyuk.png`, `fener-gemi-altin.png` | Fener gemileri (4) | emoji (⛵ 🚤 🚢) | Yükü büyüdükçe büyüyen dört gemi: yelkenli sandal, motorlu tekne, yük gemisi, altın yük gemisi; yandan, **sola (limana) bakar**; gece denizinde okunacak açık renkler; 192 px | P1 | Yeni (oyun yenileme) · yük etiketini (×0,5 …) uygulama geminin altına yazar |
+| 8 | `fener-kandil.png` | Kandil | emoji (🏮) | Suda yüzen yanık kandil, sıcak turuncu ışık halesi; 192 px | P1 | Yeni (oyun yenileme) · üç kandil Fırtına Gecesi'ni başlatır |
+| 9 | `fener-kule.png` | Fener kulesi | kodla çizilen taş sütun ve ray | Dikey deniz feneri gövdesi: taş ve kırmızı-beyaz kuşaklar, ışık odası **boş** (ışığı ve merceği uygulama çizer, sıralar arasında gezdirir); 128 × 1024 px | P2 | Yeni (oyun yenileme) · sıraların başında, tahtanın solunda durur |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → ilgili çizim değişir (`rocket-stage.tsx` `RocketSprite` ve `Planet`; `fish-stage.tsx` `FishSprite`, `Cannon` ve `Water`; `fener-stage.tsx` `shipLook`, `SeaCell` ve `Tower`). Işık huzmesi, roketin izi ve alevi, patlama, kabarcıklar, yağmur ve şimşek kodla çizilmeye devam eder (hareket ettikleri ve her ekran boyuna uydukları için).
+
+
+## 18. Oda oyunları: Renk Kartları, XOX, Dört Taş (21)
+
+Renk Kartları (`app/src/components/games/room/cards.tsx`, kart yüzleri `card-face.tsx`), XOX (`room/xox.tsx`) ve Dört Taş (`room/four.tsx`) şu an düz görünümlerle, degradelerle ve Ionicons simgeleriyle çiziliyor; hareket, ses ve el sonu hazır. Aşağıdaki görseller gelince yalnız çizim değişir, oyun aynı kalır. Hepsi **şeffaf arka planlı PNG, üstünde yazı ve rakam yok** (rakamları, "+2"yi ve kart sayılarını uygulama yazar). Renk Kartları'nın destesi bize özgüdür: dört renk Turkuaz, Mercan, Altın ve Yeşil'dir, her rengin kendi amblemi vardır (damla, alev, güneş, yaprak). Başka kart oyunlarının kart yüzü düzeni (ortada eğik beyaz oval gibi), yazı tipi ya da adı kullanılmamalı.
+
+| # | Dosya adı | Ad | Şu an | Ne çizilecek | Öncelik | Not |
+|---|---|---|---|---|---|---|
+| 1 | `renk-kart-turkuaz.png`, `renk-kart-mercan.png`, `renk-kart-altin.png`, `renk-kart-yesil.png` | Kart yüzü zeminleri (4) | kodla çizilen degrade ve soluk Ionicons amblemi | Dikey oyun kartı yüzü (yaklaşık 2:3, köşeler yuvarlak, ince beyaz kenar): rengin açıktan koyuya zemini, sağ altta büyük ve soluk amblem (damla, alev, güneş, yaprak); ortası ve sol üst köşe **boş** (rakamı ya da işareti uygulama koyar); 384 × 552 px | P1 | Yeni (oyun yenileme) · elde 54–58 px, ortada 62 px genişlikte çizilir; 360 dp ekranda sol üst köşe okunmalı |
+| 2 | `renk-amblem-damla.png`, `renk-amblem-alev.png`, `renk-amblem-gunes.png`, `renk-amblem-yaprak.png` | Renk amblemleri (4) | Ionicons `water`, `flame`, `sunny`, `leaf` | Aynı kalıpta dört küçük beyaz amblem (tek renk, dolu biçim); 192 px | P2 | Yeni (oyun yenileme) · kartın köşesinde 10 px, masadaki "Renk" rozetinde 13 px, renk seçiminde 24 px çizilir: çok sade olmalı |
+| 3 | `renk-isaret-atla.png`, `renk-isaret-yon.png`, `renk-isaret-arti2.png` | İşaret kartı simgeleri (3) | Ionicons `ban`, `swap-vertical` ve "+2" yazısı | Beyaz, kalın çizgili üç işaret: Atla (üstü çizili daire), Yön (ters yönlü iki ok), +2 (üst üste iki küçük kart; "+2" yazısını uygulama ekler); 192 px | P2 | Yeni (oyun yenileme) · kartın ortasında ve köşesinde |
+| 4 | `renk-joker.png`, `renk-joker-arti4.png` | Joker yüzleri (2) | kodla çizilen dört renkli disk | Dikey kart yüzü: gece laciverti zemin, ortada dört rengin (turkuaz, mercan, altın, yeşil) döndüğü parlak fırıldak; ikincisinde fırıldağın üstünde boş koyu plaka ("+4"ü uygulama yazar); 384 × 552 px | P1 | Yeni (oyun yenileme) · renk seçtiren kartlar |
+| 5 | `renk-kart-arka.png` | Kart arkası | kodla çizilen lacivert kart, turkuaz eşkenar dörtgen ve mercan nokta | Dikey kart arkası: gece laciverti zemin, turkuaz ince çerçeve, ortada turkuaz eşkenar dörtgen ve mercan göbek, çok hafif dalga deseni; 384 × 552 px | P1 | Yeni (oyun yenileme) · destede, rakiplerin kart sayısında ve uçan kartta |
+| 6 | `renk-masa.png` | Kart masası | kodla çizilen koyu degrade ve ince iç çizgi | Yatay, köşeleri çok yuvarlak masa yüzeyi: koyu petrol-lacivert keçe, çok hafif doku, kenarda ince açık şerit; ortası sade (desteler oraya gelir); 1024 × 480 px | P3 | Yeni (oyun yenileme) · kenar rengi oyunda ortadaki renge göre uygulamadan boyanır, görselde nötr kalmalı |
+| 7 | `oyun-renk-kartlari.png` | Renk Kartları kapağı | emoji (🃏) | Oyun kapak simgesi, diğer `oyun-*.png` kapaklarıyla aynı 3D üslupta: yelpaze açılmış dört renkli kart (turkuaz, mercan, altın, yeşil), en üstte dört renkli fırıldaklı Joker; 512 px | P1 | Yeni (oyun yenileme) · Oyun Merkezi kartı, oda menüsü ve oyun başlığı (`components/GameArt.tsx` `COVER.cards`) |
+| 8 | `xox-x.png`, `xox-o.png` | XOX işaretleri (2) | kodla çizilen iki çubuk ve halka | Kalın, uçları yuvarlak, hafif parlayan iki işaret: turkuaz X ve mercan O; tam karşıdan; 256 px | P3 | Yeni (oyun yenileme) · işaretler şu an kodla "çizilerek" geliyor; görsel gelirse büyüyerek gelir. Kodla çizilen hali yeterli, acele yok |
+| 9 | `dort-tas-mercan.png`, `dort-tas-altin.png` | Dört Taş taşları (2) | kodla çizilen degrade daire ve iç halka | Üstten görünen parlak, hafif bombeli iki pul: mercan ve altın; kenarda ince çentikli halka; 192 px | P2 | Yeni (oyun yenileme) · tahtada yaklaşık 38 px, oyuncu rozetinde 18 px çizilir |
+| 10 | `dort-tas-hucre.png` | Tahta hücresi | kodla çizilen, ortası delik mavi kare | Dört Taş tahtasının tek hücresi: gece mavisi parlak plastik kare, ortasında **şeffaf** yuvarlak delik, deliğin kenarında ince iç gölge; kenarlar yan yana döşenince ek yeri görünmemeli; 192 px | P2 | Yeni (oyun yenileme) · uygulama 7 × 6 döşer; taş deliğin arkasından düşerken görünür, bu yüzden delik tam şeffaf olmalı |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → kart yüzleri ve arkası `room/card-face.tsx` içinde (`CardFace`, `CardBack`, `CARD_COLORS`), masa `room/cards.tsx` içinde, taş ve hücre `room/four.tsx` içinde (`Disc` ve tahtanın ön yüzü), kapak `components/GameArt.tsx` `COVER` listesinde değişir. Süre halkası, kazanan çizgi, uçan kartlar ve konfeti kodla çizilmeye devam eder (hareket ettikleri için).
