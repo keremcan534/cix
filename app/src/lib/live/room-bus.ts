@@ -57,13 +57,20 @@ type Link = { setSeat: (seat: number | null) => void; send: (msg: PeerSignal) =>
  * asked first). Null when the metadata has none of it (an older server, or nothing written yet).
  */
 export type RoomState = { layoutId: string | null; micCount: number | null; micQueue: boolean; queue: string[]; music: RoomMusic | null };
-/** A track in the room's music queue: `key` its place in the queue, `by` who added it (server user id). */
-export type QueueTrack = { key: string; title: string; url: string; seconds: number; by: string; byName: string };
 /**
- * The room's music (server/api/music.mjs): tracks[0] plays from `startedAt` (server ms, pauses taken out), the rest
- * wait in order; `pausedAt` is when it was paused (null: playing). Both null when the queue is empty.
+ * A row of the room's playlist: `key` the row (the same track can be on the list twice), `by` who added it (server
+ * user id), `artist` '' when the file's name gave none.
  */
-export type RoomMusic = { tracks: QueueTrack[]; startedAt: number | null; pausedAt: number | null };
+export type QueueTrack = { key: string; title: string; artist: string; url: string; seconds: number; by: string; byName: string };
+/** off: the list plays once; one: the playing track again and again; all: the list again from the top. */
+export type MusicRepeat = 'off' | 'one' | 'all';
+/**
+ * The room's music (server/api/music.mjs): `tracks` play one after another from `startedAt` (server ms, pauses
+ * taken out): the playing row first, then what follows it (round the list with repeat all, only itself with
+ * repeat one); `pausedAt` is when it was paused (null: playing). Both null when nothing plays. `list` is the whole
+ * playlist in its order, played rows included (the sheet shows it).
+ */
+export type RoomMusic = { tracks: QueueTrack[]; startedAt: number | null; pausedAt: number | null; repeat: MusicRepeat; list: QueueTrack[] };
 type Snapshot = { roomId: string | null; peers: LivePeer[]; meSpeaking: boolean; lockedSeats: number[]; state: RoomState | null };
 
 const EMPTY: Snapshot = { roomId: null, peers: [], meSpeaking: false, lockedSeats: [], state: null };
@@ -136,23 +143,41 @@ export function parseRoomState(metadata: string | undefined): RoomState | null {
 
 const text = (v: unknown, max: number) => (typeof v === 'string' && v.length <= max ? v : null);
 const stamp = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
-/** The music the server wrote (metadata or an API answer); null when there is none. Odd tracks are left out. */
-export function parseMusic(raw: unknown): RoomMusic | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const m = raw as Record<string, unknown>;
-  if (!Array.isArray(m.tracks)) return null;
-  const tracks: QueueTrack[] = [];
-  for (const t of m.tracks.slice(0, 20) as Record<string, unknown>[]) {
+/** Rows on a room's playlist (server/api/music.mjs LIST_MAX). */
+export const LIST_MAX = 50;
+const REPEATS: readonly MusicRepeat[] = ['off', 'one', 'all'];
+function parseTracks(raw: unknown): QueueTrack[] {
+  const out: QueueTrack[] = [];
+  if (!Array.isArray(raw)) return out;
+  for (const t of raw.slice(0, LIST_MAX) as Record<string, unknown>[]) {
     if (!t || typeof t !== 'object') continue;
     const key = text(t.key, 18);
     const title = text(t.title, 80);
     const url = text(t.url, 500);
     const seconds = Number.isInteger(t.seconds) && (t.seconds as number) >= 5 && (t.seconds as number) <= 1200 ? (t.seconds as number) : null;
     if (!key || !/^\d+$/.test(key) || !title || !url || !url.startsWith('https://') || !seconds) continue;
-    tracks.push({ key, title, url, seconds, by: text(t.by, 64) ?? '', byName: text(t.byName, 80) ?? '' });
+    out.push({ key, title, artist: text(t.artist, 80) ?? '', url, seconds, by: text(t.by, 64) ?? '', byName: text(t.byName, 80) ?? '' });
   }
+  return out;
+}
+/**
+ * The music the server wrote (metadata or an API answer); null when there is none. Odd tracks are left out. The
+ * list is built from `order` (every row's key) and the rows in `tracks` and `others`; a server from before the
+ * playlist sends only `tracks`, which is then the list.
+ */
+export function parseMusic(raw: unknown): RoomMusic | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (!Array.isArray(m.tracks)) return null;
+  const tracks = parseTracks(m.tracks);
   const startedAt = tracks.length ? stamp(m.startedAt) : null;
-  return { tracks, startedAt, pausedAt: startedAt === null ? null : stamp(m.pausedAt) };
+  const repeat = REPEATS.find((r) => r === m.repeat) ?? 'off';
+  const byKey = new Map([...tracks, ...parseTracks(m.others)].map((t) => [t.key, t]));
+  const order = Array.isArray(m.order) ? m.order.slice(0, LIST_MAX).filter((k): k is string => typeof k === 'string' && byKey.has(k)) : [];
+  // Rows in tracks that order leaves out (it can't, but a list must show what plays) go at the end.
+  const keys = [...new Set([...order, ...tracks.map((t) => t.key)])];
+  const list = keys.map((k) => byKey.get(k)!);
+  return { tracks, startedAt, pausedAt: startedAt === null ? null : stamp(m.pausedAt), repeat, list };
 }
 
 /** `{"lockedSeats":[2,5]}` → [2, 5]; mic 0 is the owner's and never locked; anything else → none. */

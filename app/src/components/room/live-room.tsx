@@ -2722,8 +2722,8 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   const music$ = {
     toggle: () => (real ? liveMusicAct({ action: nowMusic?.paused ? 'resume' : 'pause' }) : setMusic((m) => ({ ...m, playing: !m.playing }))),
     next: () => (real ? liveMusicAct({ action: 'skip' }) : setMusic((m) => ({ queue: m.queue.slice(1), playing: m.queue.length > 1, position: 0 }))),
-    // Kapat: the music stops for everyone and the bar goes.
-    close: () => (real ? liveMusicAct({ action: 'clear' }) : setMusic({ queue: [], playing: false, position: 0 })),
+    // Kapat: the music stops for everyone and the bar goes; a server room keeps its playlist.
+    close: () => (real ? liveMusicAct({ action: 'stop' }) : setMusic({ queue: [], playing: false, position: 0 })),
     add: (t: Track) => {
       setMusic((m) => ({ ...m, queue: [...m.queue, t], playing: m.queue.length === 0 ? true : m.playing }));
       addMsg({ system: true, text: `🎵 Sıraya eklendi: ${t.title}` });

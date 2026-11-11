@@ -45,6 +45,16 @@ const lastMeta = (room) => {
   const c = lkCalls.filter((x) => x.method === 'UpdateRoomMetadata' && x.body.room === `oda-${room}`).pop();
   return c && JSON.parse(c.body.metadata);
 };
+// Older apps read tracks, startedAt and pausedAt; the playlist adds repeat, order and others.
+const EMPTY = { tracks: [], startedAt: null, pausedAt: null, repeat: 'off', order: [], others: [] };
+const titles = (list) => list.map((t) => t.title);
+/** The room's list in its order, as the new app builds it from order, tracks and others. */
+const listOf = (m) => {
+  const by = new Map([...m.tracks, ...m.others].map((t) => [t.key, t]));
+  return m.order.map((k) => by.get(k).title);
+};
+const keyOf = (m, title) => [...m.tracks, ...m.others].find((t) => t.title === title).key;
+const read = async (room, who) => (await ok(call('GET', `/api/rooms/music?room=${room}`, null, who.session), 'oku')).music;
 
 describe('DJ ve oda müziği', () => {
   test('DJ sınırı: yalnız sahip atar, Lv.1’de 3, seviye artınca artar; DJ başka yetki almaz', async () => {
@@ -161,7 +171,7 @@ describe('DJ ve oda müziği', () => {
     await ok(call('POST', '/api/rooms/dj', { room, user: dj.user.id, dj: false }, owner.session), 'dj al');
     assert.equal(await status(play(dj, { action: 'skip' })), 403);
     m = (await ok(play(owner, { action: 'clear' }), 'temizle')).music;
-    assert.deepEqual(m, { tracks: [], startedAt: null, pausedAt: null });
+    assert.deepEqual(m, EMPTY);
   });
 
   test('Çal: parça hemen baştan çalar, çalanın yerine geçer; Kapat (clear) susturur', async () => {
@@ -190,7 +200,7 @@ describe('DJ ve oda müziği', () => {
     assert.deepEqual(lastMeta(room).music.tracks.map((t) => t.title), ['Akşam'], 'odadaki telefonlar');
 
     m = (await ok(play(owner, { action: 'clear' }), 'kapat')).music;
-    assert.deepEqual(m, { tracks: [], startedAt: null, pausedAt: null });
+    assert.deepEqual(m, EMPTY);
     assert.deepEqual(lastMeta(room).music.tracks, [], 'çubuk herkesin ekranından kalkar');
   });
 
@@ -210,5 +220,157 @@ describe('DJ ve oda müziği', () => {
     const app = [...limits.matchAll(/djs: (\d+)/g)].map((x) => Number(x[1]));
     const server = fs.readFileSync(path.join(import.meta.dirname, '..', 'music.mjs'), 'utf8');
     assert.deepEqual(app, JSON.parse(/export const DJ_LIMITS = (\[[^\]]+\])/.exec(server)[1]));
+  });
+
+  test('çalma listesi: birden çok parça birden, öne al, sonraki, önceki, seçileni çal; çalınan listede kalır', async () => {
+    const owner = await signUp('Liste Sahibi');
+    const dj = await signUp('Liste Dj');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Liste ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    await ok(call('POST', '/api/rooms/dj', { room, user: dj.user.id, dj: true }, owner.session), 'dj');
+    const [a, b, c] = [await addTrack(dj, 'Ay', 60), await addTrack(dj, 'Bulut', 90), await addTrack(dj, 'Ceviz', 120)];
+    const other = await addTrack(owner, 'Sahibin', 60);
+    const play = (body, who = dj) => call('POST', '/api/rooms/music', { room, ...body }, who.session);
+
+    assert.equal(await status(play({ action: 'add', tracks: [a.id, other.id] })), 404, 'başkasının parçası: hiçbiri eklenmez');
+    assert.equal(await status(play({ action: 'add', tracks: [] })), 400);
+    assert.equal(await status(play({ action: 'add', tracks: ['x'] })), 400);
+    let m = (await ok(play({ action: 'add', tracks: [a.id, b.id, c.id] }), 'üçü birden')).music;
+    assert.deepEqual(listOf(m), ['Ay', 'Bulut', 'Ceviz']);
+    assert.deepEqual(titles(m.tracks), ['Ay', 'Bulut', 'Ceviz'], 'ilki hemen çalar');
+    assert.ok(Math.abs(m.startedAt - Date.now()) < 5000);
+
+    m = (await ok(play({ action: 'top', key: keyOf(m, 'Ceviz') }), 'öne al')).music;
+    assert.deepEqual(listOf(m), ['Ay', 'Ceviz', 'Bulut']);
+    assert.equal(await status(play({ action: 'top', key: keyOf(m, 'Ay') })), 409, 'çalan zaten başta');
+    assert.equal(await status(play({ action: 'top', key: '999999' })), 404);
+
+    // Next: the played row stays on the list (older apps see only what plays from now on).
+    m = (await ok(play({ action: 'skip' }), 'sonraki')).music;
+    assert.deepEqual(titles(m.tracks), ['Ceviz', 'Bulut']);
+    assert.deepEqual(titles(m.others), ['Ay']);
+    assert.deepEqual(listOf(m), ['Ay', 'Ceviz', 'Bulut']);
+    assert.deepEqual(titles(lastMeta(room).music.tracks), ['Ceviz', 'Bulut'], 'odadaki telefonlar');
+
+    // Previous in the first seconds: the row before; later: the same track from its start.
+    m = (await ok(play({ action: 'prev' }), 'önceki')).music;
+    assert.deepEqual(titles(m.tracks), ['Ay', 'Ceviz', 'Bulut']);
+    await h.sql.query("UPDATE rooms SET music_started_at = now() - interval '20 seconds' WHERE id = $1", [room]);
+    m = (await ok(play({ action: 'prev' }), 'baştan')).music;
+    assert.equal(m.tracks[0].title, 'Ay');
+    assert.ok(Date.now() - m.startedAt < 3000, 'baştan başladı');
+    m = (await ok(play({ action: 'prev' }), 'ilk satırda önceki')).music;
+    assert.equal(m.tracks[0].title, 'Ay', 'tekrar kapalıyken ilk satırdan geri gidilmez');
+
+    // Paused, then next: the next one waits at its start, still paused.
+    await ok(play({ action: 'pause' }), 'durdur');
+    m = (await ok(play({ action: 'skip' }), 'durmuşken sonraki')).music;
+    assert.equal(m.tracks[0].title, 'Ceviz');
+    assert.equal(m.pausedAt, m.startedAt);
+
+    // A row tapped plays now; a played row taken out; the playing one taken out: the next one starts.
+    m = (await ok(play({ action: 'jump', key: keyOf(m, 'Bulut') }), 'seçileni çal')).music;
+    assert.deepEqual(titles(m.tracks), ['Bulut']);
+    assert.equal(m.pausedAt, null);
+    m = (await ok(play({ action: 'remove', key: keyOf(m, 'Ay') }), 'çalınanı çıkar')).music;
+    assert.deepEqual(listOf(m), ['Ceviz', 'Bulut']);
+    assert.equal(await status(play({ action: 'remove', key: '999999' })), 404);
+    m = (await ok(play({ action: 'jump', key: keyOf(m, 'Ceviz') }), 'Ceviz')).music;
+    m = (await ok(play({ action: 'remove', key: keyOf(m, 'Ceviz') }), 'çalanı çıkar')).music;
+    assert.deepEqual(titles(m.tracks), ['Bulut']);
+    assert.ok(Date.now() - m.startedAt < 3000);
+
+    // The last one skipped with repeat off: the music ends, the list stays; play (resume) starts it from the top.
+    m = (await ok(play({ action: 'skip' }), 'sondan sonraki')).music;
+    assert.deepEqual([m.tracks, m.startedAt, listOf(m)], [[], null, ['Bulut']]);
+    m = (await ok(play({ action: 'resume' }), 'baştan çal')).music;
+    assert.deepEqual(titles(m.tracks), ['Bulut']);
+    // The bar's Kapat (stop): the music stops for everyone, the list stays.
+    m = (await ok(play({ action: 'stop' }), 'kapat')).music;
+    assert.deepEqual([m.tracks, m.startedAt, listOf(m)], [[], null, ['Bulut']]);
+    assert.deepEqual(lastMeta(room).music.tracks, [], 'çubuk herkesin ekranından kalkar');
+
+    // A listener can't touch the list.
+    const member = await signUp('Liste Dinleyici');
+    for (const body of [{ action: 'top', key: keyOf(m, 'Bulut') }, { action: 'prev' }, { action: 'repeat', mode: 'all' }]) assert.equal(await status(play(body, member)), 403);
+  });
+
+  test('tekrar: bir (aynı parça), hepsi (liste başa döner), kapalı (liste biter, satırlar kalır)', async () => {
+    const owner = await signUp('Tekrar Sahibi');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Tekrar ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    const [a, b] = [await addTrack(owner, 'Deniz', 60), await addTrack(owner, 'Elma', 90)];
+    const play = (body) => call('POST', '/api/rooms/music', { room, ...body }, owner.session);
+    const read = async () => (await ok(call('GET', `/api/rooms/music?room=${room}`, null, owner.session), 'oku')).music;
+    const ago = (s) => h.sql.query(`UPDATE rooms SET music_started_at = now() - interval '${s} seconds' WHERE id = $1`, [room]);
+    await ok(play({ action: 'add', tracks: [a.id, b.id] }), 'ekle');
+    assert.equal(await status(play({ action: 'repeat', mode: 'hep' })), 400);
+
+    // One: two laps and 10 s in, the same track; older apps get only that one to walk.
+    let m = (await ok(play({ action: 'repeat', mode: 'one' }), 'bir')).music;
+    assert.equal(m.repeat, 'one');
+    assert.deepEqual([titles(m.tracks), titles(m.others)], [['Deniz'], ['Elma']]);
+    await ago(130);
+    m = await read();
+    assert.equal(m.tracks[0].title, 'Deniz');
+    assert.ok(Math.abs(Date.now() - m.startedAt - 10_000) < 3000, 'üçüncü turun 10. saniyesi');
+
+    // All: 215 s from Deniz is a round (150 s) and 65 s: Elma, 5 s in; the list goes round for older apps.
+    await ok(play({ action: 'repeat', mode: 'all' }), 'hepsi');
+    await ago(215);
+    m = await read();
+    assert.deepEqual([titles(m.tracks), m.others, listOf(m)], [['Elma', 'Deniz'], [], ['Deniz', 'Elma']]);
+    assert.ok(Math.abs(Date.now() - m.startedAt - 5_000) < 3000);
+    assert.deepEqual(titles((await ok(play({ action: 'skip' }), 'sonda sonraki')).music.tracks), ['Deniz', 'Elma'], 'sondan başa');
+    assert.equal((await ok(play({ action: 'prev' }), 'başta önceki')).music.tracks[0].title, 'Elma', 'baştan sona');
+
+    // Off: past the end nothing plays, the rows stay.
+    await ok(play({ action: 'repeat', mode: 'off' }), 'kapalı');
+    await ago(100);
+    m = await read();
+    assert.deepEqual([m.tracks, m.startedAt, listOf(m)], [[], null, ['Deniz', 'Elma']]);
+  });
+
+  test('Çal (eski uygulama): parça çalanın hemen arkasına girer ve çalar; liste dolunca en eski çalınmışlar çıkar', async () => {
+    const owner = await signUp('Dolu Liste');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Dolu ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    const [a, b, c] = [await addTrack(owner, 'Fener', 60), await addTrack(owner, 'Güz', 60), await addTrack(owner, 'Hasat', 60)];
+    const play = (body) => call('POST', '/api/rooms/music', { room, ...body }, owner.session);
+    await ok(play({ action: 'add', tracks: [a.id, b.id] }), 'ekle');
+    let m = (await ok(play({ action: 'play', track: c.id }), 'çal')).music;
+    assert.deepEqual([listOf(m), titles(m.tracks)], [['Fener', 'Hasat', 'Güz'], ['Hasat', 'Güz']]);
+    await ok(play({ action: 'skip' }), 'sonraki');
+
+    // 50 rows, the playing one third: two more drop the two that played; three more are too many.
+    const fill = 50 - 3;
+    await h.sql.query(
+      `INSERT INTO room_music_queue (room_id, track_id, added_by, pos) SELECT $1, $2, $3, 100 + g FROM generate_series(1, ${fill}) g`,
+      [room, a.id, owner.user.id],
+    );
+    assert.equal((await read(room, owner)).order.length, 50);
+    assert.equal(await status(play({ action: 'add', tracks: [a.id, b.id, c.id] })), 409, 'çalınmış iki satır yetmez');
+    m = (await ok(play({ action: 'add', tracks: [b.id, c.id] }), 'dolu listeye ekle')).music;
+    assert.equal(m.order.length, 50);
+    assert.equal(listOf(m)[0], 'Güz', 'Fener ve Hasat (çalınmışlar) çıktı');
+    assert.deepEqual(listOf(m).slice(-2), ['Güz', 'Hasat']);
+  });
+
+  test('sanatçı adı kütüphanede ve odada; parçanın sonunda oda bilgisi yeniden yazılır', async () => {
+    const owner = await signUp('Sanatçı Odası');
+    const room = (await ok(call('POST', '/api/rooms', { title: `Sanatçı ${rnd(2)}` }, owner.session), 'oda')).room.id;
+    const put = (body) => call('POST', '/api/music', { title: 'Kısa', url: file(owner), seconds: 5, size: 1000, ...body }, owner.session);
+    assert.notEqual((await put({ artist: 'Ara 0532 123 45 67' }))[0], 200, 'iletişim bilgisi');
+    const t = (await ok(put({ artist: '  Gece Grubu ' }), 'parça')).track;
+    assert.equal(t.artist, 'Gece Grubu');
+    assert.equal((await ok(put({}), 'sanatçısız')).track.artist, '');
+    assert.equal((await ok(call('GET', '/api/music', null, owner.session), 'liste')).tracks.find((x) => x.id === t.id).artist, 'Gece Grubu');
+
+    await ok(call('POST', '/api/rooms/music', { room, action: 'repeat', mode: 'one' }, owner.session), 'bir');
+    let m = (await ok(call('POST', '/api/rooms/music', { room, action: 'add', tracks: [t.id] }, owner.session), 'ekle')).music;
+    assert.equal(m.tracks[0].artist, 'Gece Grubu');
+    // 5 s track, 4.2 s in: the next read sets the end's timer; at the end the phones get the next lap.
+    await h.sql.query("UPDATE rooms SET music_started_at = now() - interval '4.2 seconds' WHERE id = $1", [room]);
+    const start = (await read(room, owner)).startedAt;
+    await new Promise((r) => setTimeout(r, 2000));
+    assert.equal(lastMeta(room).music.startedAt, start + 5000, 'yeni tur oda bilgisinde');
+    assert.equal(lastMeta(room).music.tracks[0].title, 'Kısa');
   });
 });
