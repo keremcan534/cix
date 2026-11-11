@@ -1,20 +1,20 @@
-// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX; rules: room-games-rules.mjs and room-games/): free
-// games the people in a room play together. The server keeps the one table a room has, rolls every die and deals
-// every card, checks each move (seat, turn) and tells the room after every change (LiveKit packet 'table': "read
-// the table again", app lib/live/room-bus), so every phone shows the same table. A player's cards go only to that
-// player.
+// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX, Dört Taş; rules: room-games-rules.mjs and
+// room-games/): free games the people in a room play together. The server keeps the one table a room has, rolls
+// every die and deals every card, checks each move (seat, turn) and tells the room after every change (LiveKit
+// packet 'table': "read the table again", app lib/live/room-bus), so every phone shows the same table. A player's
+// cards go only to that player.
 //
 //   GET  /api/rooms/table?room=                                  → { table }   (null: no table in the room)
 //   POST /api/rooms/table { room, action, game?, options?, move? } → { table }
 //     action: open { game, options? } (room staff; Ludo's options: { mode: 'quick' | 'classic' }), join, start
 //             (whoever opened it, or staff; the first seat once the opener left), move { move }, leave, again (a
 //             seated player, after a hand), close (as start)
-//     move:   XOX { cell } · Renk Kartları { card } or { card: null } · Ludo { roll: true }, then { token } when
-//             there is a choice
+//     move:   XOX { cell } · Dört Taş { col } · Renk Kartları { card, color? } (a Joker names its colour),
+//             { draw: true } or { pass: true } · Ludo { roll: true }, then { token } when there is a choice
 //
-// A turn has TURN_MS; when it runs out the table plays for that seat (Ludo throws and moves, Renk Kartları plays its
-// first card that fits or draws) and after MISSES such turns in a row the seat leaves. In XOX the one whose time ran
-// out loses. This is applied whenever someone reads or acts on the table, so no clock runs here.
+// A turn has TURN_MS; when it runs out the table plays for that seat (Ludo throws and moves, Renk Kartları plays a
+// card that fits or draws, Dört Taş drops a disc) and after MISSES such turns in a row the seat leaves. In XOX the one
+// whose time ran out loses. This is applied whenever someone reads or acts on the table, so no clock runs here.
 // People who block each other (either way) don't sit at one table. Someone banned from the room can't play in it.
 // Kept: the table while it is played; one nobody touched for a day goes when a new table opens, and a deleted
 // account's tables go with it (social.mjs eraseAccount). Nothing here is money.

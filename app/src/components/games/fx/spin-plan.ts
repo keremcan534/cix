@@ -13,24 +13,33 @@ const mod = (a: number, n: number) => ((a % n) + n) % n;
 export const SPIN_WIND = 0.055;
 /** The share of the run spent getting up to speed; the rest of it the wheel only slows. */
 const RAMP = 0.07;
-/** Top speed of the run (ways per unit of time): the ramp covers RAMP / 2 of the way at it, the slowing (1 − RAMP) / 3. */
-const TOP = 1 / (RAMP / 2 + (1 - RAMP) / 3);
+/**
+ * How the wheel slows: its distance left falls as this power of the time left. 2 would be plain friction (it stops
+ * abruptly), 3 creeps so slowly at the end that it looks stopped long before it is; 2.5 crawls over the last slice
+ * and is still seen moving until it rests.
+ */
+const SLOW = 2.5;
+/** Top speed of the run (ways per unit of time): the ramp covers RAMP / 2 of the way at it, the slowing (1 − RAMP) / SLOW. */
+const TOP = 1 / (RAMP / 2 + (1 - RAMP) / SLOW);
+const SLOWING = TOP / (SLOW * (1 - RAMP) ** (SLOW - 1));
 
 /** The run itself, 0…1 over 0…1: up to speed within RAMP, then slowing all the way to the stop (no jump in speed). */
 export function runEase(u: number): number {
   const x = clamp01(u);
-  return x < RAMP ? (TOP * x * x) / (2 * RAMP) : 1 - (TOP * (1 - x) ** 3) / (3 * (1 - RAMP) ** 2);
+  return x < RAMP ? (TOP * x * x) / (2 * RAMP) : 1 - SLOWING * (1 - x) ** SLOW;
 }
 /** When the run has covered `p` of its way: the inverse of runEase. */
 export function runEaseAt(p: number): number {
   const y = clamp01(p);
-  return y < (TOP * RAMP) / 2 ? Math.sqrt((2 * RAMP * y) / TOP) : 1 - Math.cbrt((3 * (1 - RAMP) ** 2 * (1 - y)) / TOP);
+  return y < (TOP * RAMP) / 2 ? Math.sqrt((2 * RAMP * y) / TOP) : 1 - ((1 - y) / SLOWING) ** (1 / SLOW);
 }
 /** How fast the run is at `u`, as a share of its top speed (1 at the end of the ramp, 0 at the stop). */
 export const runSpeed = (u: number) => {
   const x = clamp01(u);
-  return x < RAMP ? x / RAMP : ((1 - x) / (1 - RAMP)) ** 2;
+  return x < RAMP ? x / RAMP : ((1 - x) / (1 - RAMP)) ** (SLOW - 1);
 };
+/** The run's top speed in ways per unit of time: a run of `span` degrees over `ms` peaks at RUN_TOP × span / ms. */
+export const RUN_TOP = TOP;
 
 /** A whole spin over 0…1: the wheel is pulled back by `back` (a share of the way) and let go into the run. */
 export const spinEase = (back: number) => (t: number) => {
@@ -52,7 +61,7 @@ export const SPIN_PULL = 0.2;
 /** Pegs passing faster than this are not all heard (ms between two ticks). */
 const TICK_GAP = 55;
 /** A tick this long after the one before is slow enough to be felt as well (a light haptic). */
-const TICK_FELT = 130;
+const TICK_FELT = 100;
 
 export type SpinTick = { /** ms after the spin starts. */ at: number; gain: number; feel: boolean };
 export type SpinPlan = {

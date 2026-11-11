@@ -20,7 +20,7 @@
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs.
 // Çantam (free gifts from rewards, sent without coins): backpack.mjs.
 // Rüzgâr Gülü (the wheel game, played here): wheel.mjs. The other Oyun Salonu games: casino.mjs. Sıralama's Oda XP board: room-xp.mjs.
-// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX): room-games.mjs.
+// Oda oyunları at a table in a room (Ludo, Renk Kartları, XOX, Dört Taş): room-games.mjs.
 // Agency network (top/sub agencies, commission, performance tiers, payouts, transfers): agency.mjs for
 // agencies and streamers, agency-admin.mjs for the centre (docs/AJANS_HIYERARSI.md).
 // Every call except sign-in, health and the catalog needs "Authorization: Bearer <session>".

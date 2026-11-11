@@ -5,34 +5,38 @@
 // randomness on the server.
 //
 // State: { game, seats: [user ids], status: 'waiting' | 'playing' | 'over', turn (seat), winner (seat or null),
-// log, misses (turns in a row the table played for each seat) } plus the game's own fields (XOX `board`, Renk
-// Kartları `hands` and `top`, Ludo's tokens: see each file). Nothing here is money: the games are free.
+// log, misses (turns in a row the table played for each seat) } plus the game's own fields (XOX and Dört Taş
+// `board`, Renk Kartları `hands` and its two piles, Ludo's tokens: see each file). Nothing here is money: the games
+// are free.
 //
 // A game's file exports:
 //   meta                 { name, min, max, autoStart? }  (autoStart: the hand starts when the last seat is taken)
 //   seatFields           the names of its fields kept per seat, arrays in seat order: they leave with the seat
 //   options(o)           optional: the opener's choices, checked and completed (kept on the table); null if wrong
 //   stale(t)             optional: true for a state an older version left that this one can't play on
-//   start(t, rnd)        its fields for a new hand, with the first `log`
+//   start(t, rnd)        its fields for a new hand, with the first `log` (and `turn`, when the first seat doesn't
+//                        start: Dört Taş)
 //   move(t, seat, move, names, rnd) → { ok: true, table } | { ok: false, reason }  (called for the seat on turn)
 //   auto(t, names, rnd)  the table after it played for the seat on turn, whose time ran out; or, instead of it,
 //   timeout(t, names)    the table when a run-out turn ends the hand (XOX: that player loses)
-//   left(t, seat)        optional: its fields to change when `seat` leaves a hand that goes on
+//   left(t, seat)        optional: its fields to change when `seat` leaves mid-hand (and `turn`, when the seats
+//                        aren't played in rising order: Renk Kartları)
 //   view(t, seat)        the state as that seat sees it (−1: someone watching)
 // Adding a game: its file, a line in GAMES below, its id in the room_tables check (a migration), and the app's
 // screen for it (app/src/components/games/room/).
 import * as cards from './room-games/cards.mjs';
+import * as four from './room-games/four.mjs';
 import * as ludo from './room-games/ludo.mjs';
 import * as xox from './room-games/xox.mjs';
 
-const GAMES = { ludo, cards, xox };
+const GAMES = { ludo, cards, xox, four };
 
-export const TABLE_GAMES = { ludo: ludo.meta, cards: cards.meta, xox: xox.meta };
+export const TABLE_GAMES = { ludo: ludo.meta, cards: cards.meta, xox: xox.meta, four: four.meta };
 /** A turn's time; then the table plays for that seat (timeoutTable). After MISSES such turns in a row the seat goes. */
 export const TURN_MS = 30_000;
 export const MISSES = 3;
 // The games' own pieces, for the callers and tests that read them from here.
-export { HAND, newCard, playable } from './room-games/cards.mjs';
+export { HAND, cardOf, fits } from './room-games/cards.mjs';
 export { LINES, xoxLine } from './room-games/xox.mjs';
 
 /** The opener's choices for `game`, checked (none for a game that takes none); null when they are not valid. */
@@ -47,9 +51,9 @@ export const openTable = (game, opener, options) => ({ game, seats: [opener], st
 export const startTable = (t, rnd) => ({ ...t, status: 'playing', turn: 0, winner: null, misses: Array(t.seats.length).fill(0), ...GAMES[t.game].start(t, rnd) });
 
 /**
- * One move by seat `seat` (`names[seat]` for the log). XOX: { cell }; Ludo: { roll: true }, then { token } when
- * there is a choice; Renk Kartları: { card } (an index in the hand) or { card: null } to draw. Returns
- * { ok: true, table } or { ok: false, reason }.
+ * One move by seat `seat` (`names[seat]` for the log). XOX: { cell }; Dört Taş: { col }; Ludo: { roll: true }, then
+ * { token } when there is a choice; Renk Kartları: { card, color? } (the card's number; a Joker names its colour),
+ * { draw: true } or, to keep the card just drawn, { pass: true }. Returns { ok: true, table } or { ok: false, reason }.
  */
 export function moveTable(t, seat, move, names, rnd) {
   if (t.status !== 'playing') return { ok: false, reason: 'Oyun başlamadı.' };
@@ -59,8 +63,9 @@ export function moveTable(t, seat, move, names, rnd) {
 }
 
 /**
- * The turn's time ran out: the table plays for that seat (Ludo throws and moves, Renk Kartları plays its first card
- * that fits or draws), and after MISSES such turns in a row the seat leaves. In XOX the one whose time ran out loses.
+ * The turn's time ran out: the table plays for that seat (Ludo throws and moves, Renk Kartları plays a card that
+ * fits or draws, Dört Taş drops a disc), and after MISSES such turns in a row the seat leaves. In XOX the one whose
+ * time ran out loses.
  */
 export function timeoutTable(t, names, rnd) {
   const g = GAMES[t.game];
@@ -88,7 +93,7 @@ export function leaveTable(t, seat, names) {
   if (next.seats.length === 1) return { ...next, ...more, status: 'over', turn: 0, winner: 0, log: `${who} masadan kalktı · 🏆 ${left[0]} kazandı!` };
   // The turn stays on whoever came after the one who left.
   const turn = t.turn > seat ? t.turn - 1 : t.turn === seat ? seat % next.seats.length : t.turn;
-  return { ...next, ...more, turn, log: `${who} masadan kalktı.` };
+  return { ...next, ...more, turn: more.turn ?? turn, log: `${who} masadan kalktı.` };
 }
 
 /** One seat's view: never another player's cards (their counts only). */
