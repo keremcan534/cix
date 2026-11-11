@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 import { rnd, startApi } from './harness.mjs';
-import { MISSES, TABLE_GAMES, TURN_MS, leaveTable, moveTable, openTable, startTable, timeoutTable, viewOf } from '../room-games-rules.mjs';
+import { MISSES, TABLE_GAMES, TURN_MS, leaveTable, moveTable, openTable, startTable, timeoutTable } from '../room-games-rules.mjs';
 
 const lkCalls = [];
 const LK_PORT = 22000 + (process.pid % 900);
