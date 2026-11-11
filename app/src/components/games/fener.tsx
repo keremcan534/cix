@@ -461,7 +461,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
             </View>
           </LinearGradient>
         </Pressable>
-        <View style={{ gap: 6, width: 100 }}>
+        <View style={{ gap: 6, width: 88 }}>
           <Pressable
             onPress={() => {
               tapHaptic();
@@ -542,13 +542,13 @@ const f = StyleSheet.create({
   banner: { position: 'absolute', left: 16, right: 16, top: '30%', alignItems: 'center', gap: 2, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 10, backgroundColor: 'rgba(4,8,20,0.88)', borderWidth: 2, borderColor: LIGHT },
   bannerTitle: { color: LIGHT, fontSize: 26, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1.5 },
   bannerSub: { color: '#E6FBFF', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   spinRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
   spinCore: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#071A2E', alignItems: 'center', justifyContent: 'center' },
   autoLeft: { color: LIGHT, fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
   side: { borderRadius: 14, borderWidth: 2, borderColor: 'rgba(255,210,122,0.55)', backgroundColor: '#0B2238', paddingVertical: 9, alignItems: 'center' },
   sideOn: { backgroundColor: LIGHT, borderColor: '#FFF3D0' },
-  sideText: { color: LIGHT, fontWeight: '900', fontSize: 14 },
+  sideText: { color: LIGHT, fontWeight: '900', fontSize: 13 },
   betRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   dim: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17 },
   pays: { gap: 8 },
