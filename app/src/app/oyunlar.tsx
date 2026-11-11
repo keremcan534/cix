@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { BreakoutCard, FloatIcon, GlossButton } from '@/components/fx/float';
+import { RollingNumber } from '@/components/fx/rolling-number';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, glassChipOf } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
@@ -29,10 +30,33 @@ import { ThemeScope, colors, fonts, makeStyles, useTheme } from '@/theme';
 type Tab = 'casino' | 'room' | 'history';
 const PROFILE = { from: 'profile' } as const;
 
+/** Oyun Salonu's shelves, in the order shown; a game not named here goes on the last one. */
+const SHELVES: { title: string; ids: CasinoGame['id'][] }[] = [
+  { title: 'Slot makineleri', ids: ['jackpot', 'super777', 'jungle', 'pinata', 'spellbook', 'neon', 'goldtree'] },
+  { title: 'Çark ve masa', ids: ['slot', 'foodwheel', 'magiccard'] },
+  { title: 'Aksiyon', ids: ['rocket', 'fish', 'olympus'] },
+];
+/** One line under a game's name: what it is, said shortly (the rules are in the game's "?" sheet). */
+const HOOK: Partial<Record<CasinoGame['id'], string>> = {
+  jackpot: '5 makara · 10 çizgi',
+  super777: '3 makara · klasik meyve',
+  jungle: '15 çizgi · Aslan Wild',
+  pinata: '20 çizgi · bol renk',
+  spellbook: '20 çizgi · dört ödül',
+  neon: '10 çizgi · en büyük fon',
+  goldtree: '3 makara · 188 kata kadar',
+  slot: 'Çarkı çevir · 8 kata kadar',
+  foodwheel: '8 seçenek · 45 kata kadar',
+  magiccard: '8 kart · 100 kata kadar',
+  rocket: 'Çarpanı seç, fırlat',
+  fish: 'Dokun, ateş et, yakala',
+  olympus: 'Fenerin ışığı kimi bulacak?',
+};
+
 export default function GameCenter() {
   const { oyun } = useLocalSearchParams<{ oyun?: CasinoGame['id'] | 'ruzgar' }>();
   const { wealthLevel, me } = useApp();
-  const { casino, roomGames, history } = useGames();
+  const { casino, roomGames, history, bank } = useGames();
   const t = useTheme();
   const s = useStyles();
   // Below Cömertlik Lv.2 Oyun Salonu is not shown at all: no tab, and an old link to one of its games opens nothing.
@@ -89,40 +113,59 @@ export default function GameCenter() {
                 </View>
               </LinearGradient>
             </Pressable>
-            {showCasino && (
-              <View style={s.grid}>
-                {casino
-                  .filter((g) => g.active)
-                  .map((g, i, all) => {
-                    const access = casinoAccess(g, PROFILE, wealthLevel);
-                    const featured = i === 0;
-                    const wide = featured || (i === all.length - 1 && all.length % 2 === 0);
-                    return (
-                      <View key={g.id} style={wide ? s.full : s.half}>
-                        <BreakoutCard
-                          icon={{ source: gameArtOf(g.id), emoji: g.emoji }}
-                          hue={gameHueOf(g.id)}
-                          iconSize={featured ? 100 : 76}
-                          featured={featured}
-                          delay={i * 300}
-                          label={`${g.name} aç`}
-                          onPress={() => setOpen({ kind: 'casino', id: g.id })}
-                        >
-                          <Text style={featured ? s.heroName : s.name} numberOfLines={1}>
-                            {g.name}
-                          </Text>
-                          <Text style={s.dim} numberOfLines={2}>
-                            {g.bets[0].toLocaleString('tr-TR')}–{g.bets[g.bets.length - 1].toLocaleString('tr-TR')} jeton · {g.fromRoom ? 'odada da açılır' : 'yalnızca buradan'}
-                            {g.providerStatus !== 'online' ? ' · sağlayıcı sorunlu' : ''}
-                          </Text>
-                          <GlossButton label={access.ok ? 'Oyna' : `Cömertlik Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
-                        </BreakoutCard>
+            {showCasino &&
+              (() => {
+                const active = casino.filter((g) => g.active);
+                const shelved = new Set(SHELVES.flatMap((x) => x.ids));
+                const rest = active.filter((g) => !shelved.has(g.id));
+                return SHELVES.map((shelf, k) => {
+                  const games = [...active.filter((g) => shelf.ids.includes(g.id)).sort((a, b) => shelf.ids.indexOf(a.id) - shelf.ids.indexOf(b.id)), ...(k === SHELVES.length - 1 ? rest : [])];
+                  if (!games.length) return null;
+                  return (
+                    <View key={shelf.title} style={{ gap: 2 }}>
+                      <Text style={s.section}>{shelf.title}</Text>
+                      <View style={s.grid}>
+                        {games.map((g, i) => {
+                          const access = casinoAccess(g, PROFILE, wealthLevel);
+                          // The first slot leads the hall; an odd one out at the end of a shelf takes the whole row.
+                          const featured = k === 0 && i === 0;
+                          const wide = featured || (i === games.length - 1 && (games.length - (k === 0 ? 1 : 0)) % 2 === 1);
+                          const fund = bank.jackpots[g.id];
+                          return (
+                            <View key={g.id} style={wide ? s.full : s.half}>
+                              <BreakoutCard
+                                icon={{ source: gameArtOf(g.id), emoji: g.emoji }}
+                                hue={gameHueOf(g.id)}
+                                iconSize={featured ? 100 : 76}
+                                featured={featured}
+                                delay={i * 300}
+                                label={`${g.name} aç`}
+                                onPress={() => setOpen({ kind: 'casino', id: g.id })}
+                              >
+                                <Text style={featured ? s.heroName : s.name} numberOfLines={1}>
+                                  {g.name}
+                                </Text>
+                                <Text style={s.dim} numberOfLines={1}>
+                                  {HOOK[g.id] ?? `${g.bets[0].toLocaleString('tr-TR')}–${g.bets[g.bets.length - 1].toLocaleString('tr-TR')} jeton`}
+                                  {g.providerStatus !== 'online' ? ' · sağlayıcı sorunlu' : ''}
+                                </Text>
+                                {fund !== undefined && (
+                                  <View style={s.fund} accessibilityLabel={`JACKPOT ${Math.floor(fund)} jeton`}>
+                                    <Text style={s.fundTag}>JACKPOT</Text>
+                                    <RollingNumber value={Math.floor(fund)} style={s.fundValue} duration={900} />
+                                  </View>
+                                )}
+                                <GlossButton label={access.ok ? 'Oyna' : `Cömertlik Lv.${g.minWealth}`} tone={access.ok ? 'money' : 'locked'} small={!featured} icon={!access.ok && <Ionicons name="lock-closed" size={12} color={t.dark ? '#C7D2E5' : t.colors.textDim} />} />
+                              </BreakoutCard>
+                            </View>
+                          );
+                        })}
                       </View>
-                    );
-                  })}
-              </View>
-            )}
-            <Text style={s.dim}>Jetonlar gerçek paraya çevrilemez. Gerçek para, para çekme veya gerçek değerli ödül içeren bir sistem hukuki inceleme olmadan açılmaz.</Text>
+                    </View>
+                  );
+                });
+              })()}
+            <Text style={s.dim}>Oyun kazançları oyun bakiyesine yazılır; yalnızca oyunlarda kullanılır, hediye edilemez ve gerçek paraya çevrilemez.</Text>
           </>
         )}
 
@@ -235,6 +278,10 @@ const useStyles = makeStyles((t) => ({
   name: { color: t.colors.text, fontFamily: fonts.display, fontSize: 17, lineHeight: 22 },
   heroName: { color: t.colors.text, fontFamily: fonts.display, fontSize: 24, lineHeight: 30 },
   section: { color: t.colors.text, fontFamily: fonts.display, fontSize: 18, lineHeight: 24, marginTop: 4 },
+  // A slot's JACKPOT fund on its card: dark and gold in both schemes, like the plaque in the game.
+  fund: { flexDirection: 'row', alignItems: 'baseline', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(8,15,30,0.82)', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(246,189,96,0.6)', paddingHorizontal: 9, paddingVertical: 2 },
+  fundTag: { color: '#F6BD60', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  fundValue: { color: '#FDE68A', fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
   dim: { color: t.colors.textDim, fontSize: 12, lineHeight: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   amount: { fontWeight: '900', fontSize: 15 },
