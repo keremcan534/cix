@@ -72,7 +72,7 @@ const ago = (at: string) => {
 
 export function WheelPlayer({ entry }: { entry: Entry }) {
   const app = useApp();
-  const { wealthLevel, coins, gameCoins, settings, setSetting } = app;
+  const { wealthLevel, coins, gameCoins, settings } = app;
   const still = settings.reduceMotion;
   const dims = useWindowDimensions();
   const [tier, setTier] = useState<WheelTierId>('kiyi');
@@ -133,7 +133,6 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
   }
 
   const left = Math.max(0, view.dailyLimit - view.playedToday);
-  const muted = settings.gameVolume === 0;
   // The wheel takes what the stage's other rows and the controls leave of the phone's height (in a room the panel
   // is a sheet over the lower part), within the stage's width.
   const inner = (width || dims.width - 28) - 20;
@@ -200,9 +199,6 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
                 <RollingNumber value={view.funds[tier]} style={w.jackpotValue} duration={900} numberOfLines={1} />
               </View>
             </LinearGradient>
-            <Pressable style={w.icon} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-              <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-            </Pressable>
             <InfoButton onPress={() => setInfo(true)} tint={colors.gold} />
           </View>
 
@@ -538,7 +534,6 @@ const w = StyleSheet.create({
   jackpot: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1.5, borderColor: 'rgba(255,101,118,0.55)' },
   jackpotLabel: { color: '#FFB3BC', fontWeight: '900', fontSize: 11, letterSpacing: 1.4 },
   jackpotValue: { color: colors.gold, fontWeight: '900', fontSize: 24, lineHeight: 28, letterSpacing: 0.5 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
 
   rim: { backgroundColor: '#3B2300', borderWidth: 3, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.45), 0 0 24px rgba(246,189,96,0.25)' },
   wedge: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftColor: 'transparent', borderRightColor: 'transparent' },

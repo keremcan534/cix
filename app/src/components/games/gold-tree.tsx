@@ -4,18 +4,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { BalancePill, BetStepper, fmt, sleep } from '@/components/games/slot-kit';
+import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { playRound } from '@/lib/live/casino';
-import { TREE_LABEL, TREE_PAYS, TREE_STRIPS, treeWindow, type TreeSym } from '@/lib/gold-tree';
+import { TREE_LABEL, TREE_OPENING, TREE_PAYS, TREE_STRIPS, treeWindow, type TreeSym } from '@/lib/gold-tree';
 import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { REEL_PACE, reelRun } from '@/lib/reel-plan';
 import { winTierOf } from '@/lib/win-tier';
@@ -34,20 +34,23 @@ function TreeCell({ sym }: { sym: TreeSym }) {
         <View style={t.coinHole} />
       </LinearGradient>
     );
+  // An empty stop: a faint bar, so a reel that stops between symbols still reads as a reel.
+  if (sym === 'blank') return <View style={t.blank} />;
   return <Text style={{ fontSize: 46 }}>{TREE_LABEL[sym]}</Text>;
 }
+
 
 /** A reel's symbol and the space under it (px): the pay line runs through the middle row. */
 const CELL = 70;
 const GAP = 4;
 
 export function GoldTreePlayer({ entry }: { entry: Entry }) {
-  const { wealthLevel, settings, setSetting, coins, gameCoins } = useApp();
+  const { wealthLevel, settings, coins, gameCoins } = useApp();
   const { casino } = useGames();
   const game = casino.find((g) => g.id === 'goldtree')!;
   const still = settings.reduceMotion;
   const [bet, setBet] = useState(game.bets[2] ?? game.bets[0]);
-  const [opening] = useState<TreeSym[][]>(() => treeWindow([0, 3, 6]));
+  const [opening] = useState<TreeSym[][]>(() => treeWindow(TREE_OPENING));
   const [grid, setGrid] = useState(opening);
   const [status, setStatus] = useState<{ text: string; tone?: 'win' | 'err' }>({ text: 'BOL ŞANS' });
   const [hit, setHit] = useState<string | null>(null);
@@ -191,15 +194,11 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     setBusy(false);
     setStatus({ text: `${note} · net ${net >= 0 ? '+' : ''}${fmt(net)}`, tone: net > 0 ? 'win' : undefined });
   };
-  const muted = settings.gameVolume === 0;
 
   return (
     <View style={{ gap: 10 }}>
       <LinearGradient colors={['#FBCFE8', '#FDE68A', '#166534']} style={t.stage}>
         <View style={t.iconRow}>
-          <Pressable style={t.icon} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-          </Pressable>
           <InfoButton onPress={() => setInfo(true)} tint="#FACC15" />
         </View>
         <Text style={t.tree}>🌳</Text>
@@ -243,34 +242,26 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
         </View>
         {win.layer}
       </LinearGradient>
-      <View style={t.controls}>
-        <BalancePill tint="#14532D" shown={held} />
-        <Pressable onPress={auto !== null ? toggleAuto : play} disabled={busy && auto === null} style={busy && auto === null && { opacity: 0.75 }} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`}>
+      <SpinControls
+        tint="#14532D"
+        held={held}
+        bets={game.bets}
+        bet={bet}
+        onBet={setBet}
+        busy={busy}
+        turbo={turbo}
+        onTurbo={() => setTurbo((v) => !v)}
+        auto={auto}
+        autoSpins={AUTO_SPINS}
+        onAuto={toggleAuto}
+        onSpin={play}
+        side={{ bg: '#CA8A04', border: '#FACC15', ink: '#fff', onBg: '#B91C1C', onBorder: '#FACC15' }}
+        spin={
           <LinearGradient colors={['#FDE68A', '#DC2626']} style={t.spin}>
             {auto !== null ? <Text style={t.autoLeft}>{auto}</Text> : <Ionicons name="sync" size={36} color="#FDE68A" />}
           </LinearGradient>
-        </Pressable>
-        <View style={{ gap: 6, flex: 1 }}>
-          <Pressable
-            onPress={() => {
-              tapHaptic();
-              setTurbo((v) => !v);
-            }}
-            style={[t.side, turbo && t.sideOn]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: turbo }}
-            accessibilityLabel={turbo ? 'Turbo kapat' : 'Turbo aç'}
-          >
-            <Text style={t.sideText}>⚡ TURBO</Text>
-          </Pressable>
-          <Pressable onPress={toggleAuto} disabled={busy && auto === null} style={[t.side, auto !== null && t.sideOn]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `${AUTO_SPINS} kez otomatik çevir`}>
-            <Text style={t.sideText}>{auto !== null ? 'DUR' : 'OTO'}</Text>
-          </Pressable>
-        </View>
-      </View>
-      <View style={{ alignItems: 'center' }}>
-        <BetStepper bets={game.bets} bet={bet} onChange={setBet} disabled={busy} tint="#14532D" />
-      </View>
+        }
+      />
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={{ gap: 6 }}>
           <Text style={t.infoHead}>Orta çizgi öder · bahsin katı</Text>
@@ -294,7 +285,6 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
 const t = StyleSheet.create({
   stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
   iconRow: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6, zIndex: 2 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, borderColor: '#FACC15', alignItems: 'center', justifyContent: 'center' },
   tree: { fontSize: 44, marginBottom: -8 },
   title: { color: '#FACC15', fontSize: 28, fontWeight: '900', textShadowColor: '#14532D', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 1 },
   paytable: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center', backgroundColor: '#166534', borderRadius: 12, padding: 6, borderWidth: 2, borderColor: '#FACC15' },
@@ -307,11 +297,11 @@ const t = StyleSheet.create({
   reelWait: { borderColor: '#EA580C' },
   coin: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FACC15' },
   coinHole: { width: 16, height: 16, backgroundColor: '#FEF3C7', borderWidth: 2, borderColor: '#92400E' },
+  blank: { width: 26, height: 5, borderRadius: 3, backgroundColor: 'rgba(15,23,42,0.13)' },
   // Through the middle of the middle row (the box's padding and the reel's border above it).
   line: { position: 'absolute', left: 0, right: 0, top: 5 + 2 + CELL + GAP + CELL / 2 - 1, height: 3, backgroundColor: '#EA580C', opacity: 0.85 },
   status: { alignSelf: 'stretch', borderRadius: 10, backgroundColor: '#0F766E', borderWidth: 2, borderColor: '#FACC15', paddingVertical: 6 },
   statusText: { color: '#FDE68A', fontWeight: '900', fontSize: 19, textAlign: 'center', letterSpacing: 1 },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   spin: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#FDE68A' },
   autoLeft: { color: '#FDE68A', fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
   infoHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
@@ -319,7 +309,4 @@ const t = StyleSheet.create({
   infoName: { color: '#fff', fontWeight: '700', flex: 1 },
   infoVal: { color: '#FDE68A', fontWeight: '800', fontVariant: ['tabular-nums'] },
   infoNote: { color: 'rgba(255,255,255,0.75)', fontSize: 13, lineHeight: 19 },
-  side: { borderRadius: 14, borderWidth: 2, borderColor: '#FACC15', backgroundColor: '#CA8A04', paddingVertical: 9, alignItems: 'center' },
-  sideOn: { backgroundColor: '#B91C1C' },
-  sideText: { color: '#fff', fontWeight: '900', fontSize: 14 },
 });

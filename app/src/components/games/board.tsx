@@ -100,7 +100,7 @@ type Light = { t: Animated.Value; lit: Animated.AnimatedInterpolation<number>[] 
 export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
   const board = BOARDS[id];
   const look = LOOKS[id];
-  const { wealthLevel, settings, setSetting, coins, gameCoins } = useApp();
+  const { wealthLevel, settings, coins, gameCoins } = useApp();
   const still = settings.reduceMotion;
   const { casino } = useGames();
   const game = casino.find((g) => g.id === id)!;
@@ -164,7 +164,6 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
 
   const total = Object.values(bets).reduce((a, b) => a + b, 0);
   const lastTotal = Object.values(last).reduce((a, b) => a + b, 0);
-  const muted = settings.gameVolume === 0;
   // The stage's inner width, and the height a phone leaves the game (the panel's own rows and the safe areas taken
   // off; in a room the panel is a sheet over the lower part). The middle of the stage takes what the rest leaves.
   const inner = (width || dims.width - 28) - 20;
@@ -424,9 +423,6 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
           <Text style={[s.title, { color: look.ink, textShadowColor: look.deep }]} numberOfLines={1} accessibilityRole="header">
             {look.title}
           </Text>
-          <Pressable style={[s.icon, { borderColor: look.frame }]} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-          </Pressable>
           <InfoButton onPress={() => setInfo(true)} tint={look.frame} />
         </View>
         {middleOfStage}
@@ -781,7 +777,6 @@ const s = StyleSheet.create({
   stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 6, height: 32 },
   title: { flex: 1, fontSize: 22, fontWeight: '900', fontStyle: 'italic', letterSpacing: 0.5, textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1, marginLeft: 4 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   wide: { flexDirection: 'row', gap: 6, alignSelf: 'stretch', marginTop: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, rowGap: 12, justifyContent: 'center', marginTop: 4 },
   ringLine: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.14)' },

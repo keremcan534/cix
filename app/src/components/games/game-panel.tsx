@@ -126,7 +126,6 @@ export function GamePanel({
         <Text style={p.title} numberOfLines={1}>
           {titleArt || wheel ? '' : `${titleEmoji} `}
           {title}
-          {casinoGame || wheel ? <Text style={p.badge}> Cömertlik Lv.{casinoGame?.minWealth ?? 2}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
         <Pressable onPress={() => setTools((t) => (t === 'games' ? null : 'games'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Başka oyuna geç" accessibilityState={{ expanded: tools === 'games' }}>
           <Ionicons name="grid-outline" size={21} color={tools === 'games' ? semantic.action : colors.textDim} />
@@ -244,8 +243,6 @@ const p = StyleSheet.create({
   full: { flex: 1, backgroundColor: colors.bg },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: colors.text, fontWeight: '900', fontSize: 17, flex: 1 },
-  badge: { color: colors.gold, fontSize: 12, fontWeight: '900' },
-  free: { color: semantic.live, fontSize: 12, fontWeight: '800' },
   voice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(19,217,223,0.10)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
   voiceText: { color: colors.text, fontSize: 12, fontWeight: '700', flex: 1 },
   mic: { width: 30, height: 30, borderRadius: 15, backgroundColor: semantic.live, alignItems: 'center', justifyContent: 'center' },

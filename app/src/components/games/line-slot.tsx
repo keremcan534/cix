@@ -7,7 +7,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
@@ -16,7 +16,7 @@ import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { BalancePill, BetStepper, fmt, sleep } from '@/components/games/slot-kit';
+import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -155,7 +155,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const c = SLOT_CONFIGS[id];
   const theme = THEMES[id];
   const reels = c.counts.length;
-  const { wealthLevel, settings, setSetting, coins, gameCoins } = useApp();
+  const { wealthLevel, settings, coins, gameCoins } = useApp();
   const { casino, bank } = useGames();
   const game = casino.find((g) => g.id === id)!;
   const still = settings.reduceMotion;
@@ -343,7 +343,6 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     setBusy(false);
     setStatus((st) => (st.tone === 'jackpot' ? st : { text: `${note} · net ${net >= 0 ? '+' : ''}${fmt(net)}`, tone: net > 0 ? 'win' : undefined }));
   };
-  const muted = settings.gameVolume === 0;
   const paySyms = Object.keys(c.paytable).reverse();
   const jackpotName = id === 'spellbook' ? 'GRAND' : 'JACKPOT';
 
@@ -351,9 +350,6 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     <View style={{ gap: 10 }}>
       <LinearGradient colors={theme.colors} style={s.stage}>
         <View style={s.iconRow}>
-          <Pressable style={[s.icon, { borderColor: theme.frame }]} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-          </Pressable>
           <InfoButton onPress={() => setInfo(true)} tint={theme.frame} />
         </View>
         <Text style={[s.title, { color: theme.ink, textShadowColor: theme.accent }, theme.title.length > 10 && { fontSize: 23 }]} accessibilityRole="header">
@@ -408,9 +404,23 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
         {win.layer}
       </LinearGradient>
 
-      <View style={s.controls}>
-        <BalancePill tint="#2A0F3D" shown={held} />
-        <Pressable onPress={auto !== null ? toggleAuto : play} disabled={busy && auto === null} style={[busy && auto === null && { opacity: 0.75 }]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`}>
+      <SpinControls
+        tint="#2A0F3D"
+        stepTint="#3B0F4F"
+        held={held}
+        bets={game.bets}
+        bet={bet}
+        onBet={setBet}
+        busy={busy}
+        turbo={turbo}
+        onTurbo={() => setTurbo((t) => !t)}
+        auto={auto}
+        autoSpins={AUTO_SPINS}
+        onAuto={toggleAuto}
+        onSpin={play}
+        side={{ bg: '#7C3AED', border: '#F0ABFC', ink: '#FDE68A', onBg: '#DB2777', onBorder: '#FACC15' }}
+        caption={`${c.lines.length} çizgi × ${fmt(bet / c.lines.length)}`}
+        spin={
           <LinearGradient colors={theme.spin} style={s.spinRing}>
             <View style={[s.spinCore, { backgroundColor: theme.accent }]}>
               {auto !== null ? (
@@ -422,31 +432,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
               )}
             </View>
           </LinearGradient>
-        </Pressable>
-        <View style={{ gap: 6, flex: 1 }}>
-          <Pressable
-            onPress={() => {
-              tapHaptic();
-              setTurbo((t) => !t);
-            }}
-            style={[s.side, turbo && s.sideOn]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: turbo }}
-            accessibilityLabel={turbo ? 'Turbo kapat' : 'Turbo aç'}
-          >
-            <Text style={s.sideText}>⚡ TURBO</Text>
-          </Pressable>
-          <Pressable onPress={toggleAuto} disabled={busy && auto === null} style={[s.side, auto !== null && s.sideOn]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `${AUTO_SPINS} kez otomatik çevir`}>
-            <Text style={s.sideText}>{auto !== null ? 'DUR' : 'OTO'}</Text>
-          </Pressable>
-        </View>
-      </View>
-      <View style={s.betRow}>
-        <BetStepper bets={game.bets} bet={bet} onChange={setBet} disabled={busy} tint="#3B0F4F" />
-        <Text style={s.dim}>
-          {c.lines.length} çizgi × {fmt(bet / c.lines.length)}
-        </Text>
-      </View>
+        }
+      />
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={s.pays}>
@@ -483,7 +470,6 @@ const GAP = 4;
 const s = StyleSheet.create({
   stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
   iconRow: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6, zIndex: 2 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 30, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1, marginTop: 4, marginRight: 76, alignSelf: 'flex-start', marginLeft: 6 },
   jpBox: { alignSelf: 'stretch', marginHorizontal: 18, borderRadius: 999, borderWidth: 3, paddingVertical: 3, alignItems: 'center' },
   jpLabel: { color: '#FEF3C7', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
@@ -502,15 +488,9 @@ const s = StyleSheet.create({
   statusWin: { backgroundColor: '#15803D' },
   statusJp: { backgroundColor: '#B45309' },
   statusText: { fontWeight: '900', fontSize: 19, textAlign: 'center', letterSpacing: 2 },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   spinRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
   spinCore: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
   autoLeft: { fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  side: { borderRadius: 14, borderWidth: 2, borderColor: '#F0ABFC', backgroundColor: '#7C3AED', paddingVertical: 9, alignItems: 'center' },
-  sideOn: { backgroundColor: '#DB2777', borderColor: '#FACC15' },
-  sideText: { color: '#FDE68A', fontWeight: '900', fontSize: 14 },
-  betRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  dim: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17 },
   pays: { gap: 8 },
   paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   payRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

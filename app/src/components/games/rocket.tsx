@@ -78,7 +78,7 @@ function Readout({ live, value, color, sub, pop, top }: { live: { t0: number; pl
 }
 
 export function RocketPlayer({ entry }: { entry: Entry }) {
-  const { wealthLevel, coins, gameCoins, setSetting } = useApp();
+  const { wealthLevel, coins, gameCoins } = useApp();
   const settings = useSettings();
   const calm = settings.reduceMotion;
   const { casino } = useGames();
@@ -298,7 +298,6 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
   };
 
   const locked = burning || auto;
-  const muted = settings.gameVolume === 0;
   const prize = Math.floor(bet * target);
   const shown = phase.kind === 'cashed' || phase.kind === 'boom' ? phase.x : 1;
   const color = phase.kind === 'boom' ? '#FB7185' : phase.kind === 'cashed' ? '#4ADE80' : phase.kind === 'fly' ? '#FDE047' : '#EEF2FF';
@@ -343,9 +342,6 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
         )}
         {hit && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.flash, { opacity: hit.interpolate({ inputRange: [0, 0.05, 0.3], outputRange: [0, 0.5, 0], extrapolate: 'clamp' }) }]} />}
         <View style={s.icons}>
-          <Pressable style={s.icon} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-          </Pressable>
           <InfoButton onPress={() => setInfo(true)} tint={ORBIT} />
         </View>
         <View style={s.trail}>
@@ -444,7 +440,6 @@ const s = StyleSheet.create({
   mult: { lineHeight: 60, fontWeight: '900', fontStyle: 'italic', fontVariant: ['tabular-nums'], textShadowColor: 'rgba(4,5,26,0.9)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 8 },
   sub: { color: '#E0E7FF', fontWeight: '800', fontSize: 13, textShadowColor: 'rgba(4,5,26,0.9)', textShadowRadius: 6 },
   icons: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, borderColor: ORBIT, alignItems: 'center', justifyContent: 'center' },
   trail: { position: 'absolute', left: 8, right: 8, bottom: 8 },
   note: { position: 'absolute', left: 14, right: 14, bottom: 50, backgroundColor: 'rgba(4,5,26,0.86)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(253,230,138,0.5)' },
   noteText: { color: '#FDE68A', fontWeight: '700', textAlign: 'center', fontSize: 12, lineHeight: 17 },

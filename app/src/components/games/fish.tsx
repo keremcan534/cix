@@ -49,7 +49,7 @@ const percent = (p: number) => `%${(p * 100).toLocaleString('tr-TR', { maximumFr
 type Run = { p0: number; at: number; on: boolean };
 
 export function FishPlayer({ entry }: { entry: Entry }) {
-  const { wealthLevel, coins, gameCoins, setSetting } = useApp();
+  const { wealthLevel, coins, gameCoins } = useApp();
   const settings = useSettings();
   const calm = settings.reduceMotion;
   const { casino } = useGames();
@@ -413,7 +413,6 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     setFrozenUntil(Date.now() + FREEZE_MS);
     setFreezeReady(Date.now() + FREEZE_COOLDOWN);
   };
-  const muted = settings.gameVolume === 0;
   // The big fish swim behind the small ones, so a small one is never hidden.
   const school = [...fish].sort((a, b) => b.size - a.size);
 
@@ -448,9 +447,6 @@ export function FishPlayer({ entry }: { entry: Entry }) {
           </Text>
         </View>
         <View style={f.icons}>
-          <Pressable style={f.icon} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-          </Pressable>
           <InfoButton onPress={() => setInfo(true)} tint="#67E8F9" />
         </View>
         {session.shots === 0 && !note && (
@@ -546,7 +542,6 @@ const f = StyleSheet.create({
   statValue: { color: '#fff', fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
   statLine: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 2 },
   icons: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, borderColor: '#67E8F9', alignItems: 'center', justifyContent: 'center' },
   hint: { position: 'absolute', left: 0, right: 0, top: 52, alignItems: 'center' },
   hintText: { color: '#fff', fontWeight: '800', fontSize: 13, backgroundColor: 'rgba(4,14,44,0.6)', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 5, overflow: 'hidden' },
   note: { position: 'absolute', top: 50, left: 12, right: 12, backgroundColor: 'rgba(4,14,44,0.86)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(253,230,138,0.5)' },

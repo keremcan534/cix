@@ -5,7 +5,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { Text } from '@/components/text';
@@ -13,7 +13,7 @@ import { CasinoLock } from '@/components/games/casino';
 import { Beam, BrightLadder, LIGHT, SEA, SeaCell, StormSky, TOWER, TOWER_GAP, Tower, fallOf, landedAt, shipLook } from '@/components/games/fener-stage';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { BalancePill, BetStepper, fmt, sleep } from '@/components/games/slot-kit';
+import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import { BRIGHTNESS, CARGO, COLS, FENER_MAX, ROWS, STORM_SPINS, STORM_TRIGGER, cargoLabel, type FCell, type FSpin } from '@/lib/fener-slot';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
@@ -59,7 +59,7 @@ const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 const run = (a: Animated.CompositeAnimation) => new Promise<void>((r) => a.start(() => r()));
 
 export function FenerPlayer({ entry }: { entry: Entry }) {
-  const { wealthLevel, coins, gameCoins, setSetting } = useApp();
+  const { wealthLevel, coins, gameCoins } = useApp();
   const settings = useSettings();
   const calm = settings.reduceMotion;
   const { casino } = useGames();
@@ -344,7 +344,6 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
     setBusy(false);
     setStatus({ text: `${note} · net ${net >= 0 ? '+' : ''}${fmt(net)}`, tone: net > 0 ? 'win' : undefined });
   };
-  const muted = settings.gameVolume === 0;
   const stormy = storm !== null;
   const boardH = ROWS * rowH + (ROWS - 1) * GAP;
 
@@ -367,9 +366,6 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
             </Text>
             <Text style={[f.kicker, stormy && { color: LIGHT }]}>{stormy ? (storm ? `FIRTINA GECESİ · ${storm}/${STORM_SPINS}` : 'FIRTINA GECESİ') : 'IŞIK HUZMESİ'}</Text>
           </View>
-          <Pressable style={f.icon} onPress={() => setSetting('gameVolume', muted ? 0.4 : 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={muted ? 'Oyun sesini aç' : 'Oyun sesini kapat'}>
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
-          </Pressable>
           <InfoButton onPress={() => setInfo(true)} tint={LIGHT} />
         </View>
 
@@ -448,9 +444,22 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
         {win.layer}
       </LinearGradient>
 
-      <View style={f.controls}>
-        <BalancePill tint="#0B2238" shown={held} />
-        <Pressable onPress={auto !== null ? toggleAuto : play} disabled={busy && auto === null} style={[busy && auto === null && { opacity: 0.75 }]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`}>
+      <SpinControls
+        tint="#0B2238"
+        held={held}
+        bets={game.bets}
+        bet={bet}
+        onBet={setBet}
+        busy={busy}
+        turbo={turbo}
+        onTurbo={() => setTurbo((t) => !t)}
+        auto={auto}
+        autoSpins={AUTO_SPINS}
+        onAuto={toggleAuto}
+        onSpin={play}
+        side={{ bg: '#0B2238', border: 'rgba(255,210,122,0.55)', ink: LIGHT, onBg: LIGHT, onBorder: '#FFF3D0', onInk: '#3A2400' }}
+        caption={`Bir turda en çok ${fmt(bet * FENER_MAX)}`}
+        spin={
           <LinearGradient colors={[LIGHT, '#E8A93A']} style={f.spinRing}>
             <View style={f.spinCore}>
               {auto !== null ? (
@@ -462,29 +471,8 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
               )}
             </View>
           </LinearGradient>
-        </Pressable>
-        <View style={{ gap: 6, width: 88 }}>
-          <Pressable
-            onPress={() => {
-              tapHaptic();
-              setTurbo((t) => !t);
-            }}
-            style={[f.side, turbo && f.sideOn]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: turbo }}
-            accessibilityLabel={turbo ? 'Hızlı çevirmeyi kapat' : 'Hızlı çevir'}
-          >
-            <Text style={[f.sideText, turbo && { color: '#3A2400' }]}>⚡ TURBO</Text>
-          </Pressable>
-          <Pressable onPress={toggleAuto} disabled={busy && auto === null} style={[f.side, auto !== null && f.sideOn]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik çevirmeyi durdur' : `${AUTO_SPINS} kez otomatik çevir`}>
-            <Text style={[f.sideText, auto !== null && { color: '#3A2400' }]}>{auto !== null ? 'DUR' : 'OTO'}</Text>
-          </Pressable>
-        </View>
-      </View>
-      <View style={f.betRow}>
-        <BetStepper bets={game.bets} bet={bet} onChange={setBet} disabled={busy} tint="#0B2238" />
-        <Text style={f.dim}>Bir turda en çok {fmt(bet * FENER_MAX)}</Text>
-      </View>
+        }
+      />
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={f.pays}>
@@ -524,7 +512,6 @@ const f = StyleSheet.create({
   stage: { borderRadius: 22, padding: 10, gap: 8, overflow: 'hidden' },
   star: { position: 'absolute', width: 2.5, height: 2.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.75)' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  icon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, borderColor: LIGHT, alignItems: 'center', justifyContent: 'center' },
   title: { color: LIGHT, fontSize: 23, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, lineHeight: 28, textShadowColor: 'rgba(120,70,0,0.9)', textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1 },
   kicker: { color: SEA, fontSize: 10, fontWeight: '900', letterSpacing: 2 },
   board: { backgroundColor: 'rgba(2,10,20,0.6)', borderRadius: 16, padding: 6, borderWidth: 1.5, borderColor: 'rgba(255,210,122,0.35)', overflow: 'hidden' },
@@ -544,15 +531,9 @@ const f = StyleSheet.create({
   banner: { position: 'absolute', left: 16, right: 16, top: '30%', alignItems: 'center', gap: 2, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 10, backgroundColor: 'rgba(4,8,20,0.88)', borderWidth: 2, borderColor: LIGHT },
   bannerTitle: { color: LIGHT, fontSize: 26, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1.5 },
   bannerSub: { color: '#E6FBFF', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   spinRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
   spinCore: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#071A2E', alignItems: 'center', justifyContent: 'center' },
   autoLeft: { color: LIGHT, fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  side: { borderRadius: 14, borderWidth: 2, borderColor: 'rgba(255,210,122,0.55)', backgroundColor: '#0B2238', paddingVertical: 9, alignItems: 'center' },
-  sideOn: { backgroundColor: LIGHT, borderColor: '#FFF3D0' },
-  sideText: { color: LIGHT, fontWeight: '900', fontSize: 13 },
-  betRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  dim: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17 },
   pays: { gap: 8 },
   paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   cargoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
