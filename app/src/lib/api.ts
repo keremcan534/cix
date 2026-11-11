@@ -19,6 +19,7 @@ import type { Outcome } from '@/lib/casino-odds';
 import { noteContactStrike, type ContactStrike } from '@/lib/contact-filter';
 import { deviceInfo } from '@/lib/device-info';
 import { forgetRoomPassword, roomPassword } from '@/lib/live/room-password';
+import type { LudoMode, LudoMove, LudoState } from '@/lib/room-games/ludo';
 
 /**
  * wealthXp: Cömertlik points, charmXp: Yankı points, only in GET /api/me (the server's counts, server/api/wheel.mjs
@@ -1034,13 +1035,14 @@ export const casino = () => call<ServerCasino>('GET', '/api/casino');
 export const casinoPlay = (body: CasinoPlayBody, ref = newRef()) =>
   call<{ round: ServerCasinoRound & { outcome: Outcome }; user: ServerUser; replay: boolean; fund: number | null }>('POST', '/api/casino/play', { ...body, ref });
 /**
- * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it. `hand` only for my
- * own cards (Renk Kartları; null when I don't sit there), `counts` everyone's card count; `mySeat` −1 when I watch.
+ * Oda oyunları at a table in a room (server/api/room-games.mjs): the room's one table, as I see it; `mySeat` −1 when I
+ * watch. `TableCommon` is what every table carries. Each game adds its own fields, as the server's
+ * room-games/<game>.mjs keeps them, and `game` tells them apart: narrow on it before reading a game's fields. A new
+ * game adds its own type to `ServerTable` and its move to `TableMove`.
  */
 export type TableCard = { color: number; value: number | '+2' | 'Atla' };
-export type ServerTable = {
+type TableCommon = {
   room: string;
-  game: 'ludo' | 'cards' | 'xox';
   name: string;
   min: number;
   max: number;
@@ -1054,16 +1056,19 @@ export type ServerTable = {
   winner: number | null;
   log: string;
   version: number;
-  board?: ('X' | 'O' | null)[];
-  pos?: number[];
-  die?: number | null;
-  top?: TableCard;
-  hand?: TableCard[] | null;
-  counts?: number[];
 };
+/** Ludo (lib/room-games/ludo): its fields come with the first hand; a table still waiting has only `mode`. */
+export type LudoServerTable = TableCommon & { game: 'ludo' } & Partial<LudoState>;
+/** Renk Kartları: `hand` only for my own cards (null when I don't sit there), `counts` everyone's card count. */
+export type CardsServerTable = TableCommon & { game: 'cards'; top?: TableCard; hand?: TableCard[] | null; counts?: number[] };
+export type XoxServerTable = TableCommon & { game: 'xox'; board?: ('X' | 'O' | null)[] };
+export type ServerTable = LudoServerTable | CardsServerTable | XoxServerTable;
+/** A move as each game takes it: XOX { cell }, Renk Kartları { card } (null draws one), Ludo { roll: true } then { token }. */
+export type TableMove = { cell: number } | { card: number | null } | LudoMove;
 export type TableAction = 'open' | 'join' | 'start' | 'move' | 'leave' | 'again' | 'close';
 export const roomTable = (room: string) => call<{ table: ServerTable | null }>('GET', `/api/rooms/table?room=${encodeURIComponent(room)}`).then((r) => r.table);
-export const roomTableAction = (room: string, action: TableAction, extra: { game?: string; move?: { cell?: number; card?: number | null } } = {}) =>
+/** `options`: the opener's choices with `open` (Ludo: Hızlı or Klasik). */
+export const roomTableAction = (room: string, action: TableAction, extra: { game?: ServerTable['game']; options?: { mode?: LudoMode }; move?: TableMove } = {}) =>
   call<{ table: ServerTable | null }>('POST', '/api/rooms/table', { room, action, ...extra }).then((r) => r.table);
 /** Sıralama › Oda XP (server/api/room-xp.mjs): open rooms by the room XP their gifts earned in the period. */
 export type RoomXpRow = { rank: number; room: ServerRoom; score: number };

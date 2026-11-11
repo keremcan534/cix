@@ -1,11 +1,11 @@
 // Free room games, playable in the prototype with room participants (other players are simulated). A live build's
 // room plays them at the server's table instead (components/games/room-tables, same look: COLORS, CardView, styles).
-// Pure game state: these components never touch the room, seats or microphones.
+// Pure game state: these components never touch the room, seats or microphones. Renk Kartları and XOX are here;
+// a game with a screen of its own is in components/games/room/ (Ludo: room/ludo).
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { Art, type ArtName } from '@/components/Art';
 import type { User } from '@/data/mock';
 import { colors, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -13,95 +13,6 @@ import { Photo } from '@/components/photo';
 export type Player = Pick<User, 'id' | 'name' | 'avatar'>;
 export const COLORS = ['#13D9DF', '#FF6576', '#F6BD60', '#22C55E'];
 const rnd = (n: number) => Math.floor(Math.random() * n);
-
-// --- Ludo (quick version: one token each, 6 to leave base, exact roll to finish, landing on someone sends them home)
-export const TRACK = 24;
-export function Ludo({ players: roomPlayers }: { players: Player[] }) {
-  // The line-up is fixed when the game opens and on "Yeniden oyna": people joining or leaving the room mid-game
-  // don't reset the board or leave it out of step with the players.
-  const [players, setPlayers] = useState(roomPlayers);
-  const [pos, setPos] = useState<number[]>(() => players.map(() => -1)); // -1 = base
-  const [turn, setTurn] = useState(0);
-  const [die, setDie] = useState<number | null>(null);
-  const [log, setLog] = useState('Sıra sende: zar at. 6 atınca taşın yola çıkar.');
-  const [winner, setWinner] = useState<number | null>(null);
-
-  const move = (who: number, d: number) => {
-    setDie(d);
-    setPos((p) => {
-      const next = [...p];
-      const cur = p[who];
-      let msg = `${players[who].name} ${d} attı`;
-      if (cur < 0) {
-        if (d === 6) {
-          next[who] = 0;
-          msg += ', yola çıktı';
-        } else msg += '';
-      } else if (cur + d <= TRACK) {
-        next[who] = cur + d;
-        const hit = next.findIndex((x, i) => i !== who && x === next[who] && x > 0 && x < TRACK);
-        if (hit >= 0) {
-          next[hit] = -1;
-          msg += ` ve ${players[hit].name} taşını eve gönderdi!`;
-        }
-      } else msg += ', bitişe tam sayı lazım';
-      if (next[who] === TRACK) {
-        setWinner(who);
-        msg = `🏆 ${players[who].name} kazandı!`;
-      }
-      setLog(msg);
-      return next;
-    });
-    if (d !== 6) setTurn((t) => (t + 1) % players.length);
-  };
-
-  // Simulated players take their turn.
-  useEffect(() => {
-    if (winner !== null || turn === 0) return;
-    const t = setTimeout(() => move(turn, rnd(6) + 1), 900);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turn, winner, pos]);
-
-  return (
-    <View style={{ gap: 10 }}>
-      {players.map((p, i) => (
-        <View key={p.id} style={g.lane}>
-          <Photo uri={p.avatar} kind="face" style={[g.av, turn === i && winner === null && { borderColor: COLORS[i] }]} />
-          <View style={g.track}>
-            {Array.from({ length: TRACK + 1 }, (_, c) => (
-              <View key={c} style={[g.cell, c === TRACK && g.home, pos[i] === c && { backgroundColor: COLORS[i] }]} />
-            ))}
-          </View>
-          <Text style={g.small}>{pos[i] < 0 ? 'Ev' : pos[i] === TRACK ? '🏁' : pos[i]}</Text>
-        </View>
-      ))}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        {die ? <Art name={`zar-zar-yuzu-${die}` as ArtName} size={24} /> : null}
-        <Text style={[g.log, { flexShrink: 1 }]}>{log}</Text>
-      </View>
-      {winner === null ? (
-        <Pressable style={[g.btn, turn !== 0 && g.btnOff]} disabled={turn !== 0} onPress={() => move(0, rnd(6) + 1)} accessibilityLabel="Zar at">
-          <Text style={g.btnText}>{turn === 0 ? 'Zar at' : `${players[turn].name} oynuyor…`}</Text>
-        </Pressable>
-      ) : (
-        <Pressable
-          style={g.btn}
-          onPress={() => {
-            setPlayers(roomPlayers);
-            setPos(roomPlayers.map(() => -1));
-            setTurn(0);
-            setWinner(null);
-            setDie(null);
-            setLog('Yeni oyun: zar at.');
-          }}
-        >
-          <Text style={g.btnText}>Yeniden oyna</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
 
 // --- Renk Kartları (UNO-like mechanic with original naming)
 export type Card = { color: number; value: number | '+2' | 'Atla' };
@@ -262,12 +173,7 @@ export function Xox({ players }: { players: Player[] }) {
 }
 
 const g = StyleSheet.create({
-  lane: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  av: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: 'transparent' },
   avSmall: { width: 26, height: 26, borderRadius: 13 },
-  track: { flex: 1, flexDirection: 'row', gap: 2 },
-  cell: { flex: 1, height: 14, borderRadius: 3, backgroundColor: colors.cardAlt },
-  home: { backgroundColor: 'rgba(246,189,96,0.35)' },
   small: { color: colors.textDim, fontSize: 12, minWidth: 22, textAlign: 'center' },
   log: { color: colors.text, fontSize: 13, textAlign: 'center', minHeight: 18 },
   btn: { backgroundColor: semantic.action, borderRadius: 999, paddingVertical: 12, alignItems: 'center', alignSelf: 'stretch' },

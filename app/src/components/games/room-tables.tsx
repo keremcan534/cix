@@ -2,17 +2,22 @@
 // like the demo's games (components/games/room-games). The server rolls the die, deals the cards, checks every move
 // and plays a turn that ran out; this screen only shows the table and sends my taps. The room staff open a table;
 // anyone in the room may sit while it waits, the others watch. Never touches the room's seats or microphones.
+//
+// What every game shares is here: reading the table, opening it, sitting down, starting, leaving. A game with a
+// screen of its own (components/games/room/: Ludo) is handed its table and those buttons; Renk Kartları and XOX are
+// still drawn here.
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Art, type ArtName } from '@/components/Art';
-import { COLORS, CardView, TRACK, playable, roomGameStyles as g, winnerOf } from '@/components/games/room-games';
+import { CardView, playable, roomGameStyles as g, winnerOf } from '@/components/games/room-games';
+import { LudoLive, LudoModePicker } from '@/components/games/room/ludo';
 import { Photo } from '@/components/photo';
 import { Text } from '@/components/text';
 import type { ServerTable, TableAction } from '@/lib/api';
 import { errorHaptic, tapHaptic } from '@/lib/haptics';
 import { myServerId } from '@/lib/live';
 import { useRoomTable } from '@/lib/live/room-table';
+import type { LudoMode } from '@/lib/room-games/ludo';
 import { colors, semantic } from '@/theme';
 
 export type TableGame = ServerTable['game'];
@@ -43,11 +48,14 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
   const { table, state, error, act, reload } = useRoomTable(roomId);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Ludo's opener picks the short game or the long one.
+  const [mode, setMode] = useState<LudoMode>('quick');
   const left = useSecondsLeft(table?.status === 'playing' ? table.turnEndsAt : null);
-  const run = async (action: TableAction, extra?: Parameters<typeof act>[1]) => {
+  /** `quiet`: the game's own screen already answered the tap (a sound, a tick). */
+  const run = async (action: TableAction, extra?: Parameters<typeof act>[1], quiet = false) => {
     if (busy) return;
     setBusy(true);
-    tapHaptic();
+    if (!quiet) tapHaptic();
     const e = await act(action, extra);
     setNote(e);
     if (e) errorHaptic();
@@ -67,7 +75,8 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
     return (
       <View style={{ gap: 10 }}>
         <Text style={g.log}>{canOpen ? `Odada açık masa yok. ${NAMES[game]} masasını aç; odadakiler masaya oturur.` : `Odada açık masa yok. ${NAMES[game]} masasını oda sahibi veya yöneticiler açar.`}</Text>
-        {canOpen && <Btn label={`${NAMES[game]} masası aç`} disabled={busy} onPress={() => run('open', { game })} />}
+        {canOpen && game === 'ludo' && <LudoModePicker mode={mode} onChange={setMode} />}
+        {canOpen && <Btn label={`${NAMES[game]} masası aç`} disabled={busy} onPress={() => run('open', game === 'ludo' ? { game, options: { mode } } : { game })} />}
         {noteLine}
       </View>
     );
@@ -103,6 +112,33 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
     </View>
   );
 
+  const over = table.status === 'over';
+  // The table's buttons, the same for every game: while it waits, and during and after a hand.
+  const waitingButtons = (
+    <>
+      {!seated && !full && <Btn label="Masaya otur" disabled={busy} onPress={() => run('join')} />}
+      {seated && opener && <Btn label={table.seats.length < table.min ? `En az ${table.min} oyuncu bekleniyor` : 'Başlat'} disabled={busy || table.seats.length < table.min} onPress={() => run('start')} />}
+      {seated && <Btn label="Masadan kalk" ghost disabled={busy} onPress={() => run('leave')} />}
+      {opener && !seated && <Btn label="Masayı kapat" ghost disabled={busy} onPress={() => run('close')} />}
+      {noteLine}
+    </>
+  );
+  const handButtons = (
+    <>
+      {over && seated && table.seats.length >= table.min && <Btn label="Yeniden oyna" disabled={busy} onPress={() => run('again')} />}
+      {over && !seated && !full && <Btn label="Masaya otur" disabled={busy} onPress={() => run('join')} />}
+      {seated && <Btn label="Masadan kalk" ghost disabled={busy} onPress={() => run('leave')} />}
+      {over && opener && <Btn label="Masayı kapat" ghost disabled={busy} onPress={() => run('close')} />}
+      {noteLine}
+    </>
+  );
+  if (table.game === 'ludo')
+    return (
+      <LudoLive table={table} busy={busy} onMove={(move) => run('move', { move }, true)}>
+        {table.status === 'waiting' ? waitingButtons : handButtons}
+      </LudoLive>
+    );
+
   if (table.status === 'waiting')
     return (
       <View style={{ gap: 10 }}>
@@ -110,39 +146,14 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
         <Text style={g.log}>
           {table.seats.length}/{table.max} oyuncu · en az {table.min} · {table.log}
         </Text>
-        {!seated && !full && <Btn label="Masaya otur" disabled={busy} onPress={() => run('join')} />}
-        {seated && opener && <Btn label={table.seats.length < table.min ? `En az ${table.min} oyuncu bekleniyor` : 'Başlat'} disabled={busy || table.seats.length < table.min} onPress={() => run('start')} />}
-        {seated && <Btn label="Masadan kalk" ghost disabled={busy} onPress={() => run('leave')} />}
-        {opener && !seated && <Btn label="Masayı kapat" ghost disabled={busy} onPress={() => run('close')} />}
-        {noteLine}
+        {waitingButtons}
       </View>
     );
 
-  const over = table.status === 'over';
   const status = over ? (table.winner !== null && table.winner === me ? '🏆 Kazandın!' : table.log) : `${table.log}${left !== null ? ` · ${myTurn ? 'senin sıran' : turnName} ${left} sn` : ''}`;
   return (
     <View style={{ gap: 10 }}>
-      {table.game !== 'ludo' && seatsRow}
-      {table.game === 'ludo' && table.pos && (
-        <>
-          {table.seats.map((p, i) => (
-            <View key={p.id} style={g.lane}>
-              <Photo uri={p.avatarUrl ?? ''} kind="face" style={[g.av, !over && table.turn === i && { borderColor: COLORS[i] }]} />
-              <View style={g.track}>
-                {Array.from({ length: TRACK + 1 }, (_, c) => (
-                  <View key={c} style={[g.cell, c === TRACK && g.home, table.pos![i] === c && { backgroundColor: COLORS[i] }]} />
-                ))}
-              </View>
-              <Text style={g.small}>{table.pos![i] < 0 ? 'Ev' : table.pos![i] === TRACK ? '🏁' : table.pos![i]}</Text>
-            </View>
-          ))}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            {table.die ? <Art name={`zar-zar-yuzu-${table.die}` as ArtName} size={24} /> : null}
-            <Text style={[g.log, { flexShrink: 1 }]}>{status}</Text>
-          </View>
-          {!over && seated && <Btn label={myTurn ? 'Zar at' : `${turnName} oynuyor…`} disabled={!myTurn || busy} onPress={() => run('move', { move: {} })} />}
-        </>
-      )}
+      {seatsRow}
       {table.game === 'cards' && table.top && (
         <>
           <View style={{ alignItems: 'center' }}>
@@ -186,11 +197,7 @@ export function LiveTable({ roomId, game, canOpen }: { roomId: string; game: Tab
         </View>
       )}
       {!seated && !over && <Text style={g.log}>Masayı izliyorsun; el bitince boş koltuğa oturabilirsin.</Text>}
-      {over && seated && table.seats.length >= table.min && <Btn label="Yeniden oyna" disabled={busy} onPress={() => run('again')} />}
-      {over && !seated && !full && <Btn label="Masaya otur" disabled={busy} onPress={() => run('join')} />}
-      {seated && <Btn label="Masadan kalk" ghost disabled={busy} onPress={() => run('leave')} />}
-      {over && opener && <Btn label="Masayı kapat" ghost disabled={busy} onPress={() => run('close')} />}
-      {noteLine}
+      {handButtons}
     </View>
   );
 }
