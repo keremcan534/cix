@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { apiRequest, roomMutes } from '@/lib/api';
 import { rememberUser, toLocal } from '@/lib/live';
+import { onServerRoom } from '@/lib/live/room-bus';
 
 type StaffAnswer = {
   owner: string;
@@ -66,7 +67,7 @@ export function staffFrom(s: StaffAnswer, mutes: { id: number; type: string; use
   };
 }
 
-/** The room's staff from the server, read on entry, every 30 s and after a staff action (`reload`). */
+/** The room's staff from the server, read on entry, when the server says it changed, every 30 s and after a staff action (`reload`). */
 export function useRoomStaff(roomId: string, enabled: boolean) {
   const [staff, setStaff] = useState<RoomStaff>(NONE);
   const [tick, setTick] = useState(0);
@@ -90,9 +91,13 @@ export function useRoomStaff(roomId: string, enabled: boolean) {
     };
     void load();
     const t = setInterval(() => void load(), 30_000);
+    // The server says so the moment someone is made an admin or DJ, kept out or muted (server/api/rooms.mjs): the
+    // new rank is on every phone at once, not at its next read.
+    const off = onServerRoom(roomId, () => void load());
     return () => {
       on = false;
       clearInterval(t);
+      off();
     };
   }, [roomId, enabled, tick]);
   return { ...staff, reload };

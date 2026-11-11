@@ -104,3 +104,31 @@ describe('fitFace', () => {
     assert.equal(fitFace(at, 10_000, 64), 64);
   });
 });
+
+describe('PK başlayınca sahne aynı kalır', () => {
+  test('klasik düzen: yer varsa yüzler ve sütunlar PK öncesiyle aynı, yalnızca puan satırı eklenir', () => {
+    // 6 mikrofon + Patron koltuğu, ekrandaki gibi.
+    const before = fitGrid(6, 360, 290, { boss: true });
+    const during = fitGrid(6, 360, 290 + 200, { boss: true, pk: true }, before);
+    assert.equal(during.face, before.face);
+    assert.equal(during.cols, before.cols);
+    assert.ok(during.height > before.height, 'puanlar yükseklik ister');
+    // Eski davranış (aynı yükseklikte PK): yüzler en küçüğe iniyordu.
+    assert.ok(fitGrid(6, 360, 290 - 60, { boss: true, pk: true }).face < before.face);
+  });
+  test('sohbet daha fazla yer veremiyorsa yüzler yalnızca gerektiği kadar küçülür, hiç büyümez', () => {
+    const before = fitGrid(6, 360, 290, { boss: true });
+    const tight = fitGrid(6, 360, 300, { boss: true, pk: true }, before);
+    assert.equal(tight.cols, before.cols);
+    assert.ok(tight.face < before.face && tight.face >= FACE_MIN);
+    assert.ok(tight.height <= 300);
+    assert.equal(fitGrid(6, 360, 5_000, { boss: true, pk: true }, before).face, before.face, 'fazla yer yüzü büyütmez');
+  });
+  test('seçilen düzen: yüz PK öncesini geçmez', () => {
+    const s = ROOM_LAYOUTS[0].layoutSchema;
+    const plan = layoutPlan(s, 360, false);
+    const before = fitLayout(s, plan, 260);
+    assert.equal(fitLayout(s, plan, 5_000, { pk: true }, before).face, before.face);
+    assert.ok(fitLayout(s, plan, 5_000, { pk: true }).face >= before.face);
+  });
+});

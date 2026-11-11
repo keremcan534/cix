@@ -159,7 +159,7 @@ import { errorHaptic, micHaptic, successHaptic, tapHaptic } from '@/lib/haptics'
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { useApp, type MyRoom } from '@/store';
 import { similarity } from '@/lib/similarity';
-import { fitGrid, fitLayout, layoutPlan, type Fitted } from '@/lib/seat-fit';
+import { fitGrid, fitLayout, layoutPlan, type FitOpts, type Fitted } from '@/lib/seat-fit';
 import { patronOnSeat } from '@/lib/patron-seat';
 import { RPS, isMovePick, moveLine, moveOfPick, needsMic, sideTarget, type Move, type Rect as MicRect } from '@/lib/room-moves';
 import { colors, fonts, gradient, semantic } from '@/theme';
@@ -3125,7 +3125,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
   // its rows; the classic grid also picks how many mics go to a row. The mic strip and a team PK keep their sizes.
   const fitOpts = { boss: bossOn, pk: !!pk && pk.status !== 'invite' };
   const plan = layout ? layoutPlan(layout.layoutSchema, win.width, theme === 'pk') : null;
-  const stageFit = strip || teamPk ? null : layout && plan ? (h: number) => fitLayout(layout.layoutSchema, plan, h, fitOpts) : (h: number) => fitGrid(allSeats.length - 1, win.width, h, fitOpts);
+  const fitWith = (o: FitOpts) => (h: number, like?: Fitted) => (layout && plan ? fitLayout(layout.layoutSchema, plan, h, o, like) : fitGrid(allSeats.length - 1, win.width, h, o, like));
+  const stageFit = strip || teamPk ? null : fitWith(fitOpts);
+  // A PK (its board, the points under the names) is added to the stage: the mics keep the sizes they have without
+  // it and the chat gives way (components/room/fit-stage).
+  const pkBoardOn = !!pk && !teamPk;
+  const calmFit = stageFit && pkBoardOn ? fitWith({ boss: bossOn }) : null;
   // The strip's mics: a tenth of the row each, so ten fit and fewer stay together on the left.
   const stripW = Math.floor((Math.min(win.width, 640) - 16) / 10);
   const stripSlot: ArenaSlot = { width: stripW, size: Math.max(24, Math.min(34, stripW - 8)) };
@@ -3313,6 +3318,12 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               the stage closes the panel (as does the back button). */}
           <FitStage
             fit={stageFit}
+            calm={calmFit}
+            pkTop={
+              pk && (pk.kind === 'cross' || pk.mode === 'solo' || pk.status === 'invite') ? (
+                pk.kind === 'room' && pk.mode === 'solo' ? <SoloBoard pk={pk} canManage={canManage && !offline} /> : <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />
+              ) : null
+            }
             frozen={typing}
             freeStyle={strip ? { flexGrow: 0, flexShrink: 1 } : { flexGrow: 0, flexShrink: 100, minHeight: 120 }}
             guess={Math.round(win.height * 0.34)}
@@ -3321,9 +3332,6 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
               <>
                 {musicEnabled && <MusicBar music={shownMusic} canControl={canControlMusic} onOpen={() => setPanel('music')} onToggle={music$.toggle} onClose={music$.close} />}
                 {session && <SessionBanner session={session} />}
-                {pk?.kind === 'cross' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
-                {pk?.kind === 'room' && pk.mode === 'solo' && <SoloBoard pk={pk} canManage={canManage && !offline} />}
-                {pk?.kind === 'room' && pk.mode === 'team' && pk.status === 'invite' && <PkBoard pk={pk} viewerRoomId={id} canManage={canManage && !offline} />}
                 {callActive && (
                   <Pressable style={styles.callBanner} onPress={() => router.push(media.call?.kind === 'match' ? '/tanis' : { pathname: '/arama/[id]', params: { id: media.call!.peerId } })} accessibilityLabel="Görüşmeye dön">
                     <Ionicons name="call" size={16} color={semantic.successInk} />

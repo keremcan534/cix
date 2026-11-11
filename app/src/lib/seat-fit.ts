@@ -70,9 +70,17 @@ function better(a: Fitted, b: Fitted, height: number) {
   return a.face > b.face || (a.face === b.face && a.height > b.height);
 }
 
-/** The columns and faces with which `guests` mics (and the host's row) fit `height` best. */
-export function fitGrid(guests: number, width: number, height: number, o: FitOpts = {}): Fitted {
+/**
+ * The columns and faces with which `guests` mics (and the host's row) fit `height` best. With `like` (the room as
+ * it is without its PK) the columns stay and the faces are at most that big: a PK adds to the stage, it doesn't
+ * rearrange it.
+ */
+export function fitGrid(guests: number, width: number, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
   const w = gridWidth(width);
+  if (like && like.cols >= 3) {
+    const max = Math.min(FACE_MAX, Math.floor(w / like.cols) - SIDE, like.face);
+    return gridAt(guests, w, like.cols, fitFace((f) => gridAt(guests, w, like.cols, f, o).height, height, max), o);
+  }
   const most = Math.max(3, Math.min(8, Math.floor(w / (FACE_MIN + SIDE)), guests));
   let best: Fitted | null = null;
   for (let cols = 3; cols <= most; cols++) {
@@ -167,8 +175,8 @@ function rowHeight(xs: LayoutSlot[], plan: LayoutPlan, sizes: ReturnType<typeof 
   return seatHeight(tallest, o.pk) + (plan.bands && xs[0].team ? 34 : 0);
 }
 
-/** The mic face with which a layout fits `height` best. */
-export function fitLayout(s: LayoutSchema, plan: LayoutPlan, height: number, o: FitOpts = {}): Fitted {
-  const face = fitFace((f) => layoutHeight(s, plan, f, o), height, plan.maxFace);
+/** The mic face with which a layout fits `height` best; at most `like`'s (the room without its PK), as in fitGrid. */
+export function fitLayout(s: LayoutSchema, plan: LayoutPlan, height: number, o: FitOpts = {}, like?: Fitted): Fitted {
+  const face = fitFace((f) => layoutHeight(s, plan, f, o), height, like ? Math.min(plan.maxFace, like.face) : plan.maxFace);
   return { face, host: hostFaceOf(face), slot: plan.micW, cols: 0, height: layoutHeight(s, plan, face, o) };
 }

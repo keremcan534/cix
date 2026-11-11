@@ -3,6 +3,8 @@
 // are, so the chat takes the rest and no empty band opens between them. When even the smallest faces don't fit,
 // the chat gives way, down to its least height; only past that (a small phone with many boards on) does the stage
 // scroll. While typing, the mics keep their size. A drag of the chat's handle redraws only this part, not the room.
+// A PK adds to the stage (its board over the mics, the points under the names) and the mics stay as they were:
+// the chat gives way for it. Only when the chat is at its least do the faces get smaller.
 import { useMemo, useState, type ReactNode } from 'react';
 import { LayoutAnimation, ScrollView, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -21,6 +23,8 @@ const same = (a: Fitted | null, b: Fitted) => !!a && a.face === b.face && a.cols
 
 export function FitStage({
   fit,
+  calm,
+  pkTop,
   frozen,
   freeStyle,
   guess,
@@ -31,8 +35,15 @@ export function FitStage({
   chatHidden,
   onTouchStart,
 }: {
-  /** Sizes the mics for a height. Null: they aren't fitted (the mic strip, a team PK), the stage takes `freeStyle`. */
-  fit: ((height: number) => Fitted) | null;
+  /**
+   * Sizes the mics for a height; with `like`, in its columns and with faces at most its size. Null: they aren't
+   * fitted (the mic strip, a team PK), the stage takes `freeStyle`.
+   */
+  fit: ((height: number, like?: Fitted) => Fitted) | null;
+  /** While a PK is on: the sizes the mics have without it (no board, no points under the names). They keep them. */
+  calm?: ((height: number) => Fitted) | null;
+  /** The PK's board, under the other boards. Its height is the chat's to give, not the mics'. */
+  pkTop?: ReactNode;
   /** Typing: the mics keep the size they had and the stage its height; the chat gives way to the keyboard. */
   frozen: boolean;
   freeStyle: StyleProp<ViewStyle>;
@@ -54,13 +65,17 @@ export function FitStage({
   const [bar, setBar] = useState(0);
   const [topH, setTopH] = useState(0);
   const [drawn, setDrawn] = useState(0);
+  const [pkH, setPkH] = useState(0);
   const [basis, setBasis] = useState(-1);
   const measure = (set: (n: number) => void) => (e: LayoutChangeEvent) => set(Math.round(e.nativeEvent.layout.height));
 
   const known = box > 0 && basis >= 0;
   const chatH = chatHidden ? 0 : basis;
   const least = chatHidden ? 0 : CHAT_LEAST;
-  const next = fit ? fit(known ? box - bar - chatH - topH - PAD_BOTTOM : guess) : null;
+  const room = box - bar - chatH - topH - PAD_BOTTOM;
+  // A PK: the mics as they are without it (the board's height given back), then as much of the chat as it can
+  // give (down to its least) for the board and the points.
+  const next = !fit ? null : !known ? fit(guess) : calm ? fit(room + Math.max(0, chatH - least), calm(room + (pkTop ? pkH : 0))) : fit(room);
   // The sizes the mics are drawn with: kept while typing, and replaced only when they change, so a drag of the
   // chat's handle doesn't draw every mic again for every pixel.
   const { reduceMotion } = useSettings();
@@ -86,7 +101,10 @@ export function FitStage({
   return (
     <View style={{ flex: 1 }} onLayout={measure(setBox)}>
       <ScrollView style={style} onTouchStart={onTouchStart} contentContainerStyle={{ paddingBottom: PAD_BOTTOM, flexGrow: 1 }} showsVerticalScrollIndicator={false} alwaysBounceVertical={false}>
-        <View onLayout={measure(setTopH)}>{top}</View>
+        <View onLayout={measure(setTopH)}>
+          {top}
+          {!!pkTop && <View onLayout={measure(setPkH)}>{pkTop}</View>}
+        </View>
         {/* Centred when the stage is taller than they are (the chat out of sight); measured as they are, not as the room around them. */}
         <View style={{ flexGrow: 1, justifyContent: 'center' }}>
           <View onLayout={measure(setDrawn)}>{seatsNode}</View>

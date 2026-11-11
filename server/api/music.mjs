@@ -27,7 +27,8 @@
 import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { mayKeepMusic, removeFiles, verifyUpload } from './media.mjs';
 // rooms.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
-import { ROOM_MAX_LEVEL, pushRoomMeta, roomLevel } from './rooms.mjs';
+import { announceRoom } from './live.mjs';
+import { ROOM_MAX_LEVEL, liveKitName, pushRoomMeta, roomLevel } from './rooms.mjs';
 
 /** DJs a room may have at each level (app data/catalog ROOM_LIMITS djs): 3, rising at the admins' rate. */
 export const DJ_LIMITS = [3, 3, 3, 3, 3, 4, 5, 7, 8, 9, 10, 12, 14, 16, 18];
@@ -237,6 +238,8 @@ export const musicRoutes = {
     if (typeof b.dj !== 'boolean') throw new HttpError(400, 'DJ açık ya da kapalı olmalı');
     if (!b.dj) {
       await db.query('DELETE FROM room_djs WHERE room_id = $1 AND user_id = $2', [room.id, target]);
+      // The phones in the room read who plays music again at once (rooms.mjs does the same for admins).
+      announceRoom(liveKitName(room.id));
       return { dj: false };
     }
     if (!(await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [target])).rowCount) throw new HttpError(404, 'Kullanıcı bulunamadı');
@@ -251,6 +254,7 @@ export const musicRoutes = {
       return true;
     });
     if (!done) throw new HttpError(409, `Bu seviyedeki odada en fazla ${max} DJ olabilir`);
+    announceRoom(liveKitName(room.id));
     return { dj: true };
   },
 };

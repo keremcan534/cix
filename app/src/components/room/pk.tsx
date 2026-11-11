@@ -375,41 +375,23 @@ function TeamPreview({ red, blue, names, colors: c }: { red: string[]; blue: str
 // --- Live boards ----------------------------------------------------------------------------------
 const teamLabel = (pk: PkSession, t: PkTeam, viewerRoomId: string) => (pk.kind === 'cross' ? (t.roomId === viewerRoomId ? `${roomTitle(t.roomId)} (biz)` : roomTitle(t.roomId)) : t.name);
 
-/** Normal PK: the live top 3 with points; the full ranking is in the detail card. */
+/** Normal PK: one slim line (name, clock) so the stage stays as it is; points are under the names, the ranking in the detail card. */
 export function SoloBoard({ pk, canManage }: { pk: PkSession; canManage: boolean }) {
   const now = useNow(pk.status !== 'done' && pk.status !== 'cancelled');
   const [open, setOpen] = useState(false);
-  const ranking = liveRanking(pk);
-  const top = ranking.filter((r) => r.points > 0).slice(0, 3);
   return (
     <>
-      <Pressable style={st.board} onPress={() => setOpen(true)} accessibilityLabel={`Normal PK, ${clockText(pk, now)}. Sıralamayı aç`}>
-        <View style={st.boardTop}>
-          <View style={[st.artRow, { flex: 1 }]}>
-            <Art name="pk-normal-pk" size={17} />
-            <Text style={[st.teamName, { color: colors.gold }]}>Normal PK</Text>
-          </View>
-          <View style={st.timer}>
-            <Text style={st.timerText}>{clockText(pk, now)}</Text>
-          </View>
-          <Text style={[st.dim, { flex: 1, textAlign: 'right' }]}>{pk.participants.length} kişi ›</Text>
+      <Pressable style={st.soloBar} onPress={() => setOpen(true)} accessibilityLabel={`Normal PK, ${clockText(pk, now)}. Sıralamayı aç`}>
+        <View style={[st.artRow, { flex: 1 }]}>
+          <Art name="pk-normal-pk" size={16} />
+          <Text style={[st.teamName, { color: colors.gold }]} numberOfLines={1}>
+            Normal PK
+          </Text>
         </View>
-        <View style={st.soloRow}>
-          {top.length === 0 ? (
-            <Text style={st.dim}>{pk.status === 'active' ? 'Henüz puan yok · mikrofondakilere hediye gönder' : 'Hazırlanıyor · hediyeler PK başlayınca sayılır'}</Text>
-          ) : (
-            top.map((r, i) => (
-              <View key={r.userId} style={st.soloChip}>
-                <Art name={(['derece-1', 'derece-2', 'derece-3'] as const)[i]} size={15} />
-                <Photo uri={userById(r.userId).avatar} kind="face" style={st.mini} />
-                <Text style={st.soloName} numberOfLines={1}>
-                  {nameOf(r.userId)}
-                </Text>
-                <Text style={st.soloPts}>{fmt(r.points)}</Text>
-              </View>
-            ))
-          )}
+        <View style={st.timer}>
+          <Text style={st.timerText}>{clockText(pk, now)}</Text>
         </View>
+        <Text style={st.dim}>Sıralama ›</Text>
       </Pressable>
       <PkDetail pk={pk} open={open} onClose={() => setOpen(false)} viewerRoomId={pk.roomId} canManage={canManage} />
     </>
@@ -752,10 +734,7 @@ const st = StyleSheet.create({
   track: { flexDirection: 'row', height: 22, borderRadius: 11, overflow: 'hidden' },
   score: { color: '#fff', fontWeight: '900', fontSize: 12, fontVariant: ['tabular-nums'] },
   boardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  soloRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  soloChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.cardAlt, borderRadius: 999, paddingRight: 8, paddingLeft: 4, paddingVertical: 2, maxWidth: '32%' },
-  soloName: { color: colors.text, fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  soloPts: { color: colors.gold, fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  soloBar: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, maxWidth: 340, width: '86%', backgroundColor: 'rgba(8,15,30,0.72)', borderRadius: 999, paddingVertical: 5, paddingLeft: 10, paddingRight: 12, borderWidth: 1, borderColor: colors.border },
   mini: { width: 20, height: 20, borderRadius: 10, marginRight: -4, borderWidth: 1, borderColor: colors.bg },
   arena: { marginHorizontal: 12, marginTop: 6, backgroundColor: 'rgba(8,15,30,0.78)', borderRadius: 16, padding: 8, gap: 8, borderWidth: 1, borderColor: colors.border },
   half: { flex: 1, minWidth: 0, borderRadius: 14, borderWidth: 1, paddingVertical: 6, paddingHorizontal: 4, gap: 6 },

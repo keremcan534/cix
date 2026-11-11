@@ -249,7 +249,10 @@ describe('Düzen ve mikrofon kuyruğu herkese oda bilgisiyle gider', () => {
     a = await signUp('Elini Kaldıran');
     b = await signUp('İkinci El');
     room = await openRoom(owner);
+    // Naming an admin tells the room too (sent without waiting): let it land before the tests count packets.
+    const from = lkCalls.length;
     await call('POST', '/api/rooms/admin', { room, user: adm.user.id }, owner.session);
+    await until(() => callsOf('SendData', from).length === 1);
   });
   const lastMeta = (from) => JSON.parse(callsOf('UpdateRoomMetadata', from).at(-1).body.metadata);
 
@@ -343,5 +346,42 @@ describe('Odada hediye duyurusu', () => {
     assert.ok(Date.now() - t0 < 2000, 'yavaş LiveKit hediyeyi bekletmez');
     delete lkMode.SendData;
     assert.equal((await call('GET', '/api/me', null, sender.session))[1].user.coins, before - 400, 'iki hediye de ödendi');
+  });
+});
+
+describe('Yetki değişince odaya haber gider', () => {
+  /** The "read the room again" packets sent to this room. */
+  const roomNews = (room, from) =>
+    callsOf('SendData', from).filter((c) => c.body.room === `oda-${room}` && JSON.parse(Buffer.from(c.body.data, 'base64').toString('utf8')).type === 'room');
+
+  test('yönetici, DJ ve çıkarma: her biri odadaki telefonlara anında bildirilir', async () => {
+    const owner = await signUp('Haberci Sahip');
+    const who = await signUp('Haberci Üye');
+    const room = await openRoom(owner);
+    const steps = [
+      ['yönetici verildi', '/api/rooms/admin', { room, user: who.user.id }],
+      ['süper yönetici', '/api/rooms/admin', { room, user: who.user.id, super: true }],
+      ['yöneticilik alındı', '/api/rooms/admin', { room, user: who.user.id, admin: false }],
+      ['DJ yapıldı', '/api/rooms/dj', { room, user: who.user.id, dj: true }],
+      ['DJ alındı', '/api/rooms/dj', { room, user: who.user.id, dj: false }],
+      ['odadan çıkarıldı', '/api/rooms/ban', { room, user: who.user.id, minutes: 5 }],
+      ['yasak kalktı', '/api/rooms/unban', { room, user: who.user.id }],
+    ];
+    for (const [name, path, body] of steps) {
+      const from = lkCalls.length;
+      const [st, j] = await call('POST', path, body, owner.session);
+      assert.equal(st, 200, `${name}: ${j.error}`);
+      assert.ok(await until(() => roomNews(room, from).length === 1), `${name}: oda paketi gitmedi`);
+    }
+  });
+
+  test('reddedilen istek haber göndermez', async () => {
+    const owner = await signUp('Haberci Sahip 2');
+    const other = await signUp('Haberci Yabancı');
+    const room = await openRoom(owner);
+    const from = lkCalls.length;
+    assert.equal((await call('POST', '/api/rooms/admin', { room, user: owner.user.id }, other.session))[0], 403);
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(roomNews(room, from).length, 0);
   });
 });
