@@ -1144,7 +1144,7 @@ export function BossSeat({
               <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
             </View>
           )}
-          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
+          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
         </LinearGradient>
         </View>
         <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
@@ -1162,7 +1162,7 @@ export function BossSeat({
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
-        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
+        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
       </LinearGradient>
       </View>
       <Text style={styles.bossTag}>PATRON</Text>

@@ -1,6 +1,7 @@
 // Stickers: one PNG per sticker of the sticker packs (data/catalog STICKER_PACKS), custom-drawn at 192 px
-// (docs/GORSEL_URETIM_LISTESI.md §3), and the free Duygular, Müzik and Hamle packs: Google's Animated Noto Emoji as
-// Lottie animations (CC BY 4.0), played by components/lottie-sticker. Stickers are what the packs sell; standard Unicode emoji are
+// (docs/GORSEL_URETIM_LISTESI.md §3), and the free Duygular, Müzik and Hamle packs (the emoji panel's Emoji tab):
+// Google's Animated Noto Emoji as Lottie animations (CC BY 4.0), played by components/lottie-sticker. The dice's faces
+// on a mic are the die pictures the games use (assets/art). Stickers are what the packs sell; standard Unicode emoji are
 // free and always drawn as text. A sticker travels as a token (lib/stickers), so typing an emoji
 // never shows a paid sticker. Two files are duplicates and not wired: tepki-eglence-yerlere-yattim
 // (= temel-kahkaha) and tepki-vip-kristal (= vip-elmas).
@@ -11,7 +12,7 @@ import { LottieSticker, type StickerPlay } from '@/components/lottie-sticker';
 import { stickerById } from '@/data/catalog';
 import { bigEmojiSize, emojiOnlyCount, emojiRuns } from '@/lib/emoji-text';
 import { mentionRuns } from '@/lib/room-mention';
-import { MOVE_ART } from '@/lib/room-moves';
+import { MIRRORED_ART, MOVE_ART } from '@/lib/room-moves';
 import { stickerIdOf, stickersOf as matchStickers, stickerText } from '@/lib/stickers';
 import { colors, fonts } from '@/theme';
 
@@ -66,6 +67,13 @@ const SRC: Record<string, number> = {
   'animasyonlu-disko-topu': require('../../assets/reactions/tepki-animasyonlu-disko-topu.png'),
   'oda-alkis': require('../../assets/reactions/tepki-oda-alkis.png'),
   'oda-saskin': require('../../assets/reactions/tepki-oda-saskin.png'),
+  // The face a Hamle die landed on (lib/room-moves diceFace).
+  'hamle-zar-1': require('../../assets/art/zar-zar-yuzu-1.png'),
+  'hamle-zar-2': require('../../assets/art/zar-zar-yuzu-2.png'),
+  'hamle-zar-3': require('../../assets/art/zar-zar-yuzu-3.png'),
+  'hamle-zar-4': require('../../assets/art/zar-zar-yuzu-4.png'),
+  'hamle-zar-5': require('../../assets/art/zar-zar-yuzu-5.png'),
+  'hamle-zar-6': require('../../assets/art/zar-zar-yuzu-6.png'),
 };
 
 /** The animated stickers (Duygular): each animation is read only when it is first drawn (it is code-sized data). */
@@ -122,16 +130,16 @@ const ANIM: Record<string, () => object> = {
   'hamle-makas': () => require('../../assets/reactions/duygu/hamle-makas.json'),
   'hamle-carpma': () => require('../../assets/reactions/duygu/hamle-carpma.json'),
   'hamle-opucuk': () => require('../../assets/reactions/duygu/hamle-opucuk.json'),
-  // Hamle picks that share a result's art: the kiss to either side, and Taş Kağıt Makas shown by its fist.
-  'hamle-opucuk-sol': () => require('../../assets/reactions/duygu/hamle-opucuk.json'),
-  'hamle-opucuk-sag': () => require('../../assets/reactions/duygu/hamle-opucuk.json'),
+  // Hamle picks that share another sticker's art: the kiss to either side is the blowing kiss (the left one drawn
+  // turned round, lib/room-moves MIRRORED_ART), in the panel and on the mic alike; Taş Kağıt Makas shows its fist.
+  'hamle-opucuk-sol': () => require('../../assets/reactions/duygu/duygu-opucuk.json'),
+  'hamle-opucuk-sag': () => require('../../assets/reactions/duygu/duygu-opucuk.json'),
   'hamle-tkm': () => require('../../assets/reactions/duygu/hamle-tas.json'),
 };
 /** Whether a sticker moves (an animation, not a picture). */
 export const isAnimatedSticker = (id: string) => id in ANIM;
 
 export const REACTION_TAB_ANIMATED = require('../../assets/reactions/tepki-sekme-hareketli.png');
-export const REACTION_TAB_RECENT = require('../../assets/reactions/tepki-sekme-son-kullanilanlar.png');
 export const EMOJI_PACKS_ICON = require('../../assets/reactions/magaza-emoji-paketleri.png');
 
 export const stickerArtOf = (id: string): number | undefined => SRC[id];
@@ -144,8 +152,19 @@ export const messagePreview = (text: string) => stickerText(text, (id) => sticke
 
 export type { StickerPlay };
 
-/** A sticker by id. */
+/** A sticker by id. One drawn facing the other way (the kiss to the left) is turned round here, wherever it shows. */
 export function StickerArt({ id, size, play = 'still' }: { id: string; size: number; play?: StickerPlay }) {
+  if (MIRRORED_ART.has(id)) {
+    return (
+      <View style={{ transform: [{ scaleX: -1 }] }}>
+        <StickerFace id={id} size={size} play={play} />
+      </View>
+    );
+  }
+  return <StickerFace id={id} size={size} play={play} />;
+}
+
+function StickerFace({ id, size, play }: { id: string; size: number; play: StickerPlay }) {
   const src = SRC[id];
   // A catalog sticker, or one of the pictures a Hamle plays (lib/room-moves).
   const sticker = stickerById(id) ?? MOVE_ART[id];

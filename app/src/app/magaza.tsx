@@ -78,7 +78,7 @@ export default function StoreScreen() {
       <ScrollView contentContainerStyle={styles.grid}>
         {tab === 'emoji' && <Text style={styles.freeNote}>Standart emojiler herkese ücretsiz. Buradaki paketler özel çizim çıkartmalardır.</Text>}
         {tab === 'emoji'
-          ? STICKER_PACKS.filter((p) => !p.roomOnly).map((p, i) => {
+          ? STICKER_PACKS.filter((p) => !p.roomOnly && !p.retired).map((p, i) => {
               const owned = packUnlocked(p.id);
               const hue = hueAt(i + 2);
               return (
