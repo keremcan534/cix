@@ -44,7 +44,7 @@ import {
 import { saveRoom } from '@/lib/room-session-persist';
 import { showAlert } from '@/lib/alert';
 import { closeServerRoom, isMyServerRoom, message as errorText } from '@/lib/live';
-import { colors, radius, semantic, space, type } from '@/theme';
+import { SCRIM, colors, edge, radius, semantic, space, type } from '@/theme';
 import { Photo } from '@/components/photo';
 
 // --- Navigation helpers -----------------------------------------------------------------------------
@@ -355,7 +355,7 @@ export function EndedDialog({ session }: { session: RoomSession }) {
   const { title, body } = endedText(session);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={dismissEnded}>
-      <View style={s.center}>
+      <View style={s.centerDim}>
         <View style={s.dialog} accessibilityViewIsModal>
           <Ionicons name={kicked ? 'remove-circle' : 'radio'} size={28} color={semantic.danger} />
           <Text style={s.dialogTitle}>{title}</Text>
@@ -522,9 +522,9 @@ export function SessionTestSheet({ visible, session, onClose, onKickMe }: { visi
 
 const shadow = { shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 10 };
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.6)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.xl, gap: space.md, borderTopWidth: 1, borderColor: colors.border },
-  sheetTop: { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTopWidth: 0, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl, borderBottomWidth: 1, paddingBottom: space.md },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.xl, gap: space.md, ...edge.sheet },
+  sheetTop: { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTopWidth: 0, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl, borderBottomWidth: 1, boxShadow: '0 10px 30px rgba(0,0,0,0.45)', paddingBottom: space.md },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheetTitle: { color: colors.text, fontWeight: '900', fontSize: type.title, textAlign: 'center', marginVertical: space.xs },
   choice: { flexDirection: 'row', alignItems: 'center', gap: space.md, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: space.md, minHeight: 64 },
@@ -550,8 +550,10 @@ const s = StyleSheet.create({
   edge: { position: 'absolute', right: 0, width: 40, paddingVertical: 6, paddingLeft: 6, borderTopLeftRadius: radius.md, borderBottomLeftRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderRightWidth: 0, borderColor: colors.border, zIndex: 50, ...shadow },
   edgeCover: { width: 28, height: 28, borderRadius: radius.sm },
   edgeDot: { position: 'absolute', right: 4, top: 4, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: colors.card },
-  center: { flex: 1, backgroundColor: 'rgba(8,15,30,0.7)', alignItems: 'center', justifyContent: 'center', padding: space.xl },
-  dialog: { width: '100%', maxWidth: 360, backgroundColor: colors.card, borderRadius: radius.xl, padding: space.xl, gap: space.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  center: { flex: 1, backgroundColor: SCRIM, alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  // The room ended under me (closed, or I was removed): a notice that stops everything, so it keeps a veil.
+  centerDim: { flex: 1, backgroundColor: 'rgba(8,15,30,0.7)', alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  dialog: { width: '100%', maxWidth: 360, backgroundColor: colors.card, borderRadius: radius.xl, padding: space.xl, gap: space.md, alignItems: 'center', ...edge.card },
   dialogTitle: { color: colors.text, fontWeight: '900', fontSize: type.title, textAlign: 'center' },
   dialogText: { color: colors.textDim, fontSize: type.body, lineHeight: 20, textAlign: 'center' },
   dialogBtn: { alignSelf: 'stretch', alignItems: 'center', borderRadius: radius.pill, paddingVertical: space.md, backgroundColor: colors.cardAlt },

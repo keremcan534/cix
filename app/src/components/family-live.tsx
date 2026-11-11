@@ -26,7 +26,7 @@ import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { applyServerUser, message, myServerId, once } from '@/lib/live';
 import * as fam from '@/lib/live/family';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const themeOf = (id: string) => KABILE_THEMES.find((t) => t.id === id) ?? KABILE_THEMES[0];
@@ -888,7 +888,7 @@ export function LiveFamilyChat() {
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic }) => ({
+const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.text, fontWeight: '700', fontSize: 16 },
   big: { color: colors.text, fontWeight: '800', fontSize: 20 },
@@ -918,8 +918,8 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 28, gap: 8 },
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 28, gap: 8, ...edge.sheet },
   quick: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 6 },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.card },
   onBand: { color: '#fff' },

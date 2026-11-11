@@ -15,7 +15,7 @@ import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { contactRefusal } from '@/lib/contact-filter';
 import { fmtD, fmtPct, fmtScore, fmtUsd, usdOf, type Loaded, type Tier } from '@/lib/agency-net';
-import { colors, fonts, radius, semantic, space } from '@/theme';
+import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 export const SERIES = { own: '#0A9FA5', parent: '#C27F1C', rest: '#33445F' } as const;
@@ -435,8 +435,8 @@ const s = StyleSheet.create({
   line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.md, paddingVertical: 2 },
   lineLabel: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
   lineValue: { color: colors.text, fontSize: 13.5, fontWeight: '600', fontVariant: ['tabular-nums'], textAlign: 'right' },
-  sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(4,8,18,0.6)' },
-  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: SCRIM },
+  sheet: { margin: space.md, padding: space.xl, gap: space.lg, borderRadius: radius.xl, ...edge.card },
   sheetTitle: { color: '#fff', fontSize: 19, fontFamily: fonts.display },
   sheetMsg: { color: colors.textDim, fontSize: 14, lineHeight: 20 },
   fieldLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700' },

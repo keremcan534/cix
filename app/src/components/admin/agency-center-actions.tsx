@@ -17,7 +17,7 @@ import { centerNet, errorText, runAction, type TreeNode } from '@/lib/agency-net
 import { showAlert } from '@/lib/alert';
 import { ApiError } from '@/lib/api';
 import { sanctionSearch } from '@/lib/live/admin';
-import { colors, fonts, radius, semantic, space } from '@/theme';
+import { SCRIM, colors, edge, fonts, radius, semantic, space } from '@/theme';
 
 type Person = { id: string; name: string; sub?: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -230,13 +230,14 @@ const st = StyleSheet.create({
   wrap: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(4,8,18,0.6)',
+    backgroundColor: SCRIM,
   },
   sheet: {
     margin: space.md,
     padding: space.xl,
     borderRadius: radius.xl,
     maxHeight: '88%',
+    ...edge.card,
   },
   title: { color: '#fff', fontSize: 19, fontFamily: fonts.display },
   label: { color: colors.textDim, fontSize: 12, fontWeight: '700' },

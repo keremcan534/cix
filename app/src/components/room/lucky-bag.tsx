@@ -20,7 +20,7 @@ import * as api from '@/lib/api';
 import { message } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { bagResult, dropBag, type Bag, type BagDrop, type BagGot, type BagGrab, type BagRules } from '@/lib/live/lucky-bags';
-import { colors } from '@/theme';
+import { SCRIM, colors } from '@/theme';
 import { RollingNumber } from '@/components/fx/rolling-number';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -513,7 +513,7 @@ export function LuckyBagCard({ bag: first, now, outcome, onClose, onJoin }: { ba
 
 const GOLD = colors.gold;
 const s = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  scrim: { flex: 1, backgroundColor: SCRIM },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
   sheet: { maxHeight: '88%' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },

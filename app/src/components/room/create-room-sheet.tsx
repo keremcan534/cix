@@ -12,7 +12,7 @@ import { ROOM_TYPES, type RoomType } from '@/data/catalog';
 import type { Room } from '@/data/mock';
 import { message, openServerRoom } from '@/lib/live';
 import { ROOM_FORM, roomFormError } from '@/lib/live/room-form';
-import { makeStyles, radius, space } from '@/theme';
+import { SCRIM, makeStyles, radius, space } from '@/theme';
 
 export function CreateRoomSheet({ visible, onClose, onCreated }: { visible: boolean; onClose: () => void; onCreated: (room: Room) => void }) {
   const s = useStyles();
@@ -111,11 +111,11 @@ export function CreateRoomSheet({ visible, onClose, onCreated }: { visible: bool
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic }) => ({
+const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   dim: { color: colors.textDim },
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: SCRIM },
   wrap: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md, maxHeight: '90%' },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.md, maxHeight: '90%', ...edge.sheet },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   title: { color: colors.text, fontSize: 18, fontWeight: '800' },
   field: { gap: 6 },

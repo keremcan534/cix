@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
-import { makeStyles, radius, space, type, useTheme } from '@/theme';
+import { SCRIM, makeStyles, radius, space, type, useTheme } from '@/theme';
 import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 export type ListedPerson = { id: string; name: string; avatarUrl?: string | null };
@@ -120,9 +120,9 @@ export function FollowListSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { maxHeight: '80%', minHeight: 240, backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg },
+const useStyles = makeStyles(({ colors, edge }) => ({
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { maxHeight: '80%', minHeight: 240, backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg, ...edge.sheet },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md },
   title: { color: colors.text, fontSize: type.title, fontWeight: '800' },
   note: { color: colors.textDim, fontSize: type.caption },

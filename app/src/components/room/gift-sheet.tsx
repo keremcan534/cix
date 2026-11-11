@@ -29,7 +29,7 @@ import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
-import { colors, radius, semantic, space, type } from '@/theme';
+import { SCRIM, colors, edge, radius, semantic, space, type } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
@@ -617,8 +617,8 @@ function GiftTile({
 }
 
 const g = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(8,4,18,0.45)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, maxHeight: '82%' },
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, maxHeight: '82%', ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: space.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
   title: { color: colors.text, fontSize: type.title, fontWeight: '800' },

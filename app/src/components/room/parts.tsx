@@ -13,7 +13,7 @@ import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
 import { stickerIdOf } from '@/lib/stickers';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
-import { colors, fonts, semantic } from '@/theme';
+import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
@@ -605,8 +605,11 @@ export function useSheetBottom(min = 34) {
   return Math.max(min, bottom + 8);
 }
 
+/** A room sheet over the stage: `scrim` is the clear tap-outside-to-close area above it (no grey veil: SCRIM), the
+ *  sheet itself stands out by its lit top edge and shadow (edge.sheet). */
 export const roomStyles = StyleSheet.create({
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 -10px 30px rgba(0,0,0,0.45)' },
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 10 },
 });
 

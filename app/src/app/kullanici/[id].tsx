@@ -58,7 +58,7 @@ import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 import { Art } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
@@ -1735,7 +1735,7 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
 }
 
 
-const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
+const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   cover: { width: '100%', height: 240, backgroundColor: colors.card },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26, paddingHorizontal: 16, paddingBottom: 6 },
   avatarWrap: { marginTop: -48, alignSelf: 'flex-start', borderRadius: 60, borderWidth: 3, borderColor: colors.bg },
@@ -1852,8 +1852,8 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   followText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   followingText: { color: colors.text },
   roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...lift },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34 },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, ...edge.sheet },
   modalTitle: { color: colors.text, fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
   inputLabel: { color: colors.textDim, fontSize: 13, fontWeight: '700', marginTop: 10, marginBottom: 6 },
   input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },

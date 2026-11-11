@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { tapHaptic } from '@/lib/haptics';
+import { SCRIM, edge } from '@/theme';
 
 /** The same two notes under every Oyun Salonu game. */
 export const GAME_BALANCE_NOTE = 'Kazançlar oyun bakiyesine yazılır; bahisler önce oradan düşer. Oyun bakiyesi yalnızca oyunlarda kullanılır, hediye edilemez ve paraya çevrilemez.';
@@ -63,8 +64,8 @@ export function InfoButton({ onPress, tint = 'rgba(255,255,255,0.55)' }: { onPre
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(3,6,18,0.6)' },
-  sheet: { maxHeight: '78%', backgroundColor: '#111A30', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 8, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { maxHeight: '78%', backgroundColor: '#111A30', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 8, ...edge.sheet },
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', marginBottom: 8 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '900' },
