@@ -4,7 +4,7 @@
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -26,6 +26,7 @@ import { LiveTable, isTableGame } from '@/components/games/room-tables';
 import type { CasinoGame } from '@/data/games';
 import { isBoard, isLineSlot } from '@/lib/casino-odds';
 import { casinoVisible, gamblingLevelOk, isPracticeBot, useGames, type Entry } from '@/lib/games';
+import { playSfx, setGameVolume } from '@/lib/game-sound';
 import { isLiveRoom } from '@/lib/live';
 import { refreshCasino } from '@/lib/live/casino';
 import { useApp } from '@/store';
@@ -91,6 +92,8 @@ export function GamePanel({
 }) {
   const { settings, setSetting, wealthLevel } = useApp();
   const { roomGames, casino } = useGames();
+  // The other games and the sound level stay behind two buttons in the header: the game has the screen to itself.
+  const [tools, setTools] = useState<'games' | 'sound' | null>(null);
   const inRoom = entry.from === 'room';
   // A server room plays its free games at the server's table (Ludo, Renk Kartları, XOX); Okey stays out of it there.
   const tables = entry.from === 'room' && isLiveRoom(entry.roomId);
@@ -121,6 +124,12 @@ export function GamePanel({
           {title}
           {casinoGame || wheel ? <Text style={p.badge}> Cömertlik Lv.{casinoGame?.minWealth ?? 2}</Text> : <Text style={p.free}> Ücretsiz</Text>}
         </Text>
+        <Pressable onPress={() => setTools((t) => (t === 'games' ? null : 'games'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Başka oyuna geç" accessibilityState={{ expanded: tools === 'games' }}>
+          <Ionicons name="grid-outline" size={21} color={tools === 'games' ? semantic.action : colors.textDim} />
+        </Pressable>
+        <Pressable onPress={() => setTools((t) => (t === 'sound' ? null : 'sound'))} hitSlop={8} accessibilityRole="button" accessibilityLabel="Oyun sesi" accessibilityState={{ expanded: tools === 'sound' }}>
+          <Ionicons name={settings.gameVolume === 0 ? 'volume-mute-outline' : 'volume-medium-outline'} size={23} color={tools === 'sound' ? semantic.action : colors.textDim} />
+        </Pressable>
         {onMinimize && (
           <Pressable onPress={onMinimize} hitSlop={8} accessibilityLabel="Oyunu küçült">
             <Ionicons name="chevron-down" size={24} color={colors.textDim} />
@@ -145,15 +154,46 @@ export function GamePanel({
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-        {switchable.map((s) => (
-          <Pressable key={s.key} onPress={() => onSwitch(s.go)} style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]} accessibilityLabel={`${s.name} oyununa geç`}>
-            {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
-            {s.key === 'w' && <Ionicons name="compass" size={15} color={colors.gold} />}
-            <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      {tools === 'games' && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+          {switchable.map((s) => (
+            <Pressable
+              key={s.key}
+              onPress={() => {
+                setTools(null);
+                onSwitch(s.go);
+              }}
+              style={[p.chip, { flexDirection: 'row', alignItems: 'center', gap: 4 }, s.key === current && p.chipOn]}
+              accessibilityLabel={`${s.name} oyununa geç`}
+            >
+              {s.art && <Image source={s.art} style={{ width: 16, height: 16 }} />}
+              {s.key === 'w' && <Ionicons name="compass" size={15} color={colors.gold} />}
+              <Text style={p.chipText}>{s.art || !s.emoji ? s.name : `${s.emoji} ${s.name}`}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      {tools === 'sound' && (
+        <View style={p.volume}>
+          <Text style={p.dim}>Oyun sesi</Text>
+          {VOLUMES.map(([v, l]) => (
+            <Pressable
+              key={l}
+              onPress={() => {
+                setSetting('gameVolume', v);
+                // Heard at the level just picked.
+                setGameVolume(v);
+                playSfx('coin');
+              }}
+              style={[p.vol, settings.gameVolume === v && p.chipOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: settings.gameVolume === v }}
+            >
+              <Text style={p.volText}>{l}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={{ paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
         {roomGame &&
@@ -181,15 +221,6 @@ export function GamePanel({
           ))}
         {casinoGame && casinoVisible(wealthLevel) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
         {wheel && gamblingLevelOk(wealthLevel) && <WheelPlayer entry={entry} />}
-        <View style={p.volume}>
-          <Text style={p.dim}>Oyun sesi</Text>
-          {VOLUMES.map(([v, l]) => (
-            <Pressable key={l} onPress={() => setSetting('gameVolume', v)} style={[p.vol, settings.gameVolume === v && p.chipOn]}>
-              <Text style={p.volText}>{l}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={p.dim}>Oyun sesleri sohbet sesini kısmaz; ses seviyeleri ayrı ayarlanır.</Text>
       </ScrollView>
     </View>
   );
@@ -218,7 +249,7 @@ const p = StyleSheet.create({
   chipText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },
   invite: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.cardAlt, borderRadius: 999, paddingVertical: 10 },
-  volume: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
+  volume: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   vol: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 4 },
   volText: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
 });
