@@ -8,7 +8,9 @@ describe('Kazanç kademesi', () => {
   test('bahsin katına göre; tutara göre değil', () => {
     assert.equal(winTierOf(0, 1000), null);
     assert.equal(winTierOf(-5, 1000), null);
-    assert.equal(winTierOf(400, 1000), 'small', 'bahsin altında kalan ödeme de küçük kazançtır');
+    assert.equal(winTierOf(400, 1000), null, 'bahsin altında kalan ödeme kazanç değildir: kutlanmaz');
+    assert.equal(winTierOf(1000, 1000), null, 'bahsi geri almak da kazanç değildir');
+    assert.equal(winTierOf(1001, 1000), 'small');
     assert.equal(winTierOf(1000 * BIG_WIN_X - 1, 1000), 'small');
     assert.equal(winTierOf(1000 * BIG_WIN_X, 1000), 'big');
     assert.equal(winTierOf(250 * 15, 250), 'mega');

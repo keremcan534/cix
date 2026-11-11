@@ -269,7 +269,10 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     if (c.jackpotShare) sp.jackpotLines.forEach((l) => c.lines[l].forEach((row, reel) => cells.add(`${reel}-${row}`)));
     if (sp.scatters >= 3) sp.grid.forEach((col, reel) => col.forEach((x, row) => x === c.scatter && cells.add(`${reel}-${row}`)));
     setLit(cells);
-    if (cells.size && !still) {
+    const payout = r.row.payout;
+    // Less than the stake back is no win: the paying symbols are shown, but nothing beats, rings or rains.
+    const won = payout > bet || (!!c.jackpotShare && sp.jackpotLines.length > 0);
+    if (cells.size && won && !still) {
       beat.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulse, { toValue: 1, duration: 360, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
@@ -278,7 +281,6 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       );
       beat.current.start();
     }
-    const payout = r.row.payout;
     // Now the balance may show the win: it rolls up while the celebration runs.
     setHeld(null);
     if (c.jackpotShare && sp.jackpotLines.length) {
@@ -287,13 +289,14 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       await win.celebrate({ amount: payout, bet, jackpot: true, title: name });
       return { net: payout - bet, stop: 'JACKPOT kazandın' };
     }
-    if (payout > 0) {
+    if (won) {
       const prize = id === 'spellbook' && sp.scatters >= 3 ? ` · ${sp.scatters >= 5 ? 'MAJOR' : sp.scatters === 4 ? 'MINOR' : 'MINI'}` : '';
       setStatus({ text: `KAZANÇ +${fmt(payout)}${prize}`, tone: 'win' });
       const seen = win.celebrate({ amount: payout, bet });
       // Turbo doesn't stand still for a small win; everything bigger is watched to the end.
       if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
-    } else setStatus({ text: theme.status });
+    } else if (payout > 0) setStatus({ text: `ÖDEME ${fmt(payout)}` });
+    else setStatus({ text: theme.status });
     return { net: payout - bet, stop: payout >= bet * BIG_WIN ? 'büyük kazanç' : null };
   };
 

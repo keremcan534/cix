@@ -1,5 +1,6 @@
 // How big a round's win is, for its celebration (components/games/fx/win-fx): by how many stakes it paid, never by
-// the plain amount, so a small stake's big hit is celebrated like a big stake's. Pure, so it is unit tested.
+// the plain amount, so a small stake's big hit is celebrated like a big stake's; and only when it paid more than
+// the round cost. Pure, so it is unit tested.
 
 export type WinTier = 'small' | 'big' | 'mega' | 'epic' | 'jackpot';
 
@@ -8,9 +9,14 @@ export const BIG_WIN_X = 5;
 const MEGA_WIN_X = 15;
 const EPIC_WIN_X = 40;
 
+/**
+ * The celebration a round's payout gets, or null for none. A payout that is not more than the round cost is money
+ * back, not a win: it is shown plainly and never celebrated (no coins, no fanfare), in every game alike.
+ */
 export function winTierOf(amount: number, bet: number, jackpot = false): WinTier | null {
   if (!(amount > 0)) return null;
   if (jackpot) return 'jackpot';
+  if (bet > 0 && amount <= bet) return null;
   const x = bet > 0 ? amount / bet : 0;
   return x >= EPIC_WIN_X ? 'epic' : x >= MEGA_WIN_X ? 'mega' : x >= BIG_WIN_X ? 'big' : 'small';
 }
