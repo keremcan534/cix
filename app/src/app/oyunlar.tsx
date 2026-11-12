@@ -14,7 +14,7 @@ import { gameArtOf, gameHueOf } from '@/components/GameArt';
 import { BreakoutCard, FloatIcon, GlossButton } from '@/components/fx/float';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { SCENES } from '@/components/fx/scenes';
-import { Backdrop, DepthCard, glassChipOf } from '@/components/fx/surface';
+import { Backdrop, DepthCard, EdgeLight, Shine, glassChipOf } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
 import { GamePanel, type OpenGame } from '@/components/games/game-panel';
 import { Card, Header } from '@/components/ui';
@@ -104,10 +104,13 @@ export default function GameCenter() {
               </View>
             </DepthCard>
             <Pressable onPress={() => setOpen({ kind: 'wheel' })} accessibilityRole="button" accessibilityLabel="Rüzgâr Gülü aç">
+              {/* Dark and gold in both schemes, like the game's own stage: a gold rim, a light along the top, a slow shine. */}
               <LinearGradient colors={['#3B2300', '#16253C', '#0A3A4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.wheelCard}>
-                <View style={s.wheelBadge}>
+                <EdgeLight inset={22} strength={0.35} />
+                <Shine radius={22} every={5200} />
+                <LinearGradient colors={['#2A4470', '#080F1E']} style={s.wheelBadge}>
                   <Ionicons name="compass" size={54} color="#F6BD60" />
-                </View>
+                </LinearGradient>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.wheelTag}>YENİ · JACKPOT</Text>
                   <Text style={s.wheelName}>Rüzgâr Gülü</Text>
@@ -303,8 +306,8 @@ const useStyles = makeStyles((t) => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   amount: { fontWeight: '900', fontSize: 15 },
   // Rüzgâr Gülü's card is dark in both schemes, like the game itself.
-  wheelCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: 'rgba(246,189,96,0.45)', boxShadow: '0 8px 24px rgba(246,189,96,0.18)' },
-  wheelBadge: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: '#F6BD60', backgroundColor: '#080F1E', alignItems: 'center', justifyContent: 'center' },
+  wheelCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, borderWidth: 1.5, borderColor: 'rgba(246,189,96,0.7)', overflow: 'hidden', boxShadow: '0 10px 26px rgba(0,0,0,0.35), 0 0 22px rgba(246,189,96,0.22)' },
+  wheelBadge: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: '#F6BD60', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(0,0,0,0.5), 0 0 18px rgba(246,189,96,0.35)' },
   wheelTag: { color: '#FF8E9A', fontWeight: '900', fontSize: 11, letterSpacing: 1.2 },
   wheelName: { color: '#FFFFFF', fontFamily: fonts.display, fontSize: 24, lineHeight: 30 },
   wheelDim: { color: '#C7D2E5', fontSize: 12, lineHeight: 17 },

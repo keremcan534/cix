@@ -3,7 +3,6 @@
 // before anything moves; the board, the beam and the collected count only replay outcome.fener. What the stage is
 // made of is in fener-stage. Oto stops at Yıldız Yağmuru, a big win, the loss limit or any refusal.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
@@ -11,7 +10,9 @@ import { RollingNumber } from '@/components/fx/rolling-number';
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { Beam, BrightLadder, LIGHT, SKY, ShowerSky, SkyCell, TOWER, TOWER_GAP, Tower, fallOf, landedAt, starLook } from '@/components/games/fener-stage';
-import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet } from '@/components/games/fx/info-sheet';
+import { SalonArt } from '@/components/games/fx/salon-art';
+import { SalonStage, StageHeader, StageStatus, glowNumber, salonScreen, useBox, type StatusTone } from '@/components/games/fx/salon';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import { BRIGHTNESS, CARGO, COLS, FENER_MAX, ROWS, STORM_SPINS, STORM_TRIGGER, cargoLabel, type FCell, type FSpin } from '@/lib/fener-slot';
@@ -69,7 +70,9 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
   const [grid, setGrid] = useState<FCell[][]>(INITIAL);
   // Where the light has settled (rows and brightness); null while the board lands and the beam sweeps.
   const [lit, setLit] = useState<{ rows: number[]; brightness: number } | null>(null);
-  const [status, setStatus] = useState<{ text: string; tone?: 'win' | 'err' | 'bonus' }>({ text: 'Işığın durduğu sıradaki yıldızlar toplanır' });
+  const [status, setStatus] = useState<{ text: string; tone?: StatusTone; amount?: number }>({ text: 'Işığın durduğu sıradaki yıldızlar toplanır' });
+  // Each win sends a shine across the stage.
+  const [shine, setShine] = useState(0);
   // Yıldız Yağmuru's spin being played (0 while it starts); null outside it.
   const [storm, setStorm] = useState<number | null>(null);
   // What has been collected at the tower in this round so far (coins).
@@ -78,7 +81,8 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
   const [turbo, setTurbo] = useState(false);
   const [auto, setAuto] = useState<number | null>(null);
   const [info, setInfo] = useState(false);
-  const [boardW, setBoardW] = useState(0);
+  // The sky takes the stage's free height: the rows grow with it.
+  const area = useBox();
   // While a round is replayed the pill shows the balance with the stake taken; the win joins it when it is seen.
   const [held, setHeld] = useState<number | null>(null);
   const [drop] = useState(() => new Animated.Value(1));
@@ -92,7 +96,6 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
   const [flash] = useState(() => new Animated.Value(0));
   const [meteors] = useState(() => new Animated.Value(0));
   const [title] = useState(() => new Animated.Value(0));
-  const [turn] = useState(() => new Animated.Value(0));
   const [sails] = useState(() => Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => new Animated.Value(0))));
   const [falls] = useState(() => Array.from({ length: COLS }, (_, c) => fallOf(drop, c)));
   const win = useWinFx();
@@ -117,23 +120,16 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
       falling.current?.stop();
     };
   }, []);
-  // The spin button's arrows turn while a round runs.
-  useEffect(() => {
-    if (!busy || calm) return;
-    const a = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }));
-    a.start();
-    return () => {
-      a.stop();
-      turn.setValue(0);
-    };
-  }, [busy, calm, turn]);
-
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
-  const room = entry.from === 'room';
+  // The board's inner width (its padding off), a column's width, and a row as tall as the free height allows, never
+  // more than twice a column (a star keeps room round it).
+  const boardW = area.w ? area.w - 12 : 0;
   const cellW = boardW ? Math.floor((boardW - TOWER - TOWER_GAP) / COLS) : 0;
-  const rowH = Math.min(room ? 46 : 56, cellW);
+  const rowH = cellW && area.h ? Math.max(40, Math.min(Math.round(cellW * 1.9), Math.floor((area.h - 12 - (ROWS - 1) * GAP) / ROWS))) : 0;
+  // The stars grow with the sky.
+  const starScale = rowH ? Math.max(0.85, Math.min(1.75, Math.min(cellW * 1.35, rowH) / 54)) : 1;
   const native = { useNativeDriver: true };
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(() => alive.current && fn(), ms));
 
@@ -294,7 +290,9 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
     setHeld(null);
     setCollected(payout);
     if (payout > 0) {
-      setStatus({ text: `Toplanan yıldızlar +${fmt(payout)}${round.capped ? ' · en yüksek kazanç' : ''}`, tone: payout > bet ? 'win' : undefined });
+      const gain = payout > bet;
+      setStatus({ text: `Toplanan yıldızlar +${fmt(payout)}${round.capped ? ' · en yüksek kazanç' : ''}`, tone: gain ? 'win' : undefined, amount: gain ? payout : undefined });
+      if (gain) setShine((x) => x + 1);
       const seen = win.celebrate({ amount: payout, bet });
       // Turbo doesn't stand still for a small win; everything bigger is watched to the end.
       if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
@@ -349,35 +347,30 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
   const boardH = ROWS * rowH + (ROWS - 1) * GAP;
 
   return (
-    <View style={{ gap: 10 }}>
-      <LinearGradient colors={['#1E2257', '#10153A', '#060918']} style={f.stage}>
+    <View style={salonScreen}>
+      <SalonStage colors={['#1D3060', '#0F1B40', '#060A1C']} accent={LIGHT} win={shine} minHeight={330}>
         {/* The night sky behind the title: a few stars. */}
         {[
           [0.48, 10],
           [0.58, 26],
           [0.66, 8],
           [0.36, 30],
+          [0.8, 16],
         ].map(([x, y], i) => (
           <View key={i} style={[f.star, { left: `${x * 100}%`, top: y }]} pointerEvents="none" />
         ))}
-        <View style={f.head}>
-          <View style={{ flex: 1 }}>
-            <Text style={f.title} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header">
-              YILDIZ AVI
-            </Text>
-            <Text style={[f.kicker, stormy && { color: LIGHT }]}>{stormy ? (storm ? `YILDIZ YAĞMURU · ${storm}/${STORM_SPINS}` : 'YILDIZ YAĞMURU') : 'IŞIK HUZMESİ'}</Text>
-          </View>
-          <InfoButton onPress={() => setInfo(true)} tint={LIGHT} />
-        </View>
+        <StageHeader title="YILDIZ AVI" ink={LIGHT} kicker={stormy ? (storm ? `YILDIZ YAĞMURU · ${storm}/${STORM_SPINS}` : 'YILDIZ YAĞMURU') : 'IŞIK HUZMESİ · 5 × 4 GÖKYÜZÜ'} kickerInk={stormy ? LIGHT : SKY} onInfo={() => setInfo(true)} />
 
-        <View style={[f.board, { height: boardH + 12 }]} onLayout={(e) => setBoardW(Math.round(e.nativeEvent.layout.width) - 12)} accessibilityLabel="Gökyüzü">
-          {cellW > 0 && (
+        <View style={f.area} onLayout={area.onLayout}>
+          {rowH > 0 && (
+          <View style={[f.board, { height: boardH + 12 }]} accessibilityLabel="Gökyüzü">
             <View style={{ height: boardH }}>
               <View style={{ marginLeft: TOWER + TOWER_GAP, gap: GAP }}>
                 {grid.map((row, r) => {
                   const on = lit?.rows.includes(r) ?? false;
                   return (
                     <View key={r} style={[f.lane, { height: rowH }]}>
+                      <View style={[StyleSheet.absoluteFill, f.laneDepth]} pointerEvents="none" />
                       {/* A lit row glows, and breathes while its stars are collected. */}
                       {on && <Animated.View style={[StyleSheet.absoluteFill, f.laneLit, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }) }]} />}
                       {/* A few faint far stars in each row. */}
@@ -389,6 +382,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
                           cell={cell}
                           w={cellW}
                           h={rowH}
+                          scale={starScale}
                           lit={on && cell.kind === 'ship'}
                           amount={on && lit && cell.kind === 'ship' ? (cell.cargo * lit.brightness * bet) / 10 : 0}
                           faint={stormy}
@@ -413,6 +407,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
                   </View>
                 ))}
             </View>
+          </View>
           )}
         </View>
 
@@ -427,14 +422,12 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
           )}
           <View style={f.collected} accessibilityLabel={`Toplanan yıldızlar ${collected} jeton`}>
             <Text style={f.collectedHead}>TOPLANAN</Text>
-            <RollingNumber value={collected} format={(n) => (n > 0 ? `+${fmt(n)}` : '0')} duration={320} style={[f.collectedValue, collected > 0 && { color: LIGHT }]} numberOfLines={1} />
+            <RollingNumber value={collected} format={(n) => (n > 0 ? `+${fmt(n)}` : '0')} duration={320} style={[f.collectedValue, collected > 0 && glowNumber]} numberOfLines={1} />
           </View>
         </View>
-        <Text style={[f.status, status.tone === 'win' && { color: '#BBF7D0' }, status.tone === 'bonus' && { color: LIGHT }, status.tone === 'err' && { color: '#FCA5A5' }]} accessibilityLiveRegion="polite" numberOfLines={2}>
-          {status.text}
-        </Text>
+        <StageStatus text={status.text} tone={status.tone} amount={status.amount} label="TOPLANAN" />
 
-        <ShowerSky dark={dark} flash={flash} fall={meteors} height={boardH + 150} still={calm} />
+        <ShowerSky dark={dark} flash={flash} fall={meteors} height={(area.h || boardH) + 200} still={calm} />
         {/* Yıldız Yağmuru's title as it starts. */}
         <Animated.View style={[f.banner, { opacity: title, transform: [{ scale: title.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }] }]} pointerEvents="none">
           <Ionicons name="sparkles" size={30} color={LIGHT} />
@@ -444,10 +437,9 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
           </Text>
         </Animated.View>
         {win.layer}
-      </LinearGradient>
+      </SalonStage>
 
       <SpinControls
-        tint="#0B2238"
         held={held}
         bets={game.bets}
         bet={bet}
@@ -459,21 +451,8 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
         autoSpins={AUTO_SPINS}
         onAuto={toggleAuto}
         onSpin={play}
-        side={{ bg: '#0B2238', border: 'rgba(255,210,122,0.55)', ink: LIGHT, onBg: LIGHT, onBorder: '#FFF3D0', onInk: '#3A2400' }}
+        look={{ ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#1D3060', '#060A1C'], ink: LIGHT }}
         caption={`Bir turda en çok ${fmt(bet * FENER_MAX)}`}
-        spin={
-          <LinearGradient colors={[LIGHT, '#E8A93A']} style={f.spinRing}>
-            <View style={f.spinCore}>
-              {auto !== null ? (
-                <Text style={f.autoLeft}>{auto}</Text>
-              ) : (
-                <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                  <Ionicons name="sync" size={34} color={LIGHT} />
-                </Animated.View>
-              )}
-            </View>
-          </LinearGradient>
-        }
       />
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
@@ -482,7 +461,7 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
           <View style={f.cargoGrid}>
             {CARGO.map((c) => (
               <View key={c.tenths} style={f.cargoItem}>
-                <Text style={{ fontSize: 18 }}>{starLook(c.tenths).emoji}</Text>
+                <SalonArt name={starLook(c.tenths).art} size={22} fallback={<Text style={{ fontSize: 18 }}>{starLook(c.tenths).emoji}</Text>} />
                 <Text style={f.cargoName}>{cargoLabel(c.tenths)}</Text>
                 <Text style={f.cargoVal}>{fmt((c.tenths * bet) / 10)}</Text>
               </View>
@@ -511,14 +490,14 @@ export function FenerPlayer({ entry }: { entry: Entry }) {
 }
 
 const f = StyleSheet.create({
-  stage: { borderRadius: 22, padding: 10, gap: 8, overflow: 'hidden' },
   star: { position: 'absolute', width: 2.5, height: 2.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.75)' },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { color: LIGHT, fontSize: 23, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, lineHeight: 28, textShadowColor: 'rgba(120,70,0,0.9)', textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1 },
-  kicker: { color: SKY, fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  board: { backgroundColor: 'rgba(2,10,20,0.6)', borderRadius: 16, padding: 6, borderWidth: 1.5, borderColor: 'rgba(255,210,122,0.35)', overflow: 'hidden' },
-  lane: { flexDirection: 'row', borderRadius: 10, backgroundColor: 'rgba(165,180,252,0.07)', borderWidth: 1, borderColor: 'rgba(165,180,252,0.12)' },
-  laneLit: { borderRadius: 10, backgroundColor: 'rgba(255,210,122,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,210,122,0.85)' },
+  // The sky takes the stage's free height; the board sits in its middle.
+  area: { flex: 1, alignSelf: 'stretch', justifyContent: 'center', minHeight: 180 },
+  board: { alignSelf: 'stretch', backgroundColor: 'rgba(2,8,20,0.62)', borderRadius: 18, padding: 6, borderWidth: 1, borderColor: 'rgba(255,210,122,0.4)', overflow: 'hidden', boxShadow: 'inset 0 2px 12px rgba(0,0,0,0.75), 0 6px 16px rgba(0,0,0,0.4)' },
+  lane: { flexDirection: 'row', borderRadius: 12, backgroundColor: 'rgba(125,160,255,0.07)', borderWidth: 1, borderColor: 'rgba(165,190,255,0.14)', overflow: 'hidden' },
+  // A lane is a strip of glass: lit along its top edge, deeper at the bottom.
+  laneDepth: { borderRadius: 12, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: 'inset 0 -10px 18px rgba(0,0,0,0.35)' },
+  laneLit: { borderRadius: 12, backgroundColor: 'rgba(255,210,122,0.18)', borderWidth: 1.5, borderColor: 'rgba(255,210,122,0.9)', boxShadow: '0 0 16px rgba(255,210,122,0.45)' },
   speck: { position: 'absolute', width: 2.5, height: 2.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
   times: { position: 'absolute', left: -2, width: TOWER + 4, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: LIGHT, borderWidth: 2, borderColor: '#FFF3D0' },
   timesText: { color: '#3A2400', fontSize: 13, lineHeight: 16, fontWeight: '900', fontVariant: ['tabular-nums'] },
@@ -526,16 +505,12 @@ const f = StyleSheet.create({
   meter: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: 'rgba(255,210,122,0.35)', backgroundColor: 'rgba(255,210,122,0.08)' },
   meterHot: { backgroundColor: 'rgba(255,210,122,0.25)', borderColor: LIGHT },
   meterText: { color: LIGHT, fontWeight: '900', fontSize: 12 },
-  collected: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, height: 34, borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'rgba(2,10,20,0.6)', borderWidth: 1, borderColor: 'rgba(255,210,122,0.3)' },
+  collected: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, height: 36, borderRadius: 12, paddingHorizontal: 12, backgroundColor: 'rgba(2,8,20,0.6)', borderWidth: 1, borderColor: 'rgba(255,210,122,0.3)', boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)' },
   collectedHead: { color: 'rgba(230,251,255,0.6)', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  collectedValue: { color: '#E6FBFF', fontSize: 19, fontWeight: '900' },
-  status: { color: '#E6FBFF', fontWeight: '800', fontSize: 12.5, lineHeight: 17, textAlign: 'center', minHeight: 17 },
+  collectedValue: { color: '#E6FBFF', fontSize: 20, lineHeight: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
   banner: { position: 'absolute', left: 16, right: 16, top: '30%', alignItems: 'center', gap: 2, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 10, backgroundColor: 'rgba(4,8,20,0.88)', borderWidth: 2, borderColor: LIGHT },
   bannerTitle: { color: LIGHT, fontSize: 26, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1.5 },
   bannerSub: { color: '#E6FBFF', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  spinRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
-  spinCore: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#071A2E', alignItems: 'center', justifyContent: 'center' },
-  autoLeft: { color: LIGHT, fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
   pays: { gap: 8 },
   paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   cargoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

@@ -9,14 +9,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions, type HostInstance, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, type HostInstance, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Shine } from '@/components/fx/surface';
 import { CasinoLock } from '@/components/games/casino';
 import { BetStack, TrayChip, chipLook } from '@/components/games/fx/chips';
 import { firstCoinAt, useFlights } from '@/components/games/fx/flights';
-import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
+import { ContactShadow, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, salonScreen, symbolShadow, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
+import { OPTION_ART, SalonArt } from '@/components/games/fx/salon-art';
 import { chipOf, isHotResult, litRange, optionShare, percentText, planLight, resultShare, shortCoins } from '@/components/games/fx/spin-plan';
 import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin } from '@/components/games/fx/wheel-stage';
 import { useWinFx } from '@/components/games/fx/win-fx';
@@ -38,33 +39,33 @@ const COINS_MS = 660;
 
 type Look = {
   title: string;
+  kicker: string;
+  /** The stage's panel, top to bottom: each board its own colour inside the shell's gold bezel (no purple). */
   colors: [string, string, string];
-  /** The stage's fine lines: its buttons' rims and the status bar's border. */
+  /** The stage's fine lines (an option card's rim when the option has no colour of its own). */
   frame: string;
   ink: string;
-  /** Under the title, and the status bar's fill. */
-  deep: string;
+  /** The light behind the wheel or the ring. */
   halo: string;
-  play: [string, string];
   verb: string;
   hint: string;
   running: string;
 };
 const LOOKS: Record<BoardId, Look> = {
-  slot: { title: 'Gece Yarısı Çarkı', colors: ['#2B1065', '#4C1D95', '#1E0B45'], frame: '#FACC15', ink: '#FDE68A', deep: '#1E0B45', halo: '#A78BFA', play: ['#C026D3', '#7E22CE'], verb: 'Çevir', hint: 'Fişini seç, meyvene koy', running: 'Çark dönüyor…' },
-  foodwheel: { title: 'Lezzet Çarkı', colors: ['#4C1D95', '#7E22CE', '#312E81'], frame: '#F0ABFC', ink: '#FDE68A', deep: '#3B0764', halo: '#F0ABFC', play: ['#DB2777', '#9D174D'], verb: 'Çevir', hint: 'Fişini seç, yemeğine koy', running: 'Işık dolaşıyor…' },
-  magiccard: { title: 'Sihir Destesi', colors: ['#3B0764', '#581C87', '#1E1B4B'], frame: '#FACC15', ink: '#FDE68A', deep: '#1E1B4B', halo: '#C084FC', play: ['#A16207', '#713F12'], verb: 'Kartı aç', hint: 'Fişini seç, kartına koy', running: 'Kart çekiliyor…' },
+  slot: { title: 'GECE YARISI ÇARKI', kicker: '20 DİLİM · ÜÇ SEÇENEK', colors: ['#1E3466', '#0F1D42', '#070F24'], frame: '#F6BD60', ink: '#FFE08A', halo: '#7DD3FC', verb: 'Çevir', hint: 'Fişini seç, meyvene koy', running: 'Çark dönüyor…' },
+  foodwheel: { title: 'LEZZET ÇARKI', kicker: 'SEKİZ YEMEK · 45 KATA KADAR', colors: ['#6E3818', '#341A10', '#0D1428'], frame: '#F6BD60', ink: '#FFE08A', halo: '#FF9F43', verb: 'Çevir', hint: 'Fişini seç, yemeğine koy', running: 'Işık dolaşıyor…' },
+  magiccard: { title: 'SİHİR DESTESİ', kicker: 'SEKİZ BURÇ · 100 KATA KADAR', colors: ['#0F4C5C', '#0B2B42', '#061424'], frame: '#F6BD60', ink: '#FFE08A', halo: '#13D9DF', verb: 'Kartı aç', hint: 'Fişini seç, kartına koy', running: 'Kart çekiliyor…' },
 };
 
 /** Each option's own color: its card's rim and its slices on the wheel. Lezzet Çarkı's greens win with Salata, its reds with Pizza. */
 const ACCENT: Record<string, string> = {
   melon: '#4ADE80',
-  seven: '#FACC15',
-  apple: '#FB7185',
-  crab: '#FB7185',
-  fish: '#FB7185',
-  shrimp: '#FB7185',
-  steak: '#FB7185',
+  seven: '#F6BD60',
+  apple: '#FF6576',
+  crab: '#FF6576',
+  fish: '#FF6576',
+  shrimp: '#FF6576',
+  steak: '#FF6576',
   tomato: '#4ADE80',
   pumpkin: '#4ADE80',
   mushroom: '#4ADE80',
@@ -91,7 +92,7 @@ const sliceFor = (result: string) => {
 /** A zodiac sign as a plain glyph in the card's own ink where the phone has one (the emoji otherwise). */
 const glyph = (id: BoardId, label: string) => (id === 'magiccard' && label.length === 1 ? `${label}︎` : label);
 
-type Status = { text: string; tone?: 'win' | 'err' };
+type Status = { text: string; tone?: StatusTone; amount?: number; label?: string };
 /** What the last round ended on, kept until the next one lands. */
 type Shown = { result: BoardResult; pays: string[] };
 /** A light on its way: the time of the run and each ring place's brightness over it. */
@@ -104,7 +105,9 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
   const still = settings.reduceMotion;
   const { casino } = useGames();
   const game = casino.find((g) => g.id === id)!;
-  const dims = useWindowDimensions();
+  // The middle of the stage (the wheel, the ring, the cards) takes the height the phone leaves it.
+  const mid = useBox();
+  const [shine, setShine] = useState(0);
   const [chip, setChip] = useState(game.bets[0]);
   const [bets, setBets] = useState<Record<string, number>>({});
   const [last, setLast] = useState<Record<string, number>>({});
@@ -164,10 +167,10 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
 
   const total = Object.values(bets).reduce((a, b) => a + b, 0);
   const lastTotal = Object.values(last).reduce((a, b) => a + b, 0);
-  // The stage's inner width, and the height a phone leaves the game (the panel's own rows and the safe areas taken
-  // off; in a room the panel is a sheet over the lower part). The middle of the stage takes what the rest leaves.
-  const inner = (width || dims.width - 28) - 20;
-  const room = Math.round(entry.from === 'room' ? dims.height * 0.78 - 112 : dims.height - 140);
+  // The screen's width (for the chip tray) and the middle area's size, as laid out.
+  const inner = (width || 360) - 26;
+  const midW = mid.w || inner;
+  const midH = mid.h;
 
   /** A tap sinks the option; `landing` ms later the chip arrives and bumps it. */
   const bump = (opt: string, landing: number) => {
@@ -298,7 +301,8 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     setSession((x) => ({ rounds: x.rounds + 1, staked: x.staked + stake, won: x.won + payout }));
     // "77" is its own picture: said once.
     const came = r.label === r.name ? r.name : `${r.label} ${r.name}`;
-    setStatus(payout > 0 ? { text: `${came} · +${fmt(payout)} jeton`, tone: 'win' } : { text: `${came} · bu tur kazanç yok` });
+    setStatus(payout > 0 ? { text: `${came} · +${fmt(payout)} jeton`, tone: 'win', amount: payout, label: (r.name || came).toLocaleUpperCase('tr-TR') } : { text: `${came} · bu tur kazanç yok` });
+    if (payout > stake) setShine((x) => x + 1);
     if (!still) {
       Animated.spring(middle, { toValue: 1, friction: 6, tension: 90, useNativeDriver: true }).start();
       // Chips on options the result doesn't pay leave the board; the paid options beat and the others dim.
@@ -346,7 +350,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
     optionNodes.current[opt] = node;
   };
   const ringPlace = (opt: string) => (id === 'slot' ? -1 : RING[id].indexOf(opt));
-  const card = (o: BoardOption, variant: Variant, style: StyleProp<ViewStyle>) => {
+  const card = (o: BoardOption, variant: Variant, style: StyleProp<ViewStyle>, size: number) => {
     const paid = !!shown && shown.pays.includes(o.id);
     return (
       <OptionCard
@@ -354,6 +358,7 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
         option={o}
         label={glyph(id, o.label)}
         variant={variant}
+        size={size}
         accent={ACCENT[o.id] ?? look.frame}
         ink={look.ink}
         bet={bets[o.id] ?? 0}
@@ -376,66 +381,66 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
   };
 
   // The part of the stage that differs: the wheel over its three options, the ring of dishes, the rows of cards.
-  let middleOfStage: React.JSX.Element;
-  if (id === 'slot') {
-    const size = Math.max(176, Math.min(248, inner - 44, room - 418));
+  // Each is as big as the middle area allows (it is measured; nothing is drawn until it is).
+  let middleOfStage: React.JSX.Element | null = null;
+  if (!midH) middleOfStage = null;
+  else if (id === 'slot') {
+    // The three option cards under the wheel are this tall.
+    const cardsH = Math.round(Math.max(66, Math.min(92, midH * 0.2)));
+    const size = Math.round(Math.max(170, Math.min(midW - 30, midH - cardsH - 30, 360)));
     middleOfStage = (
       <>
         <FruitWheel size={size} spin={spin} halo={look.halo} slice={running ? null : slice} result={running ? null : (shown?.result ?? null)} />
-        <View style={s.wide}>{board.options.map((o) => card(o, 'wide', { flex: 1 }))}</View>
+        <View style={[s.wide, { height: cardsH }]}>{board.options.map((o) => card(o, 'wide', { flex: 1 }, Math.round(cardsH * 0.4)))}</View>
       </>
     );
   } else if (id === 'foodwheel') {
-    const box = Math.max(236, Math.min(300, inner, room - 326));
-    const cell = Math.round(box * 0.24);
+    const box = Math.round(Math.max(236, Math.min(midW, midH - 8, 420)));
+    const cell = Math.round(box * 0.25);
     const radius = (box - cell) / 2 - 2;
     const result = running ? null : (shown?.result ?? null);
     middleOfStage = (
       <View style={{ width: box, height: box }}>
-        <Image source={GLOW} style={{ position: 'absolute', left: -box * 0.2, top: -box * 0.2, width: box * 1.4, height: box * 1.4, opacity: 0.45, tintColor: look.halo }} />
+        <Image source={GLOW} style={{ position: 'absolute', left: -box * 0.2, top: -box * 0.2, width: box * 1.4, height: box * 1.4, opacity: 0.4, tintColor: look.halo }} />
+        {/* A dark round table the dishes stand round, with a gold rail. */}
+        <View style={[s.table, { left: box / 2 - radius - cell * 0.32, top: box / 2 - radius - cell * 0.32, width: (radius + cell * 0.32) * 2, height: (radius + cell * 0.32) * 2, borderRadius: radius + cell * 0.32 }]} />
         <View style={[s.ringLine, { left: box / 2 - radius, top: box / 2 - radius, width: radius * 2, height: radius * 2, borderRadius: radius }]} />
         {[0, 45, 90, 135].map((deg) => (
           <View key={deg} style={[s.spoke, { left: box / 2 - 1, top: box / 2 - radius, height: radius * 2, transform: [{ rotate: `${deg}deg` }] }]} />
         ))}
         {board.options.map((o, i) => {
           const a = (i / board.options.length) * Math.PI * 2 - Math.PI / 2;
-          return card(o, 'round', { position: 'absolute', left: box / 2 + Math.cos(a) * radius - cell / 2, top: box / 2 + Math.sin(a) * radius - cell / 2, width: cell, height: cell });
+          return card(o, 'round', { position: 'absolute', left: box / 2 + Math.cos(a) * radius - cell / 2, top: box / 2 + Math.sin(a) * radius - cell / 2, width: cell, height: cell }, Math.round(cell * 0.36));
         })}
-        <Plate size={Math.round(box * 0.34)} box={box} middle={middle} running={running} result={result} wins={!!result && result.pays.length > 0} ink={look.ink} />
+        <Plate size={Math.round(box * 0.34)} box={box} middle={middle} running={running} result={result} wins={!!result && result.pays.length > 0} />
       </View>
     );
   } else {
-    const cardW = (inner - 18) / 4;
-    const cardH = Math.round(Math.max(74, Math.min(cardW * 1.28, (room - 424) / 2)));
+    const cardW = (midW - 18) / 4;
+    const deckH = Math.round(Math.max(84, Math.min(130, midH * 0.26)));
+    const cardH = Math.round(Math.max(74, Math.min(cardW * 1.5, (midH - deckH - 8 - 12 - 8) / 2)));
     const result = shown?.result ?? null;
     middleOfStage = (
       <View style={{ alignSelf: 'stretch', gap: 8 }}>
-        <Deck middle={middle} result={result} label={result ? glyph(id, result.label) : ''} mult={result ? board.options.find((o) => o.id === result.id)?.mult : undefined} running={running} ink={look.ink} />
-        <View style={s.grid}>{board.options.map((o) => card(o, 'tall', { width: cardW, height: cardH }))}</View>
+        <Deck height={deckH} middle={middle} result={result} label={result ? glyph(id, result.label) : ''} mult={result ? board.options.find((o) => o.id === result.id)?.mult : undefined} running={running} ink={look.ink} />
+        <View style={s.grid}>{board.options.map((o) => card(o, 'tall', { width: cardW, height: cardH }, Math.round(Math.min(cardW * 0.5, cardH * 0.36))))}</View>
       </View>
     );
   }
 
   return (
-    <View ref={root} collapsable={false} style={{ gap: 10 }} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
-      <LinearGradient colors={look.colors} style={s.stage}>
-        <View style={s.head}>
-          <Text style={[s.title, { color: look.ink, textShadowColor: look.deep }]} numberOfLines={1} accessibilityRole="header">
-            {look.title}
-          </Text>
-          <InfoButton onPress={() => setInfo(true)} tint={look.frame} />
+    <View ref={root} collapsable={false} style={salonScreen} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+      <SalonStage colors={look.colors} accent={look.frame} win={shine} minHeight={id === 'magiccard' ? 340 : 360} inner={{ alignItems: 'center' }}>
+        <StageHeader title={look.title} kicker={look.kicker} onInfo={() => setInfo(true)} style={{ alignSelf: 'stretch' }} />
+        <View style={s.middle} onLayout={mid.onLayout}>
+          {middleOfStage}
         </View>
-        {middleOfStage}
-        <View style={[s.status, { borderColor: look.frame, backgroundColor: look.deep }, status.tone === 'win' && s.statusWin]} accessibilityLiveRegion="polite">
-          <Text style={[s.statusText, { color: look.ink }, status.tone === 'err' && s.statusErr]} numberOfLines={2}>
-            {status.text}
-          </Text>
-        </View>
+        <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
         <View style={{ alignSelf: 'stretch' }}>
           <ResultTrail items={trail} />
         </View>
         {win.layer}
-      </LinearGradient>
+      </SalonStage>
 
       <View style={s.tray}>
         {game.bets.map((b) => (
@@ -459,39 +464,26 @@ export function BoardPlayer({ id, entry }: { id: BoardId; entry: Entry }) {
       <View style={s.row}>
         <Animated.View style={{ flex: 1, transform: [{ scale: pillPop }] }}>
           <View ref={pill} collapsable={false} style={{ flexDirection: 'row' }}>
-            <BalancePill tint="#2A0F3D" shown={held} />
+            <BalancePill shown={held} />
           </View>
         </Animated.View>
-        <Pressable onPress={clear} disabled={busy || !total} style={[s.side, s.sideIcon, (busy || !total) && s.off]} accessibilityRole="button" accessibilityLabel="Bahisleri temizle">
-          <Ionicons name="trash-outline" size={19} color="#FDE68A" />
-        </Pressable>
-        <Pressable onPress={() => start(last, true)} disabled={busy || !lastTotal} style={[s.side, (busy || !lastTotal) && s.off]} accessibilityRole="button" accessibilityLabel={lastTotal ? `Son bahisleri tekrarla, ${lastTotal} jeton` : 'Son bahisleri tekrarla'}>
-          <Ionicons name="refresh" size={17} color="#FDE68A" />
-          <View>
-            <Text style={s.sideText}>Tekrar</Text>
-            {lastTotal > 0 && <Text style={s.sideSub}>{shortCoins(lastTotal)}</Text>}
-          </View>
-        </Pressable>
+        <SideButton compact onPress={clear} disabled={busy || !total} icon="trash-outline" a11y="Bahisleri temizle" />
+        <SideButton onPress={() => start(last, true)} disabled={busy || !lastTotal} icon="refresh" label="Tekrar" sub={lastTotal > 0 ? shortCoins(lastTotal) : undefined} a11y={lastTotal ? `Son bahisleri tekrarla, ${lastTotal} jeton` : 'Son bahisleri tekrarla'} style={{ flex: 0, minWidth: 96 }} />
       </View>
-      <Pressable onPress={() => start(bets)} disabled={busy || !total} style={({ pressed }) => [(busy || !total) && s.off, pressed && { transform: [{ scale: 0.98 }] }]} accessibilityRole="button" accessibilityLabel={`${look.verb}, toplam ${total} jeton`}>
-        <LinearGradient colors={['#FDE68A', '#F59E0B']} style={s.playRing}>
-          <LinearGradient colors={look.play} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.play}>
-            {busy ? (
-              <Text style={s.playText}>{running ? look.running : paying ? look.verb : 'Tur başlıyor…'}</Text>
-            ) : total ? (
-              <>
-                <Ionicons name={id === 'magiccard' ? 'sparkles' : 'sync'} size={20} color="#FDE68A" />
-                <Text style={s.playText} numberOfLines={1}>
-                  {look.verb} · {fmt(total)}
-                </Text>
-              </>
-            ) : (
-              <Text style={[s.playText, s.playIdle]}>Önce fişini koy</Text>
-            )}
-            {!busy && total > 0 && <Shine radius={999} every={2600} />}
-          </LinearGradient>
-        </LinearGradient>
-      </Pressable>
+      <WideAction onPress={() => start(bets)} disabled={busy || !total} off={!busy && !total} label={`${look.verb}, toplam ${total} jeton`}>
+        {busy ? (
+          <Text style={[s.playText, wideInk()]}>{running ? look.running : paying ? look.verb : 'Tur başlıyor…'}</Text>
+        ) : total ? (
+          <>
+            <Ionicons name={id === 'magiccard' ? 'sparkles' : 'sync'} size={20} color={SALON.goldInk} />
+            <Text style={[s.playText, tabular, wideInk()]} numberOfLines={1}>
+              {look.verb} · {fmt(total)}
+            </Text>
+          </>
+        ) : (
+          <Text style={[s.playText, s.playIdle, wideInk(true)]}>Önce fişini koy</Text>
+        )}
+      </WideAction>
       {fly.layer}
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
@@ -516,6 +508,7 @@ function OptionCard({
   option,
   label,
   variant,
+  size,
   accent,
   ink,
   bet,
@@ -537,6 +530,8 @@ function OptionCard({
   option: BoardOption;
   label: string;
   variant: Variant;
+  /** The picture's size (px): the card grows with the stage and its picture with it. */
+  size: number;
   accent: string;
   ink: string;
   bet: number;
@@ -568,6 +563,17 @@ function OptionCard({
     [wins, fades, lost, pop, pulse, fade, sweep],
   );
   const seven = option.label === '77';
+  const round = variant === 'round';
+  const rad = round ? 999 : 14;
+  // The glyph: its picture once delivered (fx/salon-art), else the emoji, the zodiac sign or the gold "77".
+  const glyphText = seven ? (
+    <Text style={[c.seven, { fontSize: size * 0.82, lineHeight: size * 1.1 }]}>{label}</Text>
+  ) : variant === 'tall' ? (
+    <Text style={[c.sign, symbolShadow, { color: ink, fontSize: size, lineHeight: size * 1.22 }]}>{label}</Text>
+  ) : (
+    <Text style={[symbolShadow, { fontSize: size, lineHeight: size * 1.2 }]}>{label}</Text>
+  );
+  const art = OPTION_ART[option.id];
   return (
     <Animated.View style={[style, { opacity: v.opacity, transform: [{ scale: v.scale }] }]}>
       <Pressable
@@ -575,22 +581,28 @@ function OptionCard({
         collapsable={false}
         onPress={() => onPress(option.id)}
         disabled={disabled}
-        style={[c.card, variant === 'round' && c.round, variant === 'tall' && c.tall, { borderColor: `${accent}AA` }]}
+        style={({ pressed }) => [c.card, round && c.round, variant === 'tall' && c.tall, { borderColor: `${accent}B3`, borderTopColor: `${accent}` }, pressed && c.pressed]}
         accessibilityRole="button"
         accessibilityLabel={`${option.name}, ${option.mult} kat${bet ? `, bahsin ${bet}` : ''}`}
       >
+        {/* A glossy plate in the option's own colour, lit from the top. */}
+        <LinearGradient colors={[`${accent}55`, '#17284A', '#0A1428']} locations={[0, 0.48, 1]} style={[StyleSheet.absoluteFill, { borderRadius: rad }]} />
+        <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.02)']} style={[c.gloss, { borderTopLeftRadius: rad, borderTopRightRadius: rad }]} />
         {variant === 'tall' && <View style={c.inset} />}
-        <Animated.View style={[c.light, variant === 'round' && c.round, { opacity: lit ?? (on ? 1 : 0) }]} pointerEvents="none" />
-        {v.beat && <Animated.View style={[c.light, c.winLight, variant === 'round' && c.round, { opacity: v.beat }]} pointerEvents="none" />}
-        <Text style={seven ? c.seven : variant === 'tall' ? [c.sign, { color: ink }] : variant === 'round' ? c.dish : c.fruit}>{label}</Text>
+        <Animated.View style={[c.light, round && c.round, { opacity: lit ?? (on ? 1 : 0) }]} pointerEvents="none" />
+        {v.beat && <Animated.View style={[c.light, c.winLight, round && c.round, { opacity: v.beat }]} pointerEvents="none" />}
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          {!seven && <ContactShadow size={size} style={{ bottom: size * 0.02 }} />}
+          {art ? <SalonArt name={art} size={size * 1.1} fallback={glyphText} /> : glyphText}
+        </View>
         {variant === 'tall' && (
-          <Text style={c.name} numberOfLines={1}>
+          <Text style={[c.name, { fontSize: Math.max(10.5, size * 0.3) }]} numberOfLines={1}>
             {option.name}
           </Text>
         )}
-        <Text style={[c.mult, { color: variant === 'tall' ? ink : accent }, variant === 'round' && c.multSmall]}>×{option.mult}</Text>
+        <Text style={[c.mult, { color: variant === 'tall' ? ink : accent, fontSize: Math.max(13, size * (round ? 0.46 : 0.5)), lineHeight: Math.max(15, size * (round ? 0.56 : 0.6)) }]}>×{option.mult}</Text>
         {variant !== 'tall' && (
-          <Text style={[c.name, variant === 'round' && c.nameSmall]} numberOfLines={1}>
+          <Text style={[c.name, { fontSize: Math.max(9, size * (round ? 0.32 : 0.36)), lineHeight: Math.max(11, size * (round ? 0.4 : 0.44)) }]} numberOfLines={1}>
             {option.name}
           </Text>
         )}
@@ -617,7 +629,7 @@ const FruitDisc = memo(function FruitDisc({ size, small }: { size: number; small
           <View key={i} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${i * SLICE}deg` }] }]} pointerEvents="none">
             <View style={[f.wedge, { left: r - half, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: r, borderTopColor: SLICE_FILL[x][i % 2] }]} />
             <View style={[f.label, { left: r - 18 }, small && { top: 5 }]}>
-              <Text style={[x === 'seven' ? f.seven : f.fruit, small && { fontSize: x === 'seven' ? 12 : 15, lineHeight: 19 }]}>{res.label}</Text>
+              <SalonArt name={OPTION_ART[x]} size={small ? 17 : 22} fallback={<Text style={[x === 'seven' ? f.seven : f.fruit, small && { fontSize: x === 'seven' ? 12 : 15, lineHeight: 19 }]}>{res.label}</Text>} />
             </View>
           </View>
         );
@@ -636,9 +648,9 @@ function FruitWheel({ size, spin, halo, slice, result }: { size: number; spin: W
   const r = disc / 2;
   const half = Math.ceil(r * Math.tan(((SLICE / 2) * Math.PI) / 180)) + 1;
   // A small wheel (a room's sheet on a small phone) keeps its ring of fruit: the middle gives way.
-  const band = Math.round(Math.min(42, disc * 0.2));
+  const band = Math.round(Math.min(46, disc * 0.2));
   const sky = disc - band * 2;
-  const hub = Math.round(Math.min(62, sky * 0.5));
+  const hub = Math.round(Math.min(78, sky * 0.5));
   return (
     <View style={{ width: size, height: size + 12, alignItems: 'center' }} accessibilityLabel={result ? `Meyve çarkı, ${result.name} geldi` : 'Meyve çarkı'}>
       <Image source={GLOW} style={{ position: 'absolute', left: -size * 0.22, top: 12 - size * 0.22, width: size * 1.44, height: size * 1.44, opacity: 0.55, tintColor: halo }} />
@@ -653,17 +665,21 @@ function FruitWheel({ size, spin, halo, slice, result }: { size: number; spin: W
               </Animated.View>
             )}
           </Animated.View>
-          <SpinBlur spin={spin} size={disc} band={band - 2} tint="rgba(30,27,75,0.5)" />
+          <SpinBlur spin={spin} size={disc} band={band - 2} tint="rgba(8,18,44,0.5)" />
           {/* The night sky in the middle doesn't turn: the fruit ring runs round it. */}
-          <LinearGradient colors={['#312E81', '#0F0A2E']} style={[f.sky, { left: band, top: band, width: sky, height: sky, borderRadius: sky / 2 }]}>
+          <LinearGradient colors={['#22396E', '#0A1430', '#050A1A']} style={[f.sky, { left: band, top: band, width: sky, height: sky, borderRadius: sky / 2 }]}>
             {STARS.map(([x, y, d], i) => (
               <View key={i} style={{ position: 'absolute', left: x * sky, top: y * sky, width: d, height: d, borderRadius: d / 2, backgroundColor: 'rgba(255,255,255,0.75)' }} />
             ))}
           </LinearGradient>
         </View>
-        <View style={[f.hub, { left: size / 2 - hub / 2, top: size / 2 - hub / 2, width: hub, height: hub, borderRadius: hub / 2 }]}>
-          {result ? <Text style={result.label === '77' ? [f.hubSeven, { fontSize: hub * 0.39 }] : { fontSize: hub * 0.48 }}>{result.label}</Text> : <Ionicons name="moon" size={Math.round(hub * 0.45)} color="#FDE68A" />}
-        </View>
+        <LinearGradient colors={['#2A4478', '#0B1730']} style={[f.hub, { left: size / 2 - hub / 2, top: size / 2 - hub / 2, width: hub, height: hub, borderRadius: hub / 2 }]}>
+          {result ? (
+            <SalonArt name={OPTION_ART[result.id]} size={hub * 0.6} fallback={<Text style={result.label === '77' ? [f.hubSeven, { fontSize: hub * 0.39 }] : [symbolShadow, { fontSize: hub * 0.48 }]}>{result.label}</Text>} />
+          ) : (
+            <SalonArt name="gece-carki-gobek" size={hub - 6} fallback={<Ionicons name="moon" size={Math.round(hub * 0.45)} color={SALON.win} />} />
+          )}
+        </LinearGradient>
       </LinearGradient>
       <View style={{ position: 'absolute', top: -14, left: size / 2 - 14 }}>
         <WheelPointer spin={spin} size={28} />
@@ -683,22 +699,25 @@ const STARS: [number, number, number][] = [
 ];
 
 /** The plate in the middle of Lezzet Çarkı's ring: what the round served (a dish, Salata, Pizza or the empty plate). */
-function Plate({ size, box, middle, running, result, wins, ink }: { size: number; box: number; middle: Animated.Value; running: boolean; result: BoardResult | null; wins: boolean; ink: string }) {
+function Plate({ size, box, middle, running, result, wins }: { size: number; box: number; middle: Animated.Value; running: boolean; result: BoardResult | null; wins: boolean }) {
   return (
     <Animated.View
       style={[p.plate, { left: box / 2 - size / 2, top: box / 2 - size / 2, width: size, height: size, borderRadius: size / 2 }, result && wins && p.plateWin, { transform: [{ scale: middle.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }] }]}
       accessibilityLabel={result ? `Tabakta ${result.name}` : 'Tabak'}
     >
+      {/* A porcelain plate: a white rim round a soft well, lit from the top. */}
+      <LinearGradient colors={['#FFFFFF', '#E3E8F0', '#B9C2D0']} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]} />
+      <LinearGradient colors={['#D7DEE8', '#F7F9FC']} style={[p.well, { left: size * 0.12, top: size * 0.12, width: size * 0.76, height: size * 0.76, borderRadius: size * 0.38 }]} />
       {result ? (
         <>
-          <Text style={{ fontSize: Math.round(size * 0.36) }}>{result.label}</Text>
-          <Text style={[p.name, { color: ink }]} numberOfLines={1}>
+          <SalonArt name={OPTION_ART[result.id]} size={Math.round(size * 0.46)} fallback={<Text style={[symbolShadow, { fontSize: Math.round(size * 0.38), lineHeight: Math.round(size * 0.48) }]}>{result.label}</Text>} />
+          <Text style={[p.name, { fontSize: Math.max(11, size * 0.11) }]} numberOfLines={1}>
             {result.name}
           </Text>
         </>
       ) : (
         <>
-          <Ionicons name="restaurant" size={Math.round(size * 0.3)} color={running ? ink : 'rgba(253,230,138,0.6)'} />
+          <SalonArt name="lezzet-tabak" size={Math.round(size * 0.5)} fallback={<Ionicons name="restaurant" size={Math.round(size * 0.3)} color={running ? '#B7832E' : '#8C97AB'} />} />
           <Text style={p.wait}>{running ? 'Geliyor…' : 'Servis bekliyor'}</Text>
         </>
       )}
@@ -707,35 +726,54 @@ function Plate({ size, box, middle, running, result, wins, ink }: { size: number
 }
 
 /** Sihir's deck: the top card lies face down and turns over to show what was drawn. */
-function Deck({ middle, result, label, mult, running, ink }: { middle: Animated.Value; result: BoardResult | null; label: string; mult?: number; running: boolean; ink: string }) {
+function Deck({ height, middle, result, label, mult, running, ink }: { height: number; middle: Animated.Value; result: BoardResult | null; label: string; mult?: number; running: boolean; ink: string }) {
   const back = middle.interpolate({ inputRange: [0, 0.5, 0.501, 1], outputRange: [1, 1, 0, 0] });
   const face = middle.interpolate({ inputRange: [0, 0.5, 0.501, 1], outputRange: [0, 0, 1, 1] });
   const turn = middle.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.04, 1] });
   const joker = !!result && !mult;
+  // A playing card (2:3) as tall as the row allows, with room for the two under it.
+  const cardH = height - 10;
+  const cardW = Math.round(cardH * 0.7);
+  const glyph = Math.round(cardH * 0.42);
+  const card = { width: cardW, height: cardH, borderRadius: Math.round(cardW * 0.14) };
   return (
-    <View style={d.row} accessibilityLabel={result && !running ? `Açılan kart ${result.name}` : 'Deste'}>
+    <View style={[d.row, { height }]} accessibilityLabel={result && !running ? `Açılan kart ${result.name}` : 'Deste'}>
       <View style={d.side}>
         <Text style={d.caption}>AÇILAN KART</Text>
         <Text style={[d.what, { color: ink }]} numberOfLines={1}>
           {running || !result ? '?' : result.name}
         </Text>
       </View>
-      <View style={d.pile}>
-        <View style={[d.card, d.under2]} />
-        <View style={[d.card, d.under1]} />
-        <Animated.View style={[d.card, { transform: [{ scaleX: turn }] }]}>
+      <View style={{ width: cardW + 8, height, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={[d.card, card, d.under2]} />
+        <View style={[d.card, card, d.under1]} />
+        <Animated.View style={[d.card, card, { transform: [{ scaleX: turn }] }]}>
           <Animated.View style={[StyleSheet.absoluteFill, d.center, { opacity: back }]}>
-            <View style={d.backInset} />
-            <Ionicons name="sparkles" size={22} color="#FDE68A" />
+            <SalonArt
+              name="sihir-kart-arkasi"
+              size={cardW}
+              h={cardH}
+              fallback={
+                <>
+                  <LinearGradient colors={['#14506A', '#0B2B42', '#061424']} style={StyleSheet.absoluteFill} />
+                  <View style={d.backInset} />
+                  <Ionicons name="sparkles" size={Math.round(cardW * 0.42)} color={SALON.win} />
+                </>
+              }
+            />
           </Animated.View>
           <Animated.View style={[StyleSheet.absoluteFill, d.center, d.face, { opacity: face }]}>
-            <Text style={joker ? d.joker : d.sign}>{label}</Text>
+            {result && OPTION_ART[result.id] ? (
+              <SalonArt name={OPTION_ART[result.id]} size={glyph * 1.1} fallback={<Text style={[joker ? d.joker : d.sign, { fontSize: glyph, lineHeight: glyph * 1.22 }]}>{label}</Text>} />
+            ) : (
+              <Text style={[joker ? d.joker : d.sign, { fontSize: glyph, lineHeight: glyph * 1.22 }]}>{label}</Text>
+            )}
           </Animated.View>
         </Animated.View>
       </View>
       <View style={[d.side, { alignItems: 'flex-end' }]}>
         <Text style={d.caption}>ÖDER</Text>
-        <Text style={[d.what, { color: ink }]} numberOfLines={1}>
+        <Text style={[d.what, tabular, { color: ink }]} numberOfLines={1}>
           {running || !result ? '?' : mult ? `×${mult}` : 'yok'}
         </Text>
       </View>
@@ -774,45 +812,33 @@ function Odds({ board, id }: { board: Board; id: BoardId }) {
 }
 
 const s = StyleSheet.create({
-  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
-  head: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 6, height: 32 },
-  title: { flex: 1, fontSize: 22, fontWeight: '900', fontStyle: 'italic', letterSpacing: 0.5, textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1, marginLeft: 4 },
-  wide: { flexDirection: 'row', gap: 6, alignSelf: 'stretch', marginTop: 4 },
+  // The middle of the stage takes its free height; what it holds sits in its middle.
+  middle: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', minHeight: 200 },
+  wide: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, rowGap: 12, justifyContent: 'center', marginTop: 4 },
-  ringLine: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.14)' },
-  spoke: { position: 'absolute', width: 2, backgroundColor: 'rgba(255,255,255,0.1)' },
-  status: { alignSelf: 'stretch', borderRadius: 10, borderWidth: 2, paddingVertical: 5, paddingHorizontal: 8, minHeight: 32, justifyContent: 'center' },
-  statusWin: { backgroundColor: '#15803D' },
-  statusText: { fontWeight: '900', fontSize: 14, textAlign: 'center', letterSpacing: 0.3 },
-  statusErr: { fontSize: 12, fontWeight: '700', letterSpacing: 0, color: '#FFFFFF' },
-  tray: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  side: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, borderRadius: 14, borderWidth: 2, borderColor: '#F0ABFC', backgroundColor: '#7C3AED', paddingHorizontal: 12 },
-  sideIcon: { width: 46, paddingHorizontal: 0, justifyContent: 'center' },
-  sideText: { color: '#FDE68A', fontWeight: '900', fontSize: 13, lineHeight: 16 },
-  sideSub: { color: 'rgba(253,230,138,0.8)', fontWeight: '800', fontSize: 10, lineHeight: 12, fontVariant: ['tabular-nums'] },
-  off: { opacity: 0.5 },
-  playRing: { borderRadius: 999, padding: 3 },
-  play: { height: 48, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18, overflow: 'hidden' },
-  playText: { color: '#FDE68A', fontWeight: '900', fontSize: 18, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
+  table: { position: 'absolute', backgroundColor: 'rgba(4,8,18,0.5)', borderWidth: 2, borderColor: 'rgba(246,189,96,0.35)', boxShadow: 'inset 0 4px 18px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,231,176,0.08)' },
+  ringLine: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)' },
+  spoke: { position: 'absolute', width: 2, backgroundColor: 'rgba(255,255,255,0.08)' },
+  tray: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SALON.row },
+  playText: { fontWeight: '900', fontSize: 18, letterSpacing: 0.5 },
   playIdle: { fontSize: 15, letterSpacing: 0 },
 });
 
 const c = StyleSheet.create({
-  card: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1.5, backgroundColor: 'rgba(12,6,36,0.6)', paddingVertical: 5, minHeight: 62 },
+  card: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1.5, paddingVertical: 4, minHeight: 62, boxShadow: '0 5px 12px rgba(0,0,0,0.5)' },
   round: { borderRadius: 999, minHeight: 0, paddingVertical: 0 },
-  tall: { backgroundColor: 'rgba(12,6,36,0.72)', paddingVertical: 4 },
-  inset: { position: 'absolute', left: 3, right: 3, top: 3, bottom: 3, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(250,204,21,0.22)' },
-  light: { position: 'absolute', left: -2, right: -2, top: -2, bottom: -2, borderRadius: 15, borderWidth: 2.5, borderColor: '#FDE047', backgroundColor: 'rgba(253,224,71,0.24)', boxShadow: '0 0 14px rgba(253,224,71,0.75)' },
-  winLight: { backgroundColor: 'rgba(253,224,71,0.34)' },
+  tall: { paddingVertical: 4 },
+  pressed: { transform: [{ scale: 0.95 }] },
+  gloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '46%' },
+  inset: { position: 'absolute', left: 3, right: 3, top: 3, bottom: 3, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(246,189,96,0.25)' },
+  light: { position: 'absolute', left: -2, right: -2, top: -2, bottom: -2, borderRadius: 15, borderWidth: 2.5, borderColor: '#FFE08A', backgroundColor: 'rgba(255,224,138,0.22)', boxShadow: '0 0 16px rgba(255,224,138,0.8)' },
+  winLight: { backgroundColor: 'rgba(255,224,138,0.34)' },
   fruit: { fontSize: 26, lineHeight: 32 },
-  dish: { fontSize: 23, lineHeight: 28 },
   sign: { fontSize: 28, lineHeight: 34 },
-  seven: { fontSize: 23, lineHeight: 32, fontWeight: '900', fontStyle: 'italic', color: '#FDE68A', textShadowColor: '#B45309', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 1 },
-  mult: { fontWeight: '900', fontSize: 15, lineHeight: 18 },
-  multSmall: { fontSize: 13, lineHeight: 15 },
-  name: { color: 'rgba(255,255,255,0.78)', fontWeight: '700', fontSize: 10.5, lineHeight: 13 },
-  nameSmall: { fontSize: 9, lineHeight: 11 },
+  seven: { fontWeight: '900', fontStyle: 'italic', color: '#FFE08A', textShadowColor: '#8A5A12', textShadowOffset: { width: 1, height: 3 }, textShadowRadius: 3 },
+  mult: { fontWeight: '900', fontSize: 15, lineHeight: 18, fontVariant: ['tabular-nums'], textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  name: { color: 'rgba(255,255,255,0.82)', fontWeight: '700', fontSize: 10.5, lineHeight: 13 },
   bet: { position: 'absolute', left: 0, right: 0, top: -9, alignItems: 'center' },
 });
 
@@ -824,32 +850,32 @@ const f = StyleSheet.create({
   seven: { fontSize: 15, lineHeight: 24, fontWeight: '900', fontStyle: 'italic', color: '#7F1D1D' },
   pegArm: { position: 'absolute', top: 0, width: 8, alignItems: 'center' },
   peg: { width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: '#FEF3C7' },
-  sky: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(253,230,138,0.55)' },
-  hub: { position: 'absolute', backgroundColor: '#1E1B4B', borderWidth: 3, borderColor: '#FACC15', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(0,0,0,0.5)' },
-  hubSeven: { fontWeight: '900', fontStyle: 'italic', color: '#FDE68A' },
+  sky: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(253,230,138,0.55)', boxShadow: 'inset 0 3px 12px rgba(0,0,0,0.7)' },
+  hub: { position: 'absolute', borderWidth: 3, borderColor: SALON.gold, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.6), 0 0 14px rgba(246,189,96,0.35)' },
+  hubSeven: { fontWeight: '900', fontStyle: 'italic', color: '#FFE08A' },
 });
 
 const p = StyleSheet.create({
-  plate: { position: 'absolute', backgroundColor: '#1E1B4B', borderWidth: 3, borderColor: 'rgba(240,171,252,0.7)', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.45)' },
-  plateWin: { borderColor: '#FDE047', boxShadow: '0 0 18px rgba(253,224,71,0.7)' },
-  name: { fontSize: 11, fontWeight: '900', marginTop: -2 },
-  wait: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', marginTop: 2 },
+  plate: { position: 'absolute', borderWidth: 2.5, borderColor: '#D9B061', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px rgba(0,0,0,0.55)' },
+  plateWin: { borderColor: '#FFE08A', boxShadow: '0 0 22px rgba(255,224,138,0.85)' },
+  well: { position: 'absolute', boxShadow: 'inset 0 3px 8px rgba(70,85,110,0.45)' },
+  name: { color: '#2A1A0A', fontWeight: '900', marginTop: -2 },
+  wait: { color: '#6B7690', fontSize: 10, fontWeight: '800', marginTop: 2 },
 });
 
 const d = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6, height: 84 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6 },
   side: { flex: 1, gap: 2 },
   caption: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   what: { fontSize: 20, fontWeight: '900' },
-  pile: { width: 62, height: 84, alignItems: 'center', justifyContent: 'center' },
-  card: { position: 'absolute', width: 56, height: 76, borderRadius: 9, backgroundColor: '#4C1D95', borderWidth: 2, borderColor: '#FACC15', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.45)' },
+  card: { position: 'absolute', backgroundColor: '#0B2B42', borderWidth: 2, borderColor: SALON.gold, overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.55)' },
   under1: { transform: [{ translateX: 3 }, { translateY: 3 }], opacity: 0.75 },
   under2: { transform: [{ translateX: 6 }, { translateY: 6 }], opacity: 0.5 },
   center: { alignItems: 'center', justifyContent: 'center' },
-  backInset: { position: 'absolute', left: 4, right: 4, top: 4, bottom: 4, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(253,230,138,0.5)' },
+  backInset: { position: 'absolute', left: 4, right: 4, top: 4, bottom: 4, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(253,230,138,0.5)' },
   face: { backgroundColor: '#FFF7E0' },
-  sign: { fontSize: 34, lineHeight: 42, color: '#581C87' },
-  joker: { fontSize: 34, lineHeight: 42 },
+  sign: { color: '#0B2B42' },
+  joker: {},
 });
 
 const o = StyleSheet.create({

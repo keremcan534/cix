@@ -7,11 +7,13 @@ import { memo, useMemo } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 
 import { artSource } from '@/components/Art';
+import { salonArt } from '@/components/games/fx/salon-art';
 import { climbSeconds, driftRanges, orbitY, pathAt, pathSamples, routeMarks, scatter, type FlightPlan, type Geo } from '@/components/games/rocket-flight';
 import { Text } from '@/components/text';
 
 const GLOW = require('../../../assets/fx/glow.png');
-const ROCKET = artSource('oyun-roket');
+// The game's own rocket once it is delivered (fx/salon-art); the cover's rocket until then.
+const ROCKET = salonArt('yorunge-roket') ?? artSource('oyun-roket');
 
 /** The rocket's box on the stage (px); the picture points straight up and is turned along the path. */
 export const ROCKET_SIZE = 58;

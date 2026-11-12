@@ -200,7 +200,9 @@ export function GamePanel({
         </View>
       )}
 
-      <ScrollView contentContainerStyle={{ paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
+      {/* At least as tall as the panel: an Oyun Salonu game's stage takes the free height (games/fx/salon), its
+          controls stay at the bottom; a phone too short for it scrolls. */}
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingVertical: 8, gap: 10 }} keyboardShouldPersistTaps="handled">
         {roomGame &&
           (roomGame.playable ? (
             <>

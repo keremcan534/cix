@@ -1,11 +1,10 @@
 // Screen for every payline slot (lib/line-slot + lib/slot-configs): Hazine Kulesi, Kızıl Yedi, Vahşi Patika, Konfeti Kutusu,
-// Kayıp Parşömen, Neon Bulvar. Each game only brings its theme below. playCasino (lib/games) settles the round before
-// the reels come to rest; the reels (components/games/fx/reel) only replay outcome.slot: they run while the round is
-// asked for, stop one after another, wait on the last ones when a scatter or the JACKPOT is one symbol away, and the
-// win is shown by win-fx. Oto is repeated rounds from this screen and stops at the JACKPOT, a big win, the loss limit
-// or any refusal (daily limit, balance, pool).
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
+// Kayıp Parşömen, Neon Bulvar. Each game only brings its theme below; the frame, the controls and the numbers are the
+// Salon shell's (fx/salon). playCasino (lib/games) settles the round before the reels come to rest; the reels
+// (components/games/fx/reel) only replay outcome.slot: they run while the round is asked for, stop one after another,
+// wait on the last ones when a scatter or the JACKPOT is one symbol away, and the win is shown by win-fx. Oto is
+// repeated rounds from this screen and stops at the JACKPOT, a big win, the loss limit or any refusal (daily limit,
+// balance, pool). The reels take the height the phone leaves them: the cells grow with it, within a reel's shape.
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
@@ -13,8 +12,9 @@ import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { CasinoLock } from '@/components/games/casino';
-import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
+import { ContactShadow, FundPlaque, Marquee, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, plaqueValue, salonScreen, symbolShadow, useBox, type ActionLook, type StatusTone } from '@/components/games/fx/salon';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
@@ -23,7 +23,7 @@ import { playSfx, warmSfx } from '@/lib/game-sound';
 import { playRound } from '@/lib/live/casino';
 import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
 import { slotWindow, stripsOf } from '@/lib/line-slot';
-import { REEL_PACE, reelRun, teasedReels } from '@/lib/reel-plan';
+import { REEL_PACE, reelRun, teasedReels, type ReelPace } from '@/lib/reel-plan';
 import { winTierOf } from '@/lib/win-tier';
 import { SLOT_CONFIGS, SPELL_PRIZES } from '@/lib/slot-configs';
 import { useApp } from '@/store';
@@ -35,120 +35,124 @@ const AUTO_LOSS = 25;
 
 type Theme = {
   title: string;
-  /** Gradient of the machine, top to bottom. */
+  /** The stage's panel, top to bottom. */
   colors: [string, string, string];
+  /** The reels' box and its rim. */
   reels: string;
-  reel: string;
   frame: string;
+  /** The plate under each symbol. */
+  plate: readonly [string, string, ...string[]];
   ink: string;
-  accent: string;
   status: string;
-  spin: [string, string];
+  /** The action button's core. */
+  look: ActionLook;
   /** Pictures for some symbols (else the label is drawn). */
   art?: Record<string, ArtName>;
   /** Colors of letter/number symbols. */
   letters?: Record<string, string>;
 };
+// Each machine keeps its own colour inside the shell's gold bezel, within the app's palette (navy, turquoise, gold,
+// coral): no purple.
 const THEMES: Record<LineSlotId, Theme> = {
   jackpot: {
     title: 'HAZİNE KULESİ',
-    colors: ['#F472B6', '#C026D3', '#7E22CE'],
-    reels: '#F0ABFC',
-    reel: '#6B21A8',
-    frame: '#FBBF24',
-    ink: '#FDE68A',
-    accent: '#9D174D',
+    colors: ['#24447A', '#132A4E', '#0A1530'],
+    reels: '#060D1C',
+    frame: '#F6BD60',
+    plate: ['#2F4D80', '#1A3058', '#0E1B38'],
+    ink: '#FFE08A',
     status: 'İYİ ŞANSLAR',
-    spin: ['#FDE68A', '#F59E0B'],
+    look: { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#24447A', '#0A1530'], ink: '#FFE08A' },
     art: { cherry: 'slot-kiraz', bell: 'slot-can' },
-    letters: { seven: '#EF4444', wild: '#F97316', dollar: '#FACC15' },
+    letters: { seven: '#FF5A6A', wild: '#FF9F43', dollar: '#FFD34D' },
   },
   super777: {
-    title: 'Kızıl Yedi',
-    colors: ['#14532D', '#166534', '#052E16'],
-    reels: '#B45309',
-    reel: '#FEF3C7',
-    frame: '#FACC15',
-    ink: '#FDE68A',
-    accent: '#065F46',
+    title: 'KIZIL YEDİ',
+    colors: ['#93253A', '#521224', '#1C0A14'],
+    reels: '#2A0A12',
+    frame: '#F6BD60',
+    plate: ['#FFFBEF', '#F5E6C4', '#D8BE88'],
+    ink: '#FFE08A',
     status: 'BOL ŞANS',
-    spin: ['#FDE68A', '#CA8A04'],
+    look: { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#93253A', '#3A0C18'], ink: '#FFE08A' },
     art: { cherry: 'slot-kiraz', lemon: 'slot-limon', grape: 'slot-uzum' },
-    letters: { seven: '#DC2626' },
+    letters: { seven: '#D93A45' },
   },
   jungle: {
-    title: 'Vahşi Patika',
-    colors: ['#4D7C0F', '#365314', '#422006'],
-    reels: '#78350F',
-    reel: '#451A03',
-    frame: '#A3E635',
-    ink: '#FDE68A',
-    accent: '#1E3A8A',
+    title: 'VAHŞİ PATİKA',
+    colors: ['#2F6326', '#1B3F1C', '#0B1C12'],
+    reels: '#0A1A0E',
+    frame: '#C6E86B',
+    plate: ['#3F6A30', '#26461F', '#132813'],
+    ink: '#FFE08A',
     status: 'KAZANÇ',
-    spin: ['#4ADE80', '#15803D'],
-    letters: { ten: '#F59E0B', j: '#2DD4BF', q: '#E879F9', k: '#F87171', a: '#FB923C' },
+    look: { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#2F6326', '#0B1C12'], ink: '#FFE08A' },
+    letters: { ten: '#F6BD60', j: '#13D9DF', q: '#FF8E9A', k: '#FF6576', a: '#FF9F43' },
   },
   pinata: {
-    title: 'Konfeti Kutusu',
-    colors: ['#38BDF8', '#F472B6', '#7C2D12'],
-    reels: '#9A3412',
-    reel: '#4C1D95',
-    frame: '#FACC15',
-    ink: '#FDE68A',
-    accent: '#B91C1C',
+    title: 'KONFETİ KUTUSU',
+    colors: ['#0F6C78', '#0C3F5C', '#0A1D38'],
+    reels: '#061426',
+    frame: '#FF8E9A',
+    plate: ['#1D6280', '#13405E', '#0A2442'],
+    ink: '#FFE08A',
     status: 'FIESTA!',
-    spin: ['#FDE68A', '#EA580C'],
-    letters: { j: '#A78BFA', q: '#FB923C', k: '#2DD4BF', a: '#F87171' },
+    look: { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#0F6C78', '#0A1D38'], ink: '#FFE08A' },
+    letters: { j: '#7DD3FC', q: '#FF9F43', k: '#13D9DF', a: '#FF6576' },
   },
   spellbook: {
-    title: 'Kayıp Parşömen',
-    colors: ['#312E81', '#4C1D95', '#1E1B4B'],
-    reels: '#6D28D9',
-    reel: '#0B0A1A',
-    frame: '#C4B5FD',
-    ink: '#FDE68A',
-    accent: '#1E3A8A',
+    title: 'KAYIP PARŞÖMEN',
+    colors: ['#1C4655', '#102C3B', '#071722'],
+    reels: '#0A0F14',
+    frame: '#E9C98B',
+    plate: ['#564029', '#35271A', '#1B140D'],
+    ink: '#FFE08A',
     status: 'BÜYÜ BAŞLASIN',
-    spin: ['#4ADE80', '#15803D'],
+    look: { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#1C4655', '#071722'], ink: '#FFE08A' },
   },
   neon: {
     title: 'NEON BULVAR',
-    colors: ['#4C1D95', '#6D28D9', '#312E81'],
-    reels: '#F59E0B',
-    reel: '#7C2D12',
-    frame: '#38BDF8',
-    ink: '#FDE68A',
-    accent: '#4C1D95',
+    colors: ['#0D2550', '#0A1735', '#050B1E'],
+    reels: '#030814',
+    frame: '#13D9DF',
+    plate: ['#143664', '#0C2143', '#061229'],
+    ink: '#FFE08A',
     status: 'İYİ ŞANSLAR',
-    spin: ['#FDE68A', '#D97706'],
-    letters: { j: '#818CF8', q: '#FACC15', k: '#F97316', wild: '#F43F5E' },
+    look: { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#0D2550', '#050B1E'], ink: '#6FF1F5' },
+    letters: { j: '#7DD3FC', q: '#FFD34D', k: '#FF9F43', wild: '#FF6576' },
   },
 };
 
-/** One reel symbol: a picture, a BAR plate, a coloured letter or the emoji. */
+/** One reel symbol: a picture, a BAR plate, a coloured letter or the emoji, standing on its contact shadow. */
 function Symbol({ label, sym, theme, dim, size }: { label: string; sym: string; theme: Theme; dim?: boolean; size: number }) {
   const o = dim ? { opacity: 0.45 } : null;
   const art = theme.art?.[sym];
-  if (art) return <Art name={art} size={size} style={o ?? undefined} />;
-  if (label === 'BAR' || label === 'BAR BAR')
-    return (
+  let face: React.JSX.Element;
+  if (art) face = <Art name={art} size={size} style={o ?? undefined} />;
+  else if (label === 'BAR' || label === 'BAR BAR')
+    face = (
       <View style={[s.barWrap, o]}>
         {(label === 'BAR BAR' ? [0, 1] : [0]).map((i) => (
-          <Text key={i} style={[s.bar, label === 'BAR BAR' && { fontSize: 11 }]}>
+          <Text key={i} style={[s.bar, { fontSize: Math.round(size * (label === 'BAR BAR' ? 0.26 : 0.33)), paddingHorizontal: Math.round(size * 0.1) }]}>
             BAR
           </Text>
         ))}
       </View>
     );
-  if (/^[\x20-\x7E]+$/.test(label)) {
+  else if (/^[\x20-\x7E]+$/.test(label)) {
     const color = theme.letters?.[sym] ?? theme.ink;
-    return (
-      <Text style={[s.letter, { color, fontSize: label.length > 2 ? size * 0.36 : size * 0.72 }, label === '77' && { letterSpacing: -3 }, o]} numberOfLines={1}>
+    face = (
+      <Text style={[s.letter, { color, fontSize: label.length > 2 ? size * 0.4 : size * 0.76, lineHeight: size * 0.95 }, label === '77' && { letterSpacing: -3 }, o]} numberOfLines={1}>
         {label}
       </Text>
     );
-  }
-  return <Text style={[{ fontSize: size * 0.72 }, o]}>{label}</Text>;
+  } else face = <Text style={[symbolShadow, { fontSize: size * 0.72, lineHeight: size * 0.9 }, o]}>{label}</Text>;
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <ContactShadow size={size} />
+      {face}
+    </View>
+  );
 }
 
 export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) {
@@ -163,14 +167,17 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   // The window the machine opens with; after that each reel keeps its own (components/games/fx/reel).
   const [opening] = useState(() => slotWindow(c, c.counts.map((_, r) => r * 4)));
   const [lit, setLit] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState<{ text: string; tone?: 'win' | 'err' | 'jackpot' }>({ text: theme.status });
+  const [status, setStatus] = useState<{ text: string; tone?: StatusTone; amount?: number; label?: string }>({ text: theme.status });
   const [busy, setBusy] = useState(false);
   const [turbo, setTurbo] = useState(false);
   const [auto, setAuto] = useState<number | null>(null);
   const [info, setInfo] = useState(false);
-  // Reels still being waited for (the border glows on them), and the reels box's width (cells are sized from it).
+  // Reels still being waited for (the border glows on them).
   const [waiting, setWaiting] = useState<boolean[]>([]);
-  const [width, setWidth] = useState(0);
+  // Each win sends a shine across the stage.
+  const [shine, setShine] = useState(0);
+  // The area the reels may take (cells are sized from it).
+  const area = useBox();
   // While the reels run the pill shows the balance with the stake taken; the win joins it when it is seen.
   const [held, setHeld] = useState<number | null>(null);
   const handles = useRef<(ReelHandle | null)[]>([]);
@@ -180,7 +187,6 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const alive = useRef(true);
   const stopAuto = useRef(false);
   const [pulse] = useState(() => new Animated.Value(0));
-  const [turn] = useState(() => new Animated.Value(0));
   const beat = useRef<Animated.CompositeAnimation | null>(null);
   const win = useWinFx();
 
@@ -195,29 +201,30 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       beat.current?.stop();
     };
   }, []);
-  // The spin button's arrows turn while a round runs.
-  useEffect(() => {
-    if (!busy || still) return;
-    const a = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }));
-    a.start();
-    return () => {
-      a.stop();
-      turn.setValue(0);
-    };
-  }, [busy, still, turn]);
 
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
   const strips = stripsOf(c);
   const fund = bank.jackpots[id];
-  // A reel's width in the box (border, padding, gaps taken off); a symbol's cell is a little taller than wide.
-  const cellW = width ? Math.floor((width - 16 - (reels - 1) * GAP) / reels) - 6 : 0;
-  const cellH = Math.round(cellW / 0.9);
-  const symSize = Math.min(reels === 3 ? 78 : 52, Math.round(cellW * 0.88));
+  // A reel's cell: as wide as the box allows, as tall as the area allows within a reel's shape (a tall 5-reel cell,
+  // a near-square 3-reel one). Box: padding 6 + rim 2 a side; a reel: padding 1 + rim 2 a side.
+  const FRAME = 2 * (6 + 2);
+  const REEL_EDGE = 2 * (1 + 2);
+  // With room, the machine wears a row of cabinet bulbs over and under its reels (and the cabinet's own edge).
+  const CABINET = area.h > 300 ? 2 * (14 + 6) + 2 * 6 : 0;
+  const fitW = area.w ? Math.floor((area.w - FRAME - (CABINET ? 12 : 0) - (reels - 1) * GAP) / reels) - REEL_EDGE : 0;
+  const fitH = area.h ? Math.floor((area.h - CABINET - FRAME - REEL_EDGE - (c.rows - 1) * GAP) / c.rows) : 0;
+  const shape = reels === 3 ? 1.2 : 1.75;
+  const cellH = fitW && fitH ? Math.max(40, Math.min(Math.round(fitW * shape), fitH)) : 0;
+  const cellW = cellH ? Math.min(fitW, Math.round(cellH * (reels === 3 ? 1.25 : 1))) : 0;
+  const symSize = Math.round(Math.min(cellW, cellH) * (reels === 3 ? 0.74 : 0.8));
+  // The reels keep the same pace in symbols a second however tall a cell is.
+  const paceOf = (p: ReelPace): ReelPace => ({ ...p, speed: p.speed * Math.max(1, cellH / (reels === 3 ? 110 : 62)) });
 
   const spinOnce = async (): Promise<{ net: number; stop: string | null } | null> => {
-    const pace = REEL_PACE[turbo ? 'turbo' : 'normal'];
+    const pace = paceOf(REEL_PACE[turbo ? 'turbo' : 'normal']);
+    const quick = paceOf(REEL_PACE.turbo);
     beat.current?.stop();
     pulse.setValue(0);
     setLit(new Set());
@@ -239,7 +246,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     if (!alive.current) return null;
     if (!r.ok) {
       // Refused (limit, balance, pool): the reels come back to where they stood.
-      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, cellH + GAP, c.rows, REEL_PACE.turbo), REEL_PACE.turbo, still)));
+      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, cellH + GAP, c.rows, quick), quick, still)));
       if (!alive.current) return null;
       setHeld(null);
       setStatus({ text: r.reason, tone: 'err' });
@@ -285,13 +292,15 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     setHeld(null);
     if (c.jackpotShare && sp.jackpotLines.length) {
       const name = id === 'spellbook' ? 'GRAND' : 'JACKPOT';
-      setStatus({ text: `${name}! +${fmt(payout)}`, tone: 'jackpot' });
+      setStatus({ text: `${name}! +${fmt(payout)}`, tone: 'jackpot', amount: payout, label: `${name}!` });
+      setShine((x) => x + 1);
       await win.celebrate({ amount: payout, bet, jackpot: true, title: name });
       return { net: payout - bet, stop: 'JACKPOT kazandın' };
     }
     if (won) {
-      const prize = id === 'spellbook' && sp.scatters >= 3 ? ` · ${sp.scatters >= 5 ? 'MAJOR' : sp.scatters === 4 ? 'MINOR' : 'MINI'}` : '';
-      setStatus({ text: `KAZANÇ +${fmt(payout)}${prize}`, tone: 'win' });
+      const prize = id === 'spellbook' && sp.scatters >= 3 ? (sp.scatters >= 5 ? 'MAJOR' : sp.scatters === 4 ? 'MINOR' : 'MINI') : '';
+      setStatus({ text: `KAZANÇ +${fmt(payout)}${prize ? ` · ${prize}` : ''}`, tone: 'win', amount: payout, label: prize || 'KAZANÇ' });
+      setShine((x) => x + 1);
       const seen = win.celebrate({ amount: payout, bet });
       // Turbo doesn't stand still for a small win; everything bigger is watched to the end.
       if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
@@ -301,7 +310,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   };
 
   const play = async () => {
-    if (busy || !cellW) return;
+    if (busy || !cellH) return;
     setBusy(true);
     await spinOnce();
     if (alive.current) setBusy(false);
@@ -311,7 +320,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       stopAuto.current = true;
       return;
     }
-    if (busy || !cellW) return;
+    if (busy || !cellH) return;
     setBusy(true);
     stopAuto.current = false;
     let net = 0;
@@ -345,68 +354,70 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   };
   const paySyms = Object.keys(c.paytable).reverse();
   const jackpotName = id === 'spellbook' ? 'GRAND' : 'JACKPOT';
+  const boxW = cellW ? reels * (cellW + REEL_EDGE) + (reels - 1) * GAP + FRAME : 0;
+  // The bulbs run fast while a win is shown.
+  const hot = status.tone === 'win' || status.tone === 'jackpot';
 
   return (
-    <View style={{ gap: 10 }}>
-      <LinearGradient colors={theme.colors} style={s.stage}>
-        <View style={s.iconRow}>
-          <InfoButton onPress={() => setInfo(true)} tint={theme.frame} />
-        </View>
-        <Text style={[s.title, { color: theme.ink, textShadowColor: theme.accent }, theme.title.length > 10 && { fontSize: 23 }]} accessibilityRole="header">
-          {theme.title}
-        </Text>
+    <View style={salonScreen}>
+      <SalonStage colors={theme.colors} win={shine} minHeight={reels === 3 ? 330 : 300}>
+        <StageHeader title={theme.title} kicker={`${reels} MAKARA · ${c.lines.length} ÇİZGİ`} onInfo={() => setInfo(true)} />
         {fund !== undefined && (
-          <LinearGradient colors={['#EF4444', '#991B1B']} style={[s.jpBox, { borderColor: theme.frame }]} accessibilityLabel={`${jackpotName} ${Math.floor(fund)} jeton`}>
-            <Text style={s.jpLabel}>{jackpotName}</Text>
-            <RollingNumber value={Math.floor(fund)} style={s.jpValue} duration={900} />
-          </LinearGradient>
+          <FundPlaque name={jackpotName} style={{ marginHorizontal: 12 }}>
+            <View accessibilityLabel={`${jackpotName} ${Math.floor(fund)} jeton`}>
+              <RollingNumber value={Math.floor(fund)} style={plaqueValue} duration={900} />
+            </View>
+          </FundPlaque>
         )}
         {id === 'spellbook' && (
           <View style={{ flexDirection: 'row', gap: 6, alignSelf: 'stretch' }}>
             {(['MINI', 'MAJOR', 'MINOR'] as const).map((k) => (
-              <View key={k} style={[s.prize, k === 'MAJOR' && { backgroundColor: '#6D28D9' }, k === 'MINI' && { backgroundColor: '#047857' }]}>
+              <View key={k} style={[s.prize, k === 'MAJOR' && s.prizeMajor]}>
                 <Text style={s.prizeName}>{k}</Text>
                 <Text style={s.prizeVal}>{fmt(SPELL_PRIZES[k] * bet)}</Text>
               </View>
             ))}
           </View>
         )}
-        <View
-          style={[s.reels, { backgroundColor: theme.reels, borderColor: theme.frame }]}
-          onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
-          accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((x) => c.symbols[x].name).join(', ')).join(' | ')}`}
-        >
-          {cellW > 0 &&
-            opening.map((col, reel) => (
-              <View key={reel} style={[s.reel, { backgroundColor: theme.reel }, waiting[reel] && s.reelWait]}>
-                <Reel
-                  ref={(h) => {
-                    handles.current[reel] = h;
-                  }}
-                  symbols={col}
-                  strip={strips[reel]}
-                  cell={cellH}
-                  gap={GAP}
-                  pulse={pulse}
-                  dim={lit.size > 0}
-                  lit={col.map((_, row) => lit.has(`${reel}-${row}`))}
-                  render={(sym) => <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />}
-                />
-              </View>
-            ))}
-          {!cellW && <View style={{ height: 200 }} />}
+        <View style={s.area} onLayout={area.onLayout}>
+          {cellH > 0 && (
+          <View style={[CABINET > 0 && s.cabinet, CABINET > 0 && { borderColor: `${theme.frame}55` }]}>
+            {CABINET > 0 && <Marquee width={boxW} hot={hot} />}
+            <View style={[s.reels, { width: boxW, backgroundColor: theme.reels, borderColor: theme.frame }]} accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((x) => c.symbols[x].name).join(', ')).join(' | ')}`}>
+              {opening.map((col, reel) => (
+                <View key={reel} style={[s.reel, { width: cellW + REEL_EDGE }, waiting[reel] && s.reelWait]}>
+                  {/* The plates stand still: the symbols roll over them and come to rest on them. */}
+                  {col.map((_, row) => {
+                    // A win lights its plates and dims the others with their symbols.
+                    const on = lit.has(`${reel}-${row}`);
+                    return <SymbolPlate key={row} w={cellW} h={cellH} tone={theme.plate} lit={on} style={[s.plate, { top: 1 + row * (cellH + GAP) }, lit.size > 0 && !on && s.plateDim]} />;
+                  })}
+                  <Reel
+                    ref={(h) => {
+                      handles.current[reel] = h;
+                    }}
+                    symbols={col}
+                    strip={strips[reel]}
+                    cell={cellH}
+                    gap={GAP}
+                    pulse={pulse}
+                    dim={lit.size > 0}
+                    lit={col.map((_, row) => lit.has(`${reel}-${row}`))}
+                    shade="rgba(0,0,0,0.35)"
+                    render={(sym) => <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />}
+                  />
+                </View>
+              ))}
+            </View>
+            {CABINET > 0 && <Marquee width={boxW} hot={hot} />}
+          </View>
+          )}
         </View>
-        <View style={[s.status, { borderColor: theme.frame, backgroundColor: theme.accent }, status.tone === 'win' && s.statusWin, status.tone === 'jackpot' && s.statusJp]} accessibilityLiveRegion="polite">
-          <Text style={[s.statusText, { color: theme.ink }, status.tone === 'err' && { fontSize: 13, letterSpacing: 0 }]} numberOfLines={2}>
-            {status.text}
-          </Text>
-        </View>
+        <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
         {win.layer}
-      </LinearGradient>
+      </SalonStage>
 
       <SpinControls
-        tint="#2A0F3D"
-        stepTint="#3B0F4F"
         held={held}
         bets={game.bets}
         bet={bet}
@@ -418,21 +429,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
         autoSpins={AUTO_SPINS}
         onAuto={toggleAuto}
         onSpin={play}
-        side={{ bg: '#7C3AED', border: '#F0ABFC', ink: '#FDE68A', onBg: '#DB2777', onBorder: '#FACC15' }}
+        look={theme.look}
         caption={`${c.lines.length} çizgi × ${fmt(bet / c.lines.length)}`}
-        spin={
-          <LinearGradient colors={theme.spin} style={s.spinRing}>
-            <View style={[s.spinCore, { backgroundColor: theme.accent }]}>
-              {auto !== null ? (
-                <Text style={[s.autoLeft, { color: theme.ink }]}>{auto}</Text>
-              ) : (
-                <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                  <Ionicons name="sync" size={34} color={theme.ink} />
-                </Animated.View>
-              )}
-            </View>
-          </LinearGradient>
-        }
       />
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
@@ -468,29 +466,22 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
 const GAP = 4;
 
 const s = StyleSheet.create({
-  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
-  iconRow: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6, zIndex: 2 },
-  title: { fontSize: 30, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, textShadowOffset: { width: 2, height: 3 }, textShadowRadius: 1, marginTop: 4, marginRight: 76, alignSelf: 'flex-start', marginLeft: 6 },
-  jpBox: { alignSelf: 'stretch', marginHorizontal: 18, borderRadius: 999, borderWidth: 3, paddingVertical: 3, alignItems: 'center' },
-  jpLabel: { color: '#FEF3C7', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
-  jpValue: { color: '#FDE68A', fontSize: 28, fontWeight: '900', letterSpacing: 2, marginTop: -2, fontVariant: ['tabular-nums'] },
-  prize: { flex: 1, alignItems: 'center', borderRadius: 10, backgroundColor: '#1D4ED8', paddingVertical: 4, borderWidth: 1.5, borderColor: '#FDE68A' },
-  prizeName: { color: '#FDE68A', fontSize: 11, fontWeight: '900' },
-  prizeVal: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  reels: { flexDirection: 'row', gap: GAP, alignSelf: 'stretch', borderRadius: 16, padding: 5, borderWidth: 3 },
-  reel: { flex: 1, minWidth: 0, borderRadius: 10, padding: 1, borderWidth: 2, borderColor: 'transparent' },
+  prize: { flex: 1, alignItems: 'center', borderRadius: 12, backgroundColor: 'rgba(4,9,20,0.55)', paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(233,201,139,0.55)' },
+  prizeMajor: { borderColor: SALON.goldHi, backgroundColor: 'rgba(246,189,96,0.18)' },
+  prizeName: { color: SALON.goldHi, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
+  prizeVal: { color: '#fff', fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  // The reels' area takes the stage's free height; the reels sit in its middle.
+  area: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', minHeight: 150 },
+  cabinet: { padding: 6, gap: 6, borderRadius: 22, borderWidth: 1, backgroundColor: 'rgba(3,7,16,0.35)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' },
+  reels: { flexDirection: 'row', gap: GAP, borderRadius: 16, padding: 6, borderWidth: 2, boxShadow: '0 8px 18px rgba(0,0,0,0.5), inset 0 2px 10px rgba(0,0,0,0.7)' },
+  reel: { borderRadius: 12, padding: 1, borderWidth: 2, borderColor: 'transparent' },
+  plate: { position: 'absolute', left: 1 },
+  plateDim: { opacity: 0.4 },
   // A reel being waited for: its frame lights up until it stops.
-  reelWait: { borderColor: '#FDE047', shadowColor: '#FDE047', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 6 },
+  reelWait: { borderColor: '#FFE08A', boxShadow: '0 0 14px rgba(255,224,138,0.9)' },
   barWrap: { gap: 2, alignItems: 'center' },
-  bar: { color: '#7C2D12', backgroundColor: '#FBBF24', fontWeight: '900', fontSize: 13, paddingHorizontal: 4, borderRadius: 3, borderWidth: 1.5, borderColor: '#7C2D12', overflow: 'hidden' },
-  letter: { fontWeight: '900', fontStyle: 'italic', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 1 },
-  status: { alignSelf: 'stretch', borderRadius: 10, borderWidth: 2, paddingVertical: 6, paddingHorizontal: 8 },
-  statusWin: { backgroundColor: '#15803D' },
-  statusJp: { backgroundColor: '#B45309' },
-  statusText: { fontWeight: '900', fontSize: 19, textAlign: 'center', letterSpacing: 2 },
-  spinRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
-  spinCore: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
-  autoLeft: { fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  bar: { color: '#5A2A06', backgroundColor: '#F6BD60', fontWeight: '900', borderRadius: 4, borderWidth: 1.5, borderColor: '#7C3F0E', overflow: 'hidden', textAlign: 'center' },
+  letter: { fontWeight: '900', fontStyle: 'italic', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 1, height: 3 }, textShadowRadius: 3 },
   pays: { gap: 8 },
   paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   payRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -4,18 +4,18 @@
 // up first. How it looks is in rocket-stage, the numbers of a flight in rocket-flight. Oto launches again and stops
 // at the loss limit or any refusal.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
+import { ChoiceChip, SALON, SalonStage, SideButton, WideAction, choiceInk, salonScreen, tabular, useBox, wideInk } from '@/components/games/fx/salon';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { climbSeconds, driftEnd, flightPlan, milestones, multiplierAt, orbitY, stageGeo, type FlightPlan } from '@/components/games/rocket-flight';
 import { EndMark, FlightLayer, ORBIT, Planet, ReadyRocket, Route, STAR_LAYERS, Space, type Flight } from '@/components/games/rocket-stage';
-import { BalancePill, BetStepper, fmt, sleep } from '@/components/games/slot-kit';
+import { WalletRow, fmt, sleep } from '@/components/games/slot-kit';
 import { ROCKET_TARGETS, rocketReturn } from '@/lib/crash-rocket';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
@@ -83,8 +83,9 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
   const calm = settings.reduceMotion;
   const { casino } = useGames();
   const game = casino.find((g) => g.id === 'rocket')!;
-  const screen = useWindowDimensions();
   const [bet, setBet] = useState(game.bets[0]);
+  // A rocket that escaped sends a shine across the stage.
+  const [shine, setShine] = useState(0);
   const [target, setTarget] = useState(2);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   // The flight on the stage: the one in the air, or the last one (its trail stays until the next rocket fires).
@@ -96,7 +97,9 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
   const [auto, setAuto] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [info, setInfo] = useState(false);
-  const [width, setWidth] = useState(0);
+  // The stage takes the height the phone leaves it; the flight's path is drawn to its size.
+  const box = useBox();
+  const width = box.w;
   // While a rocket is on its way the pill shows the balance with the stake taken; the win joins it when it is seen.
   const [held, setHeld] = useState<number | null>(null);
   const [arm] = useState(() => new Animated.Value(1));
@@ -161,9 +164,8 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
     return () => a.stop();
   }, [burning, calm, flick]);
 
-  // The stage is as tall as the screen allows with the controls still on screen under it; a room's sheet is shorter.
-  const height = entry.from === 'room' ? Math.max(210, Math.min(260, Math.round(screen.height * 0.3))) : Math.max(250, Math.min(380, Math.round(screen.height * 0.44)));
-  const geo = useMemo(() => (width ? stageGeo(width, height) : null), [width, height]);
+  const height = box.h;
+  const geo = useMemo(() => (width && height ? stageGeo(width, height) : null), [width, height]);
 
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
@@ -260,6 +262,7 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
     }, 950);
     if (won) {
       setPhase({ kind: 'cashed', x: target, win: r.row.payout });
+      if (r.row.payout > bet) setShine((x) => x + 1);
       playSfx('cashout');
       // The rocket is seen leaving before the win takes the stage.
       if (!calm) await sleep(460);
@@ -317,8 +320,9 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
   const hit = flight && flight.end === 'boom' && !calm ? flight.fx : null;
 
   return (
-    <View style={{ gap: 10 }}>
-      <View style={[s.stage, { height }]} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+    <View style={salonScreen}>
+      <SalonStage colors={['#141F52', '#0B1234', '#05081C']} accent={ORBIT} win={shine} minHeight={250} inner={s.stage}>
+        <View style={StyleSheet.absoluteFill} onLayout={box.onLayout} pointerEvents="none" />
         {geo && (
           <Animated.View
             style={[
@@ -356,13 +360,14 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
         <View style={[StyleSheet.absoluteFill, winTierOf(prize, bet) === 'small' && { left: '34%' }]} pointerEvents="box-none">
           {win.layer}
         </View>
-      </View>
+      </SalonStage>
 
-      <View style={s.panel}>
+      <View style={{ gap: SALON.row }}>
         <View style={s.targets} accessibilityRole="radiogroup" accessibilityLabel="Kaçış çarpanı">
           {ROCKET_TARGETS.map((t) => (
-            <Pressable
+            <ChoiceChip
               key={t}
+              on={target === t}
               disabled={locked}
               onPress={() => {
                 if (t === target) return;
@@ -371,40 +376,31 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
                 setTarget(t);
                 if (phase.kind !== 'idle') setPhase({ kind: 'idle' });
               }}
-              style={[s.target, target === t && s.targetOn, locked && target !== t && { opacity: 0.45 }]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: target === t, disabled: locked }}
-              accessibilityLabel={`Kaçış ${t.toLocaleString('tr-TR')} kat`}
+              style={s.target}
+              label={`Kaçış ${t.toLocaleString('tr-TR')} kat`}
             >
-              <Text style={[s.targetText, target === t && { color: '#04051A' }]}>{short(t)}</Text>
-            </Pressable>
+              <Text style={[tabular, s.targetText, choiceInk(target === t)]}>{short(t)}</Text>
+            </ChoiceChip>
           ))}
         </View>
+        <WalletRow
+          held={held}
+          bets={game.bets}
+          bet={bet}
+          onBet={(b) => {
+            setBet(b);
+            if (phase.kind !== 'idle') setPhase({ kind: 'idle' });
+          }}
+          disabled={locked}
+        />
         <View style={s.row}>
-          <BalancePill tint="#0D0F3A" shown={held} />
-          <BetStepper
-            bets={game.bets}
-            bet={bet}
-            onChange={(b) => {
-              setBet(b);
-              if (phase.kind !== 'idle') setPhase({ kind: 'idle' });
-            }}
-            disabled={locked}
-            tint="#0D0F3A"
-          />
-        </View>
-        <View style={s.row}>
-          <Pressable onPress={toggleAuto} disabled={burning && !auto} style={[s.auto, auto && s.autoOn, burning && !auto && { opacity: 0.5 }]} accessibilityRole="button" accessibilityLabel={auto ? 'Otomatik fırlatmayı durdur' : 'Otomatik fırlat'}>
-            <Text style={s.autoText}>{auto ? 'DUR' : 'OTO'}</Text>
-          </Pressable>
-          <Pressable onPress={play} disabled={locked} style={[{ flex: 1 }, locked && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={`Fırlat, kaçış ${target.toLocaleString('tr-TR')} kat, ${bet} jeton`}>
-            <LinearGradient colors={['#FDE047', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.go}>
-              <Ionicons name="rocket" size={19} color="#1E1B4B" />
-              <Text style={s.goText} numberOfLines={1}>
-                {burning ? 'Roket yolda…' : `Fırlat · ${short(target)} · ${fmt(bet)}`}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+          <SideButton onPress={toggleAuto} on={auto} disabled={burning && !auto} icon={auto ? 'stop' : 'repeat'} label={auto ? 'DUR' : 'OTO'} a11y={auto ? 'Otomatik fırlatmayı durdur' : 'Otomatik fırlat'} style={{ flex: 0, minWidth: 96 }} />
+          <WideAction onPress={play} disabled={locked} label={`Fırlat, kaçış ${target.toLocaleString('tr-TR')} kat, ${bet} jeton`} style={{ flex: 1 }}>
+            <Ionicons name="rocket" size={19} color={SALON.goldInk} />
+            <Text style={[tabular, s.goText, wideInk()]} numberOfLines={1}>
+              {burning ? 'Roket yolda…' : `Fırlat · ${short(target)} · ${fmt(bet)}`}
+            </Text>
+          </WideAction>
         </View>
       </View>
 
@@ -434,7 +430,8 @@ export function RocketPlayer({ entry }: { entry: Entry }) {
 }
 
 const s = StyleSheet.create({
-  stage: { borderRadius: 22, overflow: 'hidden', backgroundColor: '#0D0F3A' },
+  // The scene is drawn edge to edge inside the shell's frame.
+  stage: { padding: 0, gap: 0 },
   flash: { backgroundColor: '#FFF7ED' },
   readout: { position: 'absolute', left: 16, alignItems: 'flex-start' },
   mult: { lineHeight: 60, fontWeight: '900', fontStyle: 'italic', fontVariant: ['tabular-nums'], textShadowColor: 'rgba(4,5,26,0.9)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 8 },
@@ -443,17 +440,11 @@ const s = StyleSheet.create({
   trail: { position: 'absolute', left: 8, right: 8, bottom: 8 },
   note: { position: 'absolute', left: 14, right: 14, bottom: 50, backgroundColor: 'rgba(4,5,26,0.86)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(253,230,138,0.5)' },
   noteText: { color: '#FDE68A', fontWeight: '700', textAlign: 'center', fontSize: 12, lineHeight: 17 },
-  panel: { backgroundColor: '#15174A', borderRadius: 20, padding: 10, gap: 8, borderWidth: 1, borderColor: 'rgba(129,140,248,0.35)' },
   targets: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  target: { flexBasis: '17%', flexGrow: 1, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)' },
-  targetOn: { backgroundColor: ORBIT, borderColor: '#CFFAFE' },
-  targetText: { color: '#fff', fontWeight: '900', fontSize: 14, fontVariant: ['tabular-nums'] },
-  row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  auto: { height: 52, borderRadius: 16, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, borderColor: 'rgba(253,224,71,0.6)' },
-  autoOn: { backgroundColor: '#BE123C', borderColor: '#FECDD3' },
-  autoText: { color: '#FDE68A', fontWeight: '900', fontSize: 15, letterSpacing: 0.5 },
-  go: { height: 52, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
-  goText: { color: '#1E1B4B', fontWeight: '900', fontSize: 17, fontVariant: ['tabular-nums'] },
+  target: { flexBasis: '17%', flexGrow: 1 },
+  targetText: { fontSize: 14 },
+  row: { flexDirection: 'row', gap: SALON.row, alignItems: 'center' },
+  goText: { fontSize: 17 },
   pays: { gap: 6 },
   paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, paddingHorizontal: 8, borderRadius: 8 },
