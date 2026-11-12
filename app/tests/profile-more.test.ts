@@ -59,7 +59,7 @@ describe('Kişisel bilgiler', () => {
     assert.equal(x.height, 172);
     assert.equal(x.weight, 0);
     assert.equal(x.job, 'Mimar');
-    assert.deepEqual(x.tags, [{ emoji: '☕', label: 'Kahve' }], 'bilinmeyen etiket gösterilmez');
+    assert.deepEqual(x.tags, [{ emoji: '☕', label: 'Kahve', art: 'etiket-kahve' }], 'bilinmeyen etiket gösterilmez');
     assert.equal(x.slogan, 'Merhaba');
     assert.equal(x.birthday, '', 'doğum günü buradan gelmez');
   });

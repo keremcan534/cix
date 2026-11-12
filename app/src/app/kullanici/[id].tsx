@@ -16,6 +16,7 @@ import { callPrice } from '@/data/economy';
 import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { privacyOf } from '@/data/privacy';
+import { countryArt } from '@/data/rooms-ui';
 import { COUNTRIES } from '@/data/social-ui';
 import {
   GIFT_COLLECTIONS,
@@ -60,7 +61,7 @@ import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, 
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
-import { Art } from '@/components/Art';
+import { Art, type ArtName } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
 import { BondBadge, BondFrame, BondsTab, shownTopBond, useBonds } from '@/components/bonds';
@@ -552,7 +553,7 @@ export default function UserProfile() {
                 </Text>
                 {country && (
                   <View style={styles.flag} accessibilityLabel={country.name}>
-                    <Text style={{ fontSize: 13 }}>{country.flag}</Text>
+                    <Art name={countryArt(country.code)} size={16} />
                     <Text style={styles.flagText}>{country.code}</Text>
                   </View>
                 )}
@@ -806,7 +807,7 @@ export default function UserProfile() {
                   <SectionTitle title="Kişilik Etiketleri" />
                   <View style={styles.chips}>
                     {extras.tags.map((t) => (
-                      <Chip key={t.label} emoji={t.emoji} label={t.label} />
+                      <Chip key={t.label} emoji={t.emoji} art={t.art} label={t.label} />
                     ))}
                   </View>
                 </View>
@@ -1217,13 +1218,13 @@ function InfoBox({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: s
   );
 }
 
-function Chip({ icon, emoji, label }: { icon?: keyof typeof Ionicons.glyphMap; emoji?: string; label: string }) {
+function Chip({ icon, emoji, art, label }: { icon?: keyof typeof Ionicons.glyphMap; emoji?: string; art?: ArtName; label: string }) {
   const { colors } = useTheme();
   const styles = useStyles();
   return (
     <View style={styles.chip}>
       {icon && <Ionicons name={icon} size={15} color={colors.text} />}
-      {emoji && <Text style={{ fontSize: 15 }}>{emoji}</Text>}
+      {art ? <Art name={art} size={20} /> : emoji && <Text style={{ fontSize: 15 }}>{emoji}</Text>}
       <Text style={{ color: colors.text, fontSize: 14 }}>{label}</Text>
     </View>
   );
@@ -1490,7 +1491,7 @@ function OnurTab({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {collections.map((c) => (
               <LinearGradient key={c.id} colors={c.done > 0 ? c.colors : dark ? ['#3F3A52', '#1F1B2E'] : ['#E9EFF7', '#D5DEEA']} style={styles.collection}>
-                <Text style={{ fontSize: 44, opacity: c.done > 0 ? 1 : 0.4 }}>{c.emoji}</Text>
+                {c.art ? <Art name={c.art} size={56} style={{ opacity: c.done > 0 ? 1 : 0.4 }} /> : <Text style={{ fontSize: 44, opacity: c.done > 0 ? 1 : 0.4 }}>{c.emoji}</Text>}
                 <Text style={[styles.collectionName, c.done === 0 && styles.collectionNameLocked]} numberOfLines={2}>
                   {c.name}
                 </Text>

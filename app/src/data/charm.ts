@@ -34,13 +34,13 @@ export const charmBonusPct = (level: number) => (level >= 46 ? 5 : level >= 36 ?
 export const charmRankBoost = (level: number) => level;
 
 export const CHARM_PERKS: LevelPerk[] = [
-  { key: 'badge', title: 'Yankı rozeti', detail: 'Profilde, odada ve sohbette adının yanında', emoji: '🏅', from: 1, kind: 'privilege' },
-  { key: 'rank', title: 'Keşfette öne çıkma', detail: 'Seviyen yükseldikçe önerilerde daha üstte', emoji: '📈', from: 1, kind: 'privilege' },
-  { key: 'bonus', title: 'Kazanç bonusu', detail: 'Aldığın hediyelerin elmasına ek', emoji: '💎', from: 6, kind: 'privilege' },
+  { key: 'badge', title: 'Yankı rozeti', detail: 'Profilde, odada ve sohbette adının yanında', emoji: '🏅', art: 'ayricalik-cazibe-rozeti', from: 1, kind: 'privilege' },
+  { key: 'rank', title: 'Keşfette öne çıkma', detail: 'Seviyen yükseldikçe önerilerde daha üstte', emoji: '📈', art: 'ayricalik-kesfette-one-cikma', from: 1, kind: 'privilege' },
+  { key: 'bonus', title: 'Kazanç bonusu', detail: 'Aldığın hediyelerin elmasına ek', emoji: '💎', art: 'ayricalik-kazanc-bonusu', from: 6, kind: 'privilege' },
   { key: 'bubble', title: 'Sohbet balonu', detail: 'Oda sohbetinde seviye renginde balon', emoji: '💬', art: 'ayricalik-sohbet-balonu', from: 6, kind: 'costume' },
-  { key: 'medal', title: 'Yankı madalyası', detail: 'Profil vitrininde grubunun amblemi', emoji: '🎖️', from: 11, kind: 'costume' },
-  { key: 'entry', title: 'Giriş efekti', detail: 'Odaya girişte seviye renginde karşılama', emoji: '✨', from: 11, kind: 'costume' },
-  { key: 'wave', title: 'Mikrofon halkası', detail: 'Konuşurken seviye renginde ses halkası', emoji: '🎙️', from: 16, kind: 'costume' },
+  { key: 'medal', title: 'Yankı madalyası', detail: 'Profil vitrininde grubunun amblemi', emoji: '🎖️', art: 'ayricalik-cazibe-madalyasi', from: 11, kind: 'costume' },
+  { key: 'entry', title: 'Giriş efekti', detail: 'Odaya girişte seviye renginde karşılama', emoji: '✨', art: 'ayricalik-giris-efekti', from: 11, kind: 'costume' },
+  { key: 'wave', title: 'Mikrofon halkası', detail: 'Konuşurken seviye renginde ses halkası', emoji: '🎙️', art: 'ayricalik-mikrofon-dalgasi', from: 16, kind: 'costume' },
   { key: 'frame', title: 'Profil çerçevesi', detail: 'Grubunun renklerinde avatar çerçevesi', emoji: '🖼️', art: 'ayricalik-profil-cercevesi', from: 21, kind: 'costume' },
-  { key: 'ride', title: 'Özel araç', detail: 'Odaya girişte gösterilen araç', emoji: '🛸', from: 31, kind: 'costume' },
+  { key: 'ride', title: 'Özel araç', detail: 'Odaya girişte gösterilen araç', emoji: '🛸', art: 'ayricalik-ozel-arac', from: 31, kind: 'costume' },
 ];

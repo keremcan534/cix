@@ -2,6 +2,7 @@
 // Generic names only; colors follow our dark theme.
 import type { Href } from 'expo-router';
 
+import type { ArtName } from '@/components/Art';
 import type { Moment, User } from '@/data/mock';
 
 // --- Benzerler --------------------------------------------------------------
@@ -72,14 +73,14 @@ export const DISCOVER_PROMO = {
 
 // --- Anlar -------------------------------------------------------------------
 
-export type MomentTopic = { id: string; title: string; views: string; emoji: string; colors: readonly [string, string] };
+export type MomentTopic = { id: string; title: string; views: string; emoji: string; art?: ArtName; colors: readonly [string, string] };
 
 export const MOMENT_TOPICS: MomentTopic[] = [
-  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', colors: ['#087A80', '#C93C4F'] },
-  { id: 'pk', title: 'Odalar Arası PK', views: '25,6 B', emoji: '⚔️', colors: ['#1D4ED8', '#DC2626'] },
-  { id: 'ootd', title: 'Günün Kombini', views: '109,3 B', emoji: '👗', colors: ['#BE185D', '#F59E0B'] },
-  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', colors: ['#0A8F95', '#0EA5E9'] },
-  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', colors: ['#0B4F63', '#0FB8BE'] },
+  { id: 'date', title: 'Romantik Randevu', views: '238,4 B', emoji: '💞', art: 'konu-romantik-randevu-konu', colors: ['#087A80', '#C93C4F'] },
+  { id: 'pk', title: 'Odalar Arası PK', views: '25,6 B', emoji: '⚔️', art: 'konu-odalar-arasi-pk-konu', colors: ['#1D4ED8', '#DC2626'] },
+  { id: 'ootd', title: 'Günün Kombini', views: '109,3 B', emoji: '👗', art: 'konu-ootd', colors: ['#BE185D', '#F59E0B'] },
+  { id: 'travel', title: 'Gezi Günlüğü', views: '64,1 B', emoji: '🧳', art: 'konu-gezi-gunlugu', colors: ['#0A8F95', '#0EA5E9'] },
+  { id: 'music', title: 'Bu Akşam Ne Dinliyoruz', views: '41,1 B', emoji: '🎧', art: 'konu-bu-aksam-ne-dinliyoruz', colors: ['#0B4F63', '#0FB8BE'] },
 ];
 
 /** Extra moments so every topic has content (ids don't clash with MOMENTS). */

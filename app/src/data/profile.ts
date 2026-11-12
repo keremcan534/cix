@@ -20,20 +20,20 @@ export const LANGUAGES = [['Türkçe'], ['Türkçe', 'English'], ['English', 'T�
 export const RELATIONSHIP = ['Bekar', 'İlişkisi var', 'Belirtilmemiş'] as const;
 export const EDUCATION = ['Lise', 'Ön lisans', 'Lisans', 'Yüksek lisans'] as const;
 
-export type Tag = { emoji: string; label: string };
+export type Tag = { emoji: string; label: string; art?: ArtName };
 export const PERSONALITY_TAGS: Tag[] = [
-  { emoji: '🏀', label: 'Basketbol' },
-  { emoji: '🍖', label: 'Mangal' },
-  { emoji: '🎸', label: 'Punk' },
-  { emoji: '🎤', label: 'Karaoke' },
-  { emoji: '☕', label: 'Kahve' },
-  { emoji: '🎮', label: 'Oyuncu' },
-  { emoji: '📚', label: 'Kitap kurdu' },
-  { emoji: '✈️', label: 'Gezgin' },
-  { emoji: '🌙', label: 'Gece kuşu' },
-  { emoji: '😂', label: 'Esprili' },
-  { emoji: '🐱', label: 'Kedisever' },
-  { emoji: '💃', label: 'Dans' },
+  { emoji: '🏀', label: 'Basketbol', art: 'etiket-basketbol' },
+  { emoji: '🍖', label: 'Mangal', art: 'etiket-mangal' },
+  { emoji: '🎸', label: 'Punk', art: 'etiket-punk' },
+  { emoji: '🎤', label: 'Karaoke', art: 'etiket-karaoke' },
+  { emoji: '☕', label: 'Kahve', art: 'etiket-kahve' },
+  { emoji: '🎮', label: 'Oyuncu', art: 'etiket-oyuncu' },
+  { emoji: '📚', label: 'Kitap kurdu', art: 'etiket-kitap-kurdu' },
+  { emoji: '✈️', label: 'Gezgin', art: 'etiket-gezgin' },
+  { emoji: '🌙', label: 'Gece kuşu', art: 'etiket-gece-kusu' },
+  { emoji: '😂', label: 'Esprili', art: 'etiket-esprili' },
+  { emoji: '🐱', label: 'Kedisever', art: 'etiket-kedisever' },
+  { emoji: '💃', label: 'Dans', art: 'etiket-dans' },
 ];
 
 export const SLOGANS = [
@@ -163,12 +163,12 @@ export const giftWallOf = (id: string): (Gift & { count: number })[] =>
   GIFTS.map((g, i) => ({ ...g, count: Math.max(0, ((seedOf(id) * (i + 3)) % 11) - 3) }));
 
 
-export type GiftCollection = { id: string; name: string; emoji: string; colors: [string, string]; total: number };
+export type GiftCollection = { id: string; name: string; emoji: string; art?: ArtName; colors: [string, string]; total: number };
 export const GIFT_COLLECTIONS: GiftCollection[] = [
-  { id: 'gc1', name: 'Romantik Randevu', emoji: '🏰', colors: ['#EC4899', '#7C3AED'], total: 25 },
-  { id: 'gc2', name: 'Mucize Keşif', emoji: '🧭', colors: ['#0EA5E9', '#6366F1'], total: 20 },
-  { id: 'gc3', name: 'Odalar Arası PK', emoji: '⚔️', colors: ['#EF4444', '#F59E0B'], total: 12 },
-  { id: 'gc4', name: 'Yıldızlı Gece', emoji: '🌌', colors: ['#312E81', '#8B5CF6'], total: 18 },
+  { id: 'gc1', name: 'Romantik Randevu', emoji: '🏰', art: 'onur-romantik-randevu', colors: ['#EC4899', '#7C3AED'], total: 25 },
+  { id: 'gc2', name: 'Mucize Keşif', emoji: '🧭', art: 'onur-mucize-kesif', colors: ['#0EA5E9', '#6366F1'], total: 20 },
+  { id: 'gc3', name: 'Odalar Arası PK', emoji: '⚔️', art: 'onur-odalar-arasi-pk-savasi', colors: ['#EF4444', '#F59E0B'], total: 12 },
+  { id: 'gc4', name: 'Yıldızlı Gece', emoji: '🌌', art: 'onur-yildizli-gece', colors: ['#312E81', '#8B5CF6'], total: 18 },
 ];
 export const collectionProgress = (id: string, col: GiftCollection) => (id === 'me' ? 0 : (seedOf(id + col.id) % (col.total + 1)) >> 1);
 
