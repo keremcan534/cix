@@ -89,7 +89,7 @@ async function liveRoundOf(gameId: CasinoGame['id'], body: Omit<api.CasinoPlayBo
 }
 
 /**
- * One round of a casino game (a pick for Mercan Avı and Yörünge, '' otherwise): the server's in a live build, the
+ * One round of a casino game (a pick for Balon Avı and Yörünge, '' otherwise): the server's in a live build, the
  * demo's on this phone otherwise. Resolves with the round for the screen to replay, or the reason it was refused.
  */
 export function playRound(gameId: CasinoGame['id'], bet: number, pick: CasinoPick, entry: Entry): Promise<PlayResult> {

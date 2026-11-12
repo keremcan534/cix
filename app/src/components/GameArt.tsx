@@ -1,5 +1,5 @@
 // Game visuals: each game's 3D cover from the app icon set (components/Art), keyed by game id (data/games).
-// Renk Kartları and Domino have no picture yet and keep their emoji.
+// Renk Kartları, Domino and Balon Avı have no picture yet and keep their emoji.
 import { Image } from 'react-native';
 
 import { artSource, type ArtName } from '@/components/Art';
@@ -20,7 +20,7 @@ const COVER: Record<string, ArtName> = {
   slot: 'oyun-lucky-77',
   jackpot: 'oyun-hazine-sandigi',
   dragon: 'oyun-dragon-tiger',
-  fish: 'oyun-balik-avi',
+  // Balon Avı (fish) shows its emoji until its own cover arrives: the old cover is a fishing rod.
 };
 const ART: Record<string, number> = Object.fromEntries(Object.entries(COVER).map(([id, name]) => [id, artSource(name)]));
 

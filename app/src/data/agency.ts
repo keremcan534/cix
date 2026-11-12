@@ -41,10 +41,10 @@ export type AgencyStatus = 'active' | 'review' | 'suspended' | 'closed';
 export type Agency = { id: string; code: string; name: string; logo: string; hosts: number; status: AgencyStatus; owner: string; founded: string; terms: string[] };
 const TERMS = ['Haftalık en az 10 saat yayın hedefi (zorunlu değil, bonus koşulu)', 'Ajans komisyonu (%40) yayıncı kazancından kesilmez, platform ayrıca öder', 'Ajanstan ayrılma talebi 7 gün içinde sonuçlanır', 'Platform desteğine her zaman doğrudan ulaşabilirsin'];
 export const AGENCIES: Agency[] = [
-  { id: 'a1', code: 'STAR01', name: 'Dalga Ajans', logo: '🌊', hosts: 48, status: 'active', owner: 'Elif', founded: '03.2025', terms: TERMS },
-  { id: 'a2', code: 'MOON22', name: 'Gelgit Medya', logo: '🌙', hosts: 31, status: 'active', owner: 'Mert', founded: '11.2025', terms: TERMS },
+  { id: 'a1', code: 'STAR01', name: 'Yıldız Ajans', logo: '⭐', hosts: 48, status: 'active', owner: 'Elif', founded: '03.2025', terms: TERMS },
+  { id: 'a2', code: 'MOON22', name: 'Nova Medya', logo: '🌙', hosts: 31, status: 'active', owner: 'Mert', founded: '11.2025', terms: TERMS },
   { id: 'a3', code: 'SIMI77', name: 'Similar Talent', logo: '💜', hosts: 19, status: 'active', owner: 'Selin', founded: '06.2026', terms: TERMS },
-  { id: 'a4', code: 'OLD999', name: 'Pusula Yetenek', logo: '🧭', hosts: 0, status: 'closed', owner: 'Kaan', founded: '01.2024', terms: TERMS },
+  { id: 'a4', code: 'OLD999', name: 'Atlas Yetenek', logo: '🗺️', hosts: 0, status: 'closed', owner: 'Kaan', founded: '01.2024', terms: TERMS },
 ];
 export const agencyByCode = (code: string) => AGENCIES.find((a) => a.code === code.trim().toUpperCase());
 

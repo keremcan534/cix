@@ -68,7 +68,7 @@ export function InviteSheet({ agencyId, onClose, onSent }: { agencyId: string; o
                 setQ(t);
                 setPick(null);
               }}
-              placeholder="Örn. Deniz"
+              placeholder="Örn. Defne"
               placeholderTextColor={colors.textDim}
               autoCapitalize="none"
               autoCorrect={false}

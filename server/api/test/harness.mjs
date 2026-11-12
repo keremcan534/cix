@@ -114,5 +114,8 @@ export function startApi(extraEnv = {}) {
   return h;
 }
 
-export const rnd = (n = 12) => crypto.randomBytes(n).toString('hex');
+// Short values (n ≤ 3) end up in visible text (room titles, names): digits only, since a hex pair can spell a handle
+// the contact filter refuses ("fb…", "dc…", "face"). Longer ones are ids and refs and stay hex.
+export const rnd = (n = 12) =>
+  n <= 3 ? Array.from(crypto.randomBytes(n * 2), (b) => String(b % 10)).join('') : crypto.randomBytes(n).toString('hex');
 export const tokenOf = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url'));

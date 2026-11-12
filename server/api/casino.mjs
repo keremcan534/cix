@@ -1,13 +1,13 @@
-// Oyun Salonu: the coin games of Oyun Merkezi and the room menu (Gece Yarısı Çarkı, Hazine Kulesi, Fener Kayalığı,
-// Mercan Avı, Yörünge, Kızıl Yedi, Vahşi Patika, Bereket Ağacı, Liman Pazarı, Sihir Destesi, Konfeti Kutusu, Kayıp
+// Oyun Salonu: the coin games of Oyun Merkezi and the room menu (Gece Yarısı Çarkı, Hazine Kulesi, Yıldız Avı,
+// Balon Avı, Yörünge, Kızıl Yedi, Vahşi Patika, Bereket Ağacı, Lezzet Çarkı, Sihir Destesi, Konfeti Kutusu, Kayıp
 // Parşömen, Neon Bulvar), played on the server like Rüzgâr Gülü (wheel.mjs).
 //
 //   GET  /api/casino                                                → { games, needLevel, allowed, gameCoins, mine }
 //   POST /api/casino/play { game, bet, pick?, bets?, place?, ref }  → { round, user, replay, fund }
 //   GET  /api/admin/casino/report                                   → { book, jackpots, periods } (admin role)
 //
-// One request is one round. A board game (Gece Yarısı Çarkı, Liman Pazarı, Sihir Destesi) sends `bets` (option →
-// coins) instead of `bet`; Mercan Avı's pick is the fish, Yörünge's the cash-out target. The stake comes from game
+// One request is one round. A board game (Gece Yarısı Çarkı, Lezzet Çarkı, Sihir Destesi) sends `bets` (option →
+// coins) instead of `bet`; Balon Avı's pick is the balloon, Yörünge's the cash-out target. The stake comes from game
 // coins first, then coins (spendCoins: coin lots, the daily spending limit, a coin_spend for the finance panel). The
 // draw is crypto.randomInt with the demo's odds (casino-rules.mjs); every win is paid in game coins, which can only
 // be played: never gifted, exchanged or withdrawn, so play money (test top-ups) never becomes anything else either.
@@ -49,7 +49,7 @@ import {
   topStake,
 } from './casino-rules.mjs';
 
-/** Rounds per person per minute (Mercan Avı's Oto shoots about one a second). */
+/** Rounds per person per minute (Balon Avı's Oto shoots about one a second). */
 const RATE = 90;
 const RETENTION_DAYS = 180;
 const DAY_START = `(date_trunc('day', now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')`;

@@ -52,14 +52,14 @@ const POOL = 0.4;
 
 type DemoAgency = { id: string; code: string; name: string; parentId: string | null; tier: string | null; status: SubAgency['status']; owner: string; region: string; score: number | null; overtakes: boolean; streamers: number; active: number; volume30: number };
 const AG: DemoAgency[] = [
-  { id: 'demo-top', code: 'MVD4K2', name: 'Mavi Dalga Ajans', parentId: null, tier: null, status: 'approved', owner: 'Sen', region: 'İstanbul', score: 66.4, overtakes: false, streamers: 14, active: 11, volume30: 1_840_000 },
+  { id: 'demo-top', code: 'MVD4K2', name: 'Mavi Işık Ajans', parentId: null, tier: null, status: 'approved', owner: 'Sen', region: 'İstanbul', score: 66.4, overtakes: false, streamers: 14, active: 11, volume30: 1_840_000 },
   { id: 'demo-s1', code: 'KZY7P1', name: 'Kuzey Yıldızı', parentId: 'demo-top', tier: 'growing', status: 'approved', owner: 'Ece Yalın', region: 'Ankara', score: 58.2, overtakes: false, streamers: 9, active: 7, volume30: 960_000 },
-  { id: 'demo-s2', code: 'EGR3M8', name: 'Ege Rüzgârı', parentId: 'demo-top', tier: 'start', status: 'approved', owner: 'Mert Kaya', region: 'İzmir', score: 36.5, overtakes: false, streamers: 4, active: 2, volume30: 210_000 },
+  { id: 'demo-s2', code: 'EGR3M8', name: 'Bahar Ajans', parentId: 'demo-top', tier: 'start', status: 'approved', owner: 'Mert Kaya', region: 'İzmir', score: 36.5, overtakes: false, streamers: 4, active: 2, volume30: 210_000 },
   { id: 'demo-s3', code: 'GCI9T5', name: 'Gece Işığı', parentId: 'demo-top', tier: 'overtook', status: 'approved', owner: 'Selin Ay', region: 'Bursa', score: 71.8, overtakes: true, streamers: 12, active: 10, volume30: 1_420_000 },
-  { id: 'demo-s4', code: 'LMN2B6', name: 'Liman Sesleri', parentId: 'demo-top', tier: 'start', status: 'pending', owner: 'Baran Tunç', region: 'Antalya', score: null, overtakes: false, streamers: 0, active: 0, volume30: 0 },
-  { id: 'demo-t2', code: 'ALK5R3', name: 'Altın Kıyı Medya', parentId: null, tier: null, status: 'approved', owner: 'Nehir Sarı', region: 'Antalya', score: 61.0, overtakes: false, streamers: 18, active: 13, volume30: 2_260_000 },
+  { id: 'demo-s4', code: 'LMN2B6', name: 'Kent Sesleri', parentId: 'demo-top', tier: 'start', status: 'pending', owner: 'Baran Tunç', region: 'Antalya', score: null, overtakes: false, streamers: 0, active: 0, volume30: 0 },
+  { id: 'demo-t2', code: 'ALK5R3', name: 'Altın Saat Medya', parentId: null, tier: null, status: 'approved', owner: 'Nehir Sarı', region: 'Antalya', score: 61.0, overtakes: false, streamers: 18, active: 13, volume30: 2_260_000 },
   { id: 'demo-s5', code: 'PRL8D4', name: 'Poyraz Stüdyo', parentId: 'demo-t2', tier: 'successful', status: 'approved', owner: 'Kaan Er', region: 'Muğla', score: 63.3, overtakes: true, streamers: 8, active: 6, volume30: 780_000 },
-  { id: 'demo-t3', code: 'SFK1N7', name: 'Şafak Yapım', parentId: null, tier: null, status: 'suspended', owner: 'Deniz Aksu', region: 'Adana', score: 22.0, overtakes: false, streamers: 3, active: 0, volume30: 40_000 },
+  { id: 'demo-t3', code: 'SFK1N7', name: 'Şafak Yapım', parentId: null, tier: null, status: 'suspended', owner: 'Dilan Aksu', region: 'Adana', score: 22.0, overtakes: false, streamers: 3, active: 0, volume30: 40_000 },
 ];
 const byId = (id: string) => AG.find((a) => a.id === id) ?? AG[0];
 const rateOf = (a: DemoAgency) => (a.parentId ? (DEMO_TIERS.find((t) => t.key === a.tier)?.sub_rate ?? 0.25) : POOL);
@@ -84,7 +84,7 @@ export const DEMO_PLATFORM = IS_DEMO ? ['agencies.view', 'agencies.approve', 'ag
 
 export const demoMe = (): Me => ({
   membership: null,
-  requests: [{ id: 901, kind: 'invite', method: 'invite', agency: { id: 'demo-t2', name: 'Altın Kıyı Medya', code: 'ALK5R3' }, note: 'Ekibimize katılmanı isteriz.', createdAt: ago(1) }],
+  requests: [{ id: 901, kind: 'invite', method: 'invite', agency: { id: 'demo-t2', name: 'Altın Saat Medya', code: 'ALK5R3' }, note: 'Ekibimize katılmanı isteriz.', createdAt: ago(1) }],
   transfer: null,
   agencies: [{ ...card(AG[0]), viewer: 'owner', perms: OWNER_PERMS }],
   platform: DEMO_PLATFORM,
@@ -146,7 +146,7 @@ export function demoOverview(id: string): Overview {
   };
 }
 
-const NAMES = ['Deniz Aksu', 'Ece Yalın', 'Mert Kaya', 'Selin Ay', 'Baran Tunç', 'Nehir Sarı', 'Kaan Er', 'İpek Gül', 'Arda Coşkun', 'Defne Ulu'];
+const NAMES = ['Dilan Aksu', 'Ece Yalın', 'Mert Kaya', 'Selin Ay', 'Baran Tunç', 'Nehir Sarı', 'Kaan Er', 'İpek Gül', 'Arda Coşkun', 'Defne Ulu'];
 export function demoStreamers(id: string, scope: 'direct' | 'sub'): Streamer[] {
   const owners = scope === 'sub' ? children(id).filter((c) => c.status === 'approved') : [byId(id)];
   return owners.flatMap((o, j) =>
@@ -328,8 +328,8 @@ export const demoTransfers = (): Transfer[] => [
     status: 'pending',
     streamer: { id: 'st-x', name: 'Nehir Sarı' },
     agency: null,
-    from: { id: 'demo-t2', name: 'Altın Kıyı Medya' },
-    to: { id: 'demo-top', name: 'Mavi Dalga Ajans' },
+    from: { id: 'demo-t2', name: 'Altın Saat Medya' },
+    to: { id: 'demo-top', name: 'Mavi Işık Ajans' },
     needs: ['from', 'to'],
     approvals: { to: { by: 'u-me', at: ago(0.5) } },
     mode: null,
@@ -380,7 +380,7 @@ export const demoAdminOverview = (): AdminOverview => {
 };
 
 export const demoAdminList = (): AdminAgency[] => [
-  { id: 'demo-s4', code: 'LMN2B6', name: 'Liman Sesleri', level: 2, status: 'pending', pendingWith: 'center', parent: { id: 'demo-top', name: 'Mavi Dalga Ajans' }, owner: { id: 'u-demo-s4', name: 'Baran Tunç' }, country: 'Türkiye', region: 'Antalya', contact: { name: 'Baran Tunç', phone: '+90 532 000 00 00', email: null }, expectedStreamers: 8, description: 'Antalya merkezli müzik yayıncıları.', tier: 'start', tierName: 'Başlangıç', createdAt: ago(2) },
+  { id: 'demo-s4', code: 'LMN2B6', name: 'Kent Sesleri', level: 2, status: 'pending', pendingWith: 'center', parent: { id: 'demo-top', name: 'Mavi Işık Ajans' }, owner: { id: 'u-demo-s4', name: 'Baran Tunç' }, country: 'Türkiye', region: 'Antalya', contact: { name: 'Baran Tunç', phone: '+90 532 000 00 00', email: null }, expectedStreamers: 8, description: 'Antalya merkezli müzik yayıncıları.', tier: 'start', tierName: 'Başlangıç', createdAt: ago(2) },
   { id: 'demo-new', code: 'YLZ6C2', name: 'Yıldız Tozu Ajans', level: 1, status: 'pending', pendingWith: 'center', parent: null, owner: { id: 'u-new', name: 'Ceren Taş' }, country: 'Türkiye', region: 'Eskişehir', contact: { name: 'Ceren Taş', phone: '+90 533 000 00 00', email: 'ceren@example.com' }, expectedStreamers: 20, description: 'Sohbet ve oyun odaları.', tier: null, tierName: null, createdAt: ago(1) },
 ];
 
@@ -445,7 +445,7 @@ export const demoAdminPerf = (): { runs: PerfRun[]; runId: number | null; scores
 });
 
 export const demoAdminPayouts = (): AdminPayout[] => [
-  { id: 52, agency: { id: 'demo-t2', name: 'Altın Kıyı Medya', code: 'ALK5R3', status: 'approved' }, amount: 210_000, usd: 42, currency: 'USD', status: 'pending', statusLabel: 'Onay bekliyor', requestedBy: 'Nehir Sarı', requestedAt: ago(0.6), approvedBy: null, approvedAt: null, paidAt: null, paymentRef: null, note: null },
+  { id: 52, agency: { id: 'demo-t2', name: 'Altın Saat Medya', code: 'ALK5R3', status: 'approved' }, amount: 210_000, usd: 42, currency: 'USD', status: 'pending', statusLabel: 'Onay bekliyor', requestedBy: 'Nehir Sarı', requestedAt: ago(0.6), approvedBy: null, approvedAt: null, paidAt: null, paymentRef: null, note: null },
   { id: 51, agency: { id: 'demo-s5', name: 'Poyraz Stüdyo', code: 'PRL8D4', status: 'approved' }, amount: 77_000, usd: 15.4, currency: 'TRY', status: 'ready', statusLabel: 'Ödemeye hazır', requestedBy: 'Kaan Er', requestedAt: ago(2), approvedBy: 'Merkez 1', approvedAt: ago(1), paidAt: null, paymentRef: null, note: null },
 ];
 
@@ -456,7 +456,7 @@ export const demoAdminTransfers = (): Transfer[] => [
     status: 'pending',
     streamer: null,
     agency: { id: 'demo-s3', name: 'Gece Işığı' },
-    from: { id: 'demo-top', name: 'Mavi Dalga Ajans' },
+    from: { id: 'demo-top', name: 'Mavi Işık Ajans' },
     to: null,
     needs: ['center'],
     approvals: {},
@@ -475,5 +475,5 @@ export const demoAdminTransfers = (): Transfer[] => [
 export const demoAudit = (): AuditRow[] => [
   { id: 991, actor: { id: 'u-admin', name: 'Merkez' }, action: 'performance.run', targetType: 'run', targetId: '12', before: null, after: { agencies: 7, changes: 0 }, result: 'ok', reason: 'Aylık değerlendirme', at: ago(1) },
   { id: 990, actor: { id: 'u-admin', name: 'Merkez' }, action: 'agency.status', targetType: 'agency', targetId: 'demo-t3', before: { status: 'approved' }, after: { status: 'suspended' }, result: 'ok', reason: '90 gündür aktif yayıncı yok', at: ago(6) },
-  { id: 989, actor: { id: 'u-demo-top', name: 'Mavi Dalga Ajans' }, action: 'agency.rate', targetType: 'agency', targetId: 'demo-s1', before: null, after: null, result: 'denied', reason: 'Üst ajans alt ajans oranını değiştiremez', at: ago(8) },
+  { id: 989, actor: { id: 'u-demo-top', name: 'Mavi Işık Ajans' }, action: 'agency.rate', targetType: 'agency', targetId: 'demo-s1', before: null, after: null, result: 'denied', reason: 'Üst ajans alt ajans oranını değiştiremez', at: ago(8) },
 ];

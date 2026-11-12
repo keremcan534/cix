@@ -54,6 +54,8 @@ describe('Rüzgâr Gülü yazıları', () => {
   });
 
   test('çevirme harcaması Cömertlik puanı saymaz', () => {
+    assert.equal(countsForWealth('Rüzgâr Gülü · tur (Klasik ×10)'), false);
+    // Rows from before the tiers were renamed (Kıyı, Açık Deniz, Derin Okyanus) read the same.
     assert.equal(countsForWealth('Rüzgâr Gülü · tur (Kıyı ×10)'), false);
   });
 });

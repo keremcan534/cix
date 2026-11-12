@@ -1,7 +1,7 @@
-// Status systems: İnci (SVIP, recharge experience), VIP (subscription), Rütbe (noble, monthly title).
+// Status systems: VIP 1–10 (SVIP, recharge experience), VIP subscription (Abonelik), Rütbe (noble, monthly title).
 import type { ArtName } from '@/components/Art';
 
-// --- İnci (SVIP): 1 recharged coin = 1 experience point; levels never expire ---------------
+// --- VIP 1–10 (SVIP): 1 recharged coin = 1 experience point; levels never expire ---------------
 export const SVIP_LEVELS = [
   { level: 1, xp: 500_000, rights: 2, colors: ['#134E4A', '#0F172A'] as [string, string], emoji: '💠', art: 'svip-01' as ArtName },
   { level: 2, xp: 1_250_000, rights: 3, colors: ['#14532D', '#052E16'] as [string, string], emoji: '🟢', art: 'svip-02' as ArtName },
@@ -16,10 +16,10 @@ export const SVIP_LEVELS = [
 ];
 export const svipLevelOf = (xp: number) => SVIP_LEVELS.filter((l) => xp >= l.xp).length;
 export type RightGroup = 'Görünüm' | 'Odada' | 'Sosyal' | 'Destek';
-/** Ordered so that İnci n has the first `rights` entries (entry notice from İnci 1, gifts from İnci 2). */
+/** Ordered so that VIP n has the first `rights` entries (entry notice from VIP 1, gifts from VIP 2). */
 export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?: ArtName }[] = [
   { name: 'Özel giriş duyurusu', emoji: '✨', group: 'Odada', art: 'ayricalik-giris-ekrani-kayan-yazi' },
-  { name: 'İnci rozeti', emoji: '🎖️', group: 'Görünüm', art: 'ayricalik-svip-rozeti' },
+  { name: 'VIP rozeti', emoji: '🎖️', group: 'Görünüm', art: 'ayricalik-svip-rozeti' },
   { name: 'Üyelere özel hediyeler', emoji: '🎁', group: 'Odada', art: 'ayricalik-svip-e-ozel-hediye' },
   { name: 'Renkli sohbet balonu', emoji: '🎨', group: 'Görünüm', art: 'ayricalik-genel-sohbet-balonu' },
   { name: 'Profil çerçevesi', emoji: '🖼️', group: 'Görünüm', art: 'ayricalik-profil-cercevesi' },
@@ -103,11 +103,11 @@ export const VIP_GIFT_PACK: { name: string; emoji: string; art: ArtName; days: n
 
 // --- Gates used across the app (admin-configurable in the real product) -------------------
 export const GATES = {
-  /** Game center: İnci 2 or Yüzbaşı+ */
+  /** Game center: VIP 2 (SVIP) or Yüzbaşı+ */
   games: (svip: number, noble: number) => svip >= 2 || noble >= 2,
   /** Invisible room entry: Rütbe right "Gizli oda girişi" (Albay+) */
   invisibleEntry: (noble: number) => hasNobleRight(noble, 'Gizli oda girişi'),
-  /** Entry banner: Rütbe "Giriş karşılaması" or İnci "Özel giriş duyurusu" */
+  /** Entry banner: Rütbe "Giriş karşılaması" or VIP (SVIP) "Özel giriş duyurusu" */
   entryBanner: (svip: number, noble: number) => noble >= 1 || svip >= 1,
   /** Room lock via a Rütbe tier */
   roomLock: (noble: number) => hasNobleRight(noble, 'Oda kilitleme'),

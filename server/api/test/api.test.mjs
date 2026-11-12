@@ -41,7 +41,7 @@ describe('Giriş ve cüzdan', () => {
     assert.equal((await call('POST', '/api/wallet/spend', { amount: -5, reason: 'x', ref: rnd(6) }, a.session))[0], 400);
     assert.equal((await call('POST', '/api/wallet/spend', { amount: 5, reason: ' ', ref: rnd(6) }, a.session))[0], 400);
     const [, rows] = await call('GET', '/api/ledger', null, a.session);
-    assert.equal(rows.rows[0].reason, 'Mağaza: Ses Dalgası (7 gün)');
+    assert.equal(rows.rows[0].reason, 'Mağaza: Ses Halkası (7 gün)', 'eski ad bugünkü ürüne bağlanır');
   });
 
   test('elmas → jeton çevirisi: sunucunun kuru, tek kez, yetersiz bakiye ve alt sınır', async () => {

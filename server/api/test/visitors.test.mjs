@@ -61,7 +61,7 @@ describe('Profil ziyaretçileri', () => {
     assert.equal((await visitors(b)).visitors[0].visits, 1, 'sayı baştan');
   });
 
-  test('Sessiz ziyaret (İnci 7) iz bırakmaz', async () => {
+  test('Sessiz ziyaret (VIP 7) iz bırakmaz', async () => {
     const a = await signUp('Sessiz A');
     const b = await signUp('Sessiz B');
     await vip(a, 40_000_000);

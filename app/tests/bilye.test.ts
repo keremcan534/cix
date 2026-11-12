@@ -1,5 +1,5 @@
 /// <reference types="node" />
-// Bilye Şelalesi (lib/bilye): the board, the simulation, the odds table and the path the screen shows. The table
+// Pachinko (lib/bilye): the board, the simulation, the odds table and the path the screen shows. The table
 // (lib/bilye/table, written by scripts/bilye-table.ts) must still match the board and the physics: every recorded
 // path has to land where the table says, or the screen would fly the ball somewhere the round didn't end.
 import { describe, test } from 'node:test';
@@ -11,7 +11,7 @@ import { fly } from '@/lib/bilye/physics';
 import { BILYE_MAX, BILYE_TENTHS, BILYE_TOTAL, BILYE_VARIANTS, bilyeChances, bilyeDetail, bilyeReturn, bilyeTarget, playBilye } from '@/lib/bilye/rules';
 import { COUNTS, SEEDS, WEIGHTS } from '@/lib/bilye/table';
 
-describe('Bilye Şelalesi tablosu', () => {
+describe('Pachinko tablosu', () => {
   test('kayıtlı her yol tablonun söylediği hedefe iner (tahta ve fizik değişmedi)', () => {
     for (const lane of LANES) {
       assert.equal(SEEDS[lane].length, TARGETS.length);
@@ -70,7 +70,7 @@ describe('Bilye Şelalesi tablosu', () => {
   });
 });
 
-describe('Bilye Şelalesi turu', () => {
+describe('Pachinko turu', () => {
   test('çekiliş hedefi ağırlıklara göre seçer: sınırlar', () => {
     for (const lane of LANES) {
       const w = WEIGHTS[lane];

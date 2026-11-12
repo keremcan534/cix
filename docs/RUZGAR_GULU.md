@@ -8,9 +8,11 @@ Oyun Salonu'nun özgün çark oyunu. Adı, dilimleri, alanları ve ekranı bize 
 
   | Alan | Kimlik | Tur ücreti |
   |---|---|---|
-  | Kıyı | `kiyi` | 250 jeton |
-  | Açık Deniz | `acik` | 2.500 jeton |
-  | Derin Okyanus | `okyanus` | 10.000 jeton |
+  | Klasik | `kiyi` | 250 jeton |
+  | Yüksek | `acik` | 2.500 jeton |
+  | Zirve | `okyanus` | 10.000 jeton |
+
+  Kimlikler alanların ilk adlarından (Kıyı, Açık Deniz, Derin Okyanus) kalmadır; JACKPOT fonları, tur geçmişi ve sunucu bunlara bağlı olduğu için değişmez. Eski cüzdan satırlarında "Rüzgâr Gülü · tur (Kıyı ×10)" gibi eski adlar görünebilir; yalnızca yazıdır, hesaplamayı etkilemez.
 
 - Bir seferde **×1, ×10 ya da ×50** tur çevrilir.
 - Ücret önce **oyun jetonundan**, yetmezse **jetondan** düşer.
@@ -78,13 +80,13 @@ Kurallar değişirse **iki dosya birlikte** değişir (`wheel-rules.mjs` ve `dat
 
 | # | Dosya adı | Ne çizilecek | Öncelik |
 |---|---|---|---|
-| 1 | `oyun-ruzgar-gulu.png` | Oyun kapağı: altın çerçeveli, turkuaz ve mercan dilimli parlak bir çark; ortasında altın bir pusula gülü, üstünde küçük mercan bir ok. Hafif önden, üçte bir açıdan. | P1 |
+| 1 | `oyun-ruzgar-gulu.png` | Oyun kapağı: altın çerçeveli, turkuaz ve pembe-kırmızı dilimli parlak bir çark; ortasında altın bir pusula gülü, üstünde küçük pembe-kırmızı bir ok. Hafif önden, üçte bir açıdan. | P1 |
 | 2 | `ruzgar-merkez.png` | Çarkın ortası: yuvarlak, cam yüzeyli, altın kenarlı bir pusula gülü (8 uçlu yıldız). Tam karşıdan, düz. | P1 |
 | 3 | `ruzgar-jackpot.png` | JACKPOT: taşan altın jetonlarla dolu, kapağı açık küçük bir hazine sandığı; arkasında altın ışık halkası. | P1 |
-| 4 | `ruzgar-alan-kiyi.png` | Kıyı alanı: kumda duran küçük bir deniz kabuğu ve tek bir altın jeton; turkuaz sığ su. | P2 |
-| 5 | `ruzgar-alan-acik.png` | Açık Deniz alanı: dalgaların üstünde yelkeni şişmiş küçük bir yelkenli; turkuaz ve altın. | P2 |
-| 6 | `ruzgar-alan-okyanus.png` | Derin Okyanus alanı: koyu lacivert suda parlayan altın bir çapa ve etrafında kabarcıklar. | P2 |
-| 7 | `ruzgar-ok.png` | Çarkın üstündeki ok: aşağıyı gösteren, mercan (#FF6576) renkli, cam yüzeyli bir damla ok. Tam karşıdan. | P3 |
+| 4 | `ruzgar-alan-kiyi.png` | Klasik alanı: küçük turkuaz bir kadife yastık üstünde tek bir altın jeton. | P2 |
+| 5 | `ruzgar-alan-acik.png` | Yüksek alanı: üst üste dizilmiş üç altın jeton kulesi, çevresinde küçük ışıltılar; turkuaz ve altın. | P2 |
+| 6 | `ruzgar-alan-okyanus.png` | Zirve alanı: altın jeton yığınının tepesinde duran parlak altın bir taç; arkasında altın ışık halkası, koyu lacivert zemin. | P2 |
+| 7 | `ruzgar-ok.png` | Çarkın üstündeki ok: aşağıyı gösteren, pembe-kırmızı (#FF6576) renkli, cam yüzeyli bir damla ok. Tam karşıdan. | P3 |
 
 Tasarım notları:
 - Mor ya da mor-pembe kullanılmayacak.

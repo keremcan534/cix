@@ -45,17 +45,17 @@ export type LevelTier = { from: number; to: number; name: string; icon: LevelIco
 export type WealthTier = LevelTier;
 export type LevelPerk = { key: string; title: string; detail: string; emoji: string; art?: ArtName; from: number; kind: 'privilege' | 'costume' };
 export const WEALTH_TIERS: WealthTier[] = [
-  { from: 0, to: 4, name: 'Damla', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
-  { from: 5, to: 9, name: 'Kaynak', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
-  { from: 10, to: 14, name: 'Dere', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF' },
-  { from: 15, to: 19, name: 'Irmak', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8' },
-  { from: 20, to: 24, name: 'Şelale', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED' },
-  { from: 25, to: 28, name: 'Göl', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2' },
-  { from: 29, to: 32, name: 'Koy', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF' },
-  { from: 33, to: 36, name: 'Körfez', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8' },
-  { from: 37, to: 40, name: 'Deniz', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006' },
-  { from: 41, to: 45, name: 'Okyanus', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF' },
-  { from: 46, to: 50, name: 'Derya', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3' },
+  { from: 0, to: 4, name: 'Kuvars', icon: 'leaf', colors: ['#2DD4BF', '#0F766E'], ink: '#ECFEFF' },
+  { from: 5, to: 9, name: 'Opal', icon: 'diamond-outline', colors: ['#38BDF8', '#1D4ED8'], ink: '#EFF6FF' },
+  { from: 10, to: 14, name: 'Akik', icon: 'diamond', colors: ['#6366F1', '#312E81'], ink: '#EEF2FF' },
+  { from: 15, to: 19, name: 'Ametist', icon: 'flower', colors: ['#F472B6', '#9D174D'], ink: '#FDF2F8' },
+  { from: 20, to: 24, name: 'Topaz', icon: 'ribbon', colors: ['#F97316', '#9A3412'], ink: '#FFF7ED' },
+  { from: 25, to: 28, name: 'Zümrüt', icon: 'flame', colors: ['#F43F5E', '#881337'], ink: '#FFF1F2' },
+  { from: 29, to: 32, name: 'Yakut', icon: 'sparkles', colors: ['#C084FC', '#6B21A8'], ink: '#FAF5FF' },
+  { from: 33, to: 36, name: 'Safir', icon: 'shield', colors: ['#EAB308', '#7C2D12'], ink: '#FEFCE8' },
+  { from: 37, to: 40, name: 'Pırlanta', icon: 'star', colors: ['#FDE047', '#A16207'], ink: '#422006' },
+  { from: 41, to: 45, name: 'Hazine', icon: 'planet', colors: ['#818CF8', '#1E1B4B'], ink: '#E0E7FF' },
+  { from: 46, to: 50, name: 'Efsane', icon: 'trophy', colors: ['#FACC15', '#18181B'], ink: '#FEF9C3' },
 ];
 export const wealthTier = (level: number) => WEALTH_TIERS.find((t) => level >= t.from && level <= t.to) ?? WEALTH_TIERS[0];
 
@@ -73,4 +73,4 @@ export const WEALTH_PERKS: WealthPerk[] = [
 ];
 
 /** Level gift names by group (shown in the perk card). */
-export const levelGiftOf = (level: number) => (level >= 41 ? 'Yıldız Gemisi' : level >= 25 ? 'Yakut Taç' : level >= 10 ? 'Kristal Küre' : 'Altın Fidan');
+export const levelGiftOf = (level: number) => (level >= 41 ? 'Uzay Mekiği' : level >= 25 ? 'Yakut Taç' : level >= 10 ? 'Kristal Küre' : 'Altın Fidan');

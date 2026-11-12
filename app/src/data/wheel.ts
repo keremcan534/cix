@@ -5,13 +5,14 @@
 // 40 % of what is played comes back: the fixed slices 37,994 %, the JACKPOT fund the other ~2 % (1,5 % of each
 // spin goes into the tier's fund; a won fund starts again from 20 spins' price).
 
+/** The tiers' ids are their first names' (Kıyı, Açık, Okyanus): the server, the funds and the history key on them. */
 export type WheelTierId = 'kiyi' | 'acik' | 'okyanus';
 export type WheelTier = { label: string; price: number };
 
 export const WHEEL_TIERS: Record<WheelTierId, WheelTier> = {
-  kiyi: { label: 'Kıyı', price: 250 },
-  acik: { label: 'Açık Deniz', price: 2500 },
-  okyanus: { label: 'Derin Okyanus', price: 10000 },
+  kiyi: { label: 'Klasik', price: 250 },
+  acik: { label: 'Yüksek', price: 2500 },
+  okyanus: { label: 'Zirve', price: 10000 },
 };
 export const WHEEL_TIER_IDS = Object.keys(WHEEL_TIERS) as WheelTierId[];
 export const isWheelTier = (x: unknown): x is WheelTierId => typeof x === 'string' && Object.hasOwn(WHEEL_TIERS, x);

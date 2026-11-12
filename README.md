@@ -73,7 +73,7 @@ Ek ve yeni güncelleme belgeleriyle eklenenler:
 | Oyun merkezi | `src/app/oyunlar.tsx` | VIP2'de açılır, sağlayıcı doğrulamalı sonuç |
 | Ayarlar | `src/app/ayarlar.tsx` | Bildirim türleri + erteleme, düşük veri, oturumlar, harcama limiti, davet izinleri, itiraz |
 
-Sonradan eklenenler: Ben sayfası, İnci 1–10 / VIP abonelik / Rütbe (Çavuş–Paşa) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
+Sonradan eklenenler: Ben sayfası, VIP 1–10 / VIP abonelik / Rütbe (Çavuş–Paşa) merkezi (`src/app/vip.tsx`, `src/data/status.ts`), Yükleme (TRY paketleri, ilk alım bonusu), Görev Merkezi, Gelir ve Kazanç Detayları (`src/app/gelir/`), Ödüllü Davet (`src/app/davet.tsx`), Müşteri hizmetleri, Kullanıcı Seviyesi, kullanıcı profili (Profil / dinamik / Onur / İlişki), oda kartı + Oda Ayarları + patron koltuğu (`src/components/room/owner.tsx`), ızgara oda menüsü ve Hot / Gameplay / Çift / Ayrıcalık hediye paneli.
 
 Demo ipuçları: şifreli oda **Futbol Muhabbeti** (şifre `1234`), yönetici olduğun oda **Yeni Arkadaşlar**, ajans kodları `STAR01` / `MOON22` / `SIMI77` (kapalı: `OLD999`).
 

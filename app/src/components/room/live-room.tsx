@@ -359,9 +359,9 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
     const ride = cosmeticById(equipped.ride);
     const noble = nobleInfo(nobleTier);
     if (!entryItem && !ride && !GATES.entryBanner(svipLevel, nobleTier)) return null;
-    const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `İnci ${svipLevel} · ` : ''}${ME.name}`;
+    const who = `${noble ? `${noble.emoji} ${noble.name} ` : ''}${svipLevel ? `VIP ${svipLevel} · ` : ''}${ME.name}`;
     const text = `${entryItem?.emoji ?? '✨'} ${ride ? `${ride.emoji} ${ride.name} ile ` : ''}${who} odaya girdi!`;
-    const badge = [noble?.emoji, svipLevel ? `İnci ${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
+    const badge = [noble?.emoji, svipLevel ? `VIP ${svipLevel}` : ''].filter(Boolean).join(' ') || undefined;
     const fx = (entryItem?.fx as EntryFx | undefined) ?? 'vip';
     const show: EntryShow = { name: ME.name, avatar: app.me.avatar, fx, ride: ride?.emoji, rideArt: storeArtOf(ride?.id), colors: entryItem ? undefined : (tier?.color ?? gradient), badge };
     return { text, show };

@@ -1,5 +1,5 @@
-// Mercan Avı's swimming as plain numbers: where a fish is at each part of its crossing, and where a shot fired now
-// will meet it. The stage (fish-stage) turns the same numbers into Animated interpolations, so what the eye sees and
+// Balon Avı's flight as plain numbers (the code still says swim and fish, the game's first names): where a balloon
+// is at each part of its crossing, and where a shot fired now will meet it. The stage (fish-stage) turns the same numbers into Animated interpolations, so what the eye sees and
 // what a tap is aimed at never disagree. Nothing here decides a round. Pure (no React, no app imports).
 
 export type Swim = {
@@ -51,7 +51,7 @@ export const shotMs = (dist: number) => Math.max(SHOT_MIN, Math.min(SHOT_MAX, (d
 /**
  * Where a shot fired from (`fx`, `fy`) meets the fish: the fish keeps swimming while the shot is in the air, so the
  * shot is aimed ahead of it. `p` is where the fish is now and `perMs` how much of its crossing it covers in a ms
- * (0 while the water is frozen).
+ * (0 while the sky is frozen).
  */
 export function leadShot(s: Swim, p: number, perMs: number, fx: number, fy: number): { x: number; y: number; ms: number } {
   let at = swimAt(s, p);
@@ -63,12 +63,12 @@ export function leadShot(s: Swim, p: number, perMs: number, fx: number, fy: numb
   return { x: at.x, y: at.y, ms };
 }
 
-/** The cannon's turn toward a point, in degrees clockwise from straight up; it never points below the water line. */
+/** The cannon's turn toward a point, in degrees clockwise from straight up; it never points below the horizon. */
 export const aimDeg = (cx: number, cy: number, x: number, y: number) => Math.max(-82, Math.min(82, (Math.atan2(x - cx, cy - y) * 180) / Math.PI));
 
 /**
- * A depth for a new fish: of a few random ones, the one furthest from the fish already swimming, so the school
- * spreads over the water instead of bunching up.
+ * A depth for a new fish: of a few random ones, the one furthest from the fish already swimming, so the flock
+ * spreads over the sky instead of bunching up.
  */
 export function freeDepth(taken: number[], top: number, bottom: number, rnd: () => number = Math.random): number {
   let best = top + rnd() * (bottom - top);

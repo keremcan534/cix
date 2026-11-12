@@ -24,7 +24,7 @@ const DEFAULT: Privacy = { showOnline: true, showLastSeen: true, showCurrentRoom
 const OVERRIDES: Record<string, Partial<Privacy>> = {
   u3: { dmFrom: 'following', callsFrom: 'following' }, // Zeynep: only people she follows
   u6: { callsFrom: 'nobody', showLastSeen: false }, // Burak: no calls
-  u9: { showOnline: false, showCurrentRoom: false }, // Deniz: hides status and room
+  u9: { showOnline: false, showCurrentRoom: false }, // Defne: hides status and room
   u10: { status: 'restricted' }, // Kaan: temporarily restricted account
   u11: { invitesFrom: 'following' },
 };

@@ -312,8 +312,8 @@ describe('save rules', () => {
     assert.match(impactOf('campaign', null, validate('campaign', camp(), { now: NOW }), { now: NOW }), /^%20 kampanya "Bayram": 100\.000 jetonluk paket alan \+20\.000 kampanya jetonu alır\./);
     assert.match(impactOf('gifts_hidden', [], ['g1']), /Gizlenir: Gül/);
     assert.match(impactOf('packs_hidden', [], ['p1']), /1\.000 jeton/);
-    assert.match(impactOf('shop_hidden', [], ['fr-neon']), /Mağazada gizlenir: Ses Dalgası/);
-    assert.match(impactOf('shop_hidden', ['fr-neon'], []), /yeniden satılır: Ses Dalgası/);
+    assert.match(impactOf('shop_hidden', [], ['fr-neon']), /Mağazada gizlenir: Ses Halkası/);
+    assert.match(impactOf('shop_hidden', ['fr-neon'], []), /yeniden satılır: Ses Halkası/);
     assert.match(impactOf('otp_global_per_hour', 300, 0), /SMS ile giriş kodu gönderimi durur/);
     assert.match(impactOf('withdraw_weekly_diamonds', 1e7, 1e6, { next: { withdraw_max_diamonds: 5e6 } }), /tek talepte de en çok bu kadar istenebilir/);
     assert.match(impactOf('withdraw_max_diamonds', 5e6, 1e6, { next: { withdraw_weekly_diamonds: 6e5 } }), /tek talepte en çok 600\.000 💎 istenebilir/);

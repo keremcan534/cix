@@ -101,7 +101,7 @@ export default function WalletScreen() {
     setTimeout(() => {
       const total = buyPack(pack.id);
       setProcessing(null);
-      showAlert('Başarılı 🎉', `${total.toLocaleString('tr-TR')} jeton hesabına eklendi. +${pack.coins.toLocaleString('tr-TR')} İnci puanı. (Demo – gerçek ödeme alınmadı)`);
+      showAlert('Başarılı 🎉', `${total.toLocaleString('tr-TR')} jeton hesabına eklendi. +${pack.coins.toLocaleString('tr-TR')} VIP puanı. (Demo – gerçek ödeme alınmadı)`);
     }, 1200);
   };
   const rows = ledger.filter((r) => r.currency === filter);
@@ -217,7 +217,7 @@ export default function WalletScreen() {
               <Pressable
                 onPress={() => {
                   addCoins(1_000_000, 'Demo test bakiyesi');
-                  showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, İnci puanı vermez)');
+                  showAlert('Test jetonu eklendi', '1.000.000 jeton eklendi. (Demo – gerçek ödeme yok, VIP puanı vermez)');
                 }}
                 style={styles.testBtn}
                 accessibilityRole="button"
@@ -289,9 +289,9 @@ export default function WalletScreen() {
               </View>
             </>
           )}
-          <Pressable onPress={() => router.push('/vip')} style={styles.svipLink} accessibilityRole="link" accessibilityLabel="İnci seviyelerine bak">
-            <Text style={styles.svipLinkText}>İnci seviyelerine bak →</Text>
-            <Text style={styles.svipLinkSub}>{svipLevel ? `İnci ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
+          <Pressable onPress={() => router.push('/vip')} style={styles.svipLink} accessibilityRole="link" accessibilityLabel="VIP seviyelerine bak">
+            <Text style={styles.svipLinkText}>VIP seviyelerine bak →</Text>
+            <Text style={styles.svipLinkSub}>{svipLevel ? `VIP ${svipLevel} · ${svipXp.toLocaleString('tr-TR')} puan` : 'Yüklediğin her jeton 1 puan'}</Text>
           </Pressable>
           <Text style={styles.note}>
             Yüklemeye devam ederek{' '}

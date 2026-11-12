@@ -14,7 +14,7 @@ export type FrameFx = 'pulse' | 'orbit' | 'aurora' | 'flame' | 'crown';
 type FrameLook = { ring: string[]; glow: string; spinMs: number; label: string };
 export const FRAME_LOOKS: Record<FrameFx, FrameLook> = {
   // Sound: turquoise ripples, the app's signature.
-  pulse: { ring: ['#13D9DF', '#076A70', '#13D9DF', '#A5F3F5'], glow: '#13D9DF', spinMs: 3600, label: 'Ses dalgası' },
+  pulse: { ring: ['#13D9DF', '#076A70', '#13D9DF', '#A5F3F5'], glow: '#13D9DF', spinMs: 3600, label: 'Ses halkası' },
   orbit: { ring: ['#38BDF8', '#13D9DF', '#E0F2FE', '#38BDF8'], glow: '#38BDF8', spinMs: 3000, label: 'Dönen ışıklar' },
   aurora: { ring: ['#13D9DF', '#38BDF8', '#FF6576', '#F6BD60', '#13D9DF'], glow: '#13D9DF', spinMs: 4200, label: 'Renk geçişi + kıvılcım' },
   flame: { ring: ['#F97316', '#EF4444', '#FDE047', '#F97316', '#B91C1C'], glow: '#F97316', spinMs: 2200, label: 'Alev + kor' },

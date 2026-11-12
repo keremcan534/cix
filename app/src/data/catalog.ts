@@ -24,7 +24,7 @@ export const COSMETIC_KINDS: { kind: CosmeticKind; label: string; emoji: string 
 ];
 
 export const COSMETICS: Cosmetic[] = [
-  { id: 'fr-neon', kind: 'frame', name: 'Ses Dalgası', emoji: '🔊', price: 150, days: 7, color: ['#13D9DF', '#076A70'], fx: 'pulse' },
+  { id: 'fr-neon', kind: 'frame', name: 'Ses Halkası', emoji: '🔊', price: 150, days: 7, color: ['#13D9DF', '#076A70'], fx: 'pulse' },
   { id: 'fr-ocean', kind: 'frame', name: 'Yörünge', emoji: '🪐', price: 300, days: 30, color: ['#38BDF8', '#A78BFA'], fx: 'orbit' },
   { id: 'fr-aurora', kind: 'frame', name: 'Aurora', emoji: '🌌', price: 600, days: 30, color: ['#13D9DF', '#FF6576'], fx: 'aurora' },
   { id: 'fr-fire', kind: 'frame', name: 'Ateş', emoji: '🔥', price: 900, days: 30, color: ['#EF4444', '#F59E0B'], fx: 'flame' },
@@ -36,7 +36,7 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'fr-laurel', kind: 'frame', name: 'Altın Defne', emoji: '🌿', price: 2_000, days: 30, color: ['#F6BD60', '#B7832E'] },
   { id: 'fr-crown-silver', kind: 'frame', name: 'Gümüş Taç', emoji: '👑', price: 4_000, days: 30, color: ['#E2E8F0', '#13D9DF'], minVip: 2 },
   { id: 'fr-crown-gold', kind: 'frame', name: 'Kraliyet Kanatları', emoji: '🪽', price: 9_000, days: null, color: ['#F6BD60', '#13D9DF'], minVip: 4 },
-  { id: 'fr-wing-coral', kind: 'frame', name: 'Melek Kalp · Mercan', emoji: '💞', price: 3_000, days: 30, color: ['#FF6576', '#F6BD60'] },
+  { id: 'fr-wing-coral', kind: 'frame', name: 'Melek Kalp · Pembe', emoji: '💞', price: 3_000, days: 30, color: ['#FF6576', '#F6BD60'] },
   { id: 'fr-wing-sky', kind: 'frame', name: 'Melek Kalp · Turkuaz', emoji: '💙', price: 3_000, days: 30, color: ['#13D9DF', '#F6BD60'] },
   { id: 'en-sparkle', kind: 'entry', name: 'Işıltı', emoji: '✨', price: 200, days: 7, color: ['#0B3B4A', '#087A80'], fx: 'sparkle' },
   { id: 'en-thunder', kind: 'entry', name: 'Şimşek', emoji: '⚡', price: 600, days: 30, color: ['#172554', '#1D4ED8'], fx: 'thunder' },
@@ -399,9 +399,9 @@ export const roomCode = (id: string) => String(10_000_000 + ([...id].reduce((h, 
 // (components/room/stage-backdrop ROOM_BG_ART); `seed` is only the card picture older apps chose with the same id.
 export const ROOM_BACKGROUNDS = [
   { id: 'bg1', name: 'Gün Batımı', seed: 'night', minLevel: 1 },
-  { id: 'bg2', name: 'Deniz Feneri', seed: 'neon', minLevel: 2 },
-  { id: 'bg3', name: 'Deniz Altı', seed: 'sea', minLevel: 4 },
-  { id: 'bg4', name: 'Turkuaz Koy', seed: 'galaxy', minLevel: 7 },
+  { id: 'bg2', name: 'Gece Işığı', seed: 'neon', minLevel: 2 },
+  { id: 'bg3', name: 'Derin Mavi', seed: 'sea', minLevel: 4 },
+  { id: 'bg4', name: 'Turkuaz', seed: 'galaxy', minLevel: 7 },
 ];
 /** The card picture an older app chose for a server room ('' for none or an unknown id): the lists fall back to it
  *  while the room has no uploaded cover (Oda Kapağı). */
@@ -433,7 +433,7 @@ export type RoomBackground = { kind: 'free' | 'paid' | 'custom'; id: string | nu
 export type Track = { id: string; title: string; artist: string; seconds: number };
 export const MUSIC_CATALOG: Track[] = [
   { id: 'm1', title: 'Gece Mavisi', artist: 'Lisanslı Kütüphane', seconds: 184 },
-  { id: 'm2', title: 'Sahil Yolu', artist: 'Lisanslı Kütüphane', seconds: 201 },
+  { id: 'm2', title: 'Gece Yolu', artist: 'Lisanslı Kütüphane', seconds: 201 },
   { id: 'm3', title: 'Lo-fi Çalışma', artist: 'Lisanslı Kütüphane', seconds: 240 },
   { id: 'm4', title: 'Parti Başlasın', artist: 'Lisanslı Kütüphane', seconds: 172 },
   { id: 'm5', title: 'Akustik Akşam', artist: 'Lisanslı Kütüphane', seconds: 215 },
@@ -480,7 +480,7 @@ export const COIN_GAME_TILES: { id: string; name: string; emoji: string; colors:
   { id: 'c2', name: 'Meyve Bahçesi', emoji: '🍓', colors: ['#16A34A', '#DB2777'] },
   { id: 'c3', name: 'Hazine Sandığı', emoji: '💰', colors: ['#CA8A04', '#7C2D12'] },
   { id: 'c4', name: 'Penaltı', emoji: '⚽', colors: ['#0EA5E9', '#1E3A8A'] },
-  { id: 'c5', name: 'Mercan Avı', emoji: '🦈', colors: ['#0891B2', '#164E63'] },
+  { id: 'c5', name: 'Balon Avı', emoji: '🎈', colors: ['#0EA5E9', '#7C3AED'] },
 ];
 
 export const GAMES: Game[] = [

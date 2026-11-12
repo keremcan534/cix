@@ -104,18 +104,18 @@ export const kabileMemberIds = (f: KabileFamily) => {
 
 // --- Power tiers (season power) ---------------------------------------------
 export const POWER_TIERS = [
-  { name: 'Sandal I', min: 0 },
-  { name: 'Sandal II', min: 10_000 },
-  { name: 'Kayık I', min: 40_000 },
-  { name: 'Kayık II', min: 90_000 },
-  { name: 'Yelkenli I', min: 160_000 },
-  { name: 'Yelkenli II', min: 260_000 },
-  { name: 'Gulet I', min: 400_000 },
-  { name: 'Gulet II', min: 600_000 },
-  { name: 'Fırkateyn I', min: 900_000 },
-  { name: 'Fırkateyn II', min: 1_200_000 },
-  { name: 'Fırkateyn III', min: 1_523_000 },
-  { name: 'Kalyon', min: 2_000_000 },
+  { name: 'Demir I', min: 0 },
+  { name: 'Demir II', min: 10_000 },
+  { name: 'Bronz I', min: 40_000 },
+  { name: 'Bronz II', min: 90_000 },
+  { name: 'Gümüş I', min: 160_000 },
+  { name: 'Gümüş II', min: 260_000 },
+  { name: 'Altın I', min: 400_000 },
+  { name: 'Altın II', min: 600_000 },
+  { name: 'Platin I', min: 900_000 },
+  { name: 'Platin II', min: 1_200_000 },
+  { name: 'Platin III', min: 1_523_000 },
+  { name: 'Efsane', min: 2_000_000 },
 ];
 export const KEEP_GOAL = 60_000; // weekly power needed to keep the current tier
 export const powerTier = (power: number) => {
@@ -214,7 +214,7 @@ export const KABILE_THEMES: { id: string; name: string; colors: readonly [string
   { id: 'gece', name: 'Gece Moru', colors: ['#3B1D6E', '#080F1E'], minLevel: 1 },
   { id: 'ates', name: 'Kızıl Ay', colors: ['#7F1D1D', '#080F1E'], minLevel: 1 },
   { id: 'orman', name: 'Zümrüt Orman', colors: ['#14532D', '#080F1E'], minLevel: 4 },
-  { id: 'okyanus', name: 'Derin Okyanus', colors: ['#0C4A6E', '#080F1E'], minLevel: 7 },
+  { id: 'okyanus', name: 'Gece Mavisi', colors: ['#0C4A6E', '#080F1E'], minLevel: 7 },
   { id: 'altin', name: 'Altın Saray', colors: ['#78350F', '#080F1E'], minLevel: 10 },
   { id: 'galaksi', name: 'Galaksi', colors: ['#581C87', '#0B1026'], minLevel: 13 },
 ];

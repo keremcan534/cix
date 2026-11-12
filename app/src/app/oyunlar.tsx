@@ -49,7 +49,7 @@ const HOOK: Partial<Record<CasinoGame['id'], string>> = {
   foodwheel: '8 seçenek · 45 kat',
   magiccard: '8 kart · 100 kat',
   rocket: 'Çarpanı seç, fırlat',
-  fish: 'Dokun, ateş et, yakala',
+  fish: 'Dokun, ateş et, patlat',
   olympus: 'Işık kimi bulacak?',
   bilye: 'Fırlat · 20 kat kupa',
 };
@@ -111,7 +111,7 @@ export default function GameCenter() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.wheelTag}>YENİ · JACKPOT</Text>
                   <Text style={s.wheelName}>Rüzgâr Gülü</Text>
-                  <Text style={s.wheelDim}>Kıyı, Açık Deniz, Derin Okyanus · ×1, ×10, ×50 çevir · her dilim kazandırır</Text>
+                  <Text style={s.wheelDim}>Klasik, Yüksek, Zirve · ×1, ×10, ×50 çevir · her dilim kazandırır</Text>
                   <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
                     <GlossButton label="Çevir" tone="money" small />
                   </View>

@@ -1,6 +1,6 @@
 /// <reference types="node" />
-// The casino games from the client's reference screens: the payline slots (lib/line-slot + lib/slot-configs), Fener
-// Kayalığı (ships in the lighthouse beam), Mercan Avı (one round per shot), the bet boards (Gece Yarısı Çarkı, Tatlı Tezgâh, Sihir Destesi),
+// The casino games from the client's reference screens: the payline slots (lib/line-slot + lib/slot-configs), Yıldız
+// Avı (stars in the searchlight beam), Balon Avı (one round per shot), the bet boards (Gece Yarısı Çarkı, Lezzet Çarkı, Sihir Destesi),
 // Roket (crash) and Bereket Ağacı. Each keeps the house rule; JACKPOT funds are part of the 40 %.
 import { afterEach, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -104,8 +104,8 @@ describe('Çizgili slotlar', () => {
   test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateSlots(60_000, 0.03));
 });
 
-describe('Fener Kayalığı', () => {
-  // A board from a compact map: '.' sea, 'k' kandil, a number = a ship with that cargo in tenths of the stake.
+describe('Yıldız Avı', () => {
+  // A board from a compact map: '.' empty sky, 'k' kuyruklu yıldız, a number = a star worth that many tenths of the stake.
   const board = (rows: (string | number)[][]): FCell[][] =>
     Array.from({ length: ROWS }, (_, r) =>
       Array.from({ length: COLS }, (_, c) => {
@@ -114,7 +114,7 @@ describe('Fener Kayalığı', () => {
       }),
     );
 
-  test('yalnızca ışıktaki sıranın gemileri öder, parlaklıkla çarpılır', () => {
+  test('yalnızca ışıktaki sıranın yıldızları öder, parlaklıkla çarpılır', () => {
     const g = board([
       [10, '.', 5],
       ['.', 500],
@@ -124,7 +124,7 @@ describe('Fener Kayalığı', () => {
     assert.equal(evaluateBoard(g, [0], 3).pay, 4.5);
     assert.equal(evaluateBoard(g, [2], 5).pay, 5);
     assert.equal(evaluateBoard(g, [3], 5).pay, 0, 'boş sıra ödemez');
-    // Fırtına: two rows at once.
+    // Yıldız Yağmuru: two rows at once.
     assert.equal(evaluateBoard(g, [0, 1], 2).pay, 103);
     // Tenths stay integers until the end: 0,1 × 3 is exactly 0,3.
     assert.equal(evaluateBoard(board([[1, 1, 1]]), [0], 1).pay, 0.3);
@@ -132,7 +132,7 @@ describe('Fener Kayalığı', () => {
     assert.equal(cargoLabel(500), '×50');
   });
 
-  test('3+ kandil Fırtına Gecesi’ni açar; fırtınada iki sıra yanar, parlaklık 1’den 6’ya çıkar', () => {
+  test('3+ kuyruklu yıldız Yıldız Yağmuru’nu açar; yağmurda iki sıra yanar, parlaklık 1’den 6’ya çıkar', () => {
     assert.equal(evaluateBoard(board([['k', 'k', '.', 'k']]), [0], 1).lamps, 3);
     assert.equal(STORM_TRIGGER, 3);
     const rnd = seeded(11);
@@ -152,7 +152,7 @@ describe('Fener Kayalığı', () => {
         });
       }
     }
-    assert.ok(storms > 100, `fırtına sayısı ${storms}`);
+    assert.ok(storms > 100, `yıldız yağmuru sayısı ${storms}`);
   });
 
   test('beklenen geri ödeme %40’ı aşmaz; simülasyon hesapla uyuşur', () => {
@@ -168,8 +168,8 @@ describe('Fener Kayalığı', () => {
   test('tam uzunlukta simülasyon (SIM_FULL=1)', SIM_FULL, () => simulateFener(200_000, 0.02));
 });
 
-describe('Mercan Avı', () => {
-  test('her balıkta beklenen geri ödeme tam %40; büyük balık daha zor yakalanır', () => {
+describe('Balon Avı', () => {
+  test('her balonda beklenen geri ödeme tam %40; büyük balon daha zor vurulur', () => {
     for (const f of FISH) assert.ok(Math.abs(fishReturn(f) - 0.4) < 1e-12, f.id);
     assert.equal(shootFish(FISH[0], FISH_HIT - 1).caught, true);
     assert.equal(shootFish(FISH[0], FISH_HIT).caught, false);
@@ -190,7 +190,7 @@ describe('Bahis tahtaları', () => {
     assert.equal(boardTotal(MAGIC_CARD), 3000);
   });
 
-  test('Tatlı Tezgâh: Salata bütün sebzeleri, Pizza bütün et ve deniz ürünlerini öder; Boş Tabak kimseyi', () => {
+  test('Lezzet Çarkı: Salata bütün sebzeleri, Pizza bütün et yemeklerini öder; Boş Tabak kimseyi', () => {
     const salad = FOOD_WHEEL.results.find((r) => r.id === 'salad')!;
     const pizza = FOOD_WHEEL.results.find((r) => r.id === 'pizza')!;
     const empty = FOOD_WHEEL.results.find((r) => r.id === 'empty')!;

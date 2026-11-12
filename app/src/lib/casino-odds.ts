@@ -128,13 +128,13 @@ export function outcomeOf(game: CasinoId, pick: string, rnd: (n: number) => numb
     const r = boardResult(b, rnd(boardTotal(b)));
     return { display: [r.id], multiplier: r.pays.includes(pick) ? optionOf(b, pick)!.mult : 0, detail: `Sonuç: ${r.label} ${r.name}`, board: r };
   }
-  // 'olympus' is Fener Kayalığı's stored id (limits, history and the server key on it); the engine is lib/fener-slot.
+  // 'olympus' is Yıldız Avı's stored id (limits, history and the server key on it); the engine is lib/fener-slot.
   if (game === 'olympus') {
     const round = playFener(rnd);
     const ships = round.base.grid[round.base.lit[0]].filter((c) => c.kind === 'ship').length;
     const detail = [
-      ships ? `ışıkta ${ships} gemi · parlaklık ×${round.base.brightness}` : 'ışıkta gemi yok',
-      round.storm.length ? `Fırtına Gecesi ${round.storm.length} dönüş` : '',
+      ships ? `ışıkta ${ships} yıldız · parlaklık ×${round.base.brightness}` : 'ışıkta yıldız yok',
+      round.storm.length ? `Yıldız Yağmuru ${round.storm.length} dönüş` : '',
       `${Math.round(round.multiplier * 10) / 10}x`,
     ];
     return { display: round.base.grid.flat().map((c) => (c.kind === 'ship' ? `ship${c.cargo}` : c.kind)), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), fener: round };
@@ -148,7 +148,7 @@ export function outcomeOf(game: CasinoId, pick: string, rnd: (n: number) => numb
   if (game === 'fish') {
     const f = fishById(pick)!;
     const shot = shootFish(f, rnd(fishDraw(f)));
-    return { display: [f.id], multiplier: shot.multiplier, detail: `${f.name} ${shot.caught ? `yakalandı · ${f.mult}x` : 'kaçtı'}`, caught: shot.caught };
+    return { display: [f.id], multiplier: shot.multiplier, detail: `${f.name} ${shot.caught ? `vuruldu · ${f.mult}x` : 'kaçtı'}`, caught: shot.caught };
   }
   return evaluate(game, pick, DRAWS[game].map(rnd));
 }

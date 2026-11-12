@@ -61,7 +61,7 @@ const SUPPORT: Item[] = [
 const CENTER: Item = { icon: 'briefcase-outline', label: 'Ajans Merkezi (başvuru onayları)', onPress: () => router.push('/ajans/merkez' as Href) };
 
 export default function ProfileScreen() {
-  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory } = useApp();
+  const { coins, isHost, following, blocked, me, logout, vipLevel, equipped, wealthLevel, paidGames, charmLevel, agencyId, myRoom, svipLevel, nobleTier, inventory, vipDays } = useApp();
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const isAdmin = useIsAdmin();
@@ -181,8 +181,8 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="İnci" sub={svipLevel ? `İnci ${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
-            <StatusCard title="VIP" sub={vipLevel ? `VIP${vipLevel}` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
+            <StatusCard title="VIP" sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="Abonelik" sub={vipDays > 0 ? `${vipDays} gün` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
             <StatusCard title="Rütbe" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>
         </View>
@@ -245,8 +245,8 @@ export default function ProfileScreen() {
                 [
                   ['slot', '🎰', 'Gece Yarısı Çarkı'],
                   ['jackpot', '💰', 'Hazine Kulesi'],
-                  ['olympus', '🔦', 'Fener Kayalığı'],
-                  ['fish', '🐟', 'Mercan Avı'],
+                  ['olympus', '🔭', 'Yıldız Avı'],
+                  ['fish', '🎈', 'Balon Avı'],
                 ] as const
               )
                 .filter(([id]) => casino.find((g) => g.id === id)?.active)

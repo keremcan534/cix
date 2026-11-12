@@ -11,7 +11,7 @@
 // Levels: Cömertlik from the coins a person spent (wheel.mjs wealthPoints), Yankı from the diamonds others gave them
 // (wallet.mjs charmPoints), as levels only: the points would tell others what someone spends or earns. A list reads
 // them for everyone in it in a few queries, and keeps them a minute (LEVELS_CACHE_MS) so Ana Sayfa's refresh stays
-// cheap. "Seviyeyi Gizle" (hideWealth, hideCharm; a VIP right, VIP 1 and up by İnci or Rütbe) sends that level as
+// cheap. "Seviyeyi Gizle" (hideWealth, hideCharm; a VIP right, VIP 1 and up by SVIP level or Rütbe) sends that level as
 // null, while the person has VIP.
 // Friends are people who follow each other. The gift wall and the "Hediye" count are the gifts of the catalog this
 // person received (gift_events). Rides and entry effects are what they own in the shop now (economy.mjs). Medals

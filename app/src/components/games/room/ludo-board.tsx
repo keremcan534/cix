@@ -12,10 +12,10 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { BASE, HOME } from '@/lib/room-games/ludo';
 import { GRID, cornerOf, hopSteps, stackSpots, tokenPoint, trackSquares, yardCentre, type Point } from '@/lib/room-games/ludo-board';
 
-/** The four colours clockwise, from the app's palette: turquoise, coral, gold, green. `ink` is text on the colour. */
+/** The four colours clockwise, from the app's palette: turquoise, pink (coral), gold, green. `ink` is text on the colour. */
 export const LUDO_COLORS = [
   { name: 'Turkuaz', base: '#13D9DF', light: '#A5F6F8', dark: '#0A8F95', deep: '#0B4A58', ink: '#04161D' },
-  { name: 'Mercan', base: '#FF6576', light: '#FFC2C9', dark: '#C93C4F', deep: '#5E1F2D', ink: '#3A0A14' },
+  { name: 'Pembe', base: '#FF6576', light: '#FFC2C9', dark: '#C93C4F', deep: '#5E1F2D', ink: '#3A0A14' },
   { name: 'Altın', base: '#F6BD60', light: '#FFE9BF', dark: '#B7832E', deep: '#5C4012', ink: '#3B2300' },
   { name: 'Yeşil', base: '#22C55E', light: '#A7F3C5', dark: '#15803D', deep: '#0E4A27', ink: '#052E16' },
 ] as const;
