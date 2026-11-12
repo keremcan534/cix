@@ -2,7 +2,8 @@
 // with all sending rules. Used by the full chat screen and by the in-room messages sheet, so a reply
 // sent from inside a room follows exactly the same rules as one sent from the Mesajlar tab.
 // With a real person the server prices each message (1v1, components/one-on-one-bar): free on a mutual follow
-// or between two people who aren't streamers; the heart bar and the gift button come from there too.
+// or between two people who aren't streamers; the heart bar and the gift button come from there too. The heart bar
+// shows with a paid pair, and with anyone once the heart between us has a level (the demo: its sample hearts).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -29,7 +30,7 @@ import { incomingWarning, scanMessage } from '@/lib/safety';
 import { messageRefusal, noteSent } from '@/lib/contact-filter';
 import { ContactNote } from '@/components/contact-note';
 import { newRef, sendDm } from '@/lib/api';
-import { HeartBar, paidPair, useChatGift, usePair } from '@/components/one-on-one-bar';
+import { HeartBar, heartOf, paidPair, useChatGift, usePair } from '@/components/one-on-one-bar';
 import { liveMode, message as errorText, refreshWallet, toServer } from '@/lib/live';
 import type { Pair } from '@/lib/live/one-on-one';
 import { MESSAGE_REPORT_REASONS, isLiveUser, liveDm, reportDm, syncThread, useLiveThread, type SendResult } from '@/lib/live/messages';
@@ -81,6 +82,7 @@ export function ChatThread({
   const dmMuted = real ? dmStopped : null;
   // A real person: what a message costs is the server's (0 while it is still being read; the server charges anyway).
   const { pair, reload } = usePair(user.id, real);
+  const heart = missing ? null : heartOf(user.id, pair);
   const price = real ? (pair?.dmPrice ?? 0) : DM_PRICE;
   const mutual = real ? price === 0 : following.has(user.id) && FOLLOWS_ME.has(user.id);
   const gift = useChatGift(user, reload);
@@ -266,7 +268,7 @@ export function ChatThread({
   return (
     <>
       {header(typing, pair)}
-      {paidPair(pair) && <HeartBar pair={pair} />}
+      {heart && (paidPair(pair) || heart.level > 0) && <HeartBar heart={heart} pair={pair} them={user} />}
       <Body style={{ flex: 1 }}>
         <FlatList
           data={[...(last && messages.length > last ? messages.slice(-last) : messages)].reverse()}

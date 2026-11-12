@@ -1,24 +1,30 @@
 // Mock data for the messages tab (Mesajlar / Arkadaşlarım / Aramalar).
 
-/** Intimacy ("yakınlık") points per user, used by the "Yakınlık" filter. */
+/**
+ * Heart points with each sample person (gifts and paid messages and minutes both ways, as on the server): the
+ * demo's "Yakınlık" order and its heart level (lib/heart-tiers), so every look of the heart can be seen.
+ */
 export const INTIMACY: Record<string, number> = {
-  u1: 1280,
-  u2: 340,
-  u3: 95,
-  u4: 60,
-  u5: 760,
-  u6: 25,
-  u7: 410,
-  u8: 18,
-  u9: 520,
-  u10: 40,
-  u11: 980,
-  u12: 12,
+  u1: 2_150_000,
+  u2: 21_000,
+  u3: 7_400,
+  u4: 2_600,
+  u5: 300_000,
+  u6: 420,
+  u7: 52_000,
+  u8: 120,
+  u9: 120_000,
+  u10: 900,
+  u11: 1_100_000,
+  u12: 0,
 };
 
 export const intimacyOf = (userId: string) => INTIMACY[userId] ?? 0;
 
-export const formatIntimacy = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}B` : String(n));
+/** One decimal, none when it is ",0": "1,3", "21". */
+const oneDecimal = (x: number) => x.toFixed(x >= 100 ? 0 : 1).replace(/\.0$/, '').replace('.', ',');
+/** "940", "1,3B", "21B", "300B", "2,2Mn". */
+export const formatIntimacy = (n: number) => (n >= 999_500 ? `${oneDecimal(n / 1_000_000)}Mn` : n >= 1000 ? `${oneDecimal(n / 1000)}B` : String(n));
 
 type Stamp = { time: string; at?: string };
 const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];

@@ -1,13 +1,16 @@
 // The person card in a room: tapping someone on a mic, on the balcony list or in the chat opens it from the bottom.
-// Who they are (photo, name, age, agency, Aile, followers) and what I can do: send a gift, mention them in the
-// chat (@bahset), follow, message, open the full profile. Room staff get "Yönet" for their actions on them.
-// Live mode: the follow state and the counts are the server's (lib/live/profile), as on the profile screen.
+// Who they are (photo, name, age, agency, Aile, followers, the heart between us) and what I can do: send a gift,
+// mention them in the chat (@bahset), follow, message, open the full profile. Room staff get "Yönet" for their
+// actions on them. Live mode: the follow state, the counts and the heart are the server's (lib/live/profile,
+// lib/live/one-on-one), as on the profile screen.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
+import { HeartBadge } from '@/components/heart-level';
+import { heartOf, usePair } from '@/components/one-on-one-bar';
 import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { useSheetBottom } from '@/components/room/parts';
 import { Avatar, VipBadge } from '@/components/ui';
@@ -39,6 +42,9 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
   // Live mode: the server's counts for this person (null until read).
   const [counts, setCounts] = useState<{ id: string; followers: number; isFollowing: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  // The heart between us (the demo: its sample heart), beside their name once it has a level.
+  const { pair } = usePair(uid, !!serverId && uid !== 'me');
+  const heart = uid === 'me' ? null : heartOf(uid, pair);
   useEffect(() => {
     if (!serverId) return;
     let on = true;
@@ -92,6 +98,7 @@ export function PersonCard({ uid, note, onClose, onGift, onMention, onReport, on
                 {u.name}
               </Text>
               {u.vip && <VipBadge />}
+              {heart && heart.level > 0 && <HeartBadge level={heart.level} />}
             </View>
             <View style={[s.row, { flexWrap: 'wrap' }]}>
               <GenderChip user={u} />
