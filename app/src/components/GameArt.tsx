@@ -3,6 +3,7 @@
 import { Image } from 'react-native';
 
 import { artSource, type ArtName } from '@/components/Art';
+import { salonArt, type SalonArtName } from '@/components/games/fx/salon-art';
 import { EmojiIcon } from '@/components/Icon3D';
 
 const COVER: Record<string, ArtName> = {
@@ -22,7 +23,15 @@ const COVER: Record<string, ArtName> = {
   dragon: 'oyun-dragon-tiger',
   // Balon Avı (fish) shows its emoji until its own cover arrives: the old cover is a fishing rod.
 };
-const ART: Record<string, number> = Object.fromEntries(Object.entries(COVER).map(([id, name]) => [id, artSource(name)]));
+// Covers that came with a machine's own pack (components/games/fx/salon-art, §24).
+const SALON_COVER: Record<string, SalonArtName> = { super777: 'kizil-yedi-kapak' };
+const ART: Record<string, number> = Object.fromEntries([
+  ...Object.entries(COVER).map(([id, name]) => [id, artSource(name)]),
+  ...Object.entries(SALON_COVER).flatMap(([id, name]) => {
+    const src = salonArt(name);
+    return src === undefined ? [] : [[id, src]];
+  }),
+]);
 
 export const gameArtOf = (id: string): number | undefined => ART[id];
 

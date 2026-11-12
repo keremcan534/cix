@@ -5,16 +5,22 @@
 // wait on the last ones when a scatter or the JACKPOT is one symbol away, and the win is shown by win-fx. Oto is
 // repeated rounds from this screen and stops at the JACKPOT, a big win, the loss limit or any refusal (daily limit,
 // balance, pool). The reels take the height the phone leaves them: the cells grow with it, within a reel's shape.
+// A machine with a skin (fx/slot-skin: Kızıl Yedi) is drawn in its own pictures instead of the shell's stage: the
+// cabinet over the reels, picture symbols, the spin button and the win plate, and its own JACKPOT / Büyük Kazanç
+// show (fx/jackpot-show); the round, the controls and Oto are the same.
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { Art, type ArtName } from '@/components/Art';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { CasinoLock } from '@/components/games/casino';
-import { GameInfoSheet } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { useJackpotShow } from '@/components/games/fx/jackpot-show';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
 import { ContactShadow, FundPlaque, Marquee, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, plaqueValue, salonScreen, symbolShadow, useBox, type ActionLook, type StatusTone } from '@/components/games/fx/salon';
+import { SkinPlate, slotSkinOf, type SlotSkin } from '@/components/games/fx/slot-skin';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import type { LineSlotId } from '@/lib/casino-odds';
@@ -155,9 +161,35 @@ function Symbol({ label, sym, theme, dim, size }: { label: string; sym: string; 
   );
 }
 
+/** Between two symbols and two reels of a skinned machine, its window's inner margin and a reel's rim (px). */
+const SKIN_GAP = 3;
+const SKIN_PAD = 3;
+const SKIN_RIM = 1.5;
+
+/**
+ * A skinned machine in the area it is given: the win plate under the cabinet, the cabinet as large as the rest
+ * allows, the reels in its window.
+ */
+function fitSkin(skin: SlotSkin, w: number, h: number, reels: number, rows: number) {
+  const plateW = Math.round(Math.min(w * 0.86, 330));
+  const plateH = Math.round(plateW / skin.plate.aspect);
+  // Short of height, the plate stands over the cabinet's base (up to this much of it); with room, under it.
+  const most = Math.round(plateH * 0.42);
+  const fw = Math.floor(Math.min(w, (h - plateH + most) * skin.frame.aspect));
+  const fh = Math.round(fw / skin.frame.aspect);
+  const lap = Math.max(0, Math.min(most, fh + plateH - h));
+  const f = skin.frame.window;
+  const win = { x: f.x * fw, y: f.y * fh, w: f.w * fw, h: f.h * fh };
+  const reelW = Math.floor((win.w - 2 * SKIN_PAD - (reels - 1) * SKIN_GAP) / reels);
+  const cellH = Math.floor((win.h - 2 * SKIN_PAD - 2 * SKIN_RIM - (rows - 1) * SKIN_GAP) / rows);
+  const symSize = Math.round(Math.min(reelW - 2 * SKIN_RIM, cellH) * 0.96);
+  return { plateW, plateH, lap, fw, fh, win, reelW, cellH, symSize };
+}
+
 export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) {
   const c = SLOT_CONFIGS[id];
   const theme = THEMES[id];
+  const skin = slotSkinOf(id);
   const reels = c.counts.length;
   const { wealthLevel, settings, coins, gameCoins } = useApp();
   const { casino, bank } = useGames();
@@ -189,6 +221,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const [pulse] = useState(() => new Animated.Value(0));
   const beat = useRef<Animated.CompositeAnimation | null>(null);
   const win = useWinFx();
+  const show = useJackpotShow(skin);
 
   useEffect(() => {
     balance.current = coins + gameCoins;
@@ -216,9 +249,12 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const fitW = area.w ? Math.floor((area.w - FRAME - (CABINET ? 12 : 0) - (reels - 1) * GAP) / reels) - REEL_EDGE : 0;
   const fitH = area.h ? Math.floor((area.h - CABINET - FRAME - REEL_EDGE - (c.rows - 1) * GAP) / c.rows) : 0;
   const shape = reels === 3 ? 1.2 : 1.75;
-  const cellH = fitW && fitH ? Math.max(40, Math.min(Math.round(fitW * shape), fitH)) : 0;
-  const cellW = cellH ? Math.min(fitW, Math.round(cellH * (reels === 3 ? 1.25 : 1))) : 0;
-  const symSize = Math.round(Math.min(cellW, cellH) * (reels === 3 ? 0.74 : 0.8));
+  const fit = skin && area.w && area.h ? fitSkin(skin, area.w, area.h, reels, c.rows) : null;
+  const gap = skin ? SKIN_GAP : GAP;
+  const plainH = fitW && fitH ? Math.max(40, Math.min(Math.round(fitW * shape), fitH)) : 0;
+  const cellH = skin ? (fit ? Math.max(30, fit.cellH) : 0) : plainH;
+  const cellW = fit ? fit.reelW - 2 * SKIN_RIM : cellH ? Math.min(fitW, Math.round(cellH * (reels === 3 ? 1.25 : 1))) : 0;
+  const symSize = fit ? fit.symSize : Math.round(Math.min(cellW, cellH) * (reels === 3 ? 0.74 : 0.8));
   // The reels keep the same pace in symbols a second however tall a cell is.
   const paceOf = (p: ReelPace): ReelPace => ({ ...p, speed: p.speed * Math.max(1, cellH / (reels === 3 ? 110 : 62)) });
 
@@ -246,7 +282,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     if (!alive.current) return null;
     if (!r.ok) {
       // Refused (limit, balance, pool): the reels come back to where they stood.
-      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, cellH + GAP, c.rows, quick), quick, still)));
+      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, cellH + gap, c.rows, quick), quick, still)));
       if (!alive.current) return null;
       setHeld(null);
       setStatus({ text: r.reason, tone: 'err' });
@@ -259,7 +295,7 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
     setWaiting(waits.map((w) => w > 0));
     await Promise.all(
       sp.grid.map((col, i) =>
-        handles.current[i]?.land(col, reelRun(i, cellH + GAP, c.rows, pace, waits[i]), pace, still).then(() => {
+        handles.current[i]?.land(col, reelRun(i, cellH + gap, c.rows, pace, waits[i]), pace, still).then(() => {
           if (!alive.current) return;
           playSfx('stop', 0.75);
           tapHaptic();
@@ -297,11 +333,18 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
       await win.celebrate({ amount: payout, bet, jackpot: true, title: name });
       return { net: payout - bet, stop: 'JACKPOT kazandın' };
     }
+    // A skinned machine shows its big wins in its own pictures: the JACKPOT and, lighter, the Büyük Kazanç.
+    if (skin && won && payout >= bet * skin.show.jackpotX) {
+      setStatus({ text: `JACKPOT! +${fmt(payout)}`, tone: 'jackpot', amount: payout, label: 'JACKPOT' });
+      await show.play({ kind: 'jackpot', amount: payout, bet });
+      return { net: payout - bet, stop: 'JACKPOT kazandın' };
+    }
     if (won) {
       const prize = id === 'spellbook' && sp.scatters >= 3 ? (sp.scatters >= 5 ? 'MAJOR' : sp.scatters === 4 ? 'MINOR' : 'MINI') : '';
-      setStatus({ text: `KAZANÇ +${fmt(payout)}${prize ? ` · ${prize}` : ''}`, tone: 'win', amount: payout, label: prize || 'KAZANÇ' });
+      const big = !!skin && payout >= bet * skin.show.bigX;
+      setStatus({ text: `KAZANÇ +${fmt(payout)}${prize ? ` · ${prize}` : ''}`, tone: 'win', amount: payout, label: big ? 'BÜYÜK KAZANÇ' : prize || 'KAZANÇ' });
       setShine((x) => x + 1);
-      const seen = win.celebrate({ amount: payout, bet });
+      const seen = big ? show.play({ kind: 'big', amount: payout, bet }) : win.celebrate({ amount: payout, bet, smallOnly: !!skin });
       // Turbo doesn't stand still for a small win; everything bigger is watched to the end.
       if (!(turbo && winTierOf(payout, bet) === 'small')) await seen;
     } else if (payout > 0) setStatus({ text: `ÖDEME ${fmt(payout)}` });
@@ -357,6 +400,110 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
   const boxW = cellW ? reels * (cellW + REEL_EDGE) + (reels - 1) * GAP + FRAME : 0;
   // The bulbs run fast while a win is shown.
   const hot = status.tone === 'win' || status.tone === 'jackpot';
+  const face = (sym: string, size: number) => {
+    const art = skin?.symbols[sym];
+    return art !== undefined ? <Image source={art} style={{ width: size, height: size }} resizeMode="contain" accessibilityIgnoresInvertColors /> : <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={size} />;
+  };
+  const reelsLabel = `Makaralar: ${grid.map((col) => col.map((x) => c.symbols[x].name).join(', ')).join(' | ')}`;
+  const columns = () =>
+    opening.map((col, reel) => (
+      <View key={reel} style={[skin ? [s.skinReel, { width: cellW + 2 * SKIN_RIM }] : [s.reel, { width: cellW + REEL_EDGE }], waiting[reel] && s.reelWait]}>
+        {/* The plates stand still: the symbols roll over them and come to rest on them. A skin's symbols need none. */}
+        {!skin &&
+          col.map((_, row) => {
+            // A win lights its plates and dims the others with their symbols.
+            const on = lit.has(`${reel}-${row}`);
+            return <SymbolPlate key={row} w={cellW} h={cellH} tone={theme.plate} lit={on} style={[s.plate, { top: 1 + row * (cellH + GAP) }, lit.size > 0 && !on && s.plateDim]} />;
+          })}
+        <Reel
+          ref={(h) => {
+            handles.current[reel] = h;
+          }}
+          symbols={col}
+          strip={strips[reel]}
+          cell={cellH}
+          gap={gap}
+          pulse={pulse}
+          dim={lit.size > 0}
+          lit={col.map((_, row) => lit.has(`${reel}-${row}`))}
+          shade={skin ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.35)'}
+          litStyle={skin ? s.skinLit : undefined}
+          render={(sym) => (skin ? face(sym, symSize) : <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />)}
+        />
+      </View>
+    ));
+  const controls = (
+    <SpinControls
+      held={held}
+      bets={game.bets}
+      bet={bet}
+      onBet={setBet}
+      busy={busy}
+      turbo={turbo}
+      onTurbo={() => setTurbo((t) => !t)}
+      auto={auto}
+      autoSpins={AUTO_SPINS}
+      onAuto={toggleAuto}
+      onSpin={play}
+      look={theme.look}
+      art={skin?.spin.src}
+      caption={`${c.lines.length} çizgi × ${fmt(bet / c.lines.length)}`}
+    />
+  );
+  const infoSheet = (
+    <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
+      <View style={s.pays}>
+        <Text style={s.paysHead}>
+          Bir çizgideki kazanç · {fmt(bet)} jeton bahiste · {reels === 3 ? '3 aynı' : '3 / 4 / 5 aynı'}
+        </Text>
+        {paySyms.map((x) => (
+          <View key={x} style={s.payRow}>
+            <View style={{ width: 52, alignItems: 'center' }}>{face(x, 34)}</View>
+            <Text style={s.payName}>{c.symbols[x].name}</Text>
+            <Text style={s.payVals}>{c.paytable[x].map((p) => fmt((p * bet) / c.lines.length)).join(' / ')}</Text>
+          </View>
+        ))}
+        {c.wild && (
+          <Text style={s.paysNote}>
+            {c.symbols[c.wild].name} her sembolün yerine geçer{c.jackpotShare ? `; bir çizgide beşi ${jackpotName} fonunun bahis / ${fmt(Math.max(...game.bets))} kadarını kazandırır.` : '.'}
+          </Text>
+        )}
+        <Text style={s.paysNote}>
+          Oto {AUTO_SPINS} tur çevirir; {c.jackpotShare ? `${jackpotName}, ` : ''}
+          {BIG_WIN} kat kazanç veya {AUTO_LOSS} bahislik kayıpta kendiliğinden durur.
+        </Text>
+      </View>
+    </GameInfoSheet>
+  );
+
+  if (skin)
+    return (
+      <View style={salonScreen}>
+        <View style={s.skinStage}>
+          <View style={s.area} onLayout={area.onLayout}>
+            {fit && cellH > 0 && (
+              <View style={{ width: fit.fw, alignItems: 'center' }}>
+                <View style={{ width: fit.fw, height: fit.fh }}>
+                  {/* The reels fill the cabinet's window and run a little under its edge; the cabinet is drawn over them. */}
+                  <LinearGradient colors={skin.reels} style={[s.skinWindow, { left: fit.win.x - 2, top: fit.win.y - 2, width: fit.win.w + 4, height: fit.win.h + 4, padding: SKIN_PAD + 2 }]} accessibilityLabel={reelsLabel}>
+                    {columns()}
+                  </LinearGradient>
+                  <Image source={skin.frame.src} style={{ position: 'absolute', left: 0, top: 0, width: fit.fw, height: fit.fh }} resizeMode="stretch" pointerEvents="none" accessibilityIgnoresInvertColors />
+                </View>
+                <SkinPlate skin={skin} width={fit.plateW} text={status.text} tone={status.tone} amount={status.amount} label={status.label} style={{ marginTop: -fit.lap }} />
+              </View>
+            )}
+          </View>
+          <View style={s.skinInfo}>
+            <InfoButton onPress={() => setInfo(true)} tint="rgba(255,231,176,0.7)" />
+          </View>
+          {win.layer}
+        </View>
+        {controls}
+        {infoSheet}
+        {show.layer}
+      </View>
+    );
 
   return (
     <View style={salonScreen}>
@@ -383,31 +530,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
           {cellH > 0 && (
           <View style={[CABINET > 0 && s.cabinet, CABINET > 0 && { borderColor: `${theme.frame}55` }]}>
             {CABINET > 0 && <Marquee width={boxW} hot={hot} />}
-            <View style={[s.reels, { width: boxW, backgroundColor: theme.reels, borderColor: theme.frame }]} accessibilityLabel={`Makaralar: ${grid.map((col) => col.map((x) => c.symbols[x].name).join(', ')).join(' | ')}`}>
-              {opening.map((col, reel) => (
-                <View key={reel} style={[s.reel, { width: cellW + REEL_EDGE }, waiting[reel] && s.reelWait]}>
-                  {/* The plates stand still: the symbols roll over them and come to rest on them. */}
-                  {col.map((_, row) => {
-                    // A win lights its plates and dims the others with their symbols.
-                    const on = lit.has(`${reel}-${row}`);
-                    return <SymbolPlate key={row} w={cellW} h={cellH} tone={theme.plate} lit={on} style={[s.plate, { top: 1 + row * (cellH + GAP) }, lit.size > 0 && !on && s.plateDim]} />;
-                  })}
-                  <Reel
-                    ref={(h) => {
-                      handles.current[reel] = h;
-                    }}
-                    symbols={col}
-                    strip={strips[reel]}
-                    cell={cellH}
-                    gap={GAP}
-                    pulse={pulse}
-                    dim={lit.size > 0}
-                    lit={col.map((_, row) => lit.has(`${reel}-${row}`))}
-                    shade="rgba(0,0,0,0.35)"
-                    render={(sym) => <Symbol label={c.symbols[sym].label} sym={sym} theme={theme} size={symSize} />}
-                  />
-                </View>
-              ))}
+            <View style={[s.reels, { width: boxW, backgroundColor: theme.reels, borderColor: theme.frame }]} accessibilityLabel={reelsLabel}>
+              {columns()}
             </View>
             {CABINET > 0 && <Marquee width={boxW} hot={hot} />}
           </View>
@@ -417,47 +541,8 @@ export function LineSlotPlayer({ id, entry }: { id: LineSlotId; entry: Entry }) 
         {win.layer}
       </SalonStage>
 
-      <SpinControls
-        held={held}
-        bets={game.bets}
-        bet={bet}
-        onBet={setBet}
-        busy={busy}
-        turbo={turbo}
-        onTurbo={() => setTurbo((t) => !t)}
-        auto={auto}
-        autoSpins={AUTO_SPINS}
-        onAuto={toggleAuto}
-        onSpin={play}
-        look={theme.look}
-        caption={`${c.lines.length} çizgi × ${fmt(bet / c.lines.length)}`}
-      />
-
-      <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
-        <View style={s.pays}>
-          <Text style={s.paysHead}>
-            Bir çizgideki kazanç · {fmt(bet)} jeton bahiste · {reels === 3 ? '3 aynı' : '3 / 4 / 5 aynı'}
-          </Text>
-          {paySyms.map((x) => (
-            <View key={x} style={s.payRow}>
-              <View style={{ width: 52, alignItems: 'center' }}>
-                <Symbol label={c.symbols[x].label} sym={x} theme={theme} size={34} />
-              </View>
-              <Text style={s.payName}>{c.symbols[x].name}</Text>
-              <Text style={s.payVals}>{c.paytable[x].map((p) => fmt((p * bet) / c.lines.length)).join(' / ')}</Text>
-            </View>
-          ))}
-          {c.wild && (
-            <Text style={s.paysNote}>
-              {c.symbols[c.wild].name} her sembolün yerine geçer{c.jackpotShare ? `; bir çizgide beşi ${jackpotName} fonunun bahis / ${fmt(Math.max(...game.bets))} kadarını kazandırır.` : '.'}
-            </Text>
-          )}
-          <Text style={s.paysNote}>
-            Oto {AUTO_SPINS} tur çevirir; {c.jackpotShare ? `${jackpotName}, ` : ''}
-            {BIG_WIN} kat kazanç veya {AUTO_LOSS} bahislik kayıpta kendiliğinden durur.
-          </Text>
-        </View>
-      </GameInfoSheet>
+      {controls}
+      {infoSheet}
     </View>
   );
 }
@@ -479,6 +564,12 @@ const s = StyleSheet.create({
   plateDim: { opacity: 0.4 },
   // A reel being waited for: its frame lights up until it stops.
   reelWait: { borderColor: '#FFE08A', boxShadow: '0 0 14px rgba(255,224,138,0.9)' },
+  // A skinned machine: no stage of the shell's, the game panel's picture behind it (fx/slot-skin).
+  skinStage: { flex: 1, minHeight: 330 },
+  skinWindow: { position: 'absolute', flexDirection: 'row', gap: SKIN_GAP },
+  skinReel: { borderRadius: 6, borderWidth: SKIN_RIM, borderColor: 'transparent' },
+  skinInfo: { position: 'absolute', top: 0, right: 0 },
+  skinLit: { borderColor: 'rgba(255,224,138,0.75)', backgroundColor: 'rgba(255,190,80,0.16)', boxShadow: '0 0 12px rgba(255,200,90,0.55), inset 0 0 10px rgba(255,214,120,0.35)' },
   barWrap: { gap: 2, alignItems: 'center' },
   bar: { color: '#5A2A06', backgroundColor: '#F6BD60', fontWeight: '900', borderRadius: 4, borderWidth: 1.5, borderColor: '#7C3F0E', overflow: 'hidden', textAlign: 'center' },
   letter: { fontWeight: '900', fontStyle: 'italic', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 1, height: 3 }, textShadowRadius: 3 },

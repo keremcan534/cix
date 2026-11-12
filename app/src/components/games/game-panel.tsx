@@ -4,7 +4,7 @@
 // switching, minimising, closing or a provider failure never change seats, mic or room membership.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Image, ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +16,7 @@ import { FortunePlayer } from '@/components/games/fortune';
 import { GoldTreePlayer } from '@/components/games/gold-tree';
 import { BoardPlayer } from '@/components/games/board';
 import { LineSlotPlayer } from '@/components/games/line-slot';
+import { SkinBackdrop, SkinOverlay, slotSkinOf } from '@/components/games/fx/slot-skin';
 import { FenerPlayer } from '@/components/games/fener';
 import { RocketPlayer } from '@/components/games/rocket';
 import { BilyePlayer } from '@/components/games/bilye';
@@ -106,6 +107,10 @@ export function GamePanel({
   const roomGame = open.kind === 'room' ? roomGames.find((g) => g.id === open.id) : undefined;
   const casinoGame = open.kind === 'casino' ? casino.find((g) => g.id === open.id) : undefined;
   const wheel = open.kind === 'wheel';
+  // A machine dressed in its own pictures (fx/slot-skin) has its picture behind the whole panel.
+  const skin = casinoGame && casinoVisible(wealthLevel, paidGames) ? slotSkinOf(casinoGame.id) : undefined;
+  // Its JACKPOT show, drawn over the whole panel (fx/jackpot-show).
+  const [overlay, setOverlay] = useState<ReactNode>(null);
   const title = wheel ? WHEEL_NAME : (roomGame?.name ?? casinoGame?.name ?? '');
   const switchable = [
     ...roomGames.filter((g) => g.active && g.playable && (!tables || isTableGame(g.id))).map((g) => ({ key: `r:${g.id}`, name: g.name, emoji: g.emoji, art: gameArtOf(g.id), go: { kind: 'room', id: g.id } as OpenGame })),
@@ -121,7 +126,8 @@ export function GamePanel({
   const titleArt = wheel ? undefined : gameArtOf(open.id);
 
   const body = (
-    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(openId) && p.tall, hidden && { display: 'none' }]}>
+    <View style={[p.panel, inRoom ? p.sheet : p.full, inRoom && isTall(openId) && p.tall, skin && p.skinned, hidden && { display: 'none' }]}>
+      {skin && <SkinBackdrop skin={skin} />}
       <View style={p.head}>
         {titleArt && <Image source={titleArt} style={{ width: 28, height: 28, marginRight: -6 }} />}
         {wheel && <Ionicons name="compass" size={24} color={colors.gold} style={{ marginRight: -6 }} />}
@@ -227,9 +233,14 @@ export function GamePanel({
           ) : (
             <Text style={p.dim}>Bu oyun yakında geliyor.</Text>
           ))}
-        {casinoGame && casinoVisible(wealthLevel, paidGames) && <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />}
+        {casinoGame && casinoVisible(wealthLevel, paidGames) && (
+          <SkinOverlay.Provider value={skin ? setOverlay : null}>
+            <CasinoScreen key={casinoGame.id} id={casinoGame.id} entry={entry} />
+          </SkinOverlay.Provider>
+        )}
         {wheel && casinoVisible(wealthLevel, paidGames) && <WheelPlayer entry={entry} />}
       </ScrollView>
+      {skin && overlay}
     </View>
   );
   const go = (href: Parameters<typeof router.push>[0]) => {
@@ -245,6 +256,7 @@ const p = StyleSheet.create({
   // Okey and the launch casino games need most of the screen; the top row of seats stays visible.
   tall: { top: '22%' },
   full: { flex: 1, backgroundColor: colors.bg },
+  skinned: { overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: colors.text, fontWeight: '900', fontSize: 17, flex: 1 },
   voice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(19,217,223,0.10)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },

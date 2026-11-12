@@ -8,7 +8,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { InfoButton } from '@/components/games/fx/info-sheet';
 import { Text } from '@/components/text';
@@ -375,7 +375,7 @@ export const ACTION: ActionLook = { ring: ['#FFF1C9', '#F6BD60', '#B7832E'], cor
  * The round action button (Çevir): a gold ring, a deep core with its icon, a halo that breathes while it waits, a
  * press that sinks and glows, and the icon turning while a round runs. `count` shows Oto's spins left instead.
  */
-export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', look = ACTION, size = SALON.action, label }: { onPress: () => void; disabled?: boolean; busy?: boolean; count?: number | null; icon?: keyof typeof Ionicons.glyphMap; look?: ActionLook; size?: number; label: string }) {
+export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', look = ACTION, size = SALON.action, label, art }: { onPress: () => void; disabled?: boolean; busy?: boolean; count?: number | null; icon?: keyof typeof Ionicons.glyphMap; look?: ActionLook; size?: number; label: string; /** A picture of the whole button (a skinned machine's, fx/slot-skin) instead of the ring and core. */ art?: number }) {
   const { still, quiet } = useSalonFx();
   const press = usePress(0.9);
   const breath = useBreath(!quiet && !busy && !disabled && count == null);
@@ -385,6 +385,16 @@ export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', lo
     <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} disabled={disabled} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled, busy: !!busy }} hitSlop={6}>
       <Animated.View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }}>
         <Animated.Image source={GLOW} style={[st.halo, { width: size * 2, height: size * 2, tintColor: look.ring[1], opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [quiet ? 0.32 : 0.28, 0.6] }) }]} />
+        {art !== undefined ? (
+          <View style={[st.artButton, { width: size, height: size }, disabled && !busy && { opacity: 0.6 }]}>
+            <Image source={art} resizeMode="contain" style={{ width: size * 1.08, height: size * 1.08 }} accessibilityIgnoresInvertColors />
+            {count != null && (
+              <View style={[st.artCount, { width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25 }]}>
+                <Text style={[tabular, st.count, { color: look.ink, fontSize: Math.round(size * 0.3), lineHeight: Math.round(size * 0.36) }]}>{count}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
         <LinearGradient colors={look.ring} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[st.ring, { width: size, height: size, borderRadius: size / 2 }, disabled && !busy && { opacity: 0.6 }]}>
           <LinearGradient colors={look.core} style={[st.core, { width: core, height: core, borderRadius: core / 2 }]}>
             <LinearGradient colors={['rgba(255,255,255,0.24)', 'rgba(255,255,255,0)']} style={[st.coreGloss, { borderTopLeftRadius: core / 2, borderTopRightRadius: core / 2 }]} />
@@ -397,6 +407,7 @@ export function ActionButton({ onPress, disabled, busy, count, icon = 'sync', lo
             )}
           </LinearGradient>
         </LinearGradient>
+        )}
       </Animated.View>
     </Pressable>
   );
@@ -517,6 +528,8 @@ const st = StyleSheet.create({
   core: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: 'inset 0 3px 8px rgba(0,0,0,0.6)' },
   coreGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '48%' },
   count: { fontSize: 28, lineHeight: 34 },
+  artButton: { alignItems: 'center', justifyContent: 'center' },
+  artCount: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(40,6,12,0.82)', borderWidth: 1, borderColor: 'rgba(255,231,176,0.7)' },
   wideWrap: { borderRadius: SALON.controlRadius },
   wideGlow: { ...StyleSheet.absoluteFill, borderRadius: SALON.controlRadius, boxShadow: '0 0 22px rgba(246,189,96,0.65)' },
   wide: { height: 54, borderRadius: SALON.controlRadius, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,241,201,0.9)', boxShadow: '0 6px 14px rgba(0,0,0,0.45)' },
