@@ -6,15 +6,16 @@
 // moment in fish-swim. (The code still calls a balloon a fish: the game's ids are its first, fish-shaped ones.)
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { aimDeg, freeDepth, leadShot, shotMs, swimAt, swimRanges, type Swim } from '@/components/games/fish-swim';
 import { BARREL, BurstView, Cannon, FishSprite, Frost, HUB_UP, ShotView, Sky, tierColor, type Burst, type Fish, type Shot } from '@/components/games/fish-stage';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { SalonStage, salonScreen, tabular, useBox } from '@/components/games/fx/salon';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { BalancePill, BetStepper, fmt } from '@/components/games/slot-kit';
+import { WalletRow, fmt } from '@/components/games/slot-kit';
 import { FISH, FISH_HIT, fishDraw } from '@/lib/fish-hunt';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { casinoAccess, useGames, type Entry } from '@/lib/games';
@@ -55,9 +56,12 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const calm = settings.reduceMotion;
   const { casino } = useGames();
   const game = casino.find((g) => g.id === 'fish')!;
-  const screen = useWindowDimensions();
   const [bet, setBet] = useState(game.bets[2] ?? game.bets[0]);
-  const [width, setWidth] = useState(0);
+  // The sky takes the height the phone leaves it; the balloons fly in all of it.
+  const box = useBox();
+  const width = box.h ? box.w : 0;
+  // Each hit worth a show sends a shine across the stage.
+  const [shine, setShine] = useState(0);
   const [fish, setFish] = useState<Fish[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [bursts, setBursts] = useState<Burst[]>([]);
@@ -96,14 +100,13 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const room = entry.from === 'room';
-  // The stage is as tall as the screen allows with the stake row still on screen under it; a room's sheet is shorter.
-  const height = room ? Math.max(240, Math.min(300, Math.round(screen.height * 0.36))) : Math.max(320, Math.min(460, Math.round(screen.height * 0.56)));
+  const height = box.h;
   const cx = width / 2;
   const cy = height - HUB_UP;
-  // The balloons keep between the top row of buttons and the cannon.
+  // The balloons keep between the top row of buttons and the cannon, and grow with the sky.
   const top = 50;
   const bottom = height - (room ? 100 : 122);
-  const scale = room ? 0.9 : 1.18;
+  const scale = Math.round(Math.max(0.85, Math.min(1.4, height / 380)) * 20) / 20;
 
   const progress = (f: Fish) => {
     const r = runs.current.get(f.key);
@@ -335,6 +338,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
           if (payout >= bet * BIG_CATCH) {
             // The balloon is seen bursting first; then the win takes the stage (and Oto waits for it).
             cheering.current = true;
+            setShine((x) => x + 1);
             timers.current.push(setTimeout(() => alive.current && void win.celebrate({ amount: payout, bet }).then(() => (cheering.current = false)), calm ? 0 : 700));
           } else successHaptic();
         } else {
@@ -418,8 +422,9 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const school = [...fish].sort((a, b) => b.size - a.size);
 
   return (
-    <View style={{ gap: 10 }}>
-      <View style={[f.scene, { height }]} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+    <View style={salonScreen}>
+      <SalonStage colors={['#3B82F6', '#2563EB', '#1D4ED8']} accent="#FFFFFF" win={shine} minHeight={room ? 230 : 300} inner={f.scene}>
+        <View style={StyleSheet.absoluteFill} onLayout={box.onLayout} pointerEvents="none" />
         {width > 0 && <Sky w={width} h={height} still={calm} flow={flow} sway={sway} />}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {school.map((x) => (
@@ -489,7 +494,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
             setNote(null);
             setAuto((a) => !a);
           }}
-          style={[f.card, f.auto, auto && { backgroundColor: '#B45309', borderColor: '#FEF3C7' }]}
+          style={[f.card, f.auto, auto && { backgroundColor: '#D9952F', borderColor: '#FFF1C9' }]}
           accessibilityRole="button"
           accessibilityState={{ selected: auto }}
           accessibilityLabel={auto ? 'Otomatik atışı durdur' : 'Otomatik atış'}
@@ -498,12 +503,9 @@ export function FishPlayer({ entry }: { entry: Entry }) {
           <Text style={f.cardText}>{auto ? 'DUR' : 'OTO'}</Text>
         </Pressable>
         {win.layer}
-      </View>
+      </SalonStage>
 
-      <View style={f.controls}>
-        <BalancePill tint="#0A2C6E" shown={shown} />
-        <BetStepper bets={game.bets} bet={bet} onChange={setBet} tint="#0A2C6E" />
-      </View>
+      <WalletRow held={shown} bets={game.bets} bet={bet} onBet={setBet} />
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={f.pays}>
@@ -537,10 +539,11 @@ export function FishPlayer({ entry }: { entry: Entry }) {
 }
 
 const f = StyleSheet.create({
-  scene: { borderRadius: 22, overflow: 'hidden', backgroundColor: '#2563EB' },
-  stats: { position: 'absolute', left: 10, top: 10, height: 32, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, paddingHorizontal: 12, backgroundColor: 'rgba(4,14,44,0.55)' },
+  // The sky is drawn edge to edge inside the shell's frame.
+  scene: { padding: 0, gap: 0 },
+  stats: { position: 'absolute', left: 10, top: 10, height: 32, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, paddingHorizontal: 12, backgroundColor: 'rgba(4,14,44,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', boxShadow: '0 3px 8px rgba(0,0,0,0.3)' },
   statHead: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  statValue: { color: '#fff', fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  statValue: { color: '#fff', fontSize: 13, ...tabular },
   statLine: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 2 },
   icons: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
   hint: { position: 'absolute', left: 0, right: 0, top: 52, alignItems: 'center' },
@@ -548,10 +551,9 @@ const f = StyleSheet.create({
   note: { position: 'absolute', top: 50, left: 12, right: 12, backgroundColor: 'rgba(4,14,44,0.86)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(253,230,138,0.5)' },
   noteText: { color: '#FDE68A', fontWeight: '700', textAlign: 'center', fontSize: 12, lineHeight: 17 },
   cards: { position: 'absolute', left: 8, bottom: 8, flexDirection: 'row', gap: 6 },
-  card: { width: 54, height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 1, backgroundColor: 'rgba(4,14,44,0.72)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' },
-  auto: { position: 'absolute', right: 8, bottom: 8, width: 64 },
+  card: { width: 56, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 1, backgroundColor: 'rgba(8,15,30,0.78)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.45)', borderTopColor: 'rgba(255,231,176,0.7)', boxShadow: '0 4px 10px rgba(0,0,0,0.4)' },
+  auto: { position: 'absolute', right: 8, bottom: 8, width: 66 },
   cardText: { color: '#fff', fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pays: { gap: 4 },
   paysHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 2 },
   payRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 3 },

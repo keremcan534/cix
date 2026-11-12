@@ -16,6 +16,8 @@ import { Avatar } from '@/components/ui';
 import { CasinoLock } from '@/components/games/casino';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { ResultTrail, type TrailItem } from '@/components/games/fx/result-trail';
+import { SalonStage, glowNumber } from '@/components/games/fx/salon';
+import { SalonArt } from '@/components/games/fx/salon-art';
 import { tally } from '@/components/games/fx/spin-plan';
 import { RimBulbs, SpinBlur, WheelPointer, useWheelSpin, type WheelSpin as SpinHandle } from '@/components/games/fx/wheel-stage';
 import { useWinFx } from '@/components/games/fx/win-fx';
@@ -91,6 +93,8 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
   const [tab, setTab] = useState<Tab>('winners');
   const [info, setInfo] = useState(false);
   const [width, setWidth] = useState(0);
+  // A spin that paid more than it cost sends a shine across the stage.
+  const [shine, setShine] = useState(0);
   const balance = useRef(coins + gameCoins);
   const alive = useRef(true);
   const spin = useWheelSpin(WHEEL_SLICES.length);
@@ -175,6 +179,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
     if (sp.jackpot > 0) setStatus({ text: `JACKPOT! +${n(sp.jackpot)} oyun jetonu${again}`, tone: 'win' });
     else if (sp.count > 1) setStatus({ text: `${sp.count} tur · +${n(sp.payout)} oyun jetonu${again}`, tone: gain ? 'win' : undefined });
     else setStatus({ text: `${sliceLabel(best)} · +${n(sp.payout)} oyun jetonu${again}`, tone: gain ? 'win' : undefined });
+    if (sp.jackpot > 0 || gain) setShine((x) => x + 1);
     if (sp.jackpot > 0) await win.celebrate({ amount: sp.payout, bet: sp.cost, jackpot: true });
     else if (gain) await win.celebrate({ amount: sp.payout, bet: sp.cost });
     else if (sp.payout === sp.cost) playSfx('coin', 0.6);
@@ -188,15 +193,16 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
   return (
     <View style={{ gap: 14 }}>
       <View style={{ gap: 10 }} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
-        <LinearGradient colors={['#14294A', '#0C3247', '#0A1528']} style={w.stage}>
+        <SalonStage colors={['#16305A', '#0C3247', '#0A1528']} fill={false} win={shine} inner={w.stage}>
           <View style={w.head}>
             <LinearGradient colors={['#4A1426', '#1B2B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={w.jackpot} accessibilityLabel={`JACKPOT ${WHEEL_TIERS[tier].label}, ${n(view.funds[tier])} jeton`}>
+              <LinearGradient colors={['rgba(255,255,255,0.14)', 'rgba(255,255,255,0)']} style={w.jackpotGloss} />
               <Ionicons name="trophy" size={20} color={colors.gold} />
               <View style={{ flex: 1 }}>
                 <Text style={w.jackpotLabel} numberOfLines={1}>
                   JACKPOT · {WHEEL_TIERS[tier].label}
                 </Text>
-                <RollingNumber value={view.funds[tier]} style={w.jackpotValue} duration={900} numberOfLines={1} />
+                <RollingNumber value={view.funds[tier]} style={[w.jackpotValue, glowNumber]} duration={900} numberOfLines={1} />
               </View>
             </LinearGradient>
             <InfoButton onPress={() => setInfo(true)} tint={colors.gold} />
@@ -218,7 +224,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
           </View>
           {summary && <Summary spin={summary} onClose={() => setSummary(null)} />}
           {win.layer}
-        </LinearGradient>
+        </SalonStage>
 
         <View style={w.tiers} accessibilityRole="tablist">
           {WHEEL_TIER_IDS.map((t) => (
@@ -265,7 +271,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
           })}
         </View>
         <View style={w.wallet}>
-          <BalancePill tint="#10233D" shown={held} />
+          <BalancePill shown={held} />
           <Text style={w.left}>
             Bugün kalan{'\n'}
             <Text style={{ color: colors.text, fontWeight: '800' }}>{n(left)}</Text>
@@ -365,8 +371,9 @@ function Wheel({ tier, size, spin, landed }: { tier: WheelTierId; size: number; 
           </Animated.View>
           <SpinBlur spin={spin} size={size} band={46} tint="rgba(22,37,60,0.5)" />
         </View>
-        <LinearGradient colors={['#1F3050', '#080F1E']} style={[w.hub, { left: (rim - 6) / 2 - 33, top: (rim - 6) / 2 - 33 }]}>
-          <Ionicons name="compass" size={34} color={colors.gold} />
+        <LinearGradient colors={['#2A4470', '#080F1E']} style={[w.hub, { left: (rim - 6) / 2 - 33, top: (rim - 6) / 2 - 33 }]}>
+          <LinearGradient colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']} style={w.hubGloss} />
+          <SalonArt name="ruzgar-merkez" size={60} fallback={<Ionicons name="compass" size={34} color={colors.gold} />} />
         </LinearGradient>
       </View>
       <View style={{ position: 'absolute', top: -14, left: rim / 2 - 15 }}>
@@ -529,11 +536,12 @@ const w = StyleSheet.create({
   ghost: { borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 8 },
   ghostText: { color: colors.text, fontWeight: '800', fontSize: 13 },
 
-  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
+  stage: { alignItems: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 6 },
-  jackpot: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1.5, borderColor: 'rgba(255,101,118,0.55)' },
+  jackpot: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1.5, borderColor: 'rgba(255,101,118,0.55)', overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.4)' },
+  jackpotGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
   jackpotLabel: { color: '#FFB3BC', fontWeight: '900', fontSize: 11, letterSpacing: 1.4 },
-  jackpotValue: { color: colors.gold, fontWeight: '900', fontSize: 24, lineHeight: 28, letterSpacing: 0.5 },
+  jackpotValue: { fontSize: 24, lineHeight: 28, letterSpacing: 0.5 },
 
   rim: { backgroundColor: '#3B2300', borderWidth: 3, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.45), 0 0 24px rgba(246,189,96,0.25)' },
   wedge: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
@@ -542,10 +550,11 @@ const w = StyleSheet.create({
   sliceSub: { fontWeight: '700', fontSize: 9, opacity: 0.85 },
   pegArm: { position: 'absolute', top: 0, width: 8, alignItems: 'center' },
   peg: { width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: '#FFE7B0' },
-  hub: { position: 'absolute', width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.gold, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' },
+  hub: { position: 'absolute', width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.gold, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.6), 0 0 14px rgba(246,189,96,0.35)' },
+  hubGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
 
-  status: { alignSelf: 'stretch', borderRadius: 10, borderWidth: 2, borderColor: 'rgba(246,189,96,0.65)', backgroundColor: '#0A1528', paddingVertical: 5, paddingHorizontal: 8, minHeight: 32, justifyContent: 'center' },
-  statusWin: { backgroundColor: '#15803D' },
+  status: { alignSelf: 'stretch', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(246,189,96,0.55)', backgroundColor: 'rgba(4,9,20,0.55)', paddingVertical: 6, paddingHorizontal: 10, minHeight: 36, justifyContent: 'center' },
+  statusWin: { backgroundColor: 'rgba(246,189,96,0.2)', borderColor: '#F6BD60', boxShadow: '0 0 14px rgba(246,189,96,0.4)' },
   statusText: { color: '#FFE7B0', fontWeight: '900', fontSize: 14, textAlign: 'center', letterSpacing: 0.3, fontVariant: ['tabular-nums'] },
   statusErr: { fontSize: 12, fontWeight: '700', letterSpacing: 0, color: '#FFFFFF' },
 

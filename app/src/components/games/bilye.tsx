@@ -5,14 +5,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
-import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { ResultTrail, pushTrail, type TrailItem } from '@/components/games/fx/result-trail';
+import { ChoiceChip, SALON, SalonStage, SideButton, StageHeader, StageStatus, WideAction, choiceInk, salonScreen, tabular, useBox, wideInk, type StatusTone } from '@/components/games/fx/salon';
+import { salonArt, type SalonArtName } from '@/components/games/fx/salon-art';
 import { useWinFx } from '@/components/games/fx/win-fx';
-import { BalancePill, BetStepper, fmt, sleep } from '@/components/games/slot-kit';
+import { WalletRow, fmt, sleep } from '@/components/games/slot-kit';
 import { BALL_R, CUPS, CUP_DEPTH, FIELD, HEIGHT, LANES, LANE_NAME, PEGS, POCKETS, POCKET_W, POCKET_Y, RAIL_Y, TARGETS, WIDTH, type Lane } from '@/lib/bilye/board';
 import { CHANNEL_X, bilyePath, launchX, type BilyePath } from '@/lib/bilye/path';
 import { FRAME_MS } from '@/lib/bilye/physics';
@@ -27,7 +29,21 @@ import { useApp, useSettings } from '@/store';
 const AUTO_LAUNCHES = 10;
 /** Oto stops when the net loss reaches this many stakes. */
 const AUTO_LOSS = 20;
-const CUP_TINT: Record<string, [string, string]> = { yakut: ['#FB7185', '#9F1239'], altin: ['#FDE68A', '#B45309'], zumrut: ['#6EE7B7', '#047857'] };
+const CUP_TINT: Record<string, [string, string]> = { yakut: ['#FF8E9A', '#9F1239'], altin: ['#FFE7B0', '#B7832E'], zumrut: ['#6EE7B7', '#047857'] };
+// The board's pictures once delivered (fx/salon-art): drawn instead of the code shapes, which stay as the fallback.
+const CUP_ART: Record<string, SalonArtName> = { yakut: 'bilye-kupa-yakut', altin: 'bilye-kupa-altin', zumrut: 'bilye-kupa-zumrut' };
+const BALL_ART = salonArt('bilye-top');
+const BOARD_ART = salonArt('bilye-tahta');
+/** The ball: its picture, or a lit silver sphere. */
+function Ball({ d }: { d: number }) {
+  if (BALL_ART !== undefined) return <Image source={BALL_ART} style={{ width: d, height: d }} />;
+  return (
+    <>
+      <LinearGradient colors={['#FFFFFF', '#CBD5E1', '#64748B']} start={{ x: 0.25, y: 0.15 }} end={{ x: 0.85, y: 0.95 }} style={StyleSheet.absoluteFill} />
+      <View style={{ position: 'absolute', left: d * 0.22, top: d * 0.16, width: d * 0.3, height: d * 0.22, borderRadius: d, backgroundColor: 'rgba(255,255,255,0.85)' }} />
+    </>
+  );
+}
 const LANE_ICON: Record<Lane, keyof typeof Ionicons.glyphMap> = { hafif: 'arrow-up', orta: 'arrow-up-circle', guclu: 'rocket' };
 const run = (a: Animated.CompositeAnimation) => new Promise<void>((r) => a.start(() => r()));
 const percent = (p: number) => `%${(p * 100).toLocaleString('tr-TR', { maximumFractionDigits: p < 0.01 ? 2 : 1 })}`;
@@ -55,7 +71,13 @@ const BoardArt = memo(function BoardArt({ k }: { k: number }) {
       ))}
       {CUPS.map((c) => (
         <View key={c.id} style={{ position: 'absolute', left: (c.x - c.w / 2 - 6) * k, top: (c.y - 2) * k, width: (c.w + 12) * k, alignItems: 'center' }} pointerEvents="none">
-          <LinearGradient colors={CUP_TINT[c.id]} style={[b.cup, { width: (c.w + 4) * k, height: (CUP_DEPTH + 5) * k, borderBottomLeftRadius: 8 * k, borderBottomRightRadius: 8 * k }]} />
+          {salonArt(CUP_ART[c.id]) !== undefined ? (
+            <Image source={salonArt(CUP_ART[c.id])} style={{ width: (c.w + 8) * k, height: (CUP_DEPTH + 9) * k }} resizeMode="contain" />
+          ) : (
+            <LinearGradient colors={CUP_TINT[c.id]} style={[b.cup, { width: (c.w + 4) * k, height: (CUP_DEPTH + 5) * k, borderBottomLeftRadius: 8 * k, borderBottomRightRadius: 8 * k }]}>
+              <View style={[b.cupGloss, { borderBottomLeftRadius: 6 * k }]} />
+            </LinearGradient>
+          )}
           <Text style={[b.cupText, { fontSize: Math.max(9, 10 * k) }]}>{multText(c.mult)}</Text>
         </View>
       ))}
@@ -69,14 +91,15 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
   const calm = settings.reduceMotion;
   const { casino } = useGames();
   const game = casino.find((g) => g.id === 'bilye')!;
-  const screen = useWindowDimensions();
   const [bet, setBet] = useState(game.bets[0]);
   const [lane, setLane] = useState<Lane>('orta');
-  const [width, setWidth] = useState(0);
+  // The board takes the stage's free height and keeps its shape within it.
+  const area = useBox();
+  const [shine, setShine] = useState(0);
   const [path, setPath] = useState<BilyePath | null>(null);
   const [lit, setLit] = useState<number[]>([]);
   const [landed, setLanded] = useState<number | null>(null);
-  const [status, setStatus] = useState<{ text: string; tone?: 'win' | 'err' }>({ text: 'Atış gücünü seç, bilyeyi fırlat' });
+  const [status, setStatus] = useState<{ text: string; tone?: StatusTone; amount?: number; label?: string }>({ text: 'Atış gücünü seç, bilyeyi fırlat' });
   const [trail, setTrail] = useState<TrailItem[]>([]);
   const [auto, setAuto] = useState<number | null>(null);
   const [info, setInfo] = useState(false);
@@ -104,10 +127,8 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
     };
   }, []);
 
-  const room = entry.from === 'room';
-  // The board keeps its shape: as wide as the stage allows, no taller than the screen leaves for it.
-  const maxH = Math.round(screen.height * (room ? 0.36 : 0.52));
-  const k = width ? Math.min(width / WIDTH, maxH / HEIGHT) : 0;
+  // The board keeps its shape: as big as the area allows.
+  const k = area.w && area.h ? Math.min(area.w / WIDTH, area.h / HEIGHT) : 0;
   const ball = useMemo(() => {
     if (!path) return null;
     const n = path.points.length / 2;
@@ -170,7 +191,8 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
     setTrail((tr) => pushTrail(tr, { key: `b${id}`, label: target.mult ? multText(target.mult) : '—', tone: payout > bet ? 'win' : target.kind === 'cup' ? 'hot' : undefined }));
     if (payout > bet) {
       playSfx('coin', 0.8);
-      setStatus({ text: `${target.name} · +${fmt(payout)}`, tone: 'win' });
+      setStatus({ text: `${target.name} · +${fmt(payout)}`, tone: 'win', amount: payout, label: target.name.toLocaleUpperCase('tr-TR') });
+      setShine((x) => x + 1);
       if (winTierOf(payout, bet)) await win.celebrate({ amount: payout, bet });
     } else if (payout > 0) {
       playSfx('stop', 0.4);
@@ -213,21 +235,13 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
   const chances = LANES.map((l) => bilyeChances(l));
 
   return (
-    <View style={{ gap: 10 }}>
-      <LinearGradient colors={['#2B1257', '#13204A', '#0B1B3A']} style={s.stage} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width) - 20)}>
-        <View style={s.head}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.title} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header">
-              PACHINKO
-            </Text>
-            <Text style={[s.status, status.tone === 'win' && { color: '#86EFAC' }, status.tone === 'err' && { color: '#FDA4AF' }]} numberOfLines={2} accessibilityLiveRegion="polite">
-              {status.text}
-            </Text>
-          </View>
-          <InfoButton onPress={() => setInfo(true)} tint="#C4B5FD" />
-        </View>
+    <View style={salonScreen}>
+      <SalonStage colors={['#1E3366', '#111E44', '#081128']} win={shine} minHeight={330}>
+        <StageHeader title="PACHINKO" kicker="ÇİVİLER · CEPLER · KUPALAR" onInfo={() => setInfo(true)} />
+        <View style={s.area} onLayout={area.onLayout}>
         {k > 0 && (
-          <View style={{ width: boardW, height: boardH, alignSelf: 'center' }} accessibilityLabel={target ? `Bilye ${target.name} içinde` : 'Bilye tahtası'}>
+          <View style={[s.board, { width: boardW, height: boardH }]} accessibilityLabel={target ? `Bilye ${target.name} içinde` : 'Bilye tahtası'}>
+            {BOARD_ART !== undefined && <Image source={BOARD_ART} style={StyleSheet.absoluteFill} resizeMode="stretch" />}
             <BoardArt k={k} />
             {/* Where a ball of the chosen strength comes over the rail. */}
             <View style={[s.aim, { left: (launchX(lane) - 6) * k, top: (RAIL_Y + BALL_R) * k }]} pointerEvents="none">
@@ -250,52 +264,46 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
             )}
             {ball ? (
               <Animated.View style={[s.ball, { width: BALL_R * 2 * k, height: BALL_R * 2 * k, borderRadius: BALL_R * k, transform: [{ translateX: ball.x }, { translateY: ball.y }] }]} pointerEvents="none">
-                <LinearGradient colors={['#FFFFFF', '#CBD5E1', '#64748B']} start={{ x: 0.25, y: 0.15 }} end={{ x: 0.85, y: 0.95 }} style={StyleSheet.absoluteFill} />
+                <Ball d={BALL_R * 2 * k} />
               </Animated.View>
             ) : (
               <View style={[s.ball, { width: BALL_R * 2 * k, height: BALL_R * 2 * k, borderRadius: BALL_R * k, left: (CHANNEL_X - BALL_R) * k, top: (HEIGHT - BALL_R * 2 - 6) * k }]} pointerEvents="none">
-                <LinearGradient colors={['#FFFFFF', '#CBD5E1', '#64748B']} start={{ x: 0.25, y: 0.15 }} end={{ x: 0.85, y: 0.95 }} style={StyleSheet.absoluteFill} />
+                <Ball d={BALL_R * 2 * k} />
               </View>
             )}
           </View>
         )}
+        </View>
+        <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
         <ResultTrail items={trail} empty="Son atışlar burada görünür" />
         {win.layer}
-      </LinearGradient>
+      </SalonStage>
 
       <View style={s.lanes} accessibilityRole="radiogroup" accessibilityLabel="Atış gücü">
         {LANES.map((l) => (
-          <Pressable
+          <ChoiceChip
             key={l}
+            on={lane === l}
             onPress={() => {
               tapHaptic();
               setLane(l);
             }}
             disabled={auto !== null}
-            style={[s.lane, lane === l && s.laneOn]}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: lane === l }}
-            accessibilityLabel={`${LANE_NAME[l]} atış`}
+            style={{ flex: 1 }}
+            label={`${LANE_NAME[l]} atış`}
           >
-            <Ionicons name={LANE_ICON[l]} size={16} color={lane === l ? '#1E1036' : '#C4B5FD'} />
-            <Text style={[s.laneText, lane === l && { color: '#1E1036' }]}>{LANE_NAME[l]}</Text>
-          </Pressable>
+            <Ionicons name={LANE_ICON[l]} size={16} color={lane === l ? SALON.goldInk : SALON.win} />
+            <Text style={[s.laneText, choiceInk(lane === l)]}>{LANE_NAME[l]}</Text>
+          </ChoiceChip>
         ))}
       </View>
+      <WalletRow held={held} bets={game.bets} bet={bet} onBet={setBet} disabled={auto !== null} />
       <View style={s.row}>
-        <BalancePill tint="#1E1036" shown={held} />
-        <BetStepper bets={game.bets} bet={bet} onChange={setBet} disabled={auto !== null} tint="#1E1036" />
-      </View>
-      <View style={s.row}>
-        <Pressable onPress={() => void toggleAuto()} style={[s.auto, auto !== null && s.autoOn]} accessibilityRole="button" accessibilityLabel={auto !== null ? 'Otomatik atışı durdur' : `${AUTO_LAUNCHES} kez otomatik fırlat`}>
-          <Text style={[s.autoText, auto !== null && { color: '#1E1036' }]}>{auto !== null ? `DUR · ${auto}` : 'OTO'}</Text>
-        </Pressable>
-        <Pressable onPress={play} disabled={auto !== null} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel={`Fırlat, ${LANE_NAME[lane]} atış, ${bet} jeton`}>
-          <LinearGradient colors={['#C4B5FD', '#7C3AED']} style={[s.go, auto !== null && { opacity: 0.6 }]}>
-            <Ionicons name="radio-button-on" size={20} color="#fff" />
-            <Text style={s.goText}>Fırlat · {fmt(bet)}</Text>
-          </LinearGradient>
-        </Pressable>
+        <SideButton onPress={() => void toggleAuto()} on={auto !== null} icon={auto !== null ? 'stop' : 'repeat'} label={auto !== null ? `DUR · ${auto}` : 'OTO'} a11y={auto !== null ? 'Otomatik atışı durdur' : `${AUTO_LAUNCHES} kez otomatik fırlat`} style={{ flex: 0, minWidth: 96 }} />
+        <WideAction onPress={play} disabled={auto !== null} label={`Fırlat, ${LANE_NAME[lane]} atış, ${bet} jeton`} style={{ flex: 1 }}>
+          <Ionicons name="radio-button-on" size={20} color={SALON.goldInk} />
+          <Text style={[tabular, s.goText, wideInk()]}>Fırlat · {fmt(bet)}</Text>
+        </WideAction>
       </View>
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
@@ -332,36 +340,31 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
 }
 
 const b = StyleSheet.create({
-  channel: { position: 'absolute', top: 0, backgroundColor: 'rgba(255,255,255,0.05)', borderLeftWidth: 1, borderColor: 'rgba(196,181,253,0.25)', borderTopRightRadius: 14 },
-  rail: { position: 'absolute', backgroundColor: 'rgba(196,181,253,0.45)', borderRadius: 2 },
-  pocket: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 3, backgroundColor: 'rgba(255,255,255,0.03)' },
-  pocketPays: { backgroundColor: 'rgba(250,204,21,0.08)' },
-  pocketText: { color: '#FDE68A', fontWeight: '900' },
-  peg: { position: 'absolute', backgroundColor: '#E9D8A6', borderWidth: 0.5, borderColor: '#7C5E10' },
-  post: { position: 'absolute', backgroundColor: '#94A3B8' },
-  cup: { borderWidth: 1.5, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.7)' },
-  cupText: { color: '#fff', fontWeight: '900', marginTop: 1, textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 3 },
+  channel: { position: 'absolute', top: 0, backgroundColor: 'rgba(255,255,255,0.05)', borderLeftWidth: 1, borderColor: 'rgba(246,189,96,0.3)', borderTopRightRadius: 14 },
+  rail: { position: 'absolute', backgroundColor: 'rgba(246,189,96,0.6)', borderRadius: 2, boxShadow: '0 0 6px rgba(246,189,96,0.4)' },
+  pocket: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 3, backgroundColor: 'rgba(255,255,255,0.03)', borderLeftWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.08)' },
+  pocketPays: { backgroundColor: 'rgba(246,189,96,0.1)' },
+  pocketText: { color: '#FFE08A', fontWeight: '900', fontVariant: ['tabular-nums'] },
+  // A brass peg head: bright on top, a dark rim, a soft shadow.
+  peg: { position: 'absolute', backgroundColor: '#F2D27A', borderWidth: 0.5, borderColor: '#7C5E10', boxShadow: '0 1px 2px rgba(0,0,0,0.6)' },
+  post: { position: 'absolute', backgroundColor: '#A7B4C8', boxShadow: '0 1px 2px rgba(0,0,0,0.6)' },
+  cup: { borderWidth: 1.5, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.7)', overflow: 'hidden', boxShadow: '0 3px 6px rgba(0,0,0,0.5)' },
+  cupGloss: { position: 'absolute', left: 2, top: 0, bottom: 2, width: '30%', backgroundColor: 'rgba(255,255,255,0.35)' },
+  cupText: { color: '#fff', fontWeight: '900', marginTop: 1, textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 3, fontVariant: ['tabular-nums'] },
 });
 
 const s = StyleSheet.create({
-  stage: { borderRadius: 22, padding: 10, gap: 8, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(196,181,253,0.35)' },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  title: { color: '#EDE9FE', fontSize: 22, fontWeight: '900', fontStyle: 'italic', letterSpacing: 0.5, textShadowColor: '#7C3AED', textShadowRadius: 8 },
-  status: { color: 'rgba(237,233,254,0.8)', fontSize: 13, fontWeight: '700', marginTop: 1 },
+  // The board takes the stage's free height and sits in its middle.
+  area: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', minHeight: 200 },
+  board: { borderRadius: 12, backgroundColor: 'rgba(4,9,22,0.45)', boxShadow: 'inset 0 2px 12px rgba(0,0,0,0.6)' },
   aim: { position: 'absolute' },
-  spark: { position: 'absolute', backgroundColor: 'rgba(253,230,138,0.55)' },
-  hit: { position: 'absolute', borderWidth: 2, borderColor: '#FDE68A', backgroundColor: 'rgba(253,230,138,0.25)' },
-  ball: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.6)' },
+  spark: { position: 'absolute', backgroundColor: 'rgba(255,224,138,0.6)', boxShadow: '0 0 8px rgba(255,224,138,0.8)' },
+  hit: { position: 'absolute', borderWidth: 2, borderColor: '#FFE08A', backgroundColor: 'rgba(255,224,138,0.25)', boxShadow: '0 0 14px rgba(255,224,138,0.75)' },
+  ball: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.65)' },
   lanes: { flexDirection: 'row', gap: 8 },
-  lane: { flex: 1, height: 42, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(196,181,253,0.4)', backgroundColor: '#1E1036', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  laneOn: { backgroundColor: '#C4B5FD', borderColor: '#EDE9FE' },
-  laneText: { color: '#C4B5FD', fontWeight: '900', fontSize: 14 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  auto: { width: 84, height: 52, borderRadius: 16, borderWidth: 2, borderColor: 'rgba(196,181,253,0.55)', backgroundColor: '#1E1036', alignItems: 'center', justifyContent: 'center' },
-  autoOn: { backgroundColor: '#FDE68A', borderColor: '#FEF3C7' },
-  autoText: { color: '#C4B5FD', fontWeight: '900', fontSize: 14 },
-  go: { height: 52, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  goText: { color: '#fff', fontWeight: '900', fontSize: 18 },
+  laneText: { fontWeight: '900', fontSize: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SALON.row },
+  goText: { fontSize: 18 },
   infoHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   infoName: { flex: 1.6, color: '#fff', fontSize: 13, fontWeight: '700' },

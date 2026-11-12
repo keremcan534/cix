@@ -759,7 +759,7 @@ Gece Yarısı Çarkı, Lezzet Çarkı, Sihir Destesi (`app/src/components/games/
 | 8 | `fis-250.png` … `fis-25000.png` | Bahis fişleri (6) | kodla çizilen fiş | Üstten görünen casino fişi, kenarında sekiz açık renk çentik, ortası boş (tutarı uygulama yazar): mavi, yeşil, kırmızı, mor, turuncu, siyah-altın; 192 px | P3 | Yeni (oyun yenileme) · `fx/chips.tsx` `ChipFace`; kodla çizilen hali yeterince iyi, acele yok |
 | 9 | `ruzgar-ozet-rozet.png` | Çoklu tur özeti rozeti | yok (düz başlık) | Küçük altın pusula gülü rozeti, altında kurdele (yazısız); 192 px | P3 | Yeni (oyun yenileme) · ×10 / ×50 özet kartının başlığında; `docs/RUZGAR_GULU.md` listesindeki `ruzgar-merkez.png` ve `ruzgar-ok.png` de hâlâ bekleniyor |
 
-Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → ilgili çizim `<Art name=…>` ile değiştirilir (çark dilimleri ve seçenek kartlarında `board.tsx`, ibre için `fx/wheel-stage.tsx`). Çarkın dilimleri, çerçevesi ve ampulleri kodla çizilmeye devam eder (dönerken net kalsın ve her ekran boyuna uysun diye).
+Teslimden sonra: dosya tam bu adla `app/assets/art/` içine konur ve `app/src/components/games/fx/salon-art.tsx` içinde kendi satırının başındaki `// ` kaldırılır; çizildiği her yer (çark dilimleri, seçenek kartları, tabak, deste ve göbek `board.tsx`, ibre `fx/wheel-stage.tsx`, Rüzgâr Gülü göbeği `wheel.tsx`) kendiliğinden görsele geçer, o zamana kadar emoji ya da kodla çizilen hali durur. Dosya geldiği halde satırı kapalı kalırsa `tests/salon-art.test.ts` uyarır. Çarkın dilimleri, çerçevesi ve ampulleri kodla çizilmeye devam eder (dönerken net kalsın ve her ekran boyuna uysun diye).
 
 
 ## 17. Oyun Salonu: Yörünge, Balon Avı, Yıldız Avı (24)
@@ -780,7 +780,7 @@ Yörünge (`app/src/components/games/rocket-stage.tsx`), Balon Avı (`fish-stage
 | 10 | `oyun-balon-avi.png` | Balon Avı kapağı | emoji (🎈) | Oyun kapak simgesi, diğer `oyun-*.png` kapaklarıyla aynı 3D üslupta: açık mavi gökyüzünde yükselen üç renkli parlak balon ve küçük bir uçurtma; 512 px | P1 | Yeni (oyun yenileme) · eski `oyun-balik-avi.png` (olta ve balık) yerine; gelince `components/GameArt.tsx` `COVER.fish` |
 | 11 | `oyun-yildiz-avi.png` | Yıldız Avı kapağı | emoji (🔭) | Oyun kapak simgesi, aynı 3D üslupta: gece göğünde yıldızları tarayan altın bir ışık huzmesi, önde küçük pirinç bir teleskop; 512 px | P1 | Yeni (oyun yenileme) · gelince `components/GameArt.tsx` `COVER.olympus` |
 
-Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → ilgili çizim değişir (`rocket-stage.tsx` `RocketSprite` ve `Planet`; `fish-stage.tsx` `FishSprite`, `Cannon` ve `Sky`; `fener-stage.tsx` `starLook`, `SkyCell` ve `Tower`). Işık huzmesi, roketin izi ve alevi, patlama, ışık zerreleri, düşen meteorlar ve parlama kodla çizilmeye devam eder (hareket ettikleri ve her ekran boyuna uydukları için).
+Teslimden sonra: dosya tam bu adla `app/assets/art/` içine konur ve `app/src/components/games/fx/salon-art.tsx` içinde kendi satırının başındaki `// ` kaldırılır; roket (`rocket-stage.tsx` `RocketSprite`), on balon (`fish-stage.tsx` `FishSprite`), yıldızlar, kuyruklu yıldız ve kule (`fener-stage.tsx` `starLook`, `SkyCell`, `Tower`) kendiliğinden görsele geçer (gezegen, top ve bulutlar için çizim yeri ayrıca bağlanır). Dosya geldiği halde satırı kapalı kalırsa `tests/salon-art.test.ts` uyarır. Işık huzmesi, roketin izi ve alevi, patlama, ışık zerreleri, düşen meteorlar ve parlama kodla çizilmeye devam eder (hareket ettikleri ve her ekran boyuna uydukları için).
 
 
 ## 18. Oda oyunları: Renk Kartları, XOX, Dört Taş (21)
@@ -816,6 +816,8 @@ Oyun şimdilik kodla çizilen şekillerle duruyor (altın noktalar çivi, renkli
 | 6 | Zümrüt kupa | Aynı biçimde yeşil zümrüt kupa | `bilye-kupa-zumrut.png` | P2 |
 | 7 | Tahta arka planı | Dikey 320×440 oranında, mor-lacivert derin bir gece göğü dokusu (çok hafif yıldız tozu), kenarlarda ince altın çerçeve; çivi ve kupa çizilmeden | `bilye-tahta.png` | P2 |
 | 8 | Fırlatma kanalı | Sağda dikey, cam bir boru; altta küçük bir yay/piston | `bilye-kanal.png` | P3 |
+
+Teslimden sonra: dosya tam bu adla `app/assets/art/` içine konur ve `app/src/components/games/fx/salon-art.tsx` içinde kendi satırının başındaki `// ` kaldırılır; bilye, üç kupa ve tahta arka planı (`bilye.tsx`) kendiliğinden görsele geçer. Tahta görselle de kodla çizilse de Oyun Salonu'nun mor içermeyen paletinde (lacivert, altın) kalmalı. Dosya geldiği halde satırı kapalı kalırsa `tests/salon-art.test.ts` uyarır.
 
 ## 20. Etkinlik Merkezi: temalar ve türler (26)
 

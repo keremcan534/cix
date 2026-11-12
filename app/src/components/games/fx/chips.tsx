@@ -14,7 +14,7 @@ const CHIP_LOOKS: ChipLook[] = [
   { fill: '#2563EB', core: '#1E3A8A', mark: '#DBEAFE', ink: '#FFFFFF' },
   { fill: '#16A34A', core: '#14532D', mark: '#DCFCE7', ink: '#FFFFFF' },
   { fill: '#DC2626', core: '#7F1D1D', mark: '#FEE2E2', ink: '#FFFFFF' },
-  { fill: '#9333EA', core: '#581C87', mark: '#F3E8FF', ink: '#FFFFFF' },
+  { fill: '#0FB8BE', core: '#0A5F63', mark: '#D5FBFC', ink: '#FFFFFF' },
   { fill: '#EA580C', core: '#7C2D12', mark: '#FFEDD5', ink: '#FFFFFF' },
   { fill: '#1F2937', core: '#0B1220', mark: '#FACC15', ink: '#FDE68A' },
 ];
