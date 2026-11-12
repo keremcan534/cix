@@ -68,7 +68,7 @@
 2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-sevimli.png,Sevimli,🧸,kategori simgesi: Sevimli,P2,Teslim edildi
 2. Efekt hediyeleri ve animasyonlar,animasyon-kategori-ozel-gun.png,Özel gün,🎄,kategori simgesi: Özel gün,P2,Teslim edildi
 2. Efekt hediyeleri ve animasyonlar,animasyon-neon-halka.png,Neon Halka,💠,avatar etrafında neon turkuaz halka,P2,"Teslim edildi · Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
-2. Efekt hediyeleri ve animasyonlar,animasyon-ses-dalgasi.png,Ses Dalgası,🔊,ses dalgası halkaları,P2,"Teslim edildi · Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
+2. Efekt hediyeleri ve animasyonlar,animasyon-ses-dalgasi.png,Ses Halkası,🔊,avatardan yayılan ses halkaları,P2,"Teslim edildi · Eski adı Ses Dalgası, dosya adı aynı kaldı · Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
 2. Efekt hediyeleri ve animasyonlar,animasyon-donen-yildizlar.png,Dönen Yıldızlar,⭐,dönen küçük yıldızlar,P2,"Teslim edildi · Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
 2. Efekt hediyeleri ve animasyonlar,animasyon-muzik-notalari.png,Müzik Notaları,🎵,uçuşan müzik notaları,P2,"Teslim edildi · Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
 2. Efekt hediyeleri ve animasyonlar,animasyon-ucan-kalpler.png,Uçan Kalpler,💖,yukarı uçan kalpler,P2,"Teslim edildi · Uygulamada hareketli oynar; ChatGPT ile kapak görseli, hareketli sürüm ayrı iş"
@@ -148,7 +148,7 @@
 4. Mağaza ürünleri,magaza-sekme-binek.png,Binek,🏎️,mağaza sekmesi: Binek,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
 4. Mağaza ürünleri,magaza-sekme-sohbet-balonu.png,Sohbet balonu,💬,mağaza sekmesi: Sohbet balonu,P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
 4. Mağaza ürünleri,magaza-sekme-ozel-id.png,Özel ID,🔢,mağaza sekmesi: Özel ID,P2,"İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: altın madalyon, numara göstermiyor"
-4. Mağaza ürünleri,cerceve-ses-dalgasi.png,Ses Dalgası,🔊,"""Ses Dalgası"" avatar çerçevesinin mağaza küçük resmi",P2,"İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: ses dalgası yerine kulaklık motifi · Çerçeve kodla çiziliyor; yalnız mağaza simgesi"
+4. Mağaza ürünleri,cerceve-ses-dalgasi.png,Ses Halkası,🔊,"""Ses Halkası"" avatar çerçevesinin mağaza küçük resmi",P2,"Eski adı Ses Dalgası, dosya adı aynı kaldı · İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: ses dalgası yerine kulaklık motifi · Çerçeve kodla çiziliyor; yalnız mağaza simgesi"
 4. Mağaza ürünleri,cerceve-yorunge.png,Yörünge,🪐,"""Yörünge"" avatar çerçevesinin mağaza küçük resmi",P2,"İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: yörünge simgesi arma gibi duruyor · Çerçeve kodla çiziliyor; yalnız mağaza simgesi"
 4. Mağaza ürünleri,cerceve-aurora.png,Aurora,🌌,"""Aurora"" avatar çerçevesinin mağaza küçük resmi",P2,"İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: Buz Kristali çerçevesinin turkuaz renk değişimi, aurora kimliği yok · Çerçeve kodla çiziliyor; yalnız mağaza simgesi"
 4. Mağaza ürünleri,cerceve-ates.png,Ateş,🔥,"""Ateş"" avatar çerçevesinin mağaza küçük resmi",P2,"İkinci 3D teslimde yakın eşleşme geldi, onaylanmadı; emoji kaldı · ⚠️ yeniden üretilmeli: altın çerçeve üstüne alev arması · Çerçeve kodla çiziliyor; yalnız mağaza simgesi"
@@ -159,7 +159,7 @@
 4. Mağaza ürünleri,cerceve-altin-defne.png,Altın Defne,🌿,"""Altın Defne"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
 4. Mağaza ürünleri,cerceve-gumus-tac.png,Gümüş Taç,👑,"""Gümüş Taç"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
 4. Mağaza ürünleri,cerceve-kraliyet-kanatlari.png,Kraliyet Kanatları,🪽,"""Kraliyet Kanatları"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
-4. Mağaza ürünleri,cerceve-melek-kalp-mercan.png,Melek Kalp · Mercan,💞,"""Melek Kalp · Mercan"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
+4. Mağaza ürünleri,cerceve-melek-kalp-mercan.png,Melek Kalp · Pembe,💞,"""Melek Kalp · Pembe"" avatar çerçevesinin mağaza küçük resmi",P2,"✅ 3D teslim edildi · Eski adı Melek Kalp · Mercan, dosya adı aynı kaldı · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı"
 4. Mağaza ürünleri,cerceve-melek-kalp-turkuaz.png,Melek Kalp · Turkuaz,💙,"""Melek Kalp · Turkuaz"" avatar çerçevesinin mağaza küçük resmi",P2,✅ 3D teslim edildi · Mağaza kartı çerçevenin kendi görselini (assets/frames) avatarla gösterdiği için ayrıca bağlanmadı
 4. Mağaza ürünleri,giris-efekti-isilti.png,Işıltı,✨,"""Işıltı"" odaya giriş efektinin simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
 4. Mağaza ürünleri,giris-efekti-simsek.png,Şimşek,⚡,"""Şimşek"" odaya giriş efektinin simgesi",P2,"✅ 3D teslim edildi, bağlandı (`app/assets/store`, `components/StoreArt.tsx`)"
@@ -351,7 +351,7 @@
 "7. VIP, SVIP, Asil, seviyeler",ayricalik-kesfette-one-cikma.png,Keşfette öne çıkma,📈,ayrıcalık simgesi: Keşfette öne çıkma,P3,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 19 dosyada
 "7. VIP, SVIP, Asil, seviyeler",ayricalik-kazanc-bonusu.png,Kazanç bonusu,💎,ayrıcalık simgesi: Kazanç bonusu,P3,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 27 dosyada
 "7. VIP, SVIP, Asil, seviyeler",ayricalik-cazibe-madalyasi.png,Cazibe madalyası,🎖️,ayrıcalık simgesi: Cazibe madalyası,P3,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 27 dosyada
-"7. VIP, SVIP, Asil, seviyeler",ayricalik-mikrofon-dalgasi.png,Mikrofon dalgası,🎙️,ayrıcalık simgesi: Mikrofon dalgası,P3,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada
+"7. VIP, SVIP, Asil, seviyeler",ayricalik-mikrofon-dalgasi.png,Mikrofon halkası,🎙️,ayrıcalık simgesi: Mikrofon halkası (mikrofon çevresinde ses halkası),P3,"Eski adı Mikrofon dalgası, dosya adı aynı kaldı · Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 2 dosyada"
 "7. VIP, SVIP, Asil, seviyeler",ayricalik-ozel-arac.png,Özel araç,🛸,ayrıcalık simgesi: Özel araç,P3,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 4 dosyada
 "7. VIP, SVIP, Asil, seviyeler",seviye-servet-seviyesi.png,Servet seviyesi,💰,Servet seviyesi simgesi,P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 27 dosyada
 "7. VIP, SVIP, Asil, seviyeler",seviye-cazibe-seviyesi.png,Cazibe seviyesi,🌹,Cazibe seviyesi simgesi,P2,Taslak teslim (parti 04–12) · yeniden üretilmeli: aynı görsel 27 dosyada

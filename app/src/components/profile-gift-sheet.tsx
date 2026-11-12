@@ -1,5 +1,5 @@
 // The gift sheet on someone's profile (kullanici/[id]): the room gift sheet's catalog grid (art, name, price with
-// the coin icon and Turkish thousands separators, İnci locks) for one person and one gift at a time.
+// the coin icon and Turkish thousands separators, VIP (SVIP) locks) for one person and one gift at a time.
 // Product rule: no gift asks for a confirmation; the button sends it. A short balance turns the button into
 // "Jeton yükle" before the tap instead of failing after it. The sender (onSend) does the real check and the
 // sending (the server in live mode) and says whether it went; the sheet closes once it did.
@@ -68,7 +68,7 @@ export function ProfileGiftSheet({
     : !gift
       ? { title: 'Bir hediye seç', disabled: true }
       : locked
-        ? { title: `İnci ${gift.minSvip} gerekli`, disabled: true }
+        ? { title: `VIP ${gift.minSvip} gerekli`, disabled: true }
         : short
           ? { title: 'Jeton yükle', onPress: goWallet }
           : { title: `Gönder · ${fmt(gift.price)}`, onPress: send };
@@ -102,7 +102,7 @@ export function ProfileGiftSheet({
                 style={s.tileWrap}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
-                accessibilityLabel={`${g.name}, ${fmt(g.price)} jeton${lock ? `, İnci ${g.minSvip} gerekli` : ''}`}
+                accessibilityLabel={`${g.name}, ${fmt(g.price)} jeton${lock ? `, VIP ${g.minSvip} gerekli` : ''}`}
               >
                 <View style={[s.tile, on && s.tileOn]}>
                   <GiftArt giftId={g.id} emoji={g.emoji} size={42} style={lock && { opacity: 0.4 }} textStyle={[s.tileArt, lock && { opacity: 0.4 }]} />
@@ -112,7 +112,7 @@ export function ProfileGiftSheet({
                   {lock ? (
                     <View style={s.lockPill}>
                       <Ionicons name="lock-closed" size={10} color={colors.gold} />
-                      <Text style={s.lockText}>İnci {g.minSvip}</Text>
+                      <Text style={s.lockText}>VIP {g.minSvip}</Text>
                     </View>
                   ) : (
                     <View style={s.priceRow}>

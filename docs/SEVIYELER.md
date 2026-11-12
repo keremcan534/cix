@@ -21,6 +21,8 @@ Rozetler profilde, Ben sekmesinde, Keşfet kartlarında ve seviye listelerinde g
   - **Sayılmaz:** Oyun Salonu oyunları, zar düellosu, oda zarfı ve jeton transferi.
   - **Uğurlu hediye:** Yalnızca harcanan jeton sayılır, kazanılan ödül sayılmaz.
 - **Eşikler:** Ortak eğriden gelir (aşağıda). Lv.1 = 10 puan, Lv.50 = 30 milyon puan.
+- **Gruplar (11):** Kuvars (Lv.0–4), Opal (5–9), Akik (10–14), Ametist (15–19), Topaz (20–24), Zümrüt (25–28), Yakut (29–32), Safir (33–36), Pırlanta (37–40), Hazine (41–45), Efsane (46–50).
+- **Seviye hediyesi:** Altın Fidan (Lv.3–9), Kristal Küre (10–24), Yakut Taç (25–40), Uzay Mekiği (41 ve üstü).
 - **Açtıkları:**
   - **Her seviye:** Seviye rozeti ve öne çıkma.
   - **Lv.3:** Seviye hediyesi.
@@ -41,6 +43,7 @@ Her kullanıcıda bulunur.
   - Ücretli aramalardan gelen elmas da sayılır.
   - Beğeni ve özel sohbet puanları sunucuya geçildiğinde günlük sınırla eklenecek.
 - **Eşikler:** Ortak eğriden gelir (aşağıda). Lv.1 = 10 puan, Lv.50 = 60 milyon puan.
+- **Gruplar (10):** Kıvılcım (Lv.0–5), Işıltı (6–10), Parıltı (11–15), Şafak (16–20), Ay Işığı (21–25), Yıldız (26–30), Kutup Yıldızı (31–35), Gökkuşağı (36–40), Kutup Işığı (41–45), Efsane Yankı (46–50).
   - Alınan elmas birçok kişiden toplandığı için son seviyeler Cömertlik'in iki katı puan ister.
 - **Kazanca etkisi:** Alınan hediye elmaslarına seviye bonusu eklenir.
   - **Oranlar:** Lv.6 %1, Lv.16 %2, Lv.26 %3, Lv.36 %4, Lv.46 %5.
@@ -50,7 +53,7 @@ Her kullanıcıda bulunur.
   - **Her seviye:** Rozet ve keşfette öne çıkma.
   - **Lv.6:** Kazanç bonusu, sohbet balonu.
   - **Lv.11:** Madalya, giriş efekti.
-  - **Lv.16:** Mikrofon dalgası.
+  - **Lv.16:** Mikrofon halkası.
   - **Lv.21:** Profil çerçevesi.
   - **Lv.31:** Özel araç.
 

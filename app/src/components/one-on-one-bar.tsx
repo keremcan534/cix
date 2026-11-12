@@ -161,7 +161,7 @@ export function useChatGift(user: User, onSent: () => void) {
   const toWallet = { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') };
   const send = async (g: Gift): Promise<boolean> => {
     if ((g.minSvip ?? 0) > svipLevel) {
-      showAlert('Üyelere özel hediye', `${g.name}, İnci ${g.minSvip} ve üstü için. Senin seviyen: İnci ${svipLevel}.`);
+      showAlert('Üyelere özel hediye', `${g.name}, VIP ${g.minSvip} ve üstü için. Senin seviyen: VIP ${svipLevel}.`);
       return false;
     }
     if (liveMode()) {

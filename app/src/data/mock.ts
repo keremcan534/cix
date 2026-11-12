@@ -200,8 +200,8 @@ export const USERS: User[] = [
   { id: 'u5', name: 'Selin', age: 25, city: 'İstanbul', distanceKm: 6, avatar: NO_PHOTO, verified: true, vip: true, bio: 'Seyahat ✈️ fotoğraf 📷', online: true, interests: ['✈️ Seyahat', '🎬 Film', '☕ Kahve'] },
   { id: 'u6', name: 'Burak', age: 27, city: 'Bursa', distanceKm: 150, avatar: NO_PHOTO, verified: true, bio: 'Futbol muhabbeti ⚽', online: false, interests: ['⚽ Spor', '🎮 Oyun', '💬 Sohbet'] },
   { id: 'u7', name: 'Ayşe', age: 21, city: 'İstanbul', distanceKm: 1, avatar: NO_PHOTO, verified: true, bio: 'Yeni insanlar tanımayı seviyorum', online: true, interests: ['💬 Sohbet', '💃 Dans', '🎧 Müzik'] },
-  { id: 'u8', name: 'Emre', age: 29, city: 'Antalya', distanceKm: 700, avatar: NO_PHOTO, verified: false, bio: 'Deniz, kum, müzik 🌊', online: true, interests: ['✈️ Seyahat', '🎧 Müzik', '⚽ Spor'] },
-  { id: 'u9', name: 'Deniz', age: 24, city: 'İstanbul', distanceKm: 8, avatar: NO_PHOTO, verified: true, bio: 'Lo-fi dinlerken sohbet', online: true, interests: ['🎧 Müzik', '📚 Kitap', '💬 Sohbet'] },
+  { id: 'u8', name: 'Emre', age: 29, city: 'Antalya', distanceKm: 700, avatar: NO_PHOTO, verified: false, bio: 'Kahve, kitap, müzik ☕', online: true, interests: ['✈️ Seyahat', '🎧 Müzik', '⚽ Spor'] },
+  { id: 'u9', name: 'Defne', age: 24, city: 'İstanbul', distanceKm: 8, avatar: NO_PHOTO, verified: true, bio: 'Lo-fi dinlerken sohbet', online: true, interests: ['🎧 Müzik', '📚 Kitap', '💬 Sohbet'] },
   { id: 'u10', name: 'Kaan', age: 30, city: 'Eskişehir', distanceKm: 230, avatar: NO_PHOTO, verified: true, bio: 'Stand-up hayranı 😂', online: false, interests: ['🎬 Film', '💬 Sohbet', '🎮 Oyun'] },
   { id: 'u11', name: 'Melis', age: 23, city: 'İstanbul', distanceKm: 3, avatar: NO_PHOTO, verified: true, vip: true, bio: 'Dans ve pop müzik 💃', online: true, interests: ['💃 Dans', '🎧 Müzik', '🎤 Karaoke'] },
   { id: 'u12', name: 'Onur', age: 26, city: 'Konya', distanceKm: 520, avatar: NO_PHOTO, verified: false, bio: 'Kahve bağımlısı', online: true, interests: ['☕ Kahve', '📚 Kitap', '💬 Sohbet'] },
@@ -226,7 +226,7 @@ export const DM_PRICE = 10;
 
 // Room audiences are larger than the named mock users: every other person in a room is a deterministic
 // "guest" (id `gx-<room>-<n>`), so room counts, lists and profiles all resolve to the same real person.
-const GUEST_NAMES = ['Ahmet', 'Büşra', 'Cem', 'Derya', 'Ece', 'Furkan', 'Gizem', 'Hakan', 'İrem', 'Kerem', 'Leyla', 'Murat', 'Nazlı', 'Oğuz', 'Pelin', 'Rüzgar', 'Sude', 'Tolga', 'Umut', 'Yağmur', 'Zehra', 'Barış', 'Ceren', 'Doruk', 'Esra', 'Gökhan', 'Hande', 'Kaan', 'Mine', 'Serkan'];
+const GUEST_NAMES = ['Ahmet', 'Büşra', 'Cem', 'Dilara', 'Ece', 'Furkan', 'Gizem', 'Hakan', 'İrem', 'Kerem', 'Leyla', 'Murat', 'Nazlı', 'Oğuz', 'Pelin', 'Rüya', 'Sude', 'Tolga', 'Umut', 'Yağmur', 'Zehra', 'Barış', 'Ceren', 'Doruk', 'Esra', 'Gökhan', 'Hande', 'Kaan', 'Mine', 'Serkan'];
 const GUEST_CITIES = ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Adana', 'Trabzon', 'Samsun', 'Kayseri'];
 const guests = new Map<string, User>();
 export const isGuestId = (id: string) => id.startsWith('gx-');
@@ -282,7 +282,7 @@ export const userById = (id: string): User =>
 
 export const ROOMS: Room[] = [
   { id: 'r1', title: 'Gece Sohbeti 🌙', category: 'Sohbet', cover: photo('night'), hostId: 'u1', listeners: 248, seatUserIds: ['u1', 'u2', 'u5', null, 'u7', null, 'u9', null, null], tags: ['Sohbet', 'Gece'], level: 6, roomType: 'free', announcement: 'Gece sohbetine hoş geldin, saygı her şeyden önce 🌙' },
-  { id: 'r2', title: 'Karaoke Akşamı 🎤', category: 'Müzik', cover: photo('karaoke'), hostId: 'u11', listeners: 512, seatUserIds: ['u11', 'u4', null, 'u1', null, null, 'u8', null, null], tags: ['Karaoke', 'Pop'], level: 11, agency: true, track: 'm4', roomType: 'music', theme: 'music', bossSeat: true, announcement: 'Dalga Ajans karaoke gecesi · sıraya girmek için koltuk iste 🎤' },
+  { id: 'r2', title: 'Karaoke Akşamı 🎤', category: 'Müzik', cover: photo('karaoke'), hostId: 'u11', listeners: 512, seatUserIds: ['u11', 'u4', null, 'u1', null, null, 'u8', null, null], tags: ['Karaoke', 'Pop'], level: 11, agency: true, track: 'm4', roomType: 'music', theme: 'music', bossSeat: true, announcement: 'Yıldız Ajans karaoke gecesi · sıraya girmek için koltuk iste 🎤' },
   { id: 'r3', title: 'Kim Milyoner? Quiz', category: 'Oyun', cover: photo('quiz'), hostId: 'u2', listeners: 133, seatUserIds: ['u2', 'u6', 'u10', 'u12', null, null, null, null, null], tags: ['Oyun', 'Bilgi'], level: 4, roomType: 'qa', announcement: 'Bilgi yarışması · soruları ❓ ile gönder' },
   { id: 'r4', title: 'Yeni Arkadaşlar 💜', category: 'Arkadaşlık', cover: photo('friends'), hostId: 'u7', listeners: 389, seatUserIds: ['u7', 'u5', 'u9', null, null, 'u3', null, null, null], tags: ['Tanışma'], level: 8, adminIds: ['me'], roomType: 'stage', theme: 'friends', bossSeat: true, announcement: 'Sen bu odanın yöneticisisin 🛡️' },
   { id: 'r5', title: 'Lo-fi & Ders Çalışma', category: 'Müzik', cover: photo('lofi'), hostId: 'u9', listeners: 76, seatUserIds: ['u9', null, null, null, null, null, null, null, null], tags: ['Lo-fi', 'Sessiz'], level: 3, track: 'm3', roomType: 'music' },

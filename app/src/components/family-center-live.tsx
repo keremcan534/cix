@@ -100,7 +100,7 @@ export function useFamilyGift(list: Gift[], place: GiftPlace | undefined, onSent
   const send = async (g: Gift): Promise<boolean> => {
     if (!to) return false;
     if ((g.minSvip ?? 0) > svipLevel) {
-      showAlert('Üyelere özel hediye', `${g.name}, İnci ${g.minSvip} ve üstü için. Senin seviyen: İnci ${svipLevel}.`);
+      showAlert('Üyelere özel hediye', `${g.name}, VIP ${g.minSvip} ve üstü için. Senin seviyen: VIP ${svipLevel}.`);
       return false;
     }
     const limited = spendBlock(g.price);

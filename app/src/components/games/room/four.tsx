@@ -24,7 +24,7 @@ export type FourView = { status: 'waiting' | 'playing' | 'over'; turn: number; w
 
 /** The two discs: coral and gold. */
 export const DISC_COLORS: { name: string; light: string; base: string; deep: string }[] = [
-  { name: 'Mercan', light: '#FF99A4', base: '#F2506A', deep: '#A91F3D' },
+  { name: 'Pembe', light: '#FF99A4', base: '#F2506A', deep: '#A91F3D' },
   { name: 'Altın', light: '#FFE08A', base: '#F2A93B', deep: '#B36A0C' },
 ];
 const FRAME = '#1E4F8F';

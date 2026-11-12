@@ -202,7 +202,7 @@ export const luckyBagRoutes = {
     } else {
       gift = GIFTS.get(b.giftId);
       if (!gift || live().giftsHidden.has(gift.id)) throw new HttpError(400, 'Bu hediye artık yok');
-      if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} İnci ${gift.minSvip} ve üstü için`);
+      if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} VIP ${gift.minSvip} ve üstü için`);
       units = int(b.count, 1, 10_000);
       if (!units || !BAG_RULES.giftCounts.includes(units)) throw new HttpError(400, `Hediye adedi ${BAG_RULES.giftCounts.join(', ')} olabilir`);
       if (!packets || !BAG_RULES.giftPackets.includes(packets)) throw new HttpError(400, `Pay sayısı ${BAG_RULES.giftPackets.join(', ')} olabilir`);

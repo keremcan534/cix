@@ -25,7 +25,7 @@ const seeded = (seed) => {
 /** No draw is expected: one fails the test. */
 const none = () => assert.fail('beklenmeyen çekiliş');
 const ALL = Array.from({ length: DECK }, (_, id) => id);
-/** The number of a card: card(1, 7) is a Mercan 7, card(1, 7, 1) the other one; card(null, 'Joker') a Joker. */
+/** The number of a card: card(1, 7) is a Pembe 7, card(1, 7, 1) the other one; card(null, 'Joker') a Joker. */
 const card = (color, value, k = 0) => ALL.filter((id) => cardOf(id).color === color && cardOf(id).value === value)[k];
 const JOKER = card(null, 'Joker');
 const PLUS4 = card(null, '+4');
@@ -43,7 +43,7 @@ const everyCard = (t) => [...t.hands.flat(), ...t.draw, ...t.discard].sort((a, b
 
 describe('Renk Kartları’nın kuralları', () => {
   test('deste bizim: 102 kart; dört renkte 1–9 ikişer, ikişer Atla, Yön ve +2; dört Joker, iki Joker +4', () => {
-    assert.deepEqual([DECK, HAND, COLOR_NAMES, TABLE_GAMES.cards], [102, 7, ['Turkuaz', 'Mercan', 'Altın', 'Yeşil'], { name: 'Renk Kartları', min: 2, max: 6 }]);
+    assert.deepEqual([DECK, HAND, COLOR_NAMES, TABLE_GAMES.cards], [102, 7, ['Turkuaz', 'Pembe', 'Altın', 'Yeşil'], { name: 'Renk Kartları', min: 2, max: 6 }]);
     const count = (color, value) => ALL.filter((id) => cardOf(id).color === color && cardOf(id).value === value).length;
     for (let color = 0; color < 4; color++) {
       for (let v = 1; v <= 9; v++) assert.equal(count(color, v), 2, `${COLOR_NAMES[color]} ${v}`);
@@ -52,7 +52,7 @@ describe('Renk Kartları’nın kuralları', () => {
     }
     assert.deepEqual([count(null, 'Joker'), count(null, '+4')], [4, 2]);
     assert.equal(ALL.filter((id) => cardOf(id).color === null).length, 6);
-    assert.deepEqual([cardName(card(1, 7)), cardName(card(3, 'Yön')), cardName(JOKER), cardName(PLUS4)], ['Mercan 7', 'Yeşil Yön', 'Joker', 'Joker +4']);
+    assert.deepEqual([cardName(card(1, 7)), cardName(card(3, 'Yön')), cardName(JOKER), cardName(PLUS4)], ['Pembe 7', 'Yeşil Yön', 'Joker', 'Joker +4']);
   });
 
   test('el başlar: karılmış desteden yedişer kart, ortaya bir sayı kartı; hiçbir kart kaybolmaz', () => {
@@ -82,7 +82,7 @@ describe('Renk Kartları’nın kuralları', () => {
     const t = hand([[card(1, 7), card(0, 5), card(3, 9)], [card(2, 3), card(0, 1)], [card(2, 8), card(2, 9)]], card(1, 5));
     assert.deepEqual([fits(card(1, 7), 1, card(1, 5)), fits(card(0, 5), 1, card(1, 5)), fits(card(3, 9), 1, card(1, 5)), fits(JOKER, 1, card(1, 5))], [true, true, false, true]);
     let r = play(t, { card: card(1, 7) });
-    assert.deepEqual([r.hands[0], r.discard, r.color, r.turn, r.n, r.log], [[card(0, 5), card(3, 9)], [card(1, 5), card(1, 7)], 1, 1, 1, 'A Mercan 7 attı']);
+    assert.deepEqual([r.hands[0], r.discard, r.color, r.turn, r.n, r.log], [[card(0, 5), card(3, 9)], [card(1, 5), card(1, 7)], 1, 1, 1, 'A Pembe 7 attı']);
     assert.deepEqual(r.last, { n: 1, seat: 0, type: 'play', card: card(1, 7), took: null, skipped: null, turned: false, one: false, mixed: false });
     r = play(t, { card: card(0, 5) });
     assert.deepEqual([r.color, r.turn, r.log], [0, 1, 'A Turkuaz 5 attı'], 'aynı yüz rengi değiştirir');
@@ -95,9 +95,9 @@ describe('Renk Kartları’nın kuralları', () => {
   test('Atla sıradakini atlatır; Yön oyunun yönünü çevirir, iki kişiyken Atla gibi oynar', () => {
     const three = (first) => hand([[first, card(0, 1), card(0, 2)], [card(2, 1), card(1, 2)], [card(3, 1), card(1, 3), card(1, 4)]], card(1, 5));
     let r = play(three(card(1, 'Atla')), { card: card(1, 'Atla') });
-    assert.deepEqual([r.turn, r.dir, r.last.skipped, r.last.turned, r.log], [2, 1, 1, false, 'A Mercan Atla attı: B sırasını kaçırdı']);
+    assert.deepEqual([r.turn, r.dir, r.last.skipped, r.last.turned, r.log], [2, 1, 1, false, 'A Pembe Atla attı: B sırasını kaçırdı']);
     r = play(three(card(1, 'Yön')), { card: card(1, 'Yön') });
-    assert.deepEqual([r.turn, r.dir, r.last.skipped, r.last.turned, r.log], [2, -1, null, true, 'A Mercan Yön attı: yön değişti']);
+    assert.deepEqual([r.turn, r.dir, r.last.skipped, r.last.turned, r.log], [2, -1, null, true, 'A Pembe Yön attı: yön değişti']);
     // Play now runs the other way: after the third seat comes the second.
     r = play(r, { card: card(1, 3) });
     assert.deepEqual([r.turn, r.dir], [1, -1]);
@@ -112,9 +112,9 @@ describe('Renk Kartları’nın kuralları', () => {
 
     const two = (first) => hand([[first, card(0, 1), card(0, 2)], [card(2, 1), card(1, 2)]], card(1, 5));
     r = play(two(card(1, 'Atla')), { card: card(1, 'Atla') });
-    assert.deepEqual([r.turn, r.last.skipped, r.log], [0, 1, 'A Mercan Atla attı: B sırasını kaçırdı']);
+    assert.deepEqual([r.turn, r.last.skipped, r.log], [0, 1, 'A Pembe Atla attı: B sırasını kaçırdı']);
     r = play(two(card(1, 'Yön')), { card: card(1, 'Yön') });
-    assert.deepEqual([r.turn, r.dir, r.last.skipped, r.last.turned, r.log], [0, -1, 1, true, 'A Mercan Yön attı: sıra yine onda']);
+    assert.deepEqual([r.turn, r.dir, r.last.skipped, r.last.turned, r.log], [0, -1, 1, true, 'A Pembe Yön attı: sıra yine onda']);
   });
 
   test('+2 sıradakine iki kart çektirir ve sırasını geçirir; Joker rengi seçtirir; Joker +4 dört kart çektirir', () => {
@@ -122,7 +122,7 @@ describe('Renk Kartları’nın kuralları', () => {
     let r = play(t(card(1, '+2'), { draw: [card(3, 7, 1), card(3, 8), card(3, 9)] }), { card: card(1, '+2') });
     // The pile's top is its last card: Yeşil 9 comes first.
     assert.deepEqual([r.hands[1], r.draw, r.turn, r.last.took, r.last.skipped], [[card(2, 1), card(3, 9), card(3, 8)], [card(3, 7, 1)], 2, [1, 2], 1]);
-    assert.equal(r.log, 'A Mercan +2 attı: B 2 kart çekti');
+    assert.equal(r.log, 'A Pembe +2 attı: B 2 kart çekti');
     // A +2 on a +2 is only a card with the same face: nothing is added up or sent back.
     r = play(hand([[card(1, '+2')], [card(3, '+2'), card(0, 1)], [card(2, 1)]], card(1, 5), { hands: [[card(0, 9), card(0, 8)], [card(3, '+2'), card(0, 1)], [card(2, 1)]], discard: [card(1, '+2')], color: 1, turn: 1 }), { card: card(3, '+2') });
     assert.deepEqual([r.hands[2].length, r.turn, r.color, r.last.took], [3, 0, 3, [2, 2]]);
@@ -146,11 +146,11 @@ describe('Renk Kartları’nın kuralları', () => {
 
   test('kart çekmek: tutmayan kart sırayı geçirir; tutan kart hemen atılabilir ya da elde tutulur', () => {
     const t = (draw) => hand([[card(1, 1), card(0, 2)], [card(2, 1)], [card(3, 1)]], card(1, 5), { draw });
-    // Yeşil 7 doesn't fit a Mercan 5.
+    // Yeşil 7 doesn't fit a Pembe 5.
     let r = play(t([card(1, 9), card(3, 7)]), { draw: true });
     assert.deepEqual([r.hands[0], r.draw, r.turn, r.drawn, r.log], [[card(1, 1), card(0, 2), card(3, 7)], [card(1, 9)], 1, null, 'A kart çekti']);
     assert.deepEqual(r.last, { n: 1, seat: 0, type: 'draw', card: null, took: [0, 1], skipped: null, turned: false, one: false, mixed: false });
-    // Mercan 9 fits: the turn waits for it to be played or kept. One may draw with a card to play in hand.
+    // Pembe 9 fits: the turn waits for it to be played or kept. One may draw with a card to play in hand.
     const drew = play(t([card(3, 7), card(1, 9)]), { draw: true });
     assert.deepEqual([drew.hands[0].length, drew.turn, drew.drawn, drew.log], [3, 0, card(1, 9), 'A kart çekti']);
     assert.equal(refused(drew, 0, { draw: true }), 'Kartını çektin: onu at ya da pas geç.');
@@ -158,7 +158,7 @@ describe('Renk Kartları’nın kuralları', () => {
     r = play(drew, { pass: true });
     assert.deepEqual([r.turn, r.drawn, r.hands[0].length, r.last.type, r.n, r.log], [1, null, 3, 'pass', 2, 'A çektiği kartı tuttu']);
     r = play(drew, { card: card(1, 9) });
-    assert.deepEqual([r.turn, r.drawn, r.hands[0], r.discard.at(-1), r.log], [1, null, [card(1, 1), card(0, 2)], card(1, 9), 'A Mercan 9 attı']);
+    assert.deepEqual([r.turn, r.drawn, r.hands[0], r.discard.at(-1), r.log], [1, null, [card(1, 1), card(0, 2)], card(1, 9), 'A Pembe 9 attı']);
     // A drawn Joker still needs its colour.
     const joker = play(t([JOKER]), { draw: true });
     assert.equal(joker.drawn, JOKER);
@@ -184,9 +184,9 @@ describe('Renk Kartları’nın kuralları', () => {
 
   test('son kartını atan kazanır; tek kartı kalana masa SON KART der', () => {
     let r = play(hand([[card(1, 7), card(0, 2)], [card(2, 1), card(2, 2)]], card(1, 5)), { card: card(1, 7) });
-    assert.deepEqual([r.status, r.last.one, r.turn, r.log], ['playing', true, 1, 'A Mercan 7 attı · SON KART!']);
+    assert.deepEqual([r.status, r.last.one, r.turn, r.log], ['playing', true, 1, 'A Pembe 7 attı · SON KART!']);
     r = play(hand([[card(1, 'Atla'), card(0, 2)], [card(2, 1), card(2, 2)]], card(1, 5)), { card: card(1, 'Atla') });
-    assert.equal(r.log, 'A Mercan Atla attı: B sırasını kaçırdı · SON KART!');
+    assert.equal(r.log, 'A Pembe Atla attı: B sırasını kaçırdı · SON KART!');
     r = play(hand([[card(1, 7)], [card(2, 1), card(2, 2)]], card(1, 5)), { card: card(1, 7) });
     assert.deepEqual([r.status, r.winner, r.hands[0], r.last.one, r.last.card, r.log], ['over', 0, [], false, card(1, 7), '🏆 A kartlarını bitirdi!']);
     assert.equal(refused(r, 1, { draw: true }), 'Oyun başlamadı.');
@@ -222,7 +222,7 @@ describe('Renk Kartları’nın kuralları', () => {
   test('süresi dolan sırada masa oynar: tutan kartı atar ya da çeker, çektiği tutarsa onu da atar; üçüncüde koltuk gider', () => {
     const t = (more) => hand([[card(3, 9), card(1, 7)], [card(0, 1), card(0, 3)], [card(2, 5), card(2, 6)]], card(1, 4), more);
     let r = timeoutTable(t(), names, none);
-    assert.deepEqual([r.hands[0], r.discard.at(-1), r.turn, r.misses, r.log], [[card(3, 9)], card(1, 7), 1, [1, 0, 0], 'A Mercan 7 attı · SON KART!']);
+    assert.deepEqual([r.hands[0], r.discard.at(-1), r.turn, r.misses, r.log], [[card(3, 9)], card(1, 7), 1, [1, 0, 0], 'A Pembe 7 attı · SON KART!']);
     // Nothing fits and the card drawn doesn't either: the turn passes.
     r = timeoutTable(t({ turn: 1, misses: [0, 1, 0], draw: [card(3, 8)] }), names, none);
     assert.deepEqual([r.hands[1], r.turn, r.misses, r.last.type, r.n, r.log], [[card(0, 1), card(0, 3), card(3, 8)], 2, [0, 2, 0], 'draw', 1, 'B kart çekti']);
@@ -426,9 +426,9 @@ describe('Renk Kartları masası sunucuda', () => {
     assert.deepEqual(await act(owner.session, room, 'move', { move: { card: JOKER } }), [409, { error: 'Jokerin rengini seç.' }]);
     assert.deepEqual(await act(owner.session, room, 'move', { move: { pass: true } }), [409, { error: 'Önce kart at ya da çek.' }]);
     let t = await ok(act(owner.session, room, 'move', { move: { card: card(1, 7) } }));
-    assert.deepEqual([t.mine, t.top, t.under, t.counts, t.turn, t.log], [[card(0, 5), card(3, 9), JOKER], card(1, 7), [card(1, 5)], [3, 3], 1, 'Oda Sahibi Mercan 7 attı']);
+    assert.deepEqual([t.mine, t.top, t.under, t.counts, t.turn, t.log], [[card(0, 5), card(3, 9), JOKER], card(1, 7), [card(1, 5)], [3, 3], 1, 'Oda Sahibi Pembe 7 attı']);
     assert.deepEqual(t.last, { n: t.n, seat: 0, type: 'play', card: card(1, 7), took: null, skipped: null, turned: false, one: false, mixed: false });
-    // Ayşe draws with a card to play in hand: the Mercan 9 on top of the pile fits, so the turn waits for her.
+    // Ayşe draws with a card to play in hand: the Pembe 9 on top of the pile fits, so the turn waits for her.
     t = await ok(act(a.session, room, 'move', { move: { draw: true } }));
     assert.deepEqual([t.drawn, t.turn, t.counts, t.pile, t.mine.length], [card(1, 9), 1, [3, 4], 1, 4]);
     const other = await ok(table(owner.session, room));
@@ -462,7 +462,7 @@ describe('Renk Kartları masası sunucuda', () => {
     assert.deepEqual([t.status, t.counts, t.deal, t.seats.length], ['playing', [7, 7, 7], 2, 3]);
     await set({ hands: [[card(1, 'Yön'), card(0, 5)], [card(2, 3)], [card(1, 1), card(2, 2)]], discard: [card(1, 5)], color: 1, turn: 0, dir: 1, drawn: null });
     t = await ok(act(owner.session, room, 'move', { move: { card: card(1, 'Yön') } }));
-    assert.deepEqual([t.dir, t.turn, t.last.turned, t.last.one, t.log], [-1, 2, true, true, 'Oda Sahibi Mercan Yön attı: yön değişti · SON KART!']);
+    assert.deepEqual([t.dir, t.turn, t.last.turned, t.last.one, t.log], [-1, 2, true, true, 'Oda Sahibi Pembe Yön attı: yön değişti · SON KART!']);
     t = await ok(act(b.session, room, 'move', { move: { card: card(1, 1) } }));
     assert.deepEqual([t.turn, t.last.one], [1, true]);
     assert.equal((await act(a.session, room, 'move', { move: { card: card(2, 3) } }))[1].error, 'Bu kart atılamaz.');

@@ -45,8 +45,8 @@ export default function PrivilegeCenter() {
         <View style={styles.segment}>
           {(
             [
-              ['svip', 'İnci'],
-              ['vip', 'VIP'],
+              ['svip', 'VIP'],
+              ['vip', 'Abonelik'],
               ['noble', 'Rütbe'],
             ] as const
           ).map(([k, l]) => (
@@ -55,7 +55,7 @@ export default function PrivilegeCenter() {
             </Pressable>
           ))}
         </View>
-        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'İnci: yüklediğin her jeton 1 puan, seviyen hiç düşmez.\nVIP: 7 günlük, 1 aylık ya da 3 aylık abonelik.\nRütbe: jetonla alınır, 30 gün geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
+        <Pressable onPress={() => showAlert('Ayrıcalıklar', 'VIP 1–10: yüklediğin her jeton 1 puan, seviyen hiç düşmez.\nAbonelik: 7 günlük, 1 aylık ya da 3 aylık VIP aboneliği.\nRütbe: jetonla alınır, 30 gün geçerli.\nTüm ayrıcalıklar sunucuda doğrulanır.')} hitSlop={10} accessibilityLabel="Yardım">
           <Ionicons name="help-circle-outline" size={26} color={colors.text} />
         </Pressable>
       </View>
@@ -115,7 +115,7 @@ function Svip() {
           const locked = svipLevel < l.level;
           const isNext = svipLevel === l.level - 1;
           return (
-            <Pressable key={l.level} onPress={() => select(i)} style={{ width: cardW }} accessibilityLabel={`İnci ${l.level} kartı`}>
+            <Pressable key={l.level} onPress={() => select(i)} style={{ width: cardW }} accessibilityLabel={`VIP ${l.level} kartı`}>
               <LinearGradient colors={l.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.svipCard, index === i && { borderColor: GOLD }]}>
                 {locked && (
                   <View style={styles.lockChip}>
@@ -124,7 +124,7 @@ function Svip() {
                   </View>
                 )}
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.svipTitle}>İnci {l.level}</Text>
+                  <Text style={styles.svipTitle}>VIP {l.level}</Text>
                   {l.art ? <Art name={l.art} size={68} style={{ marginLeft: 'auto' }} /> : <Text style={{ fontSize: 54, marginLeft: 'auto' }}>{l.emoji}</Text>}
                 </View>
                 {isNext ? (
@@ -154,7 +154,7 @@ function Svip() {
       <View style={styles.rightsTitleRow}>
         <Art name="svip-svip-isareti" size={22} />
         <Text style={[styles.rightsTitle, { marginVertical: 0 }]}>
-          İnci {lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length}
+          VIP {lv.level} hakları {lv.rights}/{SVIP_RIGHTS.length}
         </Text>
         <Art name="svip-svip-isareti" size={22} />
       </View>
@@ -168,7 +168,7 @@ function Svip() {
               accessibilityState={{ disabled: !on }}
               onPress={() => {
                 const need = SVIP_LEVELS.find((x) => x.rights > i);
-                showAlert(r.name, on ? `İnci ${lv.level} ile kullanabilirsin.` : need ? `İnci ${need.level} ile açılır.` : 'Yakında.');
+                showAlert(r.name, on ? `VIP ${lv.level} ile kullanabilirsin.` : need ? `VIP ${need.level} ile açılır.` : 'Yakında.');
               }}>
               {/* Locked: only the art fades; the name stays readable (textDim). */}
               <View style={[styles.rightIcon, !on && { opacity: 0.38 }]}>
@@ -181,7 +181,7 @@ function Svip() {
           );
         })}
       </View>
-      <Text style={styles.note}>Yüklediğin her jeton 1 İnci puanı kazandırır. Bonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen yüklemenin puanı geri alınır.</Text>
+      <Text style={styles.note}>Yüklediğin her jeton 1 VIP puanı kazandırır. Bonus jetonlar ve hediye gelen jetonlar sayılmaz; iade edilen yüklemenin puanı geri alınır.</Text>
     </ScrollView>
   );
 }
@@ -204,7 +204,7 @@ function Vip() {
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Satın al', onPress: () => buyVipPlan(p.days) && showAlert('VIP aktif 🎉', `${p.days} gün eklendi.`) },
     ]);
-  // Live mode: what others see is the server's (server/api/profiles.mjs, VIP by İnci or Rütbe there), so the switches
+  // Live mode: what others see is the server's (server/api/profiles.mjs, VIP by SVIP level or Rütbe there), so the switches
   // start from it and a change goes there first; the server says no without VIP.
   const live = liveMode();
   useEffect(() => {
@@ -479,7 +479,7 @@ function Noble() {
 const LIGHT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
 
 // The privilege center keeps its warm night palette in the dark scheme. In the light one the screen, the plan cards,
-// boxes and table become white cards with dark-gold text; the İnci level cards, emblems and gold fills stay as they are.
+// boxes and table become white cards with dark-gold text; the VIP level cards, emblems and gold fills stay as they are.
 const useStyles = makeStyles(({ colors, surface, ink, dark }) => {
   const gold = dark ? GOLD : colors.gold;
   const shadow = dark ? {} : { boxShadow: LIGHT_SHADOW };

@@ -224,7 +224,7 @@ type AppState = {
   checkIn: () => number;
   inviteCode: string;
   // vip, agency, family
-  /** Visual status level (frames/badges), derived from İnci (SVIP), Rütbe (noble) and VIP subscription. */
+  /** Visual status level (frames/badges), derived from the VIP 1–10 level (SVIP), Rütbe (noble) and VIP subscription. */
   vipLevel: number;
   svipXp: number;
   svipLevel: number;

@@ -118,7 +118,7 @@ export const svipLevel = (xp) => SVIP_XP.filter((t) => xp >= t).length;
 // fails when they drift. Sticker packs are 'pack-<id>'. Prices and durations change only with a deploy.
 /** [sku, kind, name, price in coins, days (null: permanent), minimum VIP level] */
 const SHOP_ROWS = [
-  ['fr-neon', 'frame', 'Ses Dalgası', 150, 7, 0],
+  ['fr-neon', 'frame', 'Ses Halkası', 150, 7, 0],
   ['fr-ocean', 'frame', 'Yörünge', 300, 30, 0],
   ['fr-aurora', 'frame', 'Aurora', 600, 30, 0],
   ['fr-fire', 'frame', 'Ateş', 900, 30, 0],
@@ -129,7 +129,7 @@ const SHOP_ROWS = [
   ['fr-laurel', 'frame', 'Altın Defne', 2_000, 30, 0],
   ['fr-crown-silver', 'frame', 'Gümüş Taç', 4_000, 30, 2],
   ['fr-crown-gold', 'frame', 'Kraliyet Kanatları', 9_000, null, 4],
-  ['fr-wing-coral', 'frame', 'Melek Kalp · Mercan', 3_000, 30, 0],
+  ['fr-wing-coral', 'frame', 'Melek Kalp · Pembe', 3_000, 30, 0],
   ['fr-wing-sky', 'frame', 'Melek Kalp · Turkuaz', 3_000, 30, 0],
   ['en-sparkle', 'entry', 'Işıltı', 200, 7, 0],
   ['en-thunder', 'entry', 'Şimşek', 600, 30, 0],

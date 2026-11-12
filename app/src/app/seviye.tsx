@@ -171,18 +171,18 @@ function LevelPane({ kind, xp, myLevel }: { kind: Kind; xp: number; myLevel: num
           <Pressable onPress={() => router.push('/vip')} style={s.card} accessibilityLabel="Ayrıcalıklarım">
             <Text style={s.cardTitle}>Diğer ayrıcalıklarım</Text>
             <Text style={s.row}>
-              İnci: {svipLevel ? `İnci ${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · İnci ${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
+              VIP seviyesi: {svipLevel ? `VIP ${svipLevel}` : 'Yok'} · {fmt(svipXp)} puan{nextSvip ? ` · VIP ${nextSvip.level} için ${fmt(nextSvip.xp - svipXp)}` : ''}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={s.row}>Rütbe:</Text>
               {noble && <Art name={noble.art} size={18} />}
               <Text style={s.row}>{noble ? `${noble.name} · ${nobleDays} gün` : 'Henüz alınmadı'}</Text>
             </View>
-            <Text style={s.row}>VIP: {vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}</Text>
+            <Text style={s.row}>VIP aboneliği: {vipDays > 0 ? `${vipDays} gün kaldı` : 'Yok'}</Text>
             <Text style={[s.row, { color: colors.gold }]}>Ayrıcalıklara git ›</Text>
           </Pressable>
         )}
-        <Text style={s.dim}>Cömertlik ve Yankı seviyeleri kalıcıdır, düşmez. VIP ve Rütbe süreli; İnci ise yükledikçe yükselir ve kalıcıdır.</Text>
+        <Text style={s.dim}>Cömertlik ve Yankı seviyeleri kalıcıdır, düşmez. VIP aboneliği ve Rütbe süreli; VIP seviyesi ise yükledikçe yükselir ve kalıcıdır.</Text>
       </View>
     </ScrollView>
   );

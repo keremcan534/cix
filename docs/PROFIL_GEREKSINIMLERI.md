@@ -111,7 +111,7 @@ Denemek için demo kullanıcılar:
 - **Zeynep:** sadece takip ettiklerinden mesaj ve arama alıyor
 - **Burak:** arama kabul etmiyor
 - **Kaan:** hesabı geçici olarak kısıtlı
-- **Deniz:** çevrimiçi durumunu ve odasını gizliyor
+- **Defne:** çevrimiçi durumunu ve odasını gizliyor
 - **Melis:** sadece takip ettiklerinden oda daveti alıyor
 
 ## 4. Rozet, seviye ve kimlik

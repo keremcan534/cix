@@ -65,7 +65,7 @@ async function liveUser(id) {
   return r.rows[0];
 }
 
-/** "Sessiz ziyaret" (silent visit): from this İnci level on, opening a profile leaves no trace (app data/status). */
+/** "Sessiz ziyaret" (silent visit): from this VIP (SVIP) level on, opening a profile leaves no trace (app data/status). */
 export const SILENT_VISIT_SVIP = 7;
 let visitsPrunedAt = 0;
 
@@ -310,7 +310,7 @@ export const socialRoutes = {
 
   /**
    * Profil ziyaretçileri: who opened my profile in the last 7 days. How many is for everyone; who they are is a VIP
-   * right (VIP 1 and up, by İnci or Rütbe), so without it `visitors` is null. Blocked people either way and deleted
+   * right (VIP 1 and up, by SVIP level or Rütbe), so without it `visitors` is null. Blocked people either way and deleted
    * accounts are left out. Newest first, at most 100.
    */
   async 'GET /api/me/visitors'(req) {

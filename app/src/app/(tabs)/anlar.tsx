@@ -597,7 +597,7 @@ function useMomentGift() {
   const send = async (g: Gift): Promise<boolean> => {
     if (!to) return false;
     if ((g.minSvip ?? 0) > svipLevel) {
-      showAlert('Üyelere özel hediye', `${g.name}, İnci ${g.minSvip} ve üstü için. Senin seviyen: İnci ${svipLevel}.`);
+      showAlert('Üyelere özel hediye', `${g.name}, VIP ${g.minSvip} ve üstü için. Senin seviyen: VIP ${svipLevel}.`);
       return false;
     }
     if (liveMode()) {
@@ -735,7 +735,7 @@ function MomentCard({
           <FramedAvatar uri={author.avatar} size={50} vipLevel={svip} frameId={frameId} online={!svip && author.online} />
           {svip > 0 && (
             <LinearGradient colors={['#0FB8BE', '#FF6576']} style={styles.svipTag}>
-              <Text style={styles.svipText}>İnci {svip}</Text>
+              <Text style={styles.svipText}>VIP {svip}</Text>
             </LinearGradient>
           )}
         </Pressable>

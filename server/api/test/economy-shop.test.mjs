@@ -354,8 +354,10 @@ describe('İade', () => {
 describe('Eski uygulama köprüsü (/api/wallet/spend)', () => {
   test('dört etiket sunucuda ürün verir; yanıt bugünkü biçimde', async () => {
     const u = await person('Eski Uygulama', 20_000);
+    // "Ses Dalgası" and "Melek Kalp · Mercan" are the frames' names before the rename (Ses Halkası, Melek Kalp · Pembe).
     for (const [reason, amount, sku] of [
       ['Mağaza: Ses Dalgası', 150, 'fr-neon'],
+      ['Mağaza: Melek Kalp · Mercan (30 gün)', 3_000, 'fr-wing-coral'],
       ['Çıkartma paketi: Eğlence', 50, 'pack-fun'],
       ['Mikrofon efekti: Neon Halka', 500, 'an-mic-neon'],
       ['Rütbe: Gemici (30 gün)', 15_000, 'noble-1'],
@@ -366,7 +368,7 @@ describe('Eski uygulama köprüsü (/api/wallet/spend)', () => {
       assert.equal(typeof j.user.coins, 'number');
       assert.ok((await rows(u)).some((x) => x.sku === sku && x.source === 'bridge'), sku);
     }
-    assert.equal(await coins(u), 20_000 - 150 - 50 - 500 - 15_000);
+    assert.equal(await coins(u), 20_000 - 150 - 3_000 - 50 - 500 - 15_000);
   });
 
   test('düşük tutar ve "Hediye:" nedeni "update_required", ücret yok; ret gövdesi { error, code }', async () => {

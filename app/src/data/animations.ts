@@ -82,7 +82,7 @@ export const MOTION_LABEL: Record<Motion, string> = {
   fly: 'Ekranı geç',
   zoom: 'Ortada büyü',
   ring: 'Neon halka',
-  wave: 'Ses dalgası',
+  wave: 'Ses halkası',
 };
 
 const T0 = '2026-10-01T00:00:00Z';
@@ -117,7 +117,7 @@ const make = (s: Seed): Animation => ({
 export const ANIMATION_SEED: Animation[] = [
   // A · mic effects (automatic while speaking; bought once, then equipped)
   make({ animation_id: 'an-mic-neon', name: 'Neon Halka', category_id: 'mic', asset: art('neon-halka'), motion: 'ring', count: 1, duration_ms: 1400, display_type: 'mic_effect', coin_price: 500 }),
-  make({ animation_id: 'an-mic-wave', name: 'Ses Dalgası', category_id: 'mic', asset: art('ses-dalgasi'), motion: 'wave', count: 3, duration_ms: 1500, display_type: 'mic_effect', coin_price: 300, free: true }),
+  make({ animation_id: 'an-mic-wave', name: 'Ses Halkası', category_id: 'mic', asset: art('ses-dalgasi'), motion: 'wave', count: 3, duration_ms: 1500, display_type: 'mic_effect', coin_price: 300, free: true }),
   make({ animation_id: 'an-mic-stars', name: 'Dönen Yıldızlar', category_id: 'mic', asset: art('donen-yildizlar'), motion: 'orbit', count: 5, duration_ms: 1800, display_type: 'mic_effect', coin_price: 800 }),
   make({ animation_id: 'an-mic-notes', name: 'Müzik Notaları', category_id: 'mic', asset: art('muzik-notalari'), motion: 'rise', count: 3, duration_ms: 1600, display_type: 'mic_effect', coin_price: 600 }),
   // Small reactions from the seat (free)
