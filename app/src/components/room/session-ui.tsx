@@ -1,5 +1,5 @@
 // What the user sees of the live room session outside the room screen, and its state inside it:
-// the leave choice ("Odayı küçült" / "Odadan çık"), the mini room card on every other screen, the edge tab
+// the mini room card on every other screen (the full room's leave sheet is components/room/leave-sheet), the edge tab
 // that brings a hidden mini card back, switching rooms, a session that ended, short notices, the restart
 // recovery card and the in-room connection banner. Everything reads lib/room-session; nothing here owns
 // the connection.
@@ -18,10 +18,8 @@ import {
   audioFocus,
   cancelSwitch,
   clearNotice,
-  closeLeaveDialog,
   confirmSwitch,
   connectionLine,
-  continueLeave,
   dismissEnded,
   endRoom,
   endedText,
@@ -42,8 +40,6 @@ import {
   type RoomSession,
 } from '@/lib/room-session';
 import { saveRoom } from '@/lib/room-session-persist';
-import { showAlert } from '@/lib/alert';
-import { closeServerRoom, isMyServerRoom, message as errorText } from '@/lib/live';
 import { SCRIM, colors, edge, radius, semantic, space, type } from '@/theme';
 import { Photo } from '@/components/photo';
 
@@ -124,55 +120,6 @@ function ChoiceSheet({ visible, title, primary, exit, extra, onCancel, top = fal
       </View>
       {top && backdrop}
     </Modal>
-  );
-}
-
-/** Back or close on the full room. Dismissing it changes nothing. */
-export function LeaveSheet() {
-  const { leaveDialog, session } = useRoomSession();
-  return (
-    <ChoiceSheet
-      visible={leaveDialog && !!session}
-      top
-      title="Odadan ayrılmak mı istiyorsun?"
-      primary={{ label: 'Odayı küçült', desc: 'Oda bağlantın devam eder. Uygulamada diğer işlemlerini yapabilirsin.', icon: 'contract', onPress: () => continueLeave() }}
-      exit={{
-        label: 'Odadan çık',
-        desc: 'Canlı odadan ayrılacaksın.',
-        icon: 'exit-outline',
-        onPress: () => {
-          endRoom('left');
-          continueLeave();
-        },
-      }}
-      extra={
-        session && isMyServerRoom(session.roomId)
-          ? {
-              label: 'Odayı herkes için kapat',
-              desc: 'Odan listelerden kalkar ve artık kimse giremez.',
-              icon: 'power-outline',
-              onPress: () => {
-                const id = session.roomId;
-                showAlert('Odayı kapat', 'Odan listelerden kalkacak ve artık kimse giremeyecek. Daha sonra yeni bir oda açabilirsin.', [
-                  { text: 'Vazgeç', style: 'cancel' },
-                  {
-                    text: 'Kapat',
-                    style: 'destructive',
-                    onPress: () =>
-                      closeServerRoom(id)
-                        .then(() => {
-                          endRoom('left');
-                          continueLeave();
-                        })
-                        .catch((e) => showAlert('Oda kapatılamadı', errorText(e))),
-                  },
-                ]);
-              },
-            }
-          : undefined
-      }
-      onCancel={closeLeaveDialog}
-    />
   );
 }
 

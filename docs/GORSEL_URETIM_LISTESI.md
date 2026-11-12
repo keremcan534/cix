@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`). Temel ücretsizdi; Güncelleme 4'te emoji panelinden ve mağazadan kalktı, gönderilmiş Temel çıkartmaları yine çizilir. Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 624 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
+**Toplam 628 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -37,6 +37,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 18. Oda oyunları: Renk Kartları, XOX, Dört Taş | 21 |
 | 19. Oyun Salonu: Bilye Şelalesi | 8 |
 | 21. Emoji paneli: VIP emojileri | 8 |
+| 22. Oda katkı sıralaması | 4 |
 
 ## ChatGPT ile üretim
 
@@ -828,3 +829,16 @@ Emoji panelinin üstünde artık "Sabit" ve "VIP" var (Güncelleme 4, madde 9). 
 | 8 | Uykulu Hilal | Gözleri kapalı, tatlı tatlı uyuyan hilal yüz, ucundan sarkan küçük altın yıldız | `tepki-vip-uykulu-hilal.png` | P3 |
 
 Teslimden sonra: dosyalar `app/assets/reactions` içine konur, `app/src/components/ReactionArt.tsx` SRC listesine eklenir ve `app/src/data/catalog.ts` STICKER_PACKS'e yeni bir paket olarak girer (panelde VIP başlığında kendi sekmesiyle görünür, `lib/emoji-panel`). Hangi VIP seviyesinden açılacağı ve fiyatı sahibin kararı; sunucu kataloğu (`server/api/catalog.mjs`) de aynı anda güncellenir.
+
+## 22. Oda katkı sıralaması (4)
+
+Oda katkı sıralaması yenilendi (Güncelleme 4, madde 14): Cömertlik ve Yankı listelerinde ilk üç kişi bir kürsüde duruyor. Bugün kürsü basamakları kodla çizilen degrade bloklar, fotoğrafların çevresi altın, gümüş ve bronz renkli düz halka; madalyalar (`derece-1/2/3`) ve birincinin tacı mevcut görseller. Aşağıdakiler kürsüyü daha değerli gösterecek yeni ve bize özgü fikirler; başka uygulamaların kanatlı çerçevelerinden alınmadı. Stil: mevcut 3D cam/jöle yüzey, gece mavisi gövde, altın (#F6BD60) detaylar, mor-pembe gradyan yok; yazı ve rakam yok; şeffaf arka plan, 512 px PNG. Oda içinde koyu zeminde, küçük boyda da okunmalı.
+
+| # | Görsel | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 1 | Altın çelenk | Fotoğrafın çevresine oturan yuvarlak altın defne çelengi; alt ortası açık (madalya oraya gelir), iç daire tamamen şeffaf; uygulamada 84 px fotoğrafın çevresinde yaklaşık 104 px | `katki-celenk-altin.png` | P1 |
+| 2 | Gümüş çelenk | Aynı biçimde gümüş defne çelengi, yaprakları biraz daha sade | `katki-celenk-gumus.png` | P2 |
+| 3 | Bronz çelenk | Aynı biçimde bronz defne çelengi, sıcak bakır tonları | `katki-celenk-bronz.png` | P2 |
+| 4 | Kürsü | Üç basamaklı kısa kürsü, önden ve hafif yukarıdan: ortası en yüksek, solu ikinci, sağı üçüncü; gece mavisi cam gövde, basamakların üst kenarında altın, gümüş ve bronz ince ışık şeridi; üstleri düz ve boş (fotoğraflar üstünde durur); yatay, yaklaşık 3:1 oranında | `katki-kursu.png` | P2 |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → çelenkler `components/room/contrib-board.tsx` içinde ilk üçün fotoğraf halkasının (`Face`, `PLACE.ring`) yerine, kürsü kodla çizilen basamakların (`pedestal`) yerine geçer. Madalyalar ve taç olduğu gibi kalır; kişinin kendi mağaza çerçevesi varsa o gösterilmeye devam eder.

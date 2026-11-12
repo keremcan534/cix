@@ -8,7 +8,7 @@
 import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client';
 
 import type { AudioEngine, EngineStats } from '@/lib/audio-engine';
-import { bindLink, decodeSignal, encodeSignal, parseSeat, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
+import { bindLink, decodeSignal, encodeSignal, parseSeat, parseServerClosed, reportPeers, reportRoomMeta, reportServerSeat, reportSignal, type PeerSignal } from '@/lib/live/room-bus';
 import { reportLevel } from '@/lib/live/voice-level';
 import type { EngineEvent } from '@/lib/room-session';
 import { setAiDenoise } from '../../modules/similar-denoise';
@@ -190,7 +190,13 @@ export function createLiveKitEngine(cfg: LiveKitConfig): AudioEngine {
     });
     // No participant = the server sent it (a paid gift's announcement); room-bus decides what each may say.
     r.on(RoomEvent.DataReceived, (payload, participant) => {
-      if (room === r && s.roomId) reportSignal(s.roomId, participant ? participant.identity : null, decodeSignal(payload));
+      if (room !== r || !s.roomId) return;
+      const raw = decodeSignal(payload);
+      // The room closed for lack of staff (server/api/room-autoclose.mjs): the session ends with the server's reason,
+      // just before the voice room ends under it.
+      const closed = participant ? null : parseServerClosed(raw);
+      if (closed) return tell(r, { type: 'removed', reason: 'server', title: closed.title, body: closed.body });
+      reportSignal(s.roomId, participant ? participant.identity : null, raw);
     });
     // A new voice starts at the volume I chose (the phone build plays it without an element).
     r.on(RoomEvent.TrackSubscribed, (track) => {

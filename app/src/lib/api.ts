@@ -528,6 +528,9 @@ export type ServerRoom = {
   hasPassword: boolean;
   createdAt: string;
   closed: boolean;
+  /** Resting for lack of staff (server/api/room-autoclose.mjs): only its owner and admins get in, and their coming
+   *  opens it again. An older server sends none. */
+  paused?: boolean;
   listeners: number;
   level?: number;
   xp?: number;
@@ -546,8 +549,10 @@ export type ServerRoom = {
   coverUrl?: string | null;
   /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
   rules?: RoomRules;
-  /** Patron koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
+  /** Patron koltuğu's holder while their sitting runs (server/api/boss-seat.mjs; what older apps read). */
   boss?: UserCard | null;
+  /** Patron koltuğu while it is on: its mode, the sitting and the numbers the sheet shows. An older server sends none. */
+  bossSeat?: BossSeatView | null;
   /** The Odalar row's chips (server/api/room-social.mjs): the owner's agency or family, a running in-room PK, and
    *  the room's place in this week's gift ranking (1–3, else null). */
   agency?: { id: string; name: string } | null;
@@ -558,10 +563,32 @@ export type ServerRoom = {
   followers?: number;
   following?: boolean;
 };
+/**
+ * Patron koltuğu as the server reads it (server/api/boss-seat.mjs). `mode`: Otomatik (gifts decide) or Davet (the owner
+ * seats someone). `holder` while a sitting runs; `until` its end (null: Davet, no end), `left` seconds to it as of the
+ * read, `spent` the holder's coins in this sitting. `minCoins` one send needs to sit on the empty seat, `minutes` a
+ * sitting lasts and each further gift adds, `holdSeconds` before anyone may take the seat.
+ */
+export type BossSeatView = {
+  mode: 'auto' | 'invite';
+  holder: UserCard | null;
+  since: string | null;
+  until: string | null;
+  left: number | null;
+  spent: number;
+  minCoins: number;
+  minutes: number;
+  holdSeconds: number;
+};
+/** Davet mode: the owner seats someone or takes them off; either mode: the holder gets up. */
+export type BossAction = { action: 'seat'; user: string } | { action: 'clear' | 'leave' };
+export const roomBoss = (room: string, body: BossAction) => call<{ room: ServerRoom }>('POST', '/api/rooms/boss', { room, ...body }).then((r) => r.room);
 /** A server room's rules (server/api/room-rules.mjs). */
 export type RoomRules = {
   micPermission: 'everyone' | 'members';
   bossSeat: boolean;
+  /** An older server sends none (Otomatik). */
+  bossMode?: 'auto' | 'invite';
   joinMode: 'open' | 'apply' | 'closed';
   manageMembers: 'owner' | 'admins';
   manageFunctions: 'owner' | 'admins';
@@ -1010,6 +1037,14 @@ export type ServerOwnerStats = {
   hours: { at: string; people: number }[];
 };
 export const roomOwnerStats = (room: string) => call<ServerOwnerStats>('GET', `/api/rooms/owner-stats?room=${encodeURIComponent(room)}`);
+/**
+ * Oda katkı sıralaması (server/api/room-contrib.mjs): Cömertlik (`sent`) or Yankı (`received`) in a server room this
+ * hour, day or week on Turkey's clock, 1 coin = 1 point. The top 50, my own place (rank null: not on the list) and
+ * when the period began.
+ */
+export type RoomContribBody = { rows: RankingRow[]; me: { rank: number | null; score: number }; since: string };
+export const roomContrib = (room: string, side: 'sent' | 'received', period: 'hour' | 'day' | 'week') =>
+  call<RoomContribBody>('GET', `/api/rooms/contrib?room=${encodeURIComponent(room)}&side=${side}&period=${period}`);
 // Yeni üye ödülleri (server/api/referrals.mjs): the welcome coins I got at sign-up (0: none), the packs whose
 // first-purchase gift is still mine, and Arkadaşını Getir: my code, the code I entered, what my invites brought.
 export type ServerRewards = {
@@ -1139,7 +1174,10 @@ export type LiveKey =
   | OneOnOneKey
   | RewardKey
   | CasinoKey
-  | DecorKey;
+  | DecorKey
+  | RoomKey;
+/** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
+export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes';
 /** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */

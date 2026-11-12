@@ -23,6 +23,7 @@ import {
   engineInfo,
   getSession,
   hasOpener,
+  leaveForRoom,
   micBlock,
   micSending,
   onAppState,
@@ -121,6 +122,18 @@ describe('Odadan çıkış', () => {
     assert.equal(continueLeave(), true);
     assert.equal(continueLeave(), false, 'ikinci kez çalışmaz');
     assert.deepEqual([backs, getSession().leaving, s().status], [1, true, 'connected'], 'küçültmek odadan çıkarmaz');
+  });
+
+  test('popüler odaya geçiş: önce mikrofon ve bağlantı kapanır, geri hareketi bir kez çalışır, yeni oda sormadan açılır', () => {
+    talking('r1');
+    let backs = 0;
+    requestLeave(() => backs++);
+    assert.equal(leaveForRoom(), true);
+    assert.deepEqual([backs, getSession().leaveDialog, getSession().leaving, getSession().session], [1, false, true, null]);
+    assert.deepEqual([stats().publishing, stats().disconnects, stats().concurrent], [false, 1, 0]);
+    assert.equal(openRoom('r2', info), 'started');
+    assert.deepEqual([s().roomId, s().micWant, getSession().switchTo], ['r2', false, null]);
+    assert.equal(stats().maxConcurrent, 1, 'iki odada aynı anda ses bağlantısı olmaz');
   });
 });
 
@@ -434,5 +447,17 @@ describe('Bitiş başlığı sunucunun sözünü kullanır', () => {
     engineEvent('r1', { type: 'connected' });
     engineEvent('r1', { type: 'failed', final: true, reason: 'kicked', message: 'Bu odadan geçici olarak çıkarıldın' });
     assert.deepEqual(endedText(s()), { title: 'Bu odadan geçici olarak çıkarıldın', body: 'Mikrofonun ve ses bağlantın kapatıldı.' });
+  });
+
+  test('yetkilisiz kalan oda kapanınca sunucunun nedeni başlık ve gövde olur', () => {
+    reporting();
+    openRoom('r1', info);
+    engineEvent('r1', { type: 'connected' });
+    engineEvent('r1', { type: 'removed', reason: 'server', title: 'Oda kapandı', body: 'Odada 5 dakikadır oda sahibi ya da yönetici yoktu.' });
+    assert.equal(s().status, 'ended');
+    assert.deepEqual(endedText(s()), { title: 'Oda kapandı', body: 'Odada 5 dakikadır oda sahibi ya da yönetici yoktu.' });
+    // The voice room ending right after it changes nothing: the session already says why.
+    engineEvent('r1', { type: 'removed', reason: 'server' });
+    assert.equal(endedText(s()).title, 'Oda kapandı');
   });
 });

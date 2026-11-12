@@ -31,6 +31,7 @@ import {
   REASON_CHIPS,
   reasonChips,
   reasonError,
+  ROOM_NUMBER_KEYS,
   valueText,
   versionError,
   wholeError,
@@ -81,6 +82,9 @@ describe('the second confirmation', () => {
     for (const k of ['call_free', 'call_free_seconds', 'match_free', 'match_free_seconds', 'heart_voice_level', 'heart_video_level'] as LiveKey[]) cases.push([k, 3, 20], [k, 3, 0], [k, 3, null]);
     for (const k of ['welcome_coins', 'invite_coins', 'invite_daily_cap'] as LiveKey[]) for (const a of [10, 100, 200, 201, 400, 401, 1000, null]) cases.push([k, 200, a]);
     cases.push(['rewards_off', [], ['welcome', 'invite', 'first_purchase']], ['rewards_off', ['invite'], null]);
+    for (const a of [1, 2, 3, 5, 60, null]) cases.push(['room_staff_away_minutes', 5, a]);
+    for (const a of [1_000, 12_000, 12_500, 25_000, 50_000, 51_000, null]) cases.push(['boss_seat_coins', 25_000, a]);
+    for (const a of [1, 10, 60, null]) cases.push(['boss_seat_minutes', 10, a]);
     for (const [k, b, a] of cases) assert.equal(bigChange(k, b, a), isBig(k, b, a), `${k}: ${JSON.stringify(b)} → ${JSON.stringify(a)}`);
   });
 
@@ -275,6 +279,10 @@ describe('values as the admin reads them', () => {
     assert.equal(valueText('gifts_hidden', ['a', 'b', 'c', 'd', 'e', 'f'], { names }), 'Gizli: Hediye a, Hediye b, Hediye c, Hediye d ve 2 tane daha');
     assert.equal(valueText('packs_hidden', ['p1'], { names }), 'Gizli: p1 paketi');
     assert.equal(valueText('min_version', null), 'Zorunlu sürüm yok');
+    assert.equal(valueText('room_staff_away_minutes', 5), '5 dakika sonra kapanır');
+    assert.equal(valueText('boss_seat_coins', 25_000), 'Tek seferde 25.000 jeton');
+    assert.equal(valueText('boss_seat_minutes', 10), '10 dakika');
+    assert.deepEqual(ROOM_NUMBER_KEYS.map((k) => k.key), Object.keys(registry.REGISTRY).filter((k) => registry.REGISTRY[k as keyof typeof registry.REGISTRY].group === 'Odalar'));
     for (const k of Object.keys(registry.REGISTRY) as LiveKey[]) assert.ok(!valueText(k, registry.DEFAULTS[k] as LiveValue).includes('💎'), k);
   });
 
