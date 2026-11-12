@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
+import { Shine } from '@/components/fx/surface';
 import { Coins } from '@/components/games/fx/coins';
 import { Text } from '@/components/text';
 import { playSfx } from '@/lib/game-sound';
@@ -24,7 +25,7 @@ export type Celebrate = (w: WinShow) => Promise<void>;
 const LOOK: Record<Exclude<WinTier, 'small'>, { ribbon: [string, string]; ink: string; ray: string }> = {
   big: { ribbon: ['#F59E0B', '#B45309'], ink: '#FFF7D6', ray: 'rgba(253,224,71,0.55)' },
   mega: { ribbon: ['#F97316', '#BE123C'], ink: '#FFF1E0', ray: 'rgba(251,146,60,0.6)' },
-  epic: { ribbon: ['#D946EF', '#6D28D9'], ink: '#FCE7FF', ray: 'rgba(232,121,249,0.6)' },
+  epic: { ribbon: ['#13D9DF', '#0A5F7A'], ink: '#F0FEFF', ray: 'rgba(111,241,245,0.6)' },
   jackpot: { ribbon: ['#FACC15', '#DC2626'], ink: '#FFFBEB', ray: 'rgba(254,240,138,0.75)' },
 };
 const RAYS = 14;
@@ -56,7 +57,7 @@ export function useWinFx(): { celebrate: Celebrate; layer: ReactNode } {
 }
 
 function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: WinTier; onDone: () => void }) {
-  const { reduceMotion } = useSettings();
+  const { reduceMotion, effectsOff } = useSettings();
   const small = tier === 'small';
   const ms = reduceMotion && !small ? Math.min(1400, WIN_SHOW[tier].ms) : WIN_SHOW[tier].ms;
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -153,9 +154,11 @@ function WinCelebration({ amount, bet, tier, title, onDone }: WinShow & { tier: 
         )}
         <Animated.View style={{ alignItems: 'center', opacity: inV.interpolate({ inputRange: [0, 0.4], outputRange: [0, 1], extrapolate: 'clamp' }), transform: [{ scale: inV.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] }}>
           <LinearGradient colors={look.ribbon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.ribbon}>
+            <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} style={s.ribbonGloss} />
             <Text style={[s.title, { color: look.ink }]} numberOfLines={1} adjustsFontSizeToFit>
               {title ?? WIN_TITLE[tier]}
             </Text>
+            {!effectsOff && <Shine radius={999} every={900} />}
           </LinearGradient>
           <Text style={s.amount} numberOfLines={1} adjustsFontSizeToFit>
             +{fmt(count)}
@@ -176,9 +179,10 @@ const s = StyleSheet.create({
   rayArm: { position: 'absolute', width: 2, height: 2, alignItems: 'center' },
   ray: { position: 'absolute', bottom: 1, width: 26, height: 230, borderTopLeftRadius: 13, borderTopRightRadius: 13 },
   rayThin: { width: 12, height: 180 },
-  ribbon: { borderRadius: 999, paddingHorizontal: 22, paddingVertical: 7, borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)' },
+  ribbon: { borderRadius: 999, paddingHorizontal: 22, paddingVertical: 7, borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)', overflow: 'hidden', boxShadow: '0 8px 20px rgba(0,0,0,0.5)' },
+  ribbonGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
   title: { fontSize: 22, fontWeight: '900', letterSpacing: 2.5, fontStyle: 'italic' },
-  amount: { color: '#FDE68A', fontSize: 54, lineHeight: 62, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 10, textShadowColor: 'rgba(120,53,15,0.9)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 6 },
+  amount: { color: '#FFE08A', fontSize: 54, lineHeight: 62, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 10, textShadowColor: 'rgba(246,189,96,0.85)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 18 },
   unit: { color: 'rgba(255,255,255,0.86)', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   floatWrap: { position: 'absolute', left: 0, right: 0, top: '36%', alignItems: 'center' },
   float: { color: '#FDE68A', fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'], textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },

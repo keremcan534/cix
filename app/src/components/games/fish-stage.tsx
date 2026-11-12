@@ -9,11 +9,26 @@ import { memo, useMemo } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 
 import { Coins } from '@/components/games/fx/coins';
+import { symbolShadow } from '@/components/games/fx/salon';
+import { SalonArt, type SalonArtName } from '@/components/games/fx/salon-art';
 import type { Swim } from '@/components/games/fish-swim';
 import { Text } from '@/components/text';
 import type { FishKind } from '@/lib/fish-hunt';
 
 const GLOW = require('../../../assets/fx/glow.png');
+/** Each target's picture (fx/salon-art), by its kind's id (the ids are the game's first ones). */
+const BALLOON_ART: Record<string, SalonArtName> = {
+  clown: 'balonavi-kucuk',
+  sardine: 'balonavi-kalp',
+  puffer: 'balonavi-yildiz',
+  squid: 'balonavi-konfeti',
+  octopus: 'balonavi-ay',
+  turtle: 'balonavi-ucurtma',
+  dolphin: 'balonavi-disko',
+  shark: 'balonavi-ucan-daire',
+  whale: 'balonavi-dev',
+  dragon: 'balonavi-ejderha',
+};
 const clamp = { extrapolate: 'clamp' as const };
 const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 
@@ -167,7 +182,10 @@ export const FishSprite = memo(function FishSprite({ fish, locked, flex, turn }:
       )}
       <Animated.View style={{ transform: [{ rotate: fish.move.tilt }] }}>
         <Animated.View style={body}>
-          <Text style={{ fontSize: s * 0.82, lineHeight: s * 1.08, transform: [{ scaleX: fish.swim.dir === 1 ? -1 : 1 }] }}>{fish.kind.emoji}</Text>
+          {/* The balloon's picture faces left: one going right is turned round. Its emoji until the picture comes. */}
+          <View style={{ transform: [{ scaleX: fish.swim.dir === 1 ? -1 : 1 }] }}>
+            <SalonArt name={BALLOON_ART[fish.kind.id] ?? 'balonavi-kucuk'} size={s} fallback={<Text style={[symbolShadow, { fontSize: s * 0.82, lineHeight: s * 1.08 }]}>{fish.kind.emoji}</Text>} />
+          </View>
         </Animated.View>
       </Animated.View>
       {caught ? (

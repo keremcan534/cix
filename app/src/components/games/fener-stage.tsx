@@ -7,10 +7,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useMemo } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
 
+import { SalonArt, salonArt, type SalonArtName } from '@/components/games/fx/salon-art';
+import { ContactShadow, SymbolPlate, symbolShadow } from '@/components/games/fx/salon';
 import { Text } from '@/components/text';
 import { ROWS, STORM_SPINS, cargoLabel, type FCell } from '@/lib/fener-slot';
 
 const GLOW = require('../../../assets/fx/glow.png');
+/** The glass disc under a star: night blue, gold under the gold star. */
+const NIGHT_DISC = ['rgba(120,150,230,0.30)', 'rgba(40,60,120,0.22)', 'rgba(10,18,40,0.10)'] as const;
+const GOLD_DISC = ['rgba(255,214,130,0.45)', 'rgba(180,120,40,0.28)', 'rgba(60,35,5,0.12)'] as const;
 export const LIGHT = '#FFD27A';
 export const SKY = '#A5B4FC';
 /** The tower's width and the gap between it and the rows (px). */
@@ -19,17 +24,32 @@ export const TOWER_GAP = 6;
 const clamp = { extrapolate: 'clamp' as const };
 const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 
-/** How a star is drawn, by its value (tenths of the stake): a few sparks, a star, a bright star, and the rare gold star. */
-export const starLook = (tenths: number) =>
-  tenths >= 250 ? { emoji: '🌟', size: 34, gold: true } : tenths >= 50 ? { emoji: '🌟', size: 30, gold: false } : tenths >= 10 ? { emoji: '⭐', size: 27, gold: false } : { emoji: '✨', size: 24, gold: false };
+/**
+ * How a star is drawn, by its value (tenths of the stake): a few sparks, a star, a bright star, and the rare gold
+ * star. `art` is its picture once delivered (fx/salon-art); the emoji stands in until then.
+ */
+export const starLook = (tenths: number): { emoji: string; size: number; gold: boolean; art: SalonArtName } =>
+  tenths >= 250
+    ? { emoji: '🌟', size: 34, gold: true, art: 'yildizavi-altin' }
+    : tenths >= 50
+      ? { emoji: '🌟', size: 30, gold: false, art: 'yildizavi-buyuk' }
+      : tenths >= 10
+        ? { emoji: '⭐', size: 27, gold: false, art: 'yildizavi-orta' }
+        : { emoji: '✨', size: 24, gold: false, art: 'yildizavi-kucuk' };
 
 // --- The tower and its searchlight ---------------------------------------------------------------------------------
+
+const TOWER_ART = salonArt('yildizavi-kule');
 
 /** The tower the searchlight rides: stone with a rail down its face and a dim lens at each row. */
 export const Tower = memo(function Tower({ rowH, gap }: { rowH: number; gap: number }) {
   return (
     <View style={[st.tower, { width: TOWER }]} pointerEvents="none">
-      <LinearGradient colors={['#56657F', '#2A364D', '#141C2C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.towerBody} />
+      {TOWER_ART !== undefined ? (
+        <Image source={TOWER_ART} resizeMode="stretch" style={st.towerBody} />
+      ) : (
+        <LinearGradient colors={['#6A7B99', '#33425C', '#141C2C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.towerBody} />
+      )}
       <View style={st.rail} />
       {Array.from({ length: ROWS }, (_, r) => (
         <View key={r} style={[st.socket, { top: r * (rowH + gap) + rowH / 2 - 7 }]} />
@@ -90,6 +110,7 @@ export const SkyCell = memo(function SkyCell({
   cell,
   w,
   h,
+  scale = 1,
   lit,
   amount,
   faint,
@@ -100,6 +121,8 @@ export const SkyCell = memo(function SkyCell({
   cell: FCell;
   w: number;
   h: number;
+  /** How much bigger than its base size a star is drawn (the sky grows with the phone). */
+  scale?: number;
   lit: boolean;
   /** What a lit star pays (coins), written on it once the light has settled. */
   amount: number;
@@ -111,20 +134,25 @@ export const SkyCell = memo(function SkyCell({
   away: number;
 }) {
   if (cell.kind === 'sea') return <View style={{ width: w, height: h }} />;
-  if (cell.kind === 'lamp')
+  if (cell.kind === 'lamp') {
+    const size = Math.round(26 * scale);
     return (
       <Animated.View style={[st.cell, { width: w, height: h, opacity: fall.opacity, transform: [{ translateY: fall.y }] }]} accessibilityLabel="Kuyruklu yıldız">
         <View style={{ alignItems: 'center', opacity: faint ? 0.4 : 1 }}>
-          <Image source={GLOW} style={st.lampGlow} />
-          <Text style={{ fontSize: 24, lineHeight: 29 }}>☄️</Text>
+          <Image source={GLOW} style={[st.lampGlow, { width: size * 2.2, height: size * 2.2, top: -size * 0.55 }]} />
+          <SalonArt name="yildizavi-kuyruklu" size={size * 1.1} fallback={<Text style={[symbolShadow, { fontSize: size, lineHeight: size * 1.2 }]}>☄️</Text>} />
           <Text style={st.lampTag} numberOfLines={1} adjustsFontSizeToFit>
             KUYRUKLU
           </Text>
         </View>
       </Animated.View>
     );
+  }
   const look = starLook(cell.cargo);
   const rich = cell.cargo >= 50;
+  const size = Math.round(look.size * scale);
+  // A disc of night glass under the star, so it stands on something.
+  const disc = Math.min(w - 6, Math.round(size * 1.45));
   return (
     <Animated.View style={[st.cell, { width: w, height: h, opacity: fall.opacity, transform: [{ translateY: fall.y }] }]} accessibilityLabel={`Yıldız, değer ${cargoLabel(cell.cargo)}`}>
       <Animated.View
@@ -134,10 +162,14 @@ export const SkyCell = memo(function SkyCell({
           transform: [{ translateX: sail.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0, -away] }) }, { translateY: sail.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, -5, 0] }) }, { scale: sail.interpolate({ inputRange: [0, 0.15, 1], outputRange: [1, 1.18, 0.6] }) }],
         }}
       >
-        {(look.gold || lit) && <Image source={GLOW} style={[st.shipGlow, { opacity: lit ? 0.85 : 0.5 }]} />}
-        <Text style={{ fontSize: look.size, lineHeight: look.size * 1.18 }}>{look.emoji}</Text>
-        <View style={[st.load, rich && st.loadRich, lit && st.loadLit]}>
-          <Text style={[st.loadText, rich && { color: LIGHT }, lit && { color: '#3A2400' }]} numberOfLines={1}>
+        {(look.gold || lit) && <Image source={GLOW} style={[st.shipGlow, { width: size * 2.2, height: size * 2.2, top: -size * 0.5, opacity: lit ? 0.85 : 0.5 }]} />}
+        <SymbolPlate w={disc} h={disc} round lit={lit} tone={look.gold ? GOLD_DISC : NIGHT_DISC} style={[st.disc, { top: (size * 1.18 - disc) / 2 }]} />
+        <View style={{ alignItems: 'center', justifyContent: 'center', height: size * 1.18 }}>
+          <ContactShadow size={size} style={{ bottom: size * 0.04 }} />
+          <SalonArt name={look.art} size={size * 1.05} fallback={<Text style={[symbolShadow, { fontSize: size, lineHeight: size * 1.18 }]}>{look.emoji}</Text>} />
+        </View>
+        <View style={[st.load, rich && st.loadRich, lit && st.loadLit, scale > 1.2 && st.loadBig]}>
+          <Text style={[st.loadText, scale > 1.2 && st.loadTextBig, rich && { color: LIGHT }, lit && { color: '#3A2400' }]} numberOfLines={1}>
             {lit && amount > 0 ? `+${fmt(amount)}` : cargoLabel(cell.cargo)}
           </Text>
         </View>
@@ -197,13 +229,16 @@ const st = StyleSheet.create({
   lens: { position: 'absolute', left: -11, width: 22, height: 22, borderRadius: 11, backgroundColor: LIGHT, borderWidth: 2, borderColor: '#FFF3D0', alignItems: 'center', justifyContent: 'center' },
   lensCore: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' },
   cell: { alignItems: 'center', justifyContent: 'center' },
-  lampGlow: { position: 'absolute', top: -12, width: 54, height: 54, tintColor: '#FB923C', opacity: 0.7 },
+  lampGlow: { position: 'absolute', tintColor: '#FB923C', opacity: 0.7 },
   lampTag: { color: LIGHT, fontSize: 9, fontWeight: '900', letterSpacing: 0.6, marginTop: -3 },
-  shipGlow: { position: 'absolute', top: -12, width: 60, height: 60, tintColor: LIGHT },
-  load: { marginTop: -4, minWidth: 34, height: 17, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(3,12,23,0.78)', borderWidth: 1, borderColor: 'rgba(230,251,255,0.3)' },
+  shipGlow: { position: 'absolute', tintColor: LIGHT },
+  disc: { position: 'absolute', opacity: 0.9 },
+  load: { marginTop: -4, minWidth: 34, height: 17, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(3,12,23,0.85)', borderWidth: 1, borderColor: 'rgba(230,251,255,0.3)', boxShadow: '0 2px 5px rgba(0,0,0,0.5)' },
+  loadBig: { height: 20, borderRadius: 10, minWidth: 40 },
   loadRich: { borderColor: LIGHT },
-  loadLit: { backgroundColor: LIGHT, borderColor: '#FFF3D0' },
+  loadLit: { backgroundColor: LIGHT, borderColor: '#FFF3D0', boxShadow: '0 0 10px rgba(255,210,122,0.8)' },
   loadText: { color: '#E6FBFF', fontSize: 12, lineHeight: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  loadTextBig: { fontSize: 13.5, lineHeight: 17 },
   meteor: { position: 'absolute', top: 0, width: 2, borderRadius: 1, backgroundColor: 'rgba(255,236,170,0.75)' },
   flash: { backgroundColor: '#FFF6DC' },
   ladder: { flexDirection: 'row', gap: 3 },

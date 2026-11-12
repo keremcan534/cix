@@ -5,8 +5,9 @@
 // values run a spin: the angle, and the time of the spin (how hard the pointer rattles, the blur). No state changes
 // while it turns; the ticks come from a timer set by the plan, not from the frames.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 
+import { salonArt } from '@/components/games/fx/salon-art';
 import { PEG_FREE, PEG_PEAK, PEG_TOUCH, planSpin, restAngle } from '@/components/games/fx/spin-plan';
 import { playSfx } from '@/lib/game-sound';
 import { pressHaptic, tapHaptic } from '@/lib/haptics';
@@ -145,11 +146,19 @@ export function useWheelSpin(slices: number) {
  */
 export function WheelPointer({ spin, size = 30, color = '#FF6576', pin = '#FFE7B0' }: { spin: WheelSpin; size?: number; color?: string; pin?: string }) {
   const half = Math.round(size * 0.36);
+  // The pointer's picture once delivered (fx/salon-art): its pin at the middle, where the pointer swings round.
+  const art = salonArt('cark-ibre');
   return (
     <Animated.View style={{ width: size, height: size * 2, transform: [{ rotate: spin.pointer }] }} pointerEvents="none">
-      <View style={[w.flap, { left: size / 2 - half - 2, top: size - 6, borderLeftWidth: half + 2, borderRightWidth: half + 2, borderTopWidth: size + 3, borderTopColor: 'rgba(0,0,0,0.35)' }]} />
-      <View style={[w.flap, { left: size / 2 - half, top: size - 4, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: size, borderTopColor: color }]} />
-      <View style={[w.pin, { left: size / 2 - 7, top: size - 7, backgroundColor: pin }]} />
+      {art !== undefined ? (
+        <Image source={art} style={{ position: 'absolute', left: -size / 2, top: 0, width: size * 2, height: size * 2 }} resizeMode="contain" />
+      ) : (
+        <>
+          <View style={[w.flap, { left: size / 2 - half - 2, top: size - 6, borderLeftWidth: half + 2, borderRightWidth: half + 2, borderTopWidth: size + 3, borderTopColor: 'rgba(0,0,0,0.35)' }]} />
+          <View style={[w.flap, { left: size / 2 - half, top: size - 4, borderLeftWidth: half, borderRightWidth: half, borderTopWidth: size, borderTopColor: color }]} />
+          <View style={[w.pin, { left: size / 2 - 7, top: size - 7, backgroundColor: pin }]} />
+        </>
+      )}
     </Animated.View>
   );
 }

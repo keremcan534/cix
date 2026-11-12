@@ -1,15 +1,15 @@
 // Bereket Ağacı: 3 reels, the middle row pays by combination (lib/gold-tree). playCasino (lib/games) settles the round
 // before the reels come to rest; they (components/games/fx/reel) only replay outcome.tree, the last one waited for
 // when the first two already match. Oto stops at a big win, the loss limit or any refusal.
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
-import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
+import { GameInfoSheet } from '@/components/games/fx/info-sheet';
 import { Reel, type ReelHandle } from '@/components/games/fx/reel';
+import { ContactShadow, SALON, SalonStage, StageHeader, StageStatus, SymbolPlate, salonScreen, symbolShadow, useBox, type StatusTone } from '@/components/games/fx/salon';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { SpinControls, fmt, sleep } from '@/components/games/slot-kit';
 import { playSfx, warmSfx } from '@/lib/game-sound';
@@ -17,7 +17,7 @@ import { casinoAccess, useGames, type Entry } from '@/lib/games';
 import { playRound } from '@/lib/live/casino';
 import { TREE_LABEL, TREE_OPENING, TREE_PAYS, TREE_STRIPS, treeWindow, type TreeSym } from '@/lib/gold-tree';
 import { errorHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
-import { REEL_PACE, reelRun } from '@/lib/reel-plan';
+import { REEL_PACE, reelRun, type ReelPace } from '@/lib/reel-plan';
 import { winTierOf } from '@/lib/win-tier';
 import { useApp } from '@/store';
 
@@ -26,23 +26,34 @@ const AUTO_SPINS = 25;
 const AUTO_LOSS = 25;
 const COIN: Partial<Record<TreeSym, [string, string]>> = { red: ['#F87171', '#B91C1C'], blue: ['#60A5FA', '#1D4ED8'], green: ['#4ADE80', '#15803D'] };
 
-function TreeCell({ sym }: { sym: TreeSym }) {
+/** One stop of a reel: a coin with its square hole, the tree, or a faint bar for an empty stop. `size` is the coin's. */
+function TreeCell({ sym, size }: { sym: TreeSym; size: number }) {
   const c = COIN[sym];
   if (c)
     return (
-      <LinearGradient colors={c} style={t.coin}>
-        <View style={t.coinHole} />
-      </LinearGradient>
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <ContactShadow size={size} style={{ bottom: -size * 0.06 }} />
+        <LinearGradient colors={c} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[t.coin, { width: size, height: size, borderRadius: size / 2, borderWidth: Math.max(2, size * 0.05) }]}>
+          <LinearGradient colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0)']} style={[t.coinGloss, { borderTopLeftRadius: size / 2, borderTopRightRadius: size / 2 }]} />
+          <View style={[t.coinHole, { width: size * 0.28, height: size * 0.28 }]} />
+        </LinearGradient>
+      </View>
     );
   // An empty stop: a faint bar, so a reel that stops between symbols still reads as a reel.
-  if (sym === 'blank') return <View style={t.blank} />;
-  return <Text style={{ fontSize: 46 }}>{TREE_LABEL[sym]}</Text>;
+  if (sym === 'blank') return <View style={[t.blank, { width: size * 0.45 }]} />;
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <ContactShadow size={size} />
+      <Text style={[symbolShadow, { fontSize: size * 0.8, lineHeight: size }]}>{TREE_LABEL[sym]}</Text>
+    </View>
+  );
 }
 
-
-/** A reel's symbol and the space under it (px): the pay line runs through the middle row. */
-const CELL = 70;
+/** Between two stops of a reel and between two reels (px). */
 const GAP = 4;
+/** The reels' box: padding 6 and rim 2 a side; a reel: rim 2 a side. */
+const BOX_EDGE = 2 * (6 + 2);
+const REEL_EDGE = 2 * 2;
 
 export function GoldTreePlayer({ entry }: { entry: Entry }) {
   const { wealthLevel, settings, coins, gameCoins } = useApp();
@@ -52,7 +63,10 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   const [bet, setBet] = useState(game.bets[2] ?? game.bets[0]);
   const [opening] = useState<TreeSym[][]>(() => treeWindow(TREE_OPENING));
   const [grid, setGrid] = useState(opening);
-  const [status, setStatus] = useState<{ text: string; tone?: 'win' | 'err' }>({ text: 'BOL ŞANS' });
+  const [status, setStatus] = useState<{ text: string; tone?: StatusTone; amount?: number; label?: string }>({ text: 'BOL ŞANS' });
+  // Each win sends a shine across the stage; the reels take the stage's free height.
+  const [shine, setShine] = useState(0);
+  const area = useBox();
   const [hit, setHit] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [turbo, setTurbo] = useState(false);
@@ -83,8 +97,17 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   const access = casinoAccess(game, entry, wealthLevel);
   if (!access.ok) return <CasinoLock reason={access.reason} needWealth={access.needWealth} />;
 
+  // A stop as tall as the area allows, a little wider than tall; the coins grow with it.
+  const fitW = area.w ? Math.floor((area.w - BOX_EDGE - 2 * GAP) / 3) - REEL_EDGE : 0;
+  const fitH = area.h ? Math.floor((area.h - BOX_EDGE - REEL_EDGE - 2 * GAP) / 3) : 0;
+  const CELL = fitW && fitH ? Math.max(48, Math.min(Math.round(fitW * 1.1), fitH, 150)) : 70;
+  const cellW = fitW ? Math.min(fitW, Math.round(CELL * 1.3)) : 0;
+  const coin = Math.round(CELL * 0.8);
+  // The reels keep the same pace in symbols a second however tall a stop is.
+  const paceOf = (p: ReelPace): ReelPace => ({ ...p, speed: p.speed * Math.max(1, CELL / 70) });
+
   const spinOnce = async (): Promise<{ net: number; stop: string | null } | null> => {
-    const pace = REEL_PACE[turbo ? 'turbo' : 'normal'];
+    const pace = paceOf(REEL_PACE[turbo ? 'turbo' : 'normal']);
     beat.current?.stop();
     pulse.setValue(0);
     setHit(null);
@@ -105,7 +128,8 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     const r = await asked;
     if (!alive.current) return null;
     if (!r.ok) {
-      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, CELL + GAP, 3, REEL_PACE.turbo), REEL_PACE.turbo, still)));
+      const quick = paceOf(REEL_PACE.turbo);
+      await Promise.all(handles.current.map((h, i) => h?.land(grid[i], reelRun(i, CELL + GAP, 3, quick), quick, still)));
       if (!alive.current) return null;
       setHeld(null);
       setStatus({ text: r.reason, tone: 'err' });
@@ -136,7 +160,8 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     const payout = r.row.payout;
     if (sp.win) {
       setHit(sp.win.name);
-      setStatus({ text: `${sp.win.name} · +${fmt(payout)}`, tone: 'win' });
+      setStatus({ text: `${sp.win.name} · +${fmt(payout)}`, tone: 'win', amount: payout, label: sp.win.name.toLocaleUpperCase('tr-TR') });
+      setShine((x) => x + 1);
       if (!still) {
         beat.current = Animated.loop(
           Animated.sequence([
@@ -152,7 +177,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
     return { net: payout - bet, stop: payout >= bet * BIG_WIN ? 'büyük kazanç' : null };
   };
   const play = async () => {
-    if (busy) return;
+    if (busy || !cellW) return;
     setBusy(true);
     await spinOnce();
     if (alive.current) setBusy(false);
@@ -162,7 +187,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
       stopAuto.current = true;
       return;
     }
-    if (busy) return;
+    if (busy || !cellW) return;
     setBusy(true);
     stopAuto.current = false;
     let net = 0;
@@ -196,15 +221,9 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   };
 
   return (
-    <View style={{ gap: 10 }}>
-      <LinearGradient colors={['#FBCFE8', '#FDE68A', '#166534']} style={t.stage}>
-        <View style={t.iconRow}>
-          <InfoButton onPress={() => setInfo(true)} tint="#FACC15" />
-        </View>
-        <Text style={t.tree}>🌳</Text>
-        <Text style={t.title} accessibilityRole="header">
-          BEREKET AĞACI
-        </Text>
+    <View style={salonScreen}>
+      <SalonStage colors={['#2F7038', '#184425', '#0A1E12']} win={shine} minHeight={330}>
+        <StageHeader title="BEREKET AĞACI" kicker="3 MAKARA · ORTA ÇİZGİ ÖDER" onInfo={() => setInfo(true)} />
         <View style={t.paytable}>
           {TREE_PAYS.map((p) => (
             <View key={p.name} style={[t.pay, hit === p.name && t.payOn]}>
@@ -213,37 +232,41 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
             </View>
           ))}
         </View>
-        <View style={t.reels} accessibilityLabel={`Orta çizgi: ${grid.map((c) => c[1]).join(', ')}`}>
-          {opening.map((col, reel) => (
-            <View key={reel} style={[t.reel, waiting && reel === 2 && t.reelWait]}>
-              <Reel
-                ref={(h) => {
-                  handles.current[reel] = h;
-                }}
-                symbols={col}
-                strip={TREE_STRIPS[reel]}
-                cell={CELL}
-                gap={GAP}
-                pulse={pulse}
-                dim={!!hit}
-                // Only the middle row pays.
-                lit={[false, !!hit, false]}
-                shade="rgba(15,23,42,0.28)"
-                render={(sym) => <TreeCell sym={sym as TreeSym} />}
-              />
+        <View style={t.area} onLayout={area.onLayout}>
+          {cellW > 0 && (
+            <View style={t.reels} accessibilityLabel={`Orta çizgi: ${grid.map((c) => c[1]).join(', ')}`}>
+              {opening.map((col, reel) => (
+                <View key={reel} style={[t.reel, { width: cellW + REEL_EDGE }, waiting && reel === 2 && t.reelWait]}>
+                  {col.map((_, row) => (
+                    // A win lights the pay line's plates and dims the others with their stops.
+                    <SymbolPlate key={row} w={cellW} h={CELL} tone={CREAM} lit={!!hit && row === 1} style={[t.plate, { top: row * (CELL + GAP) }, !!hit && row !== 1 && { opacity: 0.4 }]} />
+                  ))}
+                  <Reel
+                    ref={(h) => {
+                      handles.current[reel] = h;
+                    }}
+                    symbols={col}
+                    strip={TREE_STRIPS[reel]}
+                    cell={CELL}
+                    gap={GAP}
+                    pulse={pulse}
+                    dim={!!hit}
+                    // Only the middle row pays.
+                    lit={[false, !!hit, false]}
+                    shade="rgba(15,23,42,0.22)"
+                    render={(sym) => <TreeCell sym={sym as TreeSym} size={coin} />}
+                  />
+                </View>
+              ))}
+              {/* Through the middle of the middle row (the box's padding and the reel's rim above it). */}
+              <View style={[t.line, { top: 6 + 2 + CELL + GAP + CELL / 2 - 1.5 }]} pointerEvents="none" />
             </View>
-          ))}
-          <View style={t.line} pointerEvents="none" />
+          )}
         </View>
-        <View style={[t.status, status.tone === 'win' && { backgroundColor: '#15803D' }]} accessibilityLiveRegion="polite">
-          <Text style={[t.statusText, status.tone === 'err' && { fontSize: 13 }]} numberOfLines={2}>
-            {status.text}
-          </Text>
-        </View>
+        <StageStatus text={status.text} tone={status.tone} amount={status.amount} label={status.label} />
         {win.layer}
-      </LinearGradient>
+      </SalonStage>
       <SpinControls
-        tint="#14532D"
         held={held}
         bets={game.bets}
         bet={bet}
@@ -255,12 +278,7 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
         autoSpins={AUTO_SPINS}
         onAuto={toggleAuto}
         onSpin={play}
-        side={{ bg: '#CA8A04', border: '#FACC15', ink: '#fff', onBg: '#B91C1C', onBorder: '#FACC15' }}
-        spin={
-          <LinearGradient colors={['#FDE68A', '#DC2626']} style={t.spin}>
-            {auto !== null ? <Text style={t.autoLeft}>{auto}</Text> : <Ionicons name="sync" size={36} color="#FDE68A" />}
-          </LinearGradient>
-        }
+        look={{ ring: ['#FFF1C9', '#F6BD60', '#B7832E'], core: ['#C93C4F', '#5A1020'], ink: SALON.win }}
       />
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={{ gap: 6 }}>
@@ -282,28 +300,26 @@ export function GoldTreePlayer({ entry }: { entry: Entry }) {
   );
 }
 
+/** The cream plate each stop rests on. */
+const CREAM = ['#FFFDF5', '#F4E8CC', '#D9C392'] as const;
+
 const t = StyleSheet.create({
-  stage: { borderRadius: 22, padding: 10, gap: 8, alignItems: 'center', overflow: 'hidden' },
-  iconRow: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6, zIndex: 2 },
-  tree: { fontSize: 44, marginBottom: -8 },
-  title: { color: '#FACC15', fontSize: 28, fontWeight: '900', textShadowColor: '#14532D', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 1 },
-  paytable: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center', backgroundColor: '#166534', borderRadius: 12, padding: 6, borderWidth: 2, borderColor: '#FACC15' },
+  paytable: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(4,14,8,0.55)', borderRadius: 14, paddingVertical: 5, paddingHorizontal: 4, borderWidth: 1, borderColor: 'rgba(246,189,96,0.55)', boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.55)' },
   pay: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  payOn: { backgroundColor: 'rgba(250,204,21,0.35)' },
+  payOn: { backgroundColor: 'rgba(246,189,96,0.35)', boxShadow: '0 0 10px rgba(246,189,96,0.6)' },
   payName: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  payVal: { color: '#FDE68A', fontWeight: '900', fontSize: 16 },
-  reels: { flexDirection: 'row', gap: 4, alignSelf: 'stretch', backgroundColor: '#14532D', borderRadius: 14, padding: 5, borderWidth: 3, borderColor: '#FACC15' },
-  reel: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  reelWait: { borderColor: '#EA580C' },
-  coin: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FACC15' },
-  coinHole: { width: 16, height: 16, backgroundColor: '#FEF3C7', borderWidth: 2, borderColor: '#92400E' },
-  blank: { width: 26, height: 5, borderRadius: 3, backgroundColor: 'rgba(15,23,42,0.13)' },
-  // Through the middle of the middle row (the box's padding and the reel's border above it).
-  line: { position: 'absolute', left: 0, right: 0, top: 5 + 2 + CELL + GAP + CELL / 2 - 1, height: 3, backgroundColor: '#EA580C', opacity: 0.85 },
-  status: { alignSelf: 'stretch', borderRadius: 10, backgroundColor: '#0F766E', borderWidth: 2, borderColor: '#FACC15', paddingVertical: 6 },
-  statusText: { color: '#FDE68A', fontWeight: '900', fontSize: 19, textAlign: 'center', letterSpacing: 1 },
-  spin: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#FDE68A' },
-  autoLeft: { color: '#FDE68A', fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  payVal: { color: SALON.win, fontWeight: '900', fontSize: 16, fontVariant: ['tabular-nums'] },
+  // The reels take the stage's free height and sit in its middle.
+  area: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', minHeight: 170 },
+  reels: { flexDirection: 'row', gap: GAP, backgroundColor: '#0B2414', borderRadius: 16, padding: 6, borderWidth: 2, borderColor: SALON.gold, boxShadow: '0 8px 18px rgba(0,0,0,0.5), inset 0 2px 10px rgba(0,0,0,0.7)' },
+  reel: { borderRadius: 12, borderWidth: 2, borderColor: 'transparent' },
+  plate: { position: 'absolute', left: 0 },
+  reelWait: { borderColor: '#FFE08A', boxShadow: '0 0 14px rgba(255,224,138,0.9)' },
+  coin: { alignItems: 'center', justifyContent: 'center', borderColor: SALON.gold, overflow: 'hidden', boxShadow: '0 3px 6px rgba(0,0,0,0.35)' },
+  coinGloss: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
+  coinHole: { backgroundColor: '#FEF3C7', borderWidth: 2, borderColor: '#92400E' },
+  blank: { height: 5, borderRadius: 3, backgroundColor: 'rgba(15,23,42,0.15)' },
+  line: { position: 'absolute', left: 2, right: 2, height: 3, borderRadius: 2, backgroundColor: '#FF6576', opacity: 0.9, boxShadow: '0 0 8px rgba(255,101,118,0.8)' },
   infoHead: { color: '#FDE68A', fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   infoName: { color: '#fff', fontWeight: '700', flex: 1 },
