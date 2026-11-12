@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { bankExchangeCoins, diamondValueTl, exchangeCoins, wholesaleTl } from '../catalog.mjs';
 import { rnd, startApi } from './harness.mjs';
 
-const h = startApi();
+const h = startApi({ TEST_TOPUP_DAILY: '50000' });
 const { call, signUp } = h;
 const DAY = 864e5;
 
