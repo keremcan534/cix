@@ -1,4 +1,4 @@
-// Yönetim › Uğurlu hediyeler: the packages, odds and limits the server draws with (server/api/lucky.mjs), today's and
+// Yönetim › Şanslı hediyeler: the packages, odds and limits the server draws with (server/api/lucky.mjs), today's and
 // all-time totals, the last sends and the big wins. Every change asks first and goes up with the settings version it
 // was read at: when someone else saved in between, the server refuses (409) and the section reads the new settings.
 // Changes count only for new sends; each send keeps the odds it was drawn with.
@@ -157,7 +157,7 @@ export function LuckySection() {
                 );
               })}
             {part === 'paket' && !editing && (
-              <Button title="Yeni Uğurlu paketi" icon="add" variant="tonal" disabled={d.config.gifts.length >= 20} onPress={() => setEditing(newGiftDraft())} />
+              <Button title="Yeni Şanslı paketi" icon="add" variant="tonal" disabled={d.config.gifts.length >= 20} onPress={() => setEditing(newGiftDraft())} />
             )}
 
             {part === 'limit' && (

@@ -9,7 +9,7 @@ import { Text } from '@/components/text';
 import { layoutSummary, type ModeId, type RoomLayout } from '@/data/room-layouts';
 import type { Result } from '@/lib/room-presence';
 import { enabledModes, layoutAccess, layoutsOf, modeById, type StageInfo } from '@/lib/room-modes';
-import { colors, radius, semantic, space } from '@/theme';
+import { SCRIM, colors, edge, radius, semantic, space } from '@/theme';
 
 const GAP = 10;
 const PREVIEW_H = 64;
@@ -192,8 +192,8 @@ export function LayoutPickerSheet({
 }
 
 const st = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.md, maxHeight: '82%' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg, paddingTop: space.md, maxHeight: '82%', ...edge.sheet },
   head: { alignItems: 'center', justifyContent: 'center', paddingVertical: space.sm },
   title: { color: colors.text, fontWeight: '800', fontSize: 17 },
   close: { position: 'absolute', right: 0, top: space.sm },

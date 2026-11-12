@@ -14,7 +14,7 @@ import { Icon3D } from '@/components/Icon3D';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { GIFTS, type Gift } from '@/data/mock';
-import { makeStyles, radius, space, type, useTheme } from '@/theme';
+import { SCRIM, makeStyles, radius, space, type, useTheme } from '@/theme';
 import { RollingNumber } from '@/components/fx/rolling-number';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -139,9 +139,9 @@ export function ProfileGiftSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, dark, ink }) => ({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { maxHeight: '80%', backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg },
+const useStyles = makeStyles(({ colors, semantic, dark, ink, edge }) => ({
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { maxHeight: '80%', backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg, ...edge.sheet },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md },
   title: { flex: 1, color: colors.text, fontSize: type.title, fontWeight: '800' },
   balance: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: radius.pill, paddingHorizontal: space.md, height: 36 },

@@ -29,7 +29,7 @@ import { refreshBackpack, useBackpack } from '@/lib/live/backpack';
 import { refreshLucky } from '@/lib/live/lucky';
 import { LUCKY_MIN_AGE, maxMult, oddsLabel, unavailable, useLucky, type LuckyGift, type LuckyRecord } from '@/lib/lucky';
 import { useApp } from '@/store';
-import { colors, radius, semantic, space, type } from '@/theme';
+import { SCRIM, colors, edge, radius, semantic, space, type } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { GiftArt, MUSIC_BADGE } from '@/components/GiftArt';
 import { RollingNumber } from '@/components/fx/rolling-number';
@@ -39,7 +39,7 @@ type PriceSort = 'default' | 'asc' | 'desc';
 
 const SHELVES: { key: Shelf; label: string; icon?: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'hot', label: 'Popüler' },
-  { key: 'lucky', label: 'Uğurlu', icon: 'leaf' },
+  { key: 'lucky', label: 'Şanslı', icon: 'leaf' },
   { key: 'couple', label: 'İkili' },
   { key: 'gameplay', label: 'Kutlama' },
   { key: 'privilege', label: 'Özel' },
@@ -114,7 +114,7 @@ export function GiftSheet({
   const { bottom: navBar } = useSafeAreaInsets();
   const lucky = useLucky();
   const shown = visibleGifts(GIFTS, useLiveCatalog());
-  // Uğurlu is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
+  // Şanslı is a game of chance: no shelf below the gambling level. Live: the server draws and pays (lib/live/lucky).
   const luckyShelf = gamblingLevelOk(wealthLevel);
   // Live: the packages, odds and today's limit as the server has them, read each time the sheet opens.
   useEffect(() => {
@@ -204,7 +204,7 @@ export function GiftSheet({
     router.push('/vip');
   };
 
-  const luckyBlock = isLucky ? (me.age < LUCKY_MIN_AGE ? `Uğurlu hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` : unavailable(lg)) : null;
+  const luckyBlock = isLucky ? (me.age < LUCKY_MIN_AGE ? `Şanslı hediyeler ${LUCKY_MIN_AGE} yaş ve üzeri içindir.` : unavailable(lg)) : null;
   const sendLucky = () => {
     if (!targets.length || luckyBlock || overLimit) return;
     if (total > coins) return goWallet();
@@ -236,7 +236,7 @@ export function GiftSheet({
   const footer = !targets.length
     ? { tone: 'info' as const, text: roomIds.length ? 'Hediyeyi kime göndereceğini yukarıdan seç.' : 'Odada hediye gönderebileceğin kimse yok.', cta: 'Önce alıcı seç', disabled: true }
     : !onShelf
-      ? { tone: 'info' as const, text: shelf === 'lucky' ? 'Şu an gönderilebilecek Uğurlu hediye yok.' : 'Bu rafta gönderilecek hediye yok. Başka bir raftan seç.', cta: 'Önce hediye seç', disabled: true }
+      ? { tone: 'info' as const, text: shelf === 'lucky' ? 'Şu an gönderilebilecek Şanslı hediye yok.' : 'Bu rafta gönderilecek hediye yok. Başka bir raftan seç.', cta: 'Önce hediye seç', disabled: true }
     : isLucky
       ? luckyBlock
         ? { tone: 'lock' as const, text: luckyBlock, cta: 'Şu an gönderilemez', disabled: true }
@@ -327,7 +327,7 @@ export function GiftSheet({
           })}
         </ScrollView>
         <View style={g.noteRow}>
-          {/* The Uğurlu note carries the disclaimer: always shown in full. */}
+          {/* The Şanslı note carries the disclaimer: always shown in full. */}
           <Text style={[g.dim, { flex: 1 }]} numberOfLines={shelf === 'lucky' ? undefined : 2}>
             {shelf === 'privilege' ? `${SHELF_NOTE.privilege} Senin seviyen: İnci ${svipLevel}.` : shelf === 'bag' && live ? LIVE_BAG_NOTE : SHELF_NOTE[shelf]}
           </Text>
@@ -402,7 +402,7 @@ export function GiftSheet({
             <GiftArt giftId={isLucky ? lg.id : gift.id} emoji={isLucky ? lg.emoji : gift.emoji} size={36} textStyle={g.summaryArt} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={g.summaryName} numberOfLines={1}>
-                {isLucky ? `${lg.name} · Uğurlu` : gift.name}
+                {isLucky ? `${lg.name} · Şanslı` : gift.name}
               </Text>
               <Text style={g.dim} numberOfLines={1}>
                 {isLucky ? `${fmt(lg.price)} jeton × ${count} adet × ${targets.length} kişi` : `${fromBag ? 'Ücretsiz' : `${fmt(gift.price)} jeton`} × ${count} adet × ${targets.length} kişi`}
@@ -502,7 +502,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
           const on = it.id === selected.id;
           const off = !!unavailable(it);
           return (
-            <Pressable key={it.id} onPress={() => onPick(it.id)} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${it.name}, Uğurlu, ${fmt(it.price)} jeton, en yüksek ×${maxMult(it)}${off ? ', şu an kapalı' : ''}`}>
+            <Pressable key={it.id} onPress={() => onPick(it.id)} style={g.tileWrap} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${it.name}, Şanslı, ${fmt(it.price)} jeton, en yüksek ×${maxMult(it)}${off ? ', şu an kapalı' : ''}`}>
               <View style={[g.tile, on && g.tileOn]}>
                 <GiftArt giftId={it.id} emoji={it.emoji} size={42} style={off && { opacity: 0.4 }} textStyle={[g.tileArt, off && { opacity: 0.4 }]} />
                 <Text style={g.tileName} numberOfLines={2}>
@@ -539,7 +539,7 @@ function LuckyShelf({ gifts, selected, view, history, version, onPick }: { gifts
           </Text>
         </View>
       ) : history.length === 0 ? (
-        <Text style={[g.dim, { padding: space.lg, textAlign: 'center' }]}>Henüz Uğurlu gönderimin yok.</Text>
+        <Text style={[g.dim, { padding: space.lg, textAlign: 'center' }]}>Henüz Şanslı gönderimin yok.</Text>
       ) : (
         <View style={g.odds}>
           {history.slice(0, 30).map((r) => (
@@ -617,8 +617,8 @@ function GiftTile({
 }
 
 const g = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(8,4,18,0.45)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, maxHeight: '82%' },
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: space.lg, maxHeight: '82%', ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: space.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
   title: { color: colors.text, fontSize: type.title, fontWeight: '800' },

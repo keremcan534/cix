@@ -10,7 +10,7 @@ import { AffiliationPills, GenderChip } from '@/components/profile-badges';
 import { FramedAvatar, LevelChips, VerifiedBadge } from '@/components/ui';
 import { cosmeticById, roomCode, roomLevel } from '@/data/catalog';
 import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
-import { FollowListSheet } from '@/components/follow-list-sheet';
+import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { FOLLOWS_ME, userById } from '@/data/mock';
 import { displayId } from '@/data/profile';
 import { nobleInfo } from '@/data/status';
@@ -25,11 +25,13 @@ import { casinoVisible, useGames } from '@/lib/games';
 import { liveMode, myServerId, oneOnOneOpen, useServerRooms } from '@/lib/live';
 import { liveSignOut } from '@/lib/live/account';
 import { useIsAdmin } from '@/lib/live/admin';
-import { loadFollowList, type FollowSide } from '@/lib/live/follows';
+import { loadMyList } from '@/lib/live/follows';
 import { useMeStats } from '@/lib/live/me-stats';
+import { splitTies, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { myCompletion, rowVisible, type MenuFlags } from '@/lib/me-view';
 
 type IconName = keyof typeof Ionicons.glyphMap;
+type OneWay = Exclude<TieSide, 'friends'>;
 type Item = MenuFlags & { icon: IconName; img?: Icon3DName; label: string; onPress: () => void; dot?: boolean };
 
 const GROWTH: Item[] = [
@@ -45,7 +47,7 @@ const GROWTH: Item[] = [
   { icon: 'game-controller-outline', label: 'Oyun kataloğu yönetimi (demo)', onPress: () => router.push('/oyun-yonetimi'), demoOnly: true, localOnly: true },
   { icon: 'sparkles-outline', label: 'Animasyon kataloğu yönetimi (demo)', onPress: () => router.push('/animasyon-yonetimi'), demoOnly: true, localOnly: true },
   { icon: 'flash-outline', label: 'PK yönetimi (demo)', onPress: () => router.push('/pk-yonetimi'), demoOnly: true, localOnly: true },
-  { icon: 'leaf-outline', label: 'Uğurlu hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true, localOnly: true },
+  { icon: 'leaf-outline', label: 'Şanslı hediye yönetimi (demo)', onPress: () => router.push('/lucky-yonetimi'), demoOnly: true, localOnly: true },
   { icon: 'key-outline', label: 'Rol ve Yetki Merkezi (demo)', onPress: () => router.push('/yetki'), demoOnly: true, localOnly: true },
   { icon: 'briefcase-outline', label: 'Ajans başvuru yönetimi (demo)', onPress: () => router.push('/ajans/yonetim'), demoOnly: true, localOnly: true },
 ];
@@ -70,17 +72,18 @@ export default function ProfileScreen() {
   const server = useMeStats();
   const serverRooms = useServerRooms();
   const ownRoom = live ? serverRooms.find((r) => r.hostId === 'me') : undefined;
-  // Same definitions as Mesajlar (Arkadaşlarım, Ziyaretçiler) so the numbers match when you tap through. Live:
-  // Mesajlar's friends are the people I follow; visitors come from the server (who they are only with VIP).
-  const followers = live ? (server.stats?.followers ?? null) : [...FOLLOWS_ME].filter((id) => !blocked.has(id)).length;
-  const followingCount = live ? (server.stats?.following ?? following.size) : following.size;
-  const friendCount = live ? [...following].filter((id) => id !== 'me' && !blocked.has(id)).length : new Set([...following, ...FOLLOWS_ME].filter((id) => id !== 'me' && !blocked.has(id))).size;
-  // Takipçiler / Takip open a list (live: from the server; demo: the sample people).
-  const [list, setList] = useState<FollowSide | null>(null);
-  const loadList = (side: FollowSide) => {
-    if (live) return loadFollowList(side);
-    const ids = side === 'followers' ? [...FOLLOWS_ME] : [...following];
-    return ids.filter((id) => id !== 'me' && !blocked.has(id)).map((id) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
+  // My follows as three separate lists, each number its list (lib/follow-ties): Takipçiler and Takip one-way only,
+  // people who follow each other only under Arkadaşlar (Mesajlar › Arkadaşlarım, same definition). Live: counted by
+  // the server (none until read); demo: the sample people. Visitors come from the server (who they are only with VIP).
+  const demoTies = splitTies(tiesOf(following, FOLLOWS_ME, blocked));
+  const followers = live ? (server.stats?.followers ?? null) : demoTies.followers.length;
+  const followingCount = live ? (server.stats?.following ?? null) : demoTies.following.length;
+  const friendCount = live ? (server.stats?.friends ?? null) : demoTies.friends.length;
+  // Takipçiler / Takip open their list (live: read from the server; demo: the sample people).
+  const [list, setList] = useState<OneWay | null>(null);
+  const loadList = (side: OneWay) => {
+    if (live) return loadMyList(side);
+    return demoTies[side].map(({ id }) => { const u = userById(id); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
   };
   const visitors = useProfileVisitors();
   const [visitorsOpen, setVisitorsOpen] = useState(false);
@@ -271,13 +274,7 @@ export default function ProfileScreen() {
           <Text style={{ color: colors.red, fontWeight: '600' }}>Çıkış yap</Text>
         </Pressable>
       </ScrollView>
-      <FollowListSheet
-        visible={list !== null}
-        title={list === 'following' ? 'Takip ettiklerin' : 'Takipçilerin'}
-        empty={list === 'following' ? 'Henüz kimseyi takip etmiyorsun.' : 'Henüz takipçin yok.'}
-        load={() => loadList(list ?? 'followers')}
-        onClose={() => setList(null)}
-      />
+      <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />
       <VisitorsSheet visible={visitorsOpen} rows={visitors.rows} count={visitors.count} onClose={() => setVisitorsOpen(false)} />
     </SafeAreaView>
   );

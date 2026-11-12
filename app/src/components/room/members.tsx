@@ -34,7 +34,7 @@ import {
   type MemberRow,
   type Membership,
 } from '@/lib/room-follow';
-import { colors, semantic } from '@/theme';
+import { SCRIM, colors, edge, semantic } from '@/theme';
 
 /** Avatars on the card's row. */
 const STRIP = 12;
@@ -427,8 +427,8 @@ function MemberLine({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, maxHeight: '80%', minHeight: 300, gap: 10 },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, maxHeight: '80%', minHeight: 300, gap: 10, ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17 },
   h2: { color: '#fff', fontWeight: '800', fontSize: 17 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },

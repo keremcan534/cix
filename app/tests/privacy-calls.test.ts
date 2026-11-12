@@ -54,16 +54,16 @@ describe('Arkadaşlarım', () => {
   const people: Record<string, Partial<User>> = { a: { online: false }, b: { online: true }, c: { online: false }, d: { online: true } };
   const person = (id: string) => ({ id, name: id, ...people[id] }) as User;
 
-  test('takip ettiklerim ve takipçilerim: önce karşılıklı, sonra çevrimiçi; engellenen ve ben yokum', () => {
-    const rows = friendRows(new Set(['a', 'b', 'x', 'me']), new Set(['a', 'c', 'd', 'x']), new Set(['x']), person);
+  test('yalnızca karşılıklı takipleşenler, önce çevrimiçi; tek yönlüler, engellenen ve ben yokum', () => {
+    const rows = friendRows(new Set(['a', 'b', 'c', 'x', 'me']), new Set(['a', 'c', 'd', 'x', 'me']), new Set(['x']), person);
     assert.deepEqual(
-      rows.map((f) => [f.user.id, f.iFollow, f.followsMe]),
-      [
-        ['a', true, true],
-        ['b', true, false],
-        ['d', false, true],
-        ['c', false, true],
-      ],
+      rows.map((f) => f.user.id),
+      ['a', 'c'],
+    );
+    const online = friendRows(new Set(['a', 'b', 'd']), new Set(['a', 'b', 'd']), new Set(), person);
+    assert.deepEqual(
+      online.map((f) => f.user.id),
+      ['b', 'd', 'a'],
     );
   });
 });

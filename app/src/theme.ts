@@ -100,6 +100,11 @@ export type Theme = {
    * color there), a hairline rim and a soft shadow in the light one so white cards do not melt into the paper.
    */
   lift: ViewStyle;
+  /**
+   * The rim and shadow of what opens over a screen, which has no grey veil behind it (SCRIM): `sheet` for a bottom
+   * sheet or menu (its top edge), `card` for a popup card (all round).
+   */
+  edge: { sheet: ViewStyle; card: ViewStyle };
   /** The hero fill: bright turquoise, reserved for the one primary button on a screen (navy text on it). */
   gradient: Pair;
   /** Deep turquoise for icon buttons, headers and bubbles that carry white content. */
@@ -167,6 +172,10 @@ const DARK: Theme = {
     shadow: 'rgba(0,0,0,0.35)',
   },
   lift: {},
+  edge: {
+    sheet: { borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 -10px 30px rgba(0,0,0,0.45)' },
+    card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 12px 36px rgba(0,0,0,0.5)' },
+  },
   gradient: ['#13D9DF', '#0FB8BE'],
   gradientDeep: ['#0A8F95', '#076A70'],
   ink: (a) => `rgba(255,255,255,${a})`,
@@ -234,6 +243,10 @@ const LIGHT: Theme = {
     borderColor: 'rgba(11,26,46,0.08)',
     boxShadow: '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)',
   },
+  edge: {
+    sheet: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(11,26,46,0.12)', boxShadow: '0 -8px 28px rgba(16,36,64,0.16)' },
+    card: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(11,26,46,0.12)', boxShadow: '0 10px 32px rgba(16,36,64,0.18)' },
+  },
   gradient: ['#13D9DF', '#0FB8BE'],
   gradientDeep: ['#0A8F95', '#076A70'],
   ink: (a) => `rgba(11,26,46,${a})`,
@@ -246,6 +259,14 @@ export const colors = DARK.colors;
 export const semantic = DARK.semantic;
 export const gradient = DARK.gradient;
 export const gradientDeep = DARK.gradientDeep;
+export const edge = DARK.edge;
+
+/**
+ * Behind a sheet, a menu or a popup: nothing, so the screen is not greyed out and only what opened stands over it.
+ * The tap-outside-to-close area stays, clear; the sheet or card carries its own edge (Theme.edge). Only dialogs
+ * that must stop everything (a sanction, a forced update, a call or match taking the screen) keep a veil.
+ */
+export const SCRIM = 'transparent';
 
 const ThemeCtx = createContext<Theme>(DARK);
 

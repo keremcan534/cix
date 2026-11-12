@@ -117,7 +117,7 @@ describe('Takip ve engelleme', () => {
     assert.equal((await call('POST', '/api/follow', { to: a.user.id }, b.session))[0], 200, 'engel kalkınca takip edilebilir');
   });
 
-  test('Takipçiler ve Takip listeleri: benim ve başkasının; engel varsa kapalı', async () => {
+  test('Takipçiler ve Takip listeleri: yalnızca hesabın sahibi görür', async () => {
     const a = await signUp('Gül');
     const b = await signUp('Hakan');
     const c = await signUp('Irmak');
@@ -127,16 +127,59 @@ describe('Takip ve engelleme', () => {
     assert.equal(s, 200);
     assert.deepEqual(j.users.map((u) => u.id), [c.user.id, b.user.id], 'en yeni önce');
     assert.ok(!Number.isNaN(Date.parse(j.users[0].followedAt)));
-    [, j] = await call('GET', `/api/followers?user=${a.user.id}`, null, b.session);
-    assert.equal(j.users.length, 2, 'başkasının takipçileri');
-    [, j] = await call('GET', `/api/following?user=${b.user.id}`, null, c.session);
-    assert.deepEqual(j.users.map((u) => u.id), [a.user.id]);
-    // c blocks b: b can't open c's lists, and c's view of a's followers leaves b out.
-    await call('POST', '/api/block', { to: b.user.id }, c.session);
-    assert.equal((await call('GET', `/api/followers?user=${c.user.id}`, null, b.session))[0], 403);
-    [, j] = await call('GET', `/api/followers?user=${a.user.id}`, null, c.session);
-    assert.deepEqual(j.users.map((u) => u.id), [c.user.id]);
+    [, j] = await call('GET', `/api/followers?user=${a.user.id}`, null, a.session);
+    assert.equal(j.users.length, 2, 'kendi kimliğiyle de olur');
+    // Someone else's lists: refused for a follower, for a friend (follow both ways) and for a stranger, either side.
+    await call('POST', '/api/follow', { to: b.user.id }, a.session);
+    for (const [side, owner, viewer] of [
+      ['followers', a, b],
+      ['following', a, b],
+      ['followers', b, a],
+      ['following', c, a],
+      ['followers', a, c],
+    ]) {
+      [s, j] = await call('GET', `/api/${side}?user=${owner.user.id}`, null, viewer.session);
+      assert.equal(s, 403, `${side} ${owner.user.name} → ${viewer.user.name}`);
+      assert.equal(j.error, 'Takip listelerini yalnızca hesabın sahibi görebilir');
+      assert.equal(j.code, 'lists_private');
+      assert.equal(j.users, undefined, 'liste yok');
+    }
     assert.equal((await call('GET', '/api/followers?user=nope', null, a.session))[0], 400);
+    // A block ends the follows both ways: gone from my own list too.
+    await call('POST', '/api/block', { to: b.user.id }, a.session);
+    [, j] = await call('GET', '/api/followers', null, a.session);
+    assert.deepEqual(j.users.map((u) => u.id), [c.user.id]);
+  });
+
+  test('profildeki sayılar: Takipçi ve Takip tek yönlü, karşılıklı olanlar yalnız Arkadaş; listelerle aynı', async () => {
+    const a = await signUp('Jale');
+    const friend = await signUp('Kaan');
+    const fan = await signUp('Lale');
+    const star = await signUp('Mert');
+    const gone = await signUp('Nur');
+    const viewer = await signUp('Oya');
+    await call('POST', '/api/follow', { to: friend.user.id }, a.session);
+    await call('POST', '/api/follow', { to: a.user.id }, friend.session);
+    await call('POST', '/api/follow', { to: a.user.id }, fan.session);
+    await call('POST', '/api/follow', { to: star.user.id }, a.session);
+    await call('POST', '/api/follow', { to: a.user.id }, gone.session);
+    await call('DELETE', '/api/me', null, gone.session);
+    const counts = async (s) => {
+      const u = (await call('GET', `/api/user?id=${a.user.id}`, null, s))[1].user;
+      return { followers: u.followers, following: u.following, oneWay: u.oneWay, friends: u.friends };
+    };
+    const mine = await counts(a.session);
+    assert.deepEqual(mine, { followers: 2, following: 2, oneWay: { followers: 1, following: 1 }, friends: 1 }, 'toplamlar eski uygulamalar için kalır');
+    assert.deepEqual(await counts(viewer.session), mine, 'başkası da aynı sayıları görür');
+    // The owner's lists, split as the app splits GET /api/me/friends, are exactly these numbers.
+    const ties = (await call('GET', '/api/me/friends', null, a.session))[1].friends;
+    const only = (f) => ties.filter(f).map((t) => t.id);
+    assert.deepEqual(only((t) => t.iFollow && !t.followsMe), [star.user.id]);
+    assert.deepEqual(only((t) => t.followsMe && !t.iFollow), [fan.user.id]);
+    assert.deepEqual(only((t) => t.iFollow && t.followsMe), [friend.user.id]);
+    // Following the fan back makes them a friend: out of Takipçi, into Arkadaş.
+    await call('POST', '/api/follow', { to: fan.user.id }, a.session);
+    assert.deepEqual(await counts(a.session), { followers: 2, following: 3, oneWay: { followers: 0, following: 1 }, friends: 2 });
   });
 });
 

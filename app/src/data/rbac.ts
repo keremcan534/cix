@@ -62,7 +62,7 @@ export const PERMISSIONS: { key: PermissionKey; label: string; group: string; cr
   { key: 'games.manage', label: 'Oyun kataloğu, VIP şartı, limit ve sağlayıcı ayarları', group: 'Oyun', critical: true, minScope: 'platform' },
   { key: 'animations.manage', label: 'Animasyon kataloğu, fiyat, lisans ve sağlayıcı yönetimi', group: 'İçerik', critical: true, minScope: 'platform' },
   { key: 'pk.manage', label: 'PK ayarları (Normal, Takım, odalar arası), aktif PK izleme, iade ve iptal', group: 'Oda', critical: true, minScope: 'platform' },
-  { key: 'lucky.manage', label: 'Uğurlu hediye paketleri, olasılıklar, ödül rezervi ve kayıtlar', group: 'Oda', critical: true, minScope: 'platform' },
+  { key: 'lucky.manage', label: 'Şanslı hediye paketleri, olasılıklar, ödül rezervi ve kayıtlar', group: 'Oda', critical: true, minScope: 'platform' },
 ];
 export const permLabel = (k: PermissionKey) => PERMISSIONS.find((p) => p.key === k)?.label ?? k;
 export const SCOPE_LABEL: Record<ScopeType, string> = { platform: 'Platform', region: 'Bölge', agency: 'Ajans', room: 'Oda' };

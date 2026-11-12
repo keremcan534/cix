@@ -19,7 +19,7 @@ import { startLinkCode, verifyLinkCode, type CodeKind } from '@/lib/live/account
 import { useRemoteConfig } from '@/lib/remote-control';
 import { CODE_LENGTH, codeFailure, codeFailureText, formatPhone, groupTrDigits, resendLabel, retrySeconds, reusableCode, trMobile, waitFromMessage, whatsappResultText, type SentCode } from '@/lib/verify-code';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 const POLL_MS = 3000;
 
@@ -356,7 +356,7 @@ function SheetBody({ kind, open, onClose }: { kind: CodeKind; open: boolean; onC
 }
 
 const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.6)' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 28,

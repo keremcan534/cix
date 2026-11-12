@@ -1,7 +1,7 @@
 // Günlük harcama limiti (Ayarlar › Harcama): a cap on the coins a person spends in a day, kept here so it holds on
 // every phone. wallet.mjs spendCoins checks and counts it in the spend's own transaction, so every coin-spending
 // route stops at it: gifts (rooms, chats, profiles, Anlar, the family chat), paid messages, paid call and match
-// minutes, the wheel, Uğurlu hediye, Şanslı çanta, bond requests, founding a family, room animations and the shop.
+// minutes, the wheel, Şanslı hediye, Şanslı çanta, bond requests, founding a family, room animations and the shop.
 // A Jeton Noktası sale isn't spending (the bank hands over coins it was paid for) and isn't capped. Every coin that
 // leaves counts, reward coins in the shop too; coins that come back later (a bond request not accepted, a bag's
 // unclaimed rest) don't lower the day's total. Game coins (the wheel's prizes) are not coins and don't count.

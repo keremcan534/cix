@@ -38,9 +38,9 @@ export type FxSignal = { t: 'fx'; animationId: string; eventId: number };
 /** A gift the server announced: `from` and `to` are server user ids, `eventId` its gift_events row. */
 export type GiftSignal = { t: 'gift'; giftId: string; count: number; to: string[]; eventId: number };
 /**
- * An Uğurlu send the server announced (server/api/lucky.mjs): `count` of the package to each of `to`; `best` the
+ * An Şanslı send the server announced (server/api/lucky.mjs): `count` of the package to each of `to`; `best` the
  * highest multiplier drawn and `bigWin` its reward when the room is told about it (0 otherwise). The name and
- * emoji come along, so a phone that never opened the Uğurlu shelf still draws it.
+ * emoji come along, so a phone that never opened the Şanslı shelf still draws it.
  */
 export type LuckySignal = { t: 'lucky'; giftId: string; name: string; emoji: string; count: number; to: string[]; eventId: number; best: number; bigWin: number };
 export type RoomSignal = PeerSignal | GiftSignal | LuckySignal | FxSignal;
@@ -248,7 +248,7 @@ export function parseServerGift(raw: unknown): { from: string; msg: GiftSignal }
   return { from: m.from, msg: { t: 'gift', giftId: m.giftId.slice(0, 32), count: m.count as number, to: [m.to], eventId: m.eventId as number } };
 }
 
-/** The server's Uğurlu packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin }`. */
+/** The server's Şanslı packet: `{ type: 'lucky', giftId, name, emoji, count, from, to: [ids], eventIds, best, bigWin }`. */
 export function parseServerLucky(raw: unknown): { from: string; msg: LuckySignal } | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;

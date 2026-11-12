@@ -42,7 +42,7 @@ import type { JoinMode, Membership } from '@/lib/room-follow';
 import { defaultMicQueue } from '@/lib/room-invites';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
-import { colors, gradient } from '@/theme';
+import { SCRIM, colors, edge, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
@@ -251,7 +251,6 @@ export function RoomInfoSheet({
   onInvite,
   live = false,
   ownerStats,
-  details = [],
   actions = [],
 }: {
   visible: boolean;
@@ -300,8 +299,6 @@ export function RoomInfoSheet({
   live?: boolean;
   /** A server room's owner: Oda Sahibi Merkezi's numbers from the server (null while they load). */
   ownerStats?: ServerOwnerStats | null;
-  /** The room at a glance (owner, my rank, listeners, mics, queue, lock…). */
-  details?: { label: string; value: string }[];
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
   actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
@@ -341,19 +338,6 @@ export function RoomInfoSheet({
               <Ionicons name="settings-outline" size={26} color="#fff" />
             </Pressable>
           </View>
-
-          {details.length > 0 && (
-            <View style={styles.details}>
-              {details.map((d) => (
-                <View key={d.label} style={styles.detailRow}>
-                  <Text style={styles.dim}>{d.label}</Text>
-                  <Text style={styles.detailValue} numberOfLines={1}>
-                    {d.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
 
           {actions.length > 0 && (
             <View style={styles.actions}>
@@ -1144,7 +1128,7 @@ export function BossSeat({
               <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
             </View>
           )}
-          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
+          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
         </LinearGradient>
         </View>
         <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
@@ -1162,7 +1146,7 @@ export function BossSeat({
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
-        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
+        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
       </LinearGradient>
       </View>
       <Text style={styles.bossTag}>PATRON</Text>
@@ -1181,8 +1165,8 @@ export const bossSeatInfo = (current: string | null, myContribution: number, top
 };
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%', ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17, marginBottom: 4 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   tiny: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: 70 },
@@ -1215,9 +1199,6 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
   bigBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 13 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
-  details: { borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 14, paddingVertical: 6 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 7 },
-  detailValue: { color: '#fff', fontWeight: '700', flexShrink: 1, textAlign: 'right' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   action: { width: '25%', alignItems: 'center', gap: 6 },
   actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },

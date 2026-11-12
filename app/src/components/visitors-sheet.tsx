@@ -14,7 +14,7 @@ import { liveMode } from '@/lib/live';
 import { useVisitors } from '@/lib/live/visitors';
 import { demoVisitorRows, liveVisitorRows, type VisitorRow } from '@/lib/visitor-rows';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 /**
  * My visitors for the screens: `count` how many (null until the server answers), `rows` who (empty without VIP),
@@ -78,9 +78,9 @@ export function VisitorsSheet({ visible, rows, count, onClose }: { visible: bool
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 12, paddingBottom: 34, maxHeight: '75%' },
+const useStyles = makeStyles(({ colors, edge }) => ({
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 12, paddingBottom: 34, maxHeight: '75%', ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   title: { color: colors.text, fontSize: 16, fontWeight: '800' },

@@ -1,4 +1,4 @@
-// Uğurlu hediyeler: gifts with a draw, played on the server (the app shows them: app/src/lib/lucky.ts).
+// Şanslı hediyeler: gifts with a draw, played on the server (the app shows them: app/src/lib/lucky.ts).
 //
 //   GET  /api/lucky                                          → { version, gifts, announceFrom, share, counts, needLevel,
 //                                                               allowed, minAge, gameCoins, mine }
@@ -101,7 +101,7 @@ export const luckyRoutes = {
     if (!Array.isArray(b.to) || b.to.length < 1 || b.to.length > MAX_TO) throw new HttpError(400, 'Geçersiz alıcı');
     const to = b.to.map((x) => userId(x, 'alıcı'));
     if (new Set(to).size !== to.length) throw new HttpError(400, 'Geçersiz alıcı');
-    if (to.includes(me.id)) throw new HttpError(400, 'Kendine Uğurlu hediye gönderemezsin');
+    if (to.includes(me.id)) throw new HttpError(400, 'Kendine Şanslı hediye gönderemezsin');
     const room = b.room === undefined || b.room === null ? null : String(b.room);
     if (room !== null && !ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     const { ref, count } = b;
@@ -113,8 +113,8 @@ export const luckyRoutes = {
 
     const before = await seen();
     if (before) return answer(before, true);
-    if (!me.birth_date || ageOf(me.birth_date) < MIN_AGE) throw new HttpError(403, `Uğurlu hediyeler ${MIN_AGE} yaş ve üzeri içindir`);
-    if ((await wealthPoints(db, me.id)) < NEED_POINTS) throw new HttpError(403, `Uğurlu hediyeler Cömertlik Lv.${NEED_LEVEL} ve üstü için`);
+    if (!me.birth_date || ageOf(me.birth_date) < MIN_AGE) throw new HttpError(403, `Şanslı hediyeler ${MIN_AGE} yaş ve üzeri içindir`);
+    if ((await wealthPoints(db, me.id)) < NEED_POINTS) throw new HttpError(403, `Şanslı hediyeler Cömertlik Lv.${NEED_LEVEL} ve üstü için`);
     for (const t of to) if (await blockedBetween(me.id, t)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
 
     let row;
@@ -132,12 +132,12 @@ export const luckyRoutes = {
         const cur = await current(c);
         announceFrom = cur.config.announceFrom;
         gift = cur.config.gifts.find((g) => g.id === b.giftId);
-        if (!gift || !gift.enabled) throw new HttpError(400, 'Bu Uğurlu hediye şu an kapalı');
+        if (!gift || !gift.enabled) throw new HttpError(400, 'Bu Şanslı hediye şu an kapalı');
         if ((await paidToday(c)) + gift.price * maxMult(gift) > cur.config.dailyPayoutLimit) throw new HttpError(409, 'Günlük ödül limiti doldu; bu hediye yarın yeniden açılır');
 
         const cost = gift.price * count * to.length;
         const share = Math.floor(gift.price * SHARE) * count;
-        const label = `${gift.name}${count > 1 ? ` ×${count}` : ''} (Uğurlu)`;
+        const label = `${gift.name}${count > 1 ? ` ×${count}` : ''} (Şanslı)`;
         const roomId = liveKitRoom(room)?.slice(4);
         events = [];
         for (const [i, rid] of to.entries()) {
@@ -167,11 +167,11 @@ export const luckyRoutes = {
         }
         const rest = cost - share * to.length;
         const many = to.length > 1 ? ` → ${to.length} kişi` : '';
-        if (rest > 0) await spendCoins(c, me.id, rest, `Uygulama içi: Uğurlu hediye ${label}${many}`, `${lref}-p`);
+        if (rest > 0) await spendCoins(c, me.id, rest, `Uygulama içi: Şanslı hediye ${label}${many}`, `${lref}-p`);
 
         const draws = Array.from({ length: count * to.length }, () => drawMult(gift.tiers, crypto.randomInt(0, ODDS_TOTAL)));
         const payout = draws.reduce((n, m) => n + m * gift.price, 0);
-        if (payout) await creditCoins(c, me.id, [{ channel: 'ugurlu', amount: payout }], `Uğurlu ödülü: ${label}${many}`, `${lref}-k`);
+        if (payout) await creditCoins(c, me.id, [{ channel: 'ugurlu', amount: payout }], `Şanslı ödülü: ${label}${many}`, `${lref}-k`);
         const ins = await c.query(
           `INSERT INTO lucky_sends (user_id, ref, gift_id, room, count, recipients, unit_price, cost, shared, payout, best_mult, draws, config_version, odds)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
@@ -204,7 +204,7 @@ export const luckyRoutes = {
         bigWin: best >= announceFrom ? best * Number(row.unit_price) : 0,
       });
       if (levelUp) announceRoom(lkRoom);
-      // Patron koltuğu: Uğurlu gifts count like any gift in the room.
+      // Patron koltuğu: Şanslı gifts count like any gift in the room.
       await refreshBoss(lkRoom.slice(4));
     }
     return answer(row, false);

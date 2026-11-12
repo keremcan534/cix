@@ -147,7 +147,7 @@ describe('Lucky: toplu gönderim', () => {
     // The second recipient is the sender: those two gifts can't go out and come back as a refund.
     const { records, error } = batch(wl, ['c1', 'batcher'], 2);
     assert.equal(records.length, 2);
-    assert.equal(error, 'Kendine Uğurlu hediye gönderemezsin.');
+    assert.equal(error, 'Kendine Şanslı hediye gönderemezsin.');
     assert.ok(wl.rows.includes(price * 2), 'iade satırı');
   });
 });

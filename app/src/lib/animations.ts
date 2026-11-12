@@ -69,6 +69,12 @@ export function isLive(a: Animation, now = new Date()) {
   return true;
 }
 export const animById = (id: string) => state.catalog.find((a) => a.animation_id === id);
+/**
+ * What a person sends from the emoji panel's Hareketli tabs: a reaction, an effect gift or a full-screen effect. In a
+ * room it also covers the sender's photo on their mic (components/room/live-room). A mic effect or an entry animation
+ * is never sent: it is bought and then plays by itself.
+ */
+export const isSentAnim = (a: Animation) => a.display_type === 'reaction' || a.display_type === 'gift' || a.display_type === 'fullscreen';
 
 // --- Admin -------------------------------------------------------------------------------------
 const log = (action: string, target: string, before?: string, after?: string) =>
@@ -168,7 +174,7 @@ export function sendAnimation(animationId: string, roomId: string, fromUserId: s
   const finish = (r: SendResult) => (done.set(requestId, r), r);
   const a = animById(animationId);
   if (!a || !isLive(a)) return finish({ ok: false, reason: 'Bu animasyon şu an kullanılamıyor.' });
-  if (a.display_type === 'mic_effect' || a.display_type === 'entry') return finish({ ok: false, reason: 'Bu içerik gönderilmez; mağazadan alınıp kullanılır.' });
+  if (!isSentAnim(a)) return finish({ ok: false, reason: 'Bu içerik gönderilmez; mağazadan alınıp kullanılır.' });
   // Free reactions are rate limited per sender so they can't flood the room.
   if (a.is_free) {
     const last = lastFree.get(fromUserId) ?? 0;

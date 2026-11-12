@@ -23,7 +23,7 @@ Kaynak: *Similarclup – Hareketli Emoji, Mikrofon Efektleri ve Animasyon Mağaz
 | `src/components/fx/anim-player.tsx` | **Veriyle çalışan oynatıcı**: görsel (emoji, 3D ikon veya URL) + hareket kalıbı (koltuktan yüksel, mikrofon çevresinde dön, patla, ekrana yağ, ekranı geç, ortada büyü, neon halka, ses dalgası). Yeni kayıt kod değişikliği gerektirmez. |
 | `src/components/fx/anim-layer.tsx` | **Oda katmanı**: olayları ortak başlangıç zamanında oynatır; aynı anda 1 tam ekran ve en fazla 6 küçük animasyon, en fazla 12 bekleyen (önce ücretsiz tepkiler düşer); düşük veri modunda hafif sürüm. **Mikrofon efekti** ayrı mekanizma olarak burada. |
 | `src/lib/animations.ts` | Katalog durumu, **sağlayıcı katmanı**, yönetici kayıtları, oda olay kanalı ve sunucunun yerine geçen `sendAnimation`. |
-| `src/components/EmojiPanel.tsx` | Odada **✨ Hareketli** sekmesi: mikrofon efektim (al/kullan/kapat), tepkiler, efekt hediyeleri, tam ekran efektler. |
+| `src/components/EmojiPanel.tsx` | Odada **✨ Hareketli** sekmeleri (ücretsizler "Sabit", ücretliler "VIP" başlığında): mikrofon efektim (al/kullan/kapat), tepkiler, efekt hediyeleri, tam ekran efektler. Gönderilen her biri gönderenin mikrofonunda, fotoğrafının üstünde de görünür (`components/room/live-room.tsx`, `isSentAnim`). |
 | `src/app/animasyon-yonetimi.tsx` | **Yönetim paneli** (`animations.manage` yetkisi): katalog, düzenleme, test oynatma, sağlayıcılar, içe aktarma, yeni ekleme, kayıtlar. |
 
 ### Gönderim akışı (§6)
