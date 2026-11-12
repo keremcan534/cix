@@ -1,4 +1,4 @@
-// Bilye Şelalesi: the path the screen shows for a round. The round's target is already decided (lib/bilye/rules,
+// Pachinko: the path the screen shows for a round. The round's target is already decided (lib/bilye/rules,
 // the server in a live build); this picks one of the recorded launches of that strength that really end there
 // (lib/bilye/table SEEDS) and flies it again, so the ball's every bounce is the simulation's own.
 //

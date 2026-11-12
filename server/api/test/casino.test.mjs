@@ -251,7 +251,7 @@ describe('Oyun Salonu sunucuda', () => {
     assert.equal(info.games.find((g) => g.id === 'olympus').dailyLimit, 2000);
     const [st, why] = await play(a.session, { game: 'fish', bet: 250, pick: 'clown' });
     assert.equal(st, 409);
-    assert.match(why.error, /Mercan Avı şu an kapalı/);
+    assert.match(why.error, /Balon Avı şu an kapalı/);
     assert.equal((await play(a.session, { game: 'rocket', bet: 5000, pick: '2' }))[0], 400, 'en yüksek bahsin üstü');
     assert.equal((await play(a.session, { game: 'olympus', bet: 1000 }))[0], 200);
     assert.equal((await play(a.session, { game: 'olympus', bet: 1000 }))[0], 200);

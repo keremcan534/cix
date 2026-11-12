@@ -6,11 +6,11 @@
 // into its tier's fund, and when the fund is won it starts again from a seed of 20 spins' price (20 × 1/4000 =
 // 0.5 %). Rounded down, in the house's favour.
 
-/** Tiers: one spin's price in coins. */
+/** Tiers: one spin's price in coins. The ids are the tiers' first names (the funds and the history key on them). */
 export const TIERS = {
-  kiyi: { label: 'Kıyı', price: 250 },
-  acik: { label: 'Açık Deniz', price: 2500 },
-  okyanus: { label: 'Derin Okyanus', price: 10000 },
+  kiyi: { label: 'Klasik', price: 250 },
+  acik: { label: 'Yüksek', price: 2500 },
+  okyanus: { label: 'Zirve', price: 10000 },
 };
 /** Spins in one go. */
 export const COUNTS = [1, 10, 50];

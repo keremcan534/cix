@@ -54,7 +54,7 @@ describe('Oyun Salonu kataloğu sunucuyla aynı', () => {
     }
   });
 
-  test('oyunların verileri aynı: makaralar, ödeme tabloları, balıklar, roket, ağaç, tahtalar, fener', () => {
+  test('oyunların verileri aynı: makaralar, ödeme tabloları, balonlar, roket, ağaç, tahtalar, Yıldız Avı', () => {
     for (const [id, c] of Object.entries(SLOT_CONFIGS)) {
       assert.deepEqual(slots.SLOT_CONFIGS[id], c, id);
       assert.deepEqual(slots.stripsOf(slots.SLOT_CONFIGS[id]), stripsOf(c), id);
@@ -73,7 +73,7 @@ describe('Oyun Salonu kataloğu sunucuyla aynı', () => {
     assert.deepEqual([slots.STORM_TRIGGER, slots.STORM_SPINS, slots.FENER_MAX], [STORM_TRIGGER, STORM_SPINS, FENER_MAX]);
   });
 
-  test('Bilye Şelalesi: sunucunun tablosu uygulamanın tahtasından (scripts/bilye-table.ts yeniden çalıştırılmalı)', () => {
+  test('Pachinko: sunucunun tablosu uygulamanın tahtasından (scripts/bilye-table.ts yeniden çalıştırılmalı)', () => {
     assert.deepEqual(bilyeTable.LANES, [...LANES]);
     assert.deepEqual(bilyeTable.LANE_NAME, LANE_NAME);
     assert.deepEqual(bilyeTable.TARGET_NAMES, TARGETS.map((t) => t.name));
@@ -119,7 +119,7 @@ describe('Canlı ayarlar paneli Oyun Salonu’nu sunucu gibi okur', () => {
     ])
       assert.equal(bigChange('casino_daily_rounds', before, after), registry.isBig('casino_daily_rounds', before, after), `${before} → ${after}`);
     assert.equal(bigChange('casino_max_bet', 25_000, 250), registry.isBig('casino_max_bet', 25_000, 250));
-    assert.equal(valueText('casino_off', ['fish', 'neon'], { names: { game: (id) => rules.gameById(id)!.name } }), 'Kapalı: Mercan Avı, Neon Bulvar');
+    assert.equal(valueText('casino_off', ['fish', 'neon'], { names: { game: (id) => rules.gameById(id)!.name } }), 'Kapalı: Balon Avı, Neon Bulvar');
     assert.equal(valueText('casino_off', []), 'Hepsi açık');
     assert.equal(valueText('casino_max_bet', 25_000), '25.000 jeton');
     assert.equal(valueText('casino_daily_rounds', 40), 'En yüksek bahisle 40 tur');

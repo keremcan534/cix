@@ -1,4 +1,4 @@
-// Oyun Salonu on the server (casino.mjs): the catalog of the games the server plays (Bilye Şelalesi's rules are in
+// Oyun Salonu on the server (casino.mjs): the catalog of the games the server plays (Pachinko's rules are in
 // casino-bilye.mjs), their stakes, and every game's
 // round as pure functions. The same rules as the app's demo engines (app/src/lib/casino-odds.ts, board-games.ts,
 // fish-hunt.ts, crash-rocket.ts, gold-tree.ts and data/games.ts); the app's test tests/casino-server.test.ts keeps
@@ -29,25 +29,25 @@ export const STAKES = {
 /** The default daily ceiling per game: this many rounds at the game's top stake (live setting casino_daily_rounds). */
 export const DAILY_ROUNDS = 40;
 /**
- * The games the server plays, in the app's order. `id` is the app's (and the history's) key: 'olympus' is Fener
- * Kayalığı and 'slot' Gece Yarısı Çarkı. The demo's switched-off games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın
+ * The games the server plays, in the app's order. `id` is the app's (and the history's) key: 'olympus' is Yıldız
+ * Avı and 'slot' Gece Yarısı Çarkı. The demo's switched-off games (Şans Çarkı, Zar, Ejder ile Kaplan, Altın
  * Kasa) are not here: nothing in the app shows them.
  */
 export const GAMES = [
   { id: 'slot', name: 'Gece Yarısı Çarkı', bets: STAKES.wide },
   { id: 'jackpot', name: 'Hazine Kulesi', bets: STAKES.wide },
-  { id: 'olympus', name: 'Fener Kayalığı', bets: STAKES.base },
-  { id: 'fish', name: 'Mercan Avı', bets: STAKES.high },
+  { id: 'olympus', name: 'Yıldız Avı', bets: STAKES.base },
+  { id: 'fish', name: 'Balon Avı', bets: STAKES.high },
   { id: 'rocket', name: 'Yörünge', bets: STAKES.wide },
   { id: 'super777', name: 'Kızıl Yedi', bets: STAKES.high },
   { id: 'jungle', name: 'Vahşi Patika', bets: STAKES.mid },
   { id: 'goldtree', name: 'Bereket Ağacı', bets: STAKES.high },
-  { id: 'foodwheel', name: 'Liman Pazarı', bets: STAKES.wide },
+  { id: 'foodwheel', name: 'Lezzet Çarkı', bets: STAKES.wide },
   { id: 'magiccard', name: 'Sihir Destesi', bets: STAKES.high },
   { id: 'pinata', name: 'Konfeti Kutusu', bets: STAKES.mid },
   { id: 'spellbook', name: 'Kayıp Parşömen', bets: STAKES.mid },
   { id: 'neon', name: 'Neon Bulvar', bets: STAKES.high },
-  { id: 'bilye', name: 'Bilye Şelalesi', bets: STAKES.wide },
+  { id: 'bilye', name: 'Pachinko', bets: STAKES.wide },
 ];
 export const GAME_IDS = GAMES.map((g) => g.id);
 export const gameById = (id) => (typeof id === 'string' ? GAMES.find((g) => g.id === id) : undefined);
@@ -60,18 +60,19 @@ export const POOL_SEED = 2_000_000;
 /** Opening JACKPOT of each slot that has one, also house advances. */
 export const JACKPOT_SEEDS = { jackpot: 100_000, jungle: 1_000_000, pinata: 500_000, spellbook: 800_000, neon: 2_000_000 };
 
-// --- Mercan Avı (app lib/fish-hunt) ------------------------------------------------------------------------------
-// A shot at a fish worth m× is caught when the draw (0…10m−1) is below FISH_HIT: P = 4 / 10m, so m × P = 0.4.
+// --- Balon Avı (app lib/fish-hunt) -------------------------------------------------------------------------------
+// A shot at a balloon worth m× hits when the draw (0…10m−1) is below FISH_HIT: P = 4 / 10m, so m × P = 0.4. The ids
+// are the game's first, fish-shaped ones: the history and the server's picks key on them.
 export const FISH = [
-  { id: 'clown', name: 'Palyaço Balığı', emoji: '🐠', mult: 2, size: 34, cross: 9, spawn: 30 },
-  { id: 'sardine', name: 'Sarı Balık', emoji: '🐟', mult: 3, size: 36, cross: 10, spawn: 26 },
-  { id: 'puffer', name: 'Balon Balığı', emoji: '🐡', mult: 5, size: 40, cross: 11, spawn: 18 },
-  { id: 'squid', name: 'Kalamar', emoji: '🦑', mult: 8, size: 44, cross: 12, spawn: 12 },
-  { id: 'octopus', name: 'Ahtapot', emoji: '🐙', mult: 10, size: 48, cross: 13, spawn: 10 },
-  { id: 'turtle', name: 'Kaplumbağa', emoji: '🐢', mult: 15, size: 50, cross: 15, spawn: 8 },
-  { id: 'dolphin', name: 'Yunus', emoji: '🐬', mult: 20, size: 56, cross: 12, spawn: 6 },
-  { id: 'shark', name: 'Köpekbalığı', emoji: '🦈', mult: 30, size: 64, cross: 14, spawn: 4 },
-  { id: 'whale', name: 'Balina', emoji: '🐳', mult: 50, size: 76, cross: 18, spawn: 2 },
+  { id: 'clown', name: 'Küçük Balon', emoji: '🎈', mult: 2, size: 34, cross: 9, spawn: 30 },
+  { id: 'sardine', name: 'Kalp Balon', emoji: '💖', mult: 3, size: 36, cross: 10, spawn: 26 },
+  { id: 'puffer', name: 'Yıldız Balon', emoji: '🌟', mult: 5, size: 40, cross: 11, spawn: 18 },
+  { id: 'squid', name: 'Konfeti Balonu', emoji: '🎊', mult: 8, size: 44, cross: 12, spawn: 12 },
+  { id: 'octopus', name: 'Ay Balon', emoji: '🌙', mult: 10, size: 48, cross: 13, spawn: 10 },
+  { id: 'turtle', name: 'Uçurtma', emoji: '🪁', mult: 15, size: 50, cross: 15, spawn: 8 },
+  { id: 'dolphin', name: 'Disko Balonu', emoji: '🪩', mult: 20, size: 56, cross: 12, spawn: 6 },
+  { id: 'shark', name: 'Uçan Daire', emoji: '🛸', mult: 30, size: 64, cross: 14, spawn: 4 },
+  { id: 'whale', name: 'Dev Balon', emoji: '🎈', mult: 50, size: 76, cross: 18, spawn: 2 },
   { id: 'dragon', name: 'Altın Ejderha', emoji: '🐉', mult: 100, size: 84, cross: 20, spawn: 1 },
 ];
 export const FISH_HIT = 4;
@@ -172,14 +173,15 @@ export const LUCKY77 = {
     { id: 'grape', name: 'Üzüm', label: '🍇', weight: 5, pays: [] },
   ],
 };
+// Lezzet Çarkı. The meat dishes keep the ids of the game's first menu (shrimp, fish, crab): bets and history key on them.
 const VEG = ['cabbage', 'mushroom', 'pumpkin', 'tomato'];
 const MEAT = ['steak', 'shrimp', 'fish', 'crab'];
 export const FOOD_WHEEL = {
   id: 'foodwheel',
   options: [
-    { id: 'crab', name: 'Yengeç', label: '🦀', mult: 45 },
-    { id: 'fish', name: 'Balık', label: '🐟', mult: 25 },
-    { id: 'shrimp', name: 'Karides', label: '🍤', mult: 15 },
+    { id: 'crab', name: 'Döner', label: '🥙', mult: 45 },
+    { id: 'fish', name: 'Hamburger', label: '🍔', mult: 25 },
+    { id: 'shrimp', name: 'Tavuk', label: '🍗', mult: 15 },
     { id: 'steak', name: 'Et', label: '🥩', mult: 10 },
     { id: 'tomato', name: 'Domates', label: '🍅', mult: 5 },
     { id: 'pumpkin', name: 'Balkabağı', label: '🎃', mult: 5 },
@@ -288,8 +290,8 @@ export function outcomeOf(game, pick, rnd) {
     const round = playFener(rnd);
     const ships = round.base.grid[round.base.lit[0]].filter((c) => c.kind === 'ship').length;
     const detail = [
-      ships ? `ışıkta ${ships} gemi · parlaklık ×${round.base.brightness}` : 'ışıkta gemi yok',
-      round.storm.length ? `Fırtına Gecesi ${round.storm.length} dönüş` : '',
+      ships ? `ışıkta ${ships} yıldız · parlaklık ×${round.base.brightness}` : 'ışıkta yıldız yok',
+      round.storm.length ? `Yıldız Yağmuru ${round.storm.length} dönüş` : '',
       `${Math.round(round.multiplier * 10) / 10}x`,
     ];
     return { display: round.base.grid.flat().map((c) => (c.kind === 'ship' ? `ship${c.cargo}` : c.kind)), multiplier: round.multiplier, detail: detail.filter(Boolean).join(' · '), fener: round };
@@ -302,7 +304,7 @@ export function outcomeOf(game, pick, rnd) {
   if (game === 'fish') {
     const f = fishById(pick);
     const shot = shootFish(f, rnd(fishDraw(f)));
-    return { display: [f.id], multiplier: shot.multiplier, detail: `${f.name} ${shot.caught ? `yakalandı · ${f.mult}x` : 'kaçtı'}`, caught: shot.caught };
+    return { display: [f.id], multiplier: shot.multiplier, detail: `${f.name} ${shot.caught ? `vuruldu · ${f.mult}x` : 'kaçtı'}`, caught: shot.caught };
   }
   throw new Error(`unknown game ${game}`);
 }

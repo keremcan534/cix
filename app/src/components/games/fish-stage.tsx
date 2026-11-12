@@ -1,7 +1,8 @@
-// What Mercan Avı's stage is made of: the water (depth, light shafts, weed, coral, bubbles), a fish swimming its
-// crossing, the cannon, a shot in the air and what it leaves where it lands (a catch bursting into coins, or a small
-// splash). Everything moves on Animated values with the native driver: a fish hangs on one value for its whole
-// crossing, the water on two loops. The numbers come from fish-swim; nothing here knows a round.
+// What Balon Avı's stage is made of: the sky (sun rays, clouds, drifting specks of light), a balloon floating its
+// crossing, the cannon, a shot in the air and what it leaves where it lands (a hit bursting into coins, or a small
+// puff). Everything moves on Animated values with the native driver: a balloon hangs on one value for its whole
+// crossing, the sky on two loops. The numbers come from fish-swim; nothing here knows a round. (A balloon is still a
+// `Fish` here: the game's ids are its first, fish-shaped ones.)
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useMemo } from 'react';
@@ -25,20 +26,20 @@ export type Fish = {
   dur: number;
   /** 0 … 1 of the crossing. */
   p: Animated.Value;
-  /** 0 → 1: the pop when it is caught, the flinch when a shot missed it. */
+  /** 0 → 1: the pop when it is hit, the wobble when a shot missed it. */
   hit: Animated.Value;
   /** Its place on the stage, from `p` (built once, when it is born). */
   move: { x: Animated.AnimatedInterpolation<number>; y: Animated.AnimatedInterpolation<number>; tilt: Animated.AnimatedInterpolation<string> };
-  /** When it was caught (ms): it pops, and is taken out of the water once it has. */
+  /** When it was hit (ms): it pops, and is taken off the stage once it has. */
   gone?: number;
 };
 export type Shot = { key: number; x0: number; y0: number; x1: number; y1: number; v: Animated.Value };
 export type Burst = { key: number; kind: 'catch' | 'miss' | 'free'; x: number; y: number; amount: number; coins: number; ms: number; v: Animated.Value };
 
-/** The light a fish's price tag is written in, by how much it pays. */
+/** The light a balloon's price tag is written in, by how much it pays. */
 export const tierColor = (mult: number) => (mult >= 50 ? '#FDE047' : mult >= 20 ? '#D8B4FE' : mult >= 8 ? '#86EFAC' : '#E0F2FE');
 
-// --- The water ------------------------------------------------------------------------------------------------
+// --- The sky --------------------------------------------------------------------------------------------------
 
 /** Ranges for something that follows f(q) with q = the loop's value shifted by `phase` (and wrapped, as a step). */
 function looped(phase: number, qs: number[], f: (q: number) => number) {
@@ -47,21 +48,15 @@ function looped(phase: number, qs: number[], f: (q: number) => number) {
   return { inputRange: [...a.map((q) => q - phase), ...b.map((q) => q - phase + 1)], outputRange: [...a.map(f), ...b.map(f)] };
 }
 
-const SHAFTS = [
+/** Rays of sunlight from the top of the sky. */
+const SUN_RAYS = [
   { x: 0.02, width: 44, deg: 15, a: 0.5, b: 0.9 },
   { x: 0.24, width: 72, deg: 19, a: 0.95, b: 0.45 },
   { x: 0.52, width: 38, deg: 13, a: 0.4, b: 0.85 },
   { x: 0.74, width: 60, deg: 17, a: 0.9, b: 0.5 },
 ];
-const WEED = [
-  { x: 0.03, len: 104, color: '#0F9F78', lean: 1 },
-  { x: 0.13, len: 78, color: '#12B886', lean: -1 },
-  { x: 0.3, len: 52, color: '#0C8A68', lean: 1 },
-  { x: 0.7, len: 58, color: '#12B886', lean: -1 },
-  { x: 0.88, len: 110, color: '#0F9F78', lean: 1 },
-  { x: 0.97, len: 80, color: '#0C8A68', lean: -1 },
-];
-const BUBBLES = [
+/** Specks of light drifting up through the air. */
+const SPECKS = [
   { x: 0.08, size: 7, phase: 0.05 },
   { x: 0.17, size: 4, phase: 0.55 },
   { x: 0.29, size: 9, phase: 0.3 },
@@ -72,24 +67,16 @@ const BUBBLES = [
   { x: 0.86, size: 5, phase: 0.92 },
   { x: 0.94, size: 6, phase: 0.25 },
 ];
-/** A coral: a fan of rounded branches from one foot. */
-const CORALS = [
-  { x: 0.07, color: '#FB7185', branches: [-24, -4, 18], len: 86 },
-  { x: 0.2, color: '#F472B6', branches: [-28, -9, 10, 30], len: 96 },
-  { x: 0.345, color: '#FB923C', branches: [-20, 4, 24], len: 44 },
-  { x: 0.66, color: '#A78BFA', branches: [-26, -6, 16], len: 48 },
-  { x: 0.8, color: '#FB7185', branches: [-30, -10, 8, 28], len: 98 },
-  { x: 0.94, color: '#FDBA74', branches: [-18, 6, 24], len: 84 },
-];
 
 /**
- * The sea the fish swim in: lit from above and dark below, with shafts of light that breathe, weed that sways,
- * coral on the bed and bubbles rising. `flow` loops 0 → 1 (the bubbles' way up), `sway` goes 0 → 1 → 0.
+ * The sky the balloons float in: deep blue above, light toward the horizon, the sun's glow and rays at the top that
+ * breathe, clouds along the bottom and specks of light drifting up. `flow` loops 0 → 1 (the specks' way up), `sway`
+ * goes 0 → 1 → 0.
  */
-export const Water = memo(function Water({ w, h, still, flow, sway }: { w: number; h: number; still: boolean; flow: Animated.Value; sway: Animated.Value }) {
-  const bubbles = useMemo(
+export const Sky = memo(function Sky({ w, h, still, flow, sway }: { w: number; h: number; still: boolean; flow: Animated.Value; sway: Animated.Value }) {
+  const specks = useMemo(
     () =>
-      BUBBLES.map((b) => ({
+      SPECKS.map((b) => ({
         ...b,
         y: flow.interpolate(looped(b.phase, [], (q) => h + 10 - q * (h + 30))),
         opacity: flow.interpolate(looped(b.phase, [0.06, 0.8], (q) => (q <= 0 || q >= 1 ? 0 : 0.55))),
@@ -98,50 +85,31 @@ export const Water = memo(function Water({ w, h, still, flow, sway }: { w: numbe
   );
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={['#22B8CF', '#1287B8', '#0B4F99', '#0A2C6E', '#07153F']} locations={[0, 0.2, 0.48, 0.76, 1]} style={StyleSheet.absoluteFill} />
-      <Image source={GLOW} style={{ position: 'absolute', left: w * 0.1, top: -w * 0.5, width: w * 0.8, height: w * 0.8, tintColor: '#CFFAFE', opacity: 0.55 }} />
-      {SHAFTS.map((s, i) => (
-        <Animated.View key={i} style={[st.shaft, { left: s.x * w, width: s.width, height: h * 0.9, transform: [{ rotate: `${s.deg}deg` }], opacity: still ? 0.6 : sway.interpolate({ inputRange: [0, 1], outputRange: [s.a, s.b] }) }]}>
-          <LinearGradient colors={['rgba(224,252,255,0.5)', 'rgba(207,250,254,0.16)', 'rgba(207,250,254,0)']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#1D4ED8', '#2563EB', '#3B82F6', '#60A5FA', '#93C5FD']} locations={[0, 0.2, 0.48, 0.76, 1]} style={StyleSheet.absoluteFill} />
+      <Image source={GLOW} style={{ position: 'absolute', left: w * 0.1, top: -w * 0.5, width: w * 0.8, height: w * 0.8, tintColor: '#FEF3C7', opacity: 0.55 }} />
+      {SUN_RAYS.map((s, i) => (
+        <Animated.View key={i} style={[st.sunRay, { left: s.x * w, width: s.width, height: h * 0.9, transform: [{ rotate: `${s.deg}deg` }], opacity: still ? 0.6 : sway.interpolate({ inputRange: [0, 1], outputRange: [s.a, s.b] }) }]}>
+          <LinearGradient colors={['rgba(255,251,235,0.45)', 'rgba(255,251,235,0.14)', 'rgba(255,251,235,0)']} style={StyleSheet.absoluteFill} />
         </Animated.View>
       ))}
-      {/* The surface, seen from below: a band of light at the top. */}
-      <LinearGradient colors={['rgba(236,254,255,0.45)', 'rgba(236,254,255,0)']} style={st.surface} />
-      {/* The bed: far rocks, then the sand the weed and the coral stand on. */}
-      <View style={[st.rock, { left: -w * 0.1, width: w * 0.62, height: 96, bottom: -34, backgroundColor: '#0A2A66' }]} />
-      <View style={[st.rock, { left: w * 0.44, width: w * 0.72, height: 124, bottom: -52, backgroundColor: '#09245A' }]} />
-      <LinearGradient colors={['rgba(7,21,63,0)', 'rgba(5,14,46,0.85)']} style={[st.deep, { height: h * 0.3 }]} />
-      {WEED.map((s, i) => (
-        <Animated.View key={i} style={[st.weed, { left: s.x * w - 4, bottom: 14 - s.len, height: s.len * 2, transform: [{ rotate: still ? `${s.lean * 3}deg` : sway.interpolate({ inputRange: [0, 1], outputRange: [`${s.lean * -7}deg`, `${s.lean * 8}deg`] }) }] }]}>
-          <View style={{ width: 8, height: s.len, borderRadius: 4, backgroundColor: s.color }} />
-        </Animated.View>
-      ))}
-      {CORALS.map((c, i) => (
-        <View key={i} style={{ position: 'absolute', left: c.x * w, bottom: 18 }}>
-          {c.branches.map((deg, k) => {
-            // The outer branches are shorter; each turns around its foot.
-            const len = c.len - Math.abs(deg) * 0.35;
-            return (
-              <View key={k} style={[st.branch, { bottom: -len, height: len * 2, transform: [{ rotate: `${deg}deg` }] }]}>
-                <View style={{ width: 9, height: len, borderRadius: 5, backgroundColor: c.color }} />
-              </View>
-            );
-          })}
-        </View>
-      ))}
-      <View style={[st.rock, { left: -w * 0.2, width: w * 1.4, height: 70, bottom: -44, backgroundColor: '#061238' }]} />
+      {/* The top of the sky: a band of light. */}
+      <LinearGradient colors={['rgba(255,251,235,0.4)', 'rgba(255,251,235,0)']} style={st.skyTop} />
+      {/* Clouds along the bottom: far ones, then a near one. */}
+      <View style={[st.cloud, { left: -w * 0.1, width: w * 0.62, height: 96, bottom: -34, backgroundColor: 'rgba(255,255,255,0.55)' }]} />
+      <View style={[st.cloud, { left: w * 0.44, width: w * 0.72, height: 124, bottom: -52, backgroundColor: 'rgba(255,255,255,0.6)' }]} />
+      <View style={[st.cloud, { left: -w * 0.2, width: w * 1.4, height: 70, bottom: -44, backgroundColor: 'rgba(255,255,255,0.85)' }]} />
       {!still &&
-        bubbles.map((b, i) => (
+        specks.map((b, i) => (
           <Animated.View
             key={i}
-            style={[st.bubble, { left: b.x * w, width: b.size, height: b.size, borderRadius: b.size, opacity: b.opacity, transform: [{ translateY: b.y }, { translateX: sway.interpolate({ inputRange: [0, 1], outputRange: i % 2 ? [-5, 5] : [4, -4] }) }] }]}
+            style={[st.speck, { left: b.x * w, width: b.size, height: b.size, borderRadius: b.size, opacity: b.opacity, transform: [{ translateY: b.y }, { translateX: sway.interpolate({ inputRange: [0, 1], outputRange: i % 2 ? [-5, 5] : [4, -4] }) }] }]}
           />
         ))}
     </View>
   );
 });
 
-/** The water turned to ice while the fish are stopped: a cold light over the stage and frost in its corners. */
+/** The sky turned to ice while the balloons are stopped: a cold light over the stage and frost in its corners. */
 export function Frost({ on }: { on: Animated.Value }) {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { opacity: on }]} pointerEvents="none">
@@ -167,12 +135,12 @@ export function Frost({ on }: { on: Animated.Value }) {
   );
 }
 
-// --- A fish ---------------------------------------------------------------------------------------------------
+// --- A balloon ------------------------------------------------------------------------------------------------
 
 /**
- * One fish: it rides its crossing (place and tilt from `fish.p`), its body flexes with the shared `flex` beat, and
- * its price tag stays level under it. Caught, it flashes, swells and spins away; missed, it flinches. `turn` spins
- * the lock ring.
+ * One balloon: it rides its crossing (place and tilt from `fish.p`), it wobbles with the shared `flex` beat, and
+ * its price tag stays level under it. Hit, it flashes, swells and spins away; missed, it wobbles. `turn` spins the
+ * lock ring.
  */
 export const FishSprite = memo(function FishSprite({ fish, locked, flex, turn }: { fish: Fish; locked: boolean; flex: Animated.Value; turn: Animated.Value }) {
   const s = fish.size;
@@ -261,8 +229,8 @@ const RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
 const DROPS = [-52, -18, 20, 50];
 
 /**
- * What a shot leaves where it lands. A catch: a ring of light, rays, coins thrown up from the fish and its amount
- * floating off. A miss, or a shot into empty water: a small ring and a few drops, soon gone.
+ * What a shot leaves where it lands. A hit: a ring of light, rays, coins thrown up from the balloon and its amount
+ * floating off. A miss, or a shot into empty sky: a small ring and a few sparks, soon gone.
  */
 export const BurstView = memo(function BurstView({ burst, still }: { burst: Burst; still: boolean }) {
   const { v } = burst;
@@ -304,13 +272,10 @@ export const BurstView = memo(function BurstView({ burst, still }: { burst: Burs
 });
 
 const st = StyleSheet.create({
-  shaft: { position: 'absolute', top: -40 },
-  surface: { position: 'absolute', left: 0, right: 0, top: 0, height: 54 },
-  rock: { position: 'absolute', borderRadius: 999 },
-  deep: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  weed: { position: 'absolute', width: 8 },
-  branch: { position: 'absolute', left: -4.5, width: 9 },
-  bubble: { position: 'absolute', top: 0, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', backgroundColor: 'rgba(255,255,255,0.18)' },
+  sunRay: { position: 'absolute', top: -40 },
+  skyTop: { position: 'absolute', left: 0, right: 0, top: 0, height: 54 },
+  cloud: { position: 'absolute', borderRadius: 999 },
+  speck: { position: 'absolute', top: 0, backgroundColor: 'rgba(255,255,255,0.7)' },
   frost: { position: 'absolute', width: 220, height: 220, tintColor: '#FFFFFF', opacity: 0.6 },
   fish: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'center' },
   lock: { position: 'absolute', borderWidth: 2.5, borderColor: '#FB7185', borderStyle: 'dashed' },

@@ -1,6 +1,6 @@
 # SimilarClub — Pachinko Mini Oyun Sistemi
 
-Oyun tasarımı, kazanç dağılımı ve teknik geliştirme şartnamesi. 11 Kasım 2026'da iletilen metin olduğu gibi buradadır. Uygulamadaki adı **Bilye Şelalesi**; 1. aşama yapıldı, neyin yapıldığı ve neyin beklediği `docs/OYUN_MERKEZI.md` › Bilye Şelalesi bölümünde.
+Oyun tasarımı, kazanç dağılımı ve teknik geliştirme şartnamesi. 11 Kasım 2026'da iletilen metin olduğu gibi buradadır. Uygulamadaki adı da **Pachinko** (kod içi kimliği `bilye`); 1. aşama yapıldı, neyin yapıldığı ve neyin beklediği `docs/OYUN_MERKEZI.md` › Pachinko bölümünde.
 
 ## 1. Projenin Amacı
 

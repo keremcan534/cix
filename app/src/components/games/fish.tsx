@@ -1,8 +1,9 @@
-// Mercan Avı: fish swim across the scene; tap one and the cannon fires. Every shot at a fish is one casino round
-// (playRound, pick = the fish), settled before the shot leaves the cannon; the shot then flies to the fish and shows
-// what the round decided: the fish bursts into coins, or it flinches and swims on. A shot that hits no fish is free
-// and is not a round. Freeze stops the fish for a moment and lock-on keeps Oto on one fish; neither changes the odds
-// (lib/fish-hunt). What the stage is made of is in fish-stage, where a fish is at any moment in fish-swim.
+// Balon Avı: balloons float across the sky; tap one and the cannon fires. Every shot at a balloon is one casino round
+// (playRound, pick = the balloon), settled before the shot leaves the cannon; the shot then flies to the balloon and
+// shows what the round decided: the balloon bursts into coins, or it wobbles and floats on. A shot that hits no
+// balloon is free and is not a round. Freeze stops the balloons for a moment and lock-on keeps Oto on one balloon;
+// neither changes the odds (lib/fish-hunt). What the stage is made of is in fish-stage, where a balloon is at any
+// moment in fish-swim. (The code still calls a balloon a fish: the game's ids are its first, fish-shaped ones.)
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
@@ -10,7 +11,7 @@ import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions, typ
 import { Text } from '@/components/text';
 import { CasinoLock } from '@/components/games/casino';
 import { aimDeg, freeDepth, leadShot, shotMs, swimAt, swimRanges, type Swim } from '@/components/games/fish-swim';
-import { BARREL, BurstView, Cannon, FishSprite, Frost, HUB_UP, ShotView, Water, tierColor, type Burst, type Fish, type Shot } from '@/components/games/fish-stage';
+import { BARREL, BurstView, Cannon, FishSprite, Frost, HUB_UP, ShotView, Sky, tierColor, type Burst, type Fish, type Shot } from '@/components/games/fish-stage';
 import { GameInfoSheet, InfoButton } from '@/components/games/fx/info-sheet';
 import { useWinFx } from '@/components/games/fx/win-fx';
 import { BalancePill, BetStepper, fmt } from '@/components/games/slot-kit';
@@ -30,9 +31,9 @@ const AUTO_EVERY = 700;
 const LIVE_AUTO_EVERY = 1000;
 /** Oto stops when the net loss reaches this many shots. */
 const AUTO_LOSS = 50;
-/** A catch that pays this many stakes or more takes the whole stage; a smaller one pops where the fish was. */
+/** A hit that pays this many stakes or more takes the whole stage; a smaller one pops where the balloon was. */
 const BIG_CATCH = 5;
-/** How long a caught fish takes to pop (ms). */
+/** How long a hit balloon takes to pop (ms). */
 const POP_MS = 620;
 const SPAWN_TOTAL = FISH.reduce((n, f) => n + f.spawn, 0);
 const ICE = '#7DD3FC';
@@ -41,11 +42,11 @@ const pickKind = () => {
   let r = Math.random() * SPAWN_TOTAL;
   return FISH.find((f) => (r -= f.spawn) < 0) ?? FISH[0];
 };
-/** Coins a catch throws up, by how much the fish pays. */
+/** Coins a hit throws up, by how much the balloon pays. */
 const coinsFor = (mult: number) => (mult >= 50 ? 16 : mult >= 15 ? 12 : mult >= 5 ? 9 : 6);
 const percent = (p: number) => `%${(p * 100).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
 
-/** Where a fish's crossing stood when it last started or stopped: what a tap or a shot is aimed with. */
+/** Where a balloon's crossing stood when it last started or stopped: what a tap or a shot is aimed with. */
 type Run = { p0: number; at: number; on: boolean };
 
 export function FishPlayer({ entry }: { entry: Entry }) {
@@ -85,7 +86,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const fishRef = useRef<Fish[]>([]);
   const runs = useRef(new Map<number, Run>());
   const autoNet = useRef(0);
-  // Fish with a shot on its way (to the server, then through the water): not a target again until it has landed.
+  // Balloons with a shot on its way (to the server, then through the air): not a target again until it has landed.
   const pending = useRef(new Set<number>());
   const icy = useRef(false);
   const aimNow = useRef(0);
@@ -99,7 +100,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
   const height = room ? Math.max(240, Math.min(300, Math.round(screen.height * 0.36))) : Math.max(320, Math.min(460, Math.round(screen.height * 0.56)));
   const cx = width / 2;
   const cy = height - HUB_UP;
-  // The fish keep between the top row of buttons and the cannon.
+  // The balloons keep between the top row of buttons and the cannon.
   const top = 50;
   const bottom = height - (room ? 100 : 122);
   const scale = room ? 0.9 : 1.18;
@@ -141,7 +142,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
       school.current.forEach((f) => f.p.stopAnimation());
     };
   }, []);
-  // The water's standing motion: bubbles rise, weed and light sway, the fish flex and the lock ring turns.
+  // The sky's standing motion: specks drift up, the light sways, the balloons wobble and the lock ring turns.
   useEffect(() => {
     if (calm) return;
     const loop = (v: Animated.Value, ms: number) => Animated.loop(Animated.timing(v, { toValue: 1, duration: ms, easing: Easing.linear, useNativeDriver: true }));
@@ -157,7 +158,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     return () => all.forEach((a) => a.stop());
   }, [calm, flow, sway, flex, turn]);
 
-  // Keep a school swimming: take out the fish that have left the scene (or have popped), bring new ones in.
+  // Keep a flock floating: take out the balloons that have left the scene (or have popped), bring new ones in.
   useEffect(() => {
     if (!width) return;
     const spawn = (first: boolean, others: Fish[]): Fish => {
@@ -165,7 +166,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
       const size = Math.round(kind.size * scale);
       const dir = Math.random() < 0.5 ? 1 : -1;
       const edge = size / 2 + 16;
-      // Each fish has its own pace around its kind's.
+      // Each balloon has its own pace around its kind's.
       const dur = kind.cross * 1000 * (0.86 + Math.random() * 0.28);
       const swim: Swim = {
         dir,
@@ -176,7 +177,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
         bobs: dur / (2100 + Math.random() * 1300),
         phase: Math.random(),
       };
-      // The first school starts spread across the scene; later fish enter from the edge.
+      // The first flock starts spread across the scene; later balloons enter from the edge.
       const p0 = first ? 0.1 + Math.random() * 0.75 : 0;
       const p = new Animated.Value(p0);
       const r = swimRanges(swim);
@@ -220,7 +221,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     return () => clearInterval(id);
   }, [width, top, bottom, scale]);
 
-  // Freeze: every fish stops where it is and swims on when the ice melts.
+  // Freeze: every balloon stops where it is and floats on when the ice melts.
   useEffect(() => {
     const left = frozenUntil - Date.now();
     if (left <= 0) return;
@@ -252,7 +253,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     if (calm) aim.setValue(aimNow.current);
     else Animated.timing(aim, { toValue: aimNow.current, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   };
-  /** Something left in the water where a shot landed. */
+  /** Something left in the air where a shot landed. */
   const burst = (kind: Burst['kind'], x: number, y: number, amount = 0, coinCount = 0) => {
     if (calm && kind !== 'catch') return;
     const ms = kind === 'catch' ? 1050 : 460;
@@ -309,7 +310,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     pressHaptic();
     setNote(null);
     const payout = r.row.payout;
-    // The round is settled; the shot leaves now, aimed where the fish will be when it gets there.
+    // The round is settled; the shot leaves now, aimed where the balloon will be when it gets there.
     const swimming = runs.current.get(target.key)?.on ?? false;
     const rad = (aimNow.current * Math.PI) / 180;
     const to = leadShot(target.swim, progress(target), swimming ? 1 / target.dur : 0, cx + Math.sin(rad) * BARREL, cy - Math.cos(rad) * BARREL);
@@ -322,7 +323,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
         settle(l);
         setSession((s) => ({ shots: s.shots + 1, net: s.net + payout - bet }));
         if (payout > 0) {
-          // Caught: the fish stops, flashes and bursts into coins where it was hit.
+          // Hit: the balloon stops, flashes and bursts into coins where it was hit.
           halt(target);
           change((list) => list.map((f) => (f.key === target.key ? { ...f, gone: Date.now() } : f)));
           setLockKey((k) => (k === target.key ? null : k));
@@ -332,12 +333,12 @@ export function FishPlayer({ entry }: { entry: Entry }) {
           playSfx('splash', 0.9);
           timers.current.push(setTimeout(() => alive.current && playSfx('coin', 0.8), 150));
           if (payout >= bet * BIG_CATCH) {
-            // The fish is seen bursting first; then the catch takes the stage (and Oto waits for it).
+            // The balloon is seen bursting first; then the win takes the stage (and Oto waits for it).
             cheering.current = true;
             timers.current.push(setTimeout(() => alive.current && void win.celebrate({ amount: payout, bet }).then(() => (cheering.current = false)), calm ? 0 : 700));
           } else successHaptic();
         } else {
-          // Missed: a small splash, and the fish flinches and swims on.
+          // Missed: a small puff, and the balloon wobbles and floats on.
           burst('miss', to.x, to.y);
           playSfx('splash', 0.2);
           if (!calm) {
@@ -369,13 +370,13 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     void fire(hit, { x, y });
   };
 
-  // Oto: fire at the locked fish, else at a random fish on screen; stops at the loss limit or any refusal.
+  // Oto: fire at the locked balloon, else at a random balloon on screen; stops at the loss limit or any refusal.
   useEffect(() => {
     if (!auto) return;
     autoNet.current = 0;
     const id = setInterval(
       () => {
-        // A big catch is being celebrated: the cannon waits for it.
+        // A big win is being celebrated: the cannon waits for it.
         if (cheering.current) return;
         const live = fishRef.current
           .filter((f) => !f.gone && !pending.current.has(f.key))
@@ -395,7 +396,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
       liveMode() ? LIVE_AUTO_EVERY : AUTO_EVERY,
     );
     return () => clearInterval(id);
-    // fire reads the latest fish through refs; restarting on every render would reset the loss count.
+    // fire reads the latest balloons through refs; restarting on every render would reset the loss count.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, lockKey, lockOn, bet, width]);
 
@@ -413,13 +414,13 @@ export function FishPlayer({ entry }: { entry: Entry }) {
     setFrozenUntil(Date.now() + FREEZE_MS);
     setFreezeReady(Date.now() + FREEZE_COOLDOWN);
   };
-  // The big fish swim behind the small ones, so a small one is never hidden.
+  // The big balloons float behind the small ones, so a small one is never hidden.
   const school = [...fish].sort((a, b) => b.size - a.size);
 
   return (
     <View style={{ gap: 10 }}>
       <View style={[f.scene, { height }]} onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}>
-        {width > 0 && <Water w={width} h={height} still={calm} flow={flow} sway={sway} />}
+        {width > 0 && <Sky w={width} h={height} still={calm} flow={flow} sway={sway} />}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {school.map((x) => (
             <FishSprite key={x.key} fish={x} locked={x.key === lockKey} flex={flex} turn={turn} />
@@ -433,7 +434,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
         </View>
         <Frost on={frost} />
         {/* A responder view, not a Pressable: press events on web carry no tap position. */}
-        <View style={StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={onTap} accessibilityRole="button" accessibilityLabel="Ateş etmek için bir balığa dokun" />
+        <View style={StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={onTap} accessibilityRole="button" accessibilityLabel="Ateş etmek için bir balona dokun" />
         <Cannon aim={aim} kick={kick} />
 
         <View style={f.stats} pointerEvents="none" accessibilityLabel={`Bu oturum ${session.shots} atış, net ${session.net} jeton`}>
@@ -451,7 +452,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
         </View>
         {session.shots === 0 && !note && (
           <View style={f.hint} pointerEvents="none">
-            <Text style={f.hintText}>Bir balığa dokun · atış {fmt(bet)} jeton</Text>
+            <Text style={f.hintText}>Bir balona dokun · atış {fmt(bet)} jeton</Text>
           </View>
         )}
         {note && (
@@ -471,12 +472,12 @@ export function FishPlayer({ entry }: { entry: Entry }) {
             style={[f.card, lockOn && { backgroundColor: '#BE123C', borderColor: '#FECDD3' }]}
             accessibilityRole="button"
             accessibilityState={{ selected: lockOn }}
-            accessibilityLabel={lockOn ? 'Kilidi kapat' : 'Hedef kilidi: Oto bir balığa ateş eder'}
+            accessibilityLabel={lockOn ? 'Kilidi kapat' : 'Hedef kilidi: Oto bir balona ateş eder'}
           >
             <Ionicons name="locate" size={21} color={lockOn ? '#fff' : '#FDA4AF'} />
             <Text style={f.cardText}>{lockOn ? (lockKey === null ? 'Seç' : 'Kilitli') : 'Kilit'}</Text>
           </Pressable>
-          <Pressable onPress={freeze} style={[f.card, frozen && { backgroundColor: '#0369A1', borderColor: '#E0F2FE' }, !frozen && freezeWait > 0 && { opacity: 0.55 }]} accessibilityRole="button" accessibilityState={{ disabled: frozen || freezeWait > 0 }} accessibilityLabel="Balıkları dondur">
+          <Pressable onPress={freeze} style={[f.card, frozen && { backgroundColor: '#0369A1', borderColor: '#E0F2FE' }, !frozen && freezeWait > 0 && { opacity: 0.55 }]} accessibilityRole="button" accessibilityState={{ disabled: frozen || freezeWait > 0 }} accessibilityLabel="Balonları dondur">
             <Ionicons name="snow" size={21} color={frozen ? '#fff' : ICE} />
             <Text style={f.cardText}>{frozen ? `${freezeLeft} sn` : freezeWait > 0 ? `${freezeWait} sn` : 'Dondur'}</Text>
           </Pressable>
@@ -506,12 +507,12 @@ export function FishPlayer({ entry }: { entry: Entry }) {
 
       <GameInfoSheet visible={info} onClose={() => setInfo(false)} title={game.name} rules={game.rules}>
         <View style={f.pays}>
-          <Text style={f.paysHead}>Balıklar · {fmt(bet)} jeton atışta</Text>
+          <Text style={f.paysHead}>Balonlar · {fmt(bet)} jeton atışta</Text>
           <View style={f.payRow}>
             <View style={{ width: 30 }} />
-            <Text style={[f.payName, f.payDim]}>Balık</Text>
+            <Text style={[f.payName, f.payDim]}>Balon</Text>
             <Text style={[f.payCell, f.payDim]}>Öder</Text>
-            <Text style={[f.payCell, f.payDim]}>Yakalanma</Text>
+            <Text style={[f.payCell, f.payDim]}>Vurulma</Text>
             <Text style={[f.payCell, f.payDim, { flex: 1.2 }]}>Kazanç</Text>
           </View>
           {FISH.map((x) => (
@@ -525,7 +526,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
               <Text style={[f.payCell, { color: '#FDE68A', flex: 1.2 }]}>{fmt(x.mult * bet)}</Text>
             </View>
           ))}
-          <Text style={f.paysNote}>Boş suya giden atış ücretsizdir. Kilit açıkken dokunduğun balık hedef olur ve Oto yalnızca ona ateş eder. Dondur balıkları {FREEZE_MS / 1000} saniye durdurur, {FREEZE_COOLDOWN / 1000} saniyede bir kullanılır. İkisi de yakalanma şansını değiştirmez.</Text>
+          <Text style={f.paysNote}>Boşluğa giden atış ücretsizdir. Kilit açıkken dokunduğun balon hedef olur ve Oto yalnızca ona ateş eder. Dondur balonları {FREEZE_MS / 1000} saniye durdurur, {FREEZE_COOLDOWN / 1000} saniyede bir kullanılır. İkisi de vurulma şansını değiştirmez.</Text>
           <Text style={f.paysNote}>
             Oto art arda ateş eder; {AUTO_LOSS} atışlık kayıpta ya da tur kabul edilmediğinde kendiliğinden durur.
           </Text>
@@ -536,7 +537,7 @@ export function FishPlayer({ entry }: { entry: Entry }) {
 }
 
 const f = StyleSheet.create({
-  scene: { borderRadius: 22, overflow: 'hidden', backgroundColor: '#0A2C6E' },
+  scene: { borderRadius: 22, overflow: 'hidden', backgroundColor: '#2563EB' },
   stats: { position: 'absolute', left: 10, top: 10, height: 32, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, paddingHorizontal: 12, backgroundColor: 'rgba(4,14,44,0.55)' },
   statHead: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   statValue: { color: '#fff', fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },

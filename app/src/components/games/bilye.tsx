@@ -1,4 +1,4 @@
-// Bilye Şelalesi: the marble board (lib/bilye). Pick the launch strength and the stake, then launch. Where the ball
+// Pachinko: the marble board (lib/bilye). Pick the launch strength and the stake, then launch. Where the ball
 // ends is drawn by playRound before anything moves (the server in a live build); the ball then flies a real path of
 // the board's simulation into that target (lib/bilye/path): up the channel, over the rail, bouncing off the pegs
 // into a pocket or a cup. Oto launches again and stops at the loss limit or any refusal. No tilt or shake control.
@@ -218,7 +218,7 @@ export function BilyePlayer({ entry }: { entry: Entry }) {
         <View style={s.head}>
           <View style={{ flex: 1 }}>
             <Text style={s.title} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header">
-              BİLYE ŞELALESİ
+              PACHINKO
             </Text>
             <Text style={[s.status, status.tone === 'win' && { color: '#86EFAC' }, status.tone === 'err' && { color: '#FDA4AF' }]} numberOfLines={2} accessibilityLiveRegion="polite">
               {status.text}

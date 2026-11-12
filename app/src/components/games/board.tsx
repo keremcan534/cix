@@ -1,4 +1,4 @@
-// Screen for the bet boards (lib/board-games): Gece Yarısı Çarkı's fruit wheel, Liman Pazarı and Sihir Destesi. Pick
+// Screen for the bet boards (lib/board-games): Gece Yarısı Çarkı's fruit wheel, Lezzet Çarkı and Sihir Destesi. Pick
 // a chip, tap options to put it on them (several options a round), then play: playBoardRound draws one result and
 // settles every bet before anything moves; the wheel, the running light and the card only show that result.
 // Tekrar plays the last round's bets again. Every option returns at most 40 % on its own (house rule).
@@ -52,11 +52,11 @@ type Look = {
 };
 const LOOKS: Record<BoardId, Look> = {
   slot: { title: 'Gece Yarısı Çarkı', colors: ['#2B1065', '#4C1D95', '#1E0B45'], frame: '#FACC15', ink: '#FDE68A', deep: '#1E0B45', halo: '#A78BFA', play: ['#C026D3', '#7E22CE'], verb: 'Çevir', hint: 'Fişini seç, meyvene koy', running: 'Çark dönüyor…' },
-  foodwheel: { title: 'Liman Pazarı', colors: ['#4C1D95', '#7E22CE', '#312E81'], frame: '#F0ABFC', ink: '#FDE68A', deep: '#3B0764', halo: '#F0ABFC', play: ['#DB2777', '#9D174D'], verb: 'Çevir', hint: 'Fişini seç, yemeğine koy', running: 'Işık dolaşıyor…' },
+  foodwheel: { title: 'Lezzet Çarkı', colors: ['#4C1D95', '#7E22CE', '#312E81'], frame: '#F0ABFC', ink: '#FDE68A', deep: '#3B0764', halo: '#F0ABFC', play: ['#DB2777', '#9D174D'], verb: 'Çevir', hint: 'Fişini seç, yemeğine koy', running: 'Işık dolaşıyor…' },
   magiccard: { title: 'Sihir Destesi', colors: ['#3B0764', '#581C87', '#1E1B4B'], frame: '#FACC15', ink: '#FDE68A', deep: '#1E1B4B', halo: '#C084FC', play: ['#A16207', '#713F12'], verb: 'Kartı aç', hint: 'Fişini seç, kartına koy', running: 'Kart çekiliyor…' },
 };
 
-/** Each option's own color: its card's rim and its slices on the wheel. Liman's greens win with Salata, its reds with Pizza. */
+/** Each option's own color: its card's rim and its slices on the wheel. Lezzet Çarkı's greens win with Salata, its reds with Pizza. */
 const ACCENT: Record<string, string> = {
   melon: '#4ADE80',
   seven: '#FACC15',
@@ -70,7 +70,7 @@ const ACCENT: Record<string, string> = {
   mushroom: '#4ADE80',
   cabbage: '#4ADE80',
 };
-/** The order the light travels in: round the ring for Liman, round the two rows of cards for Sihir. */
+/** The order the light travels in: round the ring for Lezzet Çarkı, round the two rows of cards for Sihir. */
 const RING: Record<Exclude<BoardId, 'slot'>, string[]> = {
   foodwheel: BOARDS.foodwheel.options.map((o) => o.id),
   magiccard: [0, 1, 2, 3, 7, 6, 5, 4].map((i) => BOARDS.magiccard.options[i].id),
@@ -682,7 +682,7 @@ const STARS: [number, number, number][] = [
   [0.5, 0.1, 2],
 ];
 
-/** The plate in the middle of Liman's ring: what the round served (a dish, Salata, Pizza or the empty plate). */
+/** The plate in the middle of Lezzet Çarkı's ring: what the round served (a dish, Salata, Pizza or the empty plate). */
 function Plate({ size, box, middle, running, result, wins, ink }: { size: number; box: number; middle: Animated.Value; running: boolean; result: BoardResult | null; wins: boolean; ink: string }) {
   return (
     <Animated.View

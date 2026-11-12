@@ -1,4 +1,4 @@
-// Bilye Şelalesi on the server: a launch's round. The same rules as the app's (app/src/lib/bilye/rules.ts); the
+// Pachinko on the server: a launch's round. The same rules as the app's (app/src/lib/bilye/rules.ts); the
 // app's tests/casino-server.test.ts keeps them equal, draw for draw, so the screen flies the ball into the target
 // the server drew. The weights come from the app's simulation of the board (bilye-table.mjs, generated) and give
 // every launch strength an expected return of at most 40 % (the house rule of every coin game).
