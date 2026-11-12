@@ -21,7 +21,9 @@ import { MessageText } from '@/components/ReactionArt';
 import { stickerIdOf } from '@/lib/stickers';
 import { Avatar } from '@/components/ui';
 import { Icon3D } from '@/components/Icon3D';
-import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import { BOT_LINES, DM_PRICE, FOLLOWS_ME, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
+import { openEvents } from '@/components/events/open';
+import { whenText } from '@/lib/events';
 import { messageTime } from '@/data/messages-ui';
 import { showAlert } from '@/lib/alert';
 import { copyText } from '@/lib/clipboard';
@@ -118,31 +120,38 @@ export function ChatThread({
     setRefused(null);
   };
   const thread = `dm:${user.id}`;
-  const deliver = (text: string, ref: string) =>
-    liveDm(user.id, text, ref, (r: SendResult) => {
-      if (r.ok) {
-        markMessageSent(user.id, ref, r.message);
-        // A paid message: the balance and the heart moved.
-        if (price > 0) {
-          void refreshWallet().catch(() => {});
-          reload();
+  const deliver = (text: string, ref: string, event?: number) =>
+    liveDm(
+      user.id,
+      text,
+      ref,
+      (r: SendResult) => {
+        if (r.ok) {
+          markMessageSent(user.id, ref, r.message);
+          // A paid message: the balance and the heart moved.
+          if (price > 0) {
+            void refreshWallet().catch(() => {});
+            reload();
+          }
+          return;
         }
-        return;
-      }
-      setMessageFailed(user.id, ref, r.reason, r.retry);
-      if (r.coins) showAlert('Yetersiz jeton', `Bu sohbette mesaj başı ${price} jeton.`, [{ text: 'Vazgeç', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }]);
-      // The server refused contact details the app let through (an older rule on this phone): the bubble says
-      // why, and the text comes back into an empty input to be changed.
-      if (!r.contact) return;
-      setRefused(r.reason);
-      setDraft((d) => d || text);
-    });
+        setMessageFailed(user.id, ref, r.reason, r.retry);
+        if (r.coins) showAlert('Yetersiz jeton', `Bu sohbette mesaj başı ${price} jeton.`, [{ text: 'Vazgeç', style: 'cancel' }, { text: 'Jeton yükle', onPress: () => router.push('/cuzdan') }]);
+        // The server refused contact details the app let through (an older rule on this phone): the bubble says
+        // why, and the text comes back into an empty input to be changed.
+        if (!r.contact) return;
+        setRefused(r.reason);
+        setDraft((d) => d || text);
+      },
+      event,
+    );
   const retry = (m: ChatMessage) => {
     if (!m.ref || m.noRetry) return;
     const refusal = messageRefusal(thread, m.text, 'dm');
     if (refusal) return setRefused(refusal);
     setMessageFailed(user.id, m.ref, null);
-    deliver(m.text, m.ref);
+    // A shared event goes again with its event.
+    deliver(m.text, m.ref, m.event?.id);
   };
 
   // Long press on a bubble: copy, report (the other person's message), delete on this phone.
@@ -298,6 +307,7 @@ export function ChatThread({
                   {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
                   {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={styles.bubbleText} />}
                   {item.room && <RoomCard room={item.room} />}
+                  {item.event && <EventCard event={item.event} />}
                   <Text style={styles.time}>
                     {messageTime(item)}{' '}
                     {item.failed ? (
@@ -325,6 +335,7 @@ export function ChatThread({
                   {!!item.image && <Image source={{ uri: item.image }} style={styles.photo} resizeMode="cover" accessibilityLabel="Fotoğraf" />}
                   {!(item.image && item.text === 'Fotoğraf') && <MessageText text={item.text} style={[styles.bubbleText, styles.theirsText]} />}
                   {item.room && <RoomCard room={item.room} theirs />}
+                  {item.event && <EventCard event={item.event} theirs />}
                   <Text style={[styles.time, styles.theirsTime]}>{messageTime(item)}</Text>
                 </Pressable>
                 <SafetyNote
@@ -453,6 +464,28 @@ function RoomCard({ room, theirs }: { room: RoomInviteCard; theirs?: boolean }) 
   );
 }
 
+/** An event sent from its detail's "Arkadaşına gönder": opens it in Etkinlik Merkezi (which shows its state now). */
+function EventCard({ event, theirs }: { event: EventShareCard; theirs?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  return (
+    <Pressable onPress={() => openEvents({ id: event.id })} style={[styles.roomCard, theirs && styles.roomCardTheirs]} accessibilityRole="button" accessibilityLabel={`${event.title} etkinliğini aç`}>
+      <View style={styles.eventIcon}>
+        <Ionicons name="calendar" size={22} color="#fff" />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.roomTitle, theirs && styles.theirsText]} numberOfLines={1}>
+          {event.title}
+        </Text>
+        <Text style={[styles.roomJoin, theirs && styles.roomJoinTheirs]} numberOfLines={1}>
+          {event.startsAt ? `${whenText(event.startsAt)} · Etkinliği gör` : 'Etkinliği gör'}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theirs ? colors.text : '#fff'} />
+    </Pressable>
+  );
+}
+
 function SafetyNote({ text, onReport }: { text: string; onReport: () => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
@@ -495,6 +528,7 @@ const useStyles = makeStyles(({ colors, lift, ink, dark }) => ({
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.25)', minWidth: 200 },
   roomCardTheirs: { backgroundColor: dark ? 'rgba(0,0,0,0.25)' : colors.cardAlt },
   roomCover: { width: 44, height: 44, borderRadius: 10 },
+  eventIcon: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7C3AED' },
   roomTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
   roomJoin: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
   roomJoinTheirs: { color: ink(0.8) },

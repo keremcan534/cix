@@ -3,6 +3,7 @@
 // and its dryRun preview is what the admin confirms; these only keep the panel honest before anyone taps.
 // Times are Istanbul time (UTC+3 all year since 2016), whatever the phone's own time zone.
 import type { CatalogCampaign, EventKey, LiveKey, LiveValue, OneOnOneKey, RewardKey, RoomKey } from '@/lib/api';
+import { REMINDER_LABEL } from '@/lib/events';
 import { RULES } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { campaignCoins } from '@/lib/live/catalog-live';
@@ -121,8 +122,9 @@ export const DECOR_NUMBER_KEYS: { key: 'room_bg_custom_price' | 'room_bg_custom_
   { key: 'room_bg_custom_days', unit: ' gün' },
 ];
 
-/** Etkinlik Merkezi's limits (server/api/live-registry.mjs EVENT_RULES), in card order, with each one's unit. */
-export const EVENT_NUMBER_KEYS: { key: EventKey; unit: string }[] = [
+/** Etkinlik Merkezi's limits (server/api/live-registry.mjs EVENT_RULES), in card order, with each one's unit. The
+ *  reminders switched off for everyone (event_reminders_off) are the card's switches. */
+export const EVENT_NUMBER_KEYS: { key: Exclude<EventKey, 'event_reminders_off'>; unit: string }[] = [
   { key: 'event_min_room_level', unit: '' },
   { key: 'event_min_lead_minutes', unit: ' dakika' },
   { key: 'event_max_minutes', unit: ' dakika' },
@@ -289,6 +291,8 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `30 günde ${fmtNum(v)} ihlal` : String(v);
     case 'event_block_days':
       return typeof v === 'number' ? `${fmtNum(v)} gün` : String(v);
+    case 'event_reminders_off':
+      return Array.isArray(v) && v.length ? `Kapalı: ${v.map((k) => REMINDER_LABEL[k as keyof typeof REMINDER_LABEL] ?? k).join(', ')}` : 'Hepsi açık';
     default:
       return String(v);
   }

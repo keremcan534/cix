@@ -1,6 +1,7 @@
 // Etkinlik Merkezi: the pure rules (no database, no core.mjs), so the server, its tests and the app's tests read the
 // same: the themes and the room level each needs, what an event's row means on a screen, the time windows of the
-// list's filters, and the checks on an application's time, length and size. The routes are in events.mjs.
+// list's filters, the checks on an application's time, length and size, when each reminder is due, and the report's
+// periods. The routes are in events.mjs.
 
 /**
  * The themes an event can wear in its room (the app draws them: lib/events THEME_LOOK). A theme opens at a room
@@ -98,3 +99,44 @@ export function planError({ startsAt, minutes, capacity }, now, r) {
 
 /** Whether the organiser may start an approved event at `now` (from EARLY_START_MINUTES before to the grace after). */
 export const mayStartAt = (startsAt, now, graceMinutes) => now >= startsAt - EARLY_START_MINUTES * MINUTE && now <= startsAt + graceMinutes * MINUTE;
+
+// --- Reminders ----------------------------------------------------------------------------------------------------
+/**
+ * The reminders a confirmed place gets: 1 hour and 15 minutes before, and when the event starts. Canlı ayarlar ›
+ * Etkinlikler turns each one off for everyone (event_reminders_off); a person turns them off for one event or for all.
+ */
+export const REMINDER_KINDS = ['hour', 'quarter', 'start'];
+export const REMINDER_LABEL = { hour: '1 saat önce', quarter: '15 dakika önce', start: 'Başlarken' };
+/** Before the start, a reminder is due from `before` minutes ahead until the next one's moment. */
+const REMINDER_WINDOWS = [
+  { kind: 'hour', before: 60, until: 15 },
+  { kind: 'quarter', before: 15, until: 0 },
+];
+
+/**
+ * The reminder due at `now` for a confirmed place, or null (all times ms; `startedAt` null while it hasn't started).
+ * Before the start: the window `now` is in, if the place was taken before that window opened (someone who reserves
+ * 40 minutes ahead gets only the 15-minute one). Once it runs: the start one. A start time that came without the event
+ * starting waits for the real start. `on`: the kinds the platform sends. Whether it went already is the database's
+ * (event_reminders_sent), so a restart or two sweeps never send one twice.
+ */
+export function reminderDue({ startsAt, startedAt, reservedAt }, now, on = REMINDER_KINDS) {
+  if (startedAt) return on.includes('start') ? 'start' : null;
+  const left = startsAt - now;
+  const w = REMINDER_WINDOWS.find((x) => left <= x.before * MINUTE && left > x.until * MINUTE);
+  if (!w || !on.includes(w.kind) || reservedAt > startsAt - w.before * MINUTE) return null;
+  return w.kind;
+}
+
+/** A reminder's push and notice: its title and line, with the time really left (`left` ms) before the start. */
+export function reminderText(kind, title, left) {
+  if (kind === 'start') return { title: 'Etkinlik başladı', body: `“${title}” başladı, odasına girip katılabilirsin.` };
+  const m = Math.max(1, Math.round(left / MINUTE));
+  return { title: 'Etkinlik hatırlatması', body: `“${title}” ${m >= 55 ? '1 saat' : `${m} dakika`} sonra başlıyor.` };
+}
+
+// --- Reports ------------------------------------------------------------------------------------------------------
+/** The report's periods (days back from now). */
+export const REPORT_DAYS = [7, 30, 90];
+/** a / b to three decimals, or null when there is nothing to divide by. */
+export const ratio = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 1000 : null);

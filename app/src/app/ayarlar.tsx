@@ -23,6 +23,7 @@ import { testLine, useLineState } from '@/lib/live/live-line';
 import { confirmDeleteLiveAccount, liveSignOut } from '@/lib/live/account';
 import { useStaffRole } from '@/lib/live/admin';
 import { useLivePrivacy, usePrivacySetter, type PrivacyKey } from '@/lib/live/privacy';
+import { useEventReminderSetting } from '@/lib/live/event-reminders';
 import { type CodeKind } from '@/lib/live/account';
 import { useRemoteConfig } from '@/lib/remote-control';
 import { useAppUpdate, versionLabel } from '@/lib/app-update';
@@ -55,6 +56,7 @@ function PrivacyToggle({ k, ...row }: { k: BoolKey & PrivacyKey; title: string; 
 const NOTIFY_ROWS: [NotifyType, string, IconName][] = [
   ['live', 'Takip ettiklerin canlı yayında', 'radio-outline'],
   ['invite', 'Oda ve arkadaş davetleri', 'mail-outline'],
+  // Etkinlik Merkezi: 1 hour and 15 minutes before and at the start of events I have a place at (server-kept in a live build).
   ['event', 'Etkinlik hatırlatmaları', 'calendar-outline'],
   ['agency', 'Ajans duyuruları', 'business-outline'],
   ['fanclub', 'Hayran kulübü', 'heart-outline'],
@@ -189,6 +191,8 @@ export default function SettingsScreen() {
   // Live: Gizlilik and "Kimler ulaşabilir" come from the server and are saved there (lib/live/privacy).
   useLivePrivacy();
   const setPrivacy = usePrivacySetter();
+  // Live: Etkinlik hatırlatmaları is the server's (it sends them; lib/live/event-reminders).
+  const setEventReminders = useEventReminderSetting();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -419,10 +423,10 @@ export default function SettingsScreen() {
               key={k}
               icon={icon}
               title={title}
-              subtitle={LOCKED_NOTIFY.includes(k) ? 'Her zaman açık' : undefined}
+              subtitle={LOCKED_NOTIFY.includes(k) ? 'Her zaman açık' : k === 'event' ? 'Yer ayırttığın etkinlikler başlamadan ve başlarken' : undefined}
               value={settings.notifyTypes[k]}
               disabled={LOCKED_NOTIFY.includes(k)}
-              onChange={(v) => setSetting('notifyTypes', { ...settings.notifyTypes, [k]: v })}
+              onChange={(v) => (k === 'event' ? setEventReminders(v) : setSetting('notifyTypes', { ...settings.notifyTypes, [k]: v }))}
             />
           ))}
           <ListBlock title={snoozed ? `Ertelendi · ${snoozedUntil} saatine kadar` : 'Bildirimleri ertele'}>

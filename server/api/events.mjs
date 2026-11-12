@@ -17,19 +17,46 @@
 //   POST /api/events/reserve  { id }             → { event }
 //   POST /api/events/unreserve { id }            → { event }
 //   POST /api/events/here     { id }             → { counted }  I am in its room while it runs
+//   POST /api/events/remind   { id, on }         → { event }   this place's reminders on or off
+//   GET  /api/events/reminders                   → { on, kinds }  my reminders for every event, the kinds sent
+//   POST /api/events/reminders { on }            → { on, kinds }  (Ayarlar › Bildirimler › Etkinlik hatırlatmaları)
+//   GET  /api/events/report?days=&room=          → { report, rooms }  the events of the rooms I own (7, 30, 90 days)
 //   GET  /api/admin/events?status=&q=&skip=      → { events, counts, more }                 (admin)
 //   POST /api/admin/events/review { id, approve, reason? } → { event }                    (admin)
 //   POST /api/admin/events/remove { id, reason }           → { event }                    (admin)
 //   GET  /api/admin/events/categories             → { categories }                          (admin)
 //   POST /api/admin/events/categories { id?, name, icon, theme, sort, active } → { category } (admin)
 //   POST /api/admin/events/categories/remove { id } → { removed }                            (admin)
+//   GET  /api/admin/events/report?days=          → { report }                                  (admin) every room
 //
 // The server alone decides an event's state: the app's clock and timer only show it. A sweep (EVENT_SWEEP_MS) starts
 // events whose time has come in an open room, ends those past their time, and ends those left unstarted past the
 // grace (a strike for the owner). Closing the room, the room resting without its staff (room-autoclose.mjs), or
 // LiveKit closing an empty one ends its running event.
+// The sweep also sends the reminders (remindEvents): people with a confirmed place hear of it 1 hour and 15 minutes
+// before and when it starts (Canlı ayarlar › Etkinlikler event_reminders_off; each person may turn them off for one
+// event or for all), as a push that also reaches the open app (push.mjs notify) and a personal notice in Similar
+// Ekibi. event_reminders_sent keeps each one sent, so none goes twice. A cancelled event is told the same way.
 // Texts are public: they pass the contact filter (core.mjs publicText).
-import { DAY, ENDED_LISTED_DAYS, MAX_OPEN_PER_ROOM, MINUTE, STATE_LABEL, THEMES, mayStartAt, offsetOf, planError, stateOf, themeOf, windowOf } from './event-rules.mjs';
+import {
+  DAY,
+  ENDED_LISTED_DAYS,
+  MAX_OPEN_PER_ROOM,
+  MINUTE,
+  REMINDER_KINDS,
+  REPORT_DAYS,
+  STATE_LABEL,
+  THEMES,
+  mayStartAt,
+  offsetOf,
+  planError,
+  ratio,
+  reminderDue,
+  reminderText,
+  stateOf,
+  themeOf,
+  windowOf,
+} from './event-rules.mjs';
 import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, text, tx } from './core.mjs';
 import { announceRoom, openVoiceRooms, presenceTracked } from './live.mjs';
 import { live } from './live-settings.mjs';
@@ -52,6 +79,8 @@ function rules() {
     grace: s.eventGrace,
     strikeLimit: s.eventStrikeLimit,
     blockDays: s.eventBlockDays,
+    // The reminders sent to everyone (the ones not switched off).
+    reminders: REMINDER_KINDS.filter((k) => !s.eventRemindersOff.has(k)),
   };
 }
 
@@ -104,6 +133,13 @@ async function rowOf(id, me, c = db) {
   return r.rows[0];
 }
 const log = (c, id, actor, action, detail = {}) => c.query('INSERT INTO event_log (event_id, actor, action, detail) VALUES ($1, $2, $3, $4)', [id, actor, action, JSON.stringify(detail)]);
+/** A personal notice for each of `ids` in Similar Ekibi (where the app shows one person's notices), opening the event. */
+const placeNotices = (c, ids, eventId, title, body) =>
+  ids.length
+    ? c.query("INSERT INTO team_notices (kind, title, body, link, target) SELECT 'event', $2, $3, $4, t FROM unnest($1::uuid[]) t", [ids, title, body.slice(0, 1000), `/?etkinlik=${eventId}`])
+    : null;
+/** The line told to people whose place went with a cancelled event. */
+const cancelText = (title, reason) => (reason ? `“${title}” iptal edildi. Neden: ${reason}` : `“${title}” iptal edildi.`);
 
 /** What `me` may see and do with row `e`: my rank in its room, whether I am an admin; a 404 when it isn't mine to see. */
 async function accessOf(e, me) {
@@ -141,6 +177,13 @@ async function detail(id, me) {
     startFrom: iso(new Date(e.starts_at).getTime() - 10 * MINUTE),
     startUntil: iso(new Date(e.starts_at).getTime() + r.grace * MINUTE),
   };
+  // My reminders: this place's (null without a confirmed place), every event's (Ayarlar), and the kinds sent.
+  const place = e.my_reservation === 'confirmed' ? (await db.query('SELECT remind FROM event_reservations WHERE event_id = $1 AND user_id = $2', [e.id, me.id])).rows[0] : null;
+  out.remind = place ? place.remind : null;
+  out.remindersOff = (await db.query('SELECT 1 FROM event_reminder_optout WHERE user_id = $1', [me.id])).rowCount > 0;
+  out.reminders = r.reminders;
+  // Taken down by the platform (not cancelled by its organiser): a shared link says so.
+  out.removed = e.status === 'cancelled' && (await db.query("SELECT 1 FROM event_log WHERE event_id = $1 AND action = 'remove' LIMIT 1", [e.id])).rowCount > 0;
   if (a.rank >= 1 || a.admin) {
     const h = await db.query('SELECT l.action, l.detail, l.created_at, u.name FROM event_log l LEFT JOIN users u ON u.id = l.actor WHERE l.event_id = $1 ORDER BY l.id DESC LIMIT 30', [e.id]);
     out.history = h.rows.map((x) => ({ action: x.action, by: x.name ?? 'Sistem', at: iso(x.created_at), detail: x.detail }));
@@ -250,7 +293,62 @@ async function voiceOpen(roomId, openNames) {
   return (await db.query('SELECT 1 FROM room_presence WHERE room = $1 LIMIT 1', [liveKitName(roomId)])).rowCount > 0;
 }
 
-/** One pass of the sweep: unstarted past the grace, due to start in an open room, past their end, in a closed room. */
+/**
+ * The reminders due now (event-rules.mjs reminderDue), each sent once: a confirmed place whose own reminders and
+ * whose person's are on, the kinds Canlı ayarlar sends. Writing event_reminders_sent first and telling only the rows
+ * it took means a restart or two sweeps at once never send one twice. Returns how many went.
+ */
+export async function remindEvents() {
+  const on = rules().reminders;
+  if (!on.length) return 0;
+  const now = Date.now();
+  // The places of events running or starting within the hour, without the reminder their moment calls for.
+  const r = await db.query(
+    `SELECT e.id, e.title, e.starts_at, e.started_at, x.user_id, x.created_at AS reserved_at
+       FROM events e
+       JOIN event_reservations x ON x.event_id = e.id AND x.status = 'confirmed' AND x.remind
+       JOIN users u ON u.id = x.user_id AND u.deleted_at IS NULL
+      WHERE e.status = 'approved' AND e.ended_at IS NULL
+        AND (e.started_at IS NOT NULL OR e.starts_at <= $1::timestamptz + interval '60 minutes')
+        AND NOT EXISTS (SELECT 1 FROM event_reminder_optout o WHERE o.user_id = x.user_id)
+        AND NOT EXISTS (
+          SELECT 1 FROM event_reminders_sent s WHERE s.event_id = e.id AND s.user_id = x.user_id AND s.starts_at = e.starts_at
+             AND s.kind = CASE WHEN e.started_at IS NOT NULL THEN 'start' WHEN e.starts_at <= $1::timestamptz + interval '15 minutes' THEN 'quarter' ELSE 'hour' END)
+      LIMIT 5000`,
+    [new Date(now)],
+  );
+  const due = r.rows
+    .map((x) => ({ ...x, kind: reminderDue({ startsAt: x.starts_at.getTime(), startedAt: x.started_at ? x.started_at.getTime() : null, reservedAt: x.reserved_at.getTime() }, now, on) }))
+    .filter((x) => x.kind)
+    // One order for every sweep, so two writing at once wait for each other instead of deadlocking.
+    .sort((a, b) => Number(a.id) - Number(b.id) || (a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0));
+  if (!due.length) return 0;
+  const of = new Map(due.map((x) => [Number(x.id), x]));
+  const groups = await tx(async (c) => {
+    const took = await c.query(
+      `INSERT INTO event_reminders_sent (event_id, user_id, kind, starts_at)
+       SELECT * FROM unnest($1::bigint[], $2::uuid[], $3::text[], $4::timestamptz[])
+       ON CONFLICT DO NOTHING RETURNING event_id, user_id, kind`,
+      [due.map((x) => x.id), due.map((x) => x.user_id), due.map((x) => x.kind), due.map((x) => x.starts_at)],
+    );
+    // One push and one line per event and kind.
+    const out = new Map();
+    for (const x of took.rows) {
+      const key = `${x.event_id}:${x.kind}`;
+      if (!out.has(key)) {
+        const e = of.get(Number(x.event_id));
+        out.set(key, { id: Number(x.event_id), kind: x.kind, text: reminderText(x.kind, e.title, e.starts_at.getTime() - now), users: [] });
+      }
+      out.get(key).users.push(x.user_id);
+    }
+    for (const g of out.values()) await placeNotices(c, g.users, g.id, g.text.title, g.text.body);
+    return [...out.values()];
+  });
+  for (const g of groups) notify(g.users, { ...g.text, data: { type: 'event', id: String(g.id), reminder: g.kind } });
+  return groups.reduce((n, g) => n + g.users.length, 0);
+}
+
+/** One pass of the sweep: unstarted past the grace, due to start in an open room, past their end, in a closed room; then the reminders. */
 export async function sweepEvents() {
   const r = rules();
   const late = await db.query("SELECT id FROM events WHERE status = 'approved' AND started_at IS NULL AND ended_at IS NULL AND starts_at < now() - make_interval(mins => $1)", [r.grace]);
@@ -284,6 +382,7 @@ export async function sweepEvents() {
     const room = await tx((c) => finish(c, id, closed ? 'room_closed' : 'time'));
     if (room) announceRoom(liveKitName(room));
   }
+  await remindEvents();
 }
 let timer = null;
 export function startEventSweep() {
@@ -337,7 +436,9 @@ export async function closeRoomEvents(roomId, actor) {
       const who = await tx(async (c) => {
         await c.query("UPDATE events SET status = 'cancelled', cancel_reason = 'Oda kapatıldı', cancelled_by = $2, cancelled_at = now(), updated_at = now() WHERE id = $1", [id, actor]);
         await log(c, id, actor, 'cancel', { reason: 'Oda kapatıldı' });
-        return (await c.query("SELECT user_id FROM event_reservations WHERE event_id = $1 AND status = 'confirmed'", [id])).rows.map((x) => x.user_id);
+        const ids = (await c.query("SELECT user_id FROM event_reservations WHERE event_id = $1 AND status = 'confirmed'", [id])).rows.map((x) => x.user_id);
+        await placeNotices(c, ids, id, 'Etkinlik iptal edildi', cancelText(title, 'Oda kapatıldı.'));
+        return ids;
       });
       if (who.length) notify(who, { title: 'Etkinlik iptal edildi', body: title, data: { type: 'event', id: String(id) } });
     }
@@ -375,6 +476,99 @@ async function adminOnly(req) {
   const u = await auth(req);
   if (u.role !== 'admin') throw new HttpError(403, 'Yönetici hesabı gerekli');
   return u;
+}
+
+// --- Reports -------------------------------------------------------------------------------------------------
+
+/** The report's period from a query value: 7, 30 or 90 days (30 when left out), else a 400. */
+function daysOf(v) {
+  const n = v === null || v === '' ? 30 : Number(v);
+  if (!REPORT_DAYS.includes(n)) throw new HttpError(400, 'Geçersiz dönem');
+  return n;
+}
+
+/**
+ * The events of the last `days` days, counted: those applied for then, and those whose start came then (drafts
+ * never sent are left out). Their outcome (approved at review, rejected, cancelled), places, the people who came,
+ * the attendance rate (came of those with a place, among events that ended), the average came per event that ran, the
+ * categories most people came to, how they ended, and the latest starts and ends. `owner`: only the rooms they own;
+ * `room`: only that room.
+ */
+async function report(days, { owner = null, room = null } = {}) {
+  const args = [days];
+  const where = ["e.status <> 'draft'", '(e.created_at >= now() - make_interval(days => $1) OR (e.starts_at >= now() - make_interval(days => $1) AND e.starts_at <= now()))'];
+  const scope = [];
+  if (owner) {
+    args.push(owner);
+    scope.push(`r.owner = $${args.length}`);
+  }
+  if (room) {
+    args.push(room);
+    scope.push(`e.room_id = $${args.length}`);
+  }
+  const rows = (
+    await db.query(
+      `SELECT e.id, e.category, c.name AS cat_name, e.status, e.started_at, e.ended_at, e.end_reason,
+              EXISTS (SELECT 1 FROM event_log l WHERE l.event_id = e.id AND l.action = 'approve') AS approved,
+              (SELECT count(*) FROM event_reservations x WHERE x.event_id = e.id AND x.status IN ('confirmed', 'attended', 'missed'))::int AS reserved,
+              (SELECT count(*) FROM event_reservations x WHERE x.event_id = e.id AND x.status = 'attended')::int AS attended,
+              (SELECT count(*) FROM event_reservations x WHERE x.event_id = e.id AND x.status = 'missed')::int AS missed,
+              (SELECT count(*) FROM event_participants q WHERE q.event_id = e.id)::int AS came
+         FROM events e JOIN rooms r ON r.id = e.room_id JOIN event_categories c ON c.id = e.category
+        WHERE ${[...where, ...scope].join(' AND ')}`,
+      args,
+    )
+  ).rows;
+  const sum = (f) => rows.reduce((n, x) => n + f(x), 0);
+  const count = (f) => rows.filter(f).length;
+  const ran = rows.filter((x) => x.started_at);
+  const attended = sum((x) => x.attended);
+  const missed = sum((x) => x.missed);
+  const cats = new Map();
+  for (const x of rows) {
+    const c = cats.get(x.category) ?? { id: x.category, name: x.cat_name, events: 0, reservations: 0, participants: 0 };
+    c.events += 1;
+    c.reservations += x.reserved;
+    c.participants += x.came;
+    cats.set(x.category, c);
+  }
+  const ends = { owner: 0, time: 0, room_closed: 0, not_started: 0, admin: 0 };
+  for (const x of rows) if (x.ended_at && x.end_reason in ends) ends[x.end_reason] += 1;
+  // The starts and ends in the period (by when they happened), newest first.
+  const records = await db.query(
+    `SELECT l.action, l.detail, l.created_at, u.name AS by_name, e.id, e.title, r.title AS room_title
+       FROM event_log l JOIN events e ON e.id = l.event_id JOIN rooms r ON r.id = e.room_id LEFT JOIN users u ON u.id = l.actor
+      WHERE l.action IN ('start', 'end', 'not_started') AND l.created_at >= now() - make_interval(days => $1) ${scope.map((x) => `AND ${x}`).join(' ')}
+      ORDER BY l.id DESC LIMIT 20`,
+    args,
+  );
+  const participants = sum((x) => x.came);
+  return {
+    days,
+    since: iso(Date.now() - days * DAY),
+    events: rows.length,
+    approved: count((x) => x.approved),
+    rejected: count((x) => x.status === 'rejected'),
+    cancelled: count((x) => x.status === 'cancelled'),
+    review: count((x) => x.status === 'review'),
+    started: ran.length,
+    reservations: sum((x) => x.reserved),
+    attended,
+    missed,
+    participants,
+    attendanceRate: ratio(attended, attended + missed),
+    avgParticipants: ran.length ? Math.round((participants / ran.length) * 10) / 10 : null,
+    categories: [...cats.values()].sort((a, b) => b.participants - a.participants || b.reservations - a.reservations || b.events - a.events || a.name.localeCompare(b.name, 'tr')).slice(0, 5),
+    ends,
+    records: records.rows.map((x) => ({
+      event: { id: Number(x.id), title: x.title },
+      room: x.room_title,
+      action: x.action,
+      reason: x.action === 'end' ? (x.detail?.reason ?? null) : null,
+      by: x.by_name ?? 'Sistem',
+      at: iso(x.created_at),
+    })),
+  };
 }
 
 /** Turns a 'category' name into a free id (Türkçe letters to plain ones). */
@@ -574,7 +768,9 @@ export const eventRoutes = {
     const who = await tx(async (c) => {
       await c.query("UPDATE events SET status = 'cancelled', cancel_reason = $2, cancelled_by = $3, cancelled_at = now(), updated_at = now() WHERE id = $1", [e.id, reason, me.id]);
       await log(c, e.id, me.id, 'cancel', reason ? { reason } : {});
-      return (await c.query("SELECT user_id FROM event_reservations WHERE event_id = $1 AND status = 'confirmed'", [e.id])).rows.map((x) => x.user_id);
+      const ids = (await c.query("SELECT user_id FROM event_reservations WHERE event_id = $1 AND status = 'confirmed'", [e.id])).rows.map((x) => x.user_id);
+      await placeNotices(c, ids, e.id, 'Etkinlik iptal edildi', cancelText(e.title, reason));
+      return ids;
     });
     if (who.length) notify(who, { title: 'Etkinlik iptal edildi', body: e.title, data: { type: 'event', id: String(e.id) } });
     if (e.status === 'approved') announceRoom(liveKitName(e.room_id));
@@ -594,6 +790,8 @@ export const eventRoutes = {
       throw new HttpError(409, Date.now() < at ? 'Etkinlik başlangıçtan en erken 10 dakika önce başlatılabilir' : 'Başlatma süresi geçti');
     }
     announceRoom(liveKitName(await begin(e.id, me.id)));
+    // Those with a place hear it has started now, not at the next sweep.
+    remindEvents().catch((err) => console.error('event reminders', err.message));
     return { event: await detail(e.id, me) };
   },
 
@@ -661,7 +859,47 @@ export const eventRoutes = {
     return { counted: true };
   },
 
+  async 'POST /api/events/remind'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    if (typeof b.on !== 'boolean') throw new HttpError(400, 'Hatırlatmayı aç ya da kapat');
+    const e = await rowOf(b.id, me.id);
+    if (e.my_reservation !== 'confirmed') throw new HttpError(409, 'Hatırlatma, yer ayırttığın etkinlikler için');
+    await db.query("UPDATE event_reservations SET remind = $3 WHERE event_id = $1 AND user_id = $2 AND status = 'confirmed'", [e.id, me.id, b.on]);
+    return { event: await detail(e.id, me) };
+  },
+
+  async 'GET /api/events/reminders'(req) {
+    const me = await auth(req);
+    const off = (await db.query('SELECT 1 FROM event_reminder_optout WHERE user_id = $1', [me.id])).rowCount > 0;
+    return { on: !off, kinds: rules().reminders };
+  },
+
+  async 'POST /api/events/reminders'(req) {
+    const me = await auth(req);
+    const b = await readJson(req);
+    if (typeof b.on !== 'boolean') throw new HttpError(400, 'Hatırlatmaları aç ya da kapat');
+    if (b.on) await db.query('DELETE FROM event_reminder_optout WHERE user_id = $1', [me.id]);
+    else await db.query('INSERT INTO event_reminder_optout (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [me.id]);
+    return { on: b.on, kinds: rules().reminders };
+  },
+
+  async 'GET /api/events/report'(req, url) {
+    const me = await auth(req);
+    const days = daysOf(url.searchParams.get('days'));
+    // Only the rooms I own; one of them when asked.
+    const rooms = (await db.query('SELECT id, title, closed_at FROM rooms WHERE owner = $1 ORDER BY created_at DESC LIMIT 50', [me.id])).rows;
+    const room = url.searchParams.get('room');
+    if (room && !rooms.some((r) => r.id === room)) throw new HttpError(403, 'Odanın raporunu oda sahibi görür');
+    return { report: await report(days, { owner: me.id, room: room || null }), rooms: rooms.map((r) => ({ id: r.id, title: r.title, closed: !!r.closed_at })) };
+  },
+
   // --- Admin ----------------------------------------------------------------------------------------------------
+  async 'GET /api/admin/events/report'(req, url) {
+    await adminOnly(req);
+    return { report: await report(daysOf(url.searchParams.get('days'))) };
+  },
+
   async 'GET /api/admin/events'(req, url) {
     const me = await adminOnly(req);
     const q = url.searchParams;
@@ -731,7 +969,9 @@ export const eventRoutes = {
       if (e.started_at) await finish(c, e.id, 'admin', me.id);
       await c.query("UPDATE events SET status = 'cancelled', cancel_reason = $2, cancelled_by = $3, cancelled_at = now(), updated_at = now() WHERE id = $1", [e.id, reason, me.id]);
       await log(c, e.id, me.id, 'remove', { reason });
-      return (await c.query("SELECT user_id FROM event_reservations WHERE event_id = $1 AND status = 'confirmed'", [e.id])).rows.map((x) => x.user_id);
+      const ids = (await c.query("SELECT user_id FROM event_reservations WHERE event_id = $1 AND status = 'confirmed'", [e.id])).rows.map((x) => x.user_id);
+      await placeNotices(c, ids, e.id, 'Etkinlik yayından kaldırıldı', `“${e.title}” yayından kaldırıldı. Neden: ${reason}`);
+      return ids;
     });
     notify([...new Set([e.owner_id, ...who])], { title: 'Etkinlik yayından kaldırıldı', body: e.title, data: { type: 'event', id: String(e.id) } });
     announceRoom(liveKitName(e.room_id));

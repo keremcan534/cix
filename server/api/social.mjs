@@ -174,6 +174,10 @@ export async function eraseAccount(c, id, phone) {
     // Arkadaşını Getir (referrals.mjs): my code and who entered whose code, both ways; the coins paid stay in the ledger.
     await c.query('DELETE FROM referrals WHERE invitee_id = $1 OR inviter_id = $1', [id]);
     await c.query('DELETE FROM referral_codes WHERE user_id = $1', [id]);
+    // Etkinlik Merkezi (events.mjs): the reminders sent to them and their choice to have none; their places stay as the
+    // events' records (the account reads as deleted).
+    await c.query('DELETE FROM event_reminders_sent WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM event_reminder_optout WHERE user_id = $1', [id]);
     // Oyun Salonu rounds (casino.mjs); the ledger keeps the money trail. Room game tables they sit at or opened.
     await c.query('DELETE FROM casino_rounds WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_tables WHERE $1 = ANY(seats) OR opened_by = $1', [id]);
