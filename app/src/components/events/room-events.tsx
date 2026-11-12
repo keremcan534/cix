@@ -15,7 +15,7 @@ import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { elapsedText, lookOf, spanText, whenText } from '@/lib/events';
 import { useSettings } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 export type RoomEvents = { running: api.EventItem | null; upcoming: api.EventItem[]; recent: api.EventItem[] };
 
@@ -208,7 +208,7 @@ export function RoomEventsSheet({ visible, onClose, data, roomId, isOwner }: { v
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, edge }) => ({
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginTop: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
   kicker: { color: 'rgba(255,255,255,0.85)', fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6, fontVariant: ['tabular-nums'] },
   title: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
@@ -216,8 +216,9 @@ const useStyles = makeStyles(({ colors }) => ({
   startText: { color: '#111', fontSize: 12.5, fontWeight: '800' },
   count: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.25)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   countText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 12 },
+  // No veil over the screen behind (theme SCRIM): the sheet stands out by its own edge.
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 12, ...edge.sheet },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heading: { color: colors.text, fontSize: 18, fontWeight: '800' },
   section: { color: colors.textDim, fontSize: 12.5, fontWeight: '800', marginTop: 6 },

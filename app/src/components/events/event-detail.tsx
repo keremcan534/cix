@@ -13,7 +13,7 @@ import { Avatar, Button } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
 import { elapsedText, lookOf, placesText, spanText, whenText } from '@/lib/events';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 type Props = {
   id: number;
@@ -363,7 +363,7 @@ function PeopleSheet({ id, onClose }: { id: number; onClose: () => void }) {
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic }) => ({
+const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
   back: { position: 'absolute', left: 12, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(10,12,30,0.45)', alignItems: 'center', justifyContent: 'center' },
@@ -390,8 +390,9 @@ const useStyles = makeStyles(({ colors, semantic }) => ({
   notice: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, backgroundColor: colors.card },
   noticeTitle: { fontSize: 14, fontWeight: '800' },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10 },
+  // No veil over the screen behind (theme SCRIM): the sheet stands out by its own edge.
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10, ...edge.sheet },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   person: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
 }));
