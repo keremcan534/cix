@@ -107,7 +107,9 @@ describe('Keşfet, profil ve Anlar', () => {
     assert.deepEqual(byId[ist.user.id].distance, (await profile(ist)).distance, 'Keşfet ile profil aynı');
 
     // Anlar
-    for (const who of [ank, town, shy, me]) await ok(call('POST', '/api/moments', { text: `Merhaba ${rnd(2)}`, ref: rnd(10) }, who.session), 'an');
+    // Fixed words: a random suffix could spell something the contact filter refuses (e.g. a social media handle).
+    const hello = ['Günaydın herkese', 'İyi akşamlar', 'Selam millet', 'Merhaba dünya'];
+    for (const [i, who] of [ank, town, shy, me].entries()) await ok(call('POST', '/api/moments', { text: hello[i], ref: rnd(10) }, who.session), 'an');
     const feed = await ok(call('GET', '/api/moments?tab=recent', null, me.session), 'anlar');
     noCoordinates(feed, 'anlar');
     const of = (who) => feed.moments.find((m) => m.author.id === who.user.id).author.distance;
