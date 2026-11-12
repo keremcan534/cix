@@ -110,7 +110,7 @@ const VERSION = (() => {
 })();
 const STARTED = Date.now();
 /** Test top-ups: the coin pack sizes; at most TEST_DAILY play coins per user per day (wallet.mjs). */
-const TOPUP_PACKS = [1000, 5000, 10000];
+const TOPUP_PACKS = [1000, 5000, 10000, 50000, 100000];
 const GIFT_MAX = 1_000_000;
 /** Largest single diamond → coin exchange (the users table holds bigint, this keeps one request sane). */
 const EXCHANGE_MAX = 1_000_000_000;

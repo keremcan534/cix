@@ -140,6 +140,8 @@ jobs:
 
           # Test server switch (TEST_MODE above). Changing .env recreates the services that read it.
           if [ "$TEST_MODE" = 1 ]; then v=1; else v=0; fi
+          # No daily cap on test coins while testing (0 = unlimited, wallet.mjs TEST_DAILY).
+          $SSH "cd /opt/similar && if ! sudo grep -qx 'TEST_TOPUP_DAILY=0' .env; then sudo sed -i '/^TEST_TOPUP_DAILY=/d' .env; echo 'TEST_TOPUP_DAILY=0' | sudo tee -a .env >/dev/null; echo 'set TEST_TOPUP_DAILY=0'; fi"
           $SSH "cd /opt/similar && for k in ALLOW_DEV_AUTH ALLOW_TEST_TOPUP; do
               if ! sudo grep -qx \"\$k=$v\" .env; then sudo sed -i \"/^\$k=/d\" .env; echo \"\$k=$v\" | sudo tee -a .env >/dev/null; echo \"set \$k=$v\"; fi; done"
 

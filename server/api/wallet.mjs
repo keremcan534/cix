@@ -65,8 +65,10 @@ export const PLAY_MONEY = env.ALLOW_TEST_TOPUP === '1' || env.ALLOW_SANDBOX_PURC
  * first-purchase and campaign gifts included.
  */
 export const TEST_DAILY = (() => {
-  const n = Number(env.TEST_TOPUP_DAILY ?? 50_000);
-  return Number.isSafeInteger(n) && n > 0 ? n : 50_000;
+  // A positive TEST_TOPUP_DAILY caps it; unset or 0 means no daily cap (the owner's choice while testing).
+  // Test coins exist only while ALLOW_TEST_TOPUP=1, which the deploy turns off with TEST_MODE=0.
+  const n = Number(env.TEST_TOPUP_DAILY ?? 0);
+  return Number.isSafeInteger(n) && n > 0 ? n : Infinity;
 })();
 
 /** Play coins credited to `userId` today (UTC day), the first-purchase and campaign gifts of test purchases included. */

@@ -122,9 +122,9 @@ export default function ServerAccount() {
 
         <Card style={{ gap: 10 }}>
           <Text style={s.title}>Test yüklemesi</Text>
-          <Text style={s.dim}>Gerçek ödeme yok; günde en fazla 50.000 jeton. Yalnızca test için.</Text>
+          <Text style={s.dim}>Gerçek ödeme yok; sınır yok. Yalnızca test için.</Text>
           <View style={s.row}>
-            {[1000, 5000, 10000].map((n) => (
+            {[1000, 10000, 100000].map((n) => (
               <Pressable key={n} style={[s.chip, busy && s.off]} disabled={busy || !user} onPress={() =>
                   run(async () => {
                     await testTopup(n);

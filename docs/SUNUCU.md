@@ -25,7 +25,7 @@
 | `GET /api/admin/alerts` | Yalnız yönetici: alarmların ayrıntısı (değer, eşik, hangi hesap), eşikler, finans aktarımının durumu, son 5xx hataları. |
 | `GET /api/me` | Hesap ve bakiyeler (jeton, elmas, oyun bakiyesi), telefon, VIP puanı (SVIP); `email` (e-postayla giriş adresi ya da `null`), `identities` (bağlı giriş yolları, ör. `["email","google"]`), `phoneVerified` |
 | `GET /api/ledger` | Son 50 işlem, her satırda işlem sonrası bakiye |
-| `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 jeton. Test yüklemesi, test satın alması ve mağaza test satın alması (ilk alım hediyesi dahil) aynı günlük sınırı paylaşır: hesap başına `TEST_TOPUP_DAILY` (varsayılan 50.000). |
+| `POST /api/wallet/test-topup` `{amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): 1.000 / 5.000 / 10.000 / 50.000 / 100.000 jeton. Test yüklemesi, test satın alması ve mağaza test satın alması (ilk alım hediyesi dahil) aynı günlük sınırı paylaşır: hesap başına `TEST_TOPUP_DAILY` (varsayılan 0: sınırsız). |
 | `POST /api/wallet/gift` `{to, amount, ref}` | **Yalnızca test** (`ALLOW_TEST_TOPUP=1`): serbest miktarlı aktarım (Sunucu hesabı ekranı). Gerçek hediye `/api/gifts/send`. |
 | `POST /api/wallet/spend` `{amount, reason, ref}` | Eski uygulamaların jetonla alımı. Mağaza ürünü (`Mağaza: …`, `Çıkartma paketi: …`, `Mikrofon efekti: …`, `Rütbe: …`) artık `POST /api/shop/buy` gibi işlenir ve hak sunucuya yazılır; tanınmayan ya da fiyatı tutmayan ürün `409 update_required` alır, jeton düşmez. Ayrıntı: **Mağaza ve rütbe**. |
 
