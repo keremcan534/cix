@@ -37,8 +37,8 @@ export const CHANNELS = {
   cevir: { label: 'Elmastan çevrildi', lock: 'jeton' },
   // Daily check-in, tasks, İlk adımlar: spent only in the shop (spendCoins `use`), so never gifted.
   odul: { label: 'Ödül jetonu', lock: 'store' },
-  // Uğurlu hediye rewards (lucky.mjs): spent like any coin; what they pay for never counts for Cömertlik.
-  ugurlu: { label: 'Uğurlu ödülü', lock: 'store' },
+  // Şanslı hediye rewards (lucky.mjs): spent like any coin; what they pay for never counts for Cömertlik.
+  ugurlu: { label: 'Şanslı ödülü', lock: 'store' },
   // Coins from someone's Şanslı çanta (lucky-bags.mjs); the store lock, whatever paid for them.
   canta: { label: 'Şanslı çanta', lock: 'store' },
   // Not a coin lot: a gift sent free from Çantam (backpack.mjs). Its diamonds lock as free coins' do.
@@ -261,7 +261,7 @@ export const walletRoutes = {
 
   /**
    * Gelir's sources: the diamonds I earned in the period (day, week, month by Turkey's calendar, or all), by where
-   * they came from. Gifts by place (a room, a chat, a moment, a profile, the family chat; Uğurlu hediye on its own), then paid
+   * they came from. Gifts by place (a room, a chat, a moment, a profile, the family chat; Şanslı hediye on its own), then paid
    * messages and paid call or match minutes (one-on-one.mjs, paid_events).
    */
   async 'GET /api/wallet/income'(req, url) {
@@ -291,7 +291,7 @@ export const walletRoutes = {
     const row = (key, label) => ({ key, label, diamonds: by[key]?.diamonds ?? 0, count: by[key]?.count ?? 0, live: true });
     const sources = [
       row('room', 'Oda hediyeleri'),
-      row('lucky', 'Uğurlu hediyeler'),
+      row('lucky', 'Şanslı hediyeler'),
       row('chat', 'Mesajdan gelen hediyeler'),
       row('moment', 'Anlar hediyeleri'),
       row('profile', 'Profilden gelen hediyeler'),

@@ -1,8 +1,8 @@
-// Room info card ("oda kartı"), full-screen "Oda Ayarları" and the boss seat.
+// Room info card ("oda kartı"), full-screen "Oda Ayarları", the boss seat and its sheet.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, type HostInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,7 +17,6 @@ import { SeatReaction, type SeatReactionData } from '@/components/room/parts';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 import { Avatar } from '@/components/ui';
 import {
-  BOSS_SEAT_MIN_COINS,
   BOSS_SEAT_MIN_LEVEL,
   LOCK_MIN_LEVEL,
   MIC_COUNT_OPTIONS,
@@ -40,9 +39,10 @@ import { CONTACT_TITLE, contactRefusal } from '@/lib/contact-filter';
 import type { ServerOwnerStats } from '@/lib/api';
 import type { JoinMode, Membership } from '@/lib/room-follow';
 import { defaultMicQueue } from '@/lib/room-invites';
+import { BOSS_SEAT_DEFAULTS, bossHeadline, bossRules, type BossCfg, type BossMode } from '@/lib/patron-seat';
 import type { Result } from '@/lib/room-presence';
 import type { MyRoom } from '@/store';
-import { colors, gradient } from '@/theme';
+import { SCRIM, colors, edge, gradient } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export type GiftLogRow = { id: string; from: string; to: string; emoji: string; name: string; count: number; coins: number; time: string; giftId?: string };
@@ -251,7 +251,6 @@ export function RoomInfoSheet({
   onInvite,
   live = false,
   ownerStats,
-  details = [],
   actions = [],
 }: {
   visible: boolean;
@@ -300,8 +299,6 @@ export function RoomInfoSheet({
   live?: boolean;
   /** A server room's owner: Oda Sahibi Merkezi's numbers from the server (null while they load). */
   ownerStats?: ServerOwnerStats | null;
-  /** The room at a glance (owner, my rank, listeners, mics, queue, lock…). */
-  details?: { label: string; value: string }[];
   /** Shortcuts to the room's sheets; each one opens from here and comes back here. */
   actions?: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[];
 }) {
@@ -341,19 +338,6 @@ export function RoomInfoSheet({
               <Ionicons name="settings-outline" size={26} color="#fff" />
             </Pressable>
           </View>
-
-          {details.length > 0 && (
-            <View style={styles.details}>
-              {details.map((d) => (
-                <View key={d.label} style={styles.detailRow}>
-                  <Text style={styles.dim}>{d.label}</Text>
-                  <Text style={styles.detailValue} numberOfLines={1}>
-                    {d.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
 
           {actions.length > 0 && (
             <View style={styles.actions}>
@@ -675,6 +659,7 @@ type Picker =
   | 'mics'
   | 'layouts'
   | 'micPerm'
+  | 'bossMode'
   | 'join'
   | 'manageMembers'
   | 'manageFunctions'
@@ -705,6 +690,7 @@ export function RoomSettingsScreen({
   standard = true,
   sections = [],
   look,
+  bossCfg = BOSS_SEAT_DEFAULTS,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -733,6 +719,8 @@ export function RoomSettingsScreen({
   sections?: SettingsSection[];
   /** Oda Süslemesi and Oda Kapağı (components/room/decor), their screens opened on top of this one. */
   look?: RoomLook;
+  /** The Patron koltuğu's numbers (a server room: as the server says; the demo: lib/patron-seat's defaults). */
+  bossCfg?: BossCfg;
 }) {
   const [picker, setPicker] = useState<Picker>(null);
   const close = () => setPicker(null);
@@ -826,10 +814,13 @@ export function RoomSettingsScreen({
           />
           <Row
             label="Patron Koltuğu"
-            hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · ${live ? 'son 24 saatte odada en çok hediye gönderen kişi oturur' : 'oturumun en çok hediye gönderen kişisi oturur'}`}
+            hint={`Oda seviyesi >= ${BOSS_SEAT_MIN_LEVEL} açılır · ${room.bossMode === 'invite' ? 'koltuğa oda sahibi oturtur' : `tek seferde ${bossCfg.coins.toLocaleString('tr-TR')} jeton gönderen oturur`}`}
             toggle={{ value: room.bossSeat && bossOpen, onChange: (v) => update({ bossSeat: v }) }}
             locked={ownerLock ?? (bossOpen ? undefined : `Patron koltuğu Lv.${BOSS_SEAT_MIN_LEVEL} odada açılır.`)}
           />
+          {room.bossSeat && bossOpen && (
+            <Row label="Koltuk modu" value={room.bossMode === 'invite' ? 'Davet' : 'Otomatik'} onPress={() => setPicker('bossMode')} locked={ownerLock} />
+          )}
 
           <Section title="Oda üyeleri" />
           <Row label="Oda üyesi başvurusu" value={joinLabel[room.joinMode]} onPress={() => setPicker('join')} locked={ownerLock} />
@@ -908,6 +899,18 @@ export function RoomSettingsScreen({
         ]}
         value={room.micPermission}
         onPick={(v) => update({ micPermission: v })}
+        onClose={close}
+      />
+      <ChoiceSheet
+        visible={picker === 'bossMode'}
+        title="Patron koltuğu: koltuk modu"
+        desc="Mod değişince koltuk boşalır."
+        options={[
+          { value: 'auto', label: 'Otomatik', sub: bossRules('auto', bossCfg).join(' ') },
+          { value: 'invite', label: 'Davet', sub: bossRules('invite', bossCfg).join(' ') },
+        ]}
+        value={room.bossMode}
+        onPick={(v) => update({ bossMode: v })}
         onClose={close}
       />
       <ChoiceSheet
@@ -1144,7 +1147,7 @@ export function BossSeat({
               <Image source={ROOM_ICON_ART.bossSeat} style={{ width: mini.size * 0.72, height: mini.size * 0.72 }} />
             </View>
           )}
-          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
+          {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={mini.size} still={still} />}
         </LinearGradient>
         </View>
         <Text style={[styles.bossTag, { fontSize: 9 }]}>PATRON</Text>
@@ -1162,7 +1165,7 @@ export function BossSeat({
             <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
           </View>
         )}
-        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
+        {reaction && u && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={62} still={still} />}
       </LinearGradient>
       </View>
       <Text style={styles.bossTag}>PATRON</Text>
@@ -1173,16 +1176,142 @@ export function BossSeat({
   );
 }
 
-export const bossSeatInfo = (current: string | null, myContribution: number, top: number) => {
-  const need = Math.max(BOSS_SEAT_MIN_COINS, top + 1) - myContribution;
-  return current === 'me'
-    ? 'Patron koltuğundasın. Ayrıcalıklar: mikrofon önceliği, altın çerçeve, giriş duyurusu. Biri seni geçerse koltuk ona geçer.'
-    : `Patron koltuğuna bu oturumda en çok hediye gönderen kişi (en az 🪙 ${BOSS_SEAT_MIN_COINS.toLocaleString('tr-TR')}) oturur.\n\nSenin katkın: 🪙 ${myContribution.toLocaleString('tr-TR')}\nKoltuğa geçmek için: 🪙 ${Math.max(0, need).toLocaleString('tr-TR')} daha`;
-};
+/** Someone the owner may seat on the Patron koltuğu (Davet mode): in the room now. */
+export type BossPick = { id: string; name: string; avatar: string };
+
+/**
+ * Patron koltuğu's sheet: the seat as I see it (empty and waiting, mine, someone else's), what one send must be,
+ * how long the sitting has left, the rules in our own words, and a button to the gift sheet. In Davet mode the owner
+ * picks who sits from the people in the room, or takes the holder off; the holder can get up in either mode.
+ */
+export function BossSeatSheet({
+  visible,
+  onClose,
+  mode,
+  holder,
+  until,
+  spent,
+  cfg,
+  holdSeconds,
+  onGift,
+  picks,
+  onSeat,
+  onClear,
+  onLeave,
+  onSitBack,
+  onProfile,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  mode: BossMode;
+  /** The holder's local id ('me' when it is me), or null. */
+  holder: string | null;
+  /** When the sitting ends (ms, this phone's clock); null without an end. */
+  until: number | null;
+  spent: number;
+  cfg: BossCfg;
+  holdSeconds?: number;
+  onGift: () => void;
+  /** Davet mode, for the owner: the people they may seat. */
+  picks?: BossPick[];
+  onSeat?: (uid: string) => void;
+  onClear?: () => void;
+  onLeave?: () => void;
+  /** The seat is mine and I sit on a numbered mic: back to the Patron seat. */
+  onSitBack?: () => void;
+  onProfile?: (uid: string) => void;
+}) {
+  const paddingBottom = useSheetBottom();
+  const [rules, setRules] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!visible || until === null) return;
+    const tick = () => setNow(Date.now());
+    tick();
+    const t = setInterval(tick, 15_000);
+    return () => clearInterval(t);
+  }, [visible, until]);
+  const u = holder ? userById(holder) : null;
+  const left = until === null ? null : Math.max(0, Math.round((until - now) / 1000));
+  const head = bossHeadline({ mode, holder, name: u?.name ?? '', left, spent, cfg });
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} />
+      <View style={[styles.sheet, { paddingBottom, gap: 12 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Pressable onPress={() => setRules((v) => !v)} hitSlop={10} accessibilityRole="button" accessibilityLabel={rules ? 'Kuralları gizle' : 'Patron koltuğu nasıl işler?'}>
+            <Ionicons name={rules ? 'help-circle' : 'help-circle-outline'} size={24} color={colors.textDim} />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Kapat">
+            <Ionicons name="close" size={22} color={colors.textDim} />
+          </Pressable>
+        </View>
+        <View style={{ alignItems: 'center', gap: 8 }}>
+          <LinearGradient colors={['#FDE68A', '#B45309']} style={styles.bossRing}>
+            {u ? (
+              <Photo uri={u.avatar} kind="face" style={{ width: 62, height: 62, borderRadius: 31 }} />
+            ) : (
+              <View style={styles.bossEmpty}>
+                <Image source={ROOM_ICON_ART.bossSeat} style={{ width: 46, height: 46 }} />
+              </View>
+            )}
+          </LinearGradient>
+          <Text style={styles.bossTitle} accessibilityRole="header">
+            {head.title}
+          </Text>
+          <Text style={[styles.dim, { textAlign: 'center', fontSize: 14, lineHeight: 20 }]}>{head.text}</Text>
+        </View>
+        {rules && (
+          <View style={styles.bossRules}>
+            <Text style={styles.cardLabel}>{mode === 'invite' ? 'Davet modu' : 'Otomatik mod'}</Text>
+            {bossRules(mode, cfg, holdSeconds).map((line, i) => (
+              <Text key={i} style={styles.dim}>
+                {i + 1}. {line}
+              </Text>
+            ))}
+          </View>
+        )}
+        {picks && onSeat && (
+          <View style={{ gap: 4 }}>
+            <Text style={styles.cardLabel}>Koltuğa oturt</Text>
+            {picks.length === 0 && <Text style={styles.dim}>Odada oturtulacak kimse yok.</Text>}
+            <ScrollView style={{ maxHeight: 220 }}>
+              {picks.map((p) => (
+                <Pressable key={p.id} style={styles.listRow} onPress={() => onSeat(p.id)} accessibilityRole="button" accessibilityLabel={`${p.name} kişisini patron koltuğuna oturt`}>
+                  <Avatar uri={p.avatar} size={34} />
+                  <Text style={{ color: '#fff', flex: 1 }} numberOfLines={1}>
+                    {p.name}
+                  </Text>
+                  <Ionicons name="arrow-up-circle-outline" size={22} color={colors.gold} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {onSitBack && <SheetButton label="Patron koltuğuna otur" icon="arrow-up-circle-outline" onPress={onSitBack} />}
+        {/* A gift moves the seat only in Otomatik mode: to sit, to take it, or to stay longer. */}
+        {mode === 'auto' && <SheetButton label="Hediye gönder" icon="gift" onPress={onGift} primary />}
+        {holder && holder !== 'me' && onProfile && <SheetButton label="Profili gör" icon="person-outline" onPress={() => onProfile(holder)} />}
+        {onLeave && <SheetButton label="Koltuktan kalk" icon="arrow-down-circle-outline" onPress={onLeave} />}
+        {onClear && <SheetButton label="Koltuktan indir" icon="arrow-down-circle-outline" onPress={onClear} danger />}
+      </View>
+    </Modal>
+  );
+}
+
+function SheetButton({ label, icon, onPress, primary, danger }: { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; onPress: () => void; primary?: boolean; danger?: boolean }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={[styles.bigBtn, { flex: 0, backgroundColor: primary ? '#FBBF24' : 'rgba(255,255,255,0.1)' }]}>
+      <Ionicons name={icon} size={18} color={primary ? '#1C1B22' : danger ? colors.red : '#fff'} />
+      <Text style={{ color: primary ? '#1C1B22' : danger ? colors.red : '#fff', fontWeight: '800', fontSize: 15 }}>{label}</Text>
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: '#24232B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 30, maxHeight: '80%', ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '800', fontSize: 17, marginBottom: 4 },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 18 },
   tiny: { color: '#fff', fontSize: 12, marginTop: 4, maxWidth: 70 },
@@ -1215,9 +1344,6 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
   bigBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 13 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
-  details: { borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 14, paddingVertical: 6 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 7 },
-  detailValue: { color: '#fff', fontWeight: '700', flexShrink: 1, textAlign: 'right' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   action: { width: '25%', alignItems: 'center', gap: 6 },
   actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
@@ -1227,4 +1353,6 @@ const styles = StyleSheet.create({
   bossRing: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },
   bossEmpty: { width: 62, height: 62, borderRadius: 31, backgroundColor: 'rgba(30,20,10,0.85)', alignItems: 'center', justifyContent: 'center' },
   bossTag: { color: '#1C1B22', backgroundColor: '#FBBF24', fontSize: 9, fontWeight: '900', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, marginTop: -10, overflow: 'hidden' },
+  bossTitle: { color: '#FDE68A', fontWeight: '900', fontSize: 18, textAlign: 'center' },
+  bossRules: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 12, gap: 6 },
 });

@@ -10,7 +10,7 @@ export type WinNews = {
   id: string;
   userName: string;
   avatar?: string;
-  /** "Uğurlu › Uğur Böceği", "Oyun Merkezi › Şans Çarkı" … */
+  /** "Şanslı › Uğur Böceği", "Oyun Merkezi › Şans Çarkı" … */
   source: string;
   roomTitle?: string;
   mult?: number;
@@ -61,15 +61,15 @@ export function announceWin(news: Omit<WinNews, 'id' | 'at'>, opts?: { mine?: bo
 }
 /** An Oyun Salonu win. The source prefix counts too, so an announcement without the flag is still caught. */
 export const isCasinoWin = (n: Pick<WinNews, 'casino' | 'source'>) => !!n.casino || n.source.startsWith('Oyun Merkezi ›');
-/** Any game of chance (Oyun Salonu or Uğurlu): not news for someone below the gambling level. */
-export const isChanceWin = (n: Pick<WinNews, 'casino' | 'source'>) => isCasinoWin(n) || n.source.startsWith('Uğurlu ›');
+/** Any game of chance (Oyun Salonu or Şanslı): not news for someone below the gambling level. */
+export const isChanceWin = (n: Pick<WinNews, 'casino' | 'source'>) => isCasinoWin(n) || n.source.startsWith('Şanslı ›');
 export const roomTitleOf = (roomId: string) => (roomId === 'yeni' ? 'Benim Odam' : (roomById(roomId)?.title ?? ''));
 
 // --- Simulated wins from other rooms (offline demo only; never in live mode) ---------------------
 const FAKE_SOURCES: { source: string; price: number; mults: number[]; casino?: boolean }[] = [
-  { source: 'Uğurlu › Şans Yoncası', price: 20, mults: [2, 5, 10, 20, 50, 100] },
-  { source: 'Uğurlu › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
-  { source: 'Uğurlu › Altın Nal', price: 500, mults: [2, 5, 10, 20] },
+  { source: 'Şanslı › Şans Yoncası', price: 20, mults: [2, 5, 10, 20, 50, 100] },
+  { source: 'Şanslı › Uğur Böceği', price: 100, mults: [2, 5, 10, 20, 50, 100, 1000] },
+  { source: 'Şanslı › Altın Nal', price: 500, mults: [2, 5, 10, 20] },
   { source: 'Oyun Merkezi › Şans Çarkı', price: 100, mults: [2, 3, 5, 10], casino: true },
   { source: 'Oyun Merkezi › Ejder ile Kaplan', price: 500, mults: [2, 8], casino: true },
 ];

@@ -1,5 +1,5 @@
 // Gelir → Gelir kaynakları (live mode): the diamonds earned in a period by where they came from, as the server
-// counts them (server/api wallet.mjs GET /api/wallet/income). Room gifts, Uğurlu hediyeler, gifts from a chat, a
+// counts them (server/api wallet.mjs GET /api/wallet/income). Room gifts, Şanslı hediyeler, gifts from a chat, a
 // moment, a profile or the family chat each on their own line; paid messages and calls are listed as "Yakında" until the server
 // has them, so the screen already shows every source.
 import Ionicons from '@expo/vector-icons/Ionicons';

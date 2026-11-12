@@ -38,7 +38,7 @@ import { ThemeScope, type Appearance, type Scheme } from '@/theme';
 
 const DEMO_SVIP_XP = SVIP_LEVELS[2].xp;
 /** Coins the server takes without a local spend (the answer's balance shows it): count them as today's spending. */
-const SERVER_TAKES = /^(Hediye gönderildi|Rüzgâr Gülü|Uğurlu hediye|Animasyon|Oyun Salonu)/;
+const SERVER_TAKES = /^(Hediye gönderildi|Rüzgâr Gülü|Şanslı hediye|Animasyon|Oyun Salonu)/;
 
 export type EarningSource = 'Hediye' | 'Arama' | 'Görev' | 'Ajans bonusu' | 'Oda sahibi bonusu' | 'Aile bonusu' | 'Arama bonusu' | 'Cazibe bonusu';
 /** The gift behind a gift earning, stored with it (a price can belong to several gifts; Lucky pays a share). */
@@ -106,6 +106,8 @@ export type MyRoom = { title: string; announcement: string; cover: string; passw
   /** "Mikrofon kuyruğu": on = a member's tap on a free mic is a speak request the owner/admins approve. */
   micQueue: boolean; roomType: RoomType; giftEffects: boolean; joinSounds: boolean; lockedSeats: number[];
   theme: RoomTheme; micCount: number; /** Selected mic layout (data/room-layouts); null = classic grid. */ layoutId: string | null; micPermission: 'everyone' | 'members'; bossSeat: boolean;
+  /** Patron koltuğu: Otomatik (gifts decide, lib/patron-seat bossStep) or Davet (the owner seats someone). */
+  bossMode: 'auto' | 'invite';
   joinMode: 'open' | 'apply' | 'closed'; manageMembers: 'owner' | 'admins'; manageFunctions: 'owner' | 'admins';
   autoRemoveDays: 0 | 7 | 14 | 30; profileVisible: boolean; videoPrivacy: boolean; memberIds: string[]; blacklist: string[];
   /** Oda Süslemesi in the demo (lib/room-decor): the free background, what is chosen over it and what I paid for. `cover` is the card picture (Oda Kapağı). */
@@ -568,6 +570,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
         layoutId: null,
         micPermission: 'everyone',
         bossSeat: true,
+        bossMode: 'auto',
         joinMode: 'apply',
         manageMembers: 'admins',
         manageFunctions: 'admins',
@@ -584,6 +587,7 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
     // The room screen looks these up in fixed lists; a saved value the lists no longer have falls back.
     room.roomType = oneOf(room.roomType, ROOM_TYPES.map((t) => t.id)) ?? 'stage';
     room.theme = oneOf(room.theme, ROOM_THEMES.map((t) => t.id)) ?? 'chat';
+    room.bossMode = oneOf(room.bossMode, ['auto', 'invite'] as const) ?? 'auto';
     for (const key of ['adminIds', 'memberIds', 'blacklist'] as const) room[key] = room[key].filter((id) => typeof id === 'string');
     room.lockedSeats = room.lockedSeats.filter(isFiniteNumber);
     return room;

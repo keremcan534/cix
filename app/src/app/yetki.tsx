@@ -25,7 +25,7 @@ import {
 } from '@/data/rbac';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 type Tab = 'roles' | 'assign' | 'check' | 'mod' | 'audit' | 'model';
 const TABS: [Tab, string][] = [
@@ -235,7 +235,7 @@ function Roles({ rbac, update, actor }: Props) {
         </View>
       )}
       <Modal visible={!!spec} transparent animationType="slide" onRequestClose={() => setSpec(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setSpec(null)} />
+        <Pressable style={{ flex: 1, backgroundColor: SCRIM }} onPress={() => setSpec(null)} />
         <View style={[styles.sheet, { paddingBottom: sheetBottom }]}>
           <Text style={styles.h2}>Teknik şartname</Text>
           <ScrollView style={{ maxHeight: 420 }}>
@@ -514,7 +514,7 @@ function Chip({ on, label, onPress, strong }: { on: boolean; label: string; onPr
 
 // The light scheme inverts the dark one's monochrome accents: white pills and buttons on night blue become navy
 // ones on white, so the selected tab and the main button keep the same weight.
-const useStyles = makeStyles(({ colors, lift, dark, ink }) => ({
+const useStyles = makeStyles(({ colors, lift, dark, ink, edge }) => ({
   actorBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 44 },
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 16, gap: 10, ...lift },
   h1: { color: colors.text, fontSize: 20, fontWeight: '900' },
@@ -542,6 +542,6 @@ const useStyles = makeStyles(({ colors, lift, dark, ink }) => ({
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   specBtn: { backgroundColor: '#fff', borderColor: colors.border },
   assignRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 10, padding: 8 },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10, paddingBottom: 30 },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10, paddingBottom: 30, ...edge.sheet },
   mono: { color: dark ? '#E4E4E7' : colors.text, fontFamily: 'monospace', fontSize: 12, lineHeight: 18 },
 }));

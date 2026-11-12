@@ -19,7 +19,7 @@ import { liveRules, useLiveCatalog } from '@/lib/live/catalog-live';
 import { exchangeOwnDiamonds, selfExchangeRate } from '@/lib/coins-bank';
 import { blockedFeature } from '@/lib/remote-control';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 const SHARES = [
@@ -166,7 +166,7 @@ export function ExchangeSheet({ visible, onClose, split }: { visible: boolean; o
 }
 
 const useStyles = makeStyles(({ colors, semantic, ink, dark }) => ({
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.6)' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 28,

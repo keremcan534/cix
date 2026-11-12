@@ -164,7 +164,7 @@ describe('Oda yönetimi', () => {
     assert.deepEqual(j.lockedSeats, [2, 5]);
     const meta = callsOf('UpdateRoomMetadata', from).at(-1);
     assert.equal(meta.body.room, lkName);
-    assert.deepEqual(JSON.parse(meta.body.metadata), { lockedSeats: [2, 5], layoutId: null, micCount: null, micQueue: false, queue: [], music: { tracks: [], startedAt: null, pausedAt: null } });
+    assert.deepEqual(JSON.parse(meta.body.metadata), { lockedSeats: [2, 5], layoutId: null, micCount: null, micQueue: false, queue: [], music: { tracks: [], startedAt: null, pausedAt: null, repeat: 'off', order: [], others: [] } });
     assert.deepEqual(meta.grant, { roomAdmin: true, room: lkName });
 
     const [, un] = await call('POST', '/api/rooms/seat', { room, action: 'unlock', seat: 2 }, owner.session);
@@ -260,7 +260,7 @@ describe('Düzen ve mikrofon kuyruğu herkese oda bilgisiyle gider', () => {
     const from = lkCalls.length;
     const [st, j] = await call('POST', '/api/rooms/update', { id: room, micCount: 6 }, adm.session);
     assert.equal(st, 200, j.error);
-    assert.deepEqual(lastMeta(from), { lockedSeats: [], layoutId: null, micCount: 6, micQueue: false, queue: [], music: { tracks: [], startedAt: null, pausedAt: null } });
+    assert.deepEqual(lastMeta(from), { lockedSeats: [], layoutId: null, micCount: 6, micQueue: false, queue: [], music: { tracks: [], startedAt: null, pausedAt: null, repeat: 'off', order: [], others: [] } });
     assert.ok(await until(() => callsOf('SendData', from).length === 1), 'eski uygulamalar için oda paketi de gider');
     await call('POST', '/api/rooms/update', { id: room, layoutId: 'audio-12-grid' }, owner.session);
     assert.equal(lastMeta(from).layoutId, 'audio-12-grid');

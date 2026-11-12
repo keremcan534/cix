@@ -330,6 +330,17 @@ export function roomOf(r: api.ServerRoom): Room {
     ...(r.background && { background: r.background, bgId: r.bgId ?? null, coverUrl: r.coverUrl ?? null }),
     ...(r.rules && { rules: r.rules, micPermission: r.rules.micPermission, bossSeat: r.rules.bossSeat, wordsText: r.rules.words.join('\n') }),
     bossId: r.boss ? r.boss.id : null,
+    // The sitting's end on this phone's clock: the server says how many seconds were left when it answered.
+    bossInfo: r.bossSeat
+      ? {
+          mode: r.bossSeat.mode === 'invite' ? 'invite' : 'auto',
+          until: r.bossSeat.left === null || r.bossSeat.left === undefined ? null : Date.now() + r.bossSeat.left * 1000,
+          spent: r.bossSeat.spent ?? 0,
+          minCoins: r.bossSeat.minCoins,
+          minutes: r.bossSeat.minutes,
+          holdSeconds: r.bossSeat.holdSeconds ?? 5,
+        }
+      : null,
   };
   // The Odalar chips come with the room lists (server/api/room-social.mjs); a read of the room alone keeps the last.
   const chips: Room['serverChips'] =

@@ -1,4 +1,4 @@
-// One Uğurlu package's editor (Yönetim › Uğurlu hediyeler, and the offline demo's admin screen). Odds are typed as
+// One Şanslı package's editor (Yönetim › Şanslı hediyeler, and the offline demo's admin screen). Odds are typed as
 // percentages; the total shows live, and a package whose odds don't add up to exactly 100 % can't be opened.
 import { useState } from 'react';
 import { Pressable, Switch, View } from 'react-native';

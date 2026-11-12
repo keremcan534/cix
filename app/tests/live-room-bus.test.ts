@@ -9,11 +9,14 @@ import {
   encodeSignal,
   getLivePeers,
   onServerBag,
+  onServerBoss,
   onServerSeat,
   onSignal,
   parseRoomMeta,
   parseRoomState,
   parseSeat,
+  parseServerBoss,
+  parseServerClosed,
   parseServerFx,
   parseServerGift,
   parseServerLucky,
@@ -150,7 +153,7 @@ test('sinyaller yalnızca kendi odasının dinleyicisine gider', () => {
   reportPeers(null, []);
 });
 
-test('sunucunun Uğurlu paketi: doğru biçim okunur, bozuk olan bırakılır, aynı gönderim bir kez', () => {
+test('sunucunun Şanslı paketi: doğru biçim okunur, bozuk olan bırakılır, aynı gönderim bir kez', () => {
   const ok = { type: 'lucky', giftId: 'lk2', name: 'Uğur Böceği', emoji: '🐞', count: 5, from: 'u-a', to: ['u-b', 'u-c'], eventIds: [7, 8], best: 50, bigWin: 5000 };
   assert.deepEqual(parseServerLucky(ok), {
     from: 'u-a',
@@ -180,6 +183,34 @@ test('Şanslı çanta: yalnızca sunucunun çanta paketi o odanın çantaların�
   off();
   reportSignal('oda-c', null, { type: 'bag', id: 4, from: 'u-a' }); // after leaving
   assert.equal(n, 1);
+});
+
+test('Patron koltuğu: yalnızca sunucunun paketi o odada sohbet satırı olur', () => {
+  const ok = { type: 'boss', event: 'took', user: 'u-a', name: 'Ayla' };
+  assert.deepEqual(parseServerBoss(ok), { event: 'took', user: 'u-a', name: 'Ayla', mode: null });
+  assert.deepEqual(parseServerBoss({ type: 'boss', event: 'mode', user: null, name: null, mode: 'invite' }), { event: 'mode', user: null, name: null, mode: 'invite' });
+  assert.equal(parseServerBoss({ ...ok, event: 'won' }), null);
+  assert.equal(parseServerBoss({ ...ok, type: 'room' }), null);
+  assert.equal(parseServerBoss(null), null);
+  assert.equal(parseServerBoss({ ...ok, name: 'x'.repeat(81) })?.name, null, 'uzun ad okunmaz');
+  const got: string[] = [];
+  const off = onServerBoss('oda-p', (n) => got.push(`${n.event}:${n.user}`));
+  reportSignal('oda-p', 'u-x', ok); // from a phone: dropped
+  reportSignal('oda-q', null, ok); // another room
+  reportSignal('oda-p', null, ok);
+  off();
+  reportSignal('oda-p', null, { ...ok, event: 'expired' }); // after leaving
+  assert.deepEqual(got, ['took:u-a']);
+});
+
+test('yetkilisiz kalan oda: sunucunun kapanış notu okunur, başkası okunmaz', () => {
+  const n = parseServerClosed({ type: 'closed', reason: 'no_staff', minutes: 5 });
+  assert.equal(n?.title, 'Oda kapandı');
+  assert.match(n?.body ?? '', /^Odada 5 dakikadır oda sahibi ya da yönetici yoktu, bu yüzden oda kapandı\. Yetkilisi gelince oda yeniden açılır\.$/);
+  assert.doesNotMatch(parseServerClosed({ type: 'closed', reason: 'no_staff', minutes: 'beş' })?.body ?? '', /dakika/);
+  assert.equal(parseServerClosed({ type: 'closed', reason: 'owner' }), null);
+  assert.equal(parseServerClosed({ type: 'room' }), null);
+  assert.equal(parseServerClosed(null), null);
 });
 
 test('koltuk emojisi ve ücretsiz Hareketli telefondan gelir; biçimi bozuk olan atılır', () => {

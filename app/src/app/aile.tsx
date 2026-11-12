@@ -44,7 +44,7 @@ import { liveMode } from '@/lib/live';
 import { youLabel } from '@/lib/tr';
 import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
-import { ThemeScope, makeStyles, useTheme } from '@/theme';
+import { SCRIM, ThemeScope, makeStyles, useTheme } from '@/theme';
 
 type Role = 'owner' | 'helper' | 'member';
 type Tab = 'oda' | 'gorev' | 'cift' | 'durum' | 'tema';
@@ -911,7 +911,7 @@ function InfoSheet({ visible, title, onClose, children }: { visible: boolean; ti
   );
 }
 
-const useStyles = makeStyles(({ colors, semantic, dark }) => ({
+const useStyles = makeStyles(({ colors, semantic, dark, edge }) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.text, fontWeight: '700', fontSize: 16 },
   sectionTitle: { color: colors.text, fontWeight: '800', fontSize: 18 },
@@ -982,8 +982,8 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   themeItem: { width: '30%', flexGrow: 1, alignItems: 'center', gap: 4, borderRadius: 14, borderWidth: 2, borderColor: 'transparent', padding: 6, backgroundColor: colors.cardAlt },
   themeSwatch: { width: '100%', height: 56, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, maxHeight: '80%' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, maxHeight: '80%', ...edge.sheet },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   stat: { width: '48%', flexGrow: 1, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10, gap: 2 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 100 },

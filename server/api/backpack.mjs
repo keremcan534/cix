@@ -23,7 +23,6 @@ import { HttpError, REF, auth, blockedBetween, db, int, limit, readJson, selfUse
 import { ROOM, announceGift, liveKitRoom } from './gifts.mjs';
 import { BACKPACK_TASK_GIFT } from './live-registry.mjs';
 import { live } from './live-settings.mjs';
-import { refreshBoss } from './rooms.mjs';
 import { LOCK_HOURS, giftDiamonds } from './wallet.mjs';
 
 /** Where gifts come from: the label the panel shows, and the gift and count the live settings give now. */
@@ -160,9 +159,8 @@ export const backpackRoutes = {
       if (!again) throw new HttpError(409, 'Geçersiz istek kimliği');
       return answer(u.id, true, again.total);
     }
-    // The room sees it on stage like any gift; a new top gifter may take the Patron koltuğu.
+    // The room sees it on stage like any gift. It cost no coins, so it doesn't move the Patron koltuğu (boss-seat.mjs).
     announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
-    await refreshBoss(lkRoom.slice(4));
     return answer(u.id, false, total);
   },
 };

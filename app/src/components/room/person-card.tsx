@@ -16,7 +16,7 @@ import { showAlert } from '@/lib/alert';
 import { liveMode, message, toServer } from '@/lib/live';
 import { followOnServer, loadPublicProfile } from '@/lib/live/profile';
 import { useApp } from '@/store';
-import { colors } from '@/theme';
+import { SCRIM, colors, edge } from '@/theme';
 
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
@@ -157,8 +157,8 @@ function Link({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; 
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.45)' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, gap: 12, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 -10px 30px rgba(0,0,0,0.45)' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, gap: 12, ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },

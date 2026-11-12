@@ -43,7 +43,7 @@ import { setRoomFollow, useFollowedRooms } from '@/lib/live/room-follow';
 import { useJoinedRooms } from '@/lib/live/room-social';
 import { openEvents } from '@/components/events/open';
 import { myRoomMark, myRoomRows, type MyRoomRow } from '@/lib/room-follow';
-import { TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
+import { SCRIM, TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { RoomCardSkeleton, Skeletons } from '@/components/fx/skeleton';
 
@@ -707,7 +707,7 @@ function RoomSearch({ visible, rooms, onClose }: { visible: boolean; rooms: Room
 // Shadow under cards and photo frames: deep and black at night, a soft navy lift on paper.
 const SOFT_SHADOW = '0 1px 2px rgba(16,36,64,0.05), 0 6px 16px rgba(16,36,64,0.06)';
 
-const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) => ({
+const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge }) => ({
   headerBar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, borderBottomColor: ink(0.06) },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
   // header segment
@@ -799,8 +799,8 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark }) =>
   bannerTitle: { color: '#fff', fontSize: 18, lineHeight: 23, fontFamily: fonts.display },
   bannerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
   // search sheet
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  searchSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10 },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  searchSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, gap: 10, ...edge.sheet },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: 12, paddingHorizontal: 12 },
   searchInput: { flex: 1, color: colors.text, paddingVertical: 10, fontSize: 15 },
   searchHint: { color: colors.textDim, fontSize: 12, fontWeight: '600' },

@@ -23,7 +23,7 @@ function Sheet({ visible, onClose, title, art, children, tall }: { visible: bool
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* The modal does not shrink for the keyboard (edge to edge): the sheet rises above it as a whole. */}
       <KeyboardAvoid style={{ flex: 1 }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={onClose} />
+        <Pressable style={roomStyles.scrim} onPress={onClose} />
         <View style={[roomStyles.sheet, { maxHeight: tall ? '85%' : '70%', paddingBottom }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             {art && <Image source={art} style={{ width: 30, height: 30, marginRight: 8 }} />}
@@ -100,8 +100,8 @@ export function MusicBar({ music, canControl, onOpen, onToggle, onClose }: { mus
   const track = music.queue[0];
   if (!track) return null;
   return (
-    // Everyone sees what plays; only the room's staff and DJs open the music (they choose it).
-    <Pressable style={styles.musicBar} onPress={canControl ? onOpen : undefined} disabled={!canControl} accessibilityLabel={`Çalan parça: ${track.title}`}>
+    // Everyone opens the music: the list and their own volume; only the room's staff and DJs change what plays.
+    <Pressable style={styles.musicBar} onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Çalan parça: ${track.title}. Müziği aç`}>
       <Text style={{ fontSize: 16 }}>🎵</Text>
       <View style={{ flex: 1 }}>
         <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>
@@ -308,31 +308,6 @@ export function DiceModal({ visible, onClose, onPlay, playsLeft }: { visible: bo
         </View>
       )}
       <GradientButton title={`At · 🪙 ${bet}`} icon="dice" onPress={() => setResult(onPlay(bet))} style={{ opacity: playsLeft ? 1 : 0.4 }} />
-    </Sheet>
-  );
-}
-
-// --- Contribution ranking ---------------------------------------------------------
-export function ContributionModal({ visible, onClose, data, locked }: { visible: boolean; onClose: () => void; data: Record<string, number>; locked: boolean }) {
-  const rows = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  return (
-    <Sheet visible={visible} onClose={onClose} title="🏆 Oda katkı sıralaması">
-      {locked ? (
-        <Text style={styles.dim}>Katkı sıralaması oda seviyesi 3&apos;te açılır.</Text>
-      ) : rows.length === 0 ? (
-        <Text style={styles.dim}>Bu oturumda henüz hediye gönderilmedi.</Text>
-      ) : (
-        <ScrollView>
-          {rows.map(([id, v], i) => (
-            <View key={id} style={styles.row}>
-              <Text style={{ color: i < 3 ? colors.gold : colors.textDim, width: 22, fontWeight: '800' }}>{i + 1}</Text>
-              <Avatar uri={userById(id).avatar} size={34} />
-              <Text style={{ color: '#fff', flex: 1 }}>{id === 'me' ? 'Sen' : userById(id).name}</Text>
-              <Text style={{ color: colors.gold, fontWeight: '700' }}>🪙 {v.toLocaleString('tr-TR')}</Text>
-            </View>
-          ))}
-        </ScrollView>
-      )}
     </Sheet>
   );
 }

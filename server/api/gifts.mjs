@@ -26,7 +26,8 @@ import { notify } from './push.mjs';
 import { purchaseOptions } from './purchases.mjs';
 import { giftCoins } from './wallet.mjs';
 import { announceRoom, roomService } from './live.mjs';
-import { refreshBoss, roomLevel } from './rooms.mjs';
+import { roomLevel } from './rooms.mjs';
+import { announceBoss, bossGift } from './boss-seat.mjs';
 
 export const ROOM = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARDS = { wealth: 'sender', charm: 'recipient' };
@@ -115,6 +116,7 @@ export const giftRoutes = {
     const label = count > 1 ? `${gift.name} ×${count}` : gift.name;
     let eventId = null;
     let levelUp = false;
+    let boss = [];
     const out = await once(u.id, 'coin', b.ref, async (c) => {
       // Lock both rows in id order so two people gifting each other at once can't deadlock.
       const locked = await c.query('SELECT id FROM users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE', [[u.id, to]]);
@@ -156,6 +158,8 @@ export const giftRoutes = {
       if (roomId) {
         const x = await c.query('UPDATE users SET room_xp = room_xp + $2 WHERE id = (SELECT owner FROM rooms WHERE id = $1 AND closed_at IS NULL) RETURNING room_xp', [roomId, total]);
         if (x.rowCount && roomLevel(Number(x.rows[0].room_xp)) > roomLevel(Number(x.rows[0].room_xp) - total)) levelUp = true;
+        // Patron koltuğu (boss-seat.mjs): this send may sit its sender down, extend their sitting or take the seat.
+        boss = await bossGift(c, { roomId, sender: u.id, coins: total });
       }
       // Never fails the gift: runs in a savepoint, and the agency job backfills a missed one from gift_events.
       await recordIncome(c, to, 'gift', `gift:${g.rows[0].id}`, total);
@@ -168,8 +172,8 @@ export const giftRoutes = {
     if (!out.replay && eventId !== null && lkRoom) announceGift(lkRoom, { giftId: gift.id, count, from: u.id, to, eventId });
     // A new room level: the room's phones read the room again (more mics from Lv.8 on).
     if (!out.replay && levelUp && lkRoom) announceRoom(lkRoom);
-    // Patron koltuğu: a new top gifter of the room takes it.
-    if (!out.replay && lkRoom) await refreshBoss(lkRoom.slice(4));
+    // Patron koltuğu: the room hears who sat, took it or whose time ended.
+    if (!out.replay && lkRoom) await announceBoss(lkRoom.slice(4), boss);
     if (!out.replay && !room) notify([to], { title: 'Hediye geldi', body: `${u.name} sana ${label} gönderdi`, data: { type: 'gift', from: u.id } });
     if (!out.replay) return { ...out, total };
     // A replay reports what that ref sent, not this body's gift and count (0: the ref was no gift).

@@ -97,8 +97,8 @@ export default function MessagesScreen() {
   else if (filter === 'today') convs = visibleConvs.filter((c) => lastOf(c) && isTodayTime(lastOf(c)));
   const totalUnread = visibleConvs.reduce((n, c) => n + c.unread, 0);
 
-  // Friends: people I follow + people who follow me (mutual first, then online). Who follows me is the demo's
-  // sample list, or my followers on the server, read each time Mesajlar comes to the front (with who is online).
+  // Friends: people I follow who follow me back (online first; one-way follows are the Ben tab's two lists). Who
+  // follows me is the demo's sample list, or my followers on the server, read each time Mesajlar comes to the front.
   const liveFollowers = useLiveFollowers(live);
   const friends = friendRows(following, live ? (liveFollowers ?? NOBODY) : FOLLOWS_ME, blocked, userById);
 
@@ -279,7 +279,7 @@ export default function MessagesScreen() {
               </Text>
             ) : undefined
           }
-          ListEmptyComponent={<Text style={styles.empty}>{'Henüz arkadaşın yok. Odalarda yeni insanlarla tanış!'}</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{'Henüz arkadaşın yok. Karşılıklı takipleştiğin kişiler burada görünür.'}</Text>}
           renderItem={({ item }) => <FriendRow friend={item} />}
         />
       )}
@@ -450,8 +450,8 @@ function ConversationRow({ conv, intimacy }: { conv: Conversation; intimacy: num
 }
 
 function FriendRow({ friend }: { friend: Friend }) {
-  const { user: u, iFollow, followsMe } = friend;
-  const relation = iFollow && followsMe ? 'Karşılıklı takip' : iFollow ? 'Takip ediyorsun' : 'Seni takip ediyor';
+  // Everyone here follows me back (lib/friend-rows).
+  const { user: u } = friend;
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   return (
@@ -467,7 +467,7 @@ function FriendRow({ friend }: { friend: Friend }) {
         </View>
         <Text style={styles.last} numberOfLines={1}>
           <Text style={{ color: u.online ? semantic.actionText : colors.textDim }}>{u.online ? 'Çevrimiçi' : 'Çevrimdışı'}</Text>
-          {` · ${relation}`}
+          {' · Karşılıklı takip'}
         </Text>
       </View>
       <Pressable style={styles.roundBtn} onPress={() => router.push(`/sohbet/${u.id}`)} hitSlop={6} accessibilityLabel={`${u.name} ile mesajlaş`}>

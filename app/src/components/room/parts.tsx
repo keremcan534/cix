@@ -13,7 +13,7 @@ import { userById, type Gift } from '@/data/mock';
 import type { FeedMsg } from '@/lib/chat-feed';
 import { stickerIdOf } from '@/lib/stickers';
 import { micHaptic, pressHaptic, tapHaptic } from '@/lib/haptics';
-import { colors, fonts, semantic } from '@/theme';
+import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 import { Icon3D } from '@/components/Icon3D';
 import { Art } from '@/components/Art';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
@@ -24,6 +24,8 @@ import { nameLine, nameSize } from '@/lib/seat-fit';
 import { levelsLive, voiceLevel } from '@/lib/live/voice-level';
 import { RollingNumber } from '@/components/fx/rolling-number';
 import { BounceBadge } from '@/components/fx/bounce-badge';
+import { AssetView } from '@/components/fx/anim-player';
+import type { Asset } from '@/data/animations';
 
 export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -185,7 +187,7 @@ export function Seat({
               <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
             </View>
           )}
-          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
+          {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
           // Küçült: only the mic's number (the host's crown), so the strip stays one short line per row.
@@ -248,21 +250,22 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
 }
 
 /**
- * `pre`: pictures that flash by before `emoji` settles (Taş Kağıt Makas shuffling its hands). `badge`: a short
- * result under the picture (the dice's number, the hand's name), shown `badgeAt` ms in. `ms`: how long it all stays.
+ * `pre`: pictures that flash by before `emoji` settles (the die tumbling, Taş Kağıt Makas shuffling its hands). `badge`:
+ * a short result under the picture (the dice's number, the hand's name), shown `badgeAt` ms in. `ms`: how long it all
+ * stays. `art`: a Hareketli item's picture (lib/animations), drawn instead of `emoji` (then its name).
  */
-export type SeatReactionData = { emoji: string; key: number; pre?: string[]; badge?: string; badgeAt?: number; ms?: number };
+export type SeatReactionData = { emoji: string; key: number; art?: Asset; pre?: string[]; badge?: string; badgeAt?: number; ms?: number };
 export const REACTION_MS = 2600;
 /** A Hamle with a result (lib/room-moves) stays long enough to be read. */
 export const RESULT_MS = 4400;
 const SHUFFLE_STEP_MS = 170;
 
 /**
- * An emoji over a seated person's avatar (seat reaction): it pops in, beats a few times, then fades. A sticker covers
- * the photo and stays on it; an animated one (Duygular) plays over and over instead of beating. A plain emoji is
- * smaller and rises as it goes.
+ * An emoji over a seated person's avatar (seat reaction): it pops in, beats a few times, then fades. A sticker or a
+ * Hareketli picture covers the photo and stays on it; an animated sticker (the Emoji tab) plays over and over instead
+ * of beating. A plain emoji is smaller and rises as it goes.
  */
-export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms = REACTION_MS }: { emoji: string; size: number; still?: boolean } & Pick<SeatReactionData, 'pre' | 'badge' | 'badgeAt' | 'ms'>) {
+export function SeatReaction({ emoji, art, size, still, pre, badge, badgeAt = 0, ms = REACTION_MS }: { emoji: string; size: number; still?: boolean } & Pick<SeatReactionData, 'art' | 'pre' | 'badge' | 'badgeAt' | 'ms'>) {
   // The shuffle before the result: one picture after another, then `emoji` (reduced motion shows the result at once).
   const shuffle = still ? 0 : (pre?.length ?? 0);
   const [step, setStep] = useState(0);
@@ -278,8 +281,9 @@ export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms =
     const t = setTimeout(() => setBadgeOn(true), still ? 0 : Math.max(badgeAt, shuffle * SHUFFLE_STEP_MS));
     return () => clearTimeout(t);
   }, [badge, badgeAt, shuffle, still]);
-  const id = stickerIdOf(emoji);
-  const cover = !!id;
+  // The result decides how it moves (a shuffle's pictures only flash by).
+  const id = art ? null : stickerIdOf(emoji);
+  const cover = !!art || !!id;
   const moving = !!id && isAnimatedSticker(id);
   const [v] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {
@@ -324,7 +328,12 @@ export function SeatReaction({ emoji, size, still, pre, badge, badgeAt = 0, ms =
         ],
       }}
     >
-      <ReactionArt emoji={shown} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
+      {art ? (
+        <AssetView asset={art} size={size * 1.12} />
+      ) : (
+        // A new picture is a new player (each step of a shuffle, then the result), so the result always draws and plays.
+        <ReactionArt key={shown} emoji={shown} size={size * (cover ? 1.12 : 0.95)} play={still ? 'still' : 'loop'} />
+      )}
       {badge && badgeOn && (
         <View style={[styles.resultBadge, { bottom: -size * 0.06 }]} accessibilityLabel={`Sonuç: ${badge}`}>
           <Text style={[styles.resultText, { fontSize: Math.round(Math.max(11, Math.min(18, size * 0.26))) }]} numberOfLines={1}>
@@ -384,13 +393,24 @@ export function ChatLine({
               <Text style={{ color: colors.textDim }}> → </Text>
               <Text style={styles.giftName}>{to}</Text>
               {giftArtOf(g.giftId) ? `  ${g.name}` : `  ${g.emoji} ${g.name}`}
-              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Uğurlu' : ''}`}
+              {`${g.count > 1 ? ` ×${g.count}` : ''}${g.lucky ? ' · Şanslı' : ''}`}
             </Text>
             {giftArtOf(g.giftId) && <GiftArt giftId={g.giftId} emoji={g.emoji} size={24} />}
           </>
         ) : (
           <Text style={styles.giftText}>{msg.text}</Text>
         )}
+      </View>
+    );
+  }
+  if (msg.system && msg.notice) {
+    return (
+      <View style={styles.noticeMsg} accessibilityRole="text" accessibilityLabel={`Sistem bildirimi: ${msg.text}`}>
+        <View style={styles.noticeHead}>
+          <Ionicons name="shield-checkmark" size={14} color={colors.gold} />
+          <Text style={styles.noticeTag}>SimilarClub</Text>
+        </View>
+        <Text style={styles.noticeText}>{msg.text}</Text>
       </View>
     );
   }
@@ -605,8 +625,11 @@ export function useSheetBottom(min = 34) {
   return Math.max(min, bottom + 8);
 }
 
+/** A room sheet over the stage: `scrim` is the clear tap-outside-to-close area above it (no grey veil: SCRIM), the
+ *  sheet itself stands out by its lit top edge and shadow (edge.sheet). */
 export const roomStyles = StyleSheet.create({
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 -10px 30px rgba(0,0,0,0.45)' },
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, ...edge.sheet },
   sheetTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 10 },
 });
 
@@ -648,6 +671,11 @@ const styles = StyleSheet.create({
   // Room events stay in the background of the conversation: no box shouting over people's messages.
   systemMsg: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, maxWidth: '92%' },
   systemText: { color: '#B9C7DE', fontSize: 12 },
+  // The community rules on entering a room: SimilarClub's own notice, set apart from people's lines and room notes.
+  noticeMsg: { alignSelf: 'stretch', gap: 4, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: 'rgba(246,189,96,0.08)', borderWidth: 1, borderColor: 'rgba(246,189,96,0.35)' },
+  noticeHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  noticeTag: { color: colors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  noticeText: { color: '#DCE4F2', fontSize: 12, lineHeight: 17 },
   botMsg: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(34,197,94,0.1)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '90%' },
   botTag: { color: colors.green, fontSize: 11, fontWeight: '900' },
   botText: { color: '#BBF7D0', fontSize: 12, flexShrink: 1 },

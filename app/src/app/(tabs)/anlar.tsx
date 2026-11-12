@@ -37,7 +37,7 @@ import { cityDistanceText } from '@/lib/live/distances';
 import type { PickedImage } from '@/lib/live/profile';
 import { useGreet } from '@/components/use-greet';
 import { useApp } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
 import { BrandLoader } from '@/components/fx/brand-loader';
 import { PostSkeleton, Skeletons } from '@/components/fx/skeleton';
@@ -1018,7 +1018,7 @@ function CommentsSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors, lift, dark }) => ({
+const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
   tab: { color: colors.textDim, fontSize: 17, fontWeight: '600' },
   tabActive: { color: colors.text, fontSize: 20, fontWeight: '800' },
@@ -1072,8 +1072,8 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
   fabText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   composeBar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 10, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   composeHint: { flex: 1, color: colors.textDim, fontSize: 14 },
-  sheetWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { backgroundColor: colors.card, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 12, paddingBottom: 34 },
+  sheetWrap: { flex: 1, backgroundColor: SCRIM },
+  sheet: { backgroundColor: colors.card, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 12, paddingBottom: 34, ...edge.sheet },
   sheetTitle: { color: colors.text, fontWeight: '700', fontSize: 16 },
   composeInput: { color: colors.text, minHeight: 90, fontSize: 16, textAlignVertical: 'top' },
   preview: { width: 110, height: 110, borderRadius: 12, backgroundColor: colors.cardAlt },

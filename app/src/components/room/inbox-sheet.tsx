@@ -18,7 +18,7 @@ import { CallButtons } from '@/components/one-on-one-bar';
 import { callsAvailable, liveCalls, loadProfile } from '@/lib/live';
 import { isLiveUser } from '@/lib/live/messages';
 import { useApp } from '@/store';
-import { colors, semantic } from '@/theme';
+import { SCRIM, colors, semantic } from '@/theme';
 
 /** Unread DMs from people I have not blocked: the badge on the room's messages button. */
 export function useInboxUnread() {
@@ -49,7 +49,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
     };
   }, [openId]);
 
-  // The whole sheet rises with the keyboard (the dimmed area above gives way first), so the reply box and the
+  // The whole sheet rises with the keyboard (the clear area above gives way first), so the reply box and the
   // newest messages stay in view; it stops below the status bar.
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (openId ? setOpenId(null) : close())}>
@@ -165,7 +165,7 @@ export function InboxSheet({ visible, onClose }: { visible: boolean; onClose: ()
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'rgba(8,15,30,0.55)' },
+  root: { flex: 1, backgroundColor: SCRIM },
   backdrop: { flex: 1 },
   sheet: {
     height: '78%',

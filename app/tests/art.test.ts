@@ -40,14 +40,18 @@ describe('Görsel dosyaları', () => {
     const files = new Map([...reactionArt.matchAll(/^  '([^']+)': (?:\(\) => )?require\('([^']+)'\)/gm)].map((m) => [m[1], m[2]]));
     const ids = ALL_STICKERS.map((x) => x.id);
     for (const id of ids) assert.ok(files.has(id), `${id}: görsel yok`);
-    // Art that isn't a pick: what a Hamle plays on the mics (the three hands, the bang, the flying kiss).
-    assert.deepEqual([...files.keys()].filter((k) => !ids.includes(k)).sort(), ['hamle-carpma', 'hamle-kagit', 'hamle-makas', 'hamle-opucuk', 'hamle-tas']);
-    // Two names for one file only where a Hamle means it: a kiss to either side, and Taş Kağıt Makas's own tile.
+    // Art that isn't a pick: what a Hamle plays on the mics (the three hands, the bang, the flying kiss, the die's faces).
+    assert.deepEqual(
+      [...files.keys()].filter((k) => !ids.includes(k)).sort(),
+      ['hamle-carpma', 'hamle-kagit', 'hamle-makas', 'hamle-opucuk', 'hamle-tas', 'hamle-zar-1', 'hamle-zar-2', 'hamle-zar-3', 'hamle-zar-4', 'hamle-zar-5', 'hamle-zar-6'],
+    );
+    // Two names for one file only where a Hamle means it: a kiss to either side is the blowing kiss (the left one
+    // turned round), and Taş Kağıt Makas's own tile.
     const shared = new Map<string, string[]>();
     for (const [id, f] of files) shared.set(f, [...(shared.get(f) ?? []), id]);
     assert.deepEqual(
       [...shared.values()].filter((v) => v.length > 1).map((v) => v.sort()).sort((a, b) => a[0].localeCompare(b[0])),
-      [['hamle-opucuk', 'hamle-opucuk-sag', 'hamle-opucuk-sol'], ['hamle-tas', 'hamle-tkm']],
+      [['duygu-opucuk', 'hamle-opucuk-sag', 'hamle-opucuk-sol'], ['hamle-tas', 'hamle-tkm']],
     );
     const bytes = new Set([...shared.keys()].map((f) => readFileSync(resolve(SRC, 'components', f)).toString('base64')));
     assert.equal(bytes.size, shared.size, 'aynı görsel iki çıkartmada');
@@ -94,6 +98,17 @@ describe('Emoji ve çıkartma paketleri', () => {
       ['basic', 'duygu', 'muzik', 'hamle', 'fun', 'love', 'animals', 'vip', 'anim'],
     );
     assert.deepEqual(FREE_PACK_IDS, ['basic', 'duygu', 'muzik', 'hamle']);
+  });
+  test('Temel emoji panelinden ve mağazadan kalktı; gönderilmiş çıkartmaları yine çizilir', () => {
+    assert.deepEqual(
+      STICKER_PACKS.filter((p) => p.retired).map((p) => p.id),
+      ['basic'],
+    );
+    // Free, so nobody loses a purchase; no paid pack is retired.
+    for (const p of STICKER_PACKS.filter((x) => x.retired)) assert.ok(!p.price && !p.minVip, p.name);
+    assert.match(read('app/magaza.tsx'), /STICKER_PACKS\.filter\(\(p\) => !p\.roomOnly && !p\.retired\)/);
+    const art = read('components/ReactionArt.tsx');
+    for (const x of STICKER_PACKS.find((p) => p.id === 'basic')!.stickers) assert.ok(art.includes(`'${x.id}': require(`), x.id);
   });
   test('ücretli paketler yalnız özel çizim çıkartma, standart emojiler ücretsiz ve ayrı', () => {
     for (const p of STICKER_PACKS) for (const x of p.stickers) assert.match(x.id, /^[a-z0-9-]+$/, `${p.name}: ${x.id}`);
@@ -143,7 +158,16 @@ describe('Duygular (Animated Noto Emoji, CC BY 4.0)', () => {
       // Not in the catalog, so they carry their own name and the emoji drawn where the animation can't play.
       assert.ok(MOVE_ART[id]?.name && MOVE_ART[id].emoji, `${id}: yedek emoji`);
     }
-    assert.deepEqual(Object.keys(MOVE_ART).sort(), ['hamle-carpma', 'hamle-kagit', 'hamle-makas', 'hamle-opucuk', 'hamle-tas']);
+    // The die's six faces: the games' die pictures, each its own face (the web draws ⚀…⚅).
+    for (let n = 1; n <= 6; n++) {
+      assert.ok(art.includes(`'hamle-zar-${n}': require('../../assets/art/zar-zar-yuzu-${n}.png'),`), `zar ${n}`);
+      assert.equal(MOVE_ART[`hamle-zar-${n}`]?.emoji, String.fromCodePoint(0x267f + n), `zar ${n}: yedek`);
+    }
+    assert.deepEqual(Object.keys(MOVE_ART).sort(), ['hamle-carpma', 'hamle-kagit', 'hamle-makas', 'hamle-opucuk', 'hamle-tas', 'hamle-zar-1', 'hamle-zar-2', 'hamle-zar-3', 'hamle-zar-4', 'hamle-zar-5', 'hamle-zar-6']);
+    // The kiss to either side is the blowing kiss, in the panel and on the mic; the left one is turned round there.
+    assert.equal(files('hamle-opucuk-sol'), 'duygu-opucuk');
+    assert.equal(files('hamle-opucuk-sag'), 'duygu-opucuk');
+    assert.match(art, /MIRRORED_ART\.has\(id\)[\s\S]*scaleX: -1/);
     assert.deepEqual(RPS.map((h) => MOVE_ART[h.id].name), RPS.map((h) => h.name));
     assert.match(readFileSync(resolve(SRC, '../assets/reactions/duygu/LICENSE.txt'), 'utf8'), /muzik-\*\.json and hamle-\*\.json/);
   });

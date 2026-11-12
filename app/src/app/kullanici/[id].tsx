@@ -9,11 +9,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text, TextInput } from '@/components/text';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { GiftArt } from '@/components/GiftArt';
-import { FollowListSheet } from '@/components/follow-list-sheet';
+import { FollowListSheet, MY_LISTS } from '@/components/follow-list-sheet';
 import { Avatar, Button, FramedAvatar, GradientButton, LevelChips, VerifiedBadge, VipBadge, VipTitle } from '@/components/ui';
 import { COSMETICS, FAN_LEVELS, cosmeticById, fanLevel, roomLevel, ROOM_LEVEL_ICONS } from '@/data/catalog';
 import { callPrice } from '@/data/economy';
-import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, USERS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
+import { FOLLOWS_ME, GIFTS, INTERESTS, MOMENTS, ROOMS, userById, type Gift, type Moment, type Room, type User } from '@/data/mock';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { privacyOf } from '@/data/privacy';
 import { COUNTRIES } from '@/data/social-ui';
@@ -35,7 +35,8 @@ import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveCalls, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
 import { callLabel, callPair, usePair } from '@/components/one-on-one-bar';
-import { loadFollowList, type FollowSide } from '@/lib/live/follows';
+import { loadMyList } from '@/lib/live/follows';
+import { splitTies, tieCounts, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { agoText, feed as momentFeed } from '@/lib/live/moments';
 import { addAlbumPhoto, followOnServer, loadMe, loadPublicProfile, loadShowcase, profilePatch, removeAlbumPhoto, saveMyExtras, saveMyProfile, uploadAvatar, type ProfileEdit, type SocialCounts } from '@/lib/live/profile';
 import { lookOf, useLooks } from '@/lib/live/looks';
@@ -57,7 +58,7 @@ import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { AffiliationPills, FEMALE_FILL, GenderChip, MALE_FILL, useAffiliations, useStaffBadge, type Affiliation } from '@/components/profile-badges';
 import { Icon3D } from '@/components/Icon3D';
 import { useApp, type FanClub } from '@/store';
-import { makeStyles, useTheme } from '@/theme';
+import { SCRIM, makeStyles, useTheme } from '@/theme';
 import { Art } from '@/components/Art';
 import { Photo } from '@/components/photo';
 import { useReport } from '@/components/report-sheet';
@@ -73,6 +74,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'iliski', label: 'Bağlar' },
 ];
 type Sheet = 'none' | 'more' | 'report' | 'call' | 'gift';
+/** My Takip ettiklerim / Takipçilerim (friends are Mesajlar › Arkadaşlarım). */
+type OneWay = Exclude<TieSide, 'friends'>;
 const NO_SHOWCASE = showcaseView({ gifts: [], rides: [], entries: [], medals: [], titles: [] });
 const BAR_H = 52;
 const TAB_H = 48;
@@ -179,10 +182,16 @@ export default function UserProfile() {
   const country = countryCode ? COUNTRIES.find((c) => c.code === countryCode) : undefined;
   // Live mode: how far they are from me by our two cities, as the server sent it (none when unknown or private).
   const distanceText = live && serverId && !isMe ? cityDistanceText(distanceOf(serverId)) : null;
-  // Live mode: the server's counts (null = not read yet, shown as "—"). Friends: people who follow each other.
-  const followers = live ? (counts?.followers ?? null) : (user.age * 37) % 900;
-  const followingCount = live ? (counts?.following ?? null) : isMe ? following.size : (user.age * 13) % 200;
-  const friends = live ? (counts?.friends ?? null) : isMe ? USERS.filter((u) => following.has(u.id) && FOLLOWS_ME.has(u.id)).length : (user.age * 7) % 60;
+  // Takipçi, Takip and Arkadaş counted as the owner's three lists are (lib/follow-ties): one-way follows, and the
+  // people who follow each other apart, as friends. Live: the server's (null = not read yet, shown as "—"); demo, my
+  // own: the sample people, as on the Ben tab. Only mine open a list: someone else's are theirs alone.
+  const ties = counts ? tieCounts(counts) : null;
+  const myDemo = isMe && !live ? splitTies(tiesOf(following, FOLLOWS_ME, blocked)) : null;
+  const followers = live ? (ties?.followers ?? null) : myDemo ? myDemo.followers.length : (user.age * 37) % 900;
+  const followingCount = live ? (ties?.following ?? null) : myDemo ? myDemo.following.length : (user.age * 13) % 200;
+  const friends = live ? (ties?.friends ?? null) : myDemo ? myDemo.friends.length : (user.age * 7) % 60;
+  const loadList = (side: OneWay) =>
+    live ? loadMyList(side) : (myDemo?.[side] ?? []).map(({ id: uid }) => { const u = userById(uid); return { id: u.id, name: u.name, avatarUrl: u.avatar || null }; });
   // Live mode: their public ID, the one their own Ben tab shows: a special ID they wear, else the number made from
   // their server id (data/profile displayId), which agency invites also take. Someone else's look is read here.
   useLooks(serverId && !isMe ? [serverId] : [], live);
@@ -253,7 +262,7 @@ export default function UserProfile() {
   const [editOpen, setEditOpen] = useState(false);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
   const [tabY, setTabY] = useState(0);
-  const [list, setList] = useState<FollowSide | null>(null);
+  const [list, setList] = useState<OneWay | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
   // Live mode: the Vitrin as the server has it (gift wall, rides, entry effects, medals, titles), read when the tab
@@ -603,11 +612,12 @@ export default function UserProfile() {
           </Pressable>
 
           <View style={styles.stats}>
-            <Stat n={followers} label="Takipçi" onPress={serverId ? () => setList('followers') : undefined} />
+            {/* Someone else's numbers open nothing: who follows them and whom they follow is theirs alone. */}
+            <Stat n={followers} label="Takipçi" onPress={isMe ? () => setList('followers') : undefined} />
             <View style={styles.vSep} />
-            <Stat n={followingCount} label="Takip" onPress={serverId ? () => setList('following') : undefined} />
+            <Stat n={followingCount} label="Takip" onPress={isMe ? () => setList('following') : undefined} />
             <View style={styles.vSep} />
-            <Stat n={friends} label="Arkadaş" />
+            <Stat n={friends} label="Arkadaş" onPress={isMe ? () => router.push({ pathname: '/(tabs)/mesajlar', params: { tab: 'friends' } }) : undefined} />
             <View style={styles.vSep} />
             <Stat n={giftCount} label="Hediye" onPress={() => setTab('onur')} />
           </View>
@@ -1028,15 +1038,7 @@ export default function UserProfile() {
               ]
         }
       />
-      {serverId && (
-        <FollowListSheet
-          visible={list !== null}
-          title={list === 'following' ? (isMe ? 'Takip ettiklerin' : 'Takip edilenler') : isMe ? 'Takipçilerin' : 'Takipçiler'}
-          empty={list === 'following' ? (isMe ? 'Henüz kimseyi takip etmiyorsun.' : 'Henüz kimseyi takip etmiyor.') : isMe ? 'Henüz takipçin yok.' : 'Henüz takipçisi yok.'}
-          load={() => loadFollowList(list ?? 'followers', serverId)}
-          onClose={() => setList(null)}
-        />
-      )}
+      {isMe && <FollowListSheet visible={list !== null} {...MY_LISTS[list ?? 'followers']} load={() => loadList(list ?? 'followers')} onClose={() => setList(null)} />}
       {giftable && <ProfileGiftSheet visible={sheet === 'gift'} name={user.name} gifts={giftChoices} coins={coins} svipLevel={svipLevel} onClose={() => setSheet('none')} onSend={sendGift} />}
 
       {editOpen && (
@@ -1733,7 +1735,7 @@ function PrivateStats(p: { coins: number; diamonds: number; vipUntil: string | n
 }
 
 
-const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
+const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   cover: { width: '100%', height: 240, backgroundColor: colors.card },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26, paddingHorizontal: 16, paddingBottom: 6 },
   avatarWrap: { marginTop: -48, alignSelf: 'flex-start', borderRadius: 60, borderWidth: 3, borderColor: colors.bg },
@@ -1850,8 +1852,8 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   followText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   followingText: { color: colors.text },
   roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...lift },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34 },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  modalSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, ...edge.sheet },
   modalTitle: { color: colors.text, fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
   inputLabel: { color: colors.textDim, fontSize: 13, fontWeight: '700', marginTop: 10, marginBottom: 6 },
   input: { backgroundColor: colors.cardAlt, color: colors.text, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },

@@ -1,5 +1,6 @@
-// Takipçiler / Takip: a bottom sheet listing people; a tap opens their profile. The list is handed in as a
-// loader so the Ben tab and someone else's profile (live: the server; demo: the sample people) share it.
+// Takip ettiklerin / Takipçilerin: a bottom sheet listing people; a tap opens their profile. Only my own lists open
+// (lib/follow-ties): another person's Takipçi and Takip are numbers only. The list is handed in as a loader so the
+// Ben tab and my profile screen (live: the server; demo: the sample people) share it.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -8,16 +9,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
-import { makeStyles, radius, space, type, useTheme } from '@/theme';
+import { SCRIM, makeStyles, radius, space, type, useTheme } from '@/theme';
 import { RowSkeleton, Skeletons } from '@/components/fx/skeleton';
 
 export type ListedPerson = { id: string; name: string; avatarUrl?: string | null };
+
+/** My two one-way lists as the sheet shows them; people who follow each other are in Arkadaşlar instead. */
+export const MY_LISTS = {
+  following: { title: 'Takip ettiklerin', empty: 'Şimdilik kimse yok.', note: "Karşılıklı takipleştiklerin Arkadaşlar'da." },
+  followers: { title: 'Takipçilerin', empty: 'Şimdilik kimse yok.', note: "Karşılıklı takipleştiklerin Arkadaşlar'da." },
+} as const;
 
 export function FollowListSheet({
   title,
   visible,
   load,
   empty,
+  note,
   onClose,
 }: {
   title: string;
@@ -26,6 +34,8 @@ export function FollowListSheet({
   load: () => Promise<ListedPerson[]> | ListedPerson[];
   /** Shown when the list is empty. */
   empty: string;
+  /** A short line under the title (who is not on this list). */
+  note?: string;
   onClose: () => void;
 }) {
   const { colors } = useTheme();
@@ -68,7 +78,10 @@ export function FollowListSheet({
       <Pressable style={s.scrim} onPress={close} accessibilityLabel={`${title} listesini kapat`} />
       <View style={[s.sheet, { paddingBottom: Math.max(space.lg, bottom + 8) }]}>
         <View style={s.header}>
-          <Text style={s.title}>{title}</Text>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={s.title}>{title}</Text>
+            {note && <Text style={s.note}>{note}</Text>}
+          </View>
           <Pressable onPress={close} hitSlop={10} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">
             <Ionicons name="close" size={22} color={colors.text} />
           </Pressable>
@@ -107,11 +120,12 @@ export function FollowListSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { maxHeight: '80%', minHeight: 240, backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg },
+const useStyles = makeStyles(({ colors, edge }) => ({
+  scrim: { flex: 1, backgroundColor: SCRIM },
+  sheet: { maxHeight: '80%', minHeight: 240, backgroundColor: colors.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg, ...edge.sheet },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md },
-  title: { flex: 1, color: colors.text, fontSize: type.title, fontWeight: '800' },
+  title: { color: colors.text, fontSize: type.title, fontWeight: '800' },
+  note: { color: colors.textDim, fontSize: type.caption },
   close: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   list: { flexGrow: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.sm },

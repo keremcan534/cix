@@ -11,7 +11,7 @@ import { Text, TextInput } from '@/components/text';
 import { Button, StateIcon } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import { message } from '@/lib/live';
-import { makeStyles, radius, space, useTheme } from '@/theme';
+import { SCRIM, makeStyles, radius, space, useTheme } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -294,7 +294,7 @@ export function Quote({ text }: { text: string }) {
 }
 
 // --- Sheet (bottom, over the panel) -------------------------------------------------------------------------
-/** The bottom card over a dimmed panel; tapping outside closes it. */
+/** The bottom card over the panel (not dimmed); tapping outside closes it. */
 export function Overlay({ onClose, children, label }: { onClose: () => void; children: ReactNode; label: string }) {
   const s = useStyles();
   return (
@@ -404,7 +404,7 @@ export function Toast({ text, onDone }: { text: string; onDone: () => void }) {
   );
 }
 
-const useStyles = makeStyles(({ colors, surface, dark, lift }) => ({
+const useStyles = makeStyles(({ colors, surface, dark, lift, edge }) => ({
   scroll: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: 96, gap: space.md },
   state: { alignItems: 'center', justifyContent: 'center', paddingVertical: 56, paddingHorizontal: space.xl, gap: space.sm },
   stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: space.xs },
@@ -432,9 +432,11 @@ const useStyles = makeStyles(({ colors, surface, dark, lift }) => ({
   copy: { padding: 4, borderRadius: radius.sm, backgroundColor: surface.pressed },
   quote: { color: colors.text, fontSize: 13, lineHeight: 19, padding: space.md, borderRadius: radius.md, backgroundColor: colors.cardAlt },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  dim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: dark ? 'rgba(0,0,0,0.55)' : 'rgba(11,26,46,0.35)' },
+  // The panel behind is not greyed out (SCRIM): the sheet stands out by its own edge.
+  dim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: SCRIM },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
+    ...edge.sheet,
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,

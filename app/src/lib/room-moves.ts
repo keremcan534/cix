@@ -14,9 +14,12 @@ export const RPS = [
   { id: 'hamle-makas', name: 'Makas' },
 ] as const;
 
+/** The die's six faces by the number thrown: their pictures (components/ReactionArt, assets/art/zar-zar-yuzu-N). */
+export const diceFace = (n: number) => `hamle-zar-${n}`;
+
 /**
  * The pictures a Hamle plays that aren't picks of the tab (so the catalog doesn't name them): the three hands, the
- * flying kiss, the bang a punch lands with. `emoji`: what is drawn where the animation can't play.
+ * flying kiss, the bang a punch lands with, the die's faces. `emoji`: what is drawn where the picture can't play.
  */
 export const MOVE_ART: Record<string, { name: string; emoji: string }> = {
   'hamle-tas': { name: 'Taş', emoji: '✊' },
@@ -24,7 +27,14 @@ export const MOVE_ART: Record<string, { name: string; emoji: string }> = {
   'hamle-makas': { name: 'Makas', emoji: '✌️' },
   'hamle-opucuk': { name: 'Öpücük', emoji: '💋' },
   'hamle-carpma': { name: 'Çarpma', emoji: '💥' },
+  ...Object.fromEntries(['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'].map((emoji, i) => [diceFace(i + 1), { name: `Zar: ${i + 1}`, emoji }])),
 };
+
+/**
+ * Pictures drawn facing the other way. The kiss to the left plays the same blowing kiss as the one to the right, whose
+ * heart flies off to the right; turned round, it flies to the left. The panel and the mic both draw it turned.
+ */
+export const MIRRORED_ART: ReadonlySet<string> = new Set(['hamle-opucuk-sol']);
 
 /** The Hamle tab's picks (data/catalog 'hamle' pack) and what each one does. */
 const PICKS: Record<string, 'dice' | 'rps' | { a: 'kiss' | 'punch'; d: Side }> = {
@@ -46,6 +56,30 @@ export function moveOfPick(stickerId: string | null | undefined, rnd: () => numb
   if (p === 'dice') return { a: 'dice', n: 1 + Math.min(5, Math.floor(rnd() * 6)) };
   if (p === 'rps') return { a: 'rps', n: Math.min(2, Math.floor(rnd() * 3)) };
   return { ...p };
+}
+
+/**
+ * What a move puts on the sender's mic, as a sticker id: the picture its pick shows in the panel (a kiss or a punch to
+ * the left faces left), the face the die landed on, the hand that came out. The result travels in the move (`n`, drawn
+ * once by the sender's phone), so every phone in the room shows the same face and the same hand.
+ */
+export function moveArt(m: Move): string {
+  if (m.a === 'dice') return diceFace(m.n);
+  if (m.a === 'rps') return RPS[m.n].id;
+  return `hamle-${m.a === 'kiss' ? 'opucuk' : 'yumruk'}-${m.d === 'l' ? 'sol' : 'sag'}`;
+}
+
+/** The die tumbling: faces in a fixed order (no face twice in a row, whichever is left out). */
+const TUMBLE = [3, 1, 5, 2, 6, 4, 1, 5, 3];
+/**
+ * The pictures that flash by on the mic before a result settles (sticker ids): the die tumbling through the other faces
+ * (never the one thrown, so it doesn't seem to land early), or the three hands twice. Fixed, so every phone shows the
+ * same; a kiss or a punch has none.
+ */
+export function moveShuffle(m: Move): string[] {
+  if (m.a === 'dice') return TUMBLE.filter((f) => f !== m.n).map(diceFace);
+  if (m.a === 'rps') return [...RPS, ...RPS].map((h) => h.id);
+  return [];
 }
 
 /** A move as another phone sent it, or null when it isn't one (only these shapes and ranges are drawn). */

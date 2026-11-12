@@ -20,7 +20,8 @@
 //   POST /api/rooms/seat   { room, action: lock|unlock, seat }              → { lockedSeats }
 //   POST /api/rooms/queue  { room, action: join|leave }                     → { queue }    (the mic queue, when on)
 //   POST /api/rooms/queue  { room, action: approve|reject, user, seat? }    → { queue }    (owner or admin)
-// DJs and the room's music: music.mjs (a DJ plays music and is not staff: none of the above).
+// DJs and the room's music: music.mjs (a DJ plays music and is not staff: none of the above). The Patron koltuğu:
+// boss-seat.mjs. A room left without its owner and admins rests after a few minutes: room-autoclose.mjs.
 // Ranks (migration 025): owner > Süper Yönetici > Yönetici > everyone else. Staff act only on people below their
 // own rank: a Yönetici on members, a Süper Yönetici also on Yöneticiler, the owner on everyone.
 // Room mutes are sanctions (sanctions.mjs): their own row, server time, audited. A room admin mutes for up to
@@ -33,7 +34,7 @@ import { HttpError, LIVE_SANCTION, SANCTION_SELECT, UUID, auth, blockedBetween, 
 // live.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { announceRoom, deleteVoiceRoom, presenceTracked, removeFromVoice, roomService, voiceCounts } from './live.mjs';
 import { applySanction, audit, liftSanction, refreshVoice } from './sanctions.mjs';
-import { BOSS_SEAT_MIN_COINS, BOSS_SEAT_MIN_LEVEL, applyRules, memberCap, rulesOf } from './room-rules.mjs';
+import { applyRules, memberCap, rulesOf } from './room-rules.mjs';
 import { ROOM_COVERS, ROOM_THEMES, vipLevelOf } from './catalog.mjs';
 import { statusOf } from './economy.mjs';
 // music.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
@@ -47,6 +48,8 @@ import { endCrossPkOfRoom } from './pk-cross.mjs';
 import { closeRoomEvents, roomEventBrief } from './events.mjs';
 // room-decor.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
 import { shownBackground } from './room-decor.mjs';
+// boss-seat.mjs imports this file too; its functions are only used inside handlers, after both have loaded.
+import { bossOf, bossRulesChanged, clearBoss } from './boss-seat.mjs';
 
 const TYPES = ['free', 'stage', 'qa', 'music', 'event', 'private'];
 /** LiveKit room name of a server room. */
@@ -79,6 +82,8 @@ const out = (r) => ({
   hasPassword: !!r.password_hash,
   createdAt: r.created_at,
   closed: !!r.closed_at,
+  // Resting for lack of staff (room-autoclose.mjs): only its owner and admins get in, and their coming opens it.
+  paused: !!r.paused_at,
   listeners: Number(r.listeners ?? 0),
   level: roomLevel(r.owner_room_xp ?? 0),
   xp: Number(r.owner_room_xp ?? 0),
@@ -97,9 +102,10 @@ const out = (r) => ({
   bgId: r.bg_id ?? null,
   background: shownBackground(r),
   coverUrl: r.cover_url ?? null,
-  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Patron koltuğu holder, if any.
+  // Oda ayarları and Moderasyon (room-rules.mjs), the same for every phone; the Patron koltuğu (boss-seat.mjs):
+  // boss, the holder (what older apps read), and bossSeat, its mode, sitting and numbers.
   rules: rulesOf(r.rules),
-  boss: r.boss_id && rulesOf(r.rules).bossSeat ? { id: r.boss_id, name: r.boss_name ?? 'Üye', avatarUrl: r.boss_avatar ?? null } : null,
+  ...bossOf(r),
 });
 /** Listeners: LiveKit's own count when it can be read (withVoiceCounts), else its webhooks (live.mjs room_presence). */
 const SELECT = `SELECT r.*, u.name AS owner_name, u.avatar_url AS owner_avatar, u.room_xp AS owner_room_xp,
@@ -217,6 +223,7 @@ const seatNo = (v) => int(v, 1, 99);
 /**
  * Whether `u` may join the LiveKit room `name`: a server room that exists and is open, not banned there, the
  * right password for a private room (owner and admins skip it). Other names only with ALLOW_PROTOTYPE_ROOMS=1.
+ * A room resting for lack of staff (room-autoclose.mjs) lets only its owner and admins in, and their coming opens it.
  */
 export async function voiceAccess(name, u, password) {
   const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
@@ -233,6 +240,10 @@ export async function voiceAccess(name, u, password) {
   if (ban.rowCount) throw new HttpError(403, ban.rows[0].until ? 'Bu odadan geçici olarak çıkarıldın' : 'Bu odaya giremezsin');
   if (await blockedBetween(room.owner, u.id)) throw new HttpError(403, 'Bu odaya giremezsin');
   const staff = room.owner === u.id || (await isAdmin(room.id, u.id));
+  if (room.paused_at) {
+    if (!staff) throw new HttpError(410, 'Oda şu an kapalı: yetkilisi gelince açılır');
+    await db.query('UPDATE rooms SET paused_at = NULL, no_staff_since = NULL WHERE id = $1', [room.id]);
+  }
   const member = !staff && (await db.query("SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2 AND status = 'member'", [room.id, u.id])).rowCount > 0;
   // A private room (Özel oda): its staff and members come in; anyone else only with its password, if it has one.
   const privateRoom = room.room_type === 'private';
@@ -256,34 +267,6 @@ export async function voiceAccess(name, u, password) {
   if (member) await db.query('UPDATE room_members SET seen_at = now() WHERE room_id = $1 AND user_id = $2', [room.id, u.id]);
   // The owner comes into their room: its followers hear that it opened (room-follow.mjs, at most every 6 hours).
   if (room.owner === u.id && !already) void roomOpened(room.id, room.owner);
-}
-
-/**
- * Patron koltuğu: the room's top gifter of the last 24 hours (once past BOSS_SEAT_MIN_COINS) sits on it while the
- * owner keeps it on and the room is Lv.3 or more; anyone banned from the room is left out. When the holder changes,
- * the room's phones are told to read the room again. Never throws.
- */
-export async function refreshBoss(roomId) {
-  try {
-    const r = (await db.query('SELECT r.id, r.rules, r.boss_id, r.closed_at, u.room_xp FROM rooms r JOIN users u ON u.id = r.owner WHERE r.id = $1', [roomId])).rows[0];
-    if (!r || r.closed_at) return;
-    let boss = null;
-    if (rulesOf(r.rules).bossSeat && roomLevel(r.room_xp ?? 0) >= BOSS_SEAT_MIN_LEVEL) {
-      const top = await db.query(
-        `SELECT g.sender, sum(g.total) AS coins FROM gift_events g
-          WHERE g.room = ANY($1::text[]) AND g.created_at > now() - interval '24 hours'
-            AND NOT EXISTS (SELECT 1 FROM room_bans b WHERE b.room_id = $2 AND b.user_id = g.sender AND (b.until IS NULL OR b.until > now()))
-          GROUP BY g.sender ORDER BY coins DESC, min(g.created_at) LIMIT 1`,
-        [[roomId, liveKitName(roomId)], roomId],
-      );
-      if (top.rowCount && Number(top.rows[0].coins) >= BOSS_SEAT_MIN_COINS) boss = top.rows[0].sender;
-    }
-    if (boss === (r.boss_id ?? null)) return;
-    await db.query('UPDATE rooms SET boss_id = $2 WHERE id = $1', [roomId, boss]);
-    announceRoom(liveKitName(roomId));
-  } catch (e) {
-    console.error('boss seat', roomId, String(e).slice(0, 200));
-  }
 }
 
 /** Members who stayed away longer than the room allows (rules.autoRemoveDays) are no longer members; staff stay. */
@@ -312,7 +295,8 @@ async function refreshRoomVoices(roomId, only = null) {
 /**
  * Whether someone already in the LiveKit room `name` may stay (checked when LiveKit says they joined, since
  * LiveKit renews a connected person's token without asking us): the room is still open, they aren't banned
- * from it or from the app, and the owner hasn't blocked them. 'closed' when the room itself should end.
+ * from it or from the app, and the owner hasn't blocked them. 'closed' when the room itself should end. While the
+ * room rests for lack of staff (room-autoclose.mjs) only its owner and admins stay.
  */
 export async function mayStay(name, identity) {
   // A 1v1 call (one-on-one.mjs): its two people, while it is live.
@@ -325,10 +309,11 @@ export async function mayStay(name, identity) {
   if (name.startsWith('call-')) return 'closed';
   const m = /^oda-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(name);
   if (!m) return PROTOTYPE_ROOMS ? 'yes' : 'closed';
-  const r = await db.query('SELECT id, owner, closed_at FROM rooms WHERE id = $1', [m[1]]);
+  const r = await db.query('SELECT id, owner, closed_at, paused_at FROM rooms WHERE id = $1', [m[1]]);
   if (!r.rowCount || r.rows[0].closed_at) return 'closed';
   if (!UUID.test(identity)) return 'no';
   const room = r.rows[0];
+  if (room.paused_at && room.owner !== identity && !(await isAdmin(room.id, identity))) return 'no';
   const u = await db.query(
     `SELECT 1 FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL
        AND NOT EXISTS (SELECT 1 FROM user_sanctions s WHERE s.user_id = u.id AND s.sanction_type = 'account_ban' AND ${LIVE_SANCTION})`,
@@ -366,16 +351,16 @@ export const roomRoutes = {
   /**
    * Open rooms, fullest first, without the ones whose owner and you have blocked each other. Once LiveKit's
    * webhooks arrive (live.mjs presenceTracked), also without other people's rooms nobody is in: such a room stays
-   * open with its blacklist and admins, and is listed again as soon as someone joins. Rooms you own or run are
-   * always listed.
+   * open with its blacklist and admins, and is listed again as soon as someone joins. A room resting for lack of
+   * staff (room-autoclose.mjs) is left out the same way. Rooms you own or run are always listed.
    */
   async 'GET /api/rooms'(req) {
     const me = await auth(req);
     const r = await db.query(
       `${SELECT} WHERE r.closed_at IS NULL AND u.deleted_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker = r.owner AND b.blocked = $1) OR (b.blocker = $1 AND b.blocked = r.owner))
-         AND (NOT $2::boolean OR r.owner = $1 OR EXISTS (SELECT 1 FROM room_presence p WHERE p.room = 'oda-' || r.id::text)
-              OR EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = r.id AND a.user_id = $1))
+         AND (r.owner = $1 OR EXISTS (SELECT 1 FROM room_admins a WHERE a.room_id = r.id AND a.user_id = $1)
+              OR (r.paused_at IS NULL AND (NOT $2::boolean OR EXISTS (SELECT 1 FROM room_presence p WHERE p.room = 'oda-' || r.id::text))))
        ORDER BY listeners DESC, r.created_at DESC LIMIT 100`,
       [me.id, presenceTracked()],
     );
@@ -387,10 +372,7 @@ export const roomRoutes = {
 
   async 'GET /api/room'(req, url) {
     const me = await auth(req);
-    // The Patron koltuğu follows the last 24 hours: a holder whose gifts got older gives the seat up here.
-    const id = url.searchParams.get('id');
-    if (typeof id === 'string' && UUID.test(id)) await refreshBoss(id);
-    const [room] = await withVoiceCounts([await roomRow(id)]);
+    const [room] = await withVoiceCounts([await roomRow(url.searchParams.get('id'))]);
     // Following the room (room-follow.mjs): how many follow it, and whether I do.
     // The running event, else the next one within a day (events.mjs): the room's banner and theme.
     return { room: { ...out(room), ...(await roomFollowOf(room.owner, me.id)), event: await roomEventBrief(room.id) } };
@@ -472,7 +454,8 @@ export const roomRoutes = {
     if (stage || queueChanged) await pushRoomMeta(room.id);
     // The phones in the room read it again: new mics or layout, a new cover, theme, type, gift effects or rules.
     if (stage || look || b.rules !== undefined) announceRoom(liveKitName(room.id));
-    if (rules.bossSeat !== rulesBefore.bossSeat) await refreshBoss(room.id);
+    // The Patron koltuğu turned on or off or changed its mode: it starts empty (boss-seat.mjs).
+    if (rules.bossSeat !== rulesBefore.bossSeat || (rules.bossSeat && rules.bossMode !== rulesBefore.bossMode)) await bossRulesChanged(room.id, rules);
     // Who may speak changed: everyone in the room gets their mic right again.
     if (rules.micPermission !== rulesBefore.micPermission) await refreshRoomVoices(room.id);
     const [fresh] = await withVoiceCounts([await roomRow(room.id)]);
@@ -524,6 +507,8 @@ export const roomRoutes = {
       [room.id, target, minutes, me.id],
     );
     await removeFromVoice(liveKitName(room.id), target);
+    // Off the Patron koltuğu too (boss-seat.mjs): someone kept out of the room doesn't sit on its seat.
+    await clearBoss(room.id, 'removed', target);
     await audit(db, { actor: me.id, role: roleOfRank(rank), action: 'room_kick', target, detail: { room: room.id, minutes } });
     announceRoom(liveKitName(room.id));
     return { until: r.rows[0].until };

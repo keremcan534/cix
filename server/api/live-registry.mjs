@@ -101,6 +101,9 @@ export function defaultsOf(e = process.env) {
     // Oda süslemesi (room-decor.mjs): both paid parts on, Özel süsleme 5.000 jeton for 30 days.
     room_decor_off: [],
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [k, x.default])),
+    // Odalar: a room without its staff closes after 5 minutes (room-autoclose.mjs); Patron koltuğu 25.000 jeton, 10
+    // dakika (boss-seat.mjs). The owner's numbers (Güncelleme 4).
+    ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Etkinlik Merkezi (events.mjs): every room owner may apply; 30 minutes ahead at least, 3 hours, 500 places.
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
   };
@@ -291,6 +294,36 @@ const decorEntries = () => {
     ),
   };
 };
+
+/**
+ * Odalar: how long a room may be without its owner and every admin before it closes (room-autoclose.mjs), and the
+ * Patron koltuğu's numbers (boss-seat.mjs): the coins one send needs to sit on the empty seat, and the minutes a
+ * sitting lasts and each further gift of the holder adds.
+ */
+const ROOMS = 'Odalar';
+const ROOM_AMOUNTS = {
+  room_staff_away_minutes: { field: 'roomStaffAwayMinutes', label: 'Yetkilisiz oda kapanır (dakika)', default: 5, bounds: { min: 1, max: 60, step: 1, big: 3 }, unit: ' dakika', help: 'Odada oda sahibi ya da yöneticisi bu kadar dakika yoksa herkes sesli odadan çıkarılır ve oda, yetkilisi gelene kadar kapalı kalır. Kısa bir bağlantı kopması odayı kapatmasın diye çok kısa tutma.', text: (a, b) => `Yetkilisiz kalan oda ${a} → ${b} dakika sonra kapanır.` },
+  boss_seat_coins: { field: 'bossSeatCoins', label: 'Patron koltuğu: tek seferde en az', default: 25_000, bounds: { min: 1_000, max: 1_000_000, step: 1_000, money: true }, unit: ' jeton', help: 'Patron koltuğu boşken odada tek seferde bu kadar jetonluk hediye gönderen koltuğa oturur. Koltuktaki kişi etkilenmez.', text: (a, b) => `Boş koltuğa oturmak için tek seferde ${a} → ${b} jeton.` },
+  boss_seat_minutes: { field: 'bossSeatMinutes', label: 'Patron koltuğu süresi (dakika)', default: 10, bounds: { min: 1, max: 60, step: 1 }, unit: ' dakika', help: 'Koltuğa oturan bu kadar dakika oturur; koltuktayken gönderdiği her hediye süreyi bir o kadar uzatır. Süren oturuşun bitişi değişmez.', text: (a, b) => `Patron koltuğunda oturma ve uzatma ${a} → ${b} dakika.` },
+};
+/** The room keys as registry entries; a coin amount that more than doubles or halves, or a close sooner than 3 minutes, asks twice. */
+const roomEntries = () =>
+  Object.fromEntries(
+    Object.entries(ROOM_AMOUNTS).map(([k, x]) => [
+      k,
+      {
+        field: x.field,
+        group: ROOMS,
+        label: x.label,
+        help: x.help,
+        type: 'int',
+        bounds: x.bounds,
+        parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+        big: (before, after) => after !== null && ((!!x.bounds.money && (after > before * 2 || after * 2 < before)) || (x.bounds.big !== undefined && after < x.bounds.big)),
+        impact: (before, after) => x.text(fmt(before), fmt(after)),
+      },
+    ]),
+  );
 
 const freezeDeep = (o) => (o && typeof o === 'object' ? Object.freeze(Object.values(o).forEach(freezeDeep) ?? o) : o);
 export const DEFAULTS = freezeDeep(defaultsOf());
@@ -688,6 +721,7 @@ export const REGISTRY = {
     impact: (before, after) => `Bir oyunda günde en çok ${fmt(before)} → ${fmt(after)} tur (en yüksek bahisle); Yörünge’de ${fmt(before * CASINO_TOP)} → ${fmt(after * CASINO_TOP)} jeton.`,
   },
   ...decorEntries(),
+  ...roomEntries(),
   ...eventEntries(),
 };
 for (const k of Object.keys(REGISTRY)) REGISTRY[k].default = DEFAULTS[k];
@@ -740,8 +774,9 @@ const readOnlySet = (xs) => {
  *     withdrawWeekly, otpPerHour, dmPrice, callVoice, callVideo, callFree, callSeconds, callPlainVoice, callPlainVideo,
  *     matchVoice, matchVideo, matchFree, matchSeconds, heartVoice,
  *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
- *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, eventMinRoomLevel, eventMinLead, eventMaxMinutes,
- *     eventMaxCapacity, eventGrace, eventStrikeLimit, eventBlockDays, invalid }
+ *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
+ *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
+ *     eventBlockDays, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -784,6 +819,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     casinoDailyRounds: val('casino_daily_rounds'),
     roomDecorOff: readOnlySet(val('room_decor_off')),
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
+    ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
     invalid: Object.freeze([...invalid]),
   });

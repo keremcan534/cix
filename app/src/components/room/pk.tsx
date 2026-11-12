@@ -38,7 +38,7 @@ import {
   type TeamId,
 } from '@/lib/pk';
 import { showAlert } from '@/lib/alert';
-import { colors, semantic } from '@/theme';
+import { SCRIM, colors, edge, semantic } from '@/theme';
 import { Photo } from '@/components/photo';
 
 export const fmt = (n: number) => n.toLocaleString('tr-TR');
@@ -684,8 +684,8 @@ export function CrossPkInvitePrompt({ invite, busy, onAnswer }: { invite: Incomi
 }
 
 const st = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.55)' },
-  sheet: { maxHeight: '86%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 12, borderTopWidth: 1, borderColor: colors.border },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { maxHeight: '86%', backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 12, ...edge.sheet },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { color: colors.text, fontWeight: '900', fontSize: 18, flexShrink: 1 },
   seg: { flexDirection: 'row', backgroundColor: colors.cardAlt, borderRadius: 999, padding: 4 },
@@ -748,8 +748,8 @@ const st = StyleSheet.create({
   others: { marginHorizontal: 12, marginTop: 6, gap: 4 },
   othersTitle: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   othersRow: { flexDirection: 'row' },
-  center: { flex: 1, backgroundColor: 'rgba(8,15,30,0.8)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  card: { width: '100%', maxWidth: 420, backgroundColor: colors.card, borderRadius: 22, padding: 18, gap: 10, borderWidth: 1, borderColor: colors.border },
+  center: { flex: 1, backgroundColor: SCRIM, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  card: { width: '100%', maxWidth: 420, backgroundColor: colors.card, borderRadius: 22, padding: 18, gap: 10, ...edge.card },
   danger: { backgroundColor: 'rgba(217,58,69,0.18)', borderRadius: 999, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.red },
   dangerText: { color: '#FF7A82', fontWeight: '900' },
   prompt: { position: 'absolute', left: 12, right: 12, top: 96, zIndex: 40, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card, borderRadius: 16, padding: 10, borderWidth: 1, borderColor: colors.gold },

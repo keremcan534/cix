@@ -8,7 +8,7 @@ import { Text } from '@/components/text';
 import { FloatIcon, Halo, hueAt } from '@/components/fx/float';
 import { EdgeLight, PressableScale } from '@/components/fx/surface';
 import { icon3dSourceFor } from '@/components/Icon3D';
-import { colors, fonts, semantic } from '@/theme';
+import { SCRIM, colors, edge, fonts, semantic } from '@/theme';
 
 export type MenuItem = {
   key: string;
@@ -124,8 +124,8 @@ function Badge({ badge }: { badge: MenuItem['badge'] }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 12, paddingTop: 10, maxHeight: '78%', borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  backdrop: { flex: 1, backgroundColor: SCRIM },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 12, paddingTop: 10, maxHeight: '78%', ...edge.sheet },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', marginBottom: 10 },
   title: { color: '#fff', fontFamily: fonts.display, fontSize: 20, lineHeight: 26, marginLeft: 8, marginBottom: 2 },
   note: { color: colors.textDim, fontSize: 12, marginLeft: 8, marginBottom: 4 },

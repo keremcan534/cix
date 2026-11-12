@@ -1,10 +1,11 @@
 // A server room's rules (rooms.rules, jsonb), set in Oda ayarları and Moderasyon and read by every phone in the room
 // (rooms.mjs out → app lib/live roomOf). Unknown or broken values fall back to the defaults, so an old row or a
 // bad write never breaks a room. In step with the app (data/catalog ROOM_LIMITS, MIC_PERMISSION_MIN_LEVEL,
-// BOSS_SEAT_MIN_LEVEL, BOSS_SEAT_MIN_COINS; store MyRoom); app tests/server-catalog.test.ts fails when they drift.
+// BOSS_SEAT_MIN_LEVEL; store MyRoom); app tests/server-catalog.test.ts fails when they drift.
 //
 //   micPermission  'everyone' | 'members'   who may take a mic (members: the room's members and staff; Lv.4)
-//   bossSeat       boolean                  Patron koltuğu: the room's top gifter of the last 24 hours sits on it (Lv.3)
+//   bossSeat       boolean                  Patron koltuğu on (Lv.3; boss-seat.mjs)
+//   bossMode       'auto' | 'invite'        Otomatik: gifts decide who sits; Davet: the owner seats someone
 //   joinMode       'open' | 'apply' | 'closed'   how someone becomes a room member
 //   manageMembers  'owner' | 'admins'       who answers and removes members
 //   manageFunctions 'owner' | 'admins'      who uses the room's tools (yavaş mod, kelime filtresi, oyunlar)
@@ -24,7 +25,6 @@ export const memberCap = (level) => ROOM_MEMBER_CAPS[Math.min(Math.max(Number(le
 export const LIMIT_OPTIONS = [50, 100, 200, 300, 500, 1_200, 2_000, 5_000];
 export const MIC_PERMISSION_MIN_LEVEL = 4;
 export const BOSS_SEAT_MIN_LEVEL = 3;
-export const BOSS_SEAT_MIN_COINS = 1_000;
 /** Seconds between two chat lines of one person while slow mode is on. */
 export const SLOW_MODE_SECONDS = 10;
 const MAX_WORDS = 30;
@@ -32,6 +32,7 @@ const MAX_WORDS = 30;
 export const RULE_DEFAULTS = Object.freeze({
   micPermission: 'everyone',
   bossSeat: false,
+  bossMode: 'auto',
   joinMode: 'open',
   manageMembers: 'admins',
   manageFunctions: 'admins',
@@ -46,6 +47,7 @@ export const RULE_DEFAULTS = Object.freeze({
 
 const ONE_OF = {
   micPermission: ['everyone', 'members'],
+  bossMode: ['auto', 'invite'],
   joinMode: ['open', 'apply', 'closed'],
   manageMembers: ['owner', 'admins'],
   manageFunctions: ['owner', 'admins'],

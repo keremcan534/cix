@@ -53,7 +53,7 @@ export const NOT_EXPORTED = {
   room_cross_pk_gifts: 'the same gifts as gift_events',
   match_queue: 'kept for seconds while waiting for a match',
   room_mic_queue: 'kept while waiting for a seat in a room',
-  room_music_queue: 'kept while a track waits to play',
+  room_music_queue: 'kept while the track is on a room’s playlist',
   phone_claims: 'a phone check’s one-time code, kept minutes',
   room_tables: 'a free game table in a room, kept only while it is played',
 };

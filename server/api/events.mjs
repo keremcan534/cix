@@ -26,7 +26,8 @@
 //
 // The server alone decides an event's state: the app's clock and timer only show it. A sweep (EVENT_SWEEP_MS) starts
 // events whose time has come in an open room, ends those past their time, and ends those left unstarted past the
-// grace (a strike for the owner). Closing the room, or LiveKit closing an empty one, ends its running event.
+// grace (a strike for the owner). Closing the room, the room resting without its staff (room-autoclose.mjs), or
+// LiveKit closing an empty one ends its running event.
 // Texts are public: they pass the contact filter (core.mjs publicText).
 import { DAY, ENDED_LISTED_DAYS, MAX_OPEN_PER_ROOM, MINUTE, STATE_LABEL, THEMES, mayStartAt, offsetOf, planError, stateOf, themeOf, windowOf } from './event-rules.mjs';
 import { HttpError, UUID, auth, db, env, int, limit, publicText, readJson, text, tx } from './core.mjs';
@@ -262,7 +263,7 @@ export async function sweepEvents() {
     });
   }
   const due = await db.query(
-    "SELECT e.id, e.room_id FROM events e JOIN rooms r ON r.id = e.room_id WHERE e.status = 'approved' AND e.started_at IS NULL AND e.ended_at IS NULL AND e.starts_at <= now() AND r.closed_at IS NULL",
+    "SELECT e.id, e.room_id FROM events e JOIN rooms r ON r.id = e.room_id WHERE e.status = 'approved' AND e.started_at IS NULL AND e.ended_at IS NULL AND e.starts_at <= now() AND r.closed_at IS NULL AND r.paused_at IS NULL",
   );
   if (due.rowCount) {
     const open = new Set(await openVoiceRooms());
@@ -276,8 +277,8 @@ export async function sweepEvents() {
     }
   }
   const over = await db.query(
-    `SELECT e.id, (r.closed_at IS NOT NULL) AS closed FROM events e JOIN rooms r ON r.id = e.room_id
-      WHERE e.started_at IS NOT NULL AND e.ended_at IS NULL AND (e.ends_at <= now() OR r.closed_at IS NOT NULL)`,
+    `SELECT e.id, (r.closed_at IS NOT NULL OR r.paused_at IS NOT NULL) AS closed FROM events e JOIN rooms r ON r.id = e.room_id
+      WHERE e.started_at IS NOT NULL AND e.ended_at IS NULL AND (e.ends_at <= now() OR r.closed_at IS NOT NULL OR r.paused_at IS NOT NULL)`,
   );
   for (const { id, closed } of over.rows) {
     const room = await tx((c) => finish(c, id, closed ? 'room_closed' : 'time'));

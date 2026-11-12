@@ -512,7 +512,9 @@ export type ServerMe = ServerUser & ServerProfile & { role?: string; genderHidde
 /** How far someone is from me by our two profile cities (server/api/city-coords.mjs), rounded: never a location.
  *  Null when either city is unknown or their profile is private to me; an older server sends none. */
 export type CityDistance = { km: number; sameCity: boolean };
-export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
+/** `followers` / `following`: totals; `oneWay`: the same without the people who follow each other (friends), as the
+ *  profile shows them (lib/follow-ties tieCounts; an older server sends none). */
+export type PublicUser = { id: string; name: string } & ServerProfile & { followers: number; following: number; oneWay?: { followers: number; following: number }; isFollowing: boolean; blockedByMe: boolean } & Partial<ProfileMore> & { distance?: CityDistance | null };
 export type UserCard = { id: string; name: string; avatarUrl: string | null };
 /** `level` / `xp`: the owner's room level, earned on the server from gifts in their room. `micCount` / `layoutId`:
  *  the mics and layout the owner or a room admin chose (null = the default). `lockedSeats`: mics the staff locked;
@@ -526,6 +528,9 @@ export type ServerRoom = {
   hasPassword: boolean;
   createdAt: string;
   closed: boolean;
+  /** Resting for lack of staff (server/api/room-autoclose.mjs): only its owner and admins get in, and their coming
+   *  opens it again. An older server sends none. */
+  paused?: boolean;
   listeners: number;
   level?: number;
   xp?: number;
@@ -544,8 +549,10 @@ export type ServerRoom = {
   coverUrl?: string | null;
   /** Oda ayarları and Moderasyon, the same on every phone (server/api/room-rules.mjs). */
   rules?: RoomRules;
-  /** Patron koltuğu: the room's top gifter of the last 24 hours, while the seat is on. */
+  /** Patron koltuğu's holder while their sitting runs (server/api/boss-seat.mjs; what older apps read). */
   boss?: UserCard | null;
+  /** Patron koltuğu while it is on: its mode, the sitting and the numbers the sheet shows. An older server sends none. */
+  bossSeat?: BossSeatView | null;
   /** The Odalar row's chips (server/api/room-social.mjs): the owner's agency or family, a running in-room PK, and
    *  the room's place in this week's gift ranking (1–3, else null). */
   agency?: { id: string; name: string } | null;
@@ -558,10 +565,32 @@ export type ServerRoom = {
   /** Etkinlik Merkezi (server/api/events.mjs): the room's running event, else its next one within a day. */
   event?: RoomEventBrief | null;
 };
+/**
+ * Patron koltuğu as the server reads it (server/api/boss-seat.mjs). `mode`: Otomatik (gifts decide) or Davet (the owner
+ * seats someone). `holder` while a sitting runs; `until` its end (null: Davet, no end), `left` seconds to it as of the
+ * read, `spent` the holder's coins in this sitting. `minCoins` one send needs to sit on the empty seat, `minutes` a
+ * sitting lasts and each further gift adds, `holdSeconds` before anyone may take the seat.
+ */
+export type BossSeatView = {
+  mode: 'auto' | 'invite';
+  holder: UserCard | null;
+  since: string | null;
+  until: string | null;
+  left: number | null;
+  spent: number;
+  minCoins: number;
+  minutes: number;
+  holdSeconds: number;
+};
+/** Davet mode: the owner seats someone or takes them off; either mode: the holder gets up. */
+export type BossAction = { action: 'seat'; user: string } | { action: 'clear' | 'leave' };
+export const roomBoss = (room: string, body: BossAction) => call<{ room: ServerRoom }>('POST', '/api/rooms/boss', { room, ...body }).then((r) => r.room);
 /** A server room's rules (server/api/room-rules.mjs). */
 export type RoomRules = {
   micPermission: 'everyone' | 'members';
   bossSeat: boolean;
+  /** An older server sends none (Otomatik). */
+  bossMode?: 'auto' | 'invite';
   joinMode: 'open' | 'apply' | 'closed';
   manageMembers: 'owner' | 'admins';
   manageFunctions: 'owner' | 'admins';
@@ -603,9 +632,8 @@ export const discover = (list: DiscoverList = 'home') => call<{ users: DiscoverU
 export const block = (to: string, on: boolean) => call<{ blocked: boolean }>('POST', '/api/block', { to, block: on }).then((r) => r.blocked);
 export const followingList = () => call<{ users: UserCard[] }>('GET', '/api/following').then((r) => r.users);
 export type FollowCard = UserCard & { followedAt: string };
-/** Takipçiler / Takip of `user` (a server id; default me), newest first. */
-export const followList = (side: 'followers' | 'following', user?: string) =>
-  call<{ users: FollowCard[] }>('GET', `/api/${side}${user ? `?user=${encodeURIComponent(user)}` : ''}`).then((r) => r.users);
+/** Who follows me / whom I follow, newest first, both ways counted (the server refuses anyone else's lists). */
+export const followList = (side: 'followers' | 'following') => call<{ users: FollowCard[] }>('GET', `/api/${side}`).then((r) => r.users);
 
 export const serverRooms = () => call<{ rooms: ServerRoom[] }>('GET', '/api/rooms').then((r) => r.rooms);
 
@@ -832,7 +860,7 @@ export type ServerWheel = {
 export const wheel = () => call<ServerWheel>('GET', '/api/wheel');
 export const wheelSpin = (tier: string, count: number, ref = newRef()) => call<{ spin: ServerWheelSpin; user: ServerUser; replay: boolean }>('POST', '/api/wheel/spin', { tier, count, ref });
 
-// Uğurlu hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
+// Şanslı hediyeler (server/api/lucky.mjs): the server draws and pays; rewards are game coins, the recipients get
 // their share as diamonds. `draws`: one multiplier per gift, recipient by recipient (`count` each).
 export type ServerLuckyTier = { mult: number; weight: number };
 export type ServerLuckyGift = { id: string; name: string; emoji: string; price: number; enabled: boolean; tiers: ServerLuckyTier[]; open?: boolean };
@@ -1108,6 +1136,14 @@ export type ServerOwnerStats = {
   hours: { at: string; people: number }[];
 };
 export const roomOwnerStats = (room: string) => call<ServerOwnerStats>('GET', `/api/rooms/owner-stats?room=${encodeURIComponent(room)}`);
+/**
+ * Oda katkı sıralaması (server/api/room-contrib.mjs): Cömertlik (`sent`) or Yankı (`received`) in a server room this
+ * hour, day or week on Turkey's clock, 1 coin = 1 point. The top 50, my own place (rank null: not on the list) and
+ * when the period began.
+ */
+export type RoomContribBody = { rows: RankingRow[]; me: { rank: number | null; score: number }; since: string };
+export const roomContrib = (room: string, side: 'sent' | 'received', period: 'hour' | 'day' | 'week') =>
+  call<RoomContribBody>('GET', `/api/rooms/contrib?room=${encodeURIComponent(room)}&side=${side}&period=${period}`);
 // Yeni üye ödülleri (server/api/referrals.mjs): the welcome coins I got at sign-up (0: none), the packs whose
 // first-purchase gift is still mine, and Arkadaşını Getir: my code, the code I entered, what my invites brought.
 export type ServerRewards = {
@@ -1238,7 +1274,10 @@ export type LiveKey =
   | RewardKey
   | CasinoKey
   | DecorKey
+  | RoomKey
   | EventKey;
+/** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
+export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes';
 /** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */
 export type EventKey = 'event_min_room_level' | 'event_min_lead_minutes' | 'event_max_minutes' | 'event_max_capacity' | 'event_grace_minutes' | 'event_strike_limit' | 'event_block_days';
 /** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */

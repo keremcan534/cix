@@ -7,20 +7,23 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Text } from '@/components/text';
 import { AssetView } from '@/components/fx/anim-player';
 import { Icon3D } from '@/components/Icon3D';
-import { EMOJI_PACKS_ICON, REACTION_TAB_ANIMATED, REACTION_TAB_RECENT, ReactionArt, StickerArt } from '@/components/ReactionArt';
-import { DISPLAY_LABEL } from '@/data/animations';
-import { FREE_PACK_IDS, STANDARD_EMOJI, STICKER_PACKS } from '@/data/catalog';
-import { isLive, useAnimations } from '@/lib/animations';
+import { EMOJI_PACKS_ICON, REACTION_TAB_ANIMATED, StickerArt } from '@/components/ReactionArt';
+import { DISPLAY_LABEL, type Animation } from '@/data/animations';
+import { packOfSticker, stickerById, type Sticker } from '@/data/catalog';
+import { isLive, isSentAnim, useAnimations } from '@/lib/animations';
+import { animIdOf, animKey, emojiTabPacks, favourites, lastTab, notePick, openTab, panelTabs, pickCounts, setLastTab, type PanelKind, type PanelTab } from '@/lib/emoji-panel';
 import { stickerIdOf, stickerToken } from '@/lib/stickers';
 import { showAlert } from '@/lib/alert';
 import { useApp } from '@/store';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
+
+const KIND_NAME: Record<PanelKind, string> = { sabit: 'Sabit', vip: 'VIP' };
 
 /**
- * Inline emoji picker, in two parts. Ücretsiz (opens first): recents, the standard emoji, the free animated
- * reactions (rooms only) and the free sticker packs. Ücretli: the paid animated reactions, effect gifts and mic
- * effects (rooms only) and the sticker packs bought in the store (locked packs show a preview). Picking a
- * sticker hands the caller its token (lib/stickers), picking an emoji hands the emoji.
+ * Inline emoji picker, in two parts (lib/emoji-panel). Sabit: Emoji (the animated faces, then Müzik and, in a room,
+ * Hamle), Favoriler (what this phone picks most) and, in a room, the free Hareketli. VIP: in a room the paid Hareketli,
+ * effect gifts and mic effects, then the sticker packs bought in the store or opened by VIP (locked packs show a
+ * preview). It opens on the tab it was last on. Picking a sticker hands the caller its token (lib/stickers).
  * In rooms (`onAnimate`) the Hareketli tabs come from the central animation catalog, so catalog changes show
  * up without an app update.
  * `onClose`: the phone's back button closes the panel (not the screen); hosts also close it on a touch above it.
@@ -41,177 +44,212 @@ export function EmojiPanel({ onPick, hint, onAnimate, onClose }: { onPick: (e: s
   const { packUnlocked, recentEmojis, rememberEmoji, buyEmojiPack, ownedAnims, micFx, buyMicFx, setMicFx } = useApp();
   const { catalog } = useAnimations();
   const styles = useStyles();
-  const [kind, setKind] = useState<'free' | 'paid'>('free');
-  // In a room it opens on Duygular, the animated faces (on a mic they cover my photo); elsewhere on the standard emoji.
-  const firstFree = onAnimate && STICKER_PACKS.some((p) => p.id === 'duygu') ? 'duygu' : 'emoji';
-  const [tab, setTab] = useState<string>(firstFree);
-  const [group, setGroup] = useState(STANDARD_EMOJI[0].id);
-  const pack = STICKER_PACKS.find((p) => p.id === tab);
+  const t = useTheme();
+  const room = !!onAnimate;
+  const [tabs] = useState(() => panelTabs(room));
+  const [tab, setTab] = useState<PanelTab>(() => openTab(lastTab(), tabs));
+  // Favoriler as it was when the panel opened: a pick counts, but the grid doesn't move under the finger.
+  const [counts] = useState(pickCounts);
+  const kind = tab.kind;
+  const pack = tab.pack;
   const locked = !!pack && !packUnlocked(pack.id);
-  // A recent sticker whose pack is no longer open (VIP ended) is hidden, not offered.
-  const recents = recentEmojis.filter((e) => {
-    const id = stickerIdOf(e);
-    return !id || STICKER_PACKS.some((p) => packUnlocked(p.id) && p.stickers.some((x) => x.id === id));
-  });
+
+  const choose = (next: PanelTab) => {
+    setTab(next);
+    setLastTab(next.id);
+  };
+  const switchKind = (k: PanelKind) => {
+    if (k !== kind) choose(tabs.find((x) => x.kind === k) ?? tabs[0]);
+  };
 
   const pick = (e: string) => {
     if (locked) return;
     rememberEmoji(e);
+    notePick(e);
     onPick(e);
   };
-
-  const packTab = (p: (typeof STICKER_PACKS)[number]) => ({ id: p.id, name: p.name, icon: p.id === STICKER_PACKS[0].id ? EMOJI_PACKS_ICON : undefined, lock: !packUnlocked(p.id) });
-  const tabsOf = (k: 'free' | 'paid'): { id: string; name: string; icon?: number; lock?: boolean }[] =>
-    k === 'free'
-      ? [
-          { id: 'recent', name: '', icon: REACTION_TAB_RECENT },
-          { id: 'emoji', name: 'Emoji' },
-          ...(onAnimate ? [{ id: 'animated-free', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []),
-          // Hamle acts on the room's mics: a chat's panel doesn't have it.
-          ...STICKER_PACKS.filter((p) => FREE_PACK_IDS.includes(p.id) && (!p.roomOnly || !!onAnimate)).map(packTab),
-        ]
-      : [...(onAnimate ? [{ id: 'animated', name: 'Hareketli', icon: REACTION_TAB_ANIMATED }] : []), ...STICKER_PACKS.filter((p) => !FREE_PACK_IDS.includes(p.id)).map(packTab)];
-  const tabs = tabsOf(kind);
-  const paidAnim = tab === 'animated';
-  const switchKind = (k: 'free' | 'paid') => {
-    setKind(k);
-    setTab(k === 'free' ? firstFree : (tabsOf('paid')[0]?.id ?? 'emoji'));
+  const animate = (a: Animation) => {
+    if (!onAnimate) return;
+    notePick(animKey(a.animation_id));
+    onAnimate(a.animation_id);
   };
+
+  /** A Hareketli item this panel can send now. */
+  const sendable = (a: Animation | undefined): a is Animation => !!a && room && isLive(a) && isSentAnim(a);
+  const animOf = (key: string) => {
+    const id = animIdOf(key);
+    return id ? catalog.find((a) => a.animation_id === id) : undefined;
+  };
+  /** A favourite this panel can still send: a sticker of an open pack shown here, or a live Hareketli in a room. */
+  const canSend = (key: string) => {
+    if (animIdOf(key)) return sendable(animOf(key));
+    const id = stickerIdOf(key);
+    const p = id ? packOfSticker(id) : undefined;
+    return !!p && !p.retired && (!p.roomOnly || room) && packUnlocked(p.id);
+  };
+  const favs = tab.id === 'fav' ? favourites(counts, recentEmojis, canSend) : [];
+
+  const tabLabel = (x: PanelTab): { name: string; icon?: number; star?: boolean; lock?: boolean } =>
+    x.id === 'emoji'
+      ? { name: 'Emoji', icon: EMOJI_PACKS_ICON }
+      : x.id === 'fav'
+        ? { name: 'Favoriler', star: true }
+        : x.id === 'animated' || x.id === 'animated-free'
+          ? { name: 'Hareketli', icon: REACTION_TAB_ANIMATED }
+          : { name: x.pack?.name ?? x.id, lock: !!x.pack && !packUnlocked(x.pack.id) };
+
+  const paidAnim = tab.id === 'animated';
   const micFxList = catalog.filter((a) => a.display_type === 'mic_effect' && isLive(a) && a.is_free === !paidAnim);
+
+  /** A sticker's picture; a Hamle pick to one side carries an arrow for that side. */
+  const art = (x: Sticker) => (
+    <View>
+      <StickerArt id={x.id} size={40} />
+      {/-(sol|sag)$/.test(x.id) && (
+        <View style={[styles.moveArrow, x.id.endsWith('-sol') ? { left: -8 } : { right: -8 }]}>
+          <Ionicons name={x.id.endsWith('-sol') ? 'arrow-back' : 'arrow-forward'} size={11} color="#fff" />
+        </View>
+      )}
+    </View>
+  );
+  /** A Hamle pick does something, so it says what: its name under the picture. */
+  const moveCell = (x: Sticker) => (
+    <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.moveCell} accessibilityRole="button" accessibilityLabel={x.name}>
+      {art(x)}
+      <Text style={styles.moveName} numberOfLines={2}>
+        {x.name}
+      </Text>
+    </Pressable>
+  );
+  const stickerCell = (x: Sticker) => (
+    <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.stickerCell} accessibilityLabel={`${x.name} çıkartması${locked ? ', kilitli' : ''}`}>
+      <StickerArt id={x.id} size={40} />
+    </Pressable>
+  );
+  const animCell = (a: Animation) => (
+    <Pressable key={a.animation_id} onPress={() => animate(a)} style={styles.animCell} accessibilityLabel={`${a.name} gönder`}>
+      <AssetView asset={a.preview_asset} size={30} />
+      <Text style={styles.animName} numberOfLines={1}>
+        {a.name}
+      </Text>
+      {a.is_free ? (
+        <Text style={styles.free}>Ücretsiz</Text>
+      ) : (
+        <View style={styles.priceRow}>
+          <Icon3D name="coin" size={11} />
+          <Text style={styles.price}>{a.coin_price.toLocaleString('tr-TR')}</Text>
+        </View>
+      )}
+      {a.display_type !== 'reaction' && <Text style={styles.kind}>{DISPLAY_LABEL[a.display_type]}</Text>}
+    </Pressable>
+  );
+  /** Favoriler: stickers, Hamle picks and Hareketli in one even grid (a paid Hareketli also shows its price). */
+  const favCell = (key: string) => {
+    const a = animOf(key);
+    if (a) {
+      return (
+        <Pressable key={key} onPress={() => animate(a)} style={styles.stickerCell} accessibilityLabel={`${a.name} gönder${a.is_free ? '' : `, ${a.coin_price} jeton`}`}>
+          <AssetView asset={a.preview_asset} size={36} />
+          {!a.is_free && (
+            <View style={styles.priceRow}>
+              <Icon3D name="coin" size={11} />
+              <Text style={styles.price}>{a.coin_price.toLocaleString('tr-TR')}</Text>
+            </View>
+          )}
+        </Pressable>
+      );
+    }
+    const id = stickerIdOf(key);
+    const x = id ? stickerById(id) : undefined;
+    if (!x) return null;
+    return (
+      <Pressable key={key} onPress={() => pick(key)} style={styles.stickerCell} accessibilityLabel={x.name}>
+        {art(x)}
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.wrap}>
       {hint && <Text style={styles.hint}>{hint}</Text>}
       <View style={styles.kinds} accessibilityRole="tablist">
-        {(['free', 'paid'] as const).map((k) => (
+        {(['sabit', 'vip'] as const).map((k) => (
           <Pressable key={k} onPress={() => switchKind(k)} style={[styles.kind2, kind === k && styles.kindOn]} accessibilityRole="tab" accessibilityState={{ selected: kind === k }}>
-            <Text style={[styles.kindText, kind === k && styles.kindTextOn]}>{k === 'free' ? 'Ücretsiz' : 'Ücretli'}</Text>
+            <Text style={[styles.kindText, kind === k && styles.kindTextOn]}>{KIND_NAME[k]}</Text>
           </Pressable>
         ))}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 8 }}>
-        {tabs.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() => setTab(p.id)}
-            style={[styles.tab, tab === p.id && styles.tabActive]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tab === p.id }}
-            accessibilityLabel={p.id === 'recent' ? 'Son kullanılanlar' : STICKER_PACKS.some((x) => x.id === p.id) ? `${p.name} çıkartmaları` : p.name}
-          >
-            {p.icon && <Image source={p.icon} style={styles.tabIcon} />}
-            {!!p.name && (
-              <Text style={styles.tabText}>
-                {p.name}
-                {p.lock ? ' 🔒' : ''}
-              </Text>
-            )}
-          </Pressable>
-        ))}
+        {tabs
+          .filter((x) => x.kind === kind)
+          .map((x) => {
+            const l = tabLabel(x);
+            return (
+              <Pressable
+                key={x.id}
+                onPress={() => choose(x)}
+                style={[styles.tab, tab.id === x.id && styles.tabActive]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab.id === x.id }}
+                accessibilityLabel={x.pack ? `${l.name} çıkartmaları` : l.name}
+              >
+                {l.icon && <Image source={l.icon} style={styles.tabIcon} />}
+                {l.star && <Ionicons name="star" size={15} color={t.colors.gold} />}
+                <Text style={styles.tabText}>
+                  {l.name}
+                  {l.lock ? ' 🔒' : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
       </ScrollView>
-      {(tab === 'animated' || tab === 'animated-free') && onAnimate ? (
+      {(tab.id === 'animated' || tab.id === 'animated-free') && onAnimate ? (
         <View style={{ paddingHorizontal: 8, gap: 6 }}>
           {micFxList.length > 0 && <Text style={styles.sub}>🎙️ Mikrofon efektim · konuşurken koltuğunda kendiliğinden oynar</Text>}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6 }}>
             {micFxList.map((a) => {
-                const owned = ownedAnims.has(a.animation_id);
-                const on = micFx === a.animation_id;
-                return (
-                  <Pressable
-                    key={a.animation_id}
-                    onPress={() => {
-                      if (on) return setMicFx(null);
-                      const err = buyMicFx(a.animation_id);
-                      if (err) showAlert('Alınamadı', err);
-                    }}
-                    style={[styles.fx, on && styles.fxOn]}
-                    accessibilityLabel={`${a.name} mikrofon efekti`}
-                  >
-                    <AssetView asset={a.preview_asset} size={18} />
-                    <Text style={styles.fxText}>{a.name}</Text>
-                    <Text style={styles.fxPrice}>{on ? '✓ Açık' : owned || a.is_free ? 'Kullan' : `${a.coin_price}`}</Text>
-                  </Pressable>
-                );
-              })}
-          </ScrollView>
-          <View style={styles.grid}>
-            {catalog
-              .filter((a) => isLive(a) && a.is_free === !paidAnim && (a.display_type === 'reaction' || a.display_type === 'gift' || a.display_type === 'fullscreen'))
-              .map((a) => (
-                <Pressable key={a.animation_id} onPress={() => onAnimate(a.animation_id)} style={styles.animCell} accessibilityLabel={`${a.name} gönder`}>
-                  <AssetView asset={a.preview_asset} size={30} />
-                  <Text style={styles.animName} numberOfLines={1}>
-                    {a.name}
-                  </Text>
-                  {a.is_free ? (
-                    <Text style={styles.free}>Ücretsiz</Text>
-                  ) : (
-                    <View style={styles.priceRow}>
-                      <Icon3D name="coin" size={11} />
-                      <Text style={styles.price}>{a.coin_price.toLocaleString('tr-TR')}</Text>
-                    </View>
-                  )}
-                  {a.display_type !== 'reaction' && <Text style={styles.kind}>{DISPLAY_LABEL[a.display_type]}</Text>}
+              const owned = ownedAnims.has(a.animation_id);
+              const on = micFx === a.animation_id;
+              return (
+                <Pressable
+                  key={a.animation_id}
+                  onPress={() => {
+                    if (on) return setMicFx(null);
+                    const err = buyMicFx(a.animation_id);
+                    if (err) showAlert('Alınamadı', err);
+                  }}
+                  style={[styles.fx, on && styles.fxOn]}
+                  accessibilityLabel={`${a.name} mikrofon efekti`}
+                >
+                  <AssetView asset={a.preview_asset} size={18} />
+                  <Text style={styles.fxText}>{a.name}</Text>
+                  <Text style={styles.fxPrice}>{on ? '✓ Açık' : owned || a.is_free ? 'Kullan' : `${a.coin_price}`}</Text>
                 </Pressable>
-              ))}
-          </View>
-        </View>
-      ) : tab === 'emoji' ? (
-        <View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, paddingHorizontal: 8, paddingTop: 6 }}>
-            {STANDARD_EMOJI.map((gr) => (
-              <Pressable key={gr.id} onPress={() => setGroup(gr.id)} style={[styles.chip, group === gr.id && styles.chipOn]} accessibilityRole="tab" accessibilityState={{ selected: group === gr.id }}>
-                <Text style={styles.chipText}>{gr.name}</Text>
-              </Pressable>
-            ))}
+              );
+            })}
           </ScrollView>
-          <ScrollView style={styles.emojiScroll} nestedScrollEnabled>
-            <View style={styles.grid}>
-              {(STANDARD_EMOJI.find((gr) => gr.id === group) ?? STANDARD_EMOJI[0]).emojis.map((e) => (
-                <Pressable key={e} onPress={() => pick(e)} style={styles.cell} accessibilityLabel={e}>
-                  <Text style={styles.emoji}>{e}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-          <Text style={styles.freeNote}>Standart emojiler herkese ücretsiz · özel çizim çıkartmalar mağazada</Text>
+          <View style={styles.grid}>{catalog.filter((a) => sendable(a) && a.is_free === !paidAnim).map(animCell)}</View>
         </View>
-      ) : tab === 'recent' ? (
-        <View style={styles.grid}>
-          {recents.length === 0 && <Text style={styles.empty}>Henüz emoji kullanmadın.</Text>}
-          {recents.map((e) => (
-            <Pressable key={e} onPress={() => pick(e)} style={styles.cell} accessibilityLabel={e}>
-              <ReactionArt emoji={e} size={32} textStyle={{ fontSize: 26 }} />
-            </Pressable>
-          ))}
-        </View>
-      ) : pack ? (
-        // A long pack (Duygular has 32) scrolls inside the panel, so the panel doesn't push the room's mics away.
+      ) : tab.id === 'emoji' ? (
+        // The faces first, then Müzik and (in a room) Hamle; it scrolls inside the panel, so the room's mics stay.
         <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
-          <View style={[styles.grid, locked && { opacity: 0.4 }]}>
-            {pack.stickers.map((x) =>
-              pack.roomOnly ? (
-                // A Hamle pick does something, so it says what: its name, and an arrow for the side it goes to.
-                <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.moveCell} accessibilityRole="button" accessibilityLabel={x.name}>
-                  <View>
-                    <StickerArt id={x.id} size={40} />
-                    {/-(sol|sag)$/.test(x.id) && (
-                      <View style={[styles.moveArrow, x.id.endsWith('-sol') ? { left: -8 } : { right: -8 }]}>
-                        <Ionicons name={x.id.endsWith('-sol') ? 'arrow-back' : 'arrow-forward'} size={11} color="#fff" />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.moveName} numberOfLines={2}>
-                    {x.name}
-                  </Text>
-                </Pressable>
-              ) : (
-                <Pressable key={x.id} onPress={() => pick(stickerToken(x.id))} style={styles.stickerCell} accessibilityLabel={`${x.name} çıkartması${locked ? ', kilitli' : ''}`}>
-                  <StickerArt id={x.id} size={40} />
-                </Pressable>
-              ),
-            )}
+          {emojiTabPacks(room).map((p, i) => (
+            <View key={p.id}>
+              {i > 0 && <Text style={styles.section}>{p.name}</Text>}
+              <View style={styles.grid}>{p.stickers.map((x) => (p.roomOnly ? moveCell(x) : stickerCell(x)))}</View>
+            </View>
+          ))}
+        </ScrollView>
+      ) : tab.id === 'fav' ? (
+        <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
+          <View style={styles.grid}>
+            {favs.length === 0 && <Text style={styles.empty}>Kullandıkça en sevdiklerin burada toplanır.</Text>}
+            {favs.map(favCell)}
           </View>
+        </ScrollView>
+      ) : pack ? (
+        <ScrollView style={styles.stickerScroll} nestedScrollEnabled>
+          <View style={[styles.grid, locked && { opacity: 0.4 }]}>{pack.stickers.map((x) => (pack.roomOnly ? moveCell(x) : stickerCell(x)))}</View>
         </ScrollView>
       ) : null}
       {locked && pack && (
@@ -244,19 +282,13 @@ const useStyles = makeStyles(({ colors, semantic, dark }) => ({
   tabActive: { backgroundColor: colors.cardAlt },
   tabText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 6, minHeight: 60 },
-  cell: { width: '12.5%', alignItems: 'center', paddingVertical: 6 },
   stickerCell: { width: '20%', alignItems: 'center', paddingVertical: 6 },
   moveCell: { width: '33.33%', alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 4 },
   moveArrow: { position: 'absolute', bottom: -2, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: semantic.action },
   moveName: { color: colors.text, fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  emoji: { fontSize: 26, lineHeight: 34 },
-  emojiScroll: { maxHeight: 200 },
   // Four rows and a part of the fifth, so it shows there is more.
   stickerScroll: { maxHeight: 236 },
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
-  chipOn: { backgroundColor: colors.cardAlt, borderColor: colors.cardAlt },
-  chipText: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  freeNote: { color: colors.textDim, fontSize: 11, textAlign: 'center', paddingBottom: 4 },
+  section: { color: colors.textDim, fontSize: 11, fontWeight: '700', paddingHorizontal: 12, paddingTop: 4 },
   empty: { color: colors.textDim, padding: 12 },
   sub: { color: colors.textDim, fontSize: 11, fontWeight: '700' },
   fx: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 5 },

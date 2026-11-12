@@ -43,7 +43,7 @@ export const incomeDetail = (e: Earning) => {
   if (e.source === 'Hediye') {
     // Older rows have no gift stored; the price alone can't tell which gift it was.
     const g = e.gift;
-    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Uğurlu (${pct(LUCKY_RECIPIENT_SHARE)})` : ''}` : '🎁 Hediye';
+    return g ? `${g.emoji} ${g.name} x${g.count}${g.lucky ? ` · Şanslı (${pct(LUCKY_RECIPIENT_SHARE)})` : ''}` : '🎁 Hediye';
   }
   if (e.source === 'Oda sahibi bonusu') return `Bonus ${pct(RULES.roomOwnerBonus)}`;
   if (e.source === 'Arama') return 'Görüntülü arama';
