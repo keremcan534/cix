@@ -1,6 +1,6 @@
 /// <reference types="node" />
 // Oyun Salonu's look (components/games/fx/salon, fx/salon-art): every picture the art list names for the Salon
-// (docs/GORSEL_URETIM_LISTESI.md §16, §17, §19) has one line in the registry; a line that is open names a PNG on
+// (docs/GORSEL_URETIM_LISTESI.md §16, §17, §19, §24) has one line in the registry; a line that is open names a PNG on
 // disk, and a PNG that has been delivered has its line open (so a dropped-in file can't be forgotten). Every Salon
 // screen is drawn in the shared shell, and none of them brings back purple. Reads the sources as text.
 import { describe, test } from 'node:test';
@@ -46,6 +46,21 @@ describe('Oyun Salonu görselleri', () => {
       // The balance and the stake are the shell's: no game paints its own tint on them any more.
       assert.doesNotMatch(code, /<(BalancePill|BetStepper)[^>]*\btint=/, `${f}: kendi rengi`);
     }
+  });
+
+  test('Kızıl Yedi giydirmesi: her sembolün resmi var, kullandığı her görsel teslim edilmiş satır', () => {
+    const skin = read('components/games/fx/slot-skin.tsx');
+    const used = [...skin.matchAll(/pic\('([a-z0-9-]+)'\)/g)].map((m) => m[1]);
+    // The 16th, the cover, is the game's picture in the lists (components/GameArt).
+    assert.equal(new Set(used).size, 15, 'paketin kapak dışındaki 15 görseli');
+    assert.match(read('components/GameArt.tsx'), /super777: 'kizil-yedi-kapak'/);
+    used.push('kizil-yedi-kapak');
+    for (const n of used)assert.ok(lines.find((l) => l.name === n)?.open, `${n}: kayıtta açık değil`);
+    const configs = read('lib/slot-configs.ts');
+    const symbols = [...(configs.match(/export const SUPER777[\s\S]*?symbols: \{([\s\S]*?)\n {2}\},/)?.[1] ?? '').matchAll(/^ {4}(\w+): \{/gm)].map((m) => m[1]);
+    assert.deepEqual(symbols.sort(), ['cherry', 'diamond', 'grape', 'lemon', 'mango', 'seven']);
+    const block = skin.match(/symbols: \{([\s\S]*?)\n {4}\},/)?.[1] ?? '';
+    for (const x of symbols) assert.match(block, new RegExp(`\\b${x}: pic\\(`), `${x}: resmi yok`);
   });
 
   test('Oyun Salonu renkleri mor değil (palet: lacivert, turkuaz, altın, mercan)', () => {

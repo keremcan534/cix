@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`). Temel ücretsizdi; Güncelleme 4'te emoji panelinden ve mağazadan kalktı, gönderilmiş Temel çıkartmaları yine çizilir. Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 663 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
+**Toplam 676 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -40,6 +40,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 21. Emoji paneli: VIP emojileri | 8 |
 | 22. Oda katkı sıralaması | 4 |
 | 23. Kalp seviyesi (birebir) | 7 |
+| 24. Kızıl Yedi deneme paketi | 13 |
 
 ## ChatGPT ile üretim
 
@@ -369,9 +370,9 @@ Aşağıdaki her satır için ayrı bir görsel üret. "Ne çizilecek" sütununu
 | 22 | `oyun-dragon-tiger.png` | Ejder ile Kaplan | 🐉 | oyun kapak simgesi: Ejder ile Kaplan | P3 | Taslak teslim (parti 04–12) |
 | 23 | `casino-kart-ejder.png` | Ejder | 🐉 | Ejder ile Kaplan masası: Ejder tarafı | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: ejderha yerine alev simgesi, aynı görsel 2 dosyada |
 | 24 | `casino-kart-kaplan.png` | Kaplan | 🐯 | Ejder ile Kaplan masası: Kaplan tarafı | P3 | Taslak teslim (parti 04–12) |
-| 25 | `slot-kiraz.png` | Kiraz | 🍒 | slot makinesi sembolü: Kiraz | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
-| 26 | `slot-limon.png` | Limon | 🍋 | slot makinesi sembolü: Limon | P3 | Taslak teslim (parti 04–12) |
-| 27 | `slot-uzum.png` | Üzüm | 🍇 | slot makinesi sembolü: Üzüm | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
+| 25 | `slot-kiraz.png` | Kiraz | 🍒 | slot makinesi sembolü: Kiraz | P3 | Taslak teslim (parti 04–12) · ✅ Kızıl Yedi deneme paketinde (§24) yeni sürümü teslim edildi, bağlandı (`app/assets/art`, 288 px; Hazine Kulesi ve Kızıl Yedi makaraları) |
+| 26 | `slot-limon.png` | Limon | 🍋 | slot makinesi sembolü: Limon | P3 | Taslak teslim (parti 04–12) · ✅ Kızıl Yedi deneme paketinde (§24) yeni sürümü teslim edildi, bağlandı (`app/assets/art`, 288 px; Kızıl Yedi makaraları) |
+| 27 | `slot-uzum.png` | Üzüm | 🍇 | slot makinesi sembolü: Üzüm | P3 | Taslak teslim (parti 04–12) · ✅ Kızıl Yedi deneme paketinde (§24) yeni sürümü teslim edildi, bağlandı (`app/assets/art`, 288 px; Kızıl Yedi makaraları) |
 | 28 | `slot-can.png` | Çan | 🔔 | slot makinesi sembolü: Çan | P3 | Taslak teslim (parti 04–12) · ⚠️ yeniden üretilmeli: aynı görsel 2 dosyada |
 
 ## 7. VIP, SVIP, Asil, seviyeler (101)
@@ -909,3 +910,28 @@ Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/
 | 7 | Kalp çizgisi | İki fotoğrafı bağlayan ince, parlak yatay şerit; ortasında küçük bir nabız tepesi, uçlara doğru incelip soluyor; mercandan altına geçen ton; yaklaşık 6:1 oranında | `kalp-cizgisi.png` | P3 |
 
 Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → `components/heart-level.tsx` içinde `HeartGlyph` her görünümün kalbini (1–5) Ionicons kalbin yerine çizer; ışık, atma, yükselen kalpler ve altın halka kodla kalır. Kalp atışı (6) çizgide giden kalbin, kalp çizgisi (7) `HeartLink` içindeki düz çizginin yerine geçer. Rozetteki ("♥ Lv.7") beyaz kalp ve dolgu rengi olduğu gibi kalır.
+
+## 24. Kızıl Yedi deneme paketi (13)
+
+Bir oyunun baştan sona gerçek görsellerle giydirilmesi için deneme: Kızıl Yedi (`super777`). Sahibin ChatGPT'de ürettiği 16 dosya; üçü (kiraz, limon, üzüm) §6'daki satırların yeni sürümü olduğu için sayıya katılmadı, 13'ü yeni. Hepsi `app/assets/art/` içinde, ekrandaki boyutun en çok 3 katına küçültüldü, kenardaki soluk pikseller temizlendi (alfa 60’ın altı sıfır; parıltıda 10; ışık huzmelerinin kare biçimli soluk zemini kenara doğru yumuşakça söndürüldü), PNG olarak sıkıştırıldı (arka plan 256 renk); toplam 3,7 MB (eski kiraz, limon, üzüm çıktı; net ekleme 3,5 MB). Kayıt `app/src/components/games/fx/salon-art.tsx` (§24 satırları), giydirme `fx/slot-skin.tsx` (oyun başına "skin": arka plan, çerçeve ve penceresi, semboller, Çevir, kazanç plakası, gösteri eşikleri), gösteri `fx/jackpot-show.tsx`. Başka bir makine aynı yolla giydirilir: görselleri buraya yeni bir bölüm olarak eklenir ve `SLOT_SKINS`'e bir satır girer.
+
+| # | Dosya adı | Ad | Görsel | Nerede | Not |
+|---|---|---|---|---|---|
+| 1 | `kizil-yedi-arka-plan.png` | Arka plan | Kızıl salon: kırmızı kadife perdeler, avize, lacivert lounge; ortası sakin | oyun panelinin tamamının arkası, koyu örtüyle | ✅ teslim edildi, bağlandı · 608 × 1080, 256 renk |
+| 2 | `kizil-yedi-cerceve.png` | Makine çerçevesi | Altın-kırmızı slot kabini, kollu; makara penceresi şeffaf (1000 × 1250 içinde x 154–785, y 402–893) | makaraların üstünde, makaralar penceresinde | ✅ teslim edildi, bağlandı · 1000 × 1250 |
+| 3 | `kizil-yedi-kazanc.png` | Kazanç plakası | Geniş altın çerçeveli kırmızı pano, ortası boş | durum ve kazanç plakası (tutar kodla, altın yazı); JACKPOT gösterisinde tutar | ✅ teslim edildi, bağlandı · 900 × 299 |
+| 4 | `kizil-yedi-cevir.png` | Çevir düğmesi | Kırmızı-altın madalyon, ortada iki ok | Çevir düğmesi (basınca küçülür); geniş sarı halesi kırpıldı | ✅ teslim edildi, bağlandı · 296 × 320 |
+| 5 | `kizil-yedi-kapak.png` | Kapak | Kızıl 7, kiraz, limon, üzüm ve elmas altın çerçevede | Oyun Salonu listesi, oda menüsü, oyun panelinin başlığı (`components/GameArt.tsx`) | ✅ teslim edildi, bağlandı · 256 × 256 |
+| 6 | `slot-kiraz.png` | Kiraz | İki parlak kiraz | makara sembolü (§6 #25'in yeni sürümü, sayıya katılmadı) | ✅ teslim edildi, bağlandı · 288 × 288 |
+| 7 | `slot-limon.png` | Limon | Parlak limon | makara sembolü (§6 #26'nın yeni sürümü, sayıya katılmadı) | ✅ teslim edildi, bağlandı · 288 × 288 |
+| 8 | `slot-mango.png` | Mango | Kırmızı-sarı mango | makara sembolü | ✅ teslim edildi, bağlandı · 288 × 288 |
+| 9 | `slot-uzum.png` | Üzüm | Kırmızı üzüm salkımı | makara sembolü (§6 #27'nin yeni sürümü, sayıya katılmadı) | ✅ teslim edildi, bağlandı · 288 × 288 |
+| 10 | `slot-yedi.png` | Yedi | Kırmızı-altın 7 | makara sembolü | ✅ teslim edildi, bağlandı · 288 × 288 |
+| 11 | `slot-elmas.png` | Elmas | Elmas, kendi süslü çerçevesinde | makara sembolü (çerçevesiyle olduğu gibi) | ✅ teslim edildi, bağlandı · 288 × 288 |
+| 12 | `jackpot-levha.png` | JACKPOT levhası | "JACKPOT" yazılı altın-kırmızı levha | JACKPOT gösterisi: yaylanarak gelir, üstünden ışık geçer | ✅ teslim edildi, bağlandı · 900 × 301 |
+| 13 | `jackpot-isik.png` | Işık huzmeleri | Merkezden yayılan altın ışınlar (çoğu soluk) | JACKPOT ve Büyük Kazanç gösterisinde levhanın arkasında döner | ✅ teslim edildi, bağlandı · 768 × 768 |
+| 14 | `jeton-altin.png` | Altın jeton | Yıldızlı altın jeton | gösteride fışkıran ve yağan jetonlar (`fx/coins`) | ✅ teslim edildi, bağlandı · 160 × 155 |
+| 15 | `jeton-yigini.png` | Jeton yığını | Altın jeton ve yakut yığını | JACKPOT gösterisinde alttan yükselir | ✅ teslim edildi, bağlandı · 768 × 414 |
+| 16 | `parilti.png` | Parıltı | Dört köşeli altın parıltı | gösteride yanıp sönen parıltılar | ✅ teslim edildi, bağlandı · 128 × 128 |
+
+Gösteri eşikleri (bahsin katı olarak): tablo 100× yazsa da bu çizgi bahsidir; tur bahsi 5 çizgiye bölündüğü için üç 7 turun **20,6 katını** öder ve makinenin bir turda ödeyebileceği en yüksek tutar 25,3 kattır (50 kat hiç gelmez). Bu yüzden **JACKPOT ≥ 20 kat** (pratikte yalnız bir çizgide üç 7), **Büyük Kazanç ≥ 10 kat** (ör. iki elmas çizgisi); altı küçük kutlama (birkaç jeton ve tutar). Oranlar, ödemeler ve bahisler değişmedi.
