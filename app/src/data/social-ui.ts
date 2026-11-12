@@ -88,7 +88,7 @@ export const EXTRA_MOMENTS: Moment[] = [
   { id: 'sm2', userId: 'u11', text: 'GEZELİMM ✨', image: 'https://picsum.photos/seed/citynight/600/750', likes: 41, comments: 3, time: '25 dk' },
   { id: 'sm3', userId: 'u2', text: 'Dün geceki PK’da odamız 3-1 kazandı 🏆 Destek veren herkese teşekkürler!', image: 'https://picsum.photos/seed/trophy/600/600', likes: 77, comments: 4, time: '2 sa' },
   { id: 'sm4', userId: 'u5', text: 'Bugünün kombini: oversize ceket + beyaz sneaker 🤍', image: 'https://picsum.photos/seed/outfit/600/750', likes: 156, comments: 11, time: '4 sa' },
-  { id: 'sm5', userId: 'u1', text: 'İlk buluşmada nereye gidilir? Benim favorim sahilde kahve ☕🌅', likes: 93, comments: 21, time: '6 sa' },
+  { id: 'sm5', userId: 'u1', text: 'İlk buluşmada nereye gidilir? Benim favorim terasta kahve ☕🌅', likes: 93, comments: 21, time: '6 sa' },
   { id: 'sm6', userId: 'u12', text: 'Bu akşam playlistimde sadece 90’lar var 🎶 Öneri bekliyorum', likes: 22, comments: 5, time: '9 sa' },
 ];
 
@@ -145,5 +145,5 @@ export const SEED_COMMENTS: Record<string, MomentComment[]> = {
     { id: 'c5', userId: 'u2', text: 'hahaha', time: '9 dk' },
   ],
   sm3: [{ id: 'c6', userId: 'u6', text: 'Rövanş istiyoruz ⚔️', time: '1 sa' }],
-  sm5: [{ id: 'c7', userId: 'u4', text: 'Kesinlikle sahil 🌊', time: '5 sa' }],
+  sm5: [{ id: 'c7', userId: 'u4', text: 'Kesinlikle teras 🌇', time: '5 sa' }],
 };

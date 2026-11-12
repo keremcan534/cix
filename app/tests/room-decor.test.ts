@@ -131,7 +131,7 @@ describe('Oda görselleri: adlar, kalan gün, kırpma', () => {
   test('odanın gösterdiği şeyin adı ve kalan günü', () => {
     assert.equal(backgroundName(null), 'Tema görünümü');
     assert.equal(backgroundName({ kind: 'free', id: null, url: null }), 'Tema görünümü');
-    assert.equal(backgroundName({ kind: 'free', id: 'bg2', url: null }), 'Deniz Feneri');
+    assert.equal(backgroundName({ kind: 'free', id: 'bg2', url: null }), 'Gece Işığı');
     assert.equal(backgroundName({ kind: 'paid', id: 'rb-salon', url: null }), 'Altın Salon');
     assert.equal(backgroundName({ kind: 'paid', id: 'rb-yeni', url: null }), 'Süsleme', 'bu sürümün tanımadığı süsleme');
     assert.equal(backgroundName({ kind: 'custom', id: null, url: 'https://x/y.jpg' }), 'Özel görsel');

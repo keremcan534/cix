@@ -341,9 +341,9 @@ export default function UserProfile() {
   const giftable = !live || !!serverId;
   /** One gift, no confirmation; true once it went. */
   const deliverGift = async (g: Gift): Promise<boolean> => {
-    // Same İnci (SVIP) lock as the room's gift sheet.
+    // Same VIP (SVIP) lock as the room's gift sheet.
     if ((g.minSvip ?? 0) > svipLevel) {
-      showAlert('Üyelere özel hediye', `${g.name}, İnci ${g.minSvip} ve üstü için. Senin seviyen: İnci ${svipLevel}.`);
+      showAlert('Üyelere özel hediye', `${g.name}, VIP ${g.minSvip} ve üstü için. Senin seviyen: VIP ${svipLevel}.`);
       return false;
     }
     if (live) {
@@ -1083,9 +1083,9 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
       onPress={() =>
         g
           ? router.push(`/kullanici/${g.id}`)
-          : showAlert('Fener Bekçisi', 'Bu profilin henüz bekçisi yok. Hayran kulübünde en çok destek veren kişi Fener Bekçisi olur.')
+          : showAlert('Baş Destekçi', 'Bu profilin henüz baş destekçisi yok. Hayran kulübünde en çok destek veren kişi Baş Destekçi olur.')
       }
-      accessibilityLabel="Fener Bekçisi"
+      accessibilityLabel="Baş Destekçi"
     >
       {g ? (
         <View style={styles.guardianRing}>
@@ -1098,7 +1098,7 @@ function Guardian({ guardian }: { guardian: { userId: string; points: number } |
       )}
       <LinearGradient colors={['#FDE68A', '#F59E0B', '#B45309']} style={styles.guardianLabel}>
         <Ionicons name="shield" size={10} color="#5B2A00" />
-        <Text style={styles.guardianText}>BEKÇİ</Text>
+        <Text style={styles.guardianText}>DESTEKÇİ</Text>
       </LinearGradient>
       {g && guardian && (
         <Text style={[styles.meta, { fontSize: 12, marginTop: 4 }]} numberOfLines={1}>

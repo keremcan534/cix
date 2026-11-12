@@ -3,7 +3,7 @@
 // opponents. In a live room the server deals and checks; the screens only read its state. tests/cards.test.ts plays
 // the same seeded games through this copy and through the server's files and fails when they differ. Pure.
 //
-// The deck is our own: 102 cards, each a number 0…101 that `cardOf` reads. Four colours (0 Turkuaz, 1 Mercan,
+// The deck is our own: 102 cards, each a number 0…101 that `cardOf` reads. Four colours (0 Turkuaz, 1 Pembe,
 // 2 Altın, 3 Yeşil) with, in each, 1…9 twice, two Atla, two Yön and two +2; then four Joker and two Joker +4, which
 // have no colour.
 //
@@ -57,7 +57,7 @@ export type CardsSeen = Omit<CardsState, 'hands' | 'draw' | 'discard'> & { count
 export const META = { name: 'Renk Kartları', min: 2, max: 6 } as const;
 export const HAND = 7;
 export const DECK = 102;
-export const COLOR_NAMES = ['Turkuaz', 'Mercan', 'Altın', 'Yeşil'];
+export const COLOR_NAMES = ['Turkuaz', 'Pembe', 'Altın', 'Yeşil'];
 export { MISSES, TURN_MS, sitDown } from '@/lib/room-games/seam';
 /** A colour's 24 cards, in the order of their numbers. */
 const FACES: CardValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 'Atla', 'Atla', 'Yön', 'Yön', '+2', '+2'];

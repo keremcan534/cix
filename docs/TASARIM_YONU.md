@@ -88,16 +88,16 @@ Açık tema: tokenlar merkezi olduğu için mümkün; ancak eski ekranlarda doğ
 
 1. **Benzerlik çekirdek fikirdir.** SimilarClub'ın sorusu "kime benziyorum, kiminle aynı dalgadayım?". Eşleşme, öneriler ve oda listeleri bu benzerlikten beslenir; ekranlar kişiyi önce kendine benzeyenlerle buluşturur.
 2. **Gece laciverti ve turkuaz.** Zemin lacivert, marka ve eylem rengi turkuaz. Diğer renkler yalnız anlam taşır (bkz. §1).
-3. **Deniz ve yolculuk ad ailesi.** Özellik adları tek bir dünyadan gelir; yeni bir özellik ad alırken önce bu aileye bakılır.
+3. **Ad verme kuralı.** Deniz, denizcilik ve gemicilik temalı ad verilmez: özellik, seviye, rozet, oyun, ürün ve demo verisi adlarında deniz, dalga, liman, fener, gemi, kaptan, inci, mercan gibi sözcükler kullanılmaz. Adlar kısa ve anlaşılır Türkçe sözcüklerdir. Sahibin belgelerinde adı geçen bir özellik o adla anılır. Bugünkü adlar:
 
    | Ad | Ne anlatır |
    | --- | --- |
-   | **İnci** (İnci 1–10) | Yüklemeyle büyüyen üyelik seviyesi |
+   | **VIP** (VIP 1–10) | Yüklemeyle büyüyen üyelik seviyesi (süreli VIP aboneliği ekranda "Abonelik" sekmesidir) |
    | **Rütbe** (Çavuş, Yüzbaşı, Binbaşı, Albay, Paşa) | 30 günlük ayrıcalık programı |
    | **Aile** | Topluluk; Aile sohbeti, Aile kasası |
    | **Balkon** | Odadaki ama mikrofonda olmayan dinleyiciler |
    | **Patron koltuğu** | Tek seferde belirlenen jetonu gönderenin koltuğu (ya da oda sahibinin oturttuğu kişinin) |
-   | **Fener** | Yol gösteren ışık; Fener Kayalığı oyunu, Fener Bekçisi rozeti |
+   | **Oda sahibi** | Odayı kuran kişi; dinleyici listesinde adının yanında yazar |
    | **Cömertlik** ve **Yankı** | Gönderilen ve alınan hediyelerden gelen iki seviye |
 
 4. **Sakin ekonomi.** Para ekranları sade; harcamaya iten bant, geri sayım ve sahte popülerlik yok (bkz. §2, kural 8).
@@ -111,12 +111,12 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 
 1. **Amaç.** Seçilen kişiye/kişilere seçilen hediyeyi, toplam maliyeti görerek göndermek.
 2. **Hedef kullanıcı ve bağlam.** Sesli odadaki dinleyici veya konuşmacı; tek elle, oda akışını kaçırmadan.
-3. **Birincil eylem.** `Gönder · {toplam}` (altın `money` buton). Duruma göre `Onayla ve gönder`, `Jeton yükle`, `Ücretsiz gönder`, `İnci ayrıcalıklarını gör`, `Önce alıcı seç` (devre dışı) olur. Aynı anda tek eylem.
+3. **Birincil eylem.** `Gönder · {toplam}` (altın `money` buton). Duruma göre `Onayla ve gönder`, `Jeton yükle`, `Ücretsiz gönder`, `VIP ayrıcalıklarını gör`, `Önce alıcı seç` (devre dışı) olur. Aynı anda tek eylem.
 4. **Bilgi hiyerarşisi.**
    - Başlık satırı: "Hediye gönder", sessiz hediye seviyesi, bakiye çipi (cüzdana gider), kapat.
    - **Kime:** "Herkes (n)" çipi + isimli avatar çipleri (çoklu seçim, seçilende onay işareti).
    - **Raflar:** Popüler · Eğlenceli · İkili · Özel · ★ Favoriler · Çantam (adet). Altında rafı açıklayan tek nötr satır ve görünür **Fiyat** sıralama düğmesi (varsayılan → ucuzdan → pahalıdan).
-   - **Izgara:** 4 sütun; görsel, ad, fiyat. En fazla bir köşe rozeti (3D / ♪). Kilitli hediyede fiyat yerine "🔒 İnci n".
+   - **Izgara:** 4 sütun; görsel, ad, fiyat. En fazla bir köşe rozeti (3D / ♪). Kilitli hediyede fiyat yerine "🔒 VIP n".
    - **Özet:** hediye, `fiyat × adet × kişi`, yakınlık (ikili hediyelerde), sağda **Toplam**.
    - **Bildirim satırı:** kalan bakiye / eksik tutar / onay uyarısı / kilit nedeni / çanta kaynağı.
    - **Eylem satırı:** adet düğmesi (×1 ▾, ön ayarlar) + birincil buton.
@@ -124,7 +124,7 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 6. **Etkileşimler.**
    - Karoya dokun: seç.
    - Uzun bas: favoriye ekle/çıkar.
-   - Kilitli karo: seçilir, ama eylem "İnci ayrıcalıklarını gör" olur.
+   - Kilitli karo: seçilir, ama eylem "VIP ayrıcalıklarını gör" olur.
    - Gönder tek dokunuşla gönderir. Kullanıcı Ayarlar'dan ek onay açtıysa eşik üstünde ilk dokunuş onay durumuna geçer; seçim değişince onay düşer.
    - Gönderimden sonra panel kapanır, odada animasyon ve sistem mesajı çıkar.
    - Bakiye çipi ve "Jeton yükle" cüzdana gider; geri tuşu odaya döner.
@@ -156,10 +156,10 @@ Kod: `app/src/components/room/gift-sheet.tsx` (oda ekranından açılır; eski `
 10. **Bağlantılar.**
     - Oda alt çubuğundaki altın hediye butonu açar.
     - Koltuktaki kişiye "Hediye gönder" o kişi seçili açar.
-    - Cüzdan / jeton yükleme ve İnci merkezi buradan açılır.
+    - Cüzdan / jeton yükleme ve VIP merkezi buradan açılır.
     - Gönderim, odadaki hediye animasyonuna ve sistem mesajına bağlanır.
 
-**Korunan işlevler.** Çoklu alıcı ve herkesi seçme, dört kategori, fiyat sıralama, favoriler (uzun basma), ücretsiz çanta ve stok düşümü, İnci kilidi, adet ön ayarları ve etiketleri, ikili hediye yakınlığı, hediye seviyesi, cüzdan geçişi, oda tarafındaki bakiye düşümü, defter kaydı, PK puanı, katkı sıralaması ve efekt ayarları.
+**Korunan işlevler.** Çoklu alıcı ve herkesi seçme, dört kategori, fiyat sıralama, favoriler (uzun basma), ücretsiz çanta ve stok düşümü, VIP kilidi, adet ön ayarları ve etiketleri, ikili hediye yakınlığı, hediye seviyesi, cüzdan geçişi, oda tarafındaki bakiye düşümü, defter kaydı, PK puanı, katkı sıralaması ve efekt ayarları.
 
 **Kabul kriterleri.**
 - [ ] Gönder düğmesine basmadan önce toplam ve kalan bakiye görünür.
@@ -217,7 +217,7 @@ Görsel dosya satın almadan, lisans riski olmadan ve uygulama boyutunu büyütm
 
 | Çerçeve | Efekt |
 | --- | --- |
-| Ses Dalgası | Turkuaz-mor halka, avatardan yayılan ses dalgaları (imza) |
+| Ses Halkası | Turkuaz-mor halka, avatardan yayılan ses halkaları (imza) |
 | Yörünge | Mavi-mor halka, etrafında dönen üç ışık |
 | Aurora | Çok renkli dönen halka, köşelerde yanıp sönen kıvılcımlar |
 | Ateş | Sıcak renkli hızlı halka, yükselen korlar |

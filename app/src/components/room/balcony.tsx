@@ -191,7 +191,7 @@ export function ParticipantsSheet({
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={s.name} numberOfLines={1}>
                       {me ? 'Sen' : u.name}
-                      {role === 'owner' ? ' · Kaptan' : role === 'admin' ? ' 🛡️' : ''}
+                      {role === 'owner' ? ' · Oda sahibi' : role === 'admin' ? ' 🛡️' : ''}
                     </Text>
                     <Text style={s.dim} numberOfLines={1}>
                       {status}

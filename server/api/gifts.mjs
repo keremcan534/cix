@@ -110,7 +110,7 @@ export const giftRoutes = {
     if (room !== null && !ROOM.test(room)) throw new HttpError(400, 'Geçersiz oda');
     // Outside a room, where it was sent (Gelir's sources); older apps send none.
     const place = room === null && PLACES.includes(b.place) ? b.place : null;
-    if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} İnci ${gift.minSvip} ve üstü için`);
+    if (gift.minSvip && svipLevel(Number(u.svip_xp)) < gift.minSvip) throw new HttpError(403, `${gift.name} VIP ${gift.minSvip} ve üstü için`);
     if (await blockedBetween(u.id, to)) throw new HttpError(403, 'Bu kişiye hediye gönderemezsin');
     const total = gift.price * count;
     const label = count > 1 ? `${gift.name} ×${count}` : gift.name;

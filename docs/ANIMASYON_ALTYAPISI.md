@@ -104,7 +104,7 @@ Kesin fiyatlar sağlayıcılardan teklif alınarak netleşmeli. Aşağıdakiler 
 
 | Kriter | Prototipte |
 |---|---|
-| Mikrofon çıkış animasyonu | ✅ Dönen Yıldızlar / Neon Halka / Ses Dalgası / Müzik Notaları (konuşurken) |
+| Mikrofon çıkış animasyonu | ✅ Dönen Yıldızlar / Neon Halka / Ses Halkası / Müzik Notaları (konuşurken) |
 | Küçük hareketli tepki | ✅ Uçan Kalpler, Alkış, Kahkaha (ücretsiz, koltuktan yükselir) |
 | Büyük animasyonlu hediye | ✅ Kraliyet Tacı (koltuktan ortaya büyür), Altın Yağmuru, Ejderha (tam ekran) |
 | Ücretsiz animasyon | ✅ |
