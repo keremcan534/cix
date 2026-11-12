@@ -255,9 +255,12 @@ export function PkPoints({ value, still }: { value: number; still?: boolean }) {
  * stays. `art`: a Hareketli item's picture (lib/animations), drawn instead of `emoji` (then its name).
  */
 export type SeatReactionData = { emoji: string; key: number; art?: Asset; pre?: string[]; badge?: string; badgeAt?: number; ms?: number };
-export const REACTION_MS = 2600;
+/** The pop-in and three beats of a seat reaction; anything longer is held on the avatar before it fades. */
+const BEAT_MS = 2600;
+/** How long a seat reaction stays: the beats plus two seconds held on the avatar (the owner asked for 2 s more). */
+export const REACTION_MS = BEAT_MS + 2000;
 /** A Hamle with a result (lib/room-moves) stays long enough to be read. */
-export const RESULT_MS = 4400;
+export const RESULT_MS = 6400;
 const SHUFFLE_STEP_MS = 170;
 
 /**
@@ -304,7 +307,7 @@ export function SeatReaction({ emoji, art, size, still, pre, badge, badgeAt = 0,
               ]),
               { iterations: 3 },
             ),
-            Animated.delay(Math.max(0, ms - REACTION_MS)),
+            Animated.delay(Math.max(0, ms - BEAT_MS)),
           ]),
       Animated.delay(250),
       Animated.timing(v, { toValue: 2, duration: 320, useNativeDriver: true }),
