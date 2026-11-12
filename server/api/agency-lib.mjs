@@ -6,7 +6,8 @@
 // 1/10,000 diamond so a split never loses or invents a fraction. Rates are numeric(6,4). 5,000 diamonds = 1 USD.
 import crypto from 'node:crypto';
 
-import { HttpError, db } from './core.mjs';
+import { HttpError, db, move } from './core.mjs';
+import { LOCK_HOURS } from './wallet.mjs';
 
 export const DIAMONDS_PER_USD = 5000;
 /** The first release runs two agency levels (top, sub). The data model allows more; settings can't exceed this. */
@@ -82,6 +83,8 @@ export const DEFAULTS = {
   parent_sees_sub_earnings: true,
   bd_policy: { rate: 0.05, basis: 'base_plus_pool' },
   suspension_policy: { reliability_below: 40, inactive_days: 90 },
+  // Ajans asistanı (docs/AJANS_ASISTANI.md): how many assistants an agency may have at once.
+  assistant_policy: { max: 1 },
 };
 
 const bad = (msg) => {
@@ -207,6 +210,10 @@ export function validateSetting(key, value, cur) {
       const v = { ...cur.suspension_policy, ...obj(value, key) };
       return { reliability_below: num(v.reliability_below, 0, 100, 'Güvenilirlik eşiği'), inactive_days: whole(v.inactive_days, 1, 3650, 'Pasiflik süresi') };
     }
+    case 'assistant_policy': {
+      const v = { ...cur.assistant_policy, ...obj(value, key) };
+      return { max: whole(v.max, 0, 20, 'Ajans asistanı sınırı') };
+    }
     default:
       return bad('Bilinmeyen ayar');
   }
@@ -279,6 +286,14 @@ export function cadenceKey(t, cadence) {
   const d = new Date(new Date(t).getTime() + TZ_MS);
   return cadence === 'quarter' ? `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}` : `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
 }
+/** Monday 00:00 (Türkiye) of the calendar week `t` falls in, as a Date. */
+export function weekStart(t) {
+  const d = new Date(new Date(t).getTime() + TZ_MS);
+  const back = (d.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back) - TZ_MS);
+}
+/** The next Monday 00:00 (Türkiye) after `t`. */
+export const nextWeekStart = (t) => new Date(weekStart(t).getTime() + 7 * 86400e3);
 export async function isClosed(c, period) {
   return (await c.query('SELECT 1 FROM agency_periods WHERE period = $1', [period])).rowCount > 0;
 }
@@ -471,7 +486,7 @@ export async function calcEvent(c, eventId) {
   const t = new Date(ev.occurred_at);
   const { values: s, ids } = await settingsAt(c, t);
   const done = (status) => c.query('UPDATE income_events SET calc_status = $2 WHERE id = $1', [ev.id, status]);
-  const link = await c.query('SELECT agency_id, joined_at FROM agency_streamers WHERE streamer_id = $1 AND joined_at <= $2 AND (ended_at IS NULL OR ended_at > $2) ORDER BY joined_at DESC LIMIT 1', [ev.streamer_id, t]);
+  const link = await c.query('SELECT agency_id, joined_at, invited_by FROM agency_streamers WHERE streamer_id = $1 AND joined_at <= $2 AND (ended_at IS NULL OR ended_at > $2) ORDER BY joined_at DESC LIMIT 1', [ev.streamer_id, t]);
   if (!link.rowCount) return (await done('no_agency'), null);
   // A type added after the settings were stored counts as its default.
   if (!(s.income_types[ev.source_type] ?? DEFAULTS.income_types[ev.source_type])) return (await done('excluded'), null);
@@ -510,6 +525,16 @@ export async function calcEvent(c, eventId) {
     }
   }
 
+  // Agency assistant: the share of the streamer's own agency (after a transition share) splits with the assistant
+  // who brought the streamer, at the assistant's share in force then. Rounded toward zero in 1/10,000 diamond, so
+  // the owner keeps the fraction and a refund takes back exactly what the gift gave.
+  let split = null;
+  if (link.rows[0].invited_by && shares[0].amount !== 0) {
+    const a = await assistantAt(c, chain[0], link.rows[0].invited_by, t);
+    const amount = a ? Math.trunc((shares[0].amount * a.pct) / 100) : 0;
+    if (amount !== 0) split = { ...a, basis: shares[0].amount, amount, rate: Math.round((shares[0].rate * a.pct) / 100) };
+  }
+
   const total = base * eff[n - 1];
   let period = periodOf(t, s.commission_period);
   if (await isClosed(c, period)) period = periodOf(new Date(), s.commission_period);
@@ -517,8 +542,8 @@ export async function calcEvent(c, eventId) {
   const parentAmount = shares.filter((x) => x.kind === 'difference').reduce((a, x) => a + x.amount, 0);
   const ins = await c.query(
     `INSERT INTO agency_commissions (income_event_id, txn, streamer_id, agency_id, parent_agency_id, top_agency_id, chain, base_diamonds, income_type,
-       pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${DIAMONDS_PER_USD}, $19, $20, $21)
+       pool_cap, total_rate, agency_rate, parent_rate, transition_rate, agency_amount, parent_amount, transition_amount, usd, period, rule_version, occurred_at, assistant_amount)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::numeric / ${DIAMONDS_PER_USD}, $19, $20, $21, $22)
      ON CONFLICT (income_event_id) DO NOTHING RETURNING *`,
     [
       ev.id,
@@ -542,6 +567,7 @@ export async function calcEvent(c, eventId) {
       period,
       version,
       t,
+      fmt4(split?.amount ?? 0),
     ],
   );
   if (!ins.rowCount) return (await done('done'), null);
@@ -550,6 +576,7 @@ export async function calcEvent(c, eventId) {
     if (sh.amount === 0) continue;
     await c.query('INSERT INTO agency_ledger (agency_id, kind, amount, rate, commission_id, period) VALUES ($1,$2,$3,$4,$5,$6)', [sh.agency, sh.kind, fmt4(sh.amount), fmt4(sh.rate), com.id, period]);
   }
+  if (split) await bookAssistantShare(c, { commissionId: com.id, agencyId: chain[0], streamerId: ev.streamer_id, period, a: split });
   // BD: the agency's responsible BD then (the streamer's agency first, else the closest ancestor). A separate
   // item paid by the platform; the agency shares above are untouched.
   const bd = await c.query('SELECT bd_id, agency_id FROM bd_assignments WHERE agency_id = ANY($1) AND assigned_at <= $2 AND (ended_at IS NULL OR ended_at > $2)', [chain, t]);
@@ -605,6 +632,96 @@ export async function recordIncome(c, streamerId, type, sourceRef, diamonds, occ
   }
 }
 
+// --- Agency assistant (docs/AJANS_ASISTANI.md) ------------------------------------------------------------------
+/**
+ * The assistant `userId` of agency `agencyId` at time `t`, with the share then: { id, userId, name, pct }, or
+ * null. Only while the assignment runs and the person is still one of the agency's own (a streamer of it or on
+ * its team): an assistant who left the agency gets nothing from then on, as one the owner removed.
+ */
+export async function assistantAt(c, agencyId, userId, t) {
+  const r = await c.query(
+    `SELECT a.id, a.user_id, u.name,
+            (SELECT s.streamer_pct FROM agency_assistant_shares s WHERE s.assistant_id = a.id AND s.effective_from <= $3
+              ORDER BY s.effective_from DESC, s.id DESC LIMIT 1) AS pct
+       FROM agency_assistants a JOIN users u ON u.id = a.user_id
+      WHERE a.agency_id = $1 AND a.user_id = $2 AND a.assigned_at <= $3 AND (a.ended_at IS NULL OR a.ended_at > $3)
+        AND (EXISTS (SELECT 1 FROM agency_streamers m WHERE m.streamer_id = a.user_id AND m.agency_id = a.agency_id AND m.joined_at <= $3 AND (m.ended_at IS NULL OR m.ended_at > $3))
+          OR EXISTS (SELECT 1 FROM staff_assignments s WHERE s.user_id = a.user_id AND s.agency_id = a.agency_id AND s.granted_at <= $3 AND (s.revoked_at IS NULL OR s.revoked_at > $3)))
+      ORDER BY a.assigned_at DESC LIMIT 1`,
+    [agencyId, userId, t],
+  );
+  if (!r.rowCount) return null;
+  return { id: Number(r.rows[0].id), userId: r.rows[0].user_id, name: r.rows[0].name, pct: Number(r.rows[0].pct ?? 0) };
+}
+
+export const ASSISTANT_REASON = 'Ajans asistanı payı';
+export const ASSISTANT_BACK_REASON = 'Ajans asistanı payı geri alındı';
+
+/**
+ * Moves `amount` (1/10,000 diamond, signed) into the assistant's account and settles the wallet: whole diamonds
+ * go in (locked as store-coin gift diamonds are, wallet.mjs LOCK_HOURS.store) once the exact total reaches them; a
+ * negative amount takes whole diamonds back, as far as the balance goes (the rest is owed and later shares pay it
+ * first). Returns the whole diamonds that moved (+ in, − out). The account row is locked first, so two splits for
+ * the same assistant at once can't both count the same fraction.
+ */
+async function settleAssistant(c, userId, amount, ref, detail) {
+  await c.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
+  const r = await c.query('SELECT coalesce(sum(amount), 0) AS exact, coalesce(sum(wallet), 0) AS wallet FROM agency_assistant_ledger WHERE user_id = $1', [userId]);
+  const target = Math.floor((e4(r.rows[0].exact) + amount) / 1e4);
+  const delta = target - Number(r.rows[0].wallet);
+  if (delta > 0) {
+    await move(c, userId, 'diamond', delta, ASSISTANT_REASON, ref, null, { channel: 'asistan', detail });
+    await c.query("INSERT INTO diamond_locks (user_id, amount, channel, unlock_at, ref) VALUES ($1, $2, 'asistan', now() + make_interval(hours => $3::int), $4)", [userId, delta, LOCK_HOURS.store, ref]);
+    return delta;
+  }
+  if (delta < 0) {
+    const balance = Number((await c.query('SELECT diamonds FROM users WHERE id = $1', [userId])).rows[0].diamonds);
+    const take = Math.min(-delta, balance);
+    if (take > 0) await move(c, userId, 'diamond', -take, ASSISTANT_BACK_REASON, ref, null, { channel: 'asistan', detail });
+    return -take;
+  }
+  return 0;
+}
+
+/** In calcEvent's transaction: the owner's 'assistant' row (the share out of the agency's commission) and the assistant's side. */
+async function bookAssistantShare(c, { commissionId, agencyId, streamerId, period, a }) {
+  const own = await c.query("INSERT INTO agency_ledger (agency_id, kind, amount, rate, commission_id, period, note) VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id", [
+    agencyId,
+    fmt4(-a.amount),
+    fmt4(a.rate),
+    commissionId,
+    period,
+    `Asistan payı %${a.pct} · ${a.name}`.slice(0, 200),
+  ]);
+  const wallet = await settleAssistant(c, a.userId, a.amount, `asistan:k${commissionId}`, { commission: Number(commissionId), agency: agencyId });
+  await c.query(
+    `INSERT INTO agency_assistant_ledger (assistant_id, user_id, agency_id, commission_id, agency_ledger_id, streamer_id, basis, pct, amount, wallet, period)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [a.id, a.userId, agencyId, commissionId, own.rows[0].id, streamerId, fmt4(a.basis), a.pct, fmt4(a.amount), wallet, period],
+  );
+}
+
+/**
+ * The centre reverses a commission (agency-admin.mjs commissions/reverse): the assistant's share of it comes back
+ * the same way. `reversals` maps each reversed agency_ledger row id to its reversal row id. Once per share.
+ */
+export async function reverseAssistantShares(c, commissionId, period, reversals) {
+  const r = await c.query(
+    `SELECT l.* FROM agency_assistant_ledger l WHERE l.commission_id = $1 AND NOT EXISTS (SELECT 1 FROM agency_assistant_ledger x WHERE x.reverses = l.id) FOR UPDATE`,
+    [commissionId],
+  );
+  for (const row of r.rows) {
+    const amount = -e4(row.amount);
+    const wallet = await settleAssistant(c, row.user_id, amount, `asistan:x${row.id}`, { commission: Number(commissionId), reverses: Number(row.id) });
+    await c.query(
+      `INSERT INTO agency_assistant_ledger (assistant_id, user_id, agency_id, commission_id, agency_ledger_id, reverses, streamer_id, basis, pct, amount, wallet, period)
+       VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [row.assistant_id, row.user_id, row.agency_id, reversals.get(Number(row.agency_ledger_id)) ?? null, row.id, row.streamer_id, fmt4(-e4(row.basis)), row.pct, fmt4(amount), wallet, period],
+    );
+  }
+  return r.rowCount;
+}
+
 // --- Ledger status -------------------------------------------------------------------------------------------
 export const PAYOUT_LABEL = { pending: 'Onay bekliyor', ready: 'Ödemeye hazır', paid: 'Ödendi', rejected: 'Reddedildi', cancelled: 'İptal edildi' };
 /** A ledger row's payout state: Hesaplanıyor (open period), Kazanıldı (closed), or its payout's state. */
@@ -621,7 +738,8 @@ export async function balances(c, agencyId) {
             coalesce(sum(l.amount) FILTER (WHERE l.payout_id IS NULL AND ap.period IS NULL), 0) AS calculating,
             coalesce(sum(l.amount) FILTER (WHERE l.kind = 'direct'), 0) AS direct,
             coalesce(sum(l.amount) FILTER (WHERE l.kind = 'difference'), 0) AS difference,
-            coalesce(sum(l.amount) FILTER (WHERE l.kind = 'transition'), 0) AS transition
+            coalesce(sum(l.amount) FILTER (WHERE l.kind = 'transition'), 0) AS transition,
+            coalesce(sum(l.amount) FILTER (WHERE l.kind = 'assistant'), 0) AS assistant
        FROM agency_ledger l LEFT JOIN agency_payouts p ON p.id = l.payout_id LEFT JOIN agency_periods ap ON ap.period = l.period
       WHERE l.agency_id = $1`,
     [agencyId],

@@ -858,6 +858,8 @@ type Values = {
   income_types: Record<string, boolean>;
   parent_zero?: { enabled: boolean; tier: string };
   bd_policy?: { rate: number; basis: string };
+  /** Ajans asistanı: how many assistants an agency may have at once (server/api/agency-assistants.mjs). */
+  assistant_policy?: { max: number };
 };
 const SETTING_TEXT: Record<string, string> = {
   pool_cap: 'Toplam havuz sınırı',
@@ -878,6 +880,7 @@ const SETTING_TEXT: Record<string, string> = {
   parent_sees_sub_earnings: 'Alt ajans kazancı görünürlüğü',
   bd_policy: 'BD politikası',
   suspension_policy: 'Askıya alma politikası',
+  assistant_policy: 'Ajans asistanı sınırı',
 };
 const PERIOD_TEXT: Record<string, string> = {
   month: 'Aylık',
@@ -922,6 +925,18 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
             if (!(val >= 0) || val > 1) return showAlert('Geçersiz değer', 'Yüzde olarak gir (ör. 40).');
             await runAction(q.demo, () => centerNet.saveSetting(key, val, r.reason), 'Kural kaydedildi.', q.reload);
           };
+          const editAssistants = async () => {
+            const r = await ask({
+              title: 'Ajans başına asistan',
+              message: `Bir ajans aynı anda en fazla bu kadar asistan atayabilir. Şu an ${fmtD(v.assistant_policy?.max ?? 1)}. Var olan asistanlar etkilenmez.`,
+              confirm: 'Kaydet',
+              field: { label: 'Yeni sınır (0–20)', placeholder: String(v.assistant_policy?.max ?? 1), keyboard: 'numeric' },
+            });
+            if (!r) return;
+            const max = /^\d{1,2}$/.test(r.field) ? Number(r.field) : NaN;
+            if (!(max >= 0 && max <= 20)) return showAlert('Geçersiz değer', '0 ile 20 arasında bir sayı yaz.');
+            await runAction(q.demo, () => centerNet.saveSetting('assistant_policy', { max }, r.reason), 'Kural kaydedildi.', q.reload);
+          };
           return (
             <>
               <Section title="Komisyon havuzu">
@@ -952,6 +967,7 @@ function RulesTab({ name, ask }: { name: string; ask: AskFn }) {
                       <Line label="Üst ajans payını sıfırlama" value={v.parent_zero.enabled ? `Açık (${v.tiers.find((t) => t.key === v.parent_zero?.tier)?.name ?? v.parent_zero.tier})` : 'Kapalı'} />
                     )}
                     {v.bd_policy && <Line label="BD komisyonu" value={`${fmtPct(v.bd_policy.rate)} · ayrı ödenir`} />}
+                    {v.assistant_policy && <EditLine label="Ajans başına asistan" value={fmtD(v.assistant_policy.max)} onEdit={editAssistants} />}
                   </View>
                 </Panel>
               </Section>

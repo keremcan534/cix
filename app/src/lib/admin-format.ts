@@ -86,6 +86,7 @@ export const AGENCY_LEDGER_LABEL: Record<string, string> = {
   adjustment: 'Düzeltme',
   reversal: 'İptal / iade',
   bd: 'BD komisyonu',
+  assistant: 'Asistan payı',
 };
 
 /** "5.000 jeton + 2.500 hediye". */

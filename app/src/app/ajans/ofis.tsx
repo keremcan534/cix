@@ -31,6 +31,7 @@ import {
   type Ask,
 } from '@/components/agency-net';
 import { HubSections, TransferCard, openOffice } from '@/components/agency-net-hub';
+import { AssistantsTab } from '@/components/agency-assistants';
 import { InviteSheet } from '@/components/agency-invite-sheet';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
@@ -72,7 +73,7 @@ import { liveMode } from '@/lib/live';
 import { useApp } from '@/store';
 import { colors, fonts, semantic, space } from '@/theme';
 
-type Tab = 'summary' | 'streamers' | 'subs' | 'performance' | 'earnings' | 'requests' | 'team' | 'more';
+type Tab = 'summary' | 'streamers' | 'subs' | 'performance' | 'earnings' | 'requests' | 'team' | 'assistants' | 'more';
 type AskFn = (a: Ask) => Promise<{ reason: string; field: string } | null>;
 type Ctx = { o: Overview; id: string; name: string; demo: boolean; reload: () => void; ask: AskFn; can: (p: string) => boolean; acting: boolean };
 
@@ -98,6 +99,8 @@ export default function AgencyOffice() {
     { key: 'earnings', label: 'Kazanç', perm: 'reports.commission' },
     { key: 'requests', label: 'Talepler', perm: 'streamers.view', badge: o ? o.counts.pending_requests + o.counts.pending_transfers : 0 },
     { key: 'team', label: 'Ekip', perm: 'staff.manage', hidden: !!o && !['owner', 'staff'].includes(o.viewer) },
+    // Ajans asistanı: only the owner names assistants and sets their share (server/api/agency-assistants.mjs).
+    { key: 'assistants', label: 'Asistanlar', hidden: !o || o.viewer !== 'owner' },
     { key: 'more', label: 'Diğer', hidden: !hub },
   ];
   const shown = tabs.filter((t) => !t.hidden);
@@ -133,6 +136,8 @@ export default function AgencyOffice() {
                 <Earnings c={ctx} />
               ) : cur.key === 'requests' ? (
                 <Requests c={ctx} />
+              ) : cur.key === 'assistants' ? (
+                <AssistantsTab agencyId={ctx.id} rate={ctx.o.rate.rate} demo={ctx.demo} name={ctx.name} />
               ) : cur.key === 'more' ? (
                 <HubSections />
               ) : (
@@ -209,6 +214,7 @@ function Summary({ c }: { c: Ctx }) {
           <Line label="Doğrudan komisyon" value={`${fmtD(e.direct30)} elmas`} />
           {!sub && <Line label="Alt ajans farkı" value={`${fmtD(e.difference30)} elmas`} />}
           {e.transition30 > 0 && <Line label="Geçiş komisyonu" value={`${fmtD(e.transition30)} elmas`} />}
+          {!!e.assistant30 && <Line label="Asistan payı" value={`${fmtD(e.assistant30)} elmas`} />}
           <Line label="Bugün · bu hafta" value={`${fmtD(e.today)} · ${fmtD(e.week)}`} />
           <Line label="Geçen ay" value={`${fmtD(e.prev_month)} elmas`} />
           <Line label="Bu ay (USD)" value={fmtUsd(e.usd.month)} strong />
@@ -653,7 +659,7 @@ function PerformanceTab({ c }: { c: Ctx }) {
 
 // --- Earnings -----------------------------------------------------------------------------------------------
 function Earnings({ c }: { c: Ctx }) {
-  const [kind, setKind] = useState<'' | 'direct' | 'difference' | 'transition'>('');
+  const [kind, setKind] = useState<'' | 'direct' | 'difference' | 'transition' | 'assistant'>('');
   // A busy agency has thousands of rows; show a page at a time (totals above always cover every row).
   const [limit, setLimit] = useState(PAGE);
   const led = useNet(c.name, () => agencyNet.commissions(c.id, { kind: kind || undefined }), () => {
@@ -697,6 +703,7 @@ function Earnings({ c }: { c: Ctx }) {
             ['direct', 'Doğrudan'],
             ['difference', 'Fark'],
             ['transition', 'Geçiş'],
+            ['assistant', 'Asistan'],
           ]}
         />
         <NetState q={led}>
@@ -706,6 +713,7 @@ function Earnings({ c }: { c: Ctx }) {
                 <Line label="Doğrudan" value={`${fmtD(d.totals.direct)} elmas`} />
                 <Line label="Fark" value={`${fmtD(d.totals.difference)} elmas`} />
                 {d.totals.transition !== 0 && <Line label="Geçiş" value={`${fmtD(d.totals.transition)} elmas`} />}
+                {!!d.totals.assistant && <Line label="Asistan payı" value={`${fmtD(d.totals.assistant)} elmas`} />}
                 {d.totals.fees !== 0 && <Line label="Transfer ücretleri" value={`${fmtD(d.totals.fees)} elmas`} />}
                 {d.totals.adjustments !== 0 && <Line label="Düzeltmeler" value={`${fmtD(d.totals.adjustments)} elmas`} />}
               </Panel>
@@ -716,7 +724,7 @@ function Earnings({ c }: { c: Ctx }) {
                   {d.rows.slice(0, limit).map((r) => (
                     <ListRow
                       key={r.id}
-                      icon={r.kind === 'difference' ? 'git-branch-outline' : r.kind === 'transition' ? 'swap-horizontal' : r.amount < 0 ? 'return-down-back-outline' : 'diamond-outline'}
+                      icon={r.kind === 'difference' ? 'git-branch-outline' : r.kind === 'transition' ? 'swap-horizontal' : r.kind === 'assistant' ? 'ribbon-outline' : r.amount < 0 ? 'return-down-back-outline' : 'diamond-outline'}
                       tone={r.amount < 0 ? 'danger' : r.kind === 'difference' ? 'money' : 'action'}
                       title={`${KIND_TEXT[r.kind] ?? r.kind}${r.streamer ? ` · ${r.streamer.name}` : ''}`}
                       subtitle={`${r.base !== null ? `${fmtD(r.base)} × ${fmtPct(r.rate)}` : fmtPct(r.rate)}${r.sourceAgency && r.kind === 'difference' ? ` · ${r.sourceAgency.name}` : ''} · ${r.statusLabel} · ${fmtDateTime(r.occurredAt ?? r.createdAt)}`}

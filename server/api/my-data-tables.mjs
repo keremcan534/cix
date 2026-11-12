@@ -14,7 +14,7 @@ export const EXPORTED = [
   'profile_extras', 'profile_photos', 'privacy_settings', 'call_history_cleared', 'room_mic_invites', 'room_polls',
   'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
-  'events', 'event_reservations', 'event_participants',
+  'events', 'event_reservations', 'event_participants', 'agency_assistants', 'agency_assistant_ledger',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */
@@ -47,6 +47,7 @@ export const NOT_EXPORTED = {
   agency_violations: 'an agency’s own records',
   bd_assignments: 'an agency’s own records',
   bd_ledger: 'an agency’s own records',
+  agency_assistant_shares: 'an agency’s own records (the owner sets them; the assistant’s copy shows the share)',
   room_pks: 'a room’s match record; the gifts in it are in gift_events',
   room_pk_gifts: 'the same gifts as gift_events',
   room_cross_pks: 'two rooms’ match record; the gifts in it are in gift_events',
