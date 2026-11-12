@@ -12,6 +12,7 @@ import type {
   AuditRow,
   JoinRequest,
   LedgerRow,
+  LedgerTotals,
   Me,
   Overview,
   Payouts,
@@ -204,7 +205,7 @@ export function demoSubs(id: string): { subagencies: SubAgency[]; nearPromotion:
   };
 }
 
-export function demoCommissions(id: string): { rows: LedgerRow[]; totals: { direct: number; difference: number; transition: number; fees: number; adjustments: number } } {
+export function demoCommissions(id: string): { rows: LedgerRow[]; totals: LedgerTotals } {
   const a = byId(id);
   const rows: LedgerRow[] = [];
   let n = 5000;

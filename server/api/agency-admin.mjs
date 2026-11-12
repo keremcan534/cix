@@ -35,6 +35,7 @@ import {
   rateAt,
   rateView,
   recordIncome,
+  reverseAssistantShares,
   settingsAt,
   tierName,
   topRate,
@@ -540,12 +541,16 @@ export const agencyAdminRoutes = {
       const rows = await c.query('SELECT l.* FROM agency_ledger l WHERE l.commission_id = $1 AND NOT EXISTS (SELECT 1 FROM agency_ledger r WHERE r.reverses = l.id) FOR UPDATE', [b.commissionId]);
       if (!rows.rowCount) throw new HttpError(404, 'Ters kaydı yapılacak komisyon yok');
       const period = periodOf(new Date(), x.s.commission_period);
+      const reversals = new Map();
       for (const l of rows.rows) {
-        await c.query("INSERT INTO agency_ledger (agency_id, kind, amount, rate, commission_id, reverses, period, note, created_by) VALUES ($1,'reversal',$2,$3,NULL,$4,$5,$6,$7)", [l.agency_id, fmt4(-e4(l.amount)), l.rate, l.id, period, reason, x.u.id]);
+        const rv = await c.query("INSERT INTO agency_ledger (agency_id, kind, amount, rate, commission_id, reverses, period, note, created_by) VALUES ($1,'reversal',$2,$3,NULL,$4,$5,$6,$7) RETURNING id", [l.agency_id, fmt4(-e4(l.amount)), l.rate, l.id, period, reason, x.u.id]);
+        reversals.set(Number(l.id), rv.rows[0].id);
         await notice(c, l.agency_id, 'ledger', 'Komisyon ters kaydı', `${d4(l.amount)} elmaslık kayıt düzeltildi: ${reason}`);
       }
-      await audit(c, x.u.id, 'commission.reverse', 'commission', b.commissionId, { after: { rows: rows.rowCount, period }, reason });
-      return { reversed: rows.rowCount, period };
+      // The agency assistant's part of it goes back from their wallet, as the owner's 'assistant' row is reversed above.
+      const assistants = await reverseAssistantShares(c, b.commissionId, period, reversals);
+      await audit(c, x.u.id, 'commission.reverse', 'commission', b.commissionId, { after: { rows: rows.rowCount, assistants, period }, reason });
+      return { reversed: rows.rowCount, assistants, period };
     });
   },
 

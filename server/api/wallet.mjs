@@ -43,6 +43,8 @@ export const CHANNELS = {
   canta: { label: 'Şanslı çanta', lock: 'store' },
   // Not a coin lot: a gift sent free from Çantam (backpack.mjs). Its diamonds lock as free coins' do.
   cantam: { label: 'Çanta hediyesi', lock: 'store' },
+  // Not a coin lot: an agency assistant's share of the agency's commission (agency-lib.mjs settleAssistant).
+  asistan: { label: 'Ajans asistanı payı', lock: 'store' },
 };
 const lockOf = (channel) => LOCK_HOURS[CHANNELS[channel].lock];
 /** One channel for a ledger row: the lots' channel, or "mixed" when it used several. */
@@ -279,7 +281,12 @@ export const walletRoutes = {
               sum(p.coins), count(*)
          FROM paid_events p
         WHERE p.earner = $1 AND ($2 = 'all' OR p.created_at >= date_trunc($2, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')
-        GROUP BY 1`,
+        GROUP BY 1
+       UNION ALL
+       SELECT 'assistant', sum(a.wallet), count(*) FILTER (WHERE a.amount > 0)
+         FROM agency_assistant_ledger a
+        WHERE a.user_id = $1 AND ($2 = 'all' OR a.created_at >= date_trunc($2, now() AT TIME ZONE 'Europe/Istanbul') AT TIME ZONE 'Europe/Istanbul')
+       HAVING count(*) > 0`,
       [u.id, period],
     );
     const by = {};
@@ -301,6 +308,10 @@ export const walletRoutes = {
       row('voice_call', 'Sesli arama ve eşleşme'),
       row('video_call', 'Görüntülü arama ve eşleşme'),
     ];
+    // An agency assistant's share (agency-assistants.mjs): the whole diamonds that reached the wallet, shown to
+    // whoever is or was an assistant.
+    const assistant = by.assistant || (await db.query('SELECT 1 FROM agency_assistants WHERE user_id = $1 LIMIT 1', [u.id])).rowCount > 0;
+    if (assistant) sources.push(row('assistant', 'Ajans asistanı payı'));
     return { period, total: sources.reduce((a, x) => a + x.diamonds, 0), sources };
   },
 

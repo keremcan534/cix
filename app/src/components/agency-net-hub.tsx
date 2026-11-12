@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MyAssistantCard } from '@/components/agency-assistants';
 import { NetState, Panel, Pill, Section, Tabs, ns, statusTone, useAsk } from '@/components/agency-net';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard } from '@/components/fx/surface';
@@ -119,6 +120,9 @@ function HubBody({ d, demo, reload, askFor }: { d: Me; demo: boolean; reload: ()
             ))}
         </Section>
       )}
+
+      {/* Ajans asistanı: my share, my invite code and what I earned (server/api/agency-assistants.mjs). */}
+      {d.assistant ? <MyAssistantCard a={d.assistant} /> : null}
 
       {d.membership ? <Membership d={d} demo={demo} reload={reload} askFor={askFor} /> : null}
 
@@ -308,7 +312,7 @@ function PickGender({ demo, reload }: { demo: boolean; reload: () => void }) {
 
 function Join({ demo, reload, pickUntil }: { demo: boolean; reload: () => void; pickUntil: string | null }) {
   const [code, setCode] = useState('');
-  const [found, setFound] = useState<{ id: string; name: string; code: string; level: number; parentName: string | null } | null>(null);
+  const [found, setFound] = useState<{ id: string; name: string; code: string; level: number; parentName: string | null; via: string | null; joinCode: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const look = async () => {
     if (demo) return showAlert('Örnek veri', 'Sunucuya bağlanılamadığı için ajans aranamıyor.');
@@ -325,7 +329,7 @@ function Join({ demo, reload, pickUntil }: { demo: boolean; reload: () => void; 
   return (
     <Panel>
       <Text style={ns.title}>Davet koduyla katıl</Text>
-      <Text style={ns.dim}>Ajansının verdiği kodu yaz; onaylayınca hemen ajansa katılırsın. Aynı anda tek ajansa bağlı olabilirsin, ayrılmak için transfer talebi gerekir.</Text>
+      <Text style={ns.dim}>Ajansının ya da ajans asistanının verdiği kodu yaz; onaylayınca hemen ajansa katılırsın. Aynı anda tek ajansa bağlı olabilirsin, ayrılmak için transfer talebi gerekir.</Text>
       {!!pickUntil && <Text style={st.note}>{fmtDate(pickUntil)} tarihine kadar kodla doğrudan katılabilirsin; sonra yalnız merkezin onayladığı transferle.</Text>}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <TextInput
@@ -351,6 +355,7 @@ function Join({ demo, reload, pickUntil }: { demo: boolean; reload: () => void; 
               {LEVEL_TEXT(found.level)}
               {found.parentName ? ` · ${found.parentName}` : ''}
             </Text>
+            {!!found.via && <Text style={ns.dim}>Davet eden: {found.via} (ajans asistanı)</Text>}
           </View>
         </View>
       )}
@@ -368,7 +373,8 @@ function Join({ demo, reload, pickUntil }: { demo: boolean; reload: () => void; 
                 void runAction(
                   demo,
                   async () => {
-                    const r = await agencyNet.join(found.code, 'code');
+                    // The code that was looked up: an agency assistant's own code records who brought me.
+                    const r = await agencyNet.join(found.joinCode, 'code');
                     // A second account on the same phone goes to the first account's agency (server rule).
                     if (r.sameDevice && r.membership) done = `Bu telefondaki ilk hesabın ${r.membership.agency.name} ajansında; bu hesap da oraya bağlandı.`;
                     else if (r.request) done = 'İsteğin ajansa iletildi.';

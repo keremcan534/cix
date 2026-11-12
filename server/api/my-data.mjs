@@ -478,6 +478,18 @@ export async function exportOf(c, uid) {
         closedAt: x.closed_at,
       }),
     ),
+    // My agency assistant roles and the shares they gave me (agency-assistants.mjs).
+    assistant: await all(
+      'SELECT a.name, x.code, x.assigned_at, x.ended_at, x.end_reason FROM agency_assistants x JOIN agencies a ON a.id = x.agency_id WHERE x.user_id = $1 ORDER BY x.id',
+      (x) => ({ agency: x.name, code: x.code, assignedAt: x.assigned_at, endedAt: x.ended_at, endReason: x.end_reason ?? null }),
+    ),
+    assistantShares: await all('SELECT l.amount, l.wallet, l.pct, l.period, l.created_at FROM agency_assistant_ledger l WHERE l.user_id = $1 ORDER BY l.id', (x) => ({
+      diamonds: Number(x.amount),
+      toWallet: Number(x.wallet),
+      pct: x.pct,
+      period: x.period,
+      at: x.created_at,
+    })),
   };
 
   // Who opened my profile: as GET /api/me/visitors shows it (the count for everyone, the people with VIP).
