@@ -245,8 +245,8 @@ export default function ProfileScreen() {
                 [
                   ['slot', '🎰', 'Gece Yarısı Çarkı'],
                   ['jackpot', '💰', 'Hazine Kulesi'],
-                  ['olympus', '🔦', 'Fener Kayalığı'],
-                  ['fish', '🐟', 'Mercan Avı'],
+                  ['olympus', '🔭', 'Yıldız Avı'],
+                  ['fish', '🎈', 'Balon Avı'],
                 ] as const
               )
                 .filter(([id]) => casino.find((g) => g.id === id)?.active)

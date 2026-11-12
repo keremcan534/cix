@@ -1,7 +1,8 @@
-// What Fener Kayalığı's stage is made of: the lighthouse tower at the head of the rows, the beam (a soft cone of
-// light that rides the tower from row to row), a sea cell with its ship or kandil, and the storm's sky (the dark,
-// the rain, the lightning and the title). Everything moves on Animated values with the native driver; the screen
-// (fener) decides when. Nothing here knows a round.
+// What Yıldız Avı's stage is made of: the observation tower at the head of the rows, the searchlight beam (a soft
+// cone of light that rides the tower from row to row), a cell of the night sky with its star or kuyruklu yıldız,
+// and Yıldız Yağmuru's sky (the dark, the falling meteors, the flash). Everything moves on Animated values with the
+// native driver; the screen (fener) decides when. Nothing here knows a round. (The cell kinds keep the game's first
+// names, 'sea' / 'ship' / 'lamp': the server and the history use them.)
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useMemo } from 'react';
 import { Animated, Image, StyleSheet, View } from 'react-native';
@@ -11,20 +12,20 @@ import { ROWS, STORM_SPINS, cargoLabel, type FCell } from '@/lib/fener-slot';
 
 const GLOW = require('../../../assets/fx/glow.png');
 export const LIGHT = '#FFD27A';
-export const SEA = '#13D9DF';
+export const SKY = '#A5B4FC';
 /** The tower's width and the gap between it and the rows (px). */
 export const TOWER = 30;
 export const TOWER_GAP = 6;
 const clamp = { extrapolate: 'clamp' as const };
 const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 
-/** How a ship is drawn, by its cargo (tenths of the stake): a dinghy, a boat, a freighter, and the rare gold ship. */
-export const shipLook = (tenths: number) =>
-  tenths >= 250 ? { emoji: '🚢', size: 34, gold: true } : tenths >= 50 ? { emoji: '🚢', size: 30, gold: false } : tenths >= 10 ? { emoji: '🚤', size: 27, gold: false } : { emoji: '⛵', size: 24, gold: false };
+/** How a star is drawn, by its value (tenths of the stake): a few sparks, a star, a bright star, and the rare gold star. */
+export const starLook = (tenths: number) =>
+  tenths >= 250 ? { emoji: '🌟', size: 34, gold: true } : tenths >= 50 ? { emoji: '🌟', size: 30, gold: false } : tenths >= 10 ? { emoji: '⭐', size: 27, gold: false } : { emoji: '✨', size: 24, gold: false };
 
-// --- The lighthouse and its beam ------------------------------------------------------------------------------------
+// --- The tower and its searchlight ---------------------------------------------------------------------------------
 
-/** The tower the light rides: stone with a rail down its face and a dim lens at each row. */
+/** The tower the searchlight rides: stone with a rail down its face and a dim lens at each row. */
 export const Tower = memo(function Tower({ rowH, gap }: { rowH: number; gap: number }) {
   return (
     <View style={[st.tower, { width: TOWER }]} pointerEvents="none">
@@ -40,7 +41,7 @@ export const Tower = memo(function Tower({ rowH, gap }: { rowH: number; gap: num
 const FAN = [-8, -4, 0, 4, 8];
 
 /**
- * The beam: a lens on the tower and a cone of light across the sea, made of a fan of soft strips that overlap at
+ * The beam: a lens on the tower and a cone of light across the sky, made of a fan of soft strips that overlap at
  * the lens (bright) and part toward the far end (faint). `row` is the row it stands on (it glides between them),
  * `on` its strength (0 out … 1 settled), `flare` a pulse when it settles.
  */
@@ -66,9 +67,9 @@ export const Beam = memo(function Beam({ row, on, flare, width, rowH, gap }: { r
   );
 });
 
-// --- The sea --------------------------------------------------------------------------------------------------
+// --- The sky --------------------------------------------------------------------------------------------------
 
-/** How a column's cells come down onto the sea (`drop` 0 → 1, each column a little after the last) and sink away again (1 → 2). */
+/** How a column's cells come down into the sky (`drop` 0 → 1, each column a little after the last) and fade away again (1 → 2). */
 export function fallOf(drop: Animated.Value, col: number) {
   const a = col * 0.14;
   const b = a + 0.44;
@@ -81,10 +82,11 @@ export function fallOf(drop: Animated.Value, col: number) {
 export const landedAt = (col: number) => col * 0.14 + 0.44;
 
 /**
- * One cell of the sea. A ship shows its cargo under it; in the settled light it shows what it brings home instead,
- * and `sail` (0 → 1) takes it along the row to the harbour at the tower. A kandil glows; the open sea is empty.
+ * One cell of the sky. A star shows its value under it; in the settled light it shows what it pays instead, and
+ * `sail` (0 → 1) takes it along the row to the tower, where it is collected. A kuyruklu yıldız glows; empty sky is
+ * empty.
  */
-export const SeaCell = memo(function SeaCell({
+export const SkyCell = memo(function SkyCell({
   cell,
   w,
   h,
@@ -99,30 +101,32 @@ export const SeaCell = memo(function SeaCell({
   w: number;
   h: number;
   lit: boolean;
-  /** What a lit ship pays (coins), written on it once the light has settled. */
+  /** What a lit star pays (coins), written on it once the light has settled. */
   amount: number;
-  /** A kandil that does nothing (the storm). */
+  /** A kuyruklu yıldız that does nothing (Yıldız Yağmuru). */
   faint: boolean;
   fall: ReturnType<typeof fallOf>;
   sail: Animated.Value;
-  /** How far the harbour is from this cell (px). */
+  /** How far the tower is from this cell (px). */
   away: number;
 }) {
   if (cell.kind === 'sea') return <View style={{ width: w, height: h }} />;
   if (cell.kind === 'lamp')
     return (
-      <Animated.View style={[st.cell, { width: w, height: h, opacity: fall.opacity, transform: [{ translateY: fall.y }] }]} accessibilityLabel="Kandil">
+      <Animated.View style={[st.cell, { width: w, height: h, opacity: fall.opacity, transform: [{ translateY: fall.y }] }]} accessibilityLabel="Kuyruklu yıldız">
         <View style={{ alignItems: 'center', opacity: faint ? 0.4 : 1 }}>
           <Image source={GLOW} style={st.lampGlow} />
-          <Text style={{ fontSize: 24, lineHeight: 29 }}>🏮</Text>
-          <Text style={st.lampTag}>KANDİL</Text>
+          <Text style={{ fontSize: 24, lineHeight: 29 }}>☄️</Text>
+          <Text style={st.lampTag} numberOfLines={1} adjustsFontSizeToFit>
+            KUYRUKLU
+          </Text>
         </View>
       </Animated.View>
     );
-  const look = shipLook(cell.cargo);
+  const look = starLook(cell.cargo);
   const rich = cell.cargo >= 50;
   return (
-    <Animated.View style={[st.cell, { width: w, height: h, opacity: fall.opacity, transform: [{ translateY: fall.y }] }]} accessibilityLabel={`Gemi, yük ${cargoLabel(cell.cargo)}`}>
+    <Animated.View style={[st.cell, { width: w, height: h, opacity: fall.opacity, transform: [{ translateY: fall.y }] }]} accessibilityLabel={`Yıldız, değer ${cargoLabel(cell.cargo)}`}>
       <Animated.View
         style={{
           alignItems: 'center',
@@ -142,48 +146,33 @@ export const SeaCell = memo(function SeaCell({
   );
 });
 
-// --- The storm ------------------------------------------------------------------------------------------------
+// --- Yıldız Yağmuru ---------------------------------------------------------------------------------------------
 
 /** Ranges for something that follows f(q) with q = the loop's value shifted by `phase` (and wrapped, as a step). */
 function looped(phase: number, f: (q: number) => number) {
   return { inputRange: [0, 1 - phase, 1 - phase, 1], outputRange: [f(phase), f(1), f(0), f(phase)] };
 }
-const DROPS = Array.from({ length: 16 }, (_, i) => ({ x: (i * 0.137 + 0.03) % 1, phase: (i * 0.61) % 1, len: 14 + (i % 4) * 5 }));
-/** A bolt: a zigzag of short bars from the top of the stage. */
-const BOLT = [
-  { x: 0, y: 0, deg: 16, len: 46 },
-  { x: -13, y: 40, deg: -24, len: 40 },
-  { x: 4, y: 74, deg: 14, len: 44 },
-  { x: -8, y: 112, deg: -20, len: 36 },
-];
+const METEORS = Array.from({ length: 16 }, (_, i) => ({ x: (i * 0.137 + 0.03) % 1, phase: (i * 0.61) % 1, len: 14 + (i % 4) * 5 }));
 
 /**
- * The storm over the stage: `dark` (0 → 1) brings the night down and the rain with it, `bolt` (0 → 1 → 0) is one
- * stroke of lightning, `rain` loops. With "Animasyonları azalt" only the dark is drawn: nothing flashes.
+ * Yıldız Yağmuru over the stage: `dark` (0 → 1) brings the night down and the falling meteors with it, `flash`
+ * (0 → 1 → 0) lights the whole sky for a moment, `fall` loops. With "Animasyonları azalt" only the dark is drawn:
+ * nothing flashes.
  */
-export const StormSky = memo(function StormSky({ dark, bolt, rain, height, still }: { dark: Animated.Value; bolt: Animated.Value; rain: Animated.Value; height: number; still: boolean }) {
-  const drops = useMemo(() => DROPS.map((d) => ({ ...d, y: rain.interpolate(looped(d.phase, (q) => -30 + q * (height + 60))) })), [rain, height]);
+export const ShowerSky = memo(function ShowerSky({ dark, flash, fall, height, still }: { dark: Animated.Value; flash: Animated.Value; fall: Animated.Value; height: number; still: boolean }) {
+  const meteors = useMemo(() => METEORS.map((d) => ({ ...d, y: fall.interpolate(looped(d.phase, (q) => -30 + q * (height + 60))) })), [fall, height]);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: dark }]}>
         <LinearGradient colors={['rgba(8,10,24,0.66)', 'rgba(10,16,34,0.24)', 'rgba(4,6,16,0.5)']} style={StyleSheet.absoluteFill} />
-        {!still && drops.map((d, i) => <Animated.View key={i} style={[st.rain, { left: `${d.x * 100}%`, height: d.len, transform: [{ translateY: d.y }, { rotate: '14deg' }] }]} />)}
+        {!still && meteors.map((d, i) => <Animated.View key={i} style={[st.meteor, { left: `${d.x * 100}%`, height: d.len, transform: [{ translateY: d.y }, { rotate: '24deg' }] }]} />)}
       </Animated.View>
-      {!still && (
-        <>
-          <Animated.View style={[StyleSheet.absoluteFill, st.flash, { opacity: bolt.interpolate({ inputRange: [0, 1], outputRange: [0, 0.3] }) }]} />
-          <Animated.View style={[st.boltAt, { opacity: bolt }]}>
-            {BOLT.map((b, i) => (
-              <View key={i} style={[st.boltBar, { left: b.x, top: b.y, height: b.len, transform: [{ rotate: `${b.deg}deg` }] }]} />
-            ))}
-          </Animated.View>
-        </>
-      )}
+      {!still && <Animated.View style={[StyleSheet.absoluteFill, st.flash, { opacity: flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.3] }) }]} />}
     </View>
   );
 });
 
-/** The storm's brightness, one step per spin: the steps passed stay lit and the current one stands out. */
+/** Yıldız Yağmuru's brightness, one step per spin: the steps passed stay lit and the current one stands out. */
 export function BrightLadder({ step }: { step: number }) {
   return (
     <View style={st.ladder} accessibilityLabel={`Parlaklık ${step} kat`}>
@@ -215,10 +204,8 @@ const st = StyleSheet.create({
   loadRich: { borderColor: LIGHT },
   loadLit: { backgroundColor: LIGHT, borderColor: '#FFF3D0' },
   loadText: { color: '#E6FBFF', fontSize: 12, lineHeight: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  rain: { position: 'absolute', top: 0, width: 1.5, borderRadius: 1, backgroundColor: 'rgba(200,220,255,0.55)' },
-  flash: { backgroundColor: '#DCEBFF' },
-  boltAt: { position: 'absolute', right: '24%', top: -6 },
-  boltBar: { position: 'absolute', width: 4, borderRadius: 2, backgroundColor: '#F5FAFF' },
+  meteor: { position: 'absolute', top: 0, width: 2, borderRadius: 1, backgroundColor: 'rgba(255,236,170,0.75)' },
+  flash: { backgroundColor: '#FFF6DC' },
   ladder: { flexDirection: 'row', gap: 3 },
   rung: { minWidth: 26, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,210,122,0.35)', backgroundColor: 'rgba(255,210,122,0.06)' },
   rungOn: { backgroundColor: 'rgba(255,210,122,0.75)', borderColor: LIGHT },

@@ -1,4 +1,4 @@
-// Bilye Şelalesi: what a launch pays. The same rules as the server's (server/api/casino-bilye.mjs); tests keep the
+// Pachinko: what a launch pays. The same rules as the server's (server/api/casino-bilye.mjs); tests keep the
 // two equal, draw for draw (tests/casino-server.test.ts) and the table equal to the board (tests/bilye.test.ts).
 //
 // A round is one draw: a number below BILYE_TOTAL picks the target (a pocket or a cup, board TARGETS) by the

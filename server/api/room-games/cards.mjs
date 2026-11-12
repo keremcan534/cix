@@ -3,7 +3,7 @@
 // app keeps a copy of these rules for its table and its practice games (app/src/lib/room-games/cards.ts);
 // app/tests/cards.test.ts plays the same seeded games through both and fails when they differ.
 //
-// The deck is our own: 102 cards, each a number 0…101 that `cardOf` reads. Four colours (0 Turkuaz, 1 Mercan,
+// The deck is our own: 102 cards, each a number 0…101 that `cardOf` reads. Four colours (0 Turkuaz, 1 Kızıl,
 // 2 Altın, 3 Yeşil) with, in each, 1…9 twice, two Atla, two Yön and two +2; then four Joker and two Joker +4, which
 // have no colour.
 //
@@ -29,7 +29,7 @@ export const meta = { name: 'Renk Kartları', min: 2, max: 6 };
 export const seatFields = ['hands'];
 export const HAND = 7;
 export const DECK = 102;
-export const COLOR_NAMES = ['Turkuaz', 'Mercan', 'Altın', 'Yeşil'];
+export const COLOR_NAMES = ['Turkuaz', 'Kızıl', 'Altın', 'Yeşil'];
 /** A colour's 24 cards, in the order of their numbers. */
 const FACES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 'Atla', 'Atla', 'Yön', 'Yön', '+2', '+2'];
 const COLORED = 4 * FACES.length;

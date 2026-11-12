@@ -1,5 +1,5 @@
 // Oyun Salonu reel games (casino.mjs): the payline slots (Hazine Kulesi, Kızıl Yedi, Vahşi Patika, Konfeti Kutusu,
-// Kayıp Parşömen, Neon Bulvar) and Fener Kayalığı. Pure data and functions, the same as the app's demo engines
+// Kayıp Parşömen, Neon Bulvar) and Yıldız Avı. Pure data and functions, the same as the app's demo engines
 // (app/src/lib/line-slot.ts, slot-configs.ts, fener-slot.ts); the app's test tests/casino-server.test.ts keeps them
 // equal, draw for draw, so the screens replay exactly what the server decided.
 //
@@ -283,15 +283,16 @@ export const NEON = {
 
 export const SLOT_CONFIGS = Object.fromEntries([MEGA, SUPER777, JUNGLE, PINATA, SPELLBOOK, NEON].map((c) => [c.id, c]));
 
-// --- Fener Kayalığı (app lib/fener-slot) -------------------------------------------------------------------------
-// Each of the 5×4 cells is drawn on its own (open sea, a ship with cargo, or a kandil); the beam stops on one row,
-// uniformly, with its own brightness draw. 3+ kandil start Fırtına Gecesi: STORM_SPINS spins lighting two rows,
-// one step brighter each spin. A round pays at most FENER_MAX times the stake.
+// --- Yıldız Avı (app lib/fener-slot) ------------------------------------------------------------------------------
+// Each of the 5×4 cells is drawn on its own (empty sky, a star with a value, or a kuyruklu yıldız; the keys 'sea',
+// 'ship' with its `cargo`, and 'lamp' are the game's first names, kept for the history); the beam stops on one row,
+// uniformly, with its own brightness draw. 3+ kuyruklu yıldız start Yıldız Yağmuru: STORM_SPINS spins lighting two
+// rows, one step brighter each spin. A round pays at most FENER_MAX times the stake.
 export const COLS = 5;
 export const ROWS = 4;
 export const CELLS = COLS * ROWS;
 export const CELL_WEIGHTS = { sea: 202, ship: 23, lamp: 5 };
-/** Cargo in tenths of the stake and its weight. */
+/** A star's value (`cargo`) in tenths of the stake and its weight. */
 export const CARGO = [
   { tenths: 1, weight: 900 },
   { tenths: 2, weight: 600 },
@@ -350,13 +351,13 @@ export function baseSpin(rnd) {
   return evaluateBoard(grid, [row], BRIGHTNESS.find((x) => (b -= x.weight) < 0).value);
 }
 
-/** Storm spin `n` (1-based): two rows lit, brightness n. */
+/** Yıldız Yağmuru spin `n` (1-based): two rows lit, brightness n. */
 export function stormSpin(rnd, n) {
   const grid = drawBoard(rnd);
   return evaluateBoard(grid, [...ROW_PAIRS[rnd(ROW_PAIRS.length)]], n);
 }
 
-/** One round: the base spin and, with 3+ kandil, the storm. */
+/** One round: the base spin and, with 3+ kuyruklu yıldız, Yıldız Yağmuru. */
 export function playFener(rnd) {
   const base = baseSpin(rnd);
   const storm = base.lamps >= STORM_TRIGGER ? Array.from({ length: STORM_SPINS }, (_, i) => stormSpin(rnd, i + 1)) : [];
@@ -369,7 +370,7 @@ export function fenerReturn() {
   const cell = (CELL_WEIGHTS.ship / CELL_TOTAL) * (CARGO.reduce((n, c) => n + c.tenths * c.weight, 0) / CARGO_TOTAL / 10);
   const bright = BRIGHTNESS.reduce((n, b) => n + b.value * b.weight, 0) / BRIGHT_TOTAL;
   const base = bright * COLS * cell;
-  // P(at least STORM_TRIGGER kandil among CELLS independent cells).
+  // P(at least STORM_TRIGGER kuyruklu yıldız among CELLS independent cells).
   const p = CELL_WEIGHTS.lamp / CELL_TOTAL;
   let pk = (1 - p) ** CELLS;
   let below = 0;

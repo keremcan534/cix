@@ -480,7 +480,7 @@ export const COIN_GAME_TILES: { id: string; name: string; emoji: string; colors:
   { id: 'c2', name: 'Meyve Bahçesi', emoji: '🍓', colors: ['#16A34A', '#DB2777'] },
   { id: 'c3', name: 'Hazine Sandığı', emoji: '💰', colors: ['#CA8A04', '#7C2D12'] },
   { id: 'c4', name: 'Penaltı', emoji: '⚽', colors: ['#0EA5E9', '#1E3A8A'] },
-  { id: 'c5', name: 'Mercan Avı', emoji: '🦈', colors: ['#0891B2', '#164E63'] },
+  { id: 'c5', name: 'Balon Avı', emoji: '🎈', colors: ['#0EA5E9', '#7C3AED'] },
 ];
 
 export const GAMES: Game[] = [

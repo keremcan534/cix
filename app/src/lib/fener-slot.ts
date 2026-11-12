@@ -1,18 +1,22 @@
-// Fener Kayalığı: a night sea under a lighthouse. Ships land on a 5×4 sea, each carrying cargo worth a share of the
-// stake; then the lighthouse beam sweeps the rows and stops on one. The ships in the light reach the harbour: their
-// cargo is paid, times the beam's brightness. Same house rule as every coin game: the expected return of a round,
-// the storm included, is at most 40 % of the stake (see lib/casino-odds).
+// Yıldız Avı: a night sky under a searchlight. Stars come out on a 5×4 sky, each worth a share of the stake; then
+// the searchlight beam sweeps the rows and stops on one. The stars in the light are collected: their value is paid,
+// times the beam's brightness. Same house rule as every coin game: the expected return of a round, Yıldız Yağmuru
+// included, is at most 40 % of the stake (see lib/casino-odds).
+//
+// The names in the code are the game's first ones (it began as a lighthouse over a sea): a cell is 'sea' (empty
+// sky), 'ship' (a star, its `cargo` is its value) or 'lamp' (a kuyruklu yıldız), and the storm is Yıldız Yağmuru.
+// The server and the history use these keys, so they stay.
 //
 // Model:
-//  - The server draws each of the 20 cells on its own: open sea, a ship (with a cargo value) or a kandil.
+//  - The server draws each of the 20 cells on its own: empty sky, a star (with a value) or a kuyruklu yıldız.
 //  - The beam stops on one of the 4 rows, uniformly; its brightness (×1, ×2, ×3, ×5) is a separate draw.
-//    Neither depends on where the ships are, so a ship just outside the light is chance, never steering.
-//  - 3+ kandil anywhere start Fırtına Gecesi: STORM_SPINS spins where the beam lights two rows at once and burns
-//    one step brighter every spin (×1, ×2 … ×6). Kandil do nothing during the storm, so a round always ends.
+//    Neither depends on where the stars are, so a star just outside the light is chance, never steering.
+//  - 3+ kuyruklu yıldız anywhere start Yıldız Yağmuru: STORM_SPINS spins where the beam lights two rows at once and
+//    burns one step brighter every spin (×1, ×2 … ×6). Kuyruklu yıldız do nothing during it, so a round always ends.
 //  - One round pays at most FENER_MAX times the stake.
 //
 // The expected return is exact (fenerReturn): every cell is an independent draw and the beam ignores the cells,
-// so a lit row's expected cargo is COLS × (ship chance × mean cargo), whatever else is on the board.
+// so a lit row's expected value is COLS × (star chance × mean value), whatever else is on the board.
 // Pure functions only (no app or storage imports), so the server and the tests run the same rules.
 
 export const COLS = 5;
@@ -24,7 +28,7 @@ export type FCell = { kind: 'sea' } | { kind: 'ship'; cargo: number } | { kind: 
 /** Relative weight of each cell kind in a draw. */
 export const CELL_WEIGHTS = { sea: 202, ship: 23, lamp: 5 } as const;
 /**
- * Cargo in tenths of the stake (1 = ×0.1 … 500 = ×50) and its weight. Kept in tenths so a row's total is an exact
+ * A star's value (`cargo`) in tenths of the stake (1 = ×0.1 … 500 = ×50) and its weight. Kept in tenths so a row's total is an exact
  * integer before the single division at the end.
  */
 export const CARGO: { tenths: number; weight: number }[] = [
@@ -50,7 +54,7 @@ export const STORM_SPINS = 6;
 export const STORM_ROWS = 2;
 export const FENER_MAX = 500;
 
-/** The six ways the storm beam can light two different rows. */
+/** The six ways Yıldız Yağmuru's beam can light two different rows. */
 export const ROW_PAIRS: [number, number][] = [
   [0, 1],
   [0, 2],
@@ -70,9 +74,9 @@ export type FSpin = {
   /** Rows the beam lit, top = 0. */
   lit: number[];
   brightness: number;
-  /** Cargo of the lit ships in multiples of the stake, before brightness. */
+  /** Value of the lit stars in multiples of the stake, before brightness. */
   cargo: number;
-  /** Kandil on the board (they only count on the base spin). */
+  /** Kuyruklu yıldız on the board (they only count on the base spin). */
   lamps: number;
   /** cargo × brightness, in multiples of the stake. */
   pay: number;
@@ -104,13 +108,13 @@ export function baseSpin(rnd: (n: number) => number): FSpin {
   return evaluateBoard(grid, [row], BRIGHTNESS.find((x) => (b -= x.weight) < 0)!.value);
 }
 
-/** Storm spin `n` (1-based): two rows lit, brightness n. */
+/** Yıldız Yağmuru spin `n` (1-based): two rows lit, brightness n. */
 export function stormSpin(rnd: (n: number) => number, n: number): FSpin {
   const grid = drawBoard(rnd);
   return evaluateBoard(grid, [...ROW_PAIRS[rnd(ROW_PAIRS.length)]], n);
 }
 
-/** One round: the base spin and, with 3+ kandil, the storm. */
+/** One round: the base spin and, with 3+ kuyruklu yıldız, Yıldız Yağmuru. */
 export function playFener(rnd: (n: number) => number): FenerRound {
   const base = baseSpin(rnd);
   const storm = base.lamps >= STORM_TRIGGER ? Array.from({ length: STORM_SPINS }, (_, i) => stormSpin(rnd, i + 1)) : [];
@@ -123,11 +127,11 @@ export function playFener(rnd: (n: number) => number): FenerRound {
  * so this is an upper bound).
  */
 export function fenerReturn(): { cell: number; base: number; trigger: number; storm: number; total: number } {
-  // Expected cargo of one cell, in multiples of the stake.
+  // Expected value of one cell, in multiples of the stake.
   const cell = (CELL_WEIGHTS.ship / CELL_TOTAL) * (CARGO.reduce((n, c) => n + c.tenths * c.weight, 0) / CARGO_TOTAL / 10);
   const bright = BRIGHTNESS.reduce((n, b) => n + b.value * b.weight, 0) / BRIGHT_TOTAL;
   const base = bright * COLS * cell;
-  // P(at least STORM_TRIGGER kandil among CELLS independent cells).
+  // P(at least STORM_TRIGGER kuyruklu yıldız among CELLS independent cells).
   const p = CELL_WEIGHTS.lamp / CELL_TOTAL;
   let pk = (1 - p) ** CELLS;
   let below = 0;
@@ -136,10 +140,10 @@ export function fenerReturn(): { cell: number; base: number; trigger: number; st
     pk = (pk * (CELLS - k) * p) / ((k + 1) * (1 - p));
   }
   const trigger = 1 - below;
-  // Storm spin n lights STORM_ROWS rows at brightness n.
+  // Yıldız Yağmuru spin n lights STORM_ROWS rows at brightness n.
   const storm = ((STORM_SPINS * (STORM_SPINS + 1)) / 2) * STORM_ROWS * COLS * cell;
   return { cell, base, trigger, storm, total: base + trigger * storm };
 }
 
-/** Short Turkish label of a cargo value: "×0,1", "×2", "×50". */
+/** Short Turkish label of a star's value: "×0,1", "×2", "×50". */
 export const cargoLabel = (tenths: number) => `×${(tenths / 10).toLocaleString('tr-TR')}`;

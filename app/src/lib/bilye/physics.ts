@@ -1,4 +1,4 @@
-// Bilye Şelalesi: the ball. A small 2D simulation: gravity, a round ball, round pegs and posts, the side walls.
+// Pachinko: the ball. A small 2D simulation: gravity, a round ball, round pegs and posts, the side walls.
 //
 // A launch is fully decided by its strength and a seed: the same pair gives the same path on every phone and in
 // node. To keep that true the sums use only + − × ÷ and Math.sqrt (exactly rounded everywhere); no sin, cos or pow,

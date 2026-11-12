@@ -48,7 +48,7 @@ const IDLE = 'Alanını seç, çarkı çevir';
 /** How long the wheel turns for a request of that many spins (ms): a longer request counts its results meanwhile. */
 const TURN_MS: Record<WheelCount, number> = { 1: 4400, 10: 4800, 50: 5600 };
 
-/** Slice colors by prize: deep navy for the small ones, sea teal for the middle, gold for the big ones. */
+/** Slice colors by prize: deep navy for the small ones, teal for the middle, gold for the big ones. */
 function sliceLook(i: number): { fill: string; ink: string } {
   const m = WHEEL_SLICES[i].milli;
   if (m === null) return { fill: '#C93C4F', ink: '#FFFFFF' };
@@ -294,7 +294,7 @@ export function WheelPlayer({ entry }: { entry: Entry }) {
         visible={info}
         onClose={() => setInfo(false)}
         title="Rüzgâr Gülü"
-        rules={`Bir alan seç (Kıyı, Açık Deniz, Derin Okyanus) ve çarkı 1, 10 ya da 50 kez çevir. Çarkta 12 dilim var ve her dilim bir şey öder; dilimler aynı boyda çizilir ama şansları farklıdır. 10 ve 50 turda çark bir kez döner, en iyi dilimde durur ve bütün turların özeti gösterilir. Sonucu sunucu belirler, çark yalnızca sonucu gösterir.`}
+        rules={`Bir alan seç (Klasik, Yüksek, Zirve) ve çarkı 1, 10 ya da 50 kez çevir. Çarkta 12 dilim var ve her dilim bir şey öder; dilimler aynı boyda çizilir ama şansları farklıdır. 10 ve 50 turda çark bir kez döner, en iyi dilimde durur ve bütün turların özeti gösterilir. Sonucu sunucu belirler, çark yalnızca sonucu gösterir.`}
       >
         <Odds tier={tier} />
         <View style={{ gap: 5 }}>

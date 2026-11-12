@@ -1,4 +1,4 @@
-// Bilye Şelalesi: the board. One board for now; a second one is another module of this shape with its own
+// Pachinko: the board. One board for now; a second one is another module of this shape with its own
 // tables (lib/bilye/table), so nothing else has to change.
 //
 // Lengths are board units (the screen scales them). The field of pegs is FIELD wide; right of it runs the launch

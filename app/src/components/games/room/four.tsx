@@ -22,9 +22,9 @@ import { colors } from '@/theme';
 /** What the stage shows. `me` −1: I watch. `discs`: seat → its colour. */
 export type FourView = { status: 'waiting' | 'playing' | 'over'; turn: number; winner: number | null; seats: Seat[]; me: number; board: (number | null)[]; discs: number[]; wins: number[]; line: number[] | null; hand: number; n: number; last: FourEvent | null };
 
-/** The two discs: coral and gold. */
+/** The two discs: crimson and gold. */
 export const DISC_COLORS: { name: string; light: string; base: string; deep: string }[] = [
-  { name: 'Mercan', light: '#FF99A4', base: '#F2506A', deep: '#A91F3D' },
+  { name: 'Kızıl', light: '#FF99A4', base: '#F2506A', deep: '#A91F3D' },
   { name: 'Altın', light: '#FFE08A', base: '#F2A93B', deep: '#B36A0C' },
 ];
 const FRAME = '#1E4F8F';

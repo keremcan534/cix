@@ -1,4 +1,4 @@
-// Bilye Şelalesi: writes src/lib/bilye/table.ts from the board and the simulation.
+// Pachinko: writes src/lib/bilye/table.ts from the board and the simulation.
 //
 //   node --experimental-strip-types --no-warnings --import ./tests/register.mjs scripts/bilye-table.ts
 //

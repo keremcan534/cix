@@ -1,4 +1,4 @@
-// Bilye Şelalesi on the server (casino-bilye.mjs, through casino.mjs) against a real Postgres: a launch is one round,
+// Pachinko on the server (casino-bilye.mjs, through casino.mjs) against a real Postgres: a launch is one round,
 // the stake through the pool like every coin game, the win paid as game coins, the history line and a retry.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,7 +23,7 @@ async function player(coins) {
 }
 const launch = (s, lane, bet = 250, ref = rnd(8)) => call('POST', '/api/casino/play', { game: 'bilye', bet, pick: lane, ref }, s);
 
-describe('Bilye Şelalesi kuralları', () => {
+describe('Pachinko kuralları', () => {
   test('her atış gücü en çok %40 geri öder; en büyük ödül 20 kat', () => {
     for (const lane of LANES) {
       assert.equal(BILYE_WEIGHTS[lane].reduce((a, b) => a + b, 0), BILYE_TOTAL);
@@ -36,7 +36,7 @@ describe('Bilye Şelalesi kuralları', () => {
   });
 });
 
-describe('Bilye Şelalesi sunucuda', () => {
+describe('Pachinko sunucuda', () => {
   test('atış: bahis düşer, kazanç oyun jetonu olarak gelir; aynı istek bir kez', async () => {
     const p = await player(10_000);
     const ref = rnd(8);

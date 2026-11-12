@@ -26,7 +26,7 @@ export const SYMBOLS: Record<Sym, { name: string; emoji: string }> = {
   gem: { name: 'Elmas', emoji: '💎' },
   crown: { name: 'Taç', emoji: '👑' },
   car: { name: 'Spor Araba', emoji: '🏎️' },
-  yacht: { name: 'Yat', emoji: '🛥️' },
+  yacht: { name: 'Özel Jet', emoji: '🛩️' }, // id from the first symbol, a yacht
   wild: { name: 'Kese', emoji: '💰' },
   vault: { name: 'Kasa', emoji: '🏦' },
 };
