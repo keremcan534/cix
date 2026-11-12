@@ -1,4 +1,4 @@
-// The one place the Oyun Salonu screens take their pictures from (docs/GORSEL_URETIM_LISTESI.md §16, §17, §19). Each
+// The one place the Oyun Salonu screens take their pictures from (docs/GORSEL_URETIM_LISTESI.md §16, §17, §19, §24). Each
 // picture the list names has a line below; until its PNG is delivered the line stays a comment and the game draws
 // its emoji or code fallback. When the owner sends a file: put it in app/assets/art/ under exactly that name and
 // uncomment its line; every place that draws it switches at once (tests/salon-art.test.ts fails while a delivered
@@ -74,7 +74,24 @@ export type SalonArtName =
   | 'bilye-kupa-yakut'
   | 'bilye-kupa-zumrut'
   | 'bilye-tahta'
-  | 'bilye-kanal';
+  | 'bilye-kanal'
+  // §24 Kızıl Yedi deneme paketi (one machine dressed in full: fx/slot-skin)
+  | 'kizil-yedi-arka-plan'
+  | 'kizil-yedi-cerceve'
+  | 'kizil-yedi-kazanc'
+  | 'kizil-yedi-cevir'
+  | 'kizil-yedi-kapak'
+  | 'slot-kiraz'
+  | 'slot-limon'
+  | 'slot-mango'
+  | 'slot-uzum'
+  | 'slot-yedi'
+  | 'slot-elmas'
+  | 'jackpot-levha'
+  | 'jackpot-isik'
+  | 'jeton-altin'
+  | 'jeton-yigini'
+  | 'parilti';
 
 const ART: Partial<Record<SalonArtName, number>> = {
   // §16
@@ -144,6 +161,23 @@ const ART: Partial<Record<SalonArtName, number>> = {
   // 'bilye-kupa-zumrut': require('../../../../assets/art/bilye-kupa-zumrut.png'),
   // 'bilye-tahta': require('../../../../assets/art/bilye-tahta.png'),
   // 'bilye-kanal': require('../../../../assets/art/bilye-kanal.png'),
+  // §24
+  'kizil-yedi-arka-plan': require('../../../../assets/art/kizil-yedi-arka-plan.png'),
+  'kizil-yedi-cerceve': require('../../../../assets/art/kizil-yedi-cerceve.png'),
+  'kizil-yedi-kazanc': require('../../../../assets/art/kizil-yedi-kazanc.png'),
+  'kizil-yedi-cevir': require('../../../../assets/art/kizil-yedi-cevir.png'),
+  'kizil-yedi-kapak': require('../../../../assets/art/kizil-yedi-kapak.png'),
+  'slot-kiraz': require('../../../../assets/art/slot-kiraz.png'),
+  'slot-limon': require('../../../../assets/art/slot-limon.png'),
+  'slot-mango': require('../../../../assets/art/slot-mango.png'),
+  'slot-uzum': require('../../../../assets/art/slot-uzum.png'),
+  'slot-yedi': require('../../../../assets/art/slot-yedi.png'),
+  'slot-elmas': require('../../../../assets/art/slot-elmas.png'),
+  'jackpot-levha': require('../../../../assets/art/jackpot-levha.png'),
+  'jackpot-isik': require('../../../../assets/art/jackpot-isik.png'),
+  'jeton-altin': require('../../../../assets/art/jeton-altin.png'),
+  'jeton-yigini': require('../../../../assets/art/jeton-yigini.png'),
+  'parilti': require('../../../../assets/art/parilti.png'),
 };
 
 /** The delivered picture, or undefined while the game still draws its fallback. */

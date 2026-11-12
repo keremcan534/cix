@@ -18,7 +18,15 @@ import { useSettings } from '@/store';
 
 const fmt = (n: number) => Math.floor(n).toLocaleString('tr-TR');
 
-export type WinShow = { amount: number; bet: number; jackpot?: boolean; /** Instead of the tier's own title (e.g. "GRAND"). */ title?: string };
+export type WinShow = {
+  amount: number;
+  bet: number;
+  jackpot?: boolean;
+  /** Instead of the tier's own title (e.g. "GRAND"). */
+  title?: string;
+  /** At most the small celebration: a game that shows its big wins with its own pictures (fx/jackpot-show). */
+  smallOnly?: boolean;
+};
 export type Celebrate = (w: WinShow) => Promise<void>;
 
 /** The ribbon and the light, per tier. */
@@ -37,8 +45,9 @@ export function useWinFx(): { celebrate: Celebrate; layer: ReactNode } {
   const celebrate = useCallback<Celebrate>(
     (w) =>
       new Promise<void>((resolve) => {
-        const tier = winTierOf(w.amount, w.bet, w.jackpot);
-        if (!tier) return resolve();
+        const found = winTierOf(w.amount, w.bet, w.jackpot);
+        if (!found) return resolve();
+        const tier = w.smallOnly ? 'small' : found;
         // A celebration still up gives way; whoever waited for it goes on.
         waiting.current?.();
         waiting.current = resolve;

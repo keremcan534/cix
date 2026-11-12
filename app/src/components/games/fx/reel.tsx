@@ -4,7 +4,7 @@
 // this only shows it. One native-driven value per run, so five reels cost five animations.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SETTLE_BACK, fillerOf, type ReelPace, type ReelRun } from '@/lib/reel-plan';
 
@@ -33,6 +33,7 @@ export function Reel({
   dim,
   pulse,
   shade = 'rgba(0,0,0,0.5)',
+  litStyle,
 }: {
   ref?: Ref<ReelHandle>;
   /** The window at rest before the first run (top to bottom). */
@@ -50,6 +51,8 @@ export function Reel({
   pulse?: Animated.Value;
   /** The reel's own darkness at its top and bottom edge, for the roundness of a drum. */
   shade?: string;
+  /** A winning cell's look instead of the yellow box (a skinned machine's, fx/slot-skin). */
+  litStyle?: StyleProp<ViewStyle>;
 }) {
   const rows = symbols.length;
   const step = cell + gap;
@@ -124,7 +127,7 @@ export function Reel({
           const rest = !moving && i < rows;
           const on = rest && !!lit?.[i];
           return (
-            <Animated.View key={`${run.id}-${i}`} style={[s.cell, { height: cell, marginBottom: gap }, on && s.on, rest && dim && !on && s.dim, on && beat ? { transform: [{ scale: beat }] } : null]}>
+            <Animated.View key={`${run.id}-${i}`} style={[s.cell, { height: cell, marginBottom: gap }, on && (litStyle ?? s.on), rest && dim && !on && s.dim, on && beat ? { transform: [{ scale: beat }] } : null]}>
               {render(sym, moving)}
             </Animated.View>
           );

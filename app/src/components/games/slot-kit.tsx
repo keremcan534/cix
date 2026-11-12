@@ -117,6 +117,7 @@ export function SpinControls({
   onAuto,
   onSpin,
   look,
+  art,
   caption,
 }: {
   /** The balance with the stake taken while the reels run (BalancePill's `shown`). */
@@ -134,6 +135,8 @@ export function SpinControls({
   onSpin: () => void;
   /** The action button's core in the game's own colour (its ring is always gold). */
   look?: ActionLook;
+  /** The spin button as a picture (a skinned machine's, fx/slot-skin). */
+  art?: number;
   /** A quiet line under the buttons (lines × line stake, the most a round pays). */
   caption?: string;
 }) {
@@ -153,7 +156,7 @@ export function SpinControls({
           label="TURBO"
           a11y={turbo ? 'Turbo kapat' : 'Turbo aç'}
         />
-        <ActionButton onPress={auto !== null ? onAuto : onSpin} disabled={waiting} busy={busy} count={auto} look={look} label={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`} />
+        <ActionButton onPress={auto !== null ? onAuto : onSpin} disabled={waiting} busy={busy} count={auto} look={look} art={art} label={auto !== null ? 'Otomatik çevirmeyi durdur' : `Çevir, ${bet} jeton`} />
         <SideButton onPress={onAuto} on={auto !== null} disabled={waiting} icon={auto !== null ? 'stop' : 'repeat'} label={auto !== null ? 'DUR' : 'OTO'} a11y={auto !== null ? 'Otomatik çevirmeyi durdur' : `${autoSpins} kez otomatik çevir`} />
       </View>
       {!!caption && <Text style={k.caption}>{caption}</Text>}

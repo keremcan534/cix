@@ -16,6 +16,7 @@ export function Coins({
   height,
   ms,
   from = 0.55,
+  source = COIN,
 }: {
   kind: 'fountain' | 'rain';
   count: number;
@@ -25,6 +26,8 @@ export function Coins({
   ms: number;
   /** A fountain's starting height, as a part of the layer's (0 top … 1 bottom). */
   from?: number;
+  /** The coin's picture (the 3D icon set's coin unless a game brings its own). */
+  source?: number;
 }) {
   const paths = useMemo(() => coinPaths(count, kind), [count, kind]);
   const [v] = useState(() => new Animated.Value(0));
@@ -55,7 +58,7 @@ export function Coins({
         return (
           <Animated.Image
             key={i}
-            source={COIN}
+            source={source}
             style={{ position: 'absolute', left: -p.size / 2, top: -p.size / 2, width: p.size, height: p.size, opacity, transform: [{ translateX: x }, { translateY: y }, { rotate }, { scaleX: flip }] }}
           />
         );
