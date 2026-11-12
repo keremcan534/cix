@@ -9,7 +9,19 @@ import type { Conversation } from '@/data/mock';
 
 export type ChatMessage = Conversation['messages'][number];
 /** A message as GET /api/messages returns it (lib/api DirectMessage). */
-export type ServerDm = { id: number; from: string; to: string; text: string; image?: string | null; createdAt: string; readAt?: string | null };
+export type ServerDm = {
+  id: number;
+  from: string;
+  to: string;
+  text: string;
+  image?: string | null;
+  /** An event sent with it (newer servers); the card opens it. */
+  event?: { id: number; title: string | null; startsAt?: string | null } | null;
+  createdAt: string;
+  readAt?: string | null;
+};
+/** The card of a server message's event, or undefined. */
+const eventCard = (d: ServerDm) => (d.event && Number.isSafeInteger(d.event.id) ? { event: { id: d.event.id, title: d.event.title ?? 'Etkinlik', startsAt: d.event.startsAt ?? null } } : null);
 export type ThreadSync = { peer: string; after: number; hidden?: readonly number[] };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -62,7 +74,7 @@ export function mergeThread(local: readonly ChatMessage[], server: readonly Serv
       out[pending] = { ...withoutFailure(out[pending]), sid: d.id, at: d.createdAt, ...seen };
       known.set(d.id, pending);
     } else {
-      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...seen });
+      out.push({ id: `s${d.id}`, fromMe: mine, text: d.text, time: clockOf(d.createdAt), at: d.createdAt, sid: d.id, ...(d.image && { image: d.image }), ...eventCard(d), ...seen });
       known.set(d.id, out.length - 1);
       if (!mine) incoming++;
     }

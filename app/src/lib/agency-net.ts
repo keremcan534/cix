@@ -37,7 +37,7 @@ export type MyAgency = AgencyCard & { viewer: Viewer | null; perms: string[] };
 export type Upcoming = { effectiveFrom: string; rate: number; tier: string | null; source: string; reason: string | null };
 /** Commission rates of an agency now: its own rate, the parent's difference share, the total and the pool cap. */
 export type RateView = { rate: number; parentShare: number; total: number; poolCap: number; upcoming: Upcoming | null };
-export type Balances = { earned: number; paid: number; in_payout: number; available: number; calculating: number; direct: number; difference: number; transition: number; pending: number };
+export type Balances = { earned: number; paid: number; in_payout: number; available: number; calculating: number; direct: number; difference: number; transition: number; pending: number; /** Agency assistants' shares (negative). */ assistant?: number };
 
 export type NextTier = { key: string; name: string; subRate: number; needScore: number; needActive: number; needOvertake: boolean; periodsInRow: number };
 export type TierChange = 'up' | 'down' | 'same' | 'held' | 'waiting';
@@ -98,6 +98,8 @@ export type Overview = {
     direct30: number;
     difference30: number;
     transition30: number;
+    /** What agency assistants got out of the agency's own commission in 30 days (negative; older servers send none). */
+    assistant30?: number;
     balances: Balances;
     usd: { month: number; available: number };
   } | null;
@@ -153,7 +155,7 @@ export type SubAgency = AgencyCard & {
   rank: number | null;
 };
 
-export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd';
+export type LedgerKind = 'direct' | 'difference' | 'transition' | 'transfer_fee' | 'adjustment' | 'reversal' | 'bd' | 'assistant';
 export type LedgerRow = {
   id: number;
   kind: LedgerKind;
@@ -180,7 +182,7 @@ export type LedgerRow = {
   occurredAt: string | null;
   calculatedAt: string | null;
 };
-export type LedgerTotals = { direct: number; difference: number; transition: number; fees: number; adjustments: number };
+export type LedgerTotals = { direct: number; difference: number; transition: number; fees: number; adjustments: number; assistant?: number };
 
 export type PerfHistory = { runId: number; asOf: string; score: number; rank: number | null; tier: string | null; tierName: string | null; change: TierChange; overtakes: boolean; volume: number; orgVolume: number; active: number };
 export type TierHistory = { from: string | null; fromName: string | null; to: string; toName: string | null; fromRate: number | null; toRate: number; effectiveFrom: string; source: string; reason: string | null; at: string };
@@ -231,7 +233,38 @@ export type Me = {
   platform: string[];
   /** The streamer rules for this account (server agency-ops.mjs streamerState); older servers send none. */
   streamer?: { eligible: boolean; gender: string | null; held: boolean; pickUntil: string | null; pickDays: number; canLeave: boolean; womenOnly: boolean };
+  /** My agency assistant card (server agency-assistants.mjs); null when I never was one, absent on older servers. */
+  assistant?: MyAssistant | null;
 };
+
+// --- Agency assistants (server/api/agency-assistants.mjs, docs/AJANS_ASISTANI.md) -------------------------------
+/** One assistant as the owner sees them (and the assistant on their own card). Shares are whole percents of the
+ *  agency's own commission from the streamers the assistant brought; amounts are diamonds. */
+export type Assistant = {
+  id: number;
+  agency: Named;
+  user: { id: string; name: string; avatarUrl: string | null };
+  code: string;
+  assignedAt: string;
+  endedAt: string | null;
+  active: boolean;
+  /** Still one of the agency's own (a streamer of it or on its team); someone who left gets no share. */
+  member: boolean;
+  share: { pct: number; since: string };
+  /** A change waiting for next Monday 00:00 (Türkiye). */
+  upcoming: { pct: number; from: string } | null;
+  /** The share may be changed this week (once a calendar week). */
+  canChange: boolean;
+  nextChangeFrom: string;
+  invited: { total: number; now: number };
+  week: { streamerIncome: number; share: number };
+  month: { share: number };
+  total: { share: number; wallet: number };
+};
+export type AssistantList = { max: number; open: number; canAdd: boolean; weekStart: string; nextWeek: string; assistants: Assistant[] };
+export type AssistantCandidate = { id: string; name: string; avatarUrl: string | null; role: 'streamer' | 'staff' };
+export type AssistantRow = { id: number; amount: number; wallet: number; pct: number; basis: number; reversal: boolean; streamer: string | null; at: string };
+export type MyAssistant = Assistant & { rows: AssistantRow[] };
 
 // --- Centre (platform) types ----------------------------------------------------------------------------------
 export type TreeNode = {
@@ -329,7 +362,13 @@ const post = <T = { ok: boolean }>(path: string, body: object) => apiRequest<T>(
 export const agencyNet = {
   // Streamer side
   me: () => get<Me>('/api/agency/me'),
-  lookup: (code: string) => get<{ agency: { id: string; name: string; code: string; level: number; parentName: string | null } }>('/api/agency/lookup', { code }).then((r) => r.agency),
+  /** An agency's code or an agency assistant's own code: `via` names the assistant; join with `joinCode`. */
+  lookup: (code: string) =>
+    get<{ agency: { id: string; name: string; code: string; level: number; parentName: string | null }; assistant?: { name: string } | null }>('/api/agency/lookup', { code }).then((r) => ({
+      ...r.agency,
+      via: r.assistant?.name ?? null,
+      joinCode: code,
+    })),
   join: (code: string, method: 'code' | 'link' | 'application', note?: string) => post<{ request?: { id: number; status: string }; membership?: { agency: { id: string; name: string; code: string } }; sameDevice?: boolean }>('/api/agency/join', { code, method, note }),
   respond: (requestId: number, accept: boolean) => post('/api/agency/requests/respond', { requestId, accept }),
   cancelRequest: (requestId: number) => post('/api/agency/requests/cancel', { requestId }),
@@ -363,6 +402,13 @@ export const agencyNet = {
   closeSub: (id: string, reason: string) => post<{ transfer: Transfer }>('/api/agency/sub/close', { id, reason, ref: newRef() }),
   appeal: (id: string, subject: 'tier' | 'commission' | 'transfer' | 'other', body: string) => post('/api/agency/appeal', { id, subject, body }),
   notices: (id: string) => get<{ notices: Notice[] }>('/api/agency/notices', { id }).then((r) => r.notices),
+
+  // Agency assistants (the owner)
+  assistants: (id: string) => get<AssistantList>('/api/agency/assistants', { id }),
+  assistantCandidates: (id: string, q = '') => get<{ users: AssistantCandidate[] }>('/api/agency/assistants/candidates', { id, q }).then((r) => r.users),
+  addAssistant: (id: string, user: string, pct: number) => post<{ assistant: Assistant }>('/api/agency/assistants/add', { id, user, pct }),
+  setAssistantShare: (id: string, assistantId: number, pct: number) => post<{ assistant: Assistant; replay: boolean }>('/api/agency/assistants/share', { id, assistantId, pct }),
+  removeAssistant: (id: string, assistantId: number) => post('/api/agency/assistants/remove', { id, assistantId }),
 };
 
 export const centerNet = {

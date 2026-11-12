@@ -38,8 +38,8 @@ export async function clearLiveCalls() {
 }
 
 // --- Yakınlık -----------------------------------------------------------------------------------------------
-const hearts = focusStore(async () => new Map((await api.myHearts()).map((h) => [toLocal(h.id), h.points])));
-/** Heart points with each person (this phone's ids), read while `on` (the Yakınlık filter is chosen). */
+const hearts = focusStore(async () => new Map((await api.myHearts()).map((h) => [toLocal(h.id), { points: h.points, level: h.level }])));
+/** The heart with each person (this phone's ids): its points and the server's level, read while `on` (the Yakınlık filter is chosen). */
 export const useLiveHearts = (on: boolean) => hearts.useData(on);
 
 // --- Yayıncı Merkezi ----------------------------------------------------------------------------------------

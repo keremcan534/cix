@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`). Temel ücretsizdi; Güncelleme 4'te emoji panelinden ve mağazadan kalktı, gönderilmiş Temel çıkartmaları yine çizilir. Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 654 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
+**Toplam 661 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -39,6 +39,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 20. Etkinlik Merkezi: temalar ve türler | 26 |
 | 21. Emoji paneli: VIP emojileri | 8 |
 | 22. Oda katkı sıralaması | 4 |
+| 23. Kalp seviyesi (birebir) | 7 |
 
 ## ChatGPT ile üretim
 
@@ -888,3 +889,19 @@ Oda katkı sıralaması yenilendi (Güncelleme 4, madde 14): Cömertlik ve Yank�
 | 4 | Kürsü | Üç basamaklı kısa kürsü, önden ve hafif yukarıdan: ortası en yüksek, solu ikinci, sağı üçüncü; gece mavisi cam gövde, basamakların üst kenarında altın, gümüş ve bronz ince ışık şeridi; üstleri düz ve boş (fotoğraflar üstünde durur); yatay, yaklaşık 3:1 oranında | `katki-kursu.png` | P2 |
 
 Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → çelenkler `components/room/contrib-board.tsx` içinde ilk üçün fotoğraf halkasının (`Face`, `PLACE.ring`) yerine, kürsü kodla çizilen basamakların (`pedestal`) yerine geçer. Madalyalar ve taç olduğu gibi kalır; kişinin kendi mağaza çerçevesi varsa o gösterilmeye devam eder.
+
+## 23. Kalp seviyesi (birebir) (7)
+
+İki kişi arasındaki kalp seviyesi (Lv.0–10) yükseldikçe kalp daha çok şey yapıyor (Güncelleme 4, madde 19). Bugün hepsi kodla çiziliyor (`app/src/components/heart-level.tsx`, görünümler `app/src/lib/heart-tiers.ts`): Ionicons kalp, renkli dolgu ve ışık; Lv.5'ten itibaren iki fotoğraf arasındaki çizgide kalp atışları gidip geliyor, Lv.7'den itibaren kalp profil fotoğrafında atıyor ve küçük kalpler yükseliyor, Lv.9–10'da altın kenar ve halka var. Görünümler sohbetin üstündeki kalp çubuğunda, karşı tarafın profilindeki "Aranızdaki kalp" kartında, profil fotoğrafının köşesinde, odadaki kişi kartında ve Mesajlar › Yakınlık listesinde. Aşağıdakiler bu kalplerin yerine geçecek görseller; yeni ve bize özgü fikirler, başka uygulamaların kanatlı ya da taçlı çerçevelerinden alınmadı. Stil: mevcut 3D cam/jöle yüzey, mercan (#FF6576) ve koyu kırmızı tonlar, altın (#F6BD60) yalnız en üst görünümde; mor ve mor-pembe gradyan yok; yazı ve rakam yok; tek nesne, şeffaf arka plan, 512 px PNG. Uygulamada 18–30 px çizilir: küçükte de okunmalı, beş kalp yan yana konunca seviye arttıkça daha değerli görünmeli. Hareketi (atma, nabız, yükselen kalpler) uygulama kodla verir; görseller durağan.
+
+| # | Görsel | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 1 | Kıvılcım kalbi (Lv.1–2) | Küçük, yumuşak açık mercan cam kalp; üst köşesinde tek bir minik kıvılcım | `kalp-seviye-kivilcim.png` | P1 |
+| 2 | Işıltı kalbi (Lv.3–4) | Mercan cam kalp, içinden sıcak bir ışık vuruyor, kenarlarında hafif parıltı | `kalp-seviye-isilti.png` | P1 |
+| 3 | Nabız kalbi (Lv.5–6) | Gül kırmızısı cam kalp, yüzeyinde ince parlak bir nabız çizgisi (tek tepe), çevresinde yumuşak hale | `kalp-seviye-nabiz.png` | P1 |
+| 4 | Tutku kalbi (Lv.7–8) | Koyu kırmızı parlak cam kalp, iki yanından yukarı süzülen iki minik mercan kalp | `kalp-seviye-tutku.png` | P1 |
+| 5 | Sonsuz kalp (Lv.9–10) | Koyu kırmızı cam kalp, ince altın kenar, ortasında yumuşak altın ışık, çevresinde birkaç küçük altın ışıltı; taç ve kanat yok | `kalp-seviye-sonsuz.png` | P1 |
+| 6 | Kalp atışı | Çizgide ilerleyen minik parlak mercan kalp, arkasında kısa ve yumuşak bir ışık izi; yatay, sağa doğru | `kalp-atis.png` | P2 |
+| 7 | Kalp çizgisi | İki fotoğrafı bağlayan ince, parlak yatay şerit; ortasında küçük bir nabız tepesi, uçlara doğru incelip soluyor; mercandan altına geçen ton; yaklaşık 6:1 oranında | `kalp-cizgisi.png` | P3 |
+
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → `components/heart-level.tsx` içinde `HeartGlyph` her görünümün kalbini (1–5) Ionicons kalbin yerine çizer; ışık, atma, yükselen kalpler ve altın halka kodla kalır. Kalp atışı (6) çizgide giden kalbin, kalp çizgisi (7) `HeartLink` içindeki düz çizginin yerine geçer. Rozetteki ("♥ Lv.7") beyaz kalp ve dolgu rengi olduğu gibi kalır.

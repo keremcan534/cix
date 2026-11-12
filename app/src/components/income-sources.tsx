@@ -30,6 +30,8 @@ const ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   message_fee: 'mail-outline',
   voice_call: 'call-outline',
   video_call: 'videocam-outline',
+  // An agency assistant's share of the agency's commission (server/api/agency-assistants.mjs).
+  assistant: 'ribbon-outline',
 };
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 

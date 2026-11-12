@@ -9,9 +9,11 @@ import { Text } from '@/components/text';
 import { SCENES } from '@/components/fx/scenes';
 import { ActionSheet, type SheetOption } from '@/components/ActionSheet';
 import { Avatar, VerifiedBadge, VipBadge } from '@/components/ui';
+import { HeartBadge } from '@/components/heart-level';
 import { CALL_HISTORY, formatDuration, formatIntimacy, intimacyOf, isTodayTime, messageTime } from '@/data/messages-ui';
 import { FOLLOWS_ME, ROOMS, userById, type Conversation, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { heartView } from '@/lib/heart-tiers';
 import { liveCallRows, type CallRowData } from '@/lib/call-rows';
 import { friendRows, type Friend } from '@/lib/friend-rows';
 import { callPair } from '@/components/one-on-one-bar';
@@ -31,6 +33,9 @@ import { VisitorsSheet, useProfileVisitors } from '@/components/visitors-sheet';
 
 type Tab = 'messages' | 'friends' | 'calls';
 type Filter = 'all' | 'intimacy' | 'online' | 'today';
+/** The heart between us as a Yakınlık row shows it. */
+type Heart = { points: number; level: number };
+const NO_HEART: Heart = { points: 0, level: 0 };
 
 // Aramalar: the simulated call history in the demo, the server's in a live build with calls (lib/live oneOnOneOpen).
 const TABS: { key: Tab; label: string }[] = [
@@ -39,7 +44,8 @@ const TABS: { key: Tab; label: string }[] = [
   ...(oneOnOneOpen() ? [{ key: 'calls' as const, label: 'Aramalar' }] : []),
 ];
 
-// Yakınlık sorts by intimacy: the demo's sample points, or a live build's heart points (lib/live/call-log).
+// Yakınlık sorts by the heart between us: the demo's sample hearts, or a live build's heart points (lib/live/call-log);
+// each row shows the heart's level in its look (components/heart-level) and its points.
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Hepsi' },
   { key: 'intimacy', label: 'Yakınlık' },
@@ -90,9 +96,9 @@ export default function MessagesScreen() {
   const visibleConvs = conversations.filter((c) => !blocked.has(c.userId));
   const lastOf = (c: Conversation) => c.messages[c.messages.length - 1];
   const hearts = useLiveHearts(live && filter === 'intimacy');
-  const intimacy = (id: string) => (live ? (hearts?.get(id) ?? 0) : intimacyOf(id));
+  const heartWith = (id: string) => (live ? (hearts?.get(id) ?? NO_HEART) : heartView(intimacyOf(id)));
   let convs = visibleConvs;
-  if (filter === 'intimacy') convs = [...visibleConvs].sort((a, b) => intimacy(b.userId) - intimacy(a.userId));
+  if (filter === 'intimacy') convs = [...visibleConvs].sort((a, b) => heartWith(b.userId).points - heartWith(a.userId).points);
   else if (filter === 'online') convs = visibleConvs.filter((c) => userById(c.userId).online);
   else if (filter === 'today') convs = visibleConvs.filter((c) => lastOf(c) && isTodayTime(lastOf(c)));
   const totalUnread = visibleConvs.reduce((n, c) => n + c.unread, 0);
@@ -263,7 +269,7 @@ export default function MessagesScreen() {
               <Text style={styles.empty}>{filter === 'online' ? 'Şu an çevrimiçi sohbet yok.' : filter === 'today' ? 'Bugün mesajlaşmadın.' : 'Henüz sohbet yok.'}</Text>
             )
           }
-          renderItem={({ item }) => <ConversationRow conv={item} intimacy={filter === 'intimacy' ? intimacy(item.userId) : null} />}
+          renderItem={({ item }) => <ConversationRow conv={item} heart={filter === 'intimacy' ? heartWith(item.userId) : null} />}
         />
       )}
 
@@ -417,8 +423,8 @@ function AvatarWithBadge({ user, size, unread }: { user: User; size: number; unr
   );
 }
 
-/** `intimacy`: the points to show beside the name (the Yakınlık filter), null for none. */
-function ConversationRow({ conv, intimacy }: { conv: Conversation; intimacy: number | null }) {
+/** `heart`: the heart between us to show beside the name (the Yakınlık filter), null for none. */
+function ConversationRow({ conv, heart }: { conv: Conversation; heart: Heart | null }) {
   const u = userById(conv.userId);
   const last = conv.messages[conv.messages.length - 1];
   const { colors } = useTheme();
@@ -433,10 +439,10 @@ function ConversationRow({ conv, intimacy }: { conv: Conversation; intimacy: num
           </Text>
           {u.verified && <VerifiedBadge />}
           {u.vip && <VipBadge />}
-          {intimacy !== null && (
+          {heart && (
             <View style={styles.intimacy}>
-              <Ionicons name="heart" size={10} color={colors.pink} />
-              <Text style={styles.intimacyText}>{formatIntimacy(intimacy)}</Text>
+              <HeartBadge level={heart.level} size="xs" still />
+              <Text style={styles.intimacyText}>{formatIntimacy(heart.points)}</Text>
             </View>
           )}
         </View>
@@ -652,16 +658,7 @@ const useStyles = makeStyles(({ colors, lift, dark }) => ({
     borderRadius: 11,
   },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  intimacy: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    marginLeft: 2,
-  },
+  intimacy: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 2 },
   intimacyText: { color: colors.pink, fontSize: 12, fontWeight: '700' },
   roundBtn: {
     width: 36,

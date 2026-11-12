@@ -22,6 +22,15 @@ const dm = (id: number, from: string, text: string, extra: Partial<ServerDm> = {
 });
 
 describe('Sohbet eşitleme (mergeThread)', () => {
+  test('etkinlikle gelen mesaj kartıyla gelir; düz mesajda kart yok', () => {
+    const r = mergeThread([], [dm(3, PEER, '📅 Seni etkinliğe bekliyorum!', { event: { id: 42, title: 'Akustik Gece', startsAt: '2026-11-11T18:30:00.000Z' } }), dm(4, PEER, 'Selam')], { peer: PEER, after: 0 });
+    assert.deepEqual(r.messages.map((m) => m.event), [{ id: 42, title: 'Akustik Gece', startsAt: '2026-11-11T18:30:00.000Z' }, undefined]);
+    // My own share, waiting for its answer, keeps its card when the server's copy takes its place.
+    const mine: ChatMessage[] = [{ id: 'l1', fromMe: true, text: 'Etkinlik', time: '10:00', ref: 'r1', event: { id: 42, title: 'Akustik Gece' } }];
+    const m = mergeThread(mine, [dm(5, ME, 'Etkinlik', { event: { id: 42, title: 'Akustik Gece' } })], { peer: PEER, after: 0 });
+    assert.deepEqual([m.messages.length, m.messages[0].sid, m.messages[0].event?.id], [1, 5, 42]);
+  });
+
   test('fotoğraf adresiyle gelir; benim fotoğrafım yazılı bekleyen mesajın yerini almaz', () => {
     const url = 'https://cdn.example.com/dm/me1/a.jpg';
     const local: ChatMessage[] = [{ id: 'l1', fromMe: true, text: 'Fotoğraf', time: '10:00', ref: 'r1' }];

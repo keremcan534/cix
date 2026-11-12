@@ -5,7 +5,7 @@
 // Chart colors are validated on the card surface (dark mode, dataviz validator): own share #0A9FA5, parent share
 // #C27F1C, the rest neutral. Text never wears a series color; legends always name the series.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { KeyboardAvoid } from '@/components/keyboard-avoid';
 
@@ -35,8 +35,12 @@ export function DemoBanner({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
+/** True inside a NetState that already shows the example label, so a nested one (a panel tab) doesn't repeat it. */
+const DemoShown = createContext(false);
+
 /** Loading / error / content for one loaded resource; the example label goes above the content. */
 export function NetState<T>({ q, children }: { q: Loaded<T>; children: (data: T) => ReactNode }) {
+  const shown = useContext(DemoShown);
   if (q.loading && !q.data)
     return (
       <View style={s.center}>
@@ -53,10 +57,10 @@ export function NetState<T>({ q, children }: { q: Loaded<T>; children: (data: T)
       </View>
     );
   return (
-    <>
-      {q.demo && <DemoBanner onRetry={q.reload} />}
+    <DemoShown.Provider value={shown || q.demo}>
+      {q.demo && !shown && <DemoBanner onRetry={q.reload} />}
       {children(q.data)}
-    </>
+    </DemoShown.Provider>
   );
 }
 

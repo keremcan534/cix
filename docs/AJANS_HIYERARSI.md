@@ -53,7 +53,7 @@ doğrudan üst ajans  = matrah × oran(üst)           (yayıncı doğrudan üst
 - **İdempotent:** her gelir `income_events.source_ref` ile tekildir, komisyonu `agency_commissions.income_event_id`
   ile bir kez yazılır (`ON CONFLICT DO NOTHING`). Aynı istek iki kez gelse de ikinci kayıt oluşmaz.
 - Her pay `agency_ledger` tablosuna ayrı satır olarak yazılır (`direct`, `difference`, `transition`, `fee`,
-  `adjustment`, `reversal`). Finansal ve geçmiş tabloları değiştirilemez ve silinemez (veritabanı tetikleyicisi
+  `adjustment`, `reversal`, `assistant`). Finansal ve geçmiş tabloları değiştirilemez ve silinemez (veritabanı tetikleyicisi
   `agency_no_delete` / güncelleme koruması); düzeltme ve iptal ayrı satırdır.
 - Her komisyon kaydı hangi ayar ve oran sürümleriyle hesaplandığını `rule_version` alanında saklar.
 
@@ -62,6 +62,14 @@ doğrudan üst ajans  = matrah × oran(üst)           (yayıncı doğrudan üst
 
 **Örnek** (varsayılanlar): 10.000 elmaslık hediye, alt ajans Başlangıç seviyesinde (%25):
 alt ajans 2.500, üst ajans 1.500 (%40 − %25), toplam 4.000 elmas = 0,80 USD. Yayıncının 10.000 elması aynen kalır.
+
+## Ajans asistanı
+
+Ajans sahibi, ajansının yayıncılarından ya da ekibinden birini asistan yapabilir (varsayılan en fazla 1,
+`assistant_policy.max`). Asistanın getirdiği yayıncıların gelirinde, ajansın kendi komisyonunun (`direct`) sahibin
+belirlediği yüzdesi aynı işlemde asistanın cüzdanına elmas olarak geçer; sahibin hesabına eksi bir `assistant` satırı
+yazılır. Pay haftada bir değişir ve sonraki pazartesi 00:00'dan (Türkiye) geçerlidir; iade ve ters kayıt payı da geri
+alır. Ayrıntı: `docs/AJANS_ASISTANI.md`.
 
 ## Performans motoru (§Performans)
 
@@ -162,6 +170,7 @@ Ajans tarafı (`agency.mjs`):
 | `GET /api/agency/transfers` · `POST transfers/approve` | Transfer kararları |
 | `POST /api/agency/independence` · `change-parent` · `appeal` | Bağımsızlık, üst ajans değişikliği, itiraz |
 | `GET /api/agency/notices` | Bildirimler |
+| `GET /api/agency/assistants` · `assistants/candidates` · `POST assistants/add` · `assistants/share` · `assistants/remove` | Ajans asistanı (`docs/AJANS_ASISTANI.md`) |
 
 Merkez tarafı (`agency-admin.mjs`): `tree`, `overview`, `list`, `create`, `decide`, `status`, `rate`, `tier`,
 `parent`, `assign`, `settings` (GET/POST), `performance/run`, `performance`, `commissions/run`, `income`,
@@ -173,8 +182,8 @@ Merkez tarafı (`agency-admin.mjs`): `tree`, `overview`, `list`, `create`, `deci
 
 - **Ajans** (`/ajans`): sunucu adresi varsa sunucunun ajans ağı; ajanslarım, üyelik, davetler, katıl/başvur.
   Sunucu adresi olmayan derlemelerde eski yerel prototip görünür.
-- **Ajans paneli** (`/ajans/ofis?id=`): Özet, Yayıncılar, Alt ajanslar, Performans, Kazanç, Talepler, Ekip. Sekmeler
-  sunucunun verdiği izinlere göre açılır.
+- **Ajans paneli** (`/ajans/ofis?id=`): Özet, Yayıncılar, Alt ajanslar, Performans, Kazanç, Talepler, Ekip, Asistanlar
+  (yalnız sahip). Sekmeler sunucunun verdiği izinlere göre açılır.
 - **Ajans Merkezi** (`/ajans/merkez`): Genel (KPI ve organizasyon ağacı), Onaylar, Performans, Kurallar
   (ayarlar ve komisyon simülatörü), Denetim.
 - Sunucuya ulaşılamazsa paneller "Örnek veri — sunucu bağlantısı yok" etiketiyle örnek veri gösterir ve işlem

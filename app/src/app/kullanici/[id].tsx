@@ -34,7 +34,8 @@ import {
 import { followRoute, presenceOf } from '@/data/presence';
 import { showAlert } from '@/lib/alert';
 import { callsAvailable, liveCalls, liveGift, liveMode, loadRooms, message, toServer } from '@/lib/live';
-import { callLabel, callPair, usePair } from '@/components/one-on-one-bar';
+import { callLabel, callPair, heartOf, usePair } from '@/components/one-on-one-bar';
+import { HeartCard, HeartPin } from '@/components/heart-level';
 import { loadMyList } from '@/lib/live/follows';
 import { splitTies, tieCounts, tiesOf, type TieSide } from '@/lib/follow-ties';
 import { agoText, feed as momentFeed } from '@/lib/live/moments';
@@ -257,8 +258,12 @@ export default function UserProfile() {
 
   const [tab, setTab] = useState<Tab>('profil');
   const [sheet, setSheet] = useState<Sheet>('none');
-  // A live build: calls are the server's (1v1): what they cost and which are open between the two of us.
-  const { pair } = usePair(id, liveCalls() && !isMe && !!serverId);
+  // A live build: what the two of us are on the server (1v1): the heart between us, and (with calls in this build)
+  // what a call costs and which are open. Read again after a gift.
+  const { pair, reload: reloadPair } = usePair(id, !isMe && !!serverId);
+  // The heart between us (the demo: its sample heart): a card under the numbers, and from the beat look on a heart
+  // beating on their photo (components/heart-level). Not on my own profile, nor with someone I blocked.
+  const heart = isMe || isBlocked ? null : heartOf(id, pair);
   const [editOpen, setEditOpen] = useState(false);
   const [sentInvites, setSentInvites] = useState<string[]>([]);
   const [tabY, setTabY] = useState(0);
@@ -368,8 +373,11 @@ export default function UserProfile() {
       return false;
     }
     recordGift(user.id, g.id, 1);
-    // Live mode: their gift count and Vitrin are read again from the server, which now has this gift.
-    if (live) setReloads((n) => n + 1);
+    // Live mode: their gift count, Vitrin and our heart are read again from the server, which now has this gift.
+    if (live) {
+      setReloads((n) => n + 1);
+      reloadPair();
+    }
     bump('giftsSent', 1);
     addFanPoints(user.id, Math.ceil(g.price / 10), `Hediye gönderdin (${g.price} jeton)`);
     successHaptic();
@@ -528,9 +536,12 @@ export default function UserProfile() {
                     </View>
                   </Pressable>
                 ) : (
-                  <BondFrame bond={topBondShown} size={96}>
-                    <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
-                  </BondFrame>
+                  <>
+                    <BondFrame bond={topBondShown} size={96}>
+                      <Avatar uri={user.avatar} size={96} ring={user.vip && !topBondShown} />
+                    </BondFrame>
+                    {heart && <HeartPin level={heart.level} style={styles.heartPin} />}
+                  </>
                 )}
               </View>
               {isMe && pendingAvatar && <Text style={styles.reviewNote}>⏳ Yeni fotoğraf incelemede · şimdilik yalnızca sen görüyorsun</Text>}
@@ -621,6 +632,7 @@ export default function UserProfile() {
             <View style={styles.vSep} />
             <Stat n={giftCount} label="Hediye" onPress={() => setTab('onur')} />
           </View>
+          {heart && heart.level > 0 && <HeartCard heart={heart} me={{ uri: me.avatar, name: me.name }} them={{ uri: user.avatar, name: user.name }} />}
           {isBlocked && <Text style={{ color: colors.red, marginTop: 8 }}>Bu kullanıcıyı engelledin.</Text>}
           {!isMe && priv.status !== 'active' && (
             <Text style={styles.statusNote}>{priv.status === 'restricted' ? '⚠️ Bu hesap geçici olarak kısıtlı: arama, hediye ve oda daveti alamıyor.' : '⛔ Bu hesap askıya alındı.'}</Text>
@@ -985,7 +997,7 @@ export default function UserProfile() {
           </Pressable>
           <BarButton icon="chatbubble-ellipses" label="Mesaj" off={!can('message').ok} onPress={() => guard('message', () => router.push(`/sohbet/${user.id}`))} />
           {callsAvailable() && <BarButton icon="call" label="Ara" off={!can('voice').ok && !can('video').ok} onPress={() => (can('voice').ok || can('video').ok ? setSheet('call') : call('sesli'))} />}
-          {!callsAvailable() && pair && !blocked.has(user.id) && <BarButton icon="call" label="Ara" off={!pair.calls.voice.open && !pair.calls.video.open} onPress={() => setSheet('call')} />}
+          {liveCalls() && pair && !blocked.has(user.id) && <BarButton icon="call" label="Ara" off={!pair.calls.voice.open && !pair.calls.video.open} onPress={() => setSheet('call')} />}
           {giftable && <BarButton icon="gift" label="Hediye" highlight off={!can('gift').ok} onPress={() => guard('gift', () => setSheet('gift'))} />}
         </SafeAreaView>
       )}
@@ -1795,6 +1807,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark, edge }) => ({
   photo: { width: 110, height: 110, borderRadius: 12 },
   addPhoto: { backgroundColor: colors.card, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, alignItems: 'center', justifyContent: 'center', gap: 2 },
   removePhoto: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(8,15,30,0.75)', alignItems: 'center', justifyContent: 'center' },
+  heartPin: { position: 'absolute', right: -4, bottom: -2 },
   cameraBadge: { position: 'absolute', right: 2, bottom: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   reviewNote: { color: colors.gold, fontSize: 12, fontWeight: '700' },
   handle: { color: colors.textDim, fontSize: 14, fontWeight: '600' },

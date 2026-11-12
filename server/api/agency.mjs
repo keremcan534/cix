@@ -68,6 +68,7 @@ import {
   transferView,
 } from './agency-ops.mjs';
 import { PLAY_MONEY, everHadPlayMoney } from './wallet.mjs';
+import { myAssistant, resolveJoinCode } from './agency-assistants.mjs';
 
 /**
  * Commission is never paid out on a server that holds or held play money (test top-ups, test or sandbox
@@ -244,22 +245,27 @@ export const agencyRoutes = {
       transfer: tr.rowCount ? transferView(tr.rows[0], names) : null,
       agencies: ag.rows.map((a) => ({ ...card(a, x.s), viewer: viewerOf(x.acc, a), perms: [...permsOn(x.acc, a, x.s)] })),
       platform: [...x.acc.platform],
+      // My agency assistant card (agency-assistants.mjs): my share, my code, what I earned; null if I never was one.
+      assistant: await myAssistant(db, x.u.id),
     };
   },
 
+  /** An agency's code, or an agency assistant's own code (`assistant` names who invites; join with the same code). */
   async 'GET /api/agency/lookup'(req, url) {
     await auth(req);
-    const a = await agencyByCode(db, url.searchParams.get('code'));
+    const { agency: a, assistant } = await resolveJoinCode(db, url.searchParams.get('code'));
     if (a.status !== 'approved') throw new HttpError(404, 'Bu kodla aktif bir ajans yok');
     const p = a.parent_id ? await db.query('SELECT name FROM agencies WHERE id = $1', [a.parent_id]) : null;
-    return { agency: { id: a.id, name: a.name, code: a.code, level: a.level, parentName: p?.rows[0]?.name ?? null } };
+    return { agency: { id: a.id, name: a.name, code: a.code, level: a.level, parentName: p?.rows[0]?.name ?? null }, assistant: assistant ? { name: assistant.name } : null };
   },
 
   async 'POST /api/agency/join'(req) {
     const b = await readJson(req);
     return tx(async (c) => {
       const x = await ctx(c, req);
-      const a = await agencyByCode(c, b.code);
+      // An assistant's code joins their agency and records them as the one who brought this streamer.
+      const { agency: a, assistant } = await resolveJoinCode(c, b.code);
+      const invitedBy = assistant && assistant.userId !== x.u.id ? assistant.userId : null;
       const method = b.method ?? 'code';
       if (!['code', 'link', 'application'].includes(method)) bad('Geçersiz katılım yolu');
       if (a.status !== 'approved') throw new HttpError(409, 'Bu ajans şu an yayıncı kabul etmiyor');
@@ -271,14 +277,20 @@ export const agencyRoutes = {
       // agency (join_policy). A second account of the same person joins the first one's agency at once.
       const first = x.s.streamer_policy.one_agency_per_person ? await firstAgencyOfPerson(c, x.u.id) : null;
       if (method !== 'application' || !x.s.join_policy.requires_approval || (first && first.id !== a.id)) {
-        const m = await linkStreamer(c, x.u.id, a, method, x.u.id);
+        const m = await linkStreamer(c, x.u.id, a, method, x.u.id, null, new Date(), invitedBy);
         const to = m.agency_id === a.id ? a : await agencyRow(c, m.agency_id);
         if (to.id === a.id) await notice(c, a.id, 'request', `${x.u.name} davet kodunla ajansına katıldı`, '');
         return { membership: { agency: { id: to.id, name: to.name, code: to.code }, joinedAt: m.joined_at, method }, sameDevice: to.id !== a.id };
       }
       try {
         await c.query('SAVEPOINT j');
-        const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by) VALUES ($1,$2,'join',$3,$4,$2) RETURNING *", [a.id, x.u.id, method, await said(opt(b.note, 300, 'Not'), x, 'agency.join')]);
+        const r = await c.query("INSERT INTO agency_requests (agency_id, user_id, kind, method, note, created_by, invited_by) VALUES ($1,$2,'join',$3,$4,$2,$5) RETURNING *", [
+          a.id,
+          x.u.id,
+          method,
+          await said(opt(b.note, 300, 'Not'), x, 'agency.join'),
+          invitedBy,
+        ]);
         await c.query('RELEASE SAVEPOINT j');
         await notice(c, a.id, 'request', `${x.u.name} katılmak istiyor`, '');
         return { request: { id: Number(r.rows[0].id), status: 'pending', agency: { id: a.id, name: a.name } } };
@@ -297,7 +309,8 @@ export const agencyRoutes = {
       const r = await c.query("SELECT * FROM agency_requests WHERE id = $1 AND user_id = $2 AND kind = 'invite' AND status = 'pending' FOR UPDATE", [b.requestId, x.u.id]);
       if (!r.rowCount) throw new HttpError(404, 'Davet bulunamadı');
       const a = await agencyRow(c, r.rows[0].agency_id, true);
-      if (b.accept === true) await linkStreamer(c, x.u.id, a, 'invite', x.u.id, null, r.rows[0].created_at);
+      // Whoever sent the invite brought this streamer (an agency assistant gets their share from it).
+      if (b.accept === true) await linkStreamer(c, x.u.id, a, 'invite', x.u.id, null, r.rows[0].created_at, r.rows[0].created_by);
       await c.query('UPDATE agency_requests SET status = $2, decided_by = $3, decided_at = now() WHERE id = $1', [r.rows[0].id, b.accept === true ? 'approved' : 'rejected', x.u.id]);
       return { status: b.accept === true ? 'approved' : 'rejected' };
     });
@@ -377,7 +390,8 @@ export const agencyRoutes = {
                   coalesce(sum(amount) FILTER (WHERE created_at > now() - interval '60 days' AND created_at <= now() - interval '30 days'), 0) AS prev_month,
                   coalesce(sum(amount) FILTER (WHERE kind = 'direct' AND created_at > now() - interval '30 days'), 0) AS direct30,
                   coalesce(sum(amount) FILTER (WHERE kind = 'difference' AND created_at > now() - interval '30 days'), 0) AS difference30,
-                  coalesce(sum(amount) FILTER (WHERE kind = 'transition' AND created_at > now() - interval '30 days'), 0) AS transition30
+                  coalesce(sum(amount) FILTER (WHERE kind = 'transition' AND created_at > now() - interval '30 days'), 0) AS transition30,
+                  coalesce(sum(amount) FILTER (WHERE kind = 'assistant' AND created_at > now() - interval '30 days'), 0) AS assistant30
              FROM agency_ledger WHERE agency_id = $1`,
           [a.id],
         )
@@ -538,7 +552,7 @@ export const agencyRoutes = {
       return { csv: [head.join(','), ...lines].join('\n'), rows: rows.length };
     }
     const sum = (k) => d4(rows.filter((x) => x.kind === k).reduce((s, x) => s + x.amount, 0));
-    return { rows, totals: { direct: sum('direct'), difference: sum('difference'), transition: sum('transition'), fees: sum('transfer_fee'), adjustments: d4(sum('adjustment') + sum('reversal')) } };
+    return { rows, totals: { direct: sum('direct'), difference: sum('difference'), transition: sum('transition'), assistant: sum('assistant'), fees: sum('transfer_fee'), adjustments: d4(sum('adjustment') + sum('reversal')) } };
   },
 
   async 'GET /api/agency/performance'(req, url) {
@@ -593,7 +607,8 @@ export const agencyRoutes = {
     let earn = [];
     if (permsOn(x.acc, a, x.s).has('reports.commission')) {
       const r = await db.query(
-        `SELECT ${bucket.replace('%s', 'created_at')} AS b, coalesce(sum(amount) FILTER (WHERE kind = 'direct'), 0) AS direct, coalesce(sum(amount) FILTER (WHERE kind = 'difference'), 0) AS difference,
+        // direct: what the agency keeps of its own streamers' commission, after an agency assistant's share.
+        `SELECT ${bucket.replace('%s', 'created_at')} AS b, coalesce(sum(amount) FILTER (WHERE kind IN ('direct', 'assistant')), 0) AS direct, coalesce(sum(amount) FILTER (WHERE kind = 'difference'), 0) AS difference,
                 coalesce(sum(amount) FILTER (WHERE kind = 'transition'), 0) AS transition, coalesce(sum(amount), 0) AS total
            FROM agency_ledger WHERE agency_id = $1 AND created_at >= $2 AND created_at < $3 GROUP BY 1 ORDER BY 1`,
         [a.id, from, to],
@@ -682,7 +697,7 @@ export const agencyRoutes = {
       const note = await said(opt(b.note, 300, 'Not'), x, 'agency.request');
       const r = await c.query("SELECT * FROM agency_requests WHERE id = $1 AND agency_id = $2 AND kind = 'join' AND status = 'pending' FOR UPDATE", [b.requestId, a.id]);
       if (!r.rowCount) throw new HttpError(404, 'Başvuru bulunamadı');
-      if (b.approve === true) await linkStreamer(c, r.rows[0].user_id, a, r.rows[0].method, x.u.id, null, r.rows[0].created_at);
+      if (b.approve === true) await linkStreamer(c, r.rows[0].user_id, a, r.rows[0].method, x.u.id, null, r.rows[0].created_at, r.rows[0].invited_by);
       await c.query('UPDATE agency_requests SET status = $2, decided_by = $3, decided_at = now() WHERE id = $1', [r.rows[0].id, b.approve === true ? 'approved' : 'rejected', x.u.id]);
       await audit(c, x.u.id, b.approve === true ? 'request.approve' : 'request.reject', 'agency', a.id, { after: { user: r.rows[0].user_id }, reason: note });
       return { status: b.approve === true ? 'approved' : 'rejected' };

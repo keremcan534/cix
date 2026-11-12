@@ -1,10 +1,12 @@
 // Yönetim › Etkinlikler: the review queue of event applications (approve, or refuse with the reason the owner
 // reads), every event by state with a search, taking one down with a reason, and the event types (add, rename,
-// reorder, close, delete an unused one). The limits (who may apply, length, places, grace, strikes) are in Canlı
-// ayarlar › Etkinlikler. Everything is the server's (server/api/events.mjs, admin role).
+// reorder, close, delete an unused one), and the report of every room's events over 7, 30 or 90 days
+// (components/events/event-report). The limits (who may apply, length, places, grace, strikes, reminders) are in
+// Canlı ayarlar › Etkinlikler. Everything is the server's (server/api/events.mjs, admin role).
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { PeriodChips, ReportBody } from '@/components/events/event-report';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
@@ -14,7 +16,7 @@ import { makeStyles, space, useTheme } from '@/theme';
 
 import { Filters, ItemCard, Line, LoadState, Notice, Quote, SectionScroll, StatusPill, confirmThen, useAdmin, useLoad } from './parts';
 
-type View_ = 'review' | 'upcoming' | 'live' | 'ended' | 'rejected' | 'cancelled' | 'all' | 'types';
+type View_ = 'review' | 'upcoming' | 'live' | 'ended' | 'rejected' | 'cancelled' | 'all' | 'types' | 'report';
 const VIEWS: [View_, string][] = [
   ['review', 'İnceleme'],
   ['upcoming', 'Yaklaşan'],
@@ -24,6 +26,7 @@ const VIEWS: [View_, string][] = [
   ['cancelled', 'İptal'],
   ['all', 'Tümü'],
   ['types', 'Türler'],
+  ['report', 'Rapor'],
 ];
 const REJECT_HINTS = ['Kapak görseli uygun değil.', 'Etkinlik adı ya da açıklaması kurallara aykırı.', 'Saat ve süre bilgisi eksik ya da hatalı.', 'Aynı içerikte başka bir etkinlik var.'];
 
@@ -36,11 +39,11 @@ export function EventsAdminSection() {
     <View style={{ flex: 1 }}>
       <View style={s.top}>
         <Filters value={view} options={VIEWS} onChange={setView} />
-        {view !== 'types' && (
+        {view !== 'types' && view !== 'report' && (
           <TextInput value={q} onChangeText={setQ} placeholder="Etkinlik, oda ya da düzenleyen ara" placeholderTextColor={colors.textDim} style={s.search} maxLength={40} />
         )}
       </View>
-      {view === 'types' ? <TypesView /> : <ListView status={view} q={q.trim()} />}
+      {view === 'types' ? <TypesView /> : view === 'report' ? <ReportView /> : <ListView status={view} q={q.trim()} />}
     </View>
   );
 }
@@ -132,6 +135,20 @@ function ListView({ status, q }: { status: string; q: string }) {
           </View>
         )}
       </LoadState>
+    </SectionScroll>
+  );
+}
+
+/** Every room's events over a period. */
+function ReportView() {
+  const [days, setDays] = useState(30);
+  const load = useLoad(() => api.adminEventReport(days), [days]);
+  return (
+    <SectionScroll load={load}>
+      <View style={{ gap: space.md }}>
+        <PeriodChips value={days} onChange={setDays} />
+        <LoadState load={load}>{(r) => <ReportBody r={r} />}</LoadState>
+      </View>
     </SectionScroll>
   );
 }

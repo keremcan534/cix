@@ -128,6 +128,8 @@ export type Gift = {
 
 /** A room invite sent in a chat: drawn as a card that opens the room. */
 export type RoomInviteCard = { roomId: string; title: string; cover: string };
+/** An Etkinlik Merkezi event sent in a chat: drawn as a card that opens the event. */
+export type EventShareCard = { id: number; title: string; startsAt?: string | null };
 export type Conversation = {
   id: string;
   userId: string;
@@ -142,6 +144,7 @@ export type Conversation = {
     /** Live mode: the server's message id, so the same message is never imported twice. */
     sid?: number;
     room?: RoomInviteCard;
+    event?: EventShareCard;
     /** Live mode: a photo in the chat (its storage address); its text is the caption ('Fotoğraf' when there is none). */
     image?: string;
     /** Live mode: the request id sent with it (a retry reuses it, so the server keeps one copy). */

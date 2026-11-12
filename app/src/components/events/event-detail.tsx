@@ -1,18 +1,22 @@
 // Etkinlik Merkezi: one event. What it is, when and where, its rules, and what I can do now: reserve a place (or
 // give it back) before it starts, join its room while it runs, go to the organiser's room after. The room's owner
-// and Süper Yönetici also start and end it, see who reserved and came, and the owner edits or cancels it. Every
-// action is the server's answer (server/api/events.mjs); the demo keeps a place on this screen only.
+// and Süper Yönetici also start and end it, see who reserved and came, and the owner edits or cancels it. With a
+// place I can turn its reminders off (all of them are in Ayarlar › Bildirimler); anyone can share it (Paylaş:
+// components/events/event-share). Opened from a link, a removed or ended event says so. Every action is the
+// server's answer (server/api/events.mjs); the demo keeps a place and its reminder on this screen only.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EventCover, StatePill } from '@/components/events/event-card';
+import { EventShareSheet } from '@/components/events/event-share';
+import { ListGroup, ListSwitch } from '@/components/list';
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { showAlert } from '@/lib/alert';
 import * as api from '@/lib/api';
-import { elapsedText, lookOf, placesText, spanText, whenText } from '@/lib/events';
+import { END_TEXT, REMINDER_KINDS, elapsedText, lookOf, placesText, reminderLine, spanText, whenText } from '@/lib/events';
 import { SCRIM, makeStyles, useTheme } from '@/theme';
 
 type Props = {
@@ -36,6 +40,10 @@ const demoDetail = (e: api.EventItem): api.EventDetail => ({
   can: { edit: false, cancel: false, start: false, end: false, reserve: e.state === 'upcoming' && e.mine !== 'confirmed', people: false },
   startFrom: e.startsAt,
   startUntil: e.startsAt,
+  remind: e.mine === 'confirmed' ? true : null,
+  remindersOff: false,
+  reminders: REMINDER_KINDS,
+  removed: false,
 });
 
 const ACTION_LABEL: Record<string, string> = {
@@ -59,6 +67,7 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState(false);
+  const [share, setShare] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(() => {
@@ -97,10 +106,16 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
     if (!e) return;
     if (demo) {
       onDemoReserve(e.id, true);
-      setE({ ...e, mine: 'confirmed', reserved: e.reserved + 1, can: { ...e.can, reserve: false } });
+      setE({ ...e, mine: 'confirmed', reserved: e.reserved + 1, remind: true, can: { ...e.can, reserve: false } });
       return;
     }
     act('Yer ayırtılamadı', () => api.reserveEvent(e.id), 'Yerin ayrıldı. Etkinlik başladığında odasına girebilirsin.');
+  };
+  /** This event's reminders on or off (my place only). */
+  const remind = (on: boolean) => {
+    if (!e) return;
+    if (demo) return setE({ ...e, remind: on });
+    act('Hatırlatma değişmedi', () => api.remindEvent(e.id, on));
   };
   const unreserve = () => {
     if (!e) return;
@@ -136,6 +151,10 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
   };
 
   const look = lookOf(e?.theme ?? 'sade');
+  // Reminders: an upcoming event I have a place at, on a server that sends any.
+  const kinds = e?.reminders ?? [];
+  const showRemind = !!e && e.state === 'upcoming' && e.mine === 'confirmed' && typeof e.remind === 'boolean' && kinds.length > 0;
+  const shareable = !!e && (e.state === 'upcoming' || e.state === 'live');
   const start = e ? new Date(e.startsAt).getTime() : 0;
   const full = !!e && e.capacity !== null && e.reserved >= e.capacity && e.mine !== 'confirmed';
 
@@ -189,6 +208,11 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
                   )}
                 </View>
                 <Text style={styles.title}>{e.title}</Text>
+                {shareable && (
+                  <View style={styles.actions}>
+                    <Button title="Paylaş" icon="share-social-outline" small variant="tonal" onPress={() => setShare(true)} />
+                  </View>
+                )}
 
                 {e.state === 'live' && e.startedAt && (
                   <View style={styles.liveBox}>
@@ -199,8 +223,21 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
                 {e.state === 'rejected' && e.rejectReason && <Notice icon="alert-circle" tone="danger" title="Başvuru reddedildi" text={`${e.rejectReason} Düzenleyip yeniden gönderebilirsin.`} />}
                 {e.state === 'review' && <Notice icon="hourglass-outline" title="İncelemede" text="Yönetim inceledikten sonra yayınlanır; sonucu Similar Ekibi mesajlarında görürsün." />}
                 {e.state === 'draft' && <Notice icon="document-outline" title="Taslak" text="Henüz gönderilmedi. Düzenleyip incelemeye gönderebilirsin." />}
-                {e.state === 'cancelled' && <Notice icon="close-circle" tone="danger" title="Etkinlik iptal edildi" text={e.cancelReason ?? 'Düzenleyen etkinliği iptal etti.'} />}
+                {e.state === 'cancelled' &&
+                  (e.removed ? (
+                    <Notice icon="remove-circle" tone="danger" title="Yayından kaldırıldı" text={e.cancelReason ?? 'Etkinlik yönetim tarafından kaldırıldı.'} />
+                  ) : (
+                    <Notice icon="close-circle" tone="danger" title="Etkinlik iptal edildi" text={e.cancelReason ?? 'Düzenleyen etkinliği iptal etti.'} />
+                  ))}
                 {e.state === 'ended' && e.endReason === 'not_started' && <Notice icon="alert-circle-outline" tone="danger" title="Başlatılmadı" text="Etkinlik zamanında başlatılmadığı için sona erdi." />}
+                {e.state === 'ended' && e.endReason !== 'not_started' && (
+                  <Notice icon="flag-outline" title="Etkinlik sona erdi" text={`${e.endReason ? END_TEXT[e.endReason] : 'Bitti'} · ${e.came.toLocaleString('tr-TR')} katılımcı`} />
+                )}
+                {showRemind && (
+                  <ListGroup footer={e.remindersOff ? 'Tüm etkinlik hatırlatmaların Ayarlar › Bildirimler’de kapalı.' : (reminderLine(kinds) ?? undefined)}>
+                    <ListSwitch icon="notifications-outline" title="Bu etkinliği hatırlat" value={!!e.remind && !e.remindersOff} disabled={busy || !!e.remindersOff} onChange={remind} />
+                  </ListGroup>
+                )}
 
                 <View style={styles.grid}>
                   <Info icon="calendar-outline" label="Başlangıç" value={whenText(e.startsAt, now)} />
@@ -275,6 +312,7 @@ export function EventDetailView({ id, demo, onDemoReserve, onClose, onChanged, o
         )}
       </View>
       {people && e && <PeopleSheet id={e.id} onClose={() => setPeople(false)} />}
+      {share && e && <EventShareSheet e={e} onClose={() => setShare(false)} />}
     </Modal>
   );
 }

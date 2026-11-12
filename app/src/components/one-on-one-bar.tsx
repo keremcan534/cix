@@ -1,16 +1,19 @@
 // 1v1 in a chat with a real person (lib/live/one-on-one): what the two of them are to each other on the server
-// (the message price, the heart level, which calls are open), the heart bar under the chat's header, the call
-// buttons in the header, and a gift sent from the chat. The server decides and charges; this only shows it.
+// (the message price, the heart level, which calls are open), the heart bar under the chat's header (drawn in the
+// heart's look, components/heart-level), the call buttons in the header, and a gift sent from the chat. The server
+// decides and charges; this only shows it.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Icon3D } from '@/components/Icon3D';
+import { HeartGlyph, HeartLink } from '@/components/heart-level';
 import { ProfileGiftSheet } from '@/components/profile-gift-sheet';
 import { Text } from '@/components/text';
+import { intimacyOf } from '@/data/messages-ui';
 import { GIFTS, type Gift, type User } from '@/data/mock';
 import { showAlert } from '@/lib/alert';
+import { heartShare, heartTier, heartTitle, heartView, lvAt, nextLookText, type HeartView } from '@/lib/heart-tiers';
 import { liveGift, liveMode, message, toServer } from '@/lib/live';
 import { useLiveCatalog, visibleGifts } from '@/lib/live/catalog-live';
 import { loadPair, MODE_NAME, type CallGate, type CallMode, type Pair } from '@/lib/live/one-on-one';
@@ -40,12 +43,14 @@ export function usePair(peer: string, on: boolean) {
 /** A paid pair (a streamer and someone who isn't): the heart level matters, it opens the calls. */
 export const paidPair = (p: Pair | null): p is Pair => !!p && p.streamer !== p.meStreamer;
 
-/** "Lv.2’de", "Lv.3’te", "Lv.6’da": a heart level with the locative suffix its number takes. */
-const SUFFIX = ['’da', '’de', '’de', '’te', '’te', '’te', '’da', '’de', '’de', '’da'];
-const lvAt = (n: number) => `Lv.${n}${SUFFIX[n % 10]}`;
+/** The heart between me and `userId`: the server's (the pair, null until read) in a live build, the demo's sample one otherwise. */
+export function heartOf(userId: string, pair: Pair | null): HeartView | null {
+  if (liveMode()) return pair?.heart ?? null;
+  return userId === 'me' ? null : heartView(intimacyOf(userId));
+}
 
-/** The next thing the heart opens, in a few words. */
-export function nextUnlock(p: Pair) {
+/** The next thing the heart opens, in a few words; null once everything is open. */
+export function nextUnlock(p: Pair): string | null {
   const { level, voiceAt, videoAt, photoAt } = p.heart;
   const next = [
     { at: voiceAt, what: 'Sesli arama' },
@@ -54,27 +59,45 @@ export function nextUnlock(p: Pair) {
   ]
     .filter((x) => level < x.at)
     .sort((a, b) => a.at - b.at)[0];
-  return next ? `${next.what} ${lvAt(next.at)} açılır` : photoAt === undefined ? 'Sesli ve görüntülü arama açık' : 'Aramalar ve fotoğraf açık';
+  return next ? `${next.what} ${lvAt(next.at)} açılır` : null;
 }
 
-/** Under the chat's header: the heart level between the two of us, and what it opens next. */
-export function HeartBar({ pair }: { pair: Pair }) {
+/**
+ * Under the chat's header: the heart between the two of us in its look (from the pulse look on, our two photos with
+ * heartbeats travelling between them), its level, and what it opens next (a paid pair) or what its next look brings.
+ */
+export function HeartBar({ heart, pair, them }: { heart: HeartView; pair: Pair | null; them: User }) {
   const styles = useStyles();
-  const { points, level, next, floor } = pair.heart;
-  const share = next === null ? 1 : Math.max(0, Math.min(1, (points - floor) / Math.max(1, next - floor)));
+  const { colors } = useTheme();
+  const { me } = useApp();
+  const { points, level, next } = heart;
+  const tier = heartTier(level);
+  const paid = paidPair(pair);
+  const hint = (paid && nextUnlock(pair)) || nextLookText(level) || 'Kalbiniz en parlak hâlinde';
+  // Paid messages grow it too where messages are paid (and in the demo, where they cost coins).
+  const grows = paid || !liveMode() ? 'Hediye ve sohbet kalbi büyütür' : 'Hediyeler kalbi büyütür';
+  const linked = tier.line === 'one' || tier.line === 'both';
   return (
-    <View style={styles.heart} accessibilityLabel={`Kalp seviyesi ${level}. ${nextUnlock(pair)}`}>
-      <Icon3D name="heart" size={22} />
+    <View style={[styles.heart, tier.rim && { borderColor: `${tier.rim}99` }]} accessible accessibilityLabel={`${heartTitle(level)}. ${hint}`}>
+      {linked ? (
+        <View style={styles.link}>
+          <HeartLink level={level} me={{ uri: me.avatar, name: me.name }} them={{ uri: them.avatar, name: them.name }} size="sm" />
+        </View>
+      ) : (
+        <HeartGlyph level={level} size={22} />
+      )}
       <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.heartRow}>
-          <Text style={styles.heartLevel}>Kalp Lv.{level}</Text>
-          <Text style={styles.heartPoints}>{next === null ? `${fmt(points)} · en yüksek seviye` : `${fmt(points)} / ${fmt(next)}`}</Text>
+          <Text style={styles.heartLevel} numberOfLines={1}>
+            {heartTitle(level)}
+          </Text>
+          <Text style={styles.heartPoints}>{next === null ? fmt(points) : `${fmt(points)} / ${fmt(next)}`}</Text>
         </View>
         <View style={styles.track}>
-          <View style={[styles.fill, { width: `${Math.round(share * 100)}%` }]} />
+          <View style={[styles.fill, { width: `${Math.round(heartShare(heart) * 100)}%`, backgroundColor: tier.id === 'none' ? colors.pink : tier.tint }]} />
         </View>
         <Text style={styles.heartHint} numberOfLines={1}>
-          {nextUnlock(pair)} · Hediye ve sohbet kalbi büyütür
+          {hint} · {grows}
         </Text>
       </View>
     </View>
@@ -183,10 +206,11 @@ const useStyles = makeStyles(({ colors, dark }) => ({
     borderWidth: 1,
     borderColor: dark ? 'rgba(255,101,118,0.28)' : 'rgba(200,48,74,0.18)',
   },
+  link: { width: 96 },
   heartRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
-  heartLevel: { color: colors.pink, fontWeight: '800', fontSize: 13 },
+  heartLevel: { color: colors.pink, fontWeight: '800', fontSize: 13, flexShrink: 1 },
   heartPoints: { color: colors.textDim, fontSize: 11, fontWeight: '600' },
   track: { height: 5, borderRadius: 3, backgroundColor: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)', overflow: 'hidden' },
-  fill: { height: 5, borderRadius: 3, backgroundColor: colors.pink },
+  fill: { height: 5, borderRadius: 3 },
   heartHint: { color: colors.textDim, fontSize: 11 },
 }));

@@ -31,6 +31,9 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
     // An event's review result, cancel or removal (server/api/events.mjs): Etkinlik Merkezi on that event.
     case 'event':
       return s('id') && /^\d{1,12}$/.test(s('id')!) ? (`/?etkinlik=${s('id')}` as Href) : '/';
+    // Named, changed or ended as an agency assistant (server/api/agency-assistants.mjs): the agency screen, my card there.
+    case 'agency_assistant':
+      return '/ajans';
     // A call: the app opens and its incoming call card rings; a missed one shows in the notifications.
     case 'call':
       return data.missed ? '/bildirimler' : null;

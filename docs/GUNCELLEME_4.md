@@ -2,7 +2,7 @@
 
 Sahibin gönderdiği "güncelleme 4" belgesinin maddeleri ve durumu. Sahibin kararları: önce hatalar ve küçük düzeltmeler, sonra ekranlar ve kurallar; oda, son yetkili ayrıldıktan 5 dakika sonra kapanır; patron koltuğunun rakamları Canlı ayarlar'dan değişir (varsayılan 25.000 jeton, 10 dakika). Belgedeki örnek ekranlar başka uygulamalardan; yalnızca işleyiş için kullanılır, ad, metin ve görünüm SimilarClub'ın kendisinin olur.
 
-**Durum:** Dalga 1 (2–11, 15, 18) ve Dalga 2 (1, 12, 13, 14, 16) yapıldı. Dalga 3 (17, 19) sırada.
+**Durum:** Dalga 1 (2–11, 15, 18) ve Dalga 2 (1, 12, 13, 14, 16) yapıldı. Dalga 3 (17, 19) yapıldı: 17 için `docs/AJANS_ASISTANI.md` (destekçi payı yok, çünkü jeton yüklemeleri ajansa komisyon yazmaz); 19 için kalp kademeleri `app/src/lib/heart-tiers.ts` içinde (Lv.0–10, altı kademe).
 
 | # | Madde | Dalga |
 |---|---|---|

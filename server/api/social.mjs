@@ -143,6 +143,8 @@ export async function eraseAccount(c, id, phone) {
     await c.query('DELETE FROM family_messages WHERE author = $1', [id]);
     // Their lines in agency groups (agency-chat.mjs).
     await c.query('DELETE FROM agency_messages WHERE author = $1', [id]);
+    // No longer an agency assistant (agency-assistants.mjs): no share from now on; the share records stay.
+    await c.query("UPDATE agency_assistants SET ended_at = now(), end_reason = 'deleted' WHERE user_id = $1 AND ended_at IS NULL", [id]);
     // Room social (room-social.mjs): their mic invites, poll votes and polls, and the follower invites they sent or
     // that were for their account.
     await c.query('DELETE FROM room_mic_invites WHERE from_user = $1 OR to_user = $1', [id]);
@@ -172,6 +174,10 @@ export async function eraseAccount(c, id, phone) {
     // Arkadaşını Getir (referrals.mjs): my code and who entered whose code, both ways; the coins paid stay in the ledger.
     await c.query('DELETE FROM referrals WHERE invitee_id = $1 OR inviter_id = $1', [id]);
     await c.query('DELETE FROM referral_codes WHERE user_id = $1', [id]);
+    // Etkinlik Merkezi (events.mjs): the reminders sent to them and their choice to have none; their places stay as the
+    // events' records (the account reads as deleted).
+    await c.query('DELETE FROM event_reminders_sent WHERE user_id = $1', [id]);
+    await c.query('DELETE FROM event_reminder_optout WHERE user_id = $1', [id]);
     // Oyun Salonu rounds (casino.mjs); the ledger keeps the money trail. Room game tables they sit at or opened.
     await c.query('DELETE FROM casino_rounds WHERE user_id = $1', [id]);
     await c.query('DELETE FROM room_tables WHERE $1 = ANY(seats) OR opened_by = $1', [id]);

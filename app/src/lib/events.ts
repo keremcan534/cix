@@ -1,12 +1,13 @@
 // Etkinlik Merkezi in the app: how each theme looks (until its art is drawn, docs/GORSEL_URETIM_LISTESI.md § 20),
 // the filter choices, and the times written the way people say them. The server decides every state
 // (server/api/events.mjs); the themes' names and room levels are its (server/api/event-rules.mjs THEMES, kept
-// equal by tests/events.test.ts). The demo (no server) shows sample events built from the demo rooms.
+// equal by tests/events.test.ts). Also the reminder sentence, the words an event is shared with, and the report's
+// numbers as shown (Aşama 4). The demo (no server) shows sample events built from the demo rooms.
 //
 // Pure functions only (no React, no storage).
 import type Ionicons from '@expo/vector-icons/Ionicons';
 
-import type { EventItem, EventTheme } from '@/lib/api';
+import type { EventItem, EventReport, EventTheme, ReminderKind } from '@/lib/api';
 
 type Glyph = keyof typeof Ionicons.glyphMap;
 
@@ -111,6 +112,64 @@ export function placesText(e: Pick<EventItem, 'reserved' | 'capacity' | 'reserva
   if (!e.reservation) return 'Yer ayırtmadan katılım';
   if (e.capacity && e.reserved >= e.capacity) return 'Kontenjan doldu';
   return e.capacity ? `${e.reserved} / ${e.capacity} yer` : `${e.reserved} kişi yer ayırttı`;
+}
+
+// --- Reminders, sharing, reports (Aşama 4) ----------------------------------------------------------------------
+/** The reminders, as the server names them (server/api/event-rules.mjs REMINDER_KINDS / REMINDER_LABEL). */
+export const REMINDER_KINDS: ReminderKind[] = ['hour', 'quarter', 'start'];
+export const REMINDER_LABEL: Record<ReminderKind, string> = { hour: '1 saat önce', quarter: '15 dakika önce', start: 'Başlarken' };
+/** The report's periods, in days (server/api/event-rules.mjs REPORT_DAYS). */
+export const REPORT_DAYS = [7, 30, 90];
+
+/** When the reminders come, in one sentence ("1 saat ve 15 dakika önce, bir de başlarken"), or null for none. */
+export function reminderLine(kinds: readonly ReminderKind[]): string | null {
+  const before = (['hour', 'quarter'] as const).filter((k) => kinds.includes(k)).map((k) => (k === 'hour' ? '1 saat' : '15 dakika'));
+  const start = kinds.includes('start');
+  if (!before.length) return start ? 'Etkinlik başlarken bildirim gelir.' : null;
+  return `Başlamadan ${before.join(' ve ')} önce${start ? ', bir de başlarken' : ''} bildirim gelir.`;
+}
+
+/** The app path that opens an event (the scheme link and the web link are lib/links'); the app reads it on Odalar. */
+export const eventPath = (id: number) => `?etkinlik=${id}`;
+/** The share sheet's line: what, when and where. */
+export const eventShareText = (e: Pick<EventItem, 'title' | 'startsAt' | 'room'>, now = Date.now()) => `Similar Club’da “${e.title}” etkinliği: ${whenText(e.startsAt, now)}, “${e.room.title}” odasında. Sen de gel!`;
+/**
+ * The message sent to a friend: no link (links don't pass the contact filter in messages). Newer apps draw the event's
+ * card under it; older ones show these words, and the title finds it in Etkinlik Alanı.
+ */
+export const eventMessageText = (e: Pick<EventItem, 'title' | 'startsAt' | 'room'>, now = Date.now()) => `📅 Seni “${e.title}” etkinliğine bekliyorum! ${whenText(e.startsAt, now)}, “${e.room.title}” odasında.`;
+
+/** A rate (0–1) as "%67", or "—" when there is none. */
+export const rateText = (r: number | null) => (r === null ? '—' : `%${Math.round(r * 100)}`);
+/** The report's headline numbers, in the order they are shown. */
+export function reportTiles(r: EventReport): [string, string][] {
+  const n = (x: number) => x.toLocaleString('tr-TR');
+  return [
+    ['Etkinlik', n(r.events)],
+    ['Onaylanan', n(r.approved)],
+    ['Reddedilen', n(r.rejected)],
+    ['İptal edilen', n(r.cancelled)],
+    ['Yer ayırtma', n(r.reservations)],
+    ['Katılımcı', n(r.participants)],
+    ['Katılım oranı', rateText(r.attendanceRate)],
+    ['Ortalama katılım', r.avgParticipants === null ? '—' : r.avgParticipants.toLocaleString('tr-TR')],
+  ];
+}
+/** How events of the period ended, the non-zero ones, in a fixed order. */
+export const END_TEXT: Record<keyof EventReport['ends'], string> = {
+  owner: 'Düzenleyen bitirdi',
+  time: 'Süresi doldu',
+  room_closed: 'Oda kapandı',
+  not_started: 'Zamanında başlatılmadı',
+  admin: 'Yönetim sonlandırdı',
+};
+export const endRows = (r: EventReport): [string, number][] => (Object.keys(END_TEXT) as (keyof EventReport['ends'])[]).filter((k) => r.ends[k] > 0).map((k) => [END_TEXT[k], r.ends[k]]);
+/** One start or end record: "Başladı", "Bitti · Süresi doldu", "Başlatılmadı". */
+export function recordText(x: EventReport['records'][number]): string {
+  if (x.action === 'start') return 'Başladı';
+  if (x.action === 'not_started') return 'Başlatılmadı';
+  const why = x.reason && x.reason in END_TEXT ? END_TEXT[x.reason as keyof EventReport['ends']] : null;
+  return why ? `Bitti · ${why}` : 'Bitti';
 }
 
 /** The first start the form offers: the next quarter hour past the earliest allowed time. */

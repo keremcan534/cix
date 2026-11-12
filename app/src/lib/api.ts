@@ -606,7 +606,9 @@ export type RoomRules = {
 export type RoomMember = UserCard & { since: string };
 export type RoomMembers = { members: RoomMember[]; total: number; cap: number; mine: 'owner' | 'member' | 'pending' | null; joinMode: RoomRules['joinMode']; canManage: boolean; pending: RoomMember[] };
 /** `image`: a photo in the chat (its storage address), null for text only. */
-export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; createdAt: string; readAt: string | null };
+export type DirectMessage = { id: number; from: string; to: string; text: string; image?: string | null; event?: SharedEvent; createdAt: string; readAt: string | null };
+/** An event sent in a message (Etkinlik Merkezi "Arkadaşına gönder"); older servers never send it. */
+export type SharedEvent = { id: number; title: string | null; startsAt: string | null };
 export type ServerConversation = { user: UserCard; last: DirectMessage; unread: number };
 export type ServerLock = { id: number; amount: number; channel: string; channelLabel: string; unlockAt: string; createdAt: string; from: { id: string; name: string } | null; gift: { id: string; count: number } | null };
 export type ServerEarnings = { diamonds: number; withdrawable: number; locked: number; lockDays: { store: number; jeton: number }; locks: ServerLock[] };
@@ -772,7 +774,15 @@ export type EventDetail = EventItem & {
   startFrom: string;
   startUntil: string;
   history?: { action: string; by: string; at: string; detail: Record<string, unknown> }[];
+  /** Aşama 4 (older servers leave them out): this place's reminders (null without a confirmed place), every event's
+   *  reminders off (Ayarlar), the kinds the platform sends, and taken down by the platform. */
+  remind?: boolean | null;
+  remindersOff?: boolean;
+  reminders?: ReminderKind[];
+  removed?: boolean;
 };
+/** The reminders a place gets (server/api/event-rules.mjs REMINDER_KINDS). */
+export type ReminderKind = 'hour' | 'quarter' | 'start';
 export type EventCategory = { id: string; name: string; icon: string; theme: string };
 export type EventTheme = { id: string; name: string; minLevel: number };
 export type EventMeta = {
@@ -822,6 +832,34 @@ export const endEvent = (id: number) => eventAct('/api/events/end', { id });
 export const reserveEvent = (id: number) => eventAct('/api/events/reserve', { id });
 export const unreserveEvent = (id: number) => eventAct('/api/events/unreserve', { id });
 export const eventHere = (id: number) => call<{ counted: boolean }>('POST', '/api/events/here', { id });
+export const remindEvent = (id: number, on: boolean) => eventAct('/api/events/remind', { id, on });
+/** My reminders for every event (Ayarlar › Bildirimler › Etkinlik hatırlatmaları), and the kinds sent. */
+export const eventReminders = () => call<{ on: boolean; kinds: ReminderKind[] }>('GET', '/api/events/reminders');
+export const setEventReminders = (on: boolean) => call<{ on: boolean; kinds: ReminderKind[] }>('POST', '/api/events/reminders', { on });
+/** The report of a period (server/api/events.mjs report): applications, places, who came, how events ended. */
+export type EventReport = {
+  days: number;
+  since: string;
+  events: number;
+  approved: number;
+  rejected: number;
+  cancelled: number;
+  review: number;
+  started: number;
+  reservations: number;
+  attended: number;
+  missed: number;
+  participants: number;
+  /** Came of those with a place, among the events that ended (0–1), or null. */
+  attendanceRate: number | null;
+  avgParticipants: number | null;
+  categories: { id: string; name: string; events: number; reservations: number; participants: number }[];
+  ends: Record<'owner' | 'time' | 'room_closed' | 'not_started' | 'admin', number>;
+  records: { event: { id: number; title: string }; room: string; action: 'start' | 'end' | 'not_started'; reason: string | null; by: string; at: string }[];
+};
+/** The rooms I own (one of them with `room`). */
+export const eventReport = (days: number, room?: string) =>
+  call<{ report: EventReport; rooms: { id: string; title: string; closed: boolean }[] }>('GET', `/api/events/report?${queryOf({ days, room })}`);
 export type AdminEvent = EventItem & { rules: string; submittedAt: string | null; rejectReason: string | null };
 export const adminEvents = (status: string, q = '', skip = 0) =>
   call<{ events: AdminEvent[]; counts: { review: number; upcoming: number; live: number }; more: boolean }>('GET', `/api/admin/events?${queryOf({ status, q, skip })}`);
@@ -832,6 +870,7 @@ export const adminEventCategories = () => call<{ categories: AdminEventCategory[
 export const saveEventCategory = (c: Partial<AdminEventCategory> & { name: string }) =>
   call<{ category: AdminEventCategory }>('POST', '/api/admin/events/categories', c).then((r) => r.category);
 export const removeEventCategory = (id: string) => call<{ removed: boolean }>('POST', '/api/admin/events/categories/remove', { id });
+export const adminEventReport = (days: number) => call<{ report: EventReport }>('GET', `/api/admin/events/report?days=${days}`).then((r) => r.report);
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
 export type ServerBond = {
@@ -897,8 +936,8 @@ export const casinoReport = () => call<CasinoReport>('GET', '/api/admin/casino/r
 export const saveLuckyConfig = (config: ServerLuckyConfig, version: number) =>
   call<{ config: ServerLuckyConfig; version: number; updatedAt: string }>('POST', '/api/admin/lucky/config', { config, version });
 
-export const sendDm = (to: string, text: string, ref = newRef(), image?: string) =>
-  call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref, ...(image && { image }) }).then((r) => r.message);
+export const sendDm = (to: string, text: string, ref = newRef(), image?: string, event?: number) =>
+  call<{ message: DirectMessage; replay: boolean }>('POST', '/api/messages', { to, text, ref, ...(image && { image }), ...(event && { event }) }).then((r) => r.message);
 export const dmThread = (peer: string) => call<{ messages: DirectMessage[] }>('GET', `/api/messages?with=${encodeURIComponent(peer)}`).then((r) => r.messages);
 export const conversations = () => call<{ conversations: ServerConversation[] }>('GET', '/api/conversations').then((r) => r.conversations);
 export const markDmRead = (peer: string) => call<{ read: number }>('POST', '/api/messages/read', { with: peer });
@@ -1279,7 +1318,15 @@ export type LiveKey =
 /** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
 export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes';
 /** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */
-export type EventKey = 'event_min_room_level' | 'event_min_lead_minutes' | 'event_max_minutes' | 'event_max_capacity' | 'event_grace_minutes' | 'event_strike_limit' | 'event_block_days';
+export type EventKey =
+  | 'event_min_room_level'
+  | 'event_min_lead_minutes'
+  | 'event_max_minutes'
+  | 'event_max_capacity'
+  | 'event_grace_minutes'
+  | 'event_strike_limit'
+  | 'event_block_days'
+  | 'event_reminders_off';
 /** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */

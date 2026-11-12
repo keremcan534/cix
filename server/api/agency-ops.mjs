@@ -112,9 +112,11 @@ export async function firstAgencyOfPerson(c, userId) {
 /**
  * Links a streamer to an agency. The partial unique index makes a second open link impossible. A streamer who
  * joins by their own choice must be eligible and not held; a second account of the same person goes to the
- * agency of the first (the row returned says where it went).
+ * agency of the first (the row returned says where it went). `invitedBy`: who brought them (the sender of the
+ * invite they accepted, or the agency assistant whose code they used), kept only for the agency it was for.
  */
-export async function linkStreamer(c, streamerId, agency, method, actor, transferId = null, at = new Date()) {
+export async function linkStreamer(c, streamerId, agency, method, actor, transferId = null, at = new Date(), invitedBy = null) {
+  const wanted = agency.id;
   if (agency.status !== 'approved') throw new HttpError(409, 'Bu ajans şu an yayıncı kabul etmiyor');
   const { values: s } = await settingsAt(c);
   const st = await streamerState(c, streamerId, s, at);
@@ -131,7 +133,8 @@ export async function linkStreamer(c, streamerId, agency, method, actor, transfe
   if (owner.rowCount && agency.owner_id !== streamerId) throw new HttpError(409, 'Ajans yöneticisi başka bir ajansa yayıncı olarak bağlanamaz');
   try {
     await c.query('SAVEPOINT link');
-    const r = await c.query('INSERT INTO agency_streamers (streamer_id, agency_id, method, transfer_id, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *', [streamerId, agency.id, method, transferId, actor]);
+    const by = invitedBy && invitedBy !== streamerId && agency.id === wanted ? invitedBy : null;
+    const r = await c.query('INSERT INTO agency_streamers (streamer_id, agency_id, method, transfer_id, created_by, invited_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [streamerId, agency.id, method, transferId, actor, by]);
     await c.query('RELEASE SAVEPOINT link');
     await c.query("UPDATE agency_requests SET status = 'cancelled', decided_at = now() WHERE user_id = $1 AND status = 'pending' AND agency_id <> $2", [streamerId, agency.id]);
     await audit(c, actor, 'streamer.link', 'streamer', streamerId, { after: { agency: agency.id, method } });
