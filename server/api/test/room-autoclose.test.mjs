@@ -108,8 +108,10 @@ describe('Yetkilisiz oda', () => {
   test('LiveKit cevap vermezse sayım baştan başlar, oda kapanmaz', async () => {
     voice.set(name, [guest.user.id]);
     await sweeps();
-    // LiveKit stops answering first: a sweep between the two lines would otherwise see an overdue count and close.
+    // LiveKit stops answering first, and every sweep that may have asked it before then finishes, so no sweep
+    // that still had a good answer sees the overdue count below.
     failPeople.add(name);
+    await sweeps();
     await ago(room, 6);
     await sweeps();
     assert.deepEqual(await rowOf(room), { no_staff_since: null, paused_at: null, closed_at: null });
