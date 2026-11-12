@@ -8,6 +8,7 @@ import { Text } from '@/components/text';
 import { Icon3D } from '@/components/Icon3D';
 import { ChoiceChips, ListBlock, ListGroup, ListRow, ListSwitch } from '@/components/list';
 import { AdminPanel } from '@/components/admin/admin-panel';
+import { AlphaVideoTestPanel } from '@/components/admin/alpha-video-test';
 import { LicensesSheet } from '@/components/licenses-sheet';
 import { Avatar, Header } from '@/components/ui';
 import { userById } from '@/data/mock';
@@ -172,6 +173,9 @@ export default function SettingsScreen() {
   const canCheckPhone = liveMode() && (verify.sms || verify.whatsapp);
   const staff = useStaffRole();
   const [adminOpen, setAdminOpen] = useState(false);
+  // Şeffaf video testi (POC): a live build's admins, and the offline demo (like its other demo admin tools).
+  const alphaTest = staff === 'admin' || (IS_DEMO && !liveMode());
+  const [alphaOpen, setAlphaOpen] = useState(false);
   const { colors, semantic } = useTheme();
   const styles = useStyles();
   const snoozed = settings.snoozeUntil > nowMs();
@@ -234,6 +238,9 @@ export default function SettingsScreen() {
               subtitle={staff === 'admin' ? 'Şikâyetler, yaptırımlar, destek, para çekme, ajans ödemeleri ve iadeler' : 'Yaptırımlar, itirazlar ve destek talepleri'}
               onPress={() => setAdminOpen(true)}
             />
+          )}
+          {alphaTest && (
+            <ListRow icon="film-outline" tone="neutral" title="Şeffaf video testi (POC)" subtitle="Yönetim · oda üstünde şeffaf video denemesi" onPress={() => setAlphaOpen(true)} />
           )}
         </ListGroup>
 
@@ -542,6 +549,7 @@ export default function SettingsScreen() {
       <LicensesSheet visible={licenses} onClose={() => setLicenses(false)} />
       {liveMode() && <VerifySheet kind={verifyKind} onClose={() => setVerifyKind(null)} />}
       {staff && <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} moderator={staff === 'moderator'} />}
+      {alphaTest && <AlphaVideoTestPanel visible={alphaOpen} onClose={() => setAlphaOpen(false)} />}
     </SafeAreaView>
   );
 }
