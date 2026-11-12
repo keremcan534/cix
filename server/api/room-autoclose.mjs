@@ -97,8 +97,9 @@ export async function sweepStaff() {
   await db.query('UPDATE rooms SET paused_at = NULL WHERE paused_at IS NOT NULL AND closed_at IS NULL AND id = ANY($1::uuid[])', [staffed]);
   await db.query('UPDATE rooms SET no_staff_since = now() WHERE no_staff_since IS NULL AND closed_at IS NULL AND paused_at IS NULL AND NOT (id = ANY($1::uuid[]))', [stop]);
   const due = await db.query(
-    'SELECT id FROM rooms WHERE closed_at IS NULL AND paused_at IS NULL AND no_staff_since <= now() - make_interval(mins => $1) ORDER BY no_staff_since LIMIT 200',
-    [live().roomStaffAwayMinutes],
+    // Never a room this very look found staffed or couldn't read, even if its count changed meanwhile.
+    'SELECT id FROM rooms WHERE closed_at IS NULL AND paused_at IS NULL AND no_staff_since <= now() - make_interval(mins => $1) AND NOT (id = ANY($2::uuid[])) ORDER BY no_staff_since LIMIT 200',
+    [live().roomStaffAwayMinutes, stop],
   );
   const occupied = new Set(seen.here.map((x) => x[0]));
   const closed = await Promise.all(due.rows.map((x) => autoCloseRoom(x.id, { voice: occupied.has(x.id) })));
