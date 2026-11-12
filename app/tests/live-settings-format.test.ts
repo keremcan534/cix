@@ -32,6 +32,7 @@ import {
   reasonChips,
   reasonError,
   ROOM_NUMBER_KEYS,
+  EVENT_NUMBER_KEYS,
   valueText,
   versionError,
   wholeError,
@@ -85,6 +86,7 @@ describe('the second confirmation', () => {
     for (const a of [1, 2, 3, 5, 60, null]) cases.push(['room_staff_away_minutes', 5, a]);
     for (const a of [1_000, 12_000, 12_500, 25_000, 50_000, 51_000, null]) cases.push(['boss_seat_coins', 25_000, a]);
     for (const a of [1, 10, 60, null]) cases.push(['boss_seat_minutes', 10, a]);
+    cases.push(['event_reminders_off', [], ['hour', 'quarter', 'start']], ['event_reminders_off', ['start'], null]);
     for (const [k, b, a] of cases) assert.equal(bigChange(k, b, a), isBig(k, b, a), `${k}: ${JSON.stringify(b)} → ${JSON.stringify(a)}`);
   });
 
@@ -282,7 +284,11 @@ describe('values as the admin reads them', () => {
     assert.equal(valueText('room_staff_away_minutes', 5), '5 dakika sonra kapanır');
     assert.equal(valueText('boss_seat_coins', 25_000), 'Tek seferde 25.000 jeton');
     assert.equal(valueText('boss_seat_minutes', 10), '10 dakika');
+    assert.equal(valueText('event_reminders_off', []), 'Hepsi açık');
+    assert.equal(valueText('event_reminders_off', ['hour', 'start']), 'Kapalı: 1 saat önce, Başlarken');
     assert.deepEqual(ROOM_NUMBER_KEYS.map((k) => k.key), Object.keys(registry.REGISTRY).filter((k) => registry.REGISTRY[k as keyof typeof registry.REGISTRY].group === 'Odalar'));
+    // Etkinlikler: the numbers, then the reminders' switches.
+    assert.deepEqual([...EVENT_NUMBER_KEYS.map((k) => k.key), 'event_reminders_off'], Object.keys(registry.REGISTRY).filter((k) => registry.REGISTRY[k as keyof typeof registry.REGISTRY].group === 'Etkinlikler'));
     for (const k of Object.keys(registry.REGISTRY) as LiveKey[]) assert.ok(!valueText(k, registry.DEFAULTS[k] as LiveValue).includes('💎'), k);
   });
 

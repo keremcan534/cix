@@ -19,6 +19,7 @@ import { copyText } from '@/lib/clipboard';
 import { useApp } from '@/store';
 import { makeStyles, useTheme } from '@/theme';
 import { EmojiIcon, Icon3D, type Icon3DName } from '@/components/Icon3D';
+import { openEvents } from '@/components/events/open';
 import { GameIcon } from '@/components/GameArt';
 import { IS_DEMO } from '@/lib/build';
 import { casinoVisible, useGames } from '@/lib/games';
@@ -103,6 +104,8 @@ export default function ProfileScreen() {
       onPress: () => showAlert(me.verified ? 'Gerçek kişi doğrulandı' : 'Doğrulama gerekli', me.verified ? 'Selfie doğrulaman tamamlandı. Para çekme ve davet ödülleri için gereklidir.' : 'Para çekmek ve davet ödülü almak için selfie ile gerçek kişi doğrulaması yap.'),
     },
     { icon: 'bag-handle-outline', img: 'gift', label: 'Çantam', dot: inventory.size > 0, onPress: () => router.push('/magaza') },
+    // Etkinlik Merkezi on Odamın Etkinlikleri: my places, the ones that passed, my rooms' events.
+    { icon: 'calendar-outline', label: 'Etkinliklerim', onPress: () => openEvents({ tab: 'mine' }) },
     { icon: 'ribbon-outline', img: 'crown', label: 'Cömertlik ve Yankı', onPress: () => router.push('/seviye') },
   ];
   // Live: agency rows follow my membership on the server (none shows until it is read).

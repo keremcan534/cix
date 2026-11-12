@@ -26,7 +26,7 @@ import { isFiniteNumber, oneOf, withDefaults } from '@/lib/saved-state';
 import { ME_DEFAULT, parkAccount, readSnapshot, unparkAccount, type Snapshot } from '@/lib/snapshot';
 import { setGameVolume } from '@/lib/game-sound';
 import { setHapticsEnabled } from '@/lib/haptics';
-import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type RoomInviteCard, type User } from '@/data/mock';
+import { CONVERSATIONS, GIFTS, ME, isServerId, type Conversation, type EventShareCard, type RoomInviteCard, type User } from '@/data/mock';
 import type { ServerEarnings, ServerUser } from '@/lib/api';
 import { block as serverBlock, follow } from '@/lib/api';
 import { bindWallet, forgetLiveAccount, liveMode, liveSpend, myServerId, rememberUser, toLocal, toServer } from '@/lib/live';
@@ -283,8 +283,8 @@ type AppState = {
   submitAvatar: (uri: string) => void;
   requestDataExport: () => void;
   conversations: Conversation[];
-  /** `room` turns the message into a room invite card that opens the room. */
-  sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard, ref?: string) => void;
+  /** `room` turns the message into a room invite card that opens the room; `event` into an event card (Etkinlik Merkezi). */
+  sendMessage: (userId: string, text: string, fromMe?: boolean, room?: RoomInviteCard, ref?: string, event?: EventShareCard) => void;
   /** Live mode: marks my message (by its request id) as not sent with the reason, or sent again (null).
    *  `retry: false`: the refusal won't change (too long, blocked), so the bubble offers no "tekrar dene". */
   setMessageFailed: (userId: string, ref: string, reason: string | null, retry?: boolean) => void;
@@ -1247,9 +1247,9 @@ function StateProvider({ children, initial: s, onReset }: { children: ReactNode;
       notify({ kind: 'security', icon: 'archive', title: 'Veri dökümü talebin alındı', body: 'Kişisel verilerinin bir kopyası en geç 30 gün içinde kayıtlı e-postana gönderilir (UK GDPR, veriye erişim hakkı).' });
     },
     conversations,
-    sendMessage: (userId, text, fromMe = true, room, ref) =>
+    sendMessage: (userId, text, fromMe = true, room, ref, event) =>
       setConversations((prev) => {
-        const msg = { id: uid(), fromMe, text, time: now(), at: new Date().toISOString(), ...(room ? { room } : {}), ...(ref ? { ref } : {}) };
+        const msg = { id: uid(), fromMe, text, time: now(), at: new Date().toISOString(), ...(room ? { room } : {}), ...(event ? { event } : {}), ...(ref ? { ref } : {}) };
         const existing = prev.find((c) => c.userId === userId);
         if (!existing) return [{ id: `c-${userId}`, userId, unread: 0, messages: [msg] }, ...prev];
         return [

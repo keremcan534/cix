@@ -63,7 +63,8 @@ export default function RoomsScreen() {
   const [cat, setCat] = useState<RoomTab>('Popüler');
   const [country, setCountry] = useState<CountryId>('ALL');
   const [sheet, setSheet] = useState<'country' | null>(null);
-  // A notice's link (an event's review result: '/?etkinlik=12') opens that event in Etkinlik Merkezi.
+  // A notice's link (an event's review result or reminder: '/?etkinlik=12') or a shared one (similarclub://?etkinlik=12,
+  // lib/events eventPath) opens that event in Etkinlik Merkezi, which shows its state now (removed, ended…).
   const { etkinlik } = useLocalSearchParams<{ etkinlik?: string }>();
   useEffect(() => {
     if (etkinlik && /^\d{1,12}$/.test(etkinlik)) openEvents({ id: Number(etkinlik), tab: 'mine' });

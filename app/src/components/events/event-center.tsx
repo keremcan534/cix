@@ -1,7 +1,8 @@
 // Etkinlik Merkezi: a full screen over the app (no route of its own; components/events/open opens it). Two tabs:
 // Etkinlik Alanı (every approved public event: status, type, time and order filters that work together, search) and
-// Odamın Etkinlikleri (the events of the rooms I own or help run, by state, and the places I reserved). The owner of
-// an open room applies from here. Every list is the server's (server/api/events.mjs); the demo shows sample events.
+// Odamın Etkinlikleri (the events of the rooms I own or help run, by state, the places I reserved and the ones that
+// passed, and the owner's report of their rooms: components/events/event-report). The owner of an open room applies
+// from here. Ben › Etkinliklerim opens it on this tab. Every list is the server's (server/api/events.mjs); the demo shows sample events.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +13,7 @@ import { ActionSheet } from '@/components/ActionSheet';
 import { EventCard } from '@/components/events/event-card';
 import { EventDetailView } from '@/components/events/event-detail';
 import { EventFormView } from '@/components/events/event-form';
+import { EventReportSheet } from '@/components/events/event-report';
 import { closeEvents, useEventsOpen, type CenterOpen, type CenterTab } from '@/components/events/open';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -50,6 +52,7 @@ function EventCenter({ open }: { open: NonNullable<CenterOpen> }) {
   const [mine, setMine] = useState<{ events: api.EventItem[]; reserved: api.EventItem[] } | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [report, setReport] = useState(false);
   const busy = useRef(false);
   const [now, setNow] = useState(() => Date.now());
   const seq = useRef(0);
@@ -270,7 +273,18 @@ function EventCenter({ open }: { open: NonNullable<CenterOpen> }) {
             ListFooterComponent={live && more ? <ActivityIndicator color={colors.primaryText} style={{ marginVertical: 12 }} /> : undefined}
           />
         ) : (
-          <MineTab live={live} mine={mine} demoReserved={demo.filter((e) => demoMine.has(e.id))} hasRoom={canCreate} failed={failed} onRetry={refresh} onOpen={setDetail} now={now} onOpenRoom={() => goRoom('yeni')} />
+          <MineTab
+            live={live}
+            mine={mine}
+            demoReserved={demo.filter((e) => demoMine.has(e.id))}
+            hasRoom={canCreate}
+            failed={failed}
+            onRetry={refresh}
+            onOpen={setDetail}
+            now={now}
+            onOpenRoom={() => goRoom('yeni')}
+            onReport={() => setReport(true)}
+          />
         )}
 
         {(canCreate || !live) && (
@@ -302,6 +316,7 @@ function EventCenter({ open }: { open: NonNullable<CenterOpen> }) {
           onRoom={goRoom}
         />
       )}
+      {report && <EventReportSheet onClose={() => setReport(false)} />}
       {form && meta && (
         <EventFormView
           meta={meta}
@@ -344,6 +359,7 @@ function MineTab({
   onOpen,
   now,
   onOpenRoom,
+  onReport,
 }: {
   live: boolean;
   mine: { events: api.EventItem[]; reserved: api.EventItem[] } | null;
@@ -354,6 +370,8 @@ function MineTab({
   onOpen: (id: number) => void;
   now: number;
   onOpenRoom: () => void;
+  /** The owner's report of their rooms. */
+  onReport: () => void;
 }) {
   const { colors } = useTheme();
   const styles = useStyles();
@@ -391,6 +409,16 @@ function MineTab({
   );
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: insets.bottom + 110 }}>
+      {live && hasRoom && (
+        <Pressable onPress={onReport} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]} accessibilityRole="button">
+          <Ionicons name="bar-chart-outline" size={20} color={colors.primaryText} />
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={styles.rowTitle}>Etkinlik raporu</Text>
+            <Text style={styles.rowSub}>Odalarının son 7, 30 ve 90 günü</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+        </Pressable>
+      )}
       <View style={{ gap: 8 }}>
         <Text style={styles.section}>Yer ayırttıklarım</Text>
         {reserved.length ? reserved.map(row) : <Text style={styles.dim}>Yer ayırttığın yaklaşan etkinlik yok.</Text>}

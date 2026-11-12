@@ -77,13 +77,14 @@ const retryable = (e: unknown) => !(e instanceof api.ApiError) || e.status === 0
  * Sends a message I already put in the local thread. `ref` is its request id: a retry sends the same one, so
  * the server never stores it twice. `done` gets the stored message, or the reason it didn't go (shown on the
  * bubble, with "tekrar dene" only when a retry can help). `contact` is true when the server refused it for
- * contact details (lib/contact-filter): sending it again would fail the same way.
+ * contact details (lib/contact-filter): sending it again would fail the same way. `event`: an Etkinlik Merkezi event
+ * the message carries (the other side's app draws its card).
  */
-export function liveDm(to: string, text: string, ref: string, done: (r: SendResult) => void) {
+export function liveDm(to: string, text: string, ref: string, done: (r: SendResult) => void, event?: number) {
   const id = toServer(to);
   if (!id) return done({ ok: false, reason: 'Kullanıcı bulunamadı', retry: false });
   api
-    .sendDm(id, text, ref)
+    .sendDm(id, text, ref, undefined, event)
     // "Seen" stays where the sync left it: moving it up to my message would skip a reply with a lower id that is
     // already on the server. The next sync finds my message by its id.
     .then((m) => done({ ok: true, message: m }))

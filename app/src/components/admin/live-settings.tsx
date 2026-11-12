@@ -54,6 +54,7 @@ import {
   type Names,
 } from '@/lib/live-settings-format';
 import { APP_VERSION } from '@/lib/reporting';
+import { REMINDER_LABEL } from '@/lib/events';
 import { makeStyles, radius, space, useTheme } from '@/theme';
 
 import { LiveChangeSheet, type LiveChanges, type LiveJob } from './live-change-sheet';
@@ -1057,12 +1058,16 @@ function RoomsCard({ kit }: { kit: Kit }) {
 // --- Etkinlikler ---------------------------------------------------------------------------------------------
 /**
  * Etkinlik Merkezi (server/api/events.mjs): who may apply (room level), how far ahead, how long and how big an
- * event may be, the start's grace, and the limit for events left unstarted. Applications are reviewed in
- * Yönetim › Etkinlikler.
+ * event may be, the start's grace, the limit for events left unstarted, and which reminders go to people with a place
+ * (1 hour, 15 minutes before, at the start: a switch each, event_reminders_off; a server without them shows none).
+ * Applications are reviewed in Yönetim › Etkinlikler.
  */
 function EventRulesCard({ kit }: { kit: Kit }) {
   const s = useStyles();
   const rows = EVENT_NUMBER_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const reminders = kit.get('event_reminders_off');
+  const kinds = (reminders?.bounds.options as string[] | undefined) ?? [];
+  const off = reminders ? listOf(reminders.effective) : [];
   const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
   const changes: LiveChanges = {};
   const errors: Record<string, string | null> = {};
@@ -1078,8 +1083,35 @@ function EventRulesCard({ kit }: { kit: Kit }) {
   for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
   if (!rows.length) return null;
   return (
-    <Card title="Etkinlikler" footer={lastChange(rows[0].x, ...rows.slice(1).map((r) => r.x))} pill={<InvalidPill x={rows.find((r) => r.x.invalid)?.x} />}>
+    <Card
+      title="Etkinlikler"
+      footer={lastChange(rows[0].x, ...rows.slice(1).map((r) => r.x), reminders)}
+      pill={<InvalidPill x={rows.find((r) => r.x.invalid)?.x ?? (reminders?.invalid ? reminders : undefined)} />}
+    >
       <Text style={s.hint}>Etkinlik başvurularının sınırları. Değişiklik yeni başvurularda ve sunucunun bir sonraki kontrolünde geçerli olur; onaylanmış etkinliklerin saati ve süresi değişmez. Başvurular Yönetim › Etkinlikler’de incelenir.</Text>
+      {reminders && (
+        <ListGroup label="Hatırlatmalar" footer={`Yer ayırtanlara gider; kişiler kendi hatırlatmalarını kapatabilir. Şu an: ${valueText('event_reminders_off', reminders.effective)}.`}>
+          {kinds.map((k) => {
+            const on = !off.includes(k);
+            const label = REMINDER_LABEL[k as keyof typeof REMINDER_LABEL] ?? k;
+            return (
+              <ListSwitch
+                key={k}
+                icon={on ? 'notifications-outline' : 'notifications-off-outline'}
+                tone={on ? 'success' : 'neutral'}
+                title={label}
+                subtitle={on ? 'Gönderiliyor' : 'Kapalı'}
+                value={on}
+                disabled={kit.locked}
+                onChange={(v) => {
+                  const next = kinds.filter((o) => (o === k ? !v : off.includes(o)));
+                  kit.open(`${label} hatırlatması ${v ? 'açılsın' : 'kapatılsın'}`, () => ({ event_reminders_off: next.length ? next : null }), v ? 'Geri dönüş' : undefined);
+                }}
+              />
+            );
+          })}
+        </ListGroup>
+      )}
       {rows.map((r) => (
         <View key={r.key}>
           <Field
