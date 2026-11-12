@@ -10,16 +10,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
-import { CARD_COLORS, CardBack, CardFace, cardHeight } from '@/components/games/room/card-face';
-import { ActionButton, EndCard, SeatFace, endSound, firstName, rnd, usePracticeTable, useSecondsLeft, type Seat } from '@/components/games/room/table-kit';
+import { CARD_COLORS, CardBack, CardFace, Emblem, cardHeight } from '@/components/games/room/card-face';
+import { roomArt } from '@/components/games/room/table-art';
+import { ActionButton, BEZEL, Bezel, EndCard, Plate, SeatFace, StatusLine, endSound, firstName, rnd, useBoardRoom, usePracticeTable, useSecondsLeft, useTableFx, type Seat } from '@/components/games/room/table-kit';
+import { Gloss } from '@/components/fx/surface';
 import { Text } from '@/components/text';
 import type { CardsServerTable } from '@/lib/api';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { META, cardName, cardOf, fits, moveTable, openTable, pickCard, sitDown, startTable, timeoutTable, viewOf, type CardsEvent, type CardsMove, type CardsTable } from '@/lib/room-games/cards';
-import { useSettings } from '@/store';
 import { colors, fonts, semantic } from '@/theme';
 
 /** What the stage shows: a table as one seat is told it, with the people on its seats. `me` −1: I watch. */
@@ -49,7 +50,8 @@ type Slot = Point & { r: number; z: number };
 
 const SEAT = 46;
 const TOP_H = 76;
-const FELT_H = 172;
+/** What the stage draws besides the felt: the others, the status line, my cards, my row and the gaps. */
+const CHROME = 330;
 const LIFT = 14;
 const FLY_MS = 340;
 
@@ -90,14 +92,17 @@ function layoutHand(ids: number[], width: number, cw: number, raised: (id: numbe
 function HandCard({ id, slot, from, delay, cw, playable, dim, still, onPress }: { id: number; slot: Slot; from: Point; delay: number; cw: number; playable: boolean; dim: boolean; still: boolean; onPress: () => void }) {
   const [x] = useState(() => new Animated.Value(still ? slot.x : from.x));
   const [y] = useState(() => new Animated.Value(still ? slot.y : from.y));
-  const [r] = useState(() => new Animated.Value(still ? slot.r : 0));
+  const [r] = useState(() => new Animated.Value(still ? slot.r : -18));
+  // Dealt from the pile: it comes small and grows into the hand.
+  const [grow] = useState(() => new Animated.Value(still ? 1 : 0.72));
   const first = useRef(true);
   useEffect(() => {
     const wait = first.current ? delay : 0;
     if (first.current && !still) setTimeout(() => playSfx('card', 0.5), wait);
     first.current = false;
-    if (still) return void [x.setValue(slot.x), y.setValue(slot.y), r.setValue(slot.r)];
+    if (still) return void [x.setValue(slot.x), y.setValue(slot.y), r.setValue(slot.r), grow.setValue(1)];
     const a = Animated.parallel([
+      Animated.timing(grow, { toValue: 1, duration: 320, delay: wait, easing: Easing.out(Easing.back(1.6)), useNativeDriver: true }),
       Animated.timing(x, { toValue: slot.x, duration: 300, delay: wait, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(y, { toValue: slot.y, duration: 300, delay: wait, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(r, { toValue: slot.r, duration: 300, delay: wait, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -106,9 +111,9 @@ function HandCard({ id, slot, from, delay, cw, playable, dim, still, onPress }: 
     return () => a.stop();
     // `delay` only matters for the first flight.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slot.x, slot.y, slot.r, still, x, y, r]);
+  }, [slot.x, slot.y, slot.r, still, x, y, r, grow]);
   return (
-    <Animated.View style={{ position: 'absolute', left: 0, top: 0, zIndex: slot.z, transform: [{ translateX: x }, { translateY: y }, { rotate: r.interpolate({ inputRange: [-90, 90], outputRange: ['-90deg', '90deg'] }) }] }}>
+    <Animated.View style={{ position: 'absolute', left: 0, top: 0, zIndex: slot.z, transform: [{ translateX: x }, { translateY: y }, { rotate: r.interpolate({ inputRange: [-90, 90], outputRange: ['-90deg', '90deg'] }) }, { scale: grow }] }}>
       <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${cardName(id)}${playable ? ', atılabilir' : ''}`} accessibilityState={{ disabled: !playable }} hitSlop={{ top: 6 }}>
         <CardFace id={id} w={cw} dim={dim} />
         {playable && <View style={[s.playable, { borderRadius: cw * 0.15 }]} />}
@@ -133,7 +138,7 @@ function TopCard({ id, w, from, tilt, still }: { id: number; w: number; from: (P
         position: 'absolute',
         left: 0,
         top: 0,
-        transform: start ? [{ translateX: go(start.x, 0) }, { translateY: go(start.y, 0) }, { rotate: t.interpolate({ inputRange: [0, 1], outputRange: [`${start.r}deg`, `${tilt}deg`] }) }, { scale: go(start.scale, 1) }] : [{ rotate: `${tilt}deg` }],
+        transform: start ? [{ translateX: go(start.x, 0) }, { translateY: go(start.y, 0) }, { rotate: t.interpolate({ inputRange: [0, 1], outputRange: [`${start.r}deg`, `${tilt}deg`] }) }, { scale: t.interpolate({ inputRange: [0, 0.78, 1], outputRange: [start.scale, 1.1, 1] }) }] : [{ rotate: `${tilt}deg` }],
       }}
     >
       <CardFace id={id} w={w} />
@@ -196,7 +201,7 @@ function Burst({ at, text, icon, color, delay = 0, still }: { at: Point; text: s
 }
 
 /** The direction of play: an arrow turning slowly round the piles, clockwise or the other way. */
-function Direction({ dir, color, size, still }: { dir: 1 | -1; color: string; size: number; still: boolean }) {
+function Direction({ dir, color, size, still }: { dir: 1 | -1; color: string; size: number; /** No turning: "Animasyonları azalt" or "Efektleri kapat". */ still: boolean }) {
   const [spin] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (still) return;
@@ -206,7 +211,7 @@ function Direction({ dir, color, size, still }: { dir: 1 | -1; color: string; si
   }, [spin, still]);
   return (
     <Animated.View pointerEvents="none" style={{ position: 'absolute', width: size, height: size, alignItems: 'center', justifyContent: 'center', transform: [{ scaleX: dir }, { rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-      <Ionicons name="refresh" size={size} color={color} style={{ opacity: 0.3 }} />
+      <Ionicons name="refresh" size={size} color={color} style={{ opacity: 0.22 }} />
     </Animated.View>
   );
 }
@@ -225,9 +230,9 @@ function Rival({ seat, count, active, endsAt, winner, waiting }: { seat: Seat; c
         winner={winner}
         badge={
           waiting ? null : (
-            <View style={[s.count, one && { backgroundColor: semantic.social, borderColor: '#FFD0D6' }]}>
+            <LinearGradient colors={one ? ['#FF8C99', semantic.social] : ['#24467A', '#0E1C36']} style={[s.count, one && { borderColor: '#FFD0D6' }]}>
               <Text style={[s.countText, one && { color: '#FFFFFF' }]}>{count}</Text>
-            </View>
+            </LinearGradient>
           )
         }
       />
@@ -239,7 +244,9 @@ function Rival({ seat, count, active, endsAt, winner, waiting }: { seat: Seat; c
 }
 
 function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView; endsAt: number | null; busy?: boolean; onMove: (m: CardsMove) => void; children?: ReactNode }) {
-  const { reduceMotion: still } = useSettings();
+  const { still, fx } = useTableFx();
+  // The felt grows with the room the sheet has; the cards on it with the felt.
+  const feltH = Math.min(230, Math.max(164, useBoardRoom(0) - CHROME));
   const [width, setWidth] = useState(0);
   // The state shown before this one: what changed between the two is what the screen plays.
   // The same step read again (the room's packet after my own move, a turn's end) keeps what it is compared with, so
@@ -256,9 +263,10 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
   const myTurn = playing && view.turn === me;
   const canAct = myTurn && !busy;
   const top = view.top;
-  const cw = width >= 350 ? 58 : 54;
+  const cw = Math.min(64, Math.max(54, Math.round(width * 0.16)));
   const ch = cardHeight(cw);
-  const pw = 62;
+  const pw = Math.round(feltH * 0.36);
+  const kw = Math.round(pw * 0.87);
   const hand = useMemo(() => sorted(view.mine ?? []), [view.mine]);
   const playable = (id: number) => canAct && top !== null && (view.drawn !== null ? id === view.drawn : fits(id, view.color, top));
   const raised = (id: number) => myTurn && top !== null && (view.drawn !== null ? id === view.drawn : fits(id, view.color, top));
@@ -268,11 +276,12 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
   // The others, in the order play reaches them from me; someone watching sees every seat.
   const rivals = useMemo(() => (me < 0 ? seats.map((_, i) => i) : seats.map((_, i) => (me + 1 + i) % n).slice(0, n - 1)), [me, n, seats]);
   const feltY = TOP_H + 4;
-  const handY = feltY + FELT_H + 30;
+  const handY = feltY + feltH + 36;
   const cx = width / 2;
-  const cy = feltY + FELT_H / 2 - 6;
-  const pileAt = { x: cx - 52, y: cy };
-  const topAt = { x: cx + 36, y: cy };
+  const cy = feltY + feltH / 2 - 6;
+  const pileAt = { x: cx - pw * 0.84, y: cy };
+  const topAt = { x: cx + pw * 0.58, y: cy };
+  const masa = roomArt('renk-masa');
   const seatAt = (seat: number): Point => {
     const i = rivals.indexOf(seat);
     if (i < 0) return { x: cx, y: handY + handH / 2 };
@@ -374,19 +383,21 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
               );
             })}
 
-            <LinearGradient colors={['#143A52', '#0C2238', '#0A1A2E']} style={[s.felt, { top: feltY, height: FELT_H, borderColor: top === null ? colors.border : tint.base, boxShadow: top === null ? undefined : `0 0 18px ${tint.base}55` }]}>
-              <View style={s.feltRim} />
-            </LinearGradient>
+            <View style={{ position: 'absolute', left: 0, top: feltY }}>
+              <Bezel width={width} height={feltH} radius={30} inset={8} tone={BEZEL.felt} glow={top === null ? null : tint.base} surface={masa ? <Image source={masa} style={StyleSheet.absoluteFill} /> : undefined}>
+                <View style={s.feltRim} />
+              </Bezel>
+            </View>
             {top !== null && (
               <>
-                <View style={{ position: 'absolute', left: cx - 78, top: cy - 78 }}>
-                  <Direction dir={view.dir} color={tint.light} size={156} still={still} />
+                <View style={{ position: 'absolute', left: cx - feltH * 0.45, top: cy - feltH * 0.45 }}>
+                  <Direction dir={view.dir} color={tint.light} size={Math.round(feltH * 0.9)} still={!fx} />
                 </View>
                 {/* The pile to draw from. */}
-                <Pressable onPress={draw} disabled={!canAct || view.drawn !== null} style={{ position: 'absolute', left: pileAt.x - 27, top: pileAt.y - cardHeight(54) / 2 }} accessibilityRole="button" accessibilityLabel={`Desteden kart çek, ${view.pile} kart`}>
-                  {view.pile > 2 && <View style={{ position: 'absolute', left: -4, top: 3 }}><CardBack w={54} /></View>}
-                  {view.pile > 1 && <View style={{ position: 'absolute', left: -2, top: 1.5 }}><CardBack w={54} /></View>}
-                  {view.pile > 0 ? <CardBack w={54} /> : <View style={[s.empty, { width: 54, height: cardHeight(54) }]} />}
+                <Pressable onPress={draw} disabled={!canAct || view.drawn !== null} style={{ position: 'absolute', left: pileAt.x - kw / 2, top: pileAt.y - cardHeight(kw) / 2 }} accessibilityRole="button" accessibilityLabel={`Desteden kart çek, ${view.pile} kart`}>
+                  {view.pile > 2 && <View style={{ position: 'absolute', left: -4, top: 3 }}><CardBack w={kw} /></View>}
+                  {view.pile > 1 && <View style={{ position: 'absolute', left: -2, top: 1.5 }}><CardBack w={kw} /></View>}
+                  {view.pile > 0 ? <CardBack w={kw} /> : <View style={[s.empty, { width: kw, height: cardHeight(kw) }]} />}
                   {canAct && view.drawn === null && !any && <View style={s.pileHint} />}
                   <View style={s.pileCount}>
                     <Text style={s.pileCountText}>{view.pile}</Text>
@@ -402,32 +413,32 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
                   <TopCard key={`${stamp}:${top}`} id={top} w={pw} from={enter} tilt={((top * 37) % 13) - 6} still={still} />
                 </View>
                 {/* The colour to follow, said in words and with its emblem. */}
-                <View style={[s.gem, { top: feltY + 8, backgroundColor: tint.base, borderColor: tint.light }]} accessibilityLabel={`Renk ${tint.name}`}>
-                  <Ionicons name={tint.icon} size={13} color="#FFFFFF" />
+                <LinearGradient colors={[tint.light, tint.base, tint.deep]} style={[s.gem, { top: feltY + 14, borderColor: tint.light, boxShadow: `0 0 12px ${tint.base}` }]} accessibilityLabel={`Renk ${tint.name}`}>
+                  <Gloss strength={0.3} />
+                  <Emblem color={view.color} size={13} />
                   <Text style={s.gemText}>{tint.name}</Text>
-                </View>
-                <View style={[s.dirChip, { top: feltY + 8 }]}>
+                </LinearGradient>
+                <View style={[s.dirChip, { top: feltY + 14 }]}>
                   <Ionicons name="refresh" size={12} color={colors.textDim} style={{ transform: [{ scaleX: view.dir }] }} />
                   <Text style={s.dirText}>{view.dir === 1 ? 'Saat yönü' : 'Ters yön'}</Text>
                 </View>
               </>
             )}
             {top === null && (
-              <View style={{ position: 'absolute', left: cx - 27, top: cy - cardHeight(54) / 2 }}>
+              <View style={{ position: 'absolute', left: cx - kw / 2, top: cy - cardHeight(kw) / 2 }}>
                 {[-16, -5, 6, 17].map((turn, i) => (
                   <View key={turn} style={{ position: 'absolute', left: (i - 1.5) * 22, top: Math.abs(i - 1.5) * 5, transform: [{ rotate: `${turn}deg` }] }}>
-                    <CardBack w={54} />
+                    <CardBack w={kw} />
                   </View>
                 ))}
               </View>
             )}
-            <Text style={[s.log, { top: feltY + FELT_H - 24 }]} numberOfLines={1}>
+            <Text style={[s.log, { top: feltY + feltH - 28 }]} numberOfLines={1}>
               {status === 'playing' ? view.log : status === 'waiting' ? `${n}/${META.max} oyuncu · en az ${META.min}` : ''}
             </Text>
-            <Text style={[s.prompt, { top: feltY + FELT_H + 6 }, myTurn && { color: colors.text }]} numberOfLines={1} accessibilityLiveRegion="polite">
-              {prompt}
-              {myTurn && left !== null && left <= 10 ? ` · ${left} sn` : ''}
-            </Text>
+            <View style={[s.prompt, { top: feltY + feltH + 4 }]}>
+              <StatusLine text={`${prompt}${myTurn && left !== null && left <= 10 ? ` · ${left} sn` : ''}`} lit={myTurn} />
+            </View>
 
             {/* What just happened, said over the table. */}
             <View key={stamp} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -450,7 +461,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
 
             {/* A Joker's colour. */}
             {pick !== null && (
-              <Pressable style={[s.picker, { top: feltY, height: FELT_H }]} onPress={() => setPicking(null)} accessibilityLabel="Renk seçimini kapat">
+              <Pressable style={[s.picker, { top: feltY, height: feltH }]} onPress={() => setPicking(null)} accessibilityLabel="Renk seçimini kapat">
                 <Text style={s.pickerTitle}>Jokerin rengini seç</Text>
                 <View style={s.pickerRow}>
                   {CARD_COLORS.map((c, i) => (
@@ -465,7 +476,8 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
                       accessibilityLabel={c.name}
                     >
                       <LinearGradient colors={[c.light, c.base, c.deep]} style={s.pickerColor}>
-                        <Ionicons name={c.icon} size={24} color="#FFFFFF" />
+                        <Gloss radius={16} strength={0.3} />
+                        <Emblem color={i} size={24} />
                         <Text style={s.pickerName}>{c.name}</Text>
                       </LinearGradient>
                     </Pressable>
@@ -475,7 +487,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
             )}
 
             {status === 'over' && (
-              <View style={{ position: 'absolute', left: 0, right: 0, top: feltY, height: FELT_H }}>
+              <View style={{ position: 'absolute', left: 0, right: 0, top: feltY, height: feltH }}>
                 <EndCard tone={view.winner === me ? 'win' : 'lose'} title={view.winner === me ? 'Kazandın!' : winner ? `${firstName(winner.name)} kazandı` : 'El bitti'} sub={view.winner === me ? 'Bütün kartlarını bitirdin' : 'Kartlarını ilk o bitirdi'} size={width} still={still} />
               </View>
             )}
@@ -484,7 +496,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
       </View>
 
       {me >= 0 && playing && (
-        <View style={s.mine}>
+        <Plate active={myTurn} tint={semantic.action} style={s.mine}>
           <SeatFace seat={seats[me]} size={44} color={semantic.action} active={myTurn} endsAt={endsAt} />
           <View style={{ flex: 1 }}>
             <Text style={s.mineName} numberOfLines={1}>
@@ -502,7 +514,7 @@ function CardsStage({ view, endsAt, busy, onMove, children }: { view: CardsView;
           ) : (
             <ActionButton small ghost={any || !myTurn} label="Kart çek" icon="layers" disabled={!canAct} onPress={draw} />
           )}
-        </View>
+        </Plate>
       )}
       {children}
     </View>
@@ -608,32 +620,31 @@ export function CardsLive({ table, busy, onMove, children }: { table: CardsServe
 }
 
 const s = StyleSheet.create({
-  felt: { position: 'absolute', left: 0, right: 0, borderRadius: 28, borderWidth: 2, overflow: 'hidden' },
-  feltRim: { position: 'absolute', left: 6, top: 6, right: 6, bottom: 6, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  feltRim: { position: 'absolute', left: 6, top: 6, right: 6, bottom: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderStyle: 'dashed' },
   rival: { alignItems: 'center', gap: 2 },
   rivalName: { color: colors.textDim, fontSize: 11, lineHeight: 14, fontWeight: '800', maxWidth: 66 },
-  count: { minWidth: 20, height: 24, borderRadius: 5, backgroundColor: '#0E1C36', borderWidth: 1.5, borderColor: semantic.action, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  count: { minWidth: 20, height: 26, borderRadius: 5, borderWidth: 1.5, borderColor: '#5DEBEF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, boxShadow: '0 2px 4px rgba(0,0,0,0.5)' },
   countText: { color: colors.text, fontSize: 12, lineHeight: 15, fontWeight: '900' },
   playable: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: '#FFFFFF', boxShadow: '0 0 10px rgba(255,255,255,0.75)' },
   empty: { borderRadius: 8, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.border },
   pileHint: { position: 'absolute', left: -4, top: -4, right: -4, bottom: -4, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', boxShadow: '0 0 12px rgba(255,255,255,0.8)' },
   pileCount: { position: 'absolute', left: 0, right: 0, bottom: -9, alignItems: 'center' },
   pileCountText: { color: colors.text, fontSize: 11, lineHeight: 14, fontWeight: '900', backgroundColor: '#0A1426', borderRadius: 8, paddingHorizontal: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  gem: { position: 'absolute', right: 10, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1.5, paddingHorizontal: 9, height: 24 },
-  gemText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '900' },
-  dirChip: { position: 'absolute', left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 8, height: 24, backgroundColor: 'rgba(8,15,30,0.55)' },
+  gem: { position: 'absolute', right: 16, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1.5, paddingHorizontal: 9, height: 26, overflow: 'hidden' },
+  gemText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 2, textShadowOffset: { width: 0, height: 1 } },
+  dirChip: { position: 'absolute', left: 16, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 9, height: 26, backgroundColor: 'rgba(8,15,30,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   dirText: { color: colors.textDim, fontSize: 11, lineHeight: 14, fontWeight: '800' },
   log: { position: 'absolute', left: 12, right: 12, color: colors.textDim, fontSize: 11, lineHeight: 15, textAlign: 'center' },
-  prompt: { position: 'absolute', left: 0, right: 0, color: colors.textDim, fontSize: 13, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
+  prompt: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   burst: { position: 'absolute', width: 120, alignItems: 'center', zIndex: 20 },
   burstPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 9, height: 26, borderWidth: 1.5, borderColor: '#0A1426', boxShadow: '0 3px 8px rgba(0,0,0,0.45)' },
   burstText: { color: '#04161D', fontSize: 12, lineHeight: 16, fontWeight: '900' },
   picker: { position: 'absolute', left: 0, right: 0, borderRadius: 28, backgroundColor: 'rgba(8,15,30,0.88)', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 25 },
   pickerTitle: { color: colors.text, fontFamily: fonts.displayBold, fontSize: 16, lineHeight: 22 },
   pickerRow: { flexDirection: 'row', gap: 8 },
-  pickerColor: { width: 72, height: 78, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)' },
+  pickerColor: { width: 72, height: 78, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.5)' },
   pickerName: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '900' },
-  mine: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 18, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  mine: { gap: 10, paddingHorizontal: 10, paddingVertical: 8 },
   mineName: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   mineHint: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '700' },
   sizes: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -9,33 +9,45 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
-import { ActionButton, DrawnRing, DuelHeader, EndCard, endSound, firstName, rnd, usePracticeTable, useSecondsLeft, type Seat } from '@/components/games/room/table-kit';
+import { MARK_ART, RoomArtImage, roomArtSet } from '@/components/games/room/table-art';
+import { ActionButton, BEZEL, Bezel, DrawnRing, DuelHeader, EndCard, StatusLine, alpha, endSound, firstName, rnd, useBoardRoom, usePracticeTable, useSecondsLeft, useTableFx, type Seat } from '@/components/games/room/table-kit';
 import { Text } from '@/components/text';
 import type { XoxServerTable } from '@/lib/api';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { errorHaptic, pressHaptic, successHaptic } from '@/lib/haptics';
 import { botCell, moveTable, openTable, sitDown, startTable, timeoutTable, xoxLine, type Mark, type XoxMove, type XoxTable } from '@/lib/room-games/xox';
-import { useSettings } from '@/store';
 import { colors } from '@/theme';
 
 /** What the stage shows. `me` −1: I watch. `marks`: seat → its mark. */
 export type XoxView = { status: 'waiting' | 'playing' | 'over'; turn: number; winner: number | null; seats: Seat[]; me: number; board: (Mark | null)[]; marks: Mark[]; wins: number[] };
 
 export const MARK_COLORS: Record<Mark, string> = { X: '#13D9DF', O: '#FF6576' };
+/** Each mark's light and deep tone: the stroke is a lit tube, not a flat bar. */
+const MARK_TONES: Record<Mark, [string, string]> = { X: ['#B4F8FA', '#0A8F95'], O: ['#FFC9CF', '#C93C4F'] };
 const GAP = 8;
+/** The bezel round the cells. */
+const INSET = 10;
+/** What the stage draws round the board: the players' plates, the status line and the gaps between them. */
+const CHROME = 120;
 const LINE = '#FFD166';
 
-/** One stroke of an X: a bar that runs in from one end. */
-function Stroke({ length, thick, color, turn, t }: { length: number; thick: number; color: string; turn: string; t: Animated.AnimatedInterpolation<number> }) {
+/** One stroke of an X: a lit tube that runs in from one end. */
+function Stroke({ length, thick, mark, turn, t }: { length: number; thick: number; mark: Mark; turn: string; t: Animated.AnimatedInterpolation<number> }) {
+  const [light, deep] = MARK_TONES[mark];
   return (
     <View style={{ position: 'absolute', width: length, height: thick, borderRadius: thick / 2, overflow: 'hidden', transform: [{ rotate: turn }] }}>
-      <Animated.View style={{ flex: 1, borderRadius: thick / 2, backgroundColor: color, transform: [{ translateX: t }] }} />
+      <Animated.View style={{ flex: 1, borderRadius: thick / 2, overflow: 'hidden', transform: [{ translateX: t }] }}>
+        <LinearGradient colors={[light, MARK_COLORS[mark], deep]} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
+      </Animated.View>
     </View>
   );
 }
 
-/** A mark in its cell. `fresh`: just placed, so it is drawn in. `lit`: one of the winning three. `faint`: the hand is over and it isn't. */
-function MarkView({ mark, cell, fresh, lit, faint, still }: { mark: Mark; cell: number; fresh: boolean; lit: boolean; faint: boolean; still: boolean }) {
+/**
+ * A mark in its cell. `fresh`: just placed, so it is drawn in, and its glow blooms as the stroke closes. `lit`: one
+ * of the winning three. `faint`: the hand is over and it isn't.
+ */
+function MarkView({ mark, cell, fresh, lit, faint, still, fx }: { mark: Mark; cell: number; fresh: boolean; lit: boolean; faint: boolean; still: boolean; fx: boolean }) {
   const [t] = useState(() => new Animated.Value(fresh && !still ? 0 : 1));
   const [beat] = useState(() => new Animated.Value(0));
   // Once drawn, the O is one whole ring: the two halves it is drawn with would show where they meet.
@@ -46,59 +58,103 @@ function MarkView({ mark, cell, fresh, lit, faint, still }: { mark: Mark; cell: 
     return () => a.stop();
   }, [t, mark]);
   useEffect(() => {
-    if (!lit || still) return void beat.setValue(0);
+    if (!lit || !fx) return void beat.setValue(0);
     const a = Animated.loop(Animated.sequence([Animated.timing(beat, { toValue: 1, duration: 480, easing: Easing.inOut(Easing.quad), useNativeDriver: true }), Animated.timing(beat, { toValue: 0, duration: 480, easing: Easing.inOut(Easing.quad), useNativeDriver: true })]));
     a.start();
     return () => a.stop();
-  }, [lit, still, beat]);
+  }, [lit, fx, beat]);
   const color = MARK_COLORS[mark];
-  const length = cell * 0.66;
-  const thick = Math.max(8, cell * 0.14);
-  return (
-    <Animated.View style={{ width: cell, height: cell, alignItems: 'center', justifyContent: 'center', opacity: faint ? 0.3 : 1, transform: [{ scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] }) }] }}>
-      {mark === 'X' ? (
-        <>
-          <Stroke length={length} thick={thick} color={color} turn="45deg" t={t.interpolate({ inputRange: [0, 0.55, 1], outputRange: [-length, 0, 0] })} />
-          <Stroke length={length} thick={thick} color={color} turn="-45deg" t={t.interpolate({ inputRange: [0, 0.45, 1], outputRange: [-length, -length, 0] })} />
-        </>
-      ) : drawn ? (
-        <View style={{ width: cell * 0.6, height: cell * 0.6, borderRadius: cell * 0.3, borderWidth: thick, borderColor: color }} />
-      ) : (
-        <DrawnRing size={cell * 0.6} width={thick} color={color} t={t} />
-      )}
-    </Animated.View>
-  );
+  const length = cell * 0.62;
+  const thick = Math.max(8, cell * 0.15);
+  const ring = cell * 0.56;
+  const art = roomArtSet(MARK_ART);
+  const bloom = t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0, 0.15, 1] });
+  const halo = `0 0 ${Math.round(thick * 1.6)}px ${color}`;
+  let body: ReactNode;
+  if (art)
+    body = (
+      <Animated.View style={{ opacity: t, transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] }}>
+        <RoomArtImage source={art[mark === 'X' ? 0 : 1]} w={cell * 0.78} />
+      </Animated.View>
+    );
+  else
+    body = (
+      <>
+        {/* The glow under the stroke. */}
+        <Animated.View pointerEvents="none" style={[s.fill, { opacity: bloom }]}>
+          {mark === 'X' ? (
+            ['45deg', '-45deg'].map((r) => <View key={r} style={{ position: 'absolute', width: length, height: thick, borderRadius: thick / 2, backgroundColor: alpha(color, 0.45), boxShadow: halo, transform: [{ rotate: r }] }} />)
+          ) : (
+            <View style={{ width: ring, height: ring, borderRadius: ring / 2, borderWidth: thick, borderColor: alpha(color, 0.45), boxShadow: `${halo}, inset ${halo}` }} />
+          )}
+        </Animated.View>
+        {mark === 'X' ? (
+          <>
+            <Stroke length={length} thick={thick} mark="X" turn="45deg" t={t.interpolate({ inputRange: [0, 0.55, 1], outputRange: [-length, 0, 0] })} />
+            <Stroke length={length} thick={thick} mark="X" turn="-45deg" t={t.interpolate({ inputRange: [0, 0.45, 1], outputRange: [-length, -length, 0] })} />
+          </>
+        ) : drawn ? (
+          <View style={{ width: ring, height: ring, borderRadius: ring / 2, borderWidth: thick, borderColor: color }}>
+            {/* The tube's light along its upper arc. */}
+            <View style={{ position: 'absolute', left: -thick * 0.72, top: -thick * 0.72, right: -thick * 0.72, bottom: -thick * 0.72, borderRadius: ring, borderWidth: thick * 0.32, borderColor: 'transparent', borderTopColor: alpha(MARK_TONES.O[0], 0.85), transform: [{ rotate: '-35deg' }] }} />
+          </View>
+        ) : (
+          <DrawnRing size={ring} width={thick} color={color} t={t} />
+        )}
+      </>
+    );
+  return <Animated.View style={{ width: cell, height: cell, alignItems: 'center', justifyContent: 'center', opacity: faint ? 0.28 : 1, transform: [{ scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }}>{body}</Animated.View>;
 }
 
-/** The stroke through the winning three: it runs out from the middle, then pulses. */
-function WinLine({ line, cell, still }: { line: number[]; cell: number; still: boolean }) {
+/** The stroke through the winning three: it sweeps from the first to the last with a spark at its head, then pulses. */
+function WinLine({ line, cell, still, fx }: { line: number[]; cell: number; still: boolean; fx: boolean }) {
   const [t] = useState(() => new Animated.Value(still ? 1 : 0));
   const [beat] = useState(() => new Animated.Value(1));
   useEffect(() => {
     if (still) return;
-    const pulse = Animated.loop(Animated.sequence([Animated.timing(beat, { toValue: 0.45, duration: 480, useNativeDriver: true }), Animated.timing(beat, { toValue: 1, duration: 480, useNativeDriver: true })]));
-    const a = Animated.timing(t, { toValue: 1, duration: 320, delay: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true });
-    a.start(() => pulse.start());
+    const pulse = Animated.loop(Animated.sequence([Animated.timing(beat, { toValue: 0.55, duration: 520, useNativeDriver: true }), Animated.timing(beat, { toValue: 1, duration: 520, useNativeDriver: true })]));
+    const a = Animated.timing(t, { toValue: 1, duration: 420, delay: 160, easing: Easing.inOut(Easing.cubic), useNativeDriver: true });
+    a.start(() => fx && pulse.start());
     return () => {
       a.stop();
       pulse.stop();
     };
-  }, [still, t, beat]);
+  }, [still, fx, t, beat]);
   const [a, , c] = line;
   const at = (i: number) => ({ x: (i % 3) * (cell + GAP) + cell / 2, y: Math.floor(i / 3) * (cell + GAP) + cell / 2 });
   const [from, to] = [at(a), at(c)];
-  const length = Math.hypot(to.x - from.x, to.y - from.y) + cell * 0.8;
+  const length = Math.hypot(to.x - from.x, to.y - from.y) + cell * 0.7;
   const angle = (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
+  const h = Math.max(8, cell * 0.09);
+  const spark = h * 3;
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={{ position: 'absolute', left: (from.x + to.x) / 2 - length / 2, top: (from.y + to.y) / 2 - 4, width: length, height: 8, borderRadius: 4, backgroundColor: LINE, boxShadow: `0 0 12px ${LINE}`, opacity: beat, transform: [{ rotate: `${angle}deg` }, { scaleX: t }] }}
-    />
+    <View pointerEvents="none" style={{ position: 'absolute', left: (from.x + to.x) / 2 - length / 2, top: (from.y + to.y) / 2 - h / 2, width: length, height: h, transform: [{ rotate: `${angle}deg` }] }}>
+      <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: length, height: h, borderRadius: h / 2, overflow: 'hidden', boxShadow: `0 0 14px ${LINE}`, opacity: beat, transformOrigin: 'left', transform: [{ scaleX: t }] }}>
+        <LinearGradient colors={['#FFF4CC', LINE, '#E3A630']} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+      {fx && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: -spark / 2,
+            top: h / 2 - spark / 2,
+            width: spark,
+            height: spark,
+            borderRadius: spark / 2,
+            backgroundColor: '#FFFFFF',
+            boxShadow: `0 0 16px ${LINE}`,
+            opacity: t.interpolate({ inputRange: [0, 0.05, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+            transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, length] }) }],
+          }}
+        />
+      )}
+    </View>
   );
 }
 
 function XoxStage({ view, endsAt, busy, onMove, children }: { view: XoxView; endsAt: number | null; busy?: boolean; onMove: (m: XoxMove) => void; children?: ReactNode }) {
-  const { reduceMotion: still } = useSettings();
+  const { still, fx } = useTableFx();
+  const room = useBoardRoom(CHROME);
   const [width, setWidth] = useState(0);
   // The board shown before this one: a mark that wasn't there is the one just placed.
   const [pair, setPair] = useState<{ cur: XoxView; before: XoxView | null }>({ cur: view, before: null });
@@ -111,8 +167,9 @@ function XoxStage({ view, endsAt, busy, onMove, children }: { view: XoxView; end
   const over = status === 'over';
   const myTurn = playing && view.turn === me;
   const line = over ? xoxLine(board) : null;
-  const side = Math.min(width, 312);
-  const cell = Math.floor((side - GAP * 2) / 3);
+  // The board takes the width it is given, as long as it still fits the sheet's height with the players and the line.
+  const cell = Math.floor((Math.min(width, room) - INSET * 2 - GAP * 2) / 3);
+  const side = cell * 3 + GAP * 2;
   const placed = board.filter(Boolean).length;
   const tone = !over ? null : view.winner === null ? 'draw' : view.winner === me ? 'win' : 'lose';
   const winnerSeat = view.winner !== null ? view.seats[view.winner] : null;
@@ -157,7 +214,7 @@ function XoxStage({ view, endsAt, busy, onMove, children }: { view: XoxView; end
           : `${firstName(turnSeat?.name ?? '')} düşünüyor…`;
 
   return (
-    <View style={{ gap: 10 }} onLayout={(e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+    <View style={{ gap: 12 }} onLayout={(e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width))}>
       <DuelHeader
         seats={view.seats}
         me={me}
@@ -168,22 +225,30 @@ function XoxStage({ view, endsAt, busy, onMove, children }: { view: XoxView; end
         winner={view.winner}
         tints={[MARK_COLORS[view.marks[0] ?? 'X'], MARK_COLORS[view.marks[1] ?? 'O']]}
         token={(seat) => (
-          <View style={[s.token, { borderColor: MARK_COLORS[view.marks[seat] ?? (seat === 0 ? 'X' : 'O')] }]}>
+          <View style={[s.token, { borderColor: MARK_COLORS[view.marks[seat] ?? (seat === 0 ? 'X' : 'O')], boxShadow: `0 0 6px ${MARK_COLORS[view.marks[seat] ?? (seat === 0 ? 'X' : 'O')]}` }]}>
             <Text style={[s.tokenText, { color: MARK_COLORS[view.marks[seat] ?? (seat === 0 ? 'X' : 'O')] }]}>{view.marks[seat] ?? (seat === 0 ? 'X' : 'O')}</Text>
           </View>
         )}
       />
       {width > 0 && (
-        <LinearGradient colors={['#16294A', '#0C182E']} style={[s.frame, { width: side + 20, borderColor: over ? (tone === 'draw' ? colors.border : LINE) : myTurn && myMark ? MARK_COLORS[myMark] : colors.border }]}>
-          <View style={{ width: side, height: cell * 3 + GAP * 2, flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-            {board.map((v, i) => (
-              <Pressable key={i} onPress={() => tap(i)} disabled={!myTurn || !!busy} style={[s.cell, { width: cell, height: cell }, myTurn && !v && s.cellOpen]} accessibilityRole="button" accessibilityLabel={`Kare ${i + 1}${v ? `, ${v}` : ', boş'}`}>
-                {v && <MarkView mark={v} cell={cell} fresh={!!before && before.board[i] !== v} lit={!!line?.includes(i)} faint={over && !line?.includes(i)} still={still} />}
-              </Pressable>
-            ))}
-            {line && <WinLine line={line} cell={cell} still={still} />}
-          </View>
-        </LinearGradient>
+        <View style={{ alignSelf: 'center' }}>
+          <Bezel width={side + INSET * 2} height={side + INSET * 2} radius={26} inset={INSET} tone={BEZEL.night} glow={over ? (tone === 'draw' ? null : LINE) : myTurn && myMark ? MARK_COLORS[myMark] : null}>
+            <View style={{ width: side, height: side, flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
+              {board.map((v, i) => {
+                const lit = !!line?.includes(i);
+                const open = myTurn && !v;
+                return (
+                  <Pressable key={i} onPress={() => tap(i)} disabled={!myTurn || !!busy} style={[s.cell, { width: cell, height: cell, borderRadius: cell * 0.18 }, open && s.cellOpen]} accessibilityRole="button" accessibilityLabel={`Kare ${i + 1}${v ? `, ${v}` : ', boş'}`}>
+                    <LinearGradient colors={lit ? [alpha(LINE, 0.3), '#0B1730'] : open ? ['#15294F', '#0D1B38'] : ['#0D1A35', '#09142B']} style={[StyleSheet.absoluteFill, { borderRadius: cell * 0.18 }]} />
+                    <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.sunk, { borderRadius: cell * 0.18 }]} />
+                    {v && <MarkView mark={v} cell={cell} fresh={!!before && before.board[i] !== v} lit={lit} faint={over && !lit} still={still} fx={fx} />}
+                  </Pressable>
+                );
+              })}
+              {line && <WinLine line={line} cell={cell} still={still} fx={fx} />}
+            </View>
+          </Bezel>
+        </View>
       )}
       {over && tone ? (
         <EndCard inline tone={tone} title={prompt} sub={sub} size={side} still={still}>
@@ -191,9 +256,7 @@ function XoxStage({ view, endsAt, busy, onMove, children }: { view: XoxView; end
         </EndCard>
       ) : (
         <>
-          <Text style={[s.prompt, myTurn && { color: colors.text }]} accessibilityLiveRegion="polite">
-            {prompt}
-          </Text>
+          <StatusLine text={prompt} lit={myTurn} tint={myMark ? MARK_COLORS[myMark] : undefined} />
           {children}
         </>
       )}
@@ -262,11 +325,11 @@ export function XoxLive({ table, busy, onMove, children }: { table: XoxServerTab
 }
 
 const s = StyleSheet.create({
-  frame: { alignSelf: 'center', padding: 10, borderRadius: 24, borderWidth: 2 },
-  cell: { borderRadius: 16, backgroundColor: '#0A1426', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  cellOpen: { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: '#0E1B33' },
+  fill: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  cell: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderBottomColor: 'rgba(255,255,255,0.12)' },
+  cellOpen: { borderColor: 'rgba(255,255,255,0.16)', borderBottomColor: 'rgba(255,255,255,0.22)' },
+  sunk: { boxShadow: 'inset 0 3px 7px rgba(0,0,0,0.55)' },
   token: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#0A1426', borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   tokenText: { fontSize: 12, lineHeight: 15, fontWeight: '900' },
-  prompt: { color: colors.textDim, fontSize: 13, lineHeight: 18, fontWeight: '800', textAlign: 'center', minHeight: 18 },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });

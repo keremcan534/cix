@@ -8,15 +8,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
-import { ActionButton, DuelHeader, EndCard, endSound, firstName, rnd, usePracticeTable, useSecondsLeft, type Seat } from '@/components/games/room/table-kit';
+import { DISC_ART, RoomArtImage, roomArt, roomArtSet } from '@/components/games/room/table-art';
+import { ActionButton, BEZEL, Bezel, DuelHeader, EndCard, StatusLine, alpha, endSound, firstName, rnd, useBoardRoom, usePracticeTable, useSecondsLeft, useTableFx, type Seat } from '@/components/games/room/table-kit';
 import { Text } from '@/components/text';
 import type { FourServerTable } from '@/lib/api';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { errorHaptic, pressHaptic, successHaptic } from '@/lib/haptics';
 import { COLS, ROWS, botCol, cellOf, moveTable, openTable, restRow, sitDown, startTable, timeoutTable, type FourEvent, type FourMove, type FourTable } from '@/lib/room-games/four';
-import { useSettings } from '@/store';
 import { colors } from '@/theme';
 
 /** What the stage shows. `me` −1: I watch. `discs`: seat → its colour. */
@@ -27,28 +27,41 @@ export const DISC_COLORS: { name: string; light: string; base: string; deep: str
   { name: 'Pembe', light: '#FF99A4', base: '#F2506A', deep: '#A91F3D' },
   { name: 'Altın', light: '#FFE08A', base: '#F2A93B', deep: '#B36A0C' },
 ];
-const FRAME = '#1E4F8F';
-const WELL = '#081226';
-const PAD = 8;
+const FRAME = '#2459A6';
+const PAD = 9;
+/** What the stage draws round the board: the players' plates, the arrows, the stand, the status line, the gaps. */
+const CHROME = 150;
 
-/** A disc. `flat`: small, for a badge. */
+/** A disc: a glossy dome with a groove round its middle, lit from above, its lower rim catching the light. */
 export function Disc({ color, size }: { color: number; size: number }) {
+  const art = roomArtSet(DISC_ART);
+  if (art) return <RoomArtImage source={art[color] ?? art[0]} w={size} />;
   const c = DISC_COLORS[color] ?? DISC_COLORS[0];
+  const groove = size * 0.66;
   return (
-    <LinearGradient colors={[c.light, c.base, c.deep]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: size * 0.62, height: size * 0.62, borderRadius: size, borderWidth: Math.max(1, size * 0.06), borderColor: 'rgba(255,255,255,0.35)', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-    </LinearGradient>
+    <View style={{ width: size, height: size, borderRadius: size / 2, boxShadow: `0 ${Math.max(1, size * 0.06)}px ${Math.max(2, size * 0.12)}px rgba(0,0,0,0.55)` }}>
+      <LinearGradient colors={[c.light, c.base, c.deep]} locations={[0, 0.5, 1]} start={{ x: 0.25, y: 0 }} end={{ x: 0.75, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]} />
+      <View style={{ position: 'absolute', left: (size - groove) / 2, top: (size - groove) / 2, width: groove, height: groove, borderRadius: groove / 2, borderWidth: Math.max(1, size * 0.05), borderColor: alpha(c.deep, 0.75), borderTopColor: 'rgba(0,0,0,0.28)', borderBottomColor: 'rgba(255,255,255,0.4)' }} />
+      <LinearGradient colors={['rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} style={{ position: 'absolute', left: size * 0.2, top: size * 0.06, width: size * 0.6, height: size * 0.42, borderRadius: size }} />
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: size / 2, borderWidth: Math.max(1, size * 0.045), borderColor: 'transparent', borderBottomColor: alpha(c.light, 0.75) }} />
+    </View>
   );
 }
 
 /** A disc on the board. `drop`: it just came, so it falls from above the board (that many rows) and bounces. */
-function BoardDisc({ color, size, drop, lit, faint, newest, still }: { color: number; size: number; drop: number; lit: boolean; faint: boolean; newest: boolean; still: boolean }) {
+function BoardDisc({ color, size, drop, lit, faint, newest, still, fx }: { color: number; size: number; drop: number; lit: boolean; faint: boolean; newest: boolean; still: boolean; fx: boolean }) {
   const [y] = useState(() => new Animated.Value(drop && !still ? -drop : 0));
+  // It lands a little squashed and springs back round.
+  const [squash] = useState(() => new Animated.Value(0));
   const [beat] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const land = setTimeout(() => drop && playSfx('chip', 0.9), still ? 0 : 150 + drop * 0.5);
-    const a = Animated.timing(y, { toValue: 0, duration: 260 + drop * 1.1, easing: Easing.bounce, useNativeDriver: true });
-    a.start();
+    const fall = 260 + drop * 1.1;
+    const a = Animated.parallel([
+      Animated.timing(y, { toValue: 0, duration: fall, easing: Easing.bounce, useNativeDriver: true }),
+      Animated.sequence([Animated.delay(fall * 0.36), Animated.timing(squash, { toValue: 1, duration: 70, useNativeDriver: true }), Animated.spring(squash, { toValue: 0, speed: 22, bounciness: 14, useNativeDriver: true })]),
+    ]);
+    if (drop && !still) a.start();
     return () => {
       clearTimeout(land);
       a.stop();
@@ -57,13 +70,13 @@ function BoardDisc({ color, size, drop, lit, faint, newest, still }: { color: nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (!lit || still) return void beat.setValue(0);
+    if (!lit || !fx) return void beat.setValue(0);
     const a = Animated.loop(Animated.sequence([Animated.timing(beat, { toValue: 1, duration: 460, easing: Easing.inOut(Easing.quad), useNativeDriver: true }), Animated.timing(beat, { toValue: 0, duration: 460, easing: Easing.inOut(Easing.quad), useNativeDriver: true })]));
     a.start();
     return () => a.stop();
-  }, [lit, still, beat]);
+  }, [lit, fx, beat]);
   return (
-    <Animated.View style={{ opacity: faint ? 0.35 : 1, transform: [{ translateY: y }, { scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }}>
+    <Animated.View style={{ opacity: faint ? 0.35 : 1, transform: [{ translateY: y }, { scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }, { scaleY: squash.interpolate({ inputRange: [0, 1], outputRange: [1, 0.86] }) }, { scaleX: squash.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }] }}>
       <Disc color={color} size={size} />
       {lit && <View style={[s.litRing, { borderRadius: size / 2 }]} />}
       {newest && !lit && <View style={[s.newest, { left: size / 2 - 3, top: size / 2 - 3 }]} />}
@@ -81,10 +94,10 @@ function Arrows({ cell, open, color, still }: { cell: number; open: boolean[]; c
     return () => a.stop();
   }, [still, bob]);
   return (
-    <Animated.View pointerEvents="none" style={{ flexDirection: 'row', paddingHorizontal: PAD, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [-2, 3] }) }] }}>
+    <Animated.View pointerEvents="none" style={{ flexDirection: 'row', paddingHorizontal: PAD + 1, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [-2, 3] }) }] }}>
       {open.map((ok, col) => (
         <View key={col} style={{ width: cell, alignItems: 'center', opacity: ok ? 1 : 0 }}>
-          <Ionicons name="caret-down" size={Math.min(20, cell * 0.5)} color={color} />
+          <Ionicons name="caret-down" size={Math.min(22, cell * 0.5)} color={color} style={{ textShadowColor: color, textShadowRadius: 8, textShadowOffset: { width: 0, height: 0 } }} />
         </View>
       ))}
     </Animated.View>
@@ -92,7 +105,8 @@ function Arrows({ cell, open, color, still }: { cell: number; open: boolean[]; c
 }
 
 function FourStage({ view, endsAt, busy, onMove, children }: { view: FourView; endsAt: number | null; busy?: boolean; onMove: (m: FourMove) => void; children?: ReactNode }) {
-  const { reduceMotion: still } = useSettings();
+  const { still, fx } = useTableFx();
+  const room = useBoardRoom(CHROME);
   const [width, setWidth] = useState(0);
   // The state shown before this one: a disc that wasn't there is the one just dropped.
   const [pair, setPair] = useState<{ cur: FourView; before: FourView | null }>({ cur: view, before: null });
@@ -104,12 +118,14 @@ function FourStage({ view, endsAt, busy, onMove, children }: { view: FourView; e
   const playing = status === 'playing';
   const over = status === 'over';
   const myTurn = playing && view.turn === me;
-  const cell = Math.floor((Math.min(width, 364) - PAD * 2) / COLS);
-  const boardW = cell * COLS + PAD * 2;
-  const boardH = cell * ROWS + PAD * 2;
+  // The board takes the width it is given, as long as it still fits the sheet's height (1 + 2 for the bezel's hairline).
+  const cell = Math.floor(Math.min((width - PAD * 2 - 2) / COLS, (room - PAD * 2 - 2) / ROWS));
+  const boardW = cell * COLS + PAD * 2 + 2;
+  const boardH = cell * ROWS + PAD * 2 + 2;
   const disc = Math.round(cell * 0.8);
   const hole = disc - 2;
   const rim = Math.ceil(cell * 0.4);
+  const cellArt = roomArt('dort-tas-hucre');
   const open = Array.from({ length: COLS }, (_, col) => restRow(board, col) >= 0);
   const tone = !over ? null : view.winner === null ? 'draw' : view.winner === me ? 'win' : 'lose';
   const winnerSeat = view.winner !== null ? view.seats[view.winner] : null;
@@ -157,43 +173,47 @@ function FourStage({ view, endsAt, busy, onMove, children }: { view: FourView; e
   const came = before && before.hand === view.hand && view.last && view.n > before.n ? cellOf(view.last.col, view.last.row) : -1;
 
   return (
-    <View style={{ gap: 8 }} onLayout={(e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width))}>
+    <View style={{ gap: 10 }} onLayout={(e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width))}>
       <DuelHeader seats={view.seats} me={me} turn={view.turn} playing={playing} endsAt={endsAt} wins={view.wins} winner={view.winner} tints={[DISC_COLORS[view.discs[0] ?? 0].base, DISC_COLORS[view.discs[1] ?? 1].base]} token={(seat) => <View style={s.token}><Disc color={view.discs[seat] ?? seat} size={18} /></View>} />
       {width > 0 && (
         <View style={{ alignSelf: 'center', width: boardW }}>
-          <View style={{ height: 22, justifyContent: 'flex-end' }}>{myTurn && mine !== null && <Arrows cell={cell} open={open} color={DISC_COLORS[mine].base} still={still} />}</View>
-          <View style={[s.board, { width: boardW, height: boardH, borderColor: over && view.line ? '#FFD166' : '#2C66B4' }]}>
+          <View style={{ height: 24, justifyContent: 'flex-end' }}>{myTurn && mine !== null && <Arrows cell={cell} open={open} color={DISC_COLORS[mine].base} still={still} />}</View>
+          <Bezel width={boardW} height={boardH} radius={20} inset={PAD + 1} tone={BEZEL.plastic} glow={over && view.line ? '#FFD166' : myTurn && mine !== null ? DISC_COLORS[mine].base : null} over>
             {/* The discs, behind the board's face. */}
-            <View style={{ position: 'absolute', left: PAD, top: PAD, width: cell * COLS, height: cell * ROWS, backgroundColor: WELL }}>
-              {board.map((color, i) => {
-                if (color === null) return null;
-                const col = i % COLS;
-                const row = Math.floor(i / COLS);
-                const lit = !!view.line?.includes(i);
-                return (
-                  <View key={`${view.hand}:${i}`} style={{ position: 'absolute', left: col * cell + (cell - disc) / 2, top: (ROWS - 1 - row) * cell + (cell - disc) / 2 }}>
-                    <BoardDisc color={color} size={disc} drop={i === came ? (ROWS - row) * cell : 0} lit={lit} faint={over && !!view.line && !lit} newest={playing && view.last !== null && cellOf(view.last.col, view.last.row) === i} still={still} />
-                  </View>
-                );
-              })}
-            </View>
-            {/* The board's face: a wall with a round hole per cell, the falling disc showing through. */}
-            <View pointerEvents="none" style={{ position: 'absolute', left: PAD, top: PAD, width: cell * COLS, height: cell * ROWS, flexDirection: 'row', flexWrap: 'wrap' }}>
-              {Array.from({ length: COLS * ROWS }, (_, i) => (
-                <View key={i} style={{ width: cell, height: cell, overflow: 'hidden' }}>
-                  <View style={{ position: 'absolute', left: (cell - hole) / 2 - rim, top: (cell - hole) / 2 - rim, width: hole + rim * 2, height: hole + rim * 2, borderRadius: hole / 2 + rim, borderWidth: rim, borderColor: FRAME }} />
-                  <View style={{ position: 'absolute', left: (cell - hole) / 2, top: (cell - hole) / 2, width: hole, height: hole, borderRadius: hole / 2, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.35)' }} />
+            {board.map((color, i) => {
+              if (color === null) return null;
+              const col = i % COLS;
+              const row = Math.floor(i / COLS);
+              const lit = !!view.line?.includes(i);
+              return (
+                <View key={`${view.hand}:${i}`} style={{ position: 'absolute', left: col * cell + (cell - disc) / 2, top: (ROWS - 1 - row) * cell + (cell - disc) / 2 }}>
+                  <BoardDisc color={color} size={disc} drop={i === came ? (ROWS - row) * cell : 0} lit={lit} faint={over && !!view.line && !lit} newest={playing && view.last !== null && cellOf(view.last.col, view.last.row) === i} still={still} fx={fx} />
                 </View>
-              ))}
+              );
+            })}
+            {/* The board's face: a wall with a round hole per cell, the falling disc showing through; each hole's
+                edge is bevelled, dark where the wall shades it and lit along its lower lip. */}
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: cell * COLS, height: cell * ROWS, flexDirection: 'row', flexWrap: 'wrap' }}>
+              {Array.from({ length: COLS * ROWS }, (_, i) =>
+                cellArt ? (
+                  <Image key={i} source={cellArt} style={{ width: cell, height: cell }} />
+                ) : (
+                  <View key={i} style={{ width: cell, height: cell, overflow: 'hidden' }}>
+                    <View style={{ position: 'absolute', left: (cell - hole) / 2 - rim, top: (cell - hole) / 2 - rim, width: hole + rim * 2, height: hole + rim * 2, borderRadius: hole / 2 + rim, borderWidth: rim, borderColor: FRAME }} />
+                    <View style={[s.lip, { left: (cell - hole) / 2 - 1, top: (cell - hole) / 2 - 1, width: hole + 2, height: hole + 2, borderRadius: hole / 2 + 1 }]} />
+                  </View>
+                ),
+              )}
             </View>
             {/* A column is one wide button. */}
-            <View style={{ position: 'absolute', left: PAD, top: 0, bottom: 0, flexDirection: 'row' }}>
+            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, flexDirection: 'row' }}>
               {open.map((ok, col) => (
                 <Pressable key={col} onPress={() => tap(col)} disabled={!myTurn || !!busy} style={{ width: cell, height: '100%' }} accessibilityRole="button" accessibilityLabel={`${col + 1}. sütun${ok ? '' : ', dolu'}`} />
               ))}
             </View>
-          </View>
-          <View style={[s.foot, { width: boardW + 12 }]} />
+          </Bezel>
+          {/* The stand the board sits in. */}
+          <LinearGradient colors={['#2A62B0', '#143468']} style={s.foot} />
         </View>
       )}
       {over && tone ? (
@@ -202,9 +222,7 @@ function FourStage({ view, endsAt, busy, onMove, children }: { view: FourView; e
         </EndCard>
       ) : (
         <>
-          <Text style={[s.prompt, myTurn && { color: colors.text }]} accessibilityLiveRegion="polite">
-            {prompt}
-          </Text>
+          <StatusLine text={prompt} lit={myTurn} tint={mine !== null ? DISC_COLORS[mine].base : undefined} />
           {children}
         </>
       )}
@@ -277,11 +295,10 @@ export function FourLive({ table, busy, onMove, children }: { table: FourServerT
 }
 
 const s = StyleSheet.create({
-  board: { borderRadius: 18, borderWidth: 2, backgroundColor: FRAME, overflow: 'hidden', boxShadow: '0 8px 18px rgba(0,0,0,0.45)' },
-  foot: { alignSelf: 'center', height: 8, marginTop: -2, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, backgroundColor: '#163A6B' },
+  lip: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(0,0,0,0.3)', borderTopColor: 'rgba(0,0,0,0.6)', borderBottomColor: 'rgba(255,255,255,0.32)' },
+  foot: { height: 10, marginTop: -3, marginHorizontal: 10, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.14)', boxShadow: '0 6px 12px rgba(0,0,0,0.5)' },
   litRing: { position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderWidth: 3, borderColor: '#FFFFFF', boxShadow: '0 0 12px rgba(255,255,255,0.9)' },
   newest: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
   token: { borderRadius: 11, borderWidth: 2, borderColor: '#0A1426' },
-  prompt: { color: colors.textDim, fontSize: 13, lineHeight: 18, fontWeight: '800', textAlign: 'center', minHeight: 18 },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });
