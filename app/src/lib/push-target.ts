@@ -28,6 +28,9 @@ export function pushTarget(data: Record<string, unknown> | undefined): Href | nu
     // A staff reply on a support ticket (server/api/support.mjs): Destek › Taleplerim.
     case 'support':
       return '/destek?tab=talepler';
+    // An event's review result, cancel or removal (server/api/events.mjs): Etkinlik Merkezi on that event.
+    case 'event':
+      return s('id') && /^\d{1,12}$/.test(s('id')!) ? (`/?etkinlik=${s('id')}` as Href) : '/';
     // A call: the app opens and its incoming call card rings; a missed one shows in the notifications.
     case 'call':
       return data.missed ? '/bildirimler' : null;

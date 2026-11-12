@@ -482,7 +482,7 @@ export const registerPush = (token: string, platform: 'ios' | 'android' | 'web',
 export const unregisterPush = (token: string) => call<{ registered: boolean }>('POST', '/api/push/unregister', { token });
 
 /** A signed address to PUT a photo or video to (with exactly `headers`); save `publicUrl` afterwards. */
-export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover', contentType: string, size: number) =>
+export const uploadUrl = (kind: 'avatar' | 'moment' | 'dm' | 'album' | 'notice' | 'music' | 'ticket' | 'roombg' | 'roomcover' | 'eventcover', contentType: string, size: number) =>
   call<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; publicUrl: string; expiresIn: number }>('POST', '/api/media/upload-url', { kind, contentType, size });
 
 /**
@@ -562,6 +562,8 @@ export type ServerRoom = {
   /** Following the room (server/api/room-follow.mjs), on the read of one room: how many follow it, and whether I do. */
   followers?: number;
   following?: boolean;
+  /** Etkinlik Merkezi (server/api/events.mjs): the room's running event, else its next one within a day. */
+  event?: RoomEventBrief | null;
 };
 /**
  * Patron koltuğu as the server reads it (server/api/boss-seat.mjs). `mode`: Otomatik (gifts decide) or Davet (the owner
@@ -733,6 +735,103 @@ export const roomEvents = (room: string) => call<{ events: ServerRoomEvent[] }>(
 export const addRoomEvent = (room: string, e: { title: string; desc: string; when: string; type: string }) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events', { room, ...e }).then((r) => r.event);
 export const cancelRoomEvent = (id: number) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events/cancel', { id }).then((r) => r.event);
 export const goRoomEvent = (id: number, going: boolean) => call<{ event: ServerRoomEvent }>('POST', '/api/rooms/events/going', { id, going }).then((r) => r.event);
+
+// --- Etkinlik Merkezi (server/api/events.mjs) ---------------------------------------------------------------------
+export type EventState = 'draft' | 'review' | 'rejected' | 'cancelled' | 'upcoming' | 'live' | 'ended';
+export type EventItem = {
+  id: number;
+  title: string;
+  description: string;
+  category: { id: string; name: string; icon: string };
+  theme: string;
+  coverUrl: string | null;
+  room: { id: string; title: string; closed: boolean };
+  host: { id: string; name: string; avatarUrl: string | null };
+  startsAt: string;
+  endsAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  endReason: 'owner' | 'time' | 'room_closed' | 'not_started' | 'admin' | null;
+  state: EventState;
+  stateLabel: string;
+  capacity: number | null;
+  reservation: boolean;
+  visibility: 'public' | 'room';
+  /** Places taken, and people who came while it ran. */
+  reserved: number;
+  came: number;
+  /** My place: confirmed, cancelled, attended, missed (null: none). */
+  mine: 'confirmed' | 'waiting' | 'cancelled' | 'attended' | 'missed' | null;
+};
+export type EventDetail = EventItem & {
+  rules: string;
+  rejectReason: string | null;
+  cancelReason: string | null;
+  rank: number;
+  can: { edit: boolean; cancel: boolean; start: boolean; end: boolean; reserve: boolean; people: boolean };
+  startFrom: string;
+  startUntil: string;
+  history?: { action: string; by: string; at: string; detail: Record<string, unknown> }[];
+};
+export type EventCategory = { id: string; name: string; icon: string; theme: string };
+export type EventTheme = { id: string; name: string; minLevel: number };
+export type EventMeta = {
+  categories: EventCategory[];
+  themes: EventTheme[];
+  rules: { minRoomLevel: number; minLeadMinutes: number; maxMinutes: number; maxCapacity: number; graceMinutes: number };
+  rooms: { id: string; title: string; level: number }[];
+  blockedUntil: string | null;
+};
+export type EventForm = {
+  room: string;
+  category: string;
+  theme?: string;
+  title: string;
+  description: string;
+  rules: string;
+  coverUrl: string | null;
+  startsAt: string;
+  minutes: number;
+  capacity: number | null;
+  reservation: boolean;
+  visibility: 'public' | 'room';
+  draft?: boolean;
+};
+export type RoomEventBrief = { id: number; title: string; theme: string; state: 'live' | 'upcoming'; startsAt: string; endsAt: string; startedAt: string | null; came: number };
+export type EventQuery = { status?: string; cat?: string; when?: string; sort?: string; following?: boolean; q?: string; skip?: number };
+const queryOf = (q: Record<string, string | number | boolean | undefined>) =>
+  Object.entries(q)
+    .filter(([, v]) => v !== undefined && v !== '' && v !== false)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v === true ? '1' : String(v))}`)
+    .join('&');
+/** The person's time-zone offset in minutes east of UTC (the list's "today" is their own day). */
+const tzOf = () => -new Date().getTimezoneOffset();
+export const eventList = (q: EventQuery) => call<{ events: EventItem[]; more: boolean }>('GET', `/api/events?${queryOf({ ...q, tz: tzOf() })}`);
+export const eventMeta = () => call<EventMeta>('GET', '/api/events/meta');
+export const eventOne = (id: number) => call<{ event: EventDetail }>('GET', `/api/events/one?id=${id}`).then((r) => r.event);
+export const eventsMine = () => call<{ events: EventItem[]; reserved: EventItem[] }>('GET', '/api/events/mine');
+export const eventsOfRoom = (room: string) => call<{ running: EventItem | null; upcoming: EventItem[]; recent: EventItem[] }>('GET', `/api/events/room?room=${encodeURIComponent(room)}`);
+export const eventPeople = (id: number) =>
+  call<{ reservations: { user: UserCard; status: string; at: string }[]; participants: { user: UserCard; at: string }[] }>('GET', `/api/events/people?id=${id}`);
+const eventAct = (path: string, body: object) => call<{ event: EventDetail }>('POST', path, body).then((r) => r.event);
+export const applyEvent = (f: EventForm) => eventAct('/api/events', f);
+export const editEvent = (id: number, f: EventForm) => eventAct('/api/events/edit', { id, ...f });
+export const cancelEvent = (id: number, reason?: string) => eventAct('/api/events/cancel', { id, reason: reason || null });
+export const startEvent = (id: number) => eventAct('/api/events/start', { id });
+export const endEvent = (id: number) => eventAct('/api/events/end', { id });
+export const reserveEvent = (id: number) => eventAct('/api/events/reserve', { id });
+export const unreserveEvent = (id: number) => eventAct('/api/events/unreserve', { id });
+export const eventHere = (id: number) => call<{ counted: boolean }>('POST', '/api/events/here', { id });
+export type AdminEvent = EventItem & { rules: string; submittedAt: string | null; rejectReason: string | null };
+export const adminEvents = (status: string, q = '', skip = 0) =>
+  call<{ events: AdminEvent[]; counts: { review: number; upcoming: number; live: number }; more: boolean }>('GET', `/api/admin/events?${queryOf({ status, q, skip })}`);
+export const reviewEvent = (id: number, approve: boolean, reason?: string) => eventAct('/api/admin/events/review', { id, approve, reason });
+export const removeEvent = (id: number, reason: string) => eventAct('/api/admin/events/remove', { id, reason });
+export type AdminEventCategory = EventCategory & { sort: number; active: boolean; used?: number };
+export const adminEventCategories = () => call<{ categories: AdminEventCategory[] }>('GET', '/api/admin/events/categories').then((r) => r.categories);
+export const saveEventCategory = (c: Partial<AdminEventCategory> & { name: string }) =>
+  call<{ category: AdminEventCategory }>('POST', '/api/admin/events/categories', c).then((r) => r.category);
+export const removeEventCategory = (id: string) => call<{ removed: boolean }>('POST', '/api/admin/events/categories/remove', { id });
 
 // Bağlar (server/api/bonds.mjs). `partner` is the other person as the asker (or the profile owner) sees it.
 export type ServerBond = {
@@ -1175,9 +1274,12 @@ export type LiveKey =
   | RewardKey
   | CasinoKey
   | DecorKey
-  | RoomKey;
+  | RoomKey
+  | EventKey;
 /** Odalar (server/api/live-registry.mjs, "Odalar"): when a room without its staff closes, and the Patron koltuğu's coins and minutes. */
 export type RoomKey = 'room_staff_away_minutes' | 'boss_seat_coins' | 'boss_seat_minutes';
+/** Etkinlik Merkezi (server/api/live-registry.mjs, "Etkinlikler"): who may apply, how far ahead, how long and big, the grace, strikes. */
+export type EventKey = 'event_min_room_level' | 'event_min_lead_minutes' | 'event_max_minutes' | 'event_max_capacity' | 'event_grace_minutes' | 'event_strike_limit' | 'event_block_days';
 /** Oda süslemesi (server/api/live-registry.mjs, "Oda süslemesi"): which sales are off, Özel süsleme's price and days. */
 export type DecorKey = 'room_decor_off' | 'room_bg_custom_price' | 'room_bg_custom_days';
 /** Yeni üye ödülleri (server/api/live-registry.mjs): which rewards are off, and their amounts and daily cap. */

@@ -2,7 +2,7 @@
 // tests can hold them to the server's rules (server/api/live-registry.mjs): the server checks every value again
 // and its dryRun preview is what the admin confirms; these only keep the panel honest before anyone taps.
 // Times are Istanbul time (UTC+3 all year since 2016), whatever the phone's own time zone.
-import type { CatalogCampaign, LiveKey, LiveValue, OneOnOneKey, RewardKey, RoomKey } from '@/lib/api';
+import type { CatalogCampaign, EventKey, LiveKey, LiveValue, OneOnOneKey, RewardKey, RoomKey } from '@/lib/api';
 import { RULES } from '@/data/rules';
 import { selfExchangeRate } from '@/lib/coins-bank';
 import { campaignCoins } from '@/lib/live/catalog-live';
@@ -119,6 +119,17 @@ export const DECOR_LABEL: Record<string, string> = { custom: 'Özel süsleme (ke
 export const DECOR_NUMBER_KEYS: { key: 'room_bg_custom_price' | 'room_bg_custom_days'; unit: string }[] = [
   { key: 'room_bg_custom_price', unit: ' jeton' },
   { key: 'room_bg_custom_days', unit: ' gün' },
+];
+
+/** Etkinlik Merkezi's limits (server/api/live-registry.mjs EVENT_RULES), in card order, with each one's unit. */
+export const EVENT_NUMBER_KEYS: { key: EventKey; unit: string }[] = [
+  { key: 'event_min_room_level', unit: '' },
+  { key: 'event_min_lead_minutes', unit: ' dakika' },
+  { key: 'event_max_minutes', unit: ' dakika' },
+  { key: 'event_max_capacity', unit: ' kişi' },
+  { key: 'event_grace_minutes', unit: ' dakika' },
+  { key: 'event_strike_limit', unit: '' },
+  { key: 'event_block_days', unit: ' gün' },
 ];
 
 /** Odalar (server/api/live-registry.mjs): when a room without its staff closes, the Patron koltuğu's coins and
@@ -266,6 +277,18 @@ export function valueText(key: LiveKey, v: LiveValue, { stored = false, names = 
       return typeof v === 'number' ? `Tek seferde ${fmtNum(v)} jeton` : String(v);
     case 'boss_seat_minutes':
       return typeof v === 'number' ? `${fmtNum(v)} dakika` : String(v);
+    case 'event_min_room_level':
+      return typeof v === 'number' ? `Oda Lv.${v} ve üstü` : String(v);
+    case 'event_min_lead_minutes':
+    case 'event_max_minutes':
+    case 'event_grace_minutes':
+      return typeof v === 'number' ? `${fmtNum(v)} dakika` : String(v);
+    case 'event_max_capacity':
+      return typeof v === 'number' ? `${fmtNum(v)} kişi` : String(v);
+    case 'event_strike_limit':
+      return typeof v === 'number' ? `30 günde ${fmtNum(v)} ihlal` : String(v);
+    case 'event_block_days':
+      return typeof v === 'number' ? `${fmtNum(v)} gün` : String(v);
     default:
       return String(v);
   }

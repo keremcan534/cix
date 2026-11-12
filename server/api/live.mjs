@@ -20,6 +20,7 @@ import crypto from 'node:crypto';
 
 import { HttpError, UUID, auth, db, env, readRaw } from './core.mjs';
 import { roomEntered } from './referrals.mjs';
+import { eventJoined, eventRoomFinished } from './events.mjs';
 import { leftVoiceRoom, mayStay, voiceAccess, voiceRoomStarted } from './rooms.mjs';
 import { voiceGrant } from './sanctions.mjs';
 
@@ -104,6 +105,8 @@ async function onEvent(e) {
       await db.query('INSERT INTO room_presence (room, identity, sid) VALUES ($1, $2, $3) ON CONFLICT (room, identity) DO UPDATE SET sid = EXCLUDED.sid', [room, who, sid]);
       // Arkadaşını Getir: an invitee's room entry pays their waiting invite (referrals.mjs; never fails the webhook).
       await roomEntered(who, room);
+      // A running event in the room counts them as come (events.mjs; never fails the webhook).
+      await eventJoined(room, who);
       break;
     }
     case 'participant_left':
@@ -125,6 +128,8 @@ async function onEvent(e) {
       break;
     case 'room_finished':
       await logPresence(await db.query('DELETE FROM room_presence WHERE room = $1 RETURNING room, identity, joined_at', [room]));
+      // The room emptied and closed: its running event ends (events.mjs).
+      await eventRoomFinished(room);
       break;
     default:
   }

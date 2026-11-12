@@ -13,7 +13,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 - Bölüm 1–3'te zayıf kalanlar: `animasyon-ejderha.png` ve `animasyon-kategori-fantastik.png` düz siluet; `tepki-temel-kahkaha` = `tepki-eglence-yerlere-yattim` ve `tepki-vip-elmas` = `tepki-vip-kristal` aynı görsel. Kahkaha ve Elmas bağlı; Yerlere Yattım ve Kristal ücretli pakette kopya satılmasın diye çıkarıldı, yenileri gelince `components/ReactionArt.tsx` ve `data/catalog.ts` STICKER_PACKS'e geri eklenir.
 - **Emoji / çıkartma ayrımı:** standart Unicode emojiler herkese ücretsiz (`STANDARD_EMOJI`); bölüm 3'teki çizimler artık satılan çıkartmalardır (`STICKER_PACKS`). Temel ücretsizdi; Güncelleme 4'te emoji panelinden ve mağazadan kalktı, gönderilmiş Temel çıkartmaları yine çizilir. Çıkartma mesajda `⟦kimlik⟧` olarak gider, emoji yazmak çıkartma göstermez.
 
-**Toplam 628 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
+**Toplam 654 görsel.** Öncelik (bölüm 1–15, 556 görsel): P1 143 (çok görünen, para kazandıran) · P2 192 · P3 160 · P4 61 (küçük arayüz simgeleri). Bölüm 16 ve sonrasının öncelikleri kendi tablolarında yazılı.
 
 | Bölüm | Adet |
 |---|---|
@@ -36,6 +36,7 @@ Uygulamada emoji kalmayacak; aşağıdaki her satır sizin üreteceğiniz **bir 
 | 17. Oyun Salonu: Yörünge, Mercan Avı, Fener Kayalığı | 22 |
 | 18. Oda oyunları: Renk Kartları, XOX, Dört Taş | 21 |
 | 19. Oyun Salonu: Bilye Şelalesi | 8 |
+| 20. Etkinlik Merkezi: temalar ve türler | 26 |
 | 21. Emoji paneli: VIP emojileri | 8 |
 | 22. Oda katkı sıralaması | 4 |
 
@@ -812,6 +813,51 @@ Oyun şimdilik kodla çizilen şekillerle duruyor (altın noktalar çivi, renkli
 | 6 | Zümrüt kupa | Aynı biçimde yeşil zümrüt kupa | `bilye-kupa-zumrut.png` | P2 |
 | 7 | Tahta arka planı | Dikey 320×440 oranında, mor-lacivert derin bir şelale dokusu, kenarlarda ince altın çerçeve; çivi ve kupa çizilmeden | `bilye-tahta.png` | P2 |
 | 8 | Fırlatma kanalı | Sağda dikey, cam bir boru; altta küçük bir yay/piston | `bilye-kanal.png` | P3 |
+
+## 20. Etkinlik Merkezi: temalar ve türler (26)
+
+Etkinlik kartları ve odadaki etkinlik teması şimdilik temanın iki rengiyle çizilen geçiş ve bir simgeyle duruyor (`app/src/lib/events.ts` THEME_LOOK). Görseller gelince kartta (kapak yüklenmemişse), tema seçicide ve etkinlik sürerken odanın arka planında kullanılacak. Adlar SimilarClub'ın kendi temaları; başka uygulamaların tema adı, deseni ya da karakteri kullanılmasın. Stil: uygulamanın 3D cam/jöle yüzeyi, yazı yok.
+
+**Tema kapakları** (16:9, 1280 × 720 PNG; kartın üstünde, yazısız; ortada temanın ana nesnesi):
+
+| # | Tema | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 1 | Sade | Mor-mavi yumuşak ışık lekeleri, ortada küçük parıltı | `etkinlik-kapak-sade.png` | P2 |
+| 2 | İlk Selam | Turkuaz-mavi zemin, el sallayan iki el silueti, baloncuklar | `etkinlik-kapak-ilk-selam.png` | P1 |
+| 3 | Pasta ve Mum | Pembe-turuncu zemin, mumlu katlı pasta, konfeti | `etkinlik-kapak-pasta.png` | P1 |
+| 4 | Sahne Işığı | Mor-pembe zemin, sahne spotları ve mikrofon, notalar | `etkinlik-kapak-sahne.png` | P1 |
+| 5 | Yıldız Gecesi | Lacivert-mor gece göğü, parlak yıldızlar, hilal | `etkinlik-kapak-yildiz.png` | P2 |
+| 6 | Kupa Gecesi | Kehribar-altın zemin, parlayan kupa, kürsü | `etkinlik-kapak-kupa.png` | P1 |
+| 7 | İki Kalp | Kırmızı-pembe zemin, iç içe iki kalp, yumuşak ışık | `etkinlik-kapak-iki-kalp.png` | P2 |
+| 8 | Ocak Başı | Turuncu-sarı sıcak zemin, şömine ateşi, fincanlar | `etkinlik-kapak-ocak.png` | P2 |
+| 9 | Altın Gala | Koyu altın zemin, kadife perde, altın ışıltılar | `etkinlik-kapak-altin-gala.png` | P2 |
+
+**Oda arka planları** (dikey 1080 × 1920 PNG; etkinlik sürerken sahnenin arkasında; üst ve orta sade kalsın, mikrofonlar okunabilsin):
+
+| # | Tema | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 10 | İlk Selam | Ferah turkuaz salon, yumuşak ışıklar | `etkinlik-oda-ilk-selam.png` | P2 |
+| 11 | Pasta ve Mum | Balonlar ve hediye kutularıyla süslü kutlama salonu | `etkinlik-oda-pasta.png` | P1 |
+| 12 | Sahne Işığı | Mor ışıklı konser sahnesi, büyük mikrofon silueti | `etkinlik-oda-sahne.png` | P1 |
+| 13 | Yıldız Gecesi | Yıldızlı gökyüzü altında çatı terası | `etkinlik-oda-yildiz.png` | P2 |
+| 14 | Kupa Gecesi | Yarışma stüdyosu, skor ışıkları, kupa | `etkinlik-oda-kupa.png` | P1 |
+| 15 | İki Kalp | Gül yaprakları ve yumuşak pembe ışık | `etkinlik-oda-iki-kalp.png` | P2 |
+| 16 | Ocak Başı | Şömineli, sıcak bir aile salonu | `etkinlik-oda-ocak.png` | P2 |
+| 17 | Altın Gala | Altın avizeli gala salonu, kadife perdeler | `etkinlik-oda-altin-gala.png` | P2 |
+| 18 | Sade | Temanın renkleriyle sade derin bir ışık | `etkinlik-oda-sade.png` | P3 |
+
+**Etkinlik türleri** (512 px kare, şeffaf; filtrede ve kartın etiketinde; yönetim yeni tür ekleyince bu biçimde yeni simge istenir):
+
+| # | Tür | Ne çizilecek | Dosya adı | Öncelik |
+|---|---|---|---|---|
+| 19 | Eğlence | Gülen yüzlü parti şapkası | `etkinlik-tur-eglence.png` | P2 |
+| 20 | Müzik | Nota ve kulaklık | `etkinlik-tur-muzik.png` | P2 |
+| 21 | Tanışma | El sallayan el | `etkinlik-tur-tanisma.png` | P2 |
+| 22 | Yarışma | Küçük kupa | `etkinlik-tur-yarisma.png` | P2 |
+| 23 | Özel Günler | Kurdeleli hediye kutusu | `etkinlik-tur-ozel-gun.png` | P2 |
+| 24 | Aile Etkinlikleri | Yan yana üç kişi silueti | `etkinlik-tur-aile.png` | P3 |
+| 25 | Çiftler Etkinlikleri | İki kalp | `etkinlik-tur-cift.png` | P3 |
+| 26 | Diğer | Üç parıltı | `etkinlik-tur-diger.png` | P3 |
 
 ## 21. Emoji paneli: VIP emojileri (8)
 

@@ -22,6 +22,7 @@ import {
   CASINO_NUMBER_KEYS,
   DECOR_LABEL,
   DECOR_NUMBER_KEYS,
+  EVENT_NUMBER_KEYS,
   CAMPAIGN_PERCENT,
   campaignError,
   campaignExample,
@@ -213,6 +214,7 @@ function Body({
             {kit.get('casino_off') && <CasinoCard kit={kit} />}
             {kit.get('room_decor_off') && <DecorCard kit={kit} />}
             {kit.get('room_staff_away_minutes') && <RoomsCard kit={kit} />}
+            {kit.get('event_max_minutes') && <EventRulesCard kit={kit} />}
             <SmsCard kit={kit} />
             <VersionCard kit={kit} />
           </View>
@@ -1047,6 +1049,53 @@ function RoomsCard({ kit }: { kit: Kit }) {
           style={{ flex: 1 }}
         />
         <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Oda ayarları değişsin', () => changes)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+}
+
+// --- Etkinlikler ---------------------------------------------------------------------------------------------
+/**
+ * Etkinlik Merkezi (server/api/events.mjs): who may apply (room level), how far ahead, how long and how big an
+ * event may be, the start's grace, and the limit for events left unstarted. Applications are reviewed in
+ * Yönetim › Etkinlikler.
+ */
+function EventRulesCard({ kit }: { kit: Kit }) {
+  const s = useStyles();
+  const rows = EVENT_NUMBER_KEYS.map(({ key, unit }) => ({ key, unit, x: kit.get(key) })).filter((r) => !!r.x);
+  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.key, fmtNum(numOf(r.x.effective))])));
+  const changes: LiveChanges = {};
+  const errors: Record<string, string | null> = {};
+  for (const r of rows) {
+    const v = parseWhole(texts[r.key] ?? '');
+    const changed = v !== r.x.effective;
+    errors[r.key] = changed ? wholeError(v, r.x.bounds as IntBounds, r.x.label, r.unit) : null;
+    if (changed && v !== null) changes[r.key] = v;
+  }
+  const dirty = Object.keys(changes).length > 0;
+  const bad = rows.some((r) => errors[r.key]);
+  const reset: LiveChanges = {};
+  for (const r of rows) if (r.x.value !== null) reset[r.key] = null;
+  if (!rows.length) return null;
+  return (
+    <Card title="Etkinlikler" footer={lastChange(rows[0].x, ...rows.slice(1).map((r) => r.x))} pill={<InvalidPill x={rows.find((r) => r.x.invalid)?.x} />}>
+      <Text style={s.hint}>Etkinlik başvurularının sınırları. Değişiklik yeni başvurularda ve sunucunun bir sonraki kontrolünde geçerli olur; onaylanmış etkinliklerin saati ve süresi değişmez. Başvurular Yönetim › Etkinlikler’de incelenir.</Text>
+      {rows.map((r) => (
+        <View key={r.key}>
+          <Field
+            label={r.x.label}
+            value={texts[r.key] ?? ''}
+            onChange={(t) => setTexts((m) => ({ ...m, [r.key]: t }))}
+            keyboard="numeric"
+            max={6}
+            hint={`Şu an ${valueText(r.key, r.x.effective)} · ${r.x.help}`}
+          />
+          <Problem text={errors[r.key] ?? null} />
+        </View>
+      ))}
+      <View style={s.row}>
+        <Button title="Varsayılana dön" variant="ghost" small disabled={kit.locked || Object.keys(reset).length === 0} onPress={() => kit.open('Etkinlik sınırları varsayılana dönsün', () => reset, 'Geri dönüş')} style={{ flex: 1 }} />
+        <Button title="Gözden geçir" variant="tonal" small disabled={kit.locked || !dirty || bad} onPress={() => kit.open('Etkinlik sınırları değişsin', () => changes)} style={{ flex: 1 }} />
       </View>
     </Card>
   );

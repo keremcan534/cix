@@ -209,7 +209,7 @@ export async function uploadPhoto(kind: PhotoKind, picked: PickedImage): Promise
 
 /** A photo already the size it is kept at (uploadPhoto's own, or a room picture cut to its shape: lib/room-picture)
  *  put in the app's storage for `kind`; resolves with its public address. */
-export async function putPhoto(kind: PhotoKind | 'roombg' | 'roomcover', img: PickedImage): Promise<string> {
+export async function putPhoto(kind: PhotoKind | 'roombg' | 'roomcover' | 'eventcover', img: PickedImage): Promise<string> {
   let file: { data: ArrayBuffer; type: string };
   try {
     file = await api.readFile(img.uri);

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,7 +19,6 @@ import { ROOMS, USERS, userById, type Room, type User } from '@/data/mock';
 import {
   COUNTRIES,
   ROOM_BANNER,
-  ROOM_EVENTS,
   ROOM_TABS,
   countryFlag,
   isMemberRoom,
@@ -41,7 +40,8 @@ import { similarity } from '@/lib/similarity';
 import { useApp } from '@/store';
 import { isLockedRoom, liveMode, message as errorText, oneOnOneOpen, reloadServerRooms, useServerRooms, useServerRoomsState } from '@/lib/live';
 import { setRoomFollow, useFollowedRooms } from '@/lib/live/room-follow';
-import { useJoinedRooms, useUpcomingEvents } from '@/lib/live/room-social';
+import { useJoinedRooms } from '@/lib/live/room-social';
+import { openEvents } from '@/components/events/open';
 import { myRoomMark, myRoomRows, type MyRoomRow } from '@/lib/room-follow';
 import { SCRIM, TAB_BAR_HEIGHT, ThemeScope, fonts, makeStyles, useTheme } from '@/theme';
 import { Photo } from '@/components/photo';
@@ -62,7 +62,12 @@ export default function RoomsScreen() {
   const [mineTab, setMineTab] = useState<MineTab>('recent');
   const [cat, setCat] = useState<RoomTab>('Popüler');
   const [country, setCountry] = useState<CountryId>('ALL');
-  const [sheet, setSheet] = useState<'events' | 'country' | null>(null);
+  const [sheet, setSheet] = useState<'country' | null>(null);
+  // A notice's link (an event's review result: '/?etkinlik=12') opens that event in Etkinlik Merkezi.
+  const { etkinlik } = useLocalSearchParams<{ etkinlik?: string }>();
+  useEffect(() => {
+    if (etkinlik && /^\d{1,12}$/.test(etkinlik)) openEvents({ id: Number(etkinlik), tab: 'mine' });
+  }, [etkinlik]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [headerH, setHeaderH] = useState(64);
   const insets = useSafeAreaInsets();
@@ -77,7 +82,6 @@ export default function RoomsScreen() {
   const joinedLive = useJoinedRooms();
   // The rooms I follow (live: the server's, open or closed; the demo: the sample rooms I followed).
   const followedRooms = useFollowedRooms();
-  const eventsLive = useUpcomingEvents();
   const visible = (live ? serverRooms : ROOMS).filter((r) => !blocked.has(r.hostId));
   // The home screen leads with the open room whose host has the most in common with you (lib/closest); a
   // password room is never offered there.
@@ -129,9 +133,6 @@ export default function RoomsScreen() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
   const unreadNotices = notifications.filter((n) => !n.read).length;
-  const events = live
-    ? (eventsLive ?? []).map((e) => ({ id: String(e.id), roomId: e.room.id, title: e.title, when: e.when }))
-    : ROOM_EVENTS.filter((e) => visible.some((r) => r.id === e.roomId));
 
   const emptyText =
     main === 'rec'
@@ -166,9 +167,9 @@ export default function RoomsScreen() {
           <Pressable onPress={() => router.push('/siralama')} hitSlop={6} accessibilityLabel="Sıralama">
             <Ionicons name="trophy-outline" size={21} color={colors.gold} />
           </Pressable>
-          <Pressable onPress={() => setSheet('events')} hitSlop={6} accessibilityLabel="Etkinlikler">
+          {/* Etkinlik Merkezi (components/events): every approved event, my room's and my places. */}
+          <Pressable onPress={() => openEvents()} hitSlop={6} accessibilityLabel="Etkinlikler">
             <Ionicons name="calendar-outline" size={21} color={colors.text} />
-            {events.length > 0 && <View style={[styles.dot, { backgroundColor: semantic.action }]} />}
           </Pressable>
           <Pressable onPress={() => setSearchOpen(true)} hitSlop={6} accessibilityLabel="Oda ara">
             <Ionicons name="search" size={22} color={colors.text} />
@@ -258,13 +259,6 @@ export default function RoomsScreen() {
         </PressableScale>
       </View>
 
-      <ActionSheet
-        visible={sheet === 'events'}
-        title={events.length ? 'Yaklaşan etkinlikler' : 'Yaklaşan etkinlik yok'}
-        titleArt={events.length ? artSource('ana-yaklasan-etkinlikler') : undefined}
-        options={events.map((e) => ({ label: `${e.when} · ${e.title}`, onPress: () => router.push(`/oda/${e.roomId}`) }))}
-        onClose={() => setSheet(null)}
-      />
       <ActionSheet
         visible={sheet === 'country'}
         title="Ülke seç"

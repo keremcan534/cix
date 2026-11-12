@@ -47,6 +47,10 @@ export const ROUTES = {
   'POST /api/calls': ['dm'],
   'POST /api/match/join': ['dm'],
   'POST /api/rooms': ['rooms'],
+  'POST /api/events': ['rooms'],
+  'POST /api/events/edit': ['rooms'],
+  'POST /api/events/start': ['rooms'],
+  'POST /api/events/reserve': ['rooms'],
   // New bags only: a bag already dropped can still be opened, and returns what is left.
   'POST /api/lucky-bags': ['gifts'],
   // A paid room animation (room-fx.mjs) is a gift to the room.

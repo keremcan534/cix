@@ -81,6 +81,7 @@ import { teamRoutes } from './team.mjs';
 import { musicRoutes } from './music.mjs';
 import { roomFxRoutes } from './room-fx.mjs';
 import { roomEventRoutes } from './room-events.mjs';
+import { eventRoutes, startEventSweep, stopEventSweep } from './events.mjs';
 import { roomSocialRoutes } from './room-social.mjs';
 import { roomFollowRoutes } from './room-follow.mjs';
 import { roomMemberRoutes } from './room-members.mjs';
@@ -278,6 +279,7 @@ const routes = {
   ...privacyRoutes,
   ...callLogRoutes,
   ...luckyBagRoutes,
+  ...eventRoutes,
   ...momentRoutes,
   ...teamRoutes,
   ...musicRoutes,
@@ -408,6 +410,7 @@ function shutdown(signal) {
   stopCallSweep();
   stopBagSweep();
   stopDecorSweep();
+  stopEventSweep();
   stopBossSweep();
   stopStaffSweep();
   server.close();
@@ -434,5 +437,6 @@ startOtpSweep();
 startCallSweep();
 startBagSweep();
 startDecorSweep();
+startEventSweep();
 startBossSweep();
 startStaffSweep();
