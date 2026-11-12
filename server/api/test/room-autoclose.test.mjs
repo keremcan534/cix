@@ -163,7 +163,10 @@ describe('Yetkilisiz oda', () => {
 
   test('yönetici gelince oda açılır, misafir yeniden girer', async () => {
     await ok(token(mod, room), 'yönetici jetonu');
-    assert.deepEqual(await rowOf(room), { no_staff_since: null, paused_at: null, closed_at: null });
+    // The room opens. The staff count itself may start again at once: the 150 ms sweep can run before the moderator
+    // shows up in the voice room, which only restarts the count.
+    const row = await rowOf(room);
+    assert.deepEqual([row.paused_at, row.closed_at], [null, null]);
     await ok(token(guest, room), 'misafir jetonu');
     // Webhooks came (the guest's above): the list shows rooms someone is in.
     await ok(hook('participant_joined', { room: { name }, participant: { identity: mod.user.id, sid: `PA_${rnd(4)}` } }), 'yönetici katıldı');
