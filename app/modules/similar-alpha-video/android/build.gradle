@@ -1,0 +1,21 @@
+// Şeffaf video (POC): AlphaVideoView, a stacked-alpha H.264 MP4 (colour on top, mask below) decoded by the
+// platform MediaPlayer into a SurfaceTexture and combined on the GPU (OpenGL ES 2.0). Plain Kotlin, no native
+// code and no extra dependency.
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.similarclub'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.similaralphavideo"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
