@@ -6,7 +6,7 @@
 // Every table that holds my personal data is read here, in one read-only snapshot: profile and sign-in, sessions and
 // devices, follows and blocks, the direct messages I sent and received, Anlar, gifts sent and received, Çantam, the wallet
 // (ledger, coin lots, diamond locks, purchases, Jeton Noktası transfers, withdrawals, shop items, paid 1v1 minutes),
-// games, rooms, family, bonds, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
+// games, rooms, Etkinlik Merkezi (my events, places and the reminders sent to me), family, bonds, agency, visits, reports I made, sanctions on me and my appeals, support tickets, the
 // spending limit and Similar Ekibi notices written to me.
 // Other people appear only as I already see them in the app: their id and name where I deal with them (a message, a
 // gift, a follow). Never what is private to them or to the staff: who blocked or reported me, who visited my profile
@@ -85,7 +85,7 @@ export async function exportOf(c, uid) {
   }));
 
   const messages = await all(
-    `SELECT m.id, m.sender, m.recipient, m.body, m.image_url, m.created_at, m.read_at, o.id AS other, o.name AS other_name
+    `SELECT m.id, m.sender, m.recipient, m.body, m.image_url, m.event_id, m.created_at, m.read_at, o.id AS other, o.name AS other_name
        FROM messages m JOIN users o ON o.id = CASE WHEN m.sender = $1 THEN m.recipient ELSE m.sender END
       WHERE m.sender = $1 OR m.recipient = $1 ORDER BY m.id`,
     (x) => ({
@@ -94,6 +94,8 @@ export async function exportOf(c, uid) {
       with: person(x.other, x.other_name),
       text: x.body,
       image: x.image_url ?? null,
+      // An event sent with it (Etkinlik Merkezi "Arkadaşına gönder").
+      event: num(x.event_id),
       createdAt: x.created_at,
       readAt: x.read_at,
     }),
@@ -379,8 +381,17 @@ export async function exportOf(c, uid) {
       endedAt: x.ended_at,
       at: x.created_at,
     })),
-    eventReservations: await all('SELECT event_id, status, created_at, updated_at FROM event_reservations WHERE user_id = $1 ORDER BY created_at', (x) => ({ event: num(x.event_id), status: x.status, at: x.created_at, changedAt: x.updated_at })),
+    eventReservations: await all('SELECT event_id, status, remind, created_at, updated_at FROM event_reservations WHERE user_id = $1 ORDER BY created_at', (x) => ({
+      event: num(x.event_id),
+      status: x.status,
+      reminders: x.remind,
+      at: x.created_at,
+      changedAt: x.updated_at,
+    })),
     eventsAttended: await all('SELECT event_id, joined_at FROM event_participants WHERE user_id = $1 ORDER BY joined_at', (x) => ({ event: num(x.event_id), at: x.joined_at })),
+    // The reminders sent to me, and whether I turned every event reminder off (Ayarlar › Bildirimler).
+    eventReminders: await all('SELECT event_id, kind, starts_at, sent_at FROM event_reminders_sent WHERE user_id = $1 ORDER BY sent_at', (x) => ({ event: num(x.event_id), kind: x.kind, eventStart: x.starts_at, at: x.sent_at })),
+    eventRemindersOff: await all('SELECT created_at FROM event_reminder_optout WHERE user_id = $1', (x) => ({ since: x.created_at })),
     music: await all('SELECT title, artist, url, seconds, size, created_at, removed_at FROM music_tracks WHERE owner = $1 ORDER BY id', (x) => ({
       title: x.title,
       artist: x.artist,

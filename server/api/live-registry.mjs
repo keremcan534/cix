@@ -14,6 +14,7 @@
 // save, withdrawal limits can only go down from today's values.
 import { EXCHANGE, GIFTS, PACKS, SHOP, WITHDRAW, exchangeCoins } from './catalog.mjs';
 import { DAILY_ROUNDS as CASINO_DAILY_ROUNDS, GAMES as CASINO_GAMES, STAKES as CASINO_STAKES } from './casino-rules.mjs';
+import { REMINDER_KINDS, REMINDER_LABEL } from './event-rules.mjs';
 
 /** Every feature that can be switched off (features.mjs ROUTES). `games` is mostly in the app; Rüzgâr Gülü is on the server. */
 export const FEATURES = ['gifts', 'purchases', 'topup', 'exchange', 'jeton', 'games', 'dm', 'rooms', 'withdraw', 'shop'];
@@ -106,6 +107,8 @@ export function defaultsOf(e = process.env) {
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [k, x.default])),
     // Etkinlik Merkezi (events.mjs): every room owner may apply; 30 minutes ahead at least, 3 hours, 500 places.
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [k, x.default])),
+    // Every reminder on: 1 hour and 15 minutes before, and at the start.
+    event_reminders_off: [],
   };
 }
 const CASINO_TOP = CASINO_STAKES.wide[CASINO_STAKES.wide.length - 1];
@@ -238,23 +241,47 @@ const EVENT_RULES = {
   event_strike_limit: { field: 'eventStrikeLimit', label: 'İhlal sınırı (30 günde)', default: 3, bounds: { min: 1, max: 10, step: 1 }, unit: '', help: '30 gün içinde bu kadar etkinliği zamanında başlatmayan oda sahibi bir süre yeni başvuru yapamaz.', text: (a, b) => `30 günde ${a} → ${b} ihlalde başvuru durur.` },
   event_block_days: { field: 'eventBlockDays', label: 'Başvuru kısıtı (gün)', default: 14, bounds: { min: 1, max: 90, step: 1 }, unit: ' gün', help: 'İhlal sınırına ulaşan oda sahibi son ihlalden sonra bu kadar gün başvuru yapamaz.', text: (a, b) => `İhlal sınırında başvuru ${a} → ${b} gün durur.` },
 };
-const eventEntries = () =>
-  Object.fromEntries(
-    Object.entries(EVENT_RULES).map(([k, x]) => [
-      k,
-      {
-        field: x.field,
-        group: EVENTS,
-        label: x.label,
-        help: x.help,
-        type: 'int',
-        bounds: x.bounds,
-        parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
-        big: () => false,
-        impact: (before, after) => x.text(fmt(before), fmt(after)),
+/** The limits as registry entries, and the reminders switched off for everyone (event-rules.mjs REMINDER_KINDS). */
+const eventEntries = () => {
+  const reminders = { options: REMINDER_KINDS, labels: REMINDER_LABEL, max: REMINDER_KINDS.length };
+  const names = (ks) => ks.map((k) => REMINDER_LABEL[k].toLocaleLowerCase('tr-TR')).join(', ');
+  return {
+    ...Object.fromEntries(
+      Object.entries(EVENT_RULES).map(([k, x]) => [
+        k,
+        {
+          field: x.field,
+          group: EVENTS,
+          label: x.label,
+          help: x.help,
+          type: 'int',
+          bounds: x.bounds,
+          parse: (v) => wholeOf(v, x.bounds, x.label, x.unit),
+          big: () => false,
+          impact: (before, after) => x.text(fmt(before), fmt(after)),
+        },
+      ]),
+    ),
+    event_reminders_off: {
+      field: 'eventRemindersOff',
+      group: EVENTS,
+      label: 'Kapalı hatırlatmalar',
+      help: 'Yer ayırtanlara etkinlikten 1 saat ve 15 dakika önce, bir de başlarken bildirim gider. Kapatılan hatırlatma kimseye gönderilmez; kişiler kendi hatırlatmalarını ayrıca kapatabilir.',
+      type: 'set',
+      bounds: reminders,
+      parse: (v) => setOf(v, reminders, 'Kapalı hatırlatmalar'),
+      big: () => false,
+      impact(before, after) {
+        const off = added(before, after);
+        const on = added(after, before);
+        const out = [];
+        if (off.length) out.push(`Gönderilmeyecek hatırlatma: ${names(off)}.`);
+        if (on.length) out.push(`Yeniden gönderilecek: ${names(on)}.`);
+        return out.join(' ') || 'Görünür bir etkisi yok.';
       },
-    ]),
-  );
+    },
+  };
+};
 /** The decoration keys as registry entries; a price that more than doubles or halves needs the second confirmation. */
 const decorEntries = () => {
   const switches = { options: DECOR_SWITCHES, labels: DECOR_LABEL, max: DECOR_SWITCHES.length };
@@ -776,7 +803,7 @@ const readOnlySet = (xs) => {
  *     heartVideo, backpackCallTask, rewardsOff: Set, welcomeCoins, inviteCoins, inviteDailyCap, casinoOff: Set, casinoOpen: Set, casinoMaxBet,
  *     casinoDailyRounds, roomDecorOff: Set, roomBgCustomPrice, roomBgCustomDays, roomStaffAwayMinutes, bossSeatCoins,
  *     bossSeatMinutes, eventMinRoomLevel, eventMinLead, eventMaxMinutes, eventMaxCapacity, eventGrace, eventStrikeLimit,
- *     eventBlockDays, invalid }
+ *     eventBlockDays, eventRemindersOff: Set, invalid }
  */
 export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
   const d = defaultsOf(e);
@@ -821,6 +848,7 @@ export function snapshotOf(rows = [], e = process.env, { v = 0 } = {}) {
     ...Object.fromEntries(Object.entries(DECOR_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(ROOM_AMOUNTS).map(([k, x]) => [x.field, val(k)])),
     ...Object.fromEntries(Object.entries(EVENT_RULES).map(([k, x]) => [x.field, val(k)])),
+    eventRemindersOff: readOnlySet(val('event_reminders_off')),
     invalid: Object.freeze([...invalid]),
   });
 }

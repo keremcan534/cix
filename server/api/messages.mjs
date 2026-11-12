@@ -1,6 +1,6 @@
 // Direct messages, stored on the server so they survive reinstalls and reach the other phone.
 //
-//   POST /api/messages       { to, text, image?, ref } → { message, replay, price?, coins? }
+//   POST /api/messages       { to, text, image?, event?, ref } → { message, replay, price?, coins? }
 //   GET  /api/messages?with=&before=                → { messages }       (newest first, 50 per page)
 //   GET  /api/conversations                         → { conversations }  (last message and unread count)
 //   POST /api/messages/read  { with }               → { read }
@@ -13,6 +13,8 @@
 // A photo (image: a photo this person put in the storage for a chat, media.mjs dm/<their id>/…) goes with a
 // streamer from the heart level, otherwise between people who follow each other (pairOf photo); its text is
 // optional.
+// An event sent to a friend (event: an approved Etkinlik Merkezi event, events.mjs) carries the event: new apps draw
+// it as the event's card ({ event: { id, title, startsAt } }), older ones only show the text, which says it in words.
 import { HttpError, REF, auth, blockedBetween, contactError, countRefusal, db, env, limit, publicText, readJson, tx, userId } from './core.mjs';
 import { bondTalk } from './bonds.mjs';
 import { checkSequence, getRules, isNumberOnly } from './contact-filter.mjs';
@@ -24,9 +26,30 @@ import { notify } from './push.mjs';
 import { assertMay } from './sanctions.mjs';
 
 const PAGE = 50;
-const out = (m) => ({ id: Number(m.id), from: m.sender, to: m.recipient, text: m.body, image: m.image_url ?? null, createdAt: m.created_at, readAt: m.read_at });
+const out = (m) => ({
+  id: Number(m.id),
+  from: m.sender,
+  to: m.recipient,
+  text: m.body,
+  image: m.image_url ?? null,
+  createdAt: m.created_at,
+  readAt: m.read_at,
+  // Only on an event's message, so the others read as before.
+  ...(m.event_id ? { event: { id: Number(m.event_id), title: m.event_title ?? null, startsAt: m.event_starts_at ?? null } } : {}),
+});
+/** A message row with its event's title and start (out). */
+const WITH_EVENT = 'SELECT m.*, e.title AS event_title, e.starts_at AS event_starts_at FROM messages m LEFT JOIN events e ON e.id = m.event_id';
 /** The text a photo without words carries (the conversation list and the notification show it). */
 export const PHOTO_TEXT = 'Fotoğraf';
+
+/** The approved event a message shares (its id, title and start), or null for none; a 400 for any other. */
+async function eventOf(v) {
+  if (v === undefined || v === null) return null;
+  if (!Number.isSafeInteger(v) || v < 1) throw new HttpError(400, 'Geçersiz etkinlik');
+  const r = await db.query("SELECT id, title, starts_at FROM events WHERE id = $1 AND status = 'approved'", [v]);
+  if (!r.rowCount) throw new HttpError(400, 'Bu etkinlik paylaşılamaz');
+  return r.rows[0];
+}
 
 /** Only a photo this person put in the storage for a chat (media.mjs: dm/<their id>/...), or null for none. */
 function photoOf(v, me) {
@@ -67,6 +90,7 @@ export const messageRoutes = {
     if (to === me.id) throw new HttpError(400, 'Kendine mesaj gönderemezsin');
     const image = photoOf(b.image, me);
     if (image) await verifyUpload(image, 'dm');
+    const ev = image ? null : await eventOf(b.event);
     const body = image && (b.text === undefined || b.text === null || String(b.text).trim() === '') ? PHOTO_TEXT : await publicText(b.text, 1, 1000, 'Mesaj', me, 'dm', 'text');
     if (!REF.test(b.ref ?? '')) throw new HttpError(400, 'Geçersiz istek kimliği');
     const peer = await db.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [to]);
@@ -82,8 +106,13 @@ export const messageRoutes = {
       if (!gate.open) throw new HttpError(403, gate.why);
     }
     const insert = (c) =>
-      c.query('INSERT INTO messages (sender, recipient, body, image_url, ref) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, image, b.ref]);
-    const replay = async () => ({ message: out((await db.query('SELECT * FROM messages WHERE sender = $1 AND ref = $2', [me.id, b.ref])).rows[0]), replay: true });
+      c
+        .query('INSERT INTO messages (sender, recipient, body, image_url, ref, event_id) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (sender, ref) DO NOTHING RETURNING *', [me.id, to, body, image, b.ref, ev?.id ?? null])
+        .then((r) => {
+          for (const m of r.rows) Object.assign(m, ev ? { event_title: ev.title, event_starts_at: ev.starts_at } : {});
+          return r;
+        });
+    const replay = async () => ({ message: out((await db.query(`${WITH_EVENT} WHERE m.sender = $1 AND m.ref = $2`, [me.id, b.ref])).rows[0]), replay: true });
     let row;
     let price = 0;
     if ((await pairOf(db, me.id, to)).dmPrice > 0) {
@@ -120,10 +149,10 @@ export const messageRoutes = {
     const peer = userId(url.searchParams.get('with'));
     const before = Number(url.searchParams.get('before') ?? 0);
     const r = await db.query(
-      `SELECT * FROM messages
-        WHERE LEAST(sender, recipient) = LEAST($1::uuid, $2::uuid) AND GREATEST(sender, recipient) = GREATEST($1::uuid, $2::uuid)
-          AND ($3::bigint = 0 OR id < $3)
-        ORDER BY id DESC LIMIT ${PAGE}`,
+      `${WITH_EVENT}
+        WHERE LEAST(m.sender, m.recipient) = LEAST($1::uuid, $2::uuid) AND GREATEST(m.sender, m.recipient) = GREATEST($1::uuid, $2::uuid)
+          AND ($3::bigint = 0 OR m.id < $3)
+        ORDER BY m.id DESC LIMIT ${PAGE}`,
       [me.id, peer, Number.isSafeInteger(before) && before > 0 ? before : 0],
     );
     return { messages: r.rows.map(out) };
@@ -133,7 +162,7 @@ export const messageRoutes = {
     const me = await auth(req);
     const r = await db.query(
       // The newest message with each person (from the sender and recipient indexes), the 200 latest talks.
-      `SELECT l.peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar,
+      `SELECT l.peer, m.*, u.name AS peer_name, u.avatar_url AS peer_avatar, ev.title AS event_title, ev.starts_at AS event_starts_at,
               (SELECT count(*) FROM messages x WHERE x.recipient = $1 AND x.sender = l.peer AND x.read_at IS NULL) AS unread
          FROM (SELECT peer, max(id) AS id FROM (
                  SELECT recipient AS peer, id FROM messages WHERE sender = $1
@@ -142,6 +171,7 @@ export const messageRoutes = {
                GROUP BY peer ORDER BY max(id) DESC LIMIT 200) l
          JOIN messages m ON m.id = l.id
          JOIN users u ON u.id = l.peer
+         LEFT JOIN events ev ON ev.id = m.event_id
         ORDER BY m.id DESC`,
       [me.id],
     );

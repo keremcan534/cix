@@ -14,7 +14,7 @@ export const EXPORTED = [
   'profile_extras', 'profile_photos', 'privacy_settings', 'call_history_cleared', 'room_mic_invites', 'room_polls',
   'room_poll_votes', 'room_follower_invites', 'room_follows', 'room_open_notices',
   'backpack_items', 'backpack_moves', 'referral_codes', 'referrals', 'casino_rounds', 'room_decor',
-  'events', 'event_reservations', 'event_participants',
+  'events', 'event_reservations', 'event_participants', 'event_reminders_sent', 'event_reminder_optout',
 ];
 
 /** Tables that point at an account but are not that person's to receive, with the reason. */
