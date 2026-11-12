@@ -741,7 +741,7 @@ Ludo artık gerçek bir tahtada oynanıyor (`app/src/components/games/room/ludo-
 | 6 | `ludo-yildiz.png` | Güvenli kare yıldızı | Ionicons `star` | Küçük, dolgun beş köşeli yıldız, açık gümüş-beyaz, hafif kabartma; 96 px, 14 px çizilecek | P3 | Yeni (oyun yenileme) · dört yıldızlı güvenli karede |
 | 7 | `ludo-kupa.png` | Ludo kupası | Ionicons `trophy` | Altın kupa, iki kulplu, kaidesinde küçük yıldız; 192 px | P3 | Yeni (oyun yenileme) · kazanan bandında ve tahtanın ortasında (küçük) |
 
-Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir (zar yüzleri gibi) → `ludo-board.tsx` ve `ludo.tsx` içinde ilgili çizim `<Art name=…>` ile değiştirilir. Taşların dördü birden gelmeden bağlanmamalı: yarısı görsel, yarısı kodla çizilmiş taş aynı tahtada yan yana durur.
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/games/room/table-art.tsx` içinde dosyanın satırındaki `null` o dosyanın `require(…)`ı olur; başka bir şey değişmez (taşlar `ludo-board.tsx` `Token`, zemin `Bezel` yüzeyi, yıldız güvenli karede, kupa tahtanın ortasında ve kazanan kartında kendiliğinden görsele döner). Taşlar bir takımdır: dördü birden gelmeden hiçbiri kullanılmaz, yarısı görsel yarısı kodla çizilmiş taş aynı tahtada yan yana durmaz.
 
 ## 16. Oyun Salonu: çark ve tahta oyunları (9)
 
@@ -800,7 +800,7 @@ Renk Kartları (`app/src/components/games/room/cards.tsx`, kart yüzleri `card-f
 | 9 | `dort-tas-pembe.png`, `dort-tas-altin.png` | Dört Taş taşları (2) | kodla çizilen degrade daire ve iç halka | Üstten görünen parlak, hafif bombeli iki pul: kızıl ve altın; kenarda ince çentikli halka; 192 px | P2 | Yeni (oyun yenileme) · tahtada yaklaşık 38 px, oyuncu rozetinde 18 px çizilir |
 | 10 | `dort-tas-hucre.png` | Tahta hücresi | kodla çizilen, ortası delik mavi kare | Dört Taş tahtasının tek hücresi: gece mavisi parlak plastik kare, ortasında **şeffaf** yuvarlak delik, deliğin kenarında ince iç gölge; kenarlar yan yana döşenince ek yeri görünmemeli; 192 px | P2 | Yeni (oyun yenileme) · uygulama 7 × 6 döşer; taş deliğin arkasından düşerken görünür, bu yüzden delik tam şeffaf olmalı |
 
-Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/Art.tsx` listesine eklenir → kart yüzleri ve arkası `room/card-face.tsx` içinde (`CardFace`, `CardBack`, `CARD_COLORS`), masa `room/cards.tsx` içinde, taş ve hücre `room/four.tsx` içinde (`Disc` ve tahtanın ön yüzü), kapak `components/GameArt.tsx` `COVER` listesinde değişir. Süre halkası, kazanan çizgi, uçan kartlar ve konfeti kodla çizilmeye devam eder (hareket ettikleri için).
+Teslimden sonra: dosyalar `app/assets/art/` içine konur ve `app/src/components/games/room/table-art.tsx` içinde dosyanın satırındaki `null` o dosyanın `require(…)`ı olur; başka bir şey değişmez: kart yüzleri, amblemler, işaretler, Jokerler ve arka `room/card-face.tsx` içinde, masa `room/cards.tsx` içinde, X ve O `room/xox.tsx` içinde, taş ve hücre `room/four.tsx` içinde kendiliğinden görsele döner. Takımlar (dört kart yüzü, dört amblem, iki taş, iki işaret) ancak hepsi gelince kullanılır. Kapak `components/GameArt.tsx` `COVER` listesine eklenir. Süre halkası, kazanan çizgi, uçan kartlar ve konfeti kodla çizilmeye devam eder (hareket ettikleri için).
 
 ## 19. Oyun Salonu: Pachinko (8)
 

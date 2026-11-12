@@ -7,8 +7,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
 
+import { LUDO_TOKEN_ART, RoomArtImage, roomArt, roomArtSet } from '@/components/games/room/table-art';
+import { BEZEL, Bezel, alpha, useBreath, useTableFx } from '@/components/games/room/table-kit';
 import { BASE, HOME } from '@/lib/room-games/ludo';
 import { GRID, cornerOf, hopSteps, stackSpots, tokenPoint, trackSquares, yardCentre, type Point } from '@/lib/room-games/ludo-board';
 
@@ -28,9 +30,9 @@ export type BoardHandle = {
   back: (color: number, index: number, from: number) => Promise<void>;
 };
 
-/** The board's rim (dp). */
-const FRAME = 5;
-const HOP_MS = 135;
+/** The board's bezel (dp). */
+const FRAME = 7;
+const HOP_MS = 140;
 /** How much bigger a token is drawn in its base, and how much smaller at home, than on a square. */
 const BASE_SCALE = 1.24;
 const HOME_SCALE = 0.62;
@@ -93,8 +95,9 @@ export function LudoBoard({
   still?: boolean;
   ref?: Ref<BoardHandle>;
 }) {
-  // The rim and its hairline border are inside `size`.
-  const inner = size - 2 * (FRAME + 1);
+  // The bezel is inside `size`.
+  const { fx } = useTableFx();
+  const inner = size - 2 * FRAME;
   const cell = inner / GRID;
   const unit = cell * 0.84;
   // Each token's place on the screen, kept for as long as the board is: the animations write to them, not React.
@@ -148,7 +151,7 @@ export function LudoBoard({
   }, [rest, cell, turns, count, still, values, busy]);
 
   const burst = (p: Point, color: number) => {
-    if (still) return;
+    if (!fx) return;
     const id = ++burstId.current;
     setBursts((b) => [...b, { id, x: p.x * cell, y: p.y * cell, color }]);
   };
@@ -169,8 +172,8 @@ export function LudoBoard({
             Animated.timing(v.xy, { toValue: { x: p.x * cell, y: p.y * cell }, duration: ms, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
             Animated.timing(v.scale, { toValue: sizeAt(step), duration: ms, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
             Animated.sequence([
-              Animated.timing(v.lift, { toValue: 1, duration: ms / 2, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-              Animated.timing(v.lift, { toValue: 0, duration: ms / 2, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+              Animated.timing(v.lift, { toValue: 1, duration: ms * 0.48, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+              Animated.timing(v.lift, { toValue: 0, duration: ms * 0.52, easing: Easing.in(Easing.quad), useNativeDriver: true }),
             ]),
           ]),
         );
@@ -205,10 +208,11 @@ export function LudoBoard({
   }));
 
   const pickable = movable && onPick ? movable : null;
+  const felt = roomArt('ludo-tahta-zemin');
   return (
-    <LinearGradient colors={['#34507C', '#1A2B47', '#101C33']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[b.frame, { width: size, height: size, borderRadius: cell * 0.9 }]} accessibilityLabel="Ludo tahtası">
-      <View style={[b.felt, { width: inner, height: inner, borderRadius: cell * 0.7 }]}>
-        <Surface cell={cell} turns={turns} count={count} colors={colors} active={active} still={!!still} />
+    <View accessibilityLabel="Ludo tahtası">
+      <Bezel width={size} height={size} radius={Math.round(cell * 0.95)} inset={FRAME} tone={BEZEL.night} surface={felt ? <Image source={felt} style={StyleSheet.absoluteFill} /> : undefined}>
+        <Surface cell={cell} turns={turns} count={count} colors={colors} active={active} still={!fx} />
         {tokens.map((t) => {
           const key = keyOf(t.color, t.index);
           const can = !!pickable && pickable.color === t.color && pickable.indexes.includes(t.index);
@@ -230,8 +234,8 @@ export function LudoBoard({
         {bursts.map((x) => (
           <Burst key={x.id} x={x.x} y={x.y} size={cell * 2.6} color={LUDO_COLORS[x.color].light} onDone={() => setBursts((all) => all.filter((y) => y.id !== x.id))} />
         ))}
-      </View>
-    </LinearGradient>
+      </Bezel>
+    </View>
   );
 }
 
@@ -239,6 +243,7 @@ export function LudoBoard({
 const Surface = memo(function Surface({ cell, turns, count, colors, active, still }: { cell: number; turns: number; count: number; colors: number[]; active: number | null; still: boolean }) {
   const squares = useMemo(() => trackSquares(turns), [turns]);
   const side = cell - GAP;
+  const star = roomArt('ludo-yildiz');
   return (
     <>
       {[0, 1, 2, 3].map((color) => (
@@ -249,15 +254,16 @@ const Surface = memo(function Surface({ cell, turns, count, colors, active, stil
         const at = { left: q.col * cell + GAP / 2, top: q.row * cell + GAP / 2, width: side, height: side, borderRadius: cell * 0.2 };
         if (q.kind === 'lane' || q.kind === 'start')
           return (
-            <LinearGradient key={`${q.col}-${q.row}`} colors={[c!.base, c!.dark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[b.square, at, b.tinted]}>
+            <LinearGradient key={`${q.col}-${q.row}`} colors={[c!.light, c!.base, c!.dark]} locations={[0, 0.3, 1]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[b.square, at, b.tinted]}>
               {q.kind === 'start' && <Ionicons name="caret-forward" size={cell * 0.62} color={c!.ink} style={{ opacity: 0.55, transform: [{ rotate: `${q.heading * 90}deg` }] }} />}
             </LinearGradient>
           );
+        // A plain square is a tile raised a little off the board: lit along its top, shaded along its foot.
         return (
-          <View key={`${q.col}-${q.row}`} style={[b.square, at, q.kind === 'star' ? b.star : b.plain]}>
-            {q.kind === 'star' && <Ionicons name="star" size={cell * 0.62} color="rgba(255,255,255,0.62)" />}
+          <LinearGradient key={`${q.col}-${q.row}`} colors={q.kind === 'star' ? ['rgba(205,218,245,0.36)', 'rgba(163,177,207,0.18)'] : ['rgba(190,205,240,0.2)', 'rgba(150,165,200,0.08)']} style={[b.square, at, q.kind === 'star' ? b.star : b.plain]}>
+            {q.kind === 'star' && (star ? <Image source={star} style={{ width: cell * 0.66, height: cell * 0.66 }} /> : <Ionicons name="star" size={cell * 0.62} color="rgba(255,255,255,0.7)" style={{ textShadowColor: 'rgba(255,255,255,0.5)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 0 } }} />)}
             {q.kind === 'gate' && <Ionicons name="arrow-forward" size={cell * 0.62} color={c!.base} style={{ transform: [{ rotate: `${q.heading * 90}deg` }] }} />}
-          </View>
+          </LinearGradient>
         );
       })}
       <Centre cell={cell} turns={turns} />
@@ -272,23 +278,13 @@ function Yard({ color, corner, turns, cell, count, playing, active, still }: { c
   const left = (centre.x - 3) * cell;
   const top = (centre.y - 3) * cell;
   const well = cell * 1.56;
-  const [glow] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    if (!active || still) return void glow.setValue(active ? 1 : 0);
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0.25, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, still, glow]);
+  const glow = useBreath(active, !still, 700, 0.25);
   return (
     <View style={{ position: 'absolute', left, top, width: side, height: side, padding: 2.5, opacity: playing ? 1 : 0.28 }}>
       <LinearGradient colors={[c.base, c.dark]} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={[b.yard, { borderRadius: cell * 0.75 }]}>
         <LinearGradient colors={['rgba(255,255,255,0.34)', 'rgba(255,255,255,0)']} style={b.yardSheen} />
         <View style={[b.tray, { margin: cell * 0.62, borderRadius: cell * 0.8 }]} />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, b.yardEdge, { borderRadius: cell * 0.75 }]} />
       </LinearGradient>
       {/* Whose turn it is: the rim of the base breathes. */}
       <Animated.View style={[b.yardRim, { borderRadius: cell * 0.75, opacity: glow, boxShadow: `0 0 ${Math.round(cell * 0.7)}px ${c.light}` }]} />
@@ -307,6 +303,7 @@ function Centre({ cell, turns }: { cell: number; turns: number }) {
   // A square of four quarters turned 45°: its top-left quarter becomes the top triangle, top-right the right one,
   // bottom-left the left one, bottom-right the bottom one. Colour 0 comes in from the left on an unturned board.
   const colorAt = (edge: number) => LUDO_COLORS[(((edge - turns) % 4) + 4) % 4];
+  const cup = roomArt('ludo-kupa');
   return (
     <View style={[b.centre, { left: cell * 6 + GAP / 2, top: cell * 6 + GAP / 2, width: side - GAP, height: side - GAP, borderRadius: cell * 0.22 }]}>
       <View style={{ position: 'absolute', left: (side - GAP - diamond) / 2, top: (side - GAP - diamond) / 2, width: diamond, height: diamond, flexDirection: 'row', flexWrap: 'wrap', transform: [{ rotate: '45deg' }] }}>
@@ -314,8 +311,9 @@ function Centre({ cell, turns }: { cell: number; turns: number }) {
           <LinearGradient key={edge} colors={[colorAt(edge).base, colorAt(edge).dark]} start={{ x: 1, y: 1 }} end={{ x: 0, y: 0 }} style={b.quarter} />
         ))}
       </View>
-      <View style={[b.hub, { width: cell * 0.9, height: cell * 0.9, borderRadius: cell }]}>
-        <Ionicons name="trophy" size={cell * 0.5} color="#F6BD60" />
+      <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']} style={b.centreLight} />
+      <View style={[b.hub, { width: cell * 0.96, height: cell * 0.96, borderRadius: cell }]}>
+        {cup ? <Image source={cup} style={{ width: cell * 0.7, height: cell * 0.7 }} /> : <Ionicons name="trophy" size={cell * 0.52} color="#F6BD60" />}
       </View>
     </View>
   );
@@ -323,26 +321,37 @@ function Centre({ cell, turns }: { cell: number; turns: number }) {
 
 const Token = memo(function Token({ color, unit, v, top, pulse, still, label, onPress }: { color: number; unit: number; v: Values; top: boolean; pulse: boolean; still: boolean; label: string; onPress?: () => void }) {
   const c = LUDO_COLORS[color];
-  const rise = v.lift.interpolate({ inputRange: [0, 1], outputRange: [0, -unit * 0.45] });
-  const swell = v.lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
-  const body = (
-    <LinearGradient colors={[c.light, c.base, c.dark]} locations={[0, 0.42, 1]} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[k.body, { borderRadius: unit / 2 }, pulse && k.lit]}>
-      <View style={[k.core, { borderRadius: unit, backgroundColor: c.dark, borderColor: c.light }]} />
-      <View style={[k.shine, { borderRadius: unit }]} />
-    </LinearGradient>
+  const art = roomArtSet(LUDO_TOKEN_ART);
+  const rise = v.lift.interpolate({ inputRange: [0, 1], outputRange: [0, -unit * 0.55] });
+  const swell = v.lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
+  // A glossy pawn seen from above: a domed base with a smaller dome on it, lit from the upper left, its lower rim
+  // catching the light.
+  const body = art ? (
+    <RoomArtImage source={art[color]} w={unit} />
+  ) : (
+    <View style={[k.body, { borderRadius: unit / 2 }, pulse && k.lit]}>
+      <LinearGradient colors={[c.light, c.base, c.dark]} locations={[0, 0.45, 1]} start={{ x: 0.25, y: 0 }} end={{ x: 0.75, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: unit / 2 }]} />
+      <View style={[k.core, { borderRadius: unit, borderColor: alpha(c.dark, 0.85) }]}>
+        <LinearGradient colors={[c.light, c.base]} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: unit }]} />
+      </View>
+      <LinearGradient colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0)']} style={[k.shine, { borderRadius: unit }]} />
+      <View style={[k.rim, { borderRadius: unit / 2, borderBottomColor: alpha(c.light, 0.95) }]} />
+    </View>
   );
   return (
-    <Animated.View
-      style={[k.wrap, { width: unit, height: unit, marginLeft: -unit / 2, marginTop: -unit / 2, zIndex: top ? 30 : pulse ? 20 : 10, pointerEvents: onPress ? 'auto' : 'none', transform: [{ translateX: v.xy.x }, { translateY: v.xy.y }, { translateY: rise }, { scale: Animated.multiply(v.scale, swell) }] }]}
-    >
-      {pulse && <Ring unit={unit} still={still} />}
-      {onPress ? (
-        <Pressable onPress={onPress} hitSlop={Math.max(4, (40 - unit) / 2)} accessibilityRole="button" accessibilityLabel={label} style={k.fill}>
-          {body}
-        </Pressable>
-      ) : (
-        body
-      )}
+    <Animated.View style={[k.wrap, { width: unit, height: unit, marginLeft: -unit / 2, marginTop: -unit / 2, zIndex: top ? 30 : pulse ? 20 : 10, pointerEvents: onPress ? 'auto' : 'none', transform: [{ translateX: v.xy.x }, { translateY: v.xy.y }, { scale: v.scale }] }]}>
+      {/* The shadow stays on the board while the token is in the air: smaller and fainter the higher it goes. */}
+      <Animated.View style={[k.shadow, { borderRadius: unit, opacity: v.lift.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0.22] }), transform: [{ scale: v.lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) }] }]} />
+      <Animated.View style={[k.fill, { transform: [{ translateY: rise }, { scale: swell }] }]}>
+        {pulse && <Ring unit={unit} still={still} />}
+        {onPress ? (
+          <Pressable onPress={onPress} hitSlop={Math.max(4, (40 - unit) / 2)} accessibilityRole="button" accessibilityLabel={label} style={k.fill}>
+            {body}
+          </Pressable>
+        ) : (
+          body
+        )}
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -388,28 +397,30 @@ function Burst({ x, y, size, color, onDone }: { x: number; y: number; size: numb
 const SPARKS = Array.from({ length: 8 }, (_, i) => [Math.cos((Math.PI * 2 * i) / 8 + 0.4), Math.sin((Math.PI * 2 * i) / 8 + 0.4)] as const);
 
 const b = StyleSheet.create({
-  frame: { padding: FRAME, boxShadow: '0 10px 26px rgba(0,0,0,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  felt: { backgroundColor: '#0A1426', overflow: 'hidden' },
   square: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  plain: { backgroundColor: 'rgba(163,177,207,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  star: { backgroundColor: 'rgba(163,177,207,0.26)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
-  tinted: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
+  plain: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', borderTopColor: 'rgba(255,255,255,0.14)', borderBottomColor: 'rgba(0,0,0,0.35)' },
+  star: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderTopColor: 'rgba(255,255,255,0.3)', borderBottomColor: 'rgba(0,0,0,0.35)' },
+  tinted: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderTopColor: 'rgba(255,255,255,0.5)', borderBottomColor: 'rgba(0,0,0,0.3)' },
   yard: { flex: 1, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   yardSheen: { position: 'absolute', left: 0, right: 0, top: 0, height: '46%' },
   yardRim: { position: 'absolute', left: 2.5, top: 2.5, right: 2.5, bottom: 2.5, borderWidth: 2, borderColor: '#FFFFFF', pointerEvents: 'none' },
-  tray: { flex: 1, backgroundColor: 'rgba(8,15,30,0.34)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.26)' },
+  tray: { flex: 1, backgroundColor: 'rgba(8,15,30,0.34)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.26)', boxShadow: 'inset 0 3px 8px rgba(0,0,0,0.45)' },
+  yardEdge: { boxShadow: '0 3px 8px rgba(0,0,0,0.45)' },
+  centreLight: { position: 'absolute', left: 0, right: 0, top: 0, height: '50%' },
   well: { position: 'absolute', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.5)' },
   centre: { position: 'absolute', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
   quarter: { width: '50%', height: '50%', borderWidth: 1, borderColor: 'rgba(8,15,30,0.45)' },
-  hub: { backgroundColor: '#0A1426', borderWidth: 1.5, borderColor: '#F6BD60', alignItems: 'center', justifyContent: 'center' },
+  hub: { backgroundColor: '#0A1426', borderWidth: 1.5, borderColor: '#F6BD60', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(246,189,96,0.55)' },
 });
 const k = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, top: 0 },
   fill: { flex: 1 },
-  body: { flex: 1, borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 3px rgba(0,0,0,0.5)' },
-  lit: { boxShadow: '0 0 8px rgba(255,255,255,0.95)' },
-  core: { width: '46%', height: '46%', borderWidth: 1, opacity: 0.9 },
-  shine: { position: 'absolute', left: '18%', top: '10%', width: '34%', height: '22%', backgroundColor: 'rgba(255,255,255,0.75)' },
+  body: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
+  lit: { boxShadow: '0 0 9px rgba(255,255,255,0.95)' },
+  core: { width: '52%', height: '52%', borderWidth: 1.5, overflow: 'hidden', boxShadow: '0 1px 2px rgba(0,0,0,0.45)' },
+  shine: { position: 'absolute', left: '16%', top: '6%', width: '52%', height: '36%' },
+  rim: { position: 'absolute', left: 1, top: 1, right: 1, bottom: 1, borderWidth: 1.5, borderColor: 'transparent' },
+  shadow: { position: 'absolute', left: '6%', right: '6%', top: '30%', height: '82%', backgroundColor: 'rgba(0,0,0,0.75)', boxShadow: '0 0 4px rgba(0,0,0,0.6)' },
   ring: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: '#FFFFFF' },
   spark: { position: 'absolute', left: -2.5, top: -2.5, width: 5, height: 5, borderRadius: 3 },
 });

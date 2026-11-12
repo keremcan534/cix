@@ -12,17 +12,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Art, type ArtName } from '@/components/Art';
-import { Gloss, PressableScale } from '@/components/fx/surface';
+import { Gloss } from '@/components/fx/surface';
 import { LUDO_COLORS, LudoBoard, type BoardHandle, type BoardToken } from '@/components/games/room/ludo-board';
-import { Photo } from '@/components/photo';
+import { RoomArtImage, roomArt } from '@/components/games/room/table-art';
+import { ActionButton, EndCard, SeatFace, alpha, useTableFx } from '@/components/games/room/table-kit';
 import { Text } from '@/components/text';
 import type { LudoServerTable } from '@/lib/api';
 import { playSfx, warmSfx } from '@/lib/game-sound';
 import { errorHaptic, pressHaptic, successHaptic, tapHaptic } from '@/lib/haptics';
 import { BASE, HOME, META, MODES, moveTable, openTable, pickToken, seatColors, startTable, type LudoEvent, type LudoMode, type LudoMove, type LudoState, type LudoTable } from '@/lib/room-games/ludo';
 import { cornerOf, turnsFor } from '@/lib/room-games/ludo-board';
-import { useSettings } from '@/store';
-import { colors, fonts, semantic } from '@/theme';
+import { colors, semantic } from '@/theme';
 
 export type LudoSeat = { id: string; name: string; avatar: string };
 /** What the stage shows: a table's Ludo fields with the people on its seats. */
@@ -111,7 +111,7 @@ function LudoStage({
   /** After a hand: another one, from the winner's banner. */
   onAgain?: () => void;
 }) {
-  const { reduceMotion: still } = useSettings();
+  const { still } = useTableFx();
   const win = useWindowDimensions();
   const [width, setWidth] = useState(0);
   const [frame, setFrame] = useState(() => frameOf(view, me));
@@ -267,8 +267,8 @@ function LudoStage({
         home={v.tokens[seat].filter((step) => step === HOME).length}
         count={v.tokens[seat].length}
         winner={v.status === 'over' && !frame.playing && v.winner === seat}
-        bar={playing && !frame.playing && v.turn === seat && turnEndsAt ? { endsAt: turnEndsAt, total: turnMs } : null}
-        still={still}
+        endsAt={playing && !frame.playing && v.turn === seat && turnEndsAt ? turnEndsAt : null}
+        total={turnMs}
       />
     );
   };
@@ -276,6 +276,7 @@ function LudoStage({
   const turnName = playing ? first(v.seats[v.turn]?.name ?? '') : '';
   const hint = !playing ? '' : frame.playing ? '' : v.turn === me ? (v.phase === 'roll' ? 'Zar at' : 'Taşını seç') : `${turnName} oynuyor`;
   const won = v.status === 'over' && !frame.playing && v.winner !== null ? v.seats[v.winner] : null;
+  const cup = roomArt('ludo-kupa');
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={s.stage}>
@@ -291,7 +292,11 @@ function LudoStage({
           <View>
             <LudoBoard ref={board} size={size} turns={turns} count={count} colors={v.colors} tokens={frame.tokens} active={active} movable={canPick ? { color: myColor, indexes: v.movable } : null} onPick={pick} still={still} />
             {cover && <View style={[StyleSheet.absoluteFill, w.veil, w.cover]}>{cover}</View>}
-            {won && <WinBanner name={v.winner === me ? null : first(won.name)} color={v.colors[v.winner!] ?? 0} size={size} still={still} onAgain={onAgain && !busy ? onAgain : undefined} />}
+            {won && (
+              <EndCard tone={v.winner === me ? 'win' : 'lose'} title={v.winner === me ? 'Kazandın!' : `${first(won.name)} kazandı`} sub={v.winner === me ? 'Bütün taşların evde' : 'El bitti'} size={size} still={still} trophy={cup ? <RoomArtImage source={cup} w={56} /> : undefined}>
+                {onAgain && !busy ? <ActionButton label="Yeniden oyna" icon="refresh" onPress={onAgain} /> : null}
+              </EndCard>
+            )}
           </View>
           <View style={s.row}>
             {chip(3)}
@@ -313,11 +318,14 @@ function LudoStage({
 const DIE_BLOCK = 104;
 const FACES = [1, 2, 3, 4, 5, 6] as const;
 
-/** The die on its pad: tumbling while `spinning`, then the face thrown; lit and tappable when it is mine to throw. */
+/** The die on its pad: it hops and tumbles while `spinning`, lands a little too big and tilted and settles on the face thrown; lit and tappable when it is mine to throw. */
 function Die({ size, face, spinning, color, ready, onPress, still }: { size: number; face: number | null; spinning: boolean; color: number | null; ready: boolean; onPress: () => void; still: boolean }) {
+  const { fx } = useTableFx();
   const [tumble, setTumble] = useState(3);
   const [turn] = useState(() => new Animated.Value(0));
+  const [hop] = useState(() => new Animated.Value(0));
   const [land] = useState(() => new Animated.Value(1));
+  const [settle] = useState(() => new Animated.Value(0));
   const [halo] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!spinning || still) return;
@@ -330,34 +338,59 @@ function Die({ size, face, spinning, color, ready, onPress, still }: { size: num
       70,
     );
     const loop = Animated.loop(Animated.timing(turn, { toValue: 1, duration: 300, easing: Easing.linear, useNativeDriver: true }));
+    const bounce = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hop, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(hop, { toValue: 0, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
     loop.start();
+    bounce.start();
     return () => {
       clearInterval(t);
       loop.stop();
+      bounce.stop();
       turn.setValue(0);
-      // It lands: a little too big, then settles.
-      land.setValue(1.28);
-      Animated.spring(land, { toValue: 1, speed: 18, bounciness: 12, useNativeDriver: true }).start();
+      hop.setValue(0);
+      // It lands: a little too big and turned, then settles square.
+      land.setValue(1.3);
+      settle.setValue(1);
+      Animated.parallel([Animated.spring(land, { toValue: 1, speed: 18, bounciness: 12, useNativeDriver: true }), Animated.spring(settle, { toValue: 0, speed: 12, bounciness: 14, useNativeDriver: true })]).start();
     };
-  }, [spinning, still, turn, land]);
+  }, [spinning, still, turn, hop, land, settle]);
   useEffect(() => {
-    if (!ready || still) return;
+    if (!ready || !fx) return;
     const loop = Animated.loop(Animated.timing(halo, { toValue: 1, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true }));
     loop.start();
     return () => {
       loop.stop();
       halo.setValue(0);
     };
-  }, [ready, still, halo]);
+  }, [ready, fx, halo]);
   const shown = spinning && !still ? tumble : (face ?? 6);
   const c = color === null ? null : LUDO_COLORS[color];
   const pad = size + 18;
   return (
     <Pressable onPress={onPress} disabled={!ready} hitSlop={8} accessibilityRole="button" accessibilityLabel={ready ? 'Zar at' : `Zar: ${face ?? 'atılmadı'}`} accessibilityState={{ disabled: !ready }} style={{ width: pad, height: pad }}>
-      {ready && !still && <Animated.View style={[d.halo, { borderRadius: pad, borderColor: c?.base ?? semantic.action, opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] }) }] }]} />}
-      <LinearGradient colors={c ? [c.light, c.dark] : ['#3A4E72', '#1F3050']} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={[d.pad, { borderRadius: pad }, ready && { boxShadow: `0 0 14px ${c?.base ?? semantic.action}` }]}>
+      {ready && fx && <Animated.View style={[d.halo, { borderRadius: pad, borderColor: c?.base ?? semantic.action, opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }), transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] }) }] }]} />}
+      <LinearGradient colors={c ? [c.light, c.base, c.dark] : ['#4A5F86', '#2A3B5E', '#1A2944']} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={[d.pad, { borderRadius: pad }, ready && { boxShadow: `0 0 16px ${c?.base ?? semantic.action}, 0 6px 14px rgba(0,0,0,0.5)` }]}>
+        <Gloss strength={0.3} />
         <View style={[d.well, { borderRadius: pad }]}>
-          <Animated.View style={{ width: size, height: size, opacity: face === null && !spinning ? 0.45 : 1, transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }, { scale: land }] }}>
+          {/* The die's shadow on the pad: smaller while it is in the air. */}
+          <Animated.View style={[d.shadow, { width: size * 0.8, height: size * 0.3, borderRadius: size, top: size * 0.86, opacity: hop.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.25] }), transform: [{ scaleX: hop.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) }] }]} />
+          <Animated.View
+            style={{
+              width: size,
+              height: size,
+              opacity: face === null && !spinning ? 0.45 : 1,
+              transform: [
+                { translateY: hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.2] }) },
+                { rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) },
+                { rotate: settle.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-26deg'] }) },
+                { scale: land },
+              ],
+            }}
+          >
             {/* Every face stays mounted, so changing face never waits for a picture to load. */}
             {FACES.map((n) => (
               <Art key={n} name={`zar-zar-yuzu-${n}` as ArtName} size={size} style={{ position: 'absolute', opacity: n === shown ? 1 : 0 }} />
@@ -379,8 +412,8 @@ function PlayerChip({
   home,
   count,
   winner,
-  bar,
-  still,
+  endsAt,
+  total,
 }: {
   seat: LudoSeat;
   color: number;
@@ -392,52 +425,30 @@ function PlayerChip({
   home: number;
   count: number;
   winner: boolean;
-  bar: { endsAt: number; total: number } | null;
-  still: boolean;
+  /** When the running turn ends, on the player on turn: the clock runs out round their face. */
+  endsAt: number | null;
+  total: number;
 }) {
   const c = LUDO_COLORS[color];
-  const [glow] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    if (!active || still) return void glow.setValue(active ? 1 : 0);
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0.2, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, still, glow]);
   const right = side === 'right';
-  const textWidth = width - FACE - 12;
+  const textWidth = width - FACE - 8;
   return (
     <View style={[p.chip, { width, flexDirection: right ? 'row-reverse' : 'row' }]} accessibilityLabel={`${mine ? 'Sen' : seat.name}, ${c.name}, ${home}/${count} taş evde${active ? ', sıra onda' : ''}`}>
-      <View style={{ width: FACE + 6, height: FACE + 6 }}>
-        <Animated.View style={[p.halo, { borderColor: c.base, opacity: glow, boxShadow: `0 0 10px ${c.base}` }]} />
-        <LinearGradient colors={[c.light, c.dark]} style={p.ring}>
-          <Photo uri={seat.avatar} kind="face" style={p.face} />
-        </LinearGradient>
-        {winner && (
-          <View style={p.crown}>
-            <Ionicons name="trophy" size={11} color={semantic.moneyInk} />
-          </View>
-        )}
-      </View>
-      <View style={{ width: textWidth, gap: 3, alignItems: right ? 'flex-end' : 'flex-start' }}>
+      <SeatFace seat={seat} size={FACE} color={c.base} active={active} endsAt={endsAt} total={total} winner={winner} tinted />
+      <View style={{ width: textWidth, gap: 4, alignItems: right ? 'flex-end' : 'flex-start' }}>
         <Text style={[p.name, active && { color: colors.text }]} numberOfLines={1}>
           {mine ? 'Sen' : seat.name}
         </Text>
         <View style={p.pips}>
           {Array.from({ length: count }, (_, i) => (
-            <View key={i} style={[p.pip, { borderColor: c.base }, i < home && { backgroundColor: c.base }]} />
+            <View key={i} style={[p.pip, { borderColor: c.base }, i < home && { backgroundColor: c.base, boxShadow: `0 0 5px ${alpha(c.base, 0.8)}` }]} />
           ))}
         </View>
-        {bar && <TurnBar endsAt={bar.endsAt} total={bar.total} color={c.base} width={Math.min(textWidth, 64)} />}
       </View>
     </View>
   );
 }
-const FACE = 34;
+const FACE = 42;
 
 /** A corner nobody sits at yet, while the table waits. */
 function FreeSeat({ side, width }: { side: 'left' | 'right'; width: number }) {
@@ -448,100 +459,6 @@ function FreeSeat({ side, width }: { side: 'left' | 'right'; width: number }) {
       </View>
       <Text style={p.freeText}>Boş koltuk</Text>
     </View>
-  );
-}
-
-/** The turn's time running out under the player's name. It is information, so it runs with "Animasyonları azalt" too. */
-function TurnBar({ endsAt, total, color, width }: { endsAt: number; total: number; color: string; width: number }) {
-  const [gone] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    const left = Math.max(0, endsAt - Date.now());
-    gone.setValue(1 - Math.min(1, left / total));
-    const a = Animated.timing(gone, { toValue: 1, duration: left, easing: Easing.linear, useNativeDriver: true });
-    a.start();
-    return () => a.stop();
-  }, [endsAt, total, gone]);
-  return (
-    <View style={[p.bar, { width }]}>
-      <Animated.View style={{ flex: 1, borderRadius: 2, backgroundColor: color, transform: [{ translateX: gone.interpolate({ inputRange: [0, 1], outputRange: [0, -width] }) }] }} />
-    </View>
-  );
-}
-
-// Where each scrap of the winner's confetti flies, fixed once: a render never draws random numbers.
-const CONFETTI = Array.from({ length: 26 }, (_, i) => {
-  const a = (i * 137.5 * Math.PI) / 180;
-  const far = 0.28 + ((i * 53) % 23) / 60;
-  return { dx: Math.cos(a) * far, dy: Math.sin(a) * far * 0.8 - 0.12, color: i % 4, turn: (i % 2 ? 1 : -1) * (180 + ((i * 71) % 240)), w: 5 + (i % 3) * 2 };
-});
-
-/** Over the board when the hand is won. `name` null: it is me. */
-function WinBanner({ name, color, size, still, onAgain }: { name: string | null; color: number; size: number; still: boolean; onAgain?: () => void }) {
-  const [t] = useState(() => new Animated.Value(still ? 1 : 0));
-  const [fly] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    if (still) return;
-    const a = Animated.parallel([
-      Animated.spring(t, { toValue: 1, speed: 10, bounciness: 12, useNativeDriver: true }),
-      Animated.timing(fly, { toValue: 1, duration: 1500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-    ]);
-    a.start();
-    return () => a.stop();
-  }, [still, t, fly]);
-  const c = LUDO_COLORS[color];
-  return (
-    <View style={[StyleSheet.absoluteFill, w.veil]} accessibilityLiveRegion="polite">
-      {!still &&
-        CONFETTI.map((f, i) => (
-          <Animated.View
-            key={i}
-            style={{
-              position: 'absolute',
-              width: f.w,
-              height: f.w * 1.6,
-              borderRadius: 1.5,
-              backgroundColor: LUDO_COLORS[f.color].base,
-              opacity: fly.interpolate({ inputRange: [0, 0.75, 1], outputRange: [1, 1, 0] }),
-              transform: [
-                { translateX: fly.interpolate({ inputRange: [0, 1], outputRange: [0, f.dx * size] }) },
-                { translateY: fly.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, f.dy * size, f.dy * size + size * 0.22] }) },
-                { rotate: fly.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${f.turn}deg`] }) },
-              ],
-            }}
-          />
-        ))}
-      <Animated.View style={{ opacity: t.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }), transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
-        <LinearGradient colors={['#1C2E4A', '#101C33']} style={[w.card, { borderColor: c.base, boxShadow: `0 0 26px ${c.base}` }]}>
-          <LinearGradient colors={['#FFE08A', '#F2A93B']} style={w.cup}>
-            <Ionicons name="trophy" size={28} color={semantic.moneyInk} />
-          </LinearGradient>
-          <Text style={w.title}>{name === null ? 'Kazandın!' : `${name} kazandı`}</Text>
-          <Text style={w.sub}>{name === null ? 'Bütün taşların evde' : 'El bitti'}</Text>
-          {onAgain && (
-            <View style={w.again}>
-              <ActionButton label="Yeniden oyna" onPress={onAgain} />
-            </View>
-          )}
-        </LinearGradient>
-      </Animated.View>
-    </View>
-  );
-}
-
-function ActionButton({ label, onPress, disabled, ghost }: { label: string; onPress: () => void; disabled?: boolean; ghost?: boolean }) {
-  if (ghost)
-    return (
-      <Pressable onPress={onPress} disabled={disabled} style={[s.ghost, disabled && { opacity: 0.5 }]} accessibilityRole="button" accessibilityLabel={label}>
-        <Text style={s.ghostText}>{label}</Text>
-      </Pressable>
-    );
-  return (
-    <PressableScale onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label} style={disabled ? { opacity: 0.5 } : undefined}>
-      <LinearGradient colors={['#6FF1F5', '#0FB8BE']} style={s.action}>
-        <Gloss strength={0.22} />
-        <Text style={s.actionText}>{label}</Text>
-      </LinearGradient>
-    </PressableScale>
   );
 }
 
@@ -631,7 +548,7 @@ export function LudoPractice({ players, fit }: { players: LudoSeat[]; fit?: bool
     <View style={s.setup}>
       <LudoModePicker mode={mode} onChange={setMode} />
       <Choice label="Oyuncu" value={size} onChange={setSize} options={[2, 3, 4].map((n) => [n, `${n} kişi`])} />
-      <ActionButton label="Oyunu başlat" onPress={start} />
+      <ActionButton label="Oyunu başlat" icon="play" onPress={start} />
     </View>
   );
   return (
@@ -646,7 +563,7 @@ export function LudoPractice({ players, fit }: { players: LudoSeat[]; fit?: bool
         onPick={(token) => act(0, { token })}
         onShown={(hand, n) => setShown({ hand, n })}
       />
-      {game && <ActionButton ghost label={over ? 'Oyun ayarları' : 'Oyunu bırak'} onPress={() => setGame(null)} />}
+      {game && <ActionButton ghost icon={over ? 'options-outline' : 'exit-outline'} label={over ? 'Oyun ayarları' : 'Oyunu bırak'} onPress={() => setGame(null)} />}
     </View>
   );
 }
@@ -721,42 +638,29 @@ const s = StyleSheet.create({
   line: { flex: 1, color: colors.textDim, fontSize: 12, lineHeight: 16, textAlign: 'center', paddingHorizontal: 4 },
   dieBlock: { width: DIE_BLOCK, alignItems: 'center', gap: 2 },
   hint: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '800', maxWidth: DIE_BLOCK },
-  setup: { alignSelf: 'stretch', gap: 10, backgroundColor: colors.card, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: '0 10px 24px rgba(0,0,0,0.5)' },
+  setup: { alignSelf: 'stretch', gap: 10, backgroundColor: colors.card, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.22)', boxShadow: '0 12px 28px rgba(0,0,0,0.55)' },
   choice: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   choiceLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700', width: 54 },
   option: { flex: 1, minHeight: 36, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   optionOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   optionText: { color: colors.text, fontSize: 12, fontWeight: '800' },
-  action: { minHeight: 48, borderRadius: 999, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 4px 14px rgba(19,217,223,0.4)' },
-  actionText: { color: semantic.actionInk, fontFamily: fonts.displayBold, fontSize: 16, lineHeight: 22 },
-  ghost: { minHeight: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt },
-  ghostText: { color: colors.text, fontWeight: '800', fontSize: 13 },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });
 const d = StyleSheet.create({
   pad: { flex: 1, padding: 3 },
-  well: { flex: 1, backgroundColor: '#0A1426', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  well: { flex: 1, backgroundColor: '#0A1426', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', boxShadow: 'inset 0 3px 8px rgba(0,0,0,0.6)' },
+  shadow: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.8)', boxShadow: '0 0 6px rgba(0,0,0,0.7)' },
   halo: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2 },
 });
 const p = StyleSheet.create({
-  chip: { alignItems: 'center', gap: 6, minHeight: FACE + 6 },
-  halo: { position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 999, borderWidth: 2 },
-  ring: { flex: 1, borderRadius: 999, padding: 3 },
-  face: { flex: 1, borderRadius: 999, backgroundColor: colors.cardAlt },
-  crown: { position: 'absolute', right: -3, top: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: semantic.money, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#0A1426' },
+  chip: { alignItems: 'center', gap: 8, minHeight: FACE },
   name: { color: colors.textDim, fontSize: 12, lineHeight: 16, fontWeight: '800' },
   pips: { flexDirection: 'row', gap: 3 },
-  pip: { width: 7, height: 7, borderRadius: 4, borderWidth: 1.5 },
-  bar: { height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' },
-  free: { width: FACE + 6, height: FACE + 6, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  pip: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
+  free: { width: FACE, height: FACE, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   freeText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
 });
 const w = StyleSheet.create({
   veil: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,15,30,0.55)', borderRadius: 16 },
   cover: { padding: 14 },
-  again: { alignSelf: 'stretch', minWidth: 170, marginTop: 8 },
-  card: { alignItems: 'center', gap: 4, paddingHorizontal: 26, paddingTop: 16, paddingBottom: 14, borderRadius: 22, borderWidth: 1.5 },
-  cup: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  title: { color: colors.text, fontFamily: fonts.display, fontSize: 22, lineHeight: 28 },
-  sub: { color: colors.textDim, fontSize: 12, lineHeight: 16 },
 });
