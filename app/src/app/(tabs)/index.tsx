@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text, TextInput } from '@/components/text';
 import { ActionSheet } from '@/components/ActionSheet';
-import { Art, artSource } from '@/components/Art';
+import { Art, artSource, type ArtName } from '@/components/Art';
 import { FloatIcon } from '@/components/fx/float';
 import { SCENES } from '@/components/fx/scenes';
 import { Backdrop, DepthCard, EdgeLight, Glass, Gloss, PressableScale, Shine, glow } from '@/components/fx/surface';
@@ -20,7 +20,7 @@ import {
   COUNTRIES,
   ROOM_BANNER,
   ROOM_TABS,
-  countryFlag,
+  countryArt,
   isMemberRoom,
   matchesTab,
   popularScore,
@@ -201,7 +201,7 @@ export default function RoomsScreen() {
               <QuickStrip coins={coins} checkedInToday={checkedInToday} />
               {similarPeople.length > 0 && <SimilarPeople people={similarPeople} rooms={visible} />}
               <SuggestionsRow items={suggestions} />
-              <CategoryBar cat={cat} onCat={setCat} countryFlag={country === 'ALL' ? null : countryFlag(country)} onCountry={() => setSheet('country')} />
+              <CategoryBar cat={cat} onCat={setCat} countryArt={country === 'ALL' ? null : countryArt(country)} onCountry={() => setSheet('country')} />
             </View>
           ) : (
             <View style={{ gap: 14, paddingBottom: 4 }}>
@@ -356,7 +356,7 @@ function QuickStrip({ coins, checkedInToday }: { coins: number; checkedInToday: 
   );
 }
 
-function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTab; onCat: (c: RoomTab) => void; countryFlag: string | null; onCountry: () => void }) {
+function CategoryBar({ cat, onCat, countryArt: flag, onCountry }: { cat: RoomTab; onCat: (c: RoomTab) => void; countryArt: ArtName | null; onCountry: () => void }) {
   const { colors, gradientDeep, surface, dark } = useTheme();
   const styles = useStyles();
   return (
@@ -389,7 +389,7 @@ function CategoryBar({ cat, onCat, countryFlag: flag, onCountry }: { cat: RoomTa
       </Pressable>
       <Pressable onPress={onCountry} hitSlop={6} accessibilityLabel="Ülke seç" style={{ marginRight: 16 }}>
         <View style={[styles.catIcon, { backgroundColor: colors.cardAlt }]}>
-          {flag ? <Text style={{ fontSize: 18 }}>{flag}</Text> : <Ionicons name="globe" size={20} color={dark ? '#38BDF8' : '#0284C7'} />}
+          {flag ? <Art name={flag} size={22} /> : <Ionicons name="globe" size={20} color={dark ? '#38BDF8' : '#0284C7'} />}
         </View>
       </Pressable>
     </View>
@@ -484,7 +484,7 @@ function MyRoomCard({ title, announcement, cover, locked, avatar, listeners = 0 
         <Photo uri={cover || avatar} kind="cover" style={styles.myCover} />
         <View style={{ flex: 1, gap: 6 }}>
           <View style={styles.titleRow}>
-            <Text style={styles.flag}>🇹🇷</Text>
+            <Art name="ulke-turkiye" size={18} />
             {locked && <Ionicons name="lock-closed" size={13} color={colors.gold} />}
             <Text style={[styles.roomTitle, { fontSize: 17 }]} numberOfLines={1}>
               {title || 'Odam'}
@@ -589,7 +589,7 @@ function RoomRowBody({ room, match, pk, mark, closed }: { room: Room; match: num
       </View>
       <View style={{ flex: 1, gap: 5, justifyContent: 'center' }}>
         <View style={styles.titleRow}>
-          <Text style={styles.flag}>{countryFlag(roomCountry(room.id))}</Text>
+          <Art name={countryArt(roomCountry(room.id))} size={18} />
           {locked(room) && <Ionicons name="lock-closed" size={13} color={colors.gold} accessibilityLabel="Şifreli oda" />}
           <Text style={styles.roomTitle} numberOfLines={1}>
             {room.title}
@@ -772,7 +772,6 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   coverFrame: { width: 84, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.cardAlt, boxShadow: dark ? '0 4px 10px rgba(0,0,0,0.35)' : SOFT_SHADOW },
   cover: { width: '100%', height: '100%' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  flag: { fontSize: 14 },
   roomTitle: { color: colors.text, fontWeight: '800', fontSize: 15, flexShrink: 1 },
   announce: { color: colors.textDim, fontSize: 12 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },

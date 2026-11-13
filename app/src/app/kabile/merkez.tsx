@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Art } from '@/components/Art';
 import { Text } from '@/components/text';
 import { LiveFamilyTasks } from '@/components/family-center-live';
 import { Avatar, Card, GradientButton, Header, StateIcon } from '@/components/ui';
@@ -165,7 +166,7 @@ function DemoKabileMerkez() {
               return (
                 <Pressable key={c.id} style={styles.chest} onPress={() => openChest(c.id)} accessibilityLabel={`${c.name}: ${chestRewardText(c.reward)}`}>
                   <View style={[styles.dot, ready && { backgroundColor: colors.primary }]} />
-                  <Text style={{ fontSize: 30 }}>{c.emoji}</Text>
+                  {c.art ? <Art name={c.art} size={44} /> : <Text style={{ fontSize: 30 }}>{c.emoji}</Text>}
                   <Text style={styles.chestNeed}>{fmtK(c.need)} puan</Text>
                   <Text style={styles.chestReward} numberOfLines={2}>
                     {chestRewardText(c.reward)}

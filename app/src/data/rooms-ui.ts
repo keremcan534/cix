@@ -1,5 +1,6 @@
 // UI-only mock data for the rooms tab (Odalar): ranking cards, room badge chips, weekly TOP ranks,
 // joined rooms, events, countries and the promo banner. Room records themselves live in mock.ts.
+import type { ArtName } from '@/components/Art';
 import { AGENCIES } from '@/data/agency';
 import { FAMILIES, LEADERBOARDS } from '@/data/economy';
 import { ROOMS, userById, type Room } from '@/data/mock';
@@ -27,6 +28,9 @@ export const COUNTRIES = [
 ] as const;
 export type CountryId = (typeof COUNTRIES)[number]['id'];
 export const countryFlag = (id: CountryId) => COUNTRIES.find((c) => c.id === id)?.flag ?? '🌍';
+/** Flag picture by country code (rooms and profiles); unknown codes get the globe. */
+const COUNTRY_ART: Record<string, ArtName> = { ALL: 'ulke-tum-ulkeler', TR: 'ulke-turkiye', AZ: 'ulke-azerbaycan', DE: 'ulke-almanya', NL: 'ulke-hollanda', CY: 'ulke-kibris' };
+export const countryArt = (code: string): ArtName => COUNTRY_ART[code] ?? 'ulke-tum-ulkeler';
 
 // --- Per-room extras ------------------------------------------------------------------------
 type RoomExtra = {

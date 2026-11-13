@@ -4,6 +4,7 @@
 import type { Href } from 'expo-router';
 import { useSyncExternalStore } from 'react';
 
+import type { ArtName } from '@/components/Art';
 import { FAMILIES } from '@/data/economy';
 import { USERS } from '@/data/mock';
 
@@ -138,11 +139,11 @@ export const KASA_GOAL = 50_000;
 
 // --- Weekly milestone chests (FIXED rewards, never random) -------------------
 export type ChestReward = { coins: number; item?: { label: string; days: number } };
-export const KABILE_CHESTS: { id: string; emoji: string; name: string; need: number; reward: ChestReward }[] = [
-  { id: 'c1', emoji: '🟫', name: 'Ahşap Sandık', need: 10_000, reward: { coins: 20 } },
-  { id: 'c2', emoji: '🟩', name: 'Yeşil Sandık', need: 25_000, reward: { coins: 50 } },
-  { id: 'c3', emoji: '🟦', name: 'Mavi Sandık', need: 50_000, reward: { coins: 50, item: { label: 'Aile çerçevesi', days: 3 } } },
-  { id: 'c4', emoji: '🟥', name: 'Kırmızı Sandık', need: 80_000, reward: { coins: 100, item: { label: 'Aile sohbet balonu', days: 7 } } },
+export const KABILE_CHESTS: { id: string; emoji: string; art?: ArtName; name: string; need: number; reward: ChestReward }[] = [
+  { id: 'c1', emoji: '🟫', art: 'kabile-ahsap-sandik', name: 'Ahşap Sandık', need: 10_000, reward: { coins: 20 } },
+  { id: 'c2', emoji: '🟩', art: 'kabile-yesil-sandik', name: 'Yeşil Sandık', need: 25_000, reward: { coins: 50 } },
+  { id: 'c3', emoji: '🟦', art: 'kabile-mavi-sandik', name: 'Mavi Sandık', need: 50_000, reward: { coins: 50, item: { label: 'Aile çerçevesi', days: 3 } } },
+  { id: 'c4', emoji: '🟥', art: 'kabile-kirmizi-sandik', name: 'Kırmızı Sandık', need: 80_000, reward: { coins: 100, item: { label: 'Aile sohbet balonu', days: 7 } } },
 ];
 export const chestRewardText = (r: ChestReward) => `${r.coins} 🪙${r.item ? ` + ${r.item.label} (${r.item.days} gün)` : ''}`;
 /** At least this much personal power this week is needed to open milestone chests. */

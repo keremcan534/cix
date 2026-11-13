@@ -662,7 +662,7 @@ function TopicStrip({ topic, onTopic, showViews = true }: { topic: string | null
                   <Text style={styles.topicViews}>{t.views}</Text>
                 </View>
               )}
-              <Text style={styles.topicEmoji}>{t.emoji}</Text>
+              {t.art ? <Art name={t.art} size={40} style={styles.topicArt} /> : <Text style={styles.topicEmoji}>{t.emoji}</Text>}
             </LinearGradient>
           </Pressable>
         ))}
@@ -1031,6 +1031,7 @@ const useStyles = makeStyles(({ colors, lift, dark, edge }) => ({
   topicTitle: { color: '#fff', fontWeight: '800', fontSize: 14, maxWidth: 148 },
   topicViews: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   topicEmoji: { position: 'absolute', right: 8, bottom: 4, fontSize: 28, opacity: 0.85 },
+  topicArt: { position: 'absolute', right: 4, bottom: 2 },
   topicFilter: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, ...lift },
   empty: { alignItems: 'center', gap: 10, padding: 32 },
   emptyBtn: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },

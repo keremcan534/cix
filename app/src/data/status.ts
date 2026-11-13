@@ -28,8 +28,8 @@ export const SVIP_RIGHTS: { name: string; emoji: string; group: RightGroup; art?
   { name: 'Hediye serisi efekti', emoji: '🔥', group: 'Odada', art: 'ayricalik-hediye-combo-skin' },
   { name: 'Kendi unvanını yaz', emoji: '✏️', group: 'Görünüm', art: 'ayricalik-diy-unvani' },
   { name: 'Sessiz ziyaret', emoji: '🥷', group: 'Sosyal', art: 'ayricalik-gizli-ziyaret' },
-  { name: 'Dolu odaya girebilme', emoji: '🚪', group: 'Odada' },
-  { name: 'Mesaj çevirisi', emoji: '🔤', group: 'Sosyal' },
+  { name: 'Dolu odaya girebilme', emoji: '🚪', group: 'Odada', art: 'ayricalik-tam-dolu-odalar' },
+  { name: 'Mesaj çevirisi', emoji: '🔤', group: 'Sosyal', art: 'ayricalik-metin-cevirisi' },
   { name: 'Yüklemede indirim', emoji: '💸', group: 'Destek', art: 'ayricalik-yukleme-indirimi' },
   { name: 'Öncelikli destek', emoji: '🎧', group: 'Destek', art: 'ayricalik-ozel-musteri-temsilcisi' },
 ];
@@ -53,10 +53,10 @@ export const NOBLE_RIGHTS: { name: string; emoji: string; art?: ArtName }[] = [
   { name: 'Sohbet balonu', emoji: '💬', art: 'ayricalik-sohbet-balonu' },
   { name: 'Odada ayrılmış koltuk', emoji: '🛋️', art: 'ayricalik-asil-koltugu' },
   { name: 'Binekler', emoji: '🚘', art: 'ayricalik-araclar' },
-  { name: 'Gizli oda girişi', emoji: '👻' },
+  { name: 'Gizli oda girişi', emoji: '👻', art: 'ayricalik-gizli-oda-girisi' },
   { name: 'Arkadaşına jeton gönder', emoji: '💗', art: 'ayricalik-jeton-hediye-et' },
-  { name: 'Sıralamada gizli kalma', emoji: '🕵️' },
-  { name: 'Aile içinde görünmezlik', emoji: '🎭' },
+  { name: 'Sıralamada gizli kalma', emoji: '🕵️', art: 'ayricalik-gizemli-kisi-kimligi' },
+  { name: 'Aile içinde görünmezlik', emoji: '🎭', art: 'ayricalik-klan-gizliligi' },
 ];
 export const nobleInfo = (tier: number) => NOBLE_TIERS.find((t) => t.tier === tier);
 export const hasNobleRight = (tier: number, name: string) => {
