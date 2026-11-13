@@ -86,6 +86,7 @@
       ],
       "./plugins/with-android-release-build",
       "./plugins/with-webrtc-software-ns",
+      "./plugins/with-app-self-update",
       "expo-secure-store",
       [
         "expo-notifications",
