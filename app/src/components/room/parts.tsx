@@ -20,6 +20,7 @@ import { HOST_FRAME_SCALE, SEAT_ART, SEAT_COLOR_ART } from '@/components/RoomArt
 import type { SeatColorId } from '@/data/seat-colors';
 import { Gloss, Shine, useSpringPress } from '@/components/fx/surface';
 import { Photo } from '@/components/photo';
+import { RoleMark, type StaffMark } from '@/components/room/role-mark';
 import { BondBubble, BondChip, BondLink } from '@/components/room/room-bonds';
 import type { RoomBond } from '@/data/bonds';
 import { nameLine, nameSize } from '@/lib/seat-fit';
@@ -33,15 +34,20 @@ export type ChatMsg = FeedMsg;
 export type RoomRole = 'owner' | 'admin' | 'member';
 export const ROLE_RANK: Record<RoomRole, number> = { owner: 3, admin: 2, member: 1 };
 
+/** The speaking ring's color: pink for women, blue for men, white when the gender isn't known or is hidden. */
+export const VOICE_RING = { Kadın: semantic.live, Erkek: '#3D9BFF', none: '#FFFFFF' } as const;
+const ringGlow = (c: string) => `0 0 12px ${c}CC`;
+
 export function Seat({
   index,
   userId,
+  gender,
   host,
   vipLevel,
   frameId,
   speaking,
   muted,
-  role,
+  staff,
   seatColor,
   locked,
   compact,
@@ -63,12 +69,15 @@ export function Seat({
 }: {
   index: number;
   userId: string | null;
+  /** The seated person's gender, for the speaking ring's color (VOICE_RING). */
+  gender?: 'Kadın' | 'Erkek' | null;
   host: boolean;
   vipLevel: number;
   frameId?: string;
   speaking: boolean;
   muted: boolean;
-  role?: RoomRole;
+  /** The staff mark on the avatar (components/room/role-mark). */
+  staff?: StaffMark | null;
   /** The room's color for its empty mics (data/seat-colors); none: turquoise. */
   seatColor?: SeatColorId | null;
   locked?: boolean;
@@ -125,6 +134,9 @@ export function Seat({
   const press = useSpringPress(0.9);
 
   const user = userId ? userById(userId) : null;
+  // The room's word wins (its looks, null: hidden); else what this phone knows of them.
+  const g = gender !== undefined ? gender : user?.showGender === false ? null : user?.gender;
+  const ring = g ? VOICE_RING[g] : VOICE_RING.none;
   const size = avatarSize ?? (host ? 60 : 48);
   // Small faces: a smaller icon and no badge by the name. The name grows a little with the face (lib/seat-fit, which
   // sizes the stage by the same numbers) and may be as wide as the seat's slot.
@@ -156,13 +168,13 @@ export function Seat({
           { opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }, { scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] },
         ]}
       >
-        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && styles.speakingGlow]}>
+        <Animated.View ref={anchorRef} collapsable={false} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: press.scale }] }, speaking && { boxShadow: `0 0 18px ${ring}A6` }]}>
           {speaking && (
             <Animated.View
               pointerEvents="none"
               style={[
                 styles.ring,
-                { width: size, height: size, borderRadius: size / 2 },
+                { width: size, height: size, borderRadius: size / 2, borderColor: ring, boxShadow: ringGlow(ring) },
                 still
                   ? { opacity: 0.85, transform: [{ scale: 1.08 }] }
                   : { opacity: level.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }), transform: [{ scale: level.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1.38] }) }] },
@@ -173,7 +185,7 @@ export function Seat({
             <FramedAvatar uri={user.avatar} size={size} vipLevel={vipLevel} frameId={frameId} />
           ) : user ? (
             <>
-              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? semantic.live : 'transparent' }} />
+              <Photo uri={user.avatar} kind="face" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: speaking ? ring : 'transparent' }} />
               {hostFrame !== undefined && (
                 <Image
                   source={hostFrame}
@@ -212,11 +224,7 @@ export function Seat({
               <Ionicons name={modMuted ? 'mic-off' : 'mic-off-outline'} size={10} color="#fff" />
             </View>
           )}
-          {role === 'admin' && (
-            <View style={styles.roleBadge} accessibilityLabel="Oda yöneticisi">
-              <Ionicons name="shield-checkmark" size={10} color={semantic.actionInk} />
-            </View>
-          )}
+          {user && <RoleMark mark={staff} edge={colors.bg} style={{ left: -2, bottom: -2 }} />}
           {reaction && user && <SeatReaction key={reaction.key} emoji={reaction.emoji} art={reaction.art} pre={reaction.pre} badge={reaction.badge} badgeAt={reaction.badgeAt} ms={reaction.ms} size={size} still={still} />}
         </Animated.View>
         {mini ? (
@@ -510,6 +518,9 @@ export function ChatLine({
   );
 }
 
+/** Every round button in the room's bottom bar (menu, messages, mic, room sound, gift) is this big. */
+export const BAR_BTN = 44;
+
 export function RoundBtn({
   icon,
   onPress,
@@ -540,8 +551,8 @@ export function RoundBtn({
       <Animated.View style={{ transform: [{ scale: press.scale }] }}>
         {gift ? (
           <View style={[styles.round, styles.giftRound]}>
-            <Icon3D name="gift" size={34} />
-            <Shine radius={24} every={3600} />
+            <Icon3D name="gift" size={30} />
+            <Shine radius={BAR_BTN / 2} every={3600} />
           </View>
         ) : (
           <View style={[styles.round, styles.glassRound]}>
@@ -564,33 +575,40 @@ const MIC_LOOK: Record<MicState, { icon: keyof typeof Ionicons.glyphMap; caption
   held: { icon: 'mic-outline', caption: 'DURAKLADI', bg: 'rgba(246,189,96,0.2)', edge: semantic.moneyEdge, fg: colors.gold, a11y: 'Mikrofonun açık ama şu an ses gitmiyor; kapatmak için dokun' },
 };
 
-/** The biggest control in the room: state is shown by color, icon and caption together, never by color alone. */
+/**
+ * The mic, as big as the bar's other buttons. Its state shows by color and icon; the states that need words (the
+ * queue, a held mic and why) also carry a short tag on the circle's lower edge, so the bar keeps one height.
+ */
 export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPress }: { state: MicState; queuePos?: number; caption?: string; hint?: string; onPress: () => void }) {
   const look = MIC_LOOK[state];
-  const caption = captionOverride ?? (state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : look.caption);
+  const press = useSpringPress(0.88);
+  const caption = captionOverride ?? (state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : state === 'queued' || state === 'held' ? look.caption : null);
   return (
     <Pressable
       onPress={() => {
         micHaptic();
         onPress();
       }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       accessibilityRole="button"
       accessibilityLabel={hint ?? look.a11y}
       accessibilityState={{ checked: state === 'on' || state === 'held' }}
       aria-checked={state === 'on' || state === 'held'}
-      style={{ alignItems: 'center', gap: 2 }}
     >
-      {({ pressed }) => (
-        <>
-          <View style={{ borderRadius: 23, backgroundColor: look.edge, paddingBottom: pressed ? 0 : 3, marginTop: pressed ? 3 : 0 }}>
-            <View style={[styles.micRound, { backgroundColor: look.bg }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
-              <Gloss strength={0.32} />
-              <Ionicons name={look.icon} size={22} color={look.fg} />
-            </View>
+      <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+        <View style={[styles.round, { backgroundColor: look.bg, borderWidth: 1, borderColor: look.edge === 'transparent' ? 'rgba(255,255,255,0.12)' : look.edge }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
+          <Gloss strength={0.32} />
+          <Ionicons name={look.icon} size={22} color={look.fg} />
+        </View>
+        {caption && (
+          <View style={styles.tagWrap} pointerEvents="none">
+            <Text style={[styles.tag, state === 'on' && { color: semantic.live }, state === 'held' && { color: colors.gold }]} numberOfLines={1}>
+              {caption}
+            </Text>
           </View>
-          <Text style={[styles.micCaption, state === 'on' && { color: semantic.live }, state === 'held' && { color: colors.gold }]}>{caption}</Text>
-        </>
-      )}
+        )}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -608,12 +626,11 @@ export function RoomSoundBtn({ muted, onPress }: { muted: boolean; onPress: () =
       accessibilityState={{ checked: !muted }}
       aria-checked={!muted}
       hitSlop={6}
-      style={({ pressed }) => ({ alignItems: 'center', gap: 2, transform: [{ scale: pressed ? 0.92 : 1 }] })}
+      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.9 : 1 }] })}
     >
-      <View style={[styles.soundRound, muted && styles.soundRoundOff]}>
-        <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color={muted ? '#FCA5A5' : '#fff'} />
+      <View style={[styles.round, styles.glassRound, muted && styles.soundRoundOff]}>
+        <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={22} color={muted ? '#FCA5A5' : '#fff'} />
       </View>
-      <Text style={[styles.micCaption, muted && { color: '#FCA5A5' }]}>{muted ? 'SESSİZ' : 'SES'}</Text>
     </Pressable>
   );
 }
@@ -670,8 +687,7 @@ const styles = StyleSheet.create({
   seat: { alignItems: 'center', gap: 4 },
   seatBody: { alignSelf: 'stretch', alignItems: 'center', gap: 4 },
   hostSeat: { width: '100%' },
-  ring: { position: 'absolute', borderWidth: 4, borderColor: semantic.live, boxShadow: '0 0 12px rgba(255,95,162,0.8)' },
-  speakingGlow: { boxShadow: '0 0 18px rgba(255,95,162,0.65)' },
+  ring: { position: 'absolute', borderWidth: 4 },
   emptySeat: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
@@ -688,7 +704,6 @@ const styles = StyleSheet.create({
   mutedBadge: { position: 'absolute', right: 0, bottom: 0, backgroundColor: colors.red, borderRadius: 10, padding: 3 },
   selfMutedBadge: { backgroundColor: '#475569' },
   invitedSeat: { borderColor: colors.gold, backgroundColor: 'rgba(246,189,96,0.12)' },
-  roleBadge: { position: 'absolute', left: -2, bottom: -2, backgroundColor: semantic.action, borderRadius: 10, padding: 3, borderWidth: 1.5, borderColor: colors.bg },
   pkWrap: { alignItems: 'center', marginTop: -1 },
   pkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(246,189,96,0.18)', borderColor: 'rgba(246,189,96,0.55)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 76 },
   pkPillBig: { backgroundColor: 'rgba(246,189,96,0.3)' },
@@ -721,15 +736,14 @@ const styles = StyleSheet.create({
   chatText: { color: '#fff', fontSize: 14, lineHeight: 19 },
   // Dark glass: keeps white text readable over the stage, with a lit top edge.
   chatGlass: { backgroundColor: 'rgba(12,22,40,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.16)' },
-  round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  round: { width: BAR_BTN, height: BAR_BTN, borderRadius: BAR_BTN / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   giftRound: { backgroundColor: 'rgba(246,189,96,0.16)', borderWidth: 2, borderColor: semantic.money, overflow: 'hidden', boxShadow: '0 0 16px rgba(246,189,96,0.45)' },
   glassRound: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
-  micRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  soundRound: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
   soundRoundOff: { backgroundColor: 'rgba(252,165,165,0.14)', borderColor: 'rgba(252,165,165,0.45)' },
   micGlowOn: { boxShadow: '0 4px 16px rgba(255,95,162,0.6)' },
   micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
-  micCaption: { color: colors.textDim, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  tagWrap: { position: 'absolute', left: -14, right: -14, bottom: -7, alignItems: 'center' },
+  tag: { color: '#fff', fontSize: 8, lineHeight: 12, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 5, borderRadius: 6, overflow: 'hidden', backgroundColor: 'rgba(12,8,20,0.92)' },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   pk: { marginHorizontal: 12, marginTop: 4, gap: 6 },

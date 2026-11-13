@@ -6,7 +6,18 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/lib/api';
 
-export type Look = { frame: string | null; entry: string | null; ride: string | null; bubble: string | null; specialId: string | null; micfx: string | null; noble: number | null; vipLevel: number };
+export type Look = {
+  frame: string | null;
+  entry: string | null;
+  ride: string | null;
+  bubble: string | null;
+  specialId: string | null;
+  micfx: string | null;
+  noble: number | null;
+  vipLevel: number;
+  /** Colors their speaking ring; none when hidden (an older server sends no field). */
+  gender?: 'Kadın' | 'Erkek' | null;
+};
 const TTL = 120_000;
 const store = new Map<string, { look: Look; at: number }>();
 const asking = new Set<string>();
