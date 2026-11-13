@@ -181,7 +181,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <StatusCard title="VIP" sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'} colors={['#0A8F95', '#0B3B4A']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
+            <StatusCard title="VIP" sub={svipLevel ? `VIP ${svipLevel}` : 'Yok'} colors={['#D02E78', '#4A1630']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'svip' } })} />
             <StatusCard title="Abonelik" sub={vipDays > 0 ? `${vipDays} gün` : 'Yok'} colors={['#B7832E', '#4A3410']} onPress={() => router.push({ pathname: '/vip', params: { tab: 'vip' } })} />
             <StatusCard title="Rütbe" sub={noble ? `${noble.emoji} ${noble.name}` : 'Henüz yok'} colors={['#7A2E4A', '#3A1A2E']} dot={!noble} onPress={() => router.push({ pathname: '/vip', params: { tab: 'noble' } })} />
           </View>

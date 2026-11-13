@@ -365,7 +365,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             </View>
 
             <View style={styles.cards}>
-              <Pressable style={[styles.miniCard, { backgroundColor: '#0A8F95' }]} onPress={() => featured && featured.id !== 'me' && router.push(`/kullanici/${featured.id}`)}>
+              <Pressable style={[styles.miniCard, { backgroundColor: '#D02E78' }]} onPress={() => featured && featured.id !== 'me' && router.push(`/kullanici/${featured.id}`)}>
                 <Text style={styles.miniTitle} numberOfLines={1}>
                   Haftanın Öne Çıkan Kişisi
                 </Text>
@@ -381,7 +381,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                   </View>
                 )}
               </Pressable>
-              <Pressable style={[styles.miniCard, { backgroundColor: '#065A60' }]} onPress={() => setSheet('ranking')}>
+              <Pressable style={[styles.miniCard, { backgroundColor: '#7A1745' }]} onPress={() => setSheet('ranking')}>
                 <Text style={styles.miniTitle} numberOfLines={1}>
                   Haftalık Aile Sıralaması
                 </Text>
@@ -446,7 +446,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                             <Text style={{ color: colors.text, fontWeight: '700' }} numberOfLines={1}>
                               {id === 'me' ? youLabel(me.name) : u.name}
                             </Text>
-                            {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: dark ? 'rgba(19,217,223,0.16)' : 'rgba(0,140,148,0.10)', color: colors.primaryText }]}>{ROLE_LABEL[r]}</Text>}
+                            {r !== 'member' && <Text style={[styles.roleBadge, r === 'helper' && { backgroundColor: dark ? 'rgba(255,95,162,0.16)' : 'rgba(208,46,120,0.10)', color: colors.primaryText }]}>{ROLE_LABEL[r]}</Text>}
                           </View>
                           <Text style={[styles.dim, p?.kind === 'room' && { color: colors.gold }]} numberOfLines={1}>
                             {id === 'me' ? 'Çevrimiçi' : presenceLabel(p, u.online)}
@@ -573,7 +573,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
                     <Text style={[styles.th, { width: 60, textAlign: 'right' }]}>Bonus</Text>
                   </View>
                   {FAMILY_XP.map((xp, i) => (
-                    <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: dark ? 'rgba(19,217,223,0.25)' : 'rgba(0,140,148,0.15)', borderRadius: 8 }]}>
+                    <View key={xp} style={[styles.tableRow, i + 1 === lvl && { backgroundColor: dark ? 'rgba(255,95,162,0.25)' : 'rgba(208,46,120,0.15)', borderRadius: 8 }]}>
                       <Text style={[styles.td, { width: 44 }]}>Lv.{i + 1}</Text>
                       <Text style={[styles.td, { flex: 1 }]}>{fmt(xp)}</Text>
                       <Text style={[styles.td, { width: 70 }]}>{familyCapacity(i + 1)}</Text>
@@ -692,7 +692,7 @@ function FamilyHome({ family, role, onLeave }: { family: KabileFamily; role: Rol
             const m = kabileMeta(f.id);
             const mine = f.id === family.id;
             return (
-              <View key={f.id} style={[styles.row, mine && { backgroundColor: dark ? 'rgba(19,217,223,0.2)' : 'rgba(0,140,148,0.12)', borderRadius: 10, paddingHorizontal: 6 }]}>
+              <View key={f.id} style={[styles.row, mine && { backgroundColor: dark ? 'rgba(255,95,162,0.2)' : 'rgba(208,46,120,0.12)', borderRadius: 10, paddingHorizontal: 6 }]}>
                 <Text style={[styles.rank, { width: 40 }]}>No.{m.weeklyRank}</Text>
                 <Text style={{ fontSize: 24 }}>{f.emoji}</Text>
                 <Text style={{ color: colors.text, flex: 1, fontWeight: mine ? '800' : '500' }}>{f.name}</Text>
@@ -732,7 +732,7 @@ function PlayingChip({ u, onPress }: { u: User; onPress: () => void }) {
   return (
     <Pressable style={{ alignItems: 'center', width: 66 }} onPress={onPress} accessibilityLabel={`${u.name} ${presenceLabel(p, u.online)}`}>
       <Avatar uri={u.avatar} size={50} />
-      <Text style={[styles.chip, p?.kind === 'room' ? { backgroundColor: '#0FB8BE' } : p?.kind === 'call' ? { backgroundColor: '#F59E0B' } : null]} numberOfLines={1}>
+      <Text style={[styles.chip, p?.kind === 'room' ? { backgroundColor: '#F0468E' } : p?.kind === 'call' ? { backgroundColor: '#F59E0B' } : null]} numberOfLines={1}>
         {p?.kind === 'room' ? '🎉 Partide' : p?.kind === 'call' ? '📞 Görüşmede' : '💬 Çevrimiçi'}
       </Text>
       <Text style={[styles.dim, { fontSize: 12 }]} numberOfLines={1}>
@@ -805,7 +805,7 @@ function CoupleTab() {
       {/* Brand card: teal-to-pink in both schemes, so its type stays white. */}
       {top && (
         <ThemeScope scheme="dark">
-        <LinearGradient colors={['#076A70', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 18, padding: 16, gap: 10 }}>
+        <LinearGradient colors={['#9C1857', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 18, padding: 16, gap: 10 }}>
           <Text style={[styles.title, { textAlign: 'center', color: '#fff' }]}>💞 En Uyumlu İkili</Text>
           <View style={styles.row}>
             <Avatar uri={userById(top.a).avatar} size={48} />
@@ -816,7 +816,7 @@ function CoupleTab() {
               <Text style={{ color: '#fff', fontWeight: '800' }}>
                 {userById(top.a).name} & {userById(top.b).name}
               </Text>
-              <Text style={[styles.dim, { color: '#A3B1CF' }]}>İkili · Lv.{top.level}</Text>
+              <Text style={[styles.dim, { color: '#CDB3C0' }]}>İkili · Lv.{top.level}</Text>
             </View>
             <Text style={{ color: '#F9A8D4', fontWeight: '900', fontSize: 16 }}>{fmtK(top.score)} ❤</Text>
           </View>
@@ -945,7 +945,7 @@ const useStyles = makeStyles(({ colors, semantic, dark, edge }) => ({
     color: dark ? '#E9D5FF' : semantic.tonalText,
     fontSize: 13,
     fontWeight: '600',
-    backgroundColor: dark ? 'rgba(19,217,223,0.22)' : 'rgba(0,140,148,0.12)',
+    backgroundColor: dark ? 'rgba(255,95,162,0.22)' : 'rgba(208,46,120,0.12)',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -963,7 +963,7 @@ const useStyles = makeStyles(({ colors, semantic, dark, edge }) => ({
   chip: { marginTop: -8, fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: '#16A34A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', maxWidth: 66 },
   roomCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: 12, padding: 10 },
   roleBadge: { color: colors.gold, fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(246,189,96,0.18)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
-  goBtn: { backgroundColor: '#0FB8BE', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
+  goBtn: { backgroundColor: '#F0468E', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   bottomBar: {
     position: 'absolute',
     left: 0,
@@ -974,8 +974,8 @@ const useStyles = makeStyles(({ colors, semantic, dark, edge }) => ({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 10,
-    backgroundColor: dark ? 'rgba(8,15,30,0.92)' : 'rgba(243,246,251,0.94)',
-    ...(dark ? {} : { boxShadow: '0 -1px 0 rgba(11,26,46,0.06), 0 -6px 16px rgba(16,36,64,0.05)' }),
+    backgroundColor: dark ? 'rgba(22,14,18,0.92)' : 'rgba(251,244,247,0.94)',
+    ...(dark ? {} : { boxShadow: '0 -1px 0 rgba(42,21,32,0.06), 0 -6px 16px rgba(64,20,40,0.05)' }),
   },
   bottomBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 13 },
   bottomText: { color: '#fff', fontWeight: '900', fontSize: 17 },

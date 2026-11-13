@@ -167,7 +167,7 @@ function Shelf({ hue, on, children }: { hue: string; on?: boolean; children: Rea
         styles.item,
         {
           borderColor: on ? colors.primaryText : `${hue}40`,
-          boxShadow: `${dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 16px ${hue}1F`,
+          boxShadow: `${dark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 1px 2px rgba(64,20,40,0.05), 0 8px 20px rgba(64,20,40,0.08)'}, 0 0 16px ${hue}1F`,
         },
       ]}
     >
@@ -263,7 +263,7 @@ function Preview({ item, avatar, still }: { item: Cosmetic; avatar: string; stil
 }
 
 const useStyles = makeStyles((t) => ({
-  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: t.dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   previewText: { color: t.colors.primaryText, fontWeight: '700', fontSize: 12 },
   entryPreview: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, borderRadius: 20, paddingHorizontal: 10, marginVertical: 12, maxWidth: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   entryPreviewSmall: { height: 32, marginVertical: 0 },
@@ -273,7 +273,7 @@ const useStyles = makeStyles((t) => ({
   rideArt: { width: 72, height: 72 },
   tabTrack: { marginHorizontal: 16, marginBottom: 12, borderRadius: 999, overflow: 'hidden', ...glassChipOf(t) },
   tab: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 999 },
-  tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(19,217,223,0.4)' },
+  tabActive: { backgroundColor: t.semantic.action, boxShadow: '0 3px 12px rgba(255,95,162,0.4)' },
   tabText: { color: t.colors.textDim, fontFamily: fonts.displayBold, fontSize: 13, lineHeight: 18 },
   tabRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   warn: { color: t.colors.gold, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },

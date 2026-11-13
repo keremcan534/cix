@@ -62,7 +62,7 @@ export function SeatMenu({ anchor, title, items, onClose }: { anchor: Rect | nul
 }
 
 const s = StyleSheet.create({
-  focus: { position: 'absolute', borderWidth: 2, borderColor: '#13D9DF' },
+  focus: { position: 'absolute', borderWidth: 2, borderColor: '#FF5FA2' },
   menu: { position: 'absolute', backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, paddingVertical: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
   arrow: { position: 'absolute', width: 14, height: 14, backgroundColor: colors.card, borderColor: colors.border, transform: [{ rotate: '45deg' }] },
   title: { color: colors.textDim, fontSize: 12, fontWeight: '800', paddingHorizontal: 14, paddingVertical: 8 },

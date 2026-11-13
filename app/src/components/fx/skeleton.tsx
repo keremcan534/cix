@@ -43,7 +43,7 @@ export function Skeleton({ width = '100%', height, radius = 8, style }: { width?
   useSweep(!reduceMotion);
   const translateX = sweep.interpolate({ inputRange: [0, 1], outputRange: [-LIGHT_W, screen] });
   return (
-    <View style={[{ width, height, borderRadius: radius, overflow: 'hidden', backgroundColor: dark ? 'rgba(255,255,255,0.07)' : 'rgba(11,26,46,0.06)' }, style]}>
+    <View style={[{ width, height, borderRadius: radius, overflow: 'hidden', backgroundColor: dark ? 'rgba(255,255,255,0.07)' : 'rgba(42,21,32,0.06)' }, style]}>
       {!reduceMotion && (
         <Animated.View style={[s.light, { transform: [{ translateX }] }]}>
           <LinearGradient

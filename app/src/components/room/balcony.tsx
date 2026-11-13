@@ -273,7 +273,7 @@ const s = StyleSheet.create({
   face: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.card },
   more: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', width: 34 },
   moreText: { color: colors.text, fontSize: 12, fontWeight: '800' },
-  total: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 12, minHeight: 40, minWidth: 56, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', boxShadow: '0 4px 14px rgba(19,217,223,0.45)' },
+  total: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: semantic.action, borderRadius: 999, paddingHorizontal: 12, minHeight: 40, minWidth: 56, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', boxShadow: '0 4px 14px rgba(255,95,162,0.45)' },
   totalText: { color: semantic.actionInk, fontWeight: '900', fontSize: 14, fontVariant: ['tabular-nums'] },
   dim: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   backdrop: { flex: 1, backgroundColor: SCRIM },

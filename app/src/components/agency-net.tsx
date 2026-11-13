@@ -414,7 +414,7 @@ const s = StyleSheet.create({
   legendValue: { color: '#fff', fontWeight: '700', fontVariant: ['tabular-nums'] },
   foot: { color: colors.textDim, fontSize: 12, lineHeight: 17 },
   tier: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.03)' },
-  tierOn: { backgroundColor: 'rgba(19,217,223,0.10)', borderWidth: 1, borderColor: 'rgba(19,217,223,0.35)' },
+  tierOn: { backgroundColor: 'rgba(255,95,162,0.10)', borderWidth: 1, borderColor: 'rgba(255,95,162,0.35)' },
   tierDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   tierName: { color: colors.textDim, fontSize: 14, fontWeight: '700' },
   tierNeed: { color: colors.textDim, fontSize: 11.5, marginTop: 1 },

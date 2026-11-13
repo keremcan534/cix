@@ -276,7 +276,7 @@ function FeedList({ data, active, empty, renderItem, sideRoom }: { data: FeedMsg
 const s = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 6, paddingTop: 8, paddingBottom: 4 },
   tab: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderTopColor: 'rgba(255,255,255,0.24)' },
-  tabOn: { backgroundColor: semantic.action, borderColor: semantic.action, borderTopColor: '#A5F3F5', boxShadow: '0 0 12px rgba(19,217,223,0.5)' },
+  tabOn: { backgroundColor: semantic.action, borderColor: semantic.action, borderTopColor: '#FFC2DC', boxShadow: '0 0 12px rgba(255,95,162,0.5)' },
   tabText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   tabTextOn: { color: semantic.actionInk, fontWeight: '900' },
   hidden: { display: 'none' },

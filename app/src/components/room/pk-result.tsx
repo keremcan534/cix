@@ -93,7 +93,7 @@ export function PkResultScreen({
   else if (r && pk.mode === 'solo') title = r.winners.length === 1 ? `${nameOf(r.winners[0])} kazandı!` : r.winners.length > 1 ? 'Beraberlik' : 'Kazanan yok';
   else if (r) title = r.winner === 'tie' ? 'Beraberlik' : `${teamName(r.winner as TeamId)} kazandı!${ours && r.winner === ours ? ' Tebrikler!' : ''}`;
   const celebrate = !still && !cancelled && !!r && (pk.mode === 'solo' ? r.winners.length === 1 : r.winner !== 'tie');
-  const heroColors: [string, string] = cancelled ? ['#2B3F63', '#16253C'] : r && pk.mode !== 'solo' && r.winner !== 'tie' && r.winner ? [pk.teams.find((t) => t.id === r.winner)!.color, '#16253C'] : ['#B7832E', '#16253C'];
+  const heroColors: [string, string] = cancelled ? ['#4A3040', '#2A1A22'] : r && pk.mode !== 'solo' && r.winner !== 'tie' && r.winner ? [pk.teams.find((t) => t.id === r.winner)!.color, '#2A1A22'] : ['#B7832E', '#2A1A22'];
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onContinue}>
@@ -239,7 +239,7 @@ export function CrownScreen({ pk, still, onClose, onProfile }: { pk: PkSession; 
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={s.backdrop}>
         <Animated.View style={[s.card, enter, { maxHeight: '88%' }]}>
-          <LinearGradient colors={['#B7832E', '#16253C']} style={[s.hero, { paddingBottom: 14 }]}>
+          <LinearGradient colors={['#B7832E', '#2A1A22']} style={[s.hero, { paddingBottom: 14 }]}>
             <Pressable onPress={onClose} style={s.close} hitSlop={8} accessibilityLabel="Kapat ve odaya dön">
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
@@ -327,10 +327,10 @@ function CrownCard({ c, onProfile }: { c: PkCrown; onProfile: (uid: string) => v
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(8,15,30,0.86)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(22,14,18,0.86)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   card: { width: '100%', maxWidth: 420, maxHeight: '92%', backgroundColor: colors.card, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   hero: { alignItems: 'center', gap: 6, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 },
-  close: { position: 'absolute', right: 10, top: 10, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,15,30,0.35)', zIndex: 2 },
+  close: { position: 'absolute', right: 10, top: 10, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,14,18,0.35)', zIndex: 2 },
   kicker: { color: '#FDE7C2', fontSize: 12, fontWeight: '800', letterSpacing: 0.4 },
   title: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center' },
   heroSub: { color: '#E2E8F5', fontSize: 13, textAlign: 'center' },

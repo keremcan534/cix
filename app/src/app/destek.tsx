@@ -173,8 +173,8 @@ export default function SupportScreen() {
               </Card>
 
               {/* The same place Mesajlar › Çevrim içi hizmet opens: a ticket the support team answers here. */}
-              <ServiceRow icon="headset" tint={['#13D9DF', '#0A8F95']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
-              <ServiceRow icon="create" tint={['#3B82F6', '#0E7C9A']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
+              <ServiceRow icon="headset" tint={['#FF5FA2', '#D02E78']} title="Çevrimiçi müşteri hizmetleri" sub="Manuel servis süresi 9:00 - 19:00" onPress={() => openNew(category)} />
+              <ServiceRow icon="create" tint={['#3B82F6', '#C2306E']} title="Geri bildirim" onPress={() => openNew('Teknik', true)} />
               <ServiceRow icon="chatbubbles" tint={['#38BDF8', '#3B82F6']} title="Sorun Takibi" sub={ticketSummary(tickets)} onPress={() => setTab('list')} />
               <ServiceRow icon="mail" tint={['#5B7BA6', '#34507A']} title="Resmi e-posta" sub={SUPPORT_EMAIL} onPress={() => openSupportMail({ subject: 'Similar Club destek' })} />
             </>

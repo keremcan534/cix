@@ -71,7 +71,7 @@ function DemoKabileKasa() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         {/* Brand banner: a dark amber-to-teal gradient in both schemes, so what sits on it keeps the dark look. */}
         <ThemeScope scheme="dark">
-        <LinearGradient colors={['#78350F', '#0B3B4A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={['#78350F', '#4A1630']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <StateIcon name="wallet-outline" size={72} tone="money" />
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={styles.heroText}>Sandık Değeri {fmt(meta.chestValue)} 🪙</Text>
@@ -176,7 +176,7 @@ const useStyles = makeStyles(({ colors }) => ({
   hero: { borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   // The banner stays dark in both schemes: its type keeps the dark scheme's colors.
   heroText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  heroDim: { color: '#A3B1CF' },
+  heroDim: { color: '#CDB3C0' },
   bar: { height: 18, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 9, overflow: 'hidden', justifyContent: 'center' },
   barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.primary, borderRadius: 9 },
   barText: { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },

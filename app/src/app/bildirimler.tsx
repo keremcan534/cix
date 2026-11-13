@@ -102,7 +102,7 @@ const useStyles = makeStyles(({ colors, semantic, lift, ink, dark }) => ({
   tabActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textDim, fontWeight: '700', fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 12, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 16 },
-  unread: { backgroundColor: dark ? 'rgba(19,217,223,0.07)' : 'rgba(0,140,148,0.06)' },
+  unread: { backgroundColor: dark ? 'rgba(255,95,162,0.07)' : 'rgba(208,46,120,0.06)' },
   pressed: { backgroundColor: ink(0.05) },
   title: { color: colors.text, fontSize: 15, fontWeight: '700' },
   body: { color: colors.textDim, fontSize: 13, lineHeight: 18 },

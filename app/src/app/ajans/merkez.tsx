@@ -1435,7 +1435,7 @@ const st = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: radius.sm,
-    backgroundColor: 'rgba(19,217,223,0.08)',
+    backgroundColor: 'rgba(255,95,162,0.08)',
   },
   upcomingText: { color: colors.text, fontSize: 12, flex: 1 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },

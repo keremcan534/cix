@@ -72,8 +72,8 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
         <Image source={picture} resizeMode="cover" onError={() => setFailed(uri)} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]} />
         {/* A navy veil, lighter than the theme's so the picture shows behind the mics (names and seats stay readable
             on a bright picture), solid toward the chat. */}
-        <LinearGradient colors={['rgba(8,15,30,0.40)', 'rgba(8,15,30,0.50)', 'rgba(8,15,30,0.88)', colors.bg]} locations={[0, 0.4, 0.68, 0.9]} style={StyleSheet.absoluteFill} />
-        <LinearGradient colors={['transparent', 'rgba(8,15,30,0.85)', colors.bg]} locations={[0, 0.6, 1]} style={s.floor} />
+        <LinearGradient colors={['rgba(22,14,18,0.40)', 'rgba(22,14,18,0.50)', 'rgba(22,14,18,0.88)', colors.bg]} locations={[0, 0.4, 0.68, 0.9]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['transparent', 'rgba(22,14,18,0.85)', colors.bg]} locations={[0, 0.6, 1]} style={s.floor} />
       </View>
     );
   }
@@ -108,7 +108,7 @@ export function StageBackdrop({ theme, background, freeId }: { theme: RoomTheme;
         />
       ))}
       {/* Darker floor under the chat. */}
-      <LinearGradient colors={['transparent', 'rgba(8,15,30,0.85)', colors.bg]} locations={[0, 0.6, 1]} style={s.floor} />
+      <LinearGradient colors={['transparent', 'rgba(22,14,18,0.85)', colors.bg]} locations={[0, 0.6, 1]} style={s.floor} />
     </View>
   );
 }

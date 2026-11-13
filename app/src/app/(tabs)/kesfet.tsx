@@ -351,7 +351,7 @@ function PromoCard() {
   const styles = useStyles();
   return (
     <Pressable style={styles.promoWrap} onPress={() => router.push(`/oda/${room.id}`)}>
-      <LinearGradient colors={['rgba(255,101,118,0.22)', 'rgba(19,217,223,0.22)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
+      <LinearGradient colors={['rgba(255,101,118,0.22)', 'rgba(255,95,162,0.22)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
         <View style={styles.promoTop}>
           <Photo uri={room.cover} kind="cover" seed={room.id} style={styles.promoCover} />
           <View style={{ flex: 1, gap: 4 }}>
@@ -432,7 +432,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   artRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   artCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
   // White rings read on the navy card; on paper a soft shadow keeps the stacked faces apart.
-  partyAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff', backgroundColor: colors.cardAlt, ...(dark ? {} : { boxShadow: '0 1px 3px rgba(16,36,64,0.18)' }) },
+  partyAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff', backgroundColor: colors.cardAlt, ...(dark ? {} : { boxShadow: '0 1px 3px rgba(64,20,40,0.18)' }) },
   partyAvatarMid: { width: 34, height: 34, borderRadius: 17, zIndex: 1 },
   starCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   tabsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 12, paddingTop: 14, paddingBottom: 6 },
@@ -477,7 +477,7 @@ const useStyles = makeStyles(({ colors, semantic, surface, lift, ink, dark, edge
   sheetLabel: { color: colors.textDim, fontWeight: '700', fontSize: 12, marginTop: 4 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   option: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  optionActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(19,217,223,0.18)' : 'rgba(0,140,148,0.11)' },
+  optionActive: { borderColor: colors.primaryText, backgroundColor: dark ? 'rgba(255,95,162,0.18)' : 'rgba(208,46,120,0.11)' },
   optionText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
   sheetBtn: { flex: 1, alignItems: 'center', borderRadius: 999, paddingVertical: 12 },
 }));

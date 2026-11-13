@@ -77,7 +77,7 @@ function DemoIliski() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
         {/* Brand banner: teal-to-pink in both schemes; the pair card on it keeps the dark look. */}
         <ThemeScope scheme="dark">
-        <LinearGradient colors={['#076A70', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={['#9C1857', '#BE185D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <Text style={styles.heroTitle}>{mode === 'cp' ? 'En Uyumlu İkili' : 'En Yakın Dostlar'}</Text>
           {top && <PairCard pair={top} mode={mode} big />}
         </LinearGradient>

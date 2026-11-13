@@ -99,7 +99,7 @@ export function BreakoutCard({
         locations={[0, 0.45, 1]}
         start={{ x: featured ? 1 : 0, y: 0 }}
         end={{ x: featured ? 0.1 : 0.7, y: 1 }}
-        style={[s.card, { borderColor: `${hue}40`, boxShadow: `${dark ? '0 10px 24px rgba(0,0,0,0.4)' : '0 1px 2px rgba(16,36,64,0.05), 0 8px 20px rgba(16,36,64,0.08)'}, 0 0 18px ${hue}22` }, featured ? { paddingRight: iconSize, minHeight: iconSize * 0.95 } : { paddingTop: iconSize - lift + 2 }]}
+        style={[s.card, { borderColor: `${hue}40`, boxShadow: `${dark ? '0 10px 24px rgba(0,0,0,0.4)' : '0 1px 2px rgba(64,20,40,0.05), 0 8px 20px rgba(64,20,40,0.08)'}, 0 0 18px ${hue}22` }, featured ? { paddingRight: iconSize, minHeight: iconSize * 0.95 } : { paddingTop: iconSize - lift + 2 }]}
       >
         <EdgeLight inset={18} strength={0.4} />
         {children}
@@ -126,16 +126,16 @@ export function GlossButton({ label, tone = 'money', small, icon }: { label: str
 }
 const TONES = {
   money: { colors: ['#FFD98A', '#F2A93B'] as const, ink: '#3B2300', glow: 'rgba(246,189,96,0.5)' },
-  action: { colors: ['#6FF1F5', '#0FB8BE'] as const, ink: '#04161D', glow: 'rgba(19,217,223,0.45)' },
+  action: { colors: ['#FF94C2', '#F0468E'] as const, ink: '#2A0A18', glow: 'rgba(255,95,162,0.45)' },
   locked: { colors: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.05)'] as const, ink: '#C7D2E5', glow: 'transparent' },
 };
 // The locked key is a faint wash of the scheme's ink; the bright fills look the same in both schemes.
-const LIGHT_TONES = { ...TONES, locked: { colors: ['rgba(11,26,46,0.08)', 'rgba(11,26,46,0.04)'] as const, ink: '#566580', glow: 'transparent' } };
+const LIGHT_TONES = { ...TONES, locked: { colors: ['rgba(42,21,32,0.08)', 'rgba(42,21,32,0.04)'] as const, ink: '#7A5868', glow: 'transparent' } };
 
 const useStyles = makeStyles(({ dark }) => ({
   glow: { position: 'absolute', pointerEvents: 'none' },
   // The contact shadow is softer and navy on paper, where a black blot would look muddy.
-  contact: { position: 'absolute', alignSelf: 'center', borderRadius: 999, backgroundColor: dark ? 'rgba(0,0,0,0.22)' : 'rgba(16,36,64,0.12)', boxShadow: dark ? '0 0 10px 5px rgba(0,0,0,0.28)' : '0 0 10px 5px rgba(16,36,64,0.10)' },
+  contact: { position: 'absolute', alignSelf: 'center', borderRadius: 999, backgroundColor: dark ? 'rgba(0,0,0,0.22)' : 'rgba(64,20,40,0.12)', boxShadow: dark ? '0 0 10px 5px rgba(0,0,0,0.28)' : '0 0 10px 5px rgba(64,20,40,0.10)' },
   emoji: { textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 6 },
   card: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 6 },
   icon: { position: 'absolute', pointerEvents: 'none' },

@@ -411,7 +411,7 @@ const useStyles = makeStyles(({ colors, semantic, edge }) => ({
   tag: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.cardAlt },
   tagText: { color: colors.text, fontSize: 12.5, fontWeight: '700' },
   title: { color: colors.text, fontSize: 24, fontWeight: '800', lineHeight: 30 },
-  liveBox: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(19,217,223,0.14)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  liveBox: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(255,95,162,0.14)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: semantic.live },
   liveText: { color: colors.primaryText, fontWeight: '800', fontSize: 14, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
