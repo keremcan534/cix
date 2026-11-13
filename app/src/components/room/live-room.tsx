@@ -3532,7 +3532,7 @@ export function LiveRoom({ id, via, full }: { id: string; via?: string; full: bo
             )}
             {!typing && roomType === 'qa' && <RoundBtn label="Sorular" icon="help" onPress={() => setPanel('qa')} badge={questions.filter((q) => !q.picked).length} />}
             {!typing && <RoundBtn label="Mesajlar" icon="chatbubble-ellipses" onPress={() => setInboxOpen(true)} badge={inboxUnread} />}
-            {/* The mic and "Oda sesi" side by side, small. A speaker keeps the mic while typing; the raise-hand button waits. */}
+            {/* The mic and "Oda sesi" side by side, as big as the other buttons. A speaker keeps the mic while typing; the raise-hand button waits. */}
             {typing && !amSeated ? null : (
               <View style={styles.micGroup}>
                 {amSeated ? (
@@ -4131,7 +4131,7 @@ const styles = StyleSheet.create({
   mentionRow: { gap: 6, paddingHorizontal: 10, paddingTop: 4 },
   mentionChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 160, paddingLeft: 3, paddingRight: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   mentionName: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  micGroup: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  micGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   mutedRow: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12 },
   mutedChip: { color: colors.gold, fontSize: 12, textAlign: 'center' },
   queueChip: { color: '#fff', fontSize: 12, backgroundColor: 'rgba(19,217,223,0.35)', marginHorizontal: 12, marginTop: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },

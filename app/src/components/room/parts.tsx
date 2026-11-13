@@ -534,10 +534,13 @@ const MIC_LOOK: Record<MicState, { icon: keyof typeof Ionicons.glyphMap; caption
   held: { icon: 'mic-outline', caption: 'DURAKLADI', bg: 'rgba(246,189,96,0.2)', edge: semantic.moneyEdge, fg: colors.gold, a11y: 'Mikrofonun açık ama şu an ses gitmiyor; kapatmak için dokun' },
 };
 
-/** The biggest control in the room: state is shown by color, icon and caption together, never by color alone. */
+/**
+ * The mic, the same size as the other bar buttons so the bar stays even. State is shown by color and icon; the
+ * states that need words (raise hand, queue place, paused or blocked) also get a small tag above the button.
+ */
 export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPress }: { state: MicState; queuePos?: number; caption?: string; hint?: string; onPress: () => void }) {
   const look = MIC_LOOK[state];
-  const caption = captionOverride ?? (state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : look.caption);
+  const caption = captionOverride ?? (state === 'queued' && queuePos !== undefined ? `SIRA ${queuePos + 1}` : state === 'on' || state === 'off' ? null : look.caption);
   return (
     <Pressable
       onPress={() => {
@@ -548,17 +551,20 @@ export function MicBtn({ state, queuePos, caption: captionOverride, hint, onPres
       accessibilityLabel={hint ?? look.a11y}
       accessibilityState={{ checked: state === 'on' || state === 'held' }}
       aria-checked={state === 'on' || state === 'held'}
-      style={{ alignItems: 'center', gap: 2 }}
     >
       {({ pressed }) => (
         <>
-          <View style={{ borderRadius: 23, backgroundColor: look.edge, paddingBottom: pressed ? 0 : 3, marginTop: pressed ? 3 : 0 }}>
-            <View style={[styles.micRound, { backgroundColor: look.bg }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand]}>
-              <Gloss strength={0.32} />
-              <Ionicons name={look.icon} size={22} color={look.fg} />
-            </View>
+          <View style={[styles.round, styles.micRound, { backgroundColor: look.bg, borderColor: look.edge }, state === 'on' && styles.micGlowOn, state === 'hand' && styles.micGlowHand, pressed && styles.pressedRound]}>
+            <Gloss strength={0.32} />
+            <Ionicons name={look.icon} size={22} color={look.fg} />
           </View>
-          <Text style={[styles.micCaption, state === 'on' && { color: semantic.live }, state === 'held' && { color: colors.gold }]}>{caption}</Text>
+          {caption && (
+            <View style={styles.micTagWrap} pointerEvents="none">
+              <Text style={[styles.micTag, state === 'held' && { color: colors.gold }]} numberOfLines={1}>
+                {caption}
+              </Text>
+            </View>
+          )}
         </>
       )}
     </Pressable>
@@ -578,12 +584,11 @@ export function RoomSoundBtn({ muted, onPress }: { muted: boolean; onPress: () =
       accessibilityState={{ checked: !muted }}
       aria-checked={!muted}
       hitSlop={6}
-      style={({ pressed }) => ({ alignItems: 'center', gap: 2, transform: [{ scale: pressed ? 0.92 : 1 }] })}
+      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.92 : 1 }] })}
     >
-      <View style={[styles.soundRound, muted && styles.soundRoundOff]}>
-        <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color={muted ? '#FCA5A5' : '#fff'} />
+      <View style={[styles.round, styles.glassRound, muted && styles.soundRoundOff]}>
+        <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={22} color={muted ? '#FCA5A5' : '#fff'} />
       </View>
-      <Text style={[styles.micCaption, muted && { color: '#FCA5A5' }]}>{muted ? 'SESSİZ' : 'SES'}</Text>
     </Pressable>
   );
 }
@@ -694,12 +699,14 @@ const styles = StyleSheet.create({
   round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   giftRound: { backgroundColor: 'rgba(246,189,96,0.16)', borderWidth: 2, borderColor: semantic.money, overflow: 'hidden', boxShadow: '0 0 16px rgba(246,189,96,0.45)' },
   glassRound: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
-  micRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  soundRound: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'rgba(255,255,255,0.28)' },
+  micRound: { borderWidth: 2, overflow: 'hidden' },
+  pressedRound: { transform: [{ scale: 0.92 }] },
   soundRoundOff: { backgroundColor: 'rgba(252,165,165,0.14)', borderColor: 'rgba(252,165,165,0.45)' },
   micGlowOn: { boxShadow: '0 4px 16px rgba(19,217,223,0.6)' },
   micGlowHand: { boxShadow: '0 4px 16px rgba(8,122,128,0.7)' },
-  micCaption: { color: colors.textDim, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  // Above the mic, so the bar's buttons stay on one line; wide enough for "SUSTURULDU".
+  micTagWrap: { position: 'absolute', bottom: 52, left: -30, right: -30, alignItems: 'center' },
+  micTag: { color: '#fff', backgroundColor: 'rgba(0,0,0,0.6)', fontSize: 10, fontWeight: '800', letterSpacing: 0.4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: colors.red, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   pk: { marginHorizontal: 12, marginTop: 4, gap: 6 },
