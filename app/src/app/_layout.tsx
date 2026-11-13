@@ -22,6 +22,7 @@ import { FeatureGate, RemoteControl } from '@/components/remote-control';
 import { RoomHost } from '@/components/room/room-host';
 import { SanctionLayer } from '@/components/sanction-screen';
 import { ME } from '@/data/mock';
+import { prepareAudioMode } from '@/lib/audio-mode';
 import { IS_DEMO } from '@/lib/build';
 import { installCrashGuard, markStarted } from '@/lib/crash-guard';
 import { initReporting } from '@/lib/reporting';
@@ -34,6 +35,8 @@ import { colors } from '@/theme';
 // Real voice (LiveKit) on web when the server is configured; the simulated engine otherwise. The profile name
 // (shared ME object, kept current by the store) names the server account on first sign-in.
 setupVoice(() => ME.name);
+// Before any room: our sounds' mode is set now, never while a room's voice runs (lib/audio-mode).
+prepareAudioMode();
 
 // Crash reports (Sentry) when the build has a DSN; first, so it sees everything after it (lib/reporting).
 initReporting();
